@@ -230,11 +230,11 @@ def extract_member(archive: Path, declared: str, member: str, dest_dir: Path) ->
                 info = tf.getmember(member)
             except KeyError as exc:
                 raise ManifestError(f"member {member!r} not found in {archive.name}") from exc
-            src = tf.extractfile(info) if info.isfile() else None
-            if src is None:
+            fobj = tf.extractfile(info) if info.isfile() else None
+            if fobj is None:
                 raise ManifestError(f"member {member!r} is not a regular file")
-            with src, target.open("wb") as out:
-                shutil.copyfileobj(src, out, CHUNK)
+            with fobj, target.open("wb") as out:
+                shutil.copyfileobj(fobj, out, CHUNK)
     else:
         try:
             import py7zr

@@ -26,8 +26,8 @@ REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TESTS))
 
-import fetch_corpora
-from fixture_server import serve
+import fetch_corpora  # noqa: E402
+from fixture_server import serve  # noqa: E402
 
 FIXTURE_MANIFEST = TESTS / "fixtures" / "fixture.json"
 PLACEHOLDER = "http://127.0.0.1:8080/"

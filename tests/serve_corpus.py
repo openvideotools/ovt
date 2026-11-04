@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "tests"))
-from fixture_server import serve
+from fixture_server import serve  # noqa: E402
 
 
 def main() -> int:
