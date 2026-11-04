@@ -61,9 +61,7 @@ def run(*args: str, env: dict | None = None) -> subprocess.CompletedProcess:
     )  # fmt: skip
 
 
-@pytest.mark.skipif(
-    not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only"
-)
+@pytest.mark.skipif(not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only")
 def test_plan_desktop_and_android():
     kits = install_qt.plan(["desktop", "android"])
     assert [k[1] for k in kits] == ["desktop", "android", "android"]
@@ -104,9 +102,7 @@ def test_requires_target():
     assert run().returncode == 2
 
 
-@pytest.mark.skipif(
-    not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only"
-)
+@pytest.mark.skipif(not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only")
 def test_install_then_skip(tmp_path, fake):
     # AT1: every requested kit gets qmake 6.8.3; AT2: the re-run skips and is fast.
     dest = tmp_path / "Qt"
@@ -136,9 +132,7 @@ def test_install_then_skip(tmp_path, fake):
     assert r2.stdout == r.stdout  # deterministic output
 
 
-@pytest.mark.skipif(
-    not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only"
-)
+@pytest.mark.skipif(not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only")
 def test_wrong_version_is_rejected(tmp_path, fake):
     r = run(
         "--target",
@@ -151,9 +145,7 @@ def test_wrong_version_is_rejected(tmp_path, fake):
     assert "QT_ROOT_DIR" not in r.stdout
 
 
-@pytest.mark.skipif(
-    not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only"
-)
+@pytest.mark.skipif(not HOST_IS_SUPPORTED, reason="host kits exist for Linux and macOS only")
 def test_aqt_failure_propagates(tmp_path, fake):
     r = run(
         "--target",

@@ -49,9 +49,7 @@ def host_kit() -> tuple[str, str, str]:
             return "linux", "linux_gcc_64", "gcc_64"
         if machine in ("aarch64", "arm64"):
             return "linux_arm64", "linux_gcc_arm64", "gcc_arm64"
-    raise UnsupportedHost(
-        f"unsupported host {system}/{machine}: Qt kits exist for macOS and Linux only"
-    )
+    raise UnsupportedHost(f"unsupported host {system}/{machine}: Qt kits exist for macOS and Linux only")
 
 
 def plan(targets: list[str]) -> list[tuple[str, str, str, str]]:
@@ -89,9 +87,7 @@ def aqt_command(dest: Path, host: str, target: str, arch: str) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument(
-        "--target", action="append", choices=("desktop", "android"), required=True
-    )
+    ap.add_argument("--target", action="append", choices=("desktop", "android"), required=True)
     ap.add_argument("--dest", type=Path, default=None)
     args = ap.parse_args(argv)
 
