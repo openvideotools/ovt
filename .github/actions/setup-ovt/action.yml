@@ -54,8 +54,26 @@ runs:
         xcode-select -p
 
     - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      # setup-python's macOS installer writes to /Users/runner, which only exists on GitHub's images.
+      if: runner.environment == 'github-hosted'
       with:
         python-version: ${{ inputs.python-version }}
+
+    - name: Python (self-hosted)
+      if: runner.environment != 'github-hosted'
+      shell: bash
+      run: |
+        # The runner's own Python (tools/brew-packages.txt: python@3.12) must be >= 3.11 for the configure-time
+        # tools (cmake/OvtThirdPartyCommon.cmake).
+        for py in python3.13 python3.12 python3.11 python3; do
+          if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+            dirname "$(command -v "$py")" >> "$GITHUB_PATH" # FindPython3 searches PATH
+            "$py" --version
+            exit 0
+          fi
+        done
+        echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
+        exit 1
 
     - name: vcpkg checkout and bootstrap
       shell: bash
