@@ -8,7 +8,8 @@
 # written before WI-0.007 have not been reformatted yet, so `--all-files` would rewrite them.
 default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
-exclude: ^(third_party/vcpkg/|docs/spec/)
+# Licence texts stay byte-identical to their sources (SPDX License List, libaom PATENTS): no whitespace fixes.
+exclude: ^(third_party/vcpkg/|docs/spec/|LICENSES/|LICENSE$|plugins/ovt-plugin-aom/PATENTS$)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -49,13 +50,10 @@ repos:
 
   # Only the staged files; the full-tree `reuse lint` is the CI job (WI-0.030). Markdown and JSON are covered
   # by REUSE.toml once WI-0.600 adds it, so the per-file check is limited to the FR-GEN-105 source types.
-  # Manual stage until WI-0.600 adds LICENSES/: without the texts every file reports "missing license".
-  # WI-0.600 deletes the `stages` line. Run it by hand with `pre-commit run reuse-lint-file --hook-stage manual`.
   - repo: https://github.com/fsfe/reuse-tool
     rev: v5.0.2
     hooks:
       - id: reuse-lint-file
-        stages: [manual]
         files: (\.(c|h|cpp|hpp|mm|fbs|py|kt|kts|qml|js|cmake|sh|toml|yml|yaml|rb)|/CMakeLists\.txt|^CMakeLists\.txt)$
 
   - repo: https://github.com/shellcheck-py/shellcheck-py
@@ -71,6 +69,19 @@ repos:
 
   - repo: local
     hooks:
+      # SPDX headers (chapter 15 §15.1.1, WI-0.601): insert a missing one, then check every id against
+      # tools/license_policy.toml [directories]. A wrong id is reported, never rewritten (`licence:` PR).
+      - id: spdx-header
+        name: SPDX header present (tools/spdx_header.py)
+        entry: python3 -I tools/spdx_header.py
+        language: system
+        files: (\.(c|h|cpp|hpp|mm|fbs|py|kt|kts|qml|js|cmake|sh|toml|yml|yaml|rb)|(^|/)CMakeLists\.txt)$
+        exclude: (_generated\.h|/Branding\.qml|/patches/)
+      - id: check-spdx-dirs
+        name: SPDX licence matches the directory (tools/check_spdx_dirs.py)
+        entry: python3 -I tools/check_spdx_dirs.py
+        language: system
+        files: (\.(c|h|cpp|hpp|mm|fbs|py|kt|kts|qml|js|cmake|sh|toml|yml|yaml|rb)|(^|/)CMakeLists\.txt)$
       - id: check-versions-md
         name: VERSIONS.md matches the third_party scripts
         entry: python3 -I tools/check_versions_md.py
@@ -84,7 +95,7 @@ repos:
         stages: [commit-msg]
       # DCO (chapter 15 §15.7): the hook does not add the trailer itself; it stops the commit and says how.
       - id: dco-signoff
-        name: "DCO Signed-off-by trailer (missing? commit with `git commit -s`)"
+        name: "DCO Signed-off-by trailer (missing? commit with `git commit -s`; see docs/dev/dco.md)"
         entry: "^Signed-off-by: .+ <[^>]+>"
         language: pygrep
         args: [--negate, --multiline]

@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: Feature request
+description: Suggest a new analysis, view, metric or workflow.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, not the solution. For example "compare the motion vectors of two encodes of the same clip".
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help?
+      description: How you imagine it working in OVT Studio, the `ovt` CLI or the Python package.
+    validations:
+      required: true
+  - type: input
+    id: wi
+    attributes:
+      label: Related work item or requirement
+      description: A `WI-` id from docs/spec/16-roadmap-and-work-items.md or a requirement id from chapter 4, if you know one.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you use today?
+      description: Other tools or workarounds, if any.

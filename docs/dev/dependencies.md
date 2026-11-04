@@ -5,10 +5,10 @@ OVT gets its libraries from three places (chapter 13 §13.3.1):
 | Source | What | Pinned by |
 |---|---|---|
 | vcpkg manifest (`vcpkg.json`) | fmt, spdlog, flatbuffers (library and the `flatc` host tool), zstd, nlohmann-json, highway, cli11, xxhash, catch2; later zimg, Vulkan, glslang, lcms, libpng, pybind11, benchmark, onnxruntime | `builtin-baseline` in `vcpkg.json` and the `third_party/vcpkg` submodule commit |
-| `third_party/*.cmake` ExternalProject scripts | FFmpeg, libaom, dav1d, libde265, HM, libvmaf, libplacebo, MoltenVK | `third_party/VERSIONS.md` (WI-0.010 and later) |
+| `third_party/*.cmake` ExternalProject scripts | FFmpeg, libaom, dav1d, libde265, HM, libvmaf, libplacebo, MoltenVK | `third_party/VERSIONS.md` |
 | Prebuilt | Qt 6.8.3 (aqtinstall), Android SDK/NDK | `tools/install_qt.py`, `tools/bootstrap_android.sh` |
 
-This page covers the vcpkg part.
+This page covers the vcpkg part first, then the `third_party/` script machinery (see "Own builds" below).
 
 `vcpkg.json` lists only the ports that some target links today. §13.3.2 of the specification shows the
 manifest's end state; each later work item adds its ports in the PR that first uses them
@@ -99,3 +99,50 @@ well under a minute.
 - **Move the baseline:** `third_party/vcpkg/vcpkg x-update-baseline`, then move the submodule to the same
   commit. This is its own PR (chapter 13 §13.3.7), weekly via Renovate (§13.3.8).
 - **Pin one port to another version:** an entry in `"overrides"`; say why in the PR.
+
+## Own builds: `third_party/*.cmake` and `VERSIONS.md`
+
+Libraries that vcpkg cannot build the way OVT needs (FFmpeg flavours, libaom with inspection, patched
+libde265, the Meson projects) have their own ExternalProject script in `third_party/<dep>.cmake`
+(chapter 13 §13.3.4). Copy `third_party/_template.cmake` to start one.
+
+**`third_party/VERSIONS.md` is the only place a version, URL or hash is written.** At configure time
+`tools/versions_to_cmake.py` turns its table into `build/<preset>/third_party/versions.cmake`:
+
+```cmake
+set(OVT_TP_libaom_VERSION "3.12.1")
+set(OVT_TP_libaom_URL "https://storage.googleapis.com/aom-releases/libaom-3.12.1.tar.gz")
+set(OVT_TP_libaom_SHA256 "9e97…")
+set(OVT_TP_libaom_LICENSE "BSD-2-Clause AND LicenseRef-AOM-Patent-License-1.0")
+```
+
+The `<dep>` part is the row's Name in lower case, with every run of other characters replaced by `_`
+(`FFmpeg` → `ffmpeg`, `vcpkg baseline` → `vcpkg_baseline`). There is no other spelling; a script never
+writes `3.12.1` itself, and `tools/versions_to_cmake.py --check` fails when one does.
+
+The parser rejects a row whose URL contains a version different from its Version column, a duplicate id, or
+a malformed hash.
+
+| Helper (`cmake/OvtThirdPartyCommon.cmake`) | What it does |
+|---|---|
+| `ovt_tp_declare(<dep> [LICENSE_FILES …])` | Checks the row exists and has a hash, downloads the archive into `OVT_TP_DOWNLOADS` (`build/third_party/downloads/`) and verifies its SHA-256. A mismatch stops configure and names the row. |
+| `${OVT_TP_PATCH} <dir>` | `PATCH_COMMAND` prefix: applies `<dir>/*.patch` in lexical order with `tools/apply_patches.py --check`; no-op for an empty or missing directory. |
+| `ovt_tp_apply_patches(<var> SERIES <file> INSTALL_DIR <INSTALL_DIR>)` | Same, from a quilt `series` file, and writes `<INSTALL_DIR>/share/ovt/patches.json`. |
+| `${OVT_TP_CMAKE_TOOLCHAIN_ARGS}` | Forwards compilers, launcher, the chain-loaded toolchain (Android NDK), macOS architecture and deployment target, and hidden visibility to a CMake-based ExternalProject. Debug presets build third-party code as `RelWithDebInfo`. |
+| `ovt_tp_import_static(tp::<x> tp_<dep> lib/<lib>.a include)` | Imported static target with the row's licence and version in the licence manifest (marked modified when the row lists patches). |
+
+`tools/apply_patches.py` checks every patch (`git apply --check`) before applying any, requires an
+`Upstream-Status:` header, and writes a `.ovt-patched` marker holding the series hash, so a rebuild does not
+apply the patches a second time.
+
+### Filling hashes and building offline
+
+```sh
+python3 -I tools/versions_to_cmake.py --update-hashes      # downloads rows still marked `<sha>`, writes the hashes
+python3 -I tools/third_party_offline.py --out dl/          # fetches and verifies every archive
+cmake --preset linux-x64-release -DOVT_TP_DOWNLOADS=$PWD/dl # configure then uses dl/ without network
+```
+
+Never type a hash by hand: `--update-hashes` computes it from the downloaded archive (and, for libaom, the
+`PATENTS sha256=` note from the archive's `PATENTS` file). Rows still holding `<sha>` are allowed in the file,
+but `ovt_tp_declare()` refuses to build them.

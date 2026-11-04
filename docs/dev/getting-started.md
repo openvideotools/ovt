@@ -90,7 +90,7 @@ On every `git commit` they check the staged files:
 | `shellcheck` | shell scripts | Lint. |
 | `pretty-format-kotlin` | `*.kt` | ktlint; needs a JDK. |
 | `check-versions-md` | `third_party/` | `tools/check_versions_md.py`: every `third_party/*.cmake` script has a `VERSIONS.md` row, and the scripts read their pins from `versions.cmake`. |
-| `reuse-lint-file` | source files | SPDX header check. Manual until WI-0.600 adds `LICENSES/`. |
+| `reuse-lint-file` | source files | SPDX header present and its licence text in `LICENSES/` (`docs/licensing.md`). |
 
 A hook that reformats a file fails the commit and leaves the fix in your working tree. Look at the change,
 `git add` it and commit again.
@@ -100,7 +100,7 @@ The commit-msg stage checks the message:
 - `check-wi-refs`: the message must reference a work item (`WI-0.007: …`) or an issue (`#15`). Merge and
   `fixup!` commits are exempt.
 - `dco-signoff`: the message needs a `Signed-off-by:` trailer (DCO, chapter 15 §15.7). The hook does not
-  add the trailer for you; it stops the commit and tells you to use `git commit -s`.
+  add the trailer for you; it stops the commit and tells you to use `git commit -s` (`docs/dev/dco.md`).
 
 The files that existed before WI-0.007 have not been reformatted yet. `pre-commit run --all-files` would
 rewrite them, so run the hooks on your own changes instead:

@@ -1,0 +1,16 @@
+{
+  "bitrate_kbps": 1500,
+  "codec": "h265",
+  "frames": [
+    {
+      "poc": 0,
+      "psnr_y": 41.123457,
+      "type": "I"
+    },
+    {
+      "poc": 2,
+      "psnr_y": 39.500000,
+      "type": "P"
+    }
+  ]
+}
