@@ -20,6 +20,7 @@ EXPECTED = {
     "BSD-2-Clause.txt",
     "BSD-3-Clause.txt",
     "CC-BY-SA-4.0.txt",
+    "CC-BY-4.0.txt",  # docs/spec/ (#20)
     "LicenseRef-AOM-Patent-License-1.0.txt",
 }
 
@@ -28,7 +29,7 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_licence_directory_holds_the_seven_texts() -> None:
+def test_licence_directory_holds_the_expected_texts() -> None:
     assert {p.name for p in LICENSES.iterdir()} == EXPECTED
 
 
