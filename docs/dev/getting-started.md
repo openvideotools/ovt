@@ -100,7 +100,7 @@ The commit-msg stage checks the message:
 - `check-wi-refs`: the message must reference a work item (`WI-0.007: …`) or an issue (`#15`). Merge and
   `fixup!` commits are exempt.
 - `dco-signoff`: the message needs a `Signed-off-by:` trailer (DCO, chapter 15 §15.7). The hook does not
-  add the trailer for you; it stops the commit and tells you to use `git commit -s`.
+  add the trailer for you; it stops the commit and tells you to use `git commit -s` (`docs/dev/dco.md`).
 
 The files that existed before WI-0.007 have not been reformatted yet. `pre-commit run --all-files` would
 rewrite them, so run the hooks on your own changes instead:

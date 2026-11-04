@@ -43,6 +43,10 @@
 file of the libaom 3.12.1 release archive, byte for byte; its SHA-256 is recorded in the libaom row of
 `third_party/VERSIONS.md`.
 
+Two texts cover governance files copied verbatim from elsewhere: `CC-BY-4.0.txt` for `CODE_OF_CONDUCT.md`
+(Contributor Covenant 2.1) and `LicenseRef-DCO-verbatim.txt` for `DCO`, whose only terms are "verbatim
+copies only".
+
 New files start with the header of their directory, for example in `core/`:
 
 ```c

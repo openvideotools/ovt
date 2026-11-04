@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/openvideotools/ovt/security/advisories/new
+    about: Crashes and memory errors on crafted input are security bugs. Report them privately.

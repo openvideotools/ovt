@@ -20,8 +20,9 @@ EXPECTED = {
     "BSD-2-Clause.txt",
     "BSD-3-Clause.txt",
     "CC-BY-SA-4.0.txt",
-    "CC-BY-4.0.txt",  # docs/spec/ (#20)
+    "CC-BY-4.0.txt",  # docs/spec/ (#20) and CODE_OF_CONDUCT.md (WI-0.604)
     "LicenseRef-AOM-Patent-License-1.0.txt",
+    "LicenseRef-DCO-verbatim.txt",  # DCO, taken verbatim (WI-0.604)
 }
 
 
