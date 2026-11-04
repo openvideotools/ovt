@@ -58,12 +58,15 @@ function(ovt_set_dependency_license name)
   set_property(GLOBAL PROPERTY "OVT_DEP_PATCHED_${name}" "${arg_PATCHED}")
 endfunction()
 
-# Normalises one LINK_LIBRARIES entry: unwraps $<LINK_ONLY:x>, drops other generator expressions,
+# Normalises one LINK_LIBRARIES entry: unwraps $<LINK_ONLY:x> and $<BUILD_INTERFACE:x>, drops other generator expressions,
 # linker flags, the ovt::flags interface target and C-runtime platform libraries. Sets out_var to "" for
 # entries to skip.
 function(_ovt_license_normalise_item item out_var)
   set(result "${item}")
   if(result MATCHES "^\\$<LINK_ONLY:(.+)>$")
+    set(result "${CMAKE_MATCH_1}")
+  endif()
+  if(result MATCHES "^\\$<BUILD_INTERFACE:(.+)>$")
     set(result "${CMAKE_MATCH_1}")
   endif()
   if(result MATCHES "^\\$<" OR result MATCHES "^-" OR result STREQUAL "")
