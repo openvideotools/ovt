@@ -14,8 +14,8 @@
 - Each file says its licence in its first lines (`SPDX-License-Identifier:`). Files that cannot carry a
   header (Markdown, JSON, binary assets) are covered by `REUSE.toml`. The full texts are in `LICENSES/`.
   `reuse lint` checks all of this ([REUSE](https://reuse.software/) specification 3.3).
-- Documentation prose is **CC-BY-SA-4.0**; code snippets inside the documentation are BSD-2-Clause
-  (`docs/LICENSE.md`).
+- Documentation prose is **CC-BY-SA-4.0**, except the specification in `docs/spec/`, which is **CC-BY-4.0**;
+  code snippets inside the documentation are BSD-2-Clause (`docs/LICENSE.md`).
 
 ## Licence per directory (chapter 15 §15.1)
 
@@ -34,7 +34,7 @@
 | `android/` | `GPL-3.0-or-later` | Part of the application. | Anything GPL-3-compatible. |
 | `python/` | `GPL-3.0-or-later` | Application-level bindings; wheel bundles GPL-compatible deps only. | Anything GPL-3-compatible. |
 | `tools/`, `tests/`, `.github/`, `cmake/`, `third_party/*.cmake` | `LGPL-2.1-or-later` | Build and test infrastructure must be reusable by downstream LGPL consumers of core. | Own code; permissive. |
-| `docs/` | `CC-BY-SA-4.0` for prose; code snippets in docs are `BSD-2-Clause` (stated in `docs/LICENSE.md`) | Documentation is not software; share-alike keeps derived docs open. | — |
+| `docs/` | `CC-BY-SA-4.0` for prose (`docs/spec/`: `CC-BY-4.0`, #20); code snippets in docs are `BSD-2-Clause` (stated in `docs/LICENSE.md`) | Documentation is not software; share-alike keeps derived docs open. | — |
 | `third_party/patches/`, `plugins/*/patches/` | licence of the patched project (stated in the patch header) | A patch is a derivative work of the upstream project. | — |
 
 `LICENSES/` holds the full texts, taken verbatim from the
