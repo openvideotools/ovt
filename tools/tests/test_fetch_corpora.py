@@ -4,15 +4,16 @@
 
 from __future__ import annotations
 
-import gzip
 import hashlib
 import io
 import json
 import shutil
+import struct
 import subprocess
 import sys
 import tarfile
 import time
+import zlib
 import urllib.error
 import urllib.request
 import zipfile
@@ -34,6 +35,14 @@ PLACEHOLDER = "http://127.0.0.1:8080/"
 PAYLOAD = bytes(range(256)) * 64  # 16 KiB
 
 
+def stored_gzip(data: bytes) -> bytes:
+    """A gzip stream with stored (uncompressed) deflate blocks: identical bytes on every zlib and Python version."""
+    comp = zlib.compressobj(0, zlib.DEFLATED, -15)
+    body = comp.compress(data) + comp.flush()
+    header = b"\x1f\x8b\x08\x00" + b"\x00\x00\x00\x00" + b"\x00\xff"
+    return header + body + struct.pack("<II", zlib.crc32(data), len(data) & 0xFFFFFFFF)
+
+
 def build_files(root: Path) -> None:
     """Deterministically write the archives served by the tests (hashes are pinned in fixture.json)."""
     root.mkdir(parents=True, exist_ok=True)
@@ -46,7 +55,7 @@ def build_files(root: Path) -> None:
         info = tarfile.TarInfo("stream.obu")
         info.size, info.mtime = len(PAYLOAD), 0
         tf.addfile(info, io.BytesIO(PAYLOAD))
-    (root / "archive.tar.gz").write_bytes(gzip.compress(raw.getvalue(), mtime=0))
+    (root / "archive.tar.gz").write_bytes(stored_gzip(raw.getvalue()))
     (root / "corrupt.bin").write_bytes(PAYLOAD)
 
 
