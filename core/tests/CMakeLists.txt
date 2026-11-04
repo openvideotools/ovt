@@ -5,9 +5,8 @@
 # framework (golden runner, test_support, tag-to-label mapping).
 
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-include(Catch)
 
 add_executable(ovt_tests_core test_version.cpp)
 target_link_libraries(ovt_tests_core PRIVATE ovt::core ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_tests_core "LGPL-2.1-or-later")
-catch_discover_tests(ovt_tests_core DISCOVERY_MODE PRE_TEST)
+ovt_catch_discover_tests(ovt_tests_core)
