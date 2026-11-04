@@ -58,3 +58,15 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 path = ["plugins/ovt-plugin-aom/PATENTS"]
 SPDX-FileCopyrightText = "Alliance for Open Media"
 SPDX-License-Identifier = "LicenseRef-AOM-Patent-License-1.0"
+
+# Governance texts taken verbatim from elsewhere (WI-0.604). These come last so they win over the
+# "**/*.md" entry above (in REUSE.toml the last matching annotation applies).
+[[annotations]]
+path = "DCO"
+SPDX-FileCopyrightText = "2004, 2006 The Linux Foundation and its contributors"
+SPDX-License-Identifier = "LicenseRef-DCO-verbatim"
+
+[[annotations]]
+path = "CODE_OF_CONDUCT.md"
+SPDX-FileCopyrightText = "2014-2021 Coraline Ada Ehmke and the Contributor Covenant contributors"
+SPDX-License-Identifier = "CC-BY-4.0"

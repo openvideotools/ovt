@@ -84,7 +84,7 @@ repos:
         stages: [commit-msg]
       # DCO (chapter 15 §15.7): the hook does not add the trailer itself; it stops the commit and says how.
       - id: dco-signoff
-        name: "DCO Signed-off-by trailer (missing? commit with `git commit -s`)"
+        name: "DCO Signed-off-by trailer (missing? commit with `git commit -s`; see docs/dev/dco.md)"
         entry: "^Signed-off-by: .+ <[^>]+>"
         language: pygrep
         args: [--negate, --multiline]

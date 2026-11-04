@@ -21,6 +21,9 @@ EXPECTED = {
     "BSD-3-Clause.txt",
     "CC-BY-SA-4.0.txt",
     "LicenseRef-AOM-Patent-License-1.0.txt",
+    # Governance texts taken verbatim (WI-0.604): CODE_OF_CONDUCT.md and DCO.
+    "CC-BY-4.0.txt",
+    "LicenseRef-DCO-verbatim.txt",
 }
 
 
@@ -28,7 +31,7 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def test_licence_directory_holds_the_seven_texts() -> None:
+def test_licence_directory_holds_the_expected_texts() -> None:
     assert {p.name for p in LICENSES.iterdir()} == EXPECTED
 
 

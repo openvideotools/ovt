@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# DCO app (dcoapp/app) settings, chapter 15 §15.7.1 and WI-0.604. How to sign off: docs/dev/dco.md.
+require:
+  members: true # maintainers sign off too
+allowRemediationCommits:
+  individual: true # a contributor may add a remediation commit for their own unsigned commits
+  thirdParty: false # nobody can certify on someone else's behalf
