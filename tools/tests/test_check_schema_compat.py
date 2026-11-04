@@ -15,7 +15,7 @@ TOOLS = Path(__file__).resolve().parents[1]
 SCRIPT = TOOLS / "check_schema_compat.py"
 sys.path.insert(0, str(TOOLS))
 
-import check_schema_compat as csc  # noqa: E402
+import check_schema_compat as csc
 
 OLD = """
 // a comment with table Fake { x:int; }
