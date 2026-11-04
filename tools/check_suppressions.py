@@ -12,7 +12,7 @@ directly above the entry, up to the previous blank line or entry-free start of f
 share the comment above the first one. A blank line ends the block.
 
 The entry kind (the text before the first `:`) is checked against the sanitizer named by the file
-(`asan*.supp`, `ubsan*.supp`, `tsan*.supp`). Messages, one per finding, exit 1 when there is any:
+(`asan*.supp` = LSan via LSAN_OPTIONS, `ubsan*.supp`, `tsan*.supp`; one runtime per file). Messages, one per finding, exit 1 when there is any:
     E-NOURL <file>:<line> <entry>
     E-KIND <file>:<line> unknown entry kind '<kind>'
     E-EMPTY <file>:<line> entry has no pattern
@@ -28,7 +28,9 @@ from pathlib import Path
 URL = re.compile(r"https://[A-Za-z0-9.-]+\.[A-Za-z]{2,}/\S+")
 
 KINDS = {
-    "asan": {"leak", "interceptor_name", "interceptor_via_fun", "interceptor_via_lib", "odr_violation"},
+    # tests/asan.supp is read by LeakSanitizer through LSAN_OPTIONS. ASan's own kinds (interceptor_*,
+    # odr_violation) come from ASAN_OPTIONS and a file that mixes both makes either runtime abort.
+    "asan": {"leak"},
     "ubsan": {
         "alignment",
         "bool",
@@ -38,9 +40,9 @@ KINDS = {
         "float-cast-overflow",
         "float-divide-by-zero",
         "function",
-        "implicit-conversion",
         "implicit-integer-sign-change",
         "implicit-signed-integer-truncation",
+        "implicit-signed-integer-truncation-or-sign-change",
         "implicit-unsigned-integer-truncation",
         "integer-divide-by-zero",
         "nonnull-attribute",
@@ -52,13 +54,13 @@ KINDS = {
         "pointer-overflow",
         "return",
         "returns-nonnull-attribute",
-        "shift",
         "shift-base",
         "shift-exponent",
         "signed-integer-overflow",
         "unreachable",
         "unsigned-integer-overflow",
         "unsigned-shift-base",
+        "undefined",
         "vla-bound",
         "vptr",
     },

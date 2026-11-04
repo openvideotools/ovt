@@ -15,5 +15,15 @@ Scratch program (not committed): two threads each run `++g` 100 000 times on a g
 
 ```sh
 g++ -fsanitize=thread -O1 -g race.cpp -o race -pthread
-TSAN_OPTIONS=halt_on_error=1 ./race     # prints "WARNING: ThreadSanitizer: data race", exit status 66
+TSAN_OPTIONS=halt_on_error=1 ./race; echo "exit status $?"
+```
+
+Output (first lines, then the last line):
+
+```text
+==================
+WARNING: ThreadSanitizer: data race (pid=1889)
+  Read of size 4 at 0x55f3ea3b201c by thread T2:
+...
+exit status 66
 ```

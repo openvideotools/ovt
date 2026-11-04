@@ -55,3 +55,15 @@ def test_missing_file_exits_2(tmp_path: Path) -> None:
         [sys.executable, "-I", str(SCRIPT), str(tmp_path / "nope.supp")], capture_output=True, text=True, check=False
     )
     assert result.returncode == 2
+
+
+def test_group_names_the_ubsan_runtime_rejects(tmp_path: Path) -> None:
+    for kind in ("shift", "implicit-conversion"):
+        result = run(tmp_path, "ubsan.supp", f"# https://example.org/bug/1\n{kind}:foo\n")
+        assert result.returncode == 1 and "E-KIND" in result.stdout, kind
+    assert run(tmp_path, "ubsan.supp", "# https://example.org/bug/1\nshift-base:foo\nundefined:bar\n").returncode == 0
+
+
+def test_asan_file_is_lsan_only(tmp_path: Path) -> None:
+    result = run(tmp_path, "asan.supp", "# https://example.org/bug/1\ninterceptor_name:foo\n")
+    assert result.returncode == 1 and "E-KIND" in result.stdout

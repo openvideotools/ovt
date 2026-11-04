@@ -21,19 +21,24 @@ misses races inside the decoders. Optimisation and debug flags are not copied: t
 `RelWithDebInfo` build type.
 
 A script that does not use CMake (Meson, `configure`) must pass `OVT_TP_SANITIZER_C_FLAGS` (compile and link) and
-`OVT_TP_SANITIZER_LINK_FLAGS` on itself. Both are empty when sanitizers are off.
+`OVT_TP_SANITIZER_LINK_FLAGS` on itself. A script must not put its own `CMAKE_C_FLAGS` or `CMAKE_CXX_FLAGS` in
+`CMAKE_ARGS`; the later definition silently replaces the other. Both are empty when sanitizers are off.
 
 ## Suppression files
 
-| File | Sanitizer | Entry kinds |
-|---|---|---|
-| `tests/asan.supp` | LeakSanitizer / ASan | `leak`, `interceptor_name`, `interceptor_via_fun`, `interceptor_via_lib`, `odr_violation` |
-| `tests/ubsan.supp` | UBSan | the check name, for example `alignment`, `shift-base`, `signed-integer-overflow` |
-| `tests/tsan.supp` | TSan | `race`, `race_top`, `thread`, `mutex`, `signal`, `deadlock`, `called_from_lib` |
+| File | Runtime | Read through | Entry kinds |
+|---|---|---|---|
+| `tests/asan.supp` | LeakSanitizer | `LSAN_OPTIONS=suppressions=tests/asan.supp` | `leak` only |
+| `tests/ubsan.supp` | UBSan | `UBSAN_OPTIONS=suppressions=tests/ubsan.supp` | check names such as `alignment`, `shift-base`, `shift-exponent`, `signed-integer-overflow`, `vptr`, `undefined` |
+| `tests/tsan.supp` | TSan | `TSAN_OPTIONS=suppressions=tests/tsan.supp` | `race`, `race_top`, `thread`, `mutex`, `signal`, `deadlock`, `called_from_lib` |
 
-Point the runtime at a file with `LSAN_OPTIONS=suppressions=tests/asan.supp`,
-`UBSAN_OPTIONS=suppressions=tests/ubsan.supp` or `TSAN_OPTIONS=suppressions=tests/tsan.supp`, appended to the
-options of the preset. The preset environments do not set the suppression options yet (they live in
+One file serves one runtime: ASan's own kinds (`interceptor_*`, `odr_violation`) belong to `ASAN_OPTIONS` and a
+file that mixes them with `leak` makes both runtimes abort with `failed to parse suppressions`. UBSan takes check
+names, not `-fsanitize` group names, so `shift` and `implicit-conversion` are rejected. `check_suppressions.py`
+enforces both.
+
+Append the option from the table to the options of the preset. The preset environments do not set the
+suppression options yet (they live in
 `CMakePresets.json`, which needs the owner's approval, and in the CI jobs of WI-0.031); until then, with the
 files empty, nothing is suppressed.
 
@@ -45,7 +50,7 @@ files empty, nothing is suppressed.
    (one function or one file, not a whole library):
 
    ```text
-   # libaom: reads past the end of the film grain table. https://aomedia.issues.chromium.org/issues/NNNN
+   # libaom: leaks the film grain table on a failed read. https://aomedia.issues.chromium.org/issues/NNNN
    # Remove when the pin in third_party/VERSIONS.md reaches the fixed release.
    leak:aom_film_grain_table_read
    ```

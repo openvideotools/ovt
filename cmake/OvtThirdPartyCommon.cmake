@@ -33,7 +33,8 @@
 #       The -fsanitize/-fno-sanitize-recover/-fno-omit-frame-pointer flags of the active OVT_SANITIZER set (§13.2.5),
 #       space-separated, empty when OVT_ENABLE_SANITIZERS=OFF. OVT_TP_CMAKE_TOOLCHAIN_ARGS already carries them as
 #       CMAKE_{C,CXX}_FLAGS and CMAKE_{EXE,SHARED,MODULE}_LINKER_FLAGS; a script that does not use
-#       CMake (Meson, configure) passes these two variables on itself (§14.8.1, WI-0.558).
+#       CMake (Meson, configure) passes these two variables on itself (§14.8.1, WI-0.558). A script must not add its
+#       own CMAKE_{C,CXX}_FLAGS to CMAKE_ARGS: the later -D replaces the other, silently dropping the sanitizer flags.
 #
 #   ovt_tp_import_static(<imported-target> <ep-target> <library-relpath> <include-relpath>)
 #       Creates the STATIC IMPORTED GLOBAL target <imported-target> (tp::aom, ...) for a library installed by
