@@ -102,7 +102,7 @@ jobs:
           fi
 
       - name: clang-tidy on the whole tree
-        if: github.event_name != 'pull_request' || true # TEMPORARY WI-0.559 probe
+        if: github.event_name != 'pull_request'
         run: |
           # run-clang-tidy 15 has no -warnings-as-errors: fail on any finding, as the PR job does.
           run-clang-tidy-15 -p "build/$PRESET" -quiet -extra-arg=-Wno-unknown-warning-option \
