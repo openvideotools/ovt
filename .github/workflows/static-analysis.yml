@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Static analysis (chapter 14 §14.8.2-14.8.4, WI-0.559; file named by chapter 13 §13.7.1):
+#   clang-tidy  PR: changed lines only (clang-tidy-diff); nightly: whole tree, warnings as errors.
+#               Also runs tools/check_ovt_flags.py (every OVT target links ovt::flags).
+#   cppcheck    nightly, non-blocking, findings uploaded as an artefact.
+# The -Werror warning set itself is the ovt::flags target (chapter 13 §13.2.5); the CI presets build with
+# OVT_WERROR=ON in build-linux-x64 / build-macos-arm64, not here.
+# Third-party actions are pinned by commit SHA, never by tag.
+name: static-analysis
+
+on:
+  pull_request:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  PRESET: linux-x64-debug
+  # Directories that hold OVT code (header filter of .clang-tidy); third_party is never analysed.
+  OVT_DIRS: core render plugins cli app
+
+jobs:
+  clang-tidy:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60 # the PR run on changed lines must stay under 10 minutes once the build cache is warm
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # the PR diff against the base commit
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-debug
+          triplet: x64-linux-ovt
+
+      - name: clang-tidy
+        run: |
+          sudo apt-get install -y -q --no-install-recommends clang-tidy-15
+          echo "/usr/lib/llvm-15/bin" >> "$GITHUB_PATH"
+
+      # Configure and build once: compile_commands.json and the generated sources (FlatBuffers headers) that
+      # clang-tidy needs.
+      - name: Configure and build
+        run: |
+          cmake --preset "$PRESET"
+          cmake --build --preset "$PRESET"
+
+      - name: Every OVT target links ovt::flags
+        run: python -I tools/check_ovt_flags.py --build-dir "build/$PRESET"
+
+      - name: clang-tidy on the changed lines
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          diff_tool="$(ls /usr/lib/llvm-15/share/clang/clang-tidy-diff.py)"
+          specs=()
+          for d in $OVT_DIRS; do
+            for ext in cpp cc h hpp; do specs+=(":(glob)$d/**/*.$ext"); done
+          done
+          git diff -U0 "$BASE" HEAD -- "${specs[@]}" > "$RUNNER_TEMP/pr.diff"
+          if [ ! -s "$RUNNER_TEMP/pr.diff" ]; then echo "no C/C++ changes"; exit 0; fi
+          python3 "$diff_tool" -p1 -path "build/$PRESET" -quiet -j "$(nproc)" < "$RUNNER_TEMP/pr.diff" | tee "$RUNNER_TEMP/tidy.txt"
+          # clang-tidy-diff exits 0 on findings unless warnings-as-errors fires, so fail on any finding.
+          if grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' "$RUNNER_TEMP/tidy.txt"; then
+            echo "::error::clang-tidy findings on the changed lines"
+            exit 1
+          fi
+
+      - name: clang-tidy on the whole tree
+        if: github.event_name != 'pull_request'
+        run: |
+          run-clang-tidy-15 -p "build/$PRESET" -quiet -warnings-as-errors='*' \
+            "^$PWD/($(echo "$OVT_DIRS" | tr ' ' '|'))/.*\.(cpp|cc)$"
+
+  cppcheck:
+    # Non-blocking and nightly only (§14.8.4): it becomes a PR check only if the owner decides so.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-debug
+          triplet: x64-linux-ovt
+
+      - name: Configure
+        run: |
+          sudo apt-get install -y -q --no-install-recommends cppcheck
+          cmake --preset "$PRESET"
+
+      - name: cppcheck
+        run: |
+          mkdir -p cppcheck-report
+          # Only OVT translation units: third_party and generated files are filtered out of the project.
+          cppcheck --enable=warning,performance,portability --std=c++20 --inline-suppr \
+            --project="build/$PRESET/compile_commands.json" \
+            --suppressions-list=tests/cppcheck.supp \
+            -i third_party -i build \
+            --xml --xml-version=2 -j "$(nproc)" 2> cppcheck-report/cppcheck.xml
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: cppcheck-report
+          path: cppcheck-report/cppcheck.xml
+          if-no-files-found: warn

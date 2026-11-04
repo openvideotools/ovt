@@ -1,4 +1,33 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Stub created by WI-0.000. WI-0.559 owns the content (chapter 13 §13.7.1 clang-tidy job).
+# clang-tidy configuration (chapter 14 §14.8.2, WI-0.559). The warning set for the compiler is the
+# ovt::flags target (chapter 13 §13.2.5), not this file. Parser directories (core/src/syntax, container,
+# bitreader) override this file with their own .clang-tidy that turns pointer arithmetic into an error
+# (§0.7.1: no raw pointer arithmetic on input data).
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cert-*,
+  -cert-err58-cpp,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  cppcoreguidelines-narrowing-conversions,
+  cppcoreguidelines-init-variables,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length
+# Warnings are errors only where a directory override says so, and in the nightly whole-tree run
+# (run-clang-tidy -warnings-as-errors='*').
+WarningsAsErrors: ""
+HeaderFilterRegex: '^(core|render|plugins|cli|app)/'
+FormatStyle: file

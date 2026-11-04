@@ -30,6 +30,10 @@ endif()
 add_library(ovt_flags INTERFACE)
 add_library(ovt::flags ALIAS ovt_flags)
 target_compile_features(ovt_flags INTERFACE cxx_std_20 c_std_11)
+# Marker for tools/check_ovt_flags.py (WI-0.559): the CMake file API lists no dependency on an INTERFACE
+# library, so "links ovt::flags" is detected by this definition on a target's compile line.
+# SPEC-ASSUMPTION(#29): marker definition OVT_FLAGS_APPLIED=1 on ovt::flags.
+target_compile_definitions(ovt_flags INTERFACE OVT_FLAGS_APPLIED=1)
 
 set(_ovt_cxx "$<COMPILE_LANGUAGE:CXX>")
 set(_ovt_release "$<CONFIG:Release,RelWithDebInfo,MinSizeRel>")
