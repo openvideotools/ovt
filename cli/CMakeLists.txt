@@ -11,3 +11,7 @@ add_dependencies(ovt_cli ovt_version_header)
 target_compile_definitions(ovt_cli PRIVATE "OVT_CLI_NAME_VALUE=\"${OVT_CLI_NAME}\"")
 set_target_properties(ovt_cli PROPERTIES OUTPUT_NAME "${OVT_CLI_NAME}")
 ovt_set_license(ovt_cli "GPL-3.0-or-later")
+
+# CLI11 (vcpkg manifest, WI-0.002) is header-only; WI-1.500's front-end uses it.
+ovt_find_package(CLI11 SPDX "BSD-3-Clause" TARGETS CLI11::CLI11 HEADER_ONLY)
+target_link_libraries(ovt_cli PRIVATE ${CLI11_TARGET})

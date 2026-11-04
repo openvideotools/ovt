@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "openvideotools",
+  "version-string": "1.0.0",
+  "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
+  "dependencies": [
+    "fmt", "spdlog", { "name": "flatbuffers", "host": true }, "flatbuffers", "zstd", "nlohmann-json", "highway", "cli11", "xxhash",
+    { "name": "catch2", "platform": "!android" }
+  ],
+  "features": {
+    "tests": { "description": "unit tests and the bench_* perf harness (chapter 14 §14.9)", "dependencies": [ "catch2", "benchmark" ] },
+    "benchmarks": { "description": "Google Benchmark perf harness (chapter 14 §14.9, WI-0.560)", "dependencies": [ "benchmark" ] },
+    "python": { "description": "python bindings", "dependencies": [ "pybind11" ] }
+  },
+  "overrides": [ ]
+}
