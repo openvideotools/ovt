@@ -16,7 +16,7 @@ import pytest
 TOOLS = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TOOLS))
 
-import install_qt
+import install_qt  # noqa: E402
 
 FAKE_AQT = textwrap.dedent(
     """
