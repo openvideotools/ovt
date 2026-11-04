@@ -13,12 +13,11 @@ ovt_add_sanitizer_canary()
 # pytest imports.
 find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
-  execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest"
-                  RESULT_VARIABLE _ovt_no_pytest OUTPUT_QUIET ERROR_QUIET)
+  execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest" RESULT_VARIABLE _ovt_no_pytest OUTPUT_QUIET
+                                                                                                    ERROR_QUIET)
   if(_ovt_no_pytest EQUAL 0)
-    add_test(NAME tools_pytest
-             COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider "${PROJECT_SOURCE_DIR}/tools/tests"
-             WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+    add_test(NAME tools_pytest COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
+                                       "${PROJECT_SOURCE_DIR}/tools/tests" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_tests_properties(tools_pytest PROPERTIES LABELS "fast;tools")
   else()
     message(STATUS "pytest not found for ${Python3_EXECUTABLE}: tools/tests not registered "
