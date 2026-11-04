@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Homebrew formulae for a macOS build host (chapter 13 §13.1, §13.9.1; WI-0.006). tools/bootstrap.sh
+# prints the `brew install` line for the missing ones. Xcode >= 16 (or its command-line tools) is a
+# separate install: `xcode-select --install`.
+cmake
+ninja
+ccache
+pkg-config
+nasm
+python@3.12
+autoconf
+autoconf-archive
+automake
+libtool
