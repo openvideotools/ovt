@@ -12,7 +12,7 @@ This page covers the vcpkg part first, then the `third_party/` script machinery 
 
 `vcpkg.json` lists only the ports that some target links today. §13.3.2 of the specification shows the
 manifest's end state; each later work item adds its ports in the PR that first uses them
-(SPEC-ASSUMPTION(#8)).
+(§13.3.2).
 
 ## How vcpkg is wired in
 

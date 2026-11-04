@@ -104,7 +104,7 @@ class Row:
 def dep_id(name: str) -> str:
     """Row Name -> the <dep> of OVT_TP_<dep>_*: lower case, runs of other characters become '_'.
 
-    SPEC-ASSUMPTION(#15): §13.3.7 says only "lower-cased"; names with spaces need the '_' mapping.
+    The mapping of chapter 13 §13.3.7 (`vcpkg baseline` -> `vcpkg_baseline`, `Gradle / AGP` -> `gradle_agp`).
     """
     ident = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
     if not ident:

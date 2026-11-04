@@ -49,7 +49,6 @@ if(OVT_INSTALL_DEV)
                                 PATH_VARS OVT_PLUGIN_DIR OVT_SCHEMA_DIR)
   # The package version is the C API version (OVT_API_VERSION, which also sets the SONAME), not the
   # 0.x product version: find_package(ovt 1 CONFIG REQUIRED) asks for API major 1 (chapter 13 §13.2.6).
-  # SPEC-ASSUMPTION(#13): package version = C API version.
   get_target_property(_ovt_api_version ovt_core VERSION)
   write_basic_package_version_file("${CMAKE_BINARY_DIR}/ovt-config-version.cmake"
                                    VERSION ${_ovt_api_version} COMPATIBILITY SameMajorVersion)

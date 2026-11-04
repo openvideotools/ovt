@@ -68,8 +68,8 @@ jobs:
 
       - name: reuse lint
         run: |
-          # SPEC-ASSUMPTION(#27): checks whose tooling arrives with a later M0.1 work item run once it is on the
-          # branch; on main, after M0.1, every one of them runs.
+          # Checks whose tooling arrives with a later M0.1 work item run once it is on the branch; on main,
+          # after M0.1, every one of them runs (chapter 13 §13.7.1).
           if [ -d LICENSES ]; then reuse lint; else echo "::notice::LICENSES/ arrives with WI-0.600; skipped"; fi
 
       - name: SPDX directory policy
@@ -121,8 +121,8 @@ jobs:
           triplet: x64-linux-ovt
 
       # configure, build and the linux-x64-release test preset; JUnit at build/linux-x64-release/junit.xml.
-      # SPEC-ASSUMPTION(#27): the `pr` lane preset is bound to linux-x64-debug (§13.2.4), which this job does
-      # not build; the release test preset runs a superset of the pr lane on the tree that is shipped.
+      # The `pr` lane preset is bound to linux-x64-debug (§13.2.4), which this job does not build; the release
+      # test preset runs a superset of the pr lane on the tree that is shipped (§13.7.1).
       - name: Configure, build, test
         run: cmake --workflow --preset ci-linux-x64
 
@@ -147,8 +147,8 @@ jobs:
           path: dist/ovt-linux-x64.tar.zst
 
   build-macos-arm64:
-    # SPEC-ASSUMPTION(#27): Karl's Mac Mini (self-hosted runner) instead of the GitHub macos-15 image: the
-    # private repository's hosted macOS minutes are scarce and the Mini is the macOS reference build host.
+    # The owner's Mac Mini (self-hosted runner) instead of the GitHub macos-15 image (§13.7.1): the private
+    # repository's hosted macOS minutes are scarce and the Mini is the macOS reference build host.
     runs-on: [self-hosted, macOS, ARM64]
     timeout-minutes: 90
     steps:
