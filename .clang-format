@@ -1,4 +1,24 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Stub created by WI-0.000. WI-0.007 owns the content (chapter 13 §13.9.3).
+# C and C++ formatting (chapter 13 §13.9.3, WI-0.007). The pre-commit hook runs clang-format 19 on changed
+# files; the lint job of CI (WI-0.030) uses the same file.
+---
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 2
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+Standard: c++20
+IncludeBlocks: Preserve
+---
+Language: ObjC
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 2
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+...

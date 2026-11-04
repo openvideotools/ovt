@@ -1,4 +1,15 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Stub created by WI-0.000. WI-0.007 owns the content (chapter 13 §13.9.2 hooks).
+# cmake-format settings (chapter 13 §13.9.2, WI-0.007). Matches the hand-written style of cmake/*.cmake:
+# two-space indent, 120 columns, lower-case commands.
+format:
+  line_width: 120
+  tab_size: 2
+  dangle_parens: false
+  command_case: lower
+  keyword_case: upper
+  max_subgroups_hwrap: 4
+  max_pargs_hwrap: 8
+markup:
+  enable_markup: false
