@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Debian/Ubuntu packages for a Linux build host (chapter 13 §13.1, §13.9.1; WI-0.006). tools/bootstrap.sh
+# checks them with dpkg and prints the `sudo apt-get install` line for the missing ones; it never runs sudo.
+# One package per line. On Ubuntu 22.04, cmake >= 3.25, gcc-13 and python3.11 come from the Kitware,
+# ubuntu-toolchain-r and deadsnakes repositories; bootstrap.sh prints the commands that add them.
+
+# Toolchain and build tools
+build-essential
+cmake
+ninja-build
+ccache
+pkg-config
+nasm
+git
+curl
+ca-certificates
+# vcpkg needs these to download and unpack ports
+zip
+unzip
+tar
+autoconf
+autoconf-archive
+automake
+libtool
+# Python for tools/ (the version check asks for >= 3.11)
+python3
+python3-venv
+# Window system and GPU headers (render/, app/; chapter 13 §13.1)
+libvulkan-dev
+mesa-vulkan-drivers
+libwayland-dev
+libxkbcommon-dev
+libxkbcommon-x11-dev
+libxcb1-dev
+libxcb-xkb-dev
+libx11-xcb-dev
+libgl1-mesa-dev
+libegl1-mesa-dev
+libva-dev
