@@ -99,4 +99,9 @@ function(ovt_add_flatbuffers_schema target)
   target_sources(${target} PRIVATE ${outputs})
   # SYSTEM: flatc output is not ours to warn about (it trips -Wuseless-cast under ovt::flags with -Werror).
   target_include_directories(${target} SYSTEM INTERFACE "$<BUILD_INTERFACE:${gen_dir}>")
+  # The generated headers include <flatbuffers/flatbuffers.h>: linking the schema target brings the library
+  # along (set by ovt_find_package(flatbuffers) in the including directory tree).
+  if(flatbuffers_TARGET)
+    target_link_libraries(${target} INTERFACE "$<BUILD_INTERFACE:${flatbuffers_TARGET}>")
+  endif()
 endfunction()

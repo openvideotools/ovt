@@ -67,7 +67,7 @@ def parse_fields(text: str) -> dict[str, set[str]]:
 
 def removed_fields(old_text: str, new_text: str) -> list[str]:
     old, new = parse_fields(old_text), parse_fields(new_text)
-    found = []
+    found: list[str] = []
     for decl, fields in old.items():
         if decl not in new:
             found.extend(f"{decl}.{f}" for f in sorted(fields))

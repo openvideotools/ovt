@@ -12,3 +12,12 @@ target_compile_definitions(
                                  "OVT_SMOKE_FBS_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/smoke.fbs\"")
 ovt_set_license(ovt_tests_schema_smoke "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_schema_smoke)
+
+# Acceptance test 1 of WI-0.003: the generated Python package imports (namespace layout, chapter 13 §13.2.3).
+find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME schema_python_import COMMAND "${Python3_EXECUTABLE}" -c
+                                             "import ovt.fb.FrameAnalysis, ovt.fb.smoke.Record")
+  set_tests_properties(schema_python_import PROPERTIES ENVIRONMENT "PYTHONPATH=${OVT_GENERATED_DIR}/python" LABELS
+                                                       "fast;schema")
+endif()
