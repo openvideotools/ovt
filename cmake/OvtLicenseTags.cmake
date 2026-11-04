@@ -59,7 +59,8 @@ function(ovt_set_dependency_license name)
 endfunction()
 
 # Normalises one LINK_LIBRARIES entry: unwraps $<LINK_ONLY:x>, drops other generator expressions,
-# linker flags and the ovt::flags interface target. Sets out_var to "" for entries to skip.
+# linker flags, the ovt::flags interface target and C-runtime platform libraries. Sets out_var to "" for
+# entries to skip.
 function(_ovt_license_normalise_item item out_var)
   set(result "${item}")
   if(result MATCHES "^\\$<LINK_ONLY:(.+)>$")
@@ -70,6 +71,11 @@ function(_ovt_license_normalise_item item out_var)
   else()
     _ovt_license_resolve("${result}" resolved)
     if(resolved STREQUAL "ovt_flags")
+      set(result "")
+    endif()
+    # Platform libraries of the C runtime (pthread, libm, libdl) are system libraries under the GPL's
+    # system-library exception; they are neither built nor distributed by OVT, so they are not listed.
+    if(result MATCHES "^(Threads::Threads|pthread|m|dl|rt)$")
       set(result "")
     endif()
   endif()
