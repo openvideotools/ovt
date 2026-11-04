@@ -22,13 +22,10 @@ ovt_git_fetch https://vcgit.hhi.fraunhofer.de/jvet/JM.git "refs/tags/JM-${JM_VER
 src="${work}/jm"
 [[ -d "${src}/ldecod" && -d "${src}/lencod" ]] || ovt_die "unexpected JM archive layout"
 
-defines="${src}/ldecod/inc/defines.h"
-sed -i 's/^#define TRACE .*/#define TRACE 1/' "${defines}"
-grep -Eq '^#define TRACE 1$' "${defines}" || ovt_die "TRACE not enabled in ${defines}"
-
-jm_cc="gcc -fcommon"
-make -C "${src}/ldecod" -j "${OVT_ORACLES_JOBS}" CC="${jm_cc}"
-make -C "${src}/lencod" -j "${OVT_ORACLES_JOBS}" CC="${jm_cc}"
+# lencod is built first, from the untouched tree; then TRACE is switched on for ldecod.
+make -C "${src}/lencod" -j "${OVT_ORACLES_JOBS}" CC="gcc -fcommon"
+ovt_enable_macro "${src}" TRACE
+make -C "${src}/ldecod" -j "${OVT_ORACLES_JOBS}" CC="gcc -fcommon -DTRACE=1"
 
 for tool in ldecod lencod; do
   bin="$(find "${src}/bin" -maxdepth 1 -type f -name "${tool}*" -perm -u+x | head -n 1)"

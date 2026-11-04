@@ -57,3 +57,19 @@ ovt_stamp() {
   mkdir -p "${OVT_ORACLES_STAMPS}"
   printf '%s\n' "$2" >"${OVT_ORACLES_STAMPS}/$1.version"
 }
+
+# ovt_enable_macro <source-dir> <MACRO>: sets every `#define MACRO <n>` under <source-dir> to 1 and fails if
+# any definition is left at another value. Callers also pass -D<MACRO>=1, which covers headers that only
+# define the macro inside `#ifndef MACRO`.
+ovt_enable_macro() {
+  local dir="$1" macro="$2" re files
+  re="^[[:space:]]*#[[:space:]]*define[[:space:]]+${macro}([[:space:]]|$)"
+  mapfile -t files < <(grep -rlE "${re}" "${dir}" --include='*.h' || true)
+  for f in "${files[@]}"; do
+    sed -i -E "s/^([[:space:]]*#[[:space:]]*define[[:space:]]+${macro})[[:space:]]+[0-9]+/\1 1/" "${f}"
+    grep -nE "${re}" "${f}" | sed "s|^|[oracles] ${f#"${dir}"/}:|" >&2
+  done
+  if grep -rhE "${re}" "${dir}" --include='*.h' | grep -vqE "define[[:space:]]+${macro}[[:space:]]+1([^0-9]|$)"; then
+    ovt_die "${macro} still has a definition other than 1 under ${dir}"
+  fi
+}

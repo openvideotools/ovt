@@ -19,13 +19,13 @@ cd "${work}" || exit 1
 ovt_git_fetch https://vcgit.hhi.fraunhofer.de/jvet/HM.git "refs/tags/${HM_VERSION}" "${HM_COMMIT}" stock
 cp -a stock trace
 
-typedef="trace/source/Lib/TLibCommon/TypeDef.h"
-sed -i -E 's/^(#define[[:space:]]+ENC_DEC_TRACE[[:space:]]+)0/\11/' "${typedef}"
-grep -Eq '^#define[[:space:]]+ENC_DEC_TRACE[[:space:]]+1' "${typedef}" || ovt_die "ENC_DEC_TRACE not enabled"
+ovt_enable_macro trace/source ENC_DEC_TRACE
 
 # HM's CMake writes the executables under <source>/bin/; find them by exact name.
 hm_build() {
-  cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release
+  local flags=""
+  [[ "$1" == trace ]] && flags="-DENC_DEC_TRACE=1"
+  cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="${flags}"
   cmake --build "$1/build" -j "${OVT_ORACLES_JOBS}" --target "${@:2}"
 }
 hm_install() {
