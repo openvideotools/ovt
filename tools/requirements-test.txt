@@ -5,3 +5,4 @@
 # Install: python -m pip install -r tools/requirements-test.txt ; run: python -m pytest tools/tests
 pytest==8.3.4
 pytest-xdist==3.6.1
+flatbuffers==25.12.19  # Python runtime for the generated ovt.fb modules (same version as the vcpkg port)
