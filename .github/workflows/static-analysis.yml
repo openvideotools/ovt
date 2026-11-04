@@ -104,9 +104,13 @@ jobs:
       - name: clang-tidy on the whole tree
         if: github.event_name != 'pull_request' || true # TEMPORARY WI-0.559 probe
         run: |
-          run-clang-tidy-15 -p "build/$PRESET" -quiet -warnings-as-errors='*' \
-            -extra-arg=-Wno-unknown-warning-option \
-            "^$PWD/($(echo "$OVT_DIRS" | tr ' ' '|'))/.*\.(cpp|cc)$"
+          # run-clang-tidy 15 has no -warnings-as-errors: fail on any finding, as the PR job does.
+          run-clang-tidy-15 -p "build/$PRESET" -quiet -extra-arg=-Wno-unknown-warning-option \
+            "^$PWD/($(echo "$OVT_DIRS" | tr ' ' '|'))/.*\.(cpp|cc)$" | tee "$RUNNER_TEMP/tidy-all.txt" || true
+          if grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' "$RUNNER_TEMP/tidy-all.txt"; then
+            echo "::error::clang-tidy findings in the whole tree"
+            exit 1
+          fi
 
   cppcheck:
     # Non-blocking and nightly only (§14.8.4): it becomes a PR check only if the owner decides so.
