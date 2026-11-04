@@ -22,6 +22,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/ovt-oracles/bin:/opt/ovt-oracles/venv/bin:/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # ca-certificates first (snapshot.ubuntu.com is HTTPS-only); everything after that is the snapshot.
+# libgstreamer-plugins-bad1.0-dev is unpacked, not installed: as a package it depends on the -dev package of
+# every bad plugin (OpenCV, VTK, GDAL, Qt 5, MPI: about 2 GB). The codecparsers headers, .pc file and .so
+# link need only the GStreamer core and base -dev packages and the bad runtime library installed above.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates \
  && printf 'APT::Snapshot "%s";\n' "${UBUNTU_SNAPSHOT}" > /etc/apt/apt.conf.d/50ovt-snapshot \
@@ -34,7 +37,10 @@ RUN apt-get update \
       libvulkan-dev libshaderc-dev liblcms2-dev libass-dev \
       libx11-dev libxext-dev libxrandr-dev libxpresent-dev libxss-dev libxinerama-dev libxkbcommon-dev \
       mesa-vulkan-drivers xvfb \
-      mediainfo mkvtoolnix libgstreamer-plugins-bad1.0-dev \
+      mediainfo mkvtoolnix \
+      libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgstreamer-plugins-bad1.0-0 \
+ && cd /tmp && apt-get download libgstreamer-plugins-bad1.0-dev \
+ && dpkg-deb -x libgstreamer-plugins-bad1.0-dev_*.deb / && rm libgstreamer-plugins-bad1.0-dev_*.deb \
  && rm -rf /var/lib/apt/lists/* \
  && echo /opt/ovt-oracles/lib > /etc/ld.so.conf.d/ovt-oracles.conf
 

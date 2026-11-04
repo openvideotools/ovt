@@ -6,7 +6,7 @@
 # from the pinned upstream Ubuntu 24.04 .deb (chapter 14 §14.2.6, D27, WI-0.554). BSD-2-Clause.
 # apt resolves the .deb's dependencies from the image's pinned Ubuntu snapshot.
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 TSDUCK_VERSION="3.45-4798"

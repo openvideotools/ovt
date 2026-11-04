@@ -8,7 +8,7 @@
 #   build_extra.sh daala   dump_psnrhvs, dump_ciede2000 (§14.4.13)
 #   build_extra.sh mpv     libplacebo (the third_party/VERSIONS.md pin) + mpv (§14.4.15); needs FFmpeg in the prefix
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 GPAC_VERSION="v2.4.0"

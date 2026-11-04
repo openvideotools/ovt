@@ -56,9 +56,9 @@ version (or the same version for every release) report the stamp their build scr
 | tstables | 3.45-4798 | as tsp | BSD-2-Clause | `tstables --version` | `3.45-4798` |
 | tsanalyze | 3.45-4798 | as tsp | BSD-2-Clause | `tsanalyze --version` | `3.45-4798` |
 | gstreamer-codecparsers | 1.24.2 | Ubuntu 24.04 snapshot (`libgstreamer-plugins-bad1.0-dev`) | LGPL-2.1-or-later | `pkg-config --modversion gstreamer-codecparsers-1.0` | `1.24.2` |
-| ldecod | 19.0 | <https://iphome.hhi.de/suehring/tml/download/jm19.0.zip> sha256 `0000000000000000000000000000000000000000000000000000000000000000`, `TRACE 1` | ITU-T/ISO reference software licence | `cat "$OVT_ORACLES_STAMPS/ldecod.version"` | `JM 19.0 TRACE=1` |
+| ldecod | 19.0 | <https://vcgit.hhi.fraunhofer.de/jvet/JM> tag JM-19.0 `ef2362d159339d583fc18cea2de4d4bed5a1417c`, `TRACE 1` | ITU-T/ISO reference software licence | `cat "$OVT_ORACLES_STAMPS/ldecod.version"` | `JM 19.0 TRACE=1` |
 | lencod | 19.0 | as ldecod (stock) | ITU-T/ISO reference software licence | `cat "$OVT_ORACLES_STAMPS/lencod.version"` | `JM 19.0` |
-| TAppEncoder | HM-18.0 | <https://vcgit.hhi.fraunhofer.de/jvet/HM> `0000000000000000000000000000000000000000` | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppEncoder.version"` | `HM-18.0` |
+| TAppEncoder | HM-18.0 | <https://vcgit.hhi.fraunhofer.de/jvet/HM> `fb4486d5ab5d0cd3b6a71659c7d5eb4509f2a4ce` | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppEncoder.version"` | `HM-18.0` |
 | TAppDecoder | HM-18.0 | as TAppEncoder | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppDecoder.version"` | `HM-18.0` |
 | TAppDecoder_trace | HM-18.0 | as TAppEncoder, `ENC_DEC_TRACE 1` | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppDecoder_trace.version"` | `HM-18.0` |
 | dump_psnrhvs | 24f889aa | <https://gitlab.xiph.org/xiph/daala> `24f889aaabe33bc390b993d737d830b8dd367e61` (master; no releases) | BSD-2-Clause | `cat "$OVT_ORACLES_STAMPS/dump_psnrhvs.version"` | `Daala 24f889aaabe33bc390b993d737d830b8dd367e61` |

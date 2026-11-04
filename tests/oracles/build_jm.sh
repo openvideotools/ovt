@@ -6,19 +6,20 @@
 #   ldecod  built with TRACE 1 (writes trace_dec.txt in the working directory)
 #   lencod  stock (the canonical PAFF generator of §14.3.3 recipe 2)
 # Pitfall: JM 19.0 defines globals in headers, so modern GCC (default -fno-common) needs -fcommon.
+# Source: the JM-19.0 tag of the HHI GitLab, commit-checked. The jm19.0.zip of §14.4.3 is not used because
+# iphome.hhi.de serves an incomplete TLS certificate chain (curl error 60).
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 JM_VERSION="19.0"
-JM_SHA256="0000000000000000000000000000000000000000000000000000000000000000"
+JM_COMMIT="ef2362d159339d583fc18cea2de4d4bed5a1417c"
 
 work="${1:-/tmp/build/jm}"
 mkdir -p "${work}"
 cd "${work}" || exit 1
-ovt_download "https://iphome.hhi.de/suehring/tml/download/jm${JM_VERSION}.zip" "${JM_SHA256}" jm.zip
-unzip -q jm.zip
-src="$(dirname "$(find "${work}" -maxdepth 3 -type d -name ldecod | head -n 1)")"
+ovt_git_fetch https://vcgit.hhi.fraunhofer.de/jvet/JM.git "refs/tags/JM-${JM_VERSION}" "${JM_COMMIT}" jm
+src="${work}/jm"
 [[ -d "${src}/ldecod" && -d "${src}/lencod" ]] || ovt_die "unexpected JM archive layout"
 
 defines="${src}/ldecod/inc/defines.h"
@@ -35,6 +36,6 @@ for tool in ldecod lencod; do
   install -D -m 0755 "${bin}" "${OVT_ORACLES_PREFIX}/bin/${tool}"
 done
 
-ovt_stamp ldecod "JM ${JM_VERSION} TRACE=1 (jm${JM_VERSION}.zip sha256 ${JM_SHA256})"
-ovt_stamp lencod "JM ${JM_VERSION} (jm${JM_VERSION}.zip sha256 ${JM_SHA256})"
+ovt_stamp ldecod "JM ${JM_VERSION} TRACE=1 (${JM_COMMIT})"
+ovt_stamp lencod "JM ${JM_VERSION} (${JM_COMMIT})"
 rm -rf "${work}"

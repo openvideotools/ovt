@@ -7,11 +7,11 @@
 #   TAppDecoder_trace         ENC_DEC_TRACE=1 in TypeDef.h (writes TraceDec.txt)
 # WI-0.563 adds the getter dumper `hm_cu_dump` on top of the stock libraries built here.
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 HM_VERSION="HM-18.0"
-HM_COMMIT="0000000000000000000000000000000000000000"
+HM_COMMIT="fb4486d5ab5d0cd3b6a71659c7d5eb4509f2a4ce"
 
 work="${1:-/tmp/build/hm}"
 mkdir -p "${work}"

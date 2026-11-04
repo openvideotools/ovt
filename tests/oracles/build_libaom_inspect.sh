@@ -7,7 +7,7 @@
 #   2. the inspection build: `inspect` exists only with CONFIG_INSPECTION=1 AND ENABLE_EXAMPLES=1.
 # The archive is the one third_party/VERSIONS.md pins (same SHA-256), so oracle and product agree.
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 LIBAOM_VERSION="3.12.1"

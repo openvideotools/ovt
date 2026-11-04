@@ -10,7 +10,7 @@
 #   FFmpeg --enable-gpl --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d
 # The binaries are oracles only: GPL, never linked into OVT. WI-0.563 adds `ffmpeg_mvs` to this script.
 
-# shellcheck source-path=SCRIPTDIR source=lib.sh
+# shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
 
 X264_REVISION="3191"
@@ -33,7 +33,7 @@ rpath="-Wl,-rpath,${P}/lib"
 # --- x264 ----------------------------------------------------------------------------------------------
 ovt_git_fetch https://code.videolan.org/videolan/x264.git master "${X264_COMMIT}" x264 full
 (
-  cd x264
+  cd x264 || exit 1
   ./configure --prefix="${P}" --enable-shared --enable-pic --bit-depth=all --chroma-format=all \
     --disable-lavf --disable-swscale --disable-ffms --disable-gpac --disable-lsmash --extra-ldflags="${rpath}"
   grep -Eq "X264_REV +${X264_REVISION}\b" x264_config.h || ovt_die "x264 is not r${X264_REVISION}"
@@ -75,7 +75,7 @@ ninja -C vmaf/libvmaf/build install
 # --- FFmpeg --------------------------------------------------------------------------------------------
 ovt_git_fetch https://github.com/FFmpeg/FFmpeg.git "refs/tags/${FFMPEG_VERSION}" "${FFMPEG_COMMIT}" ffmpeg
 (
-  cd ffmpeg
+  cd ffmpeg || exit 1
   ./configure --prefix="${P}" --enable-gpl --enable-shared --disable-static --disable-doc --disable-debug \
     --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d \
     --extra-cflags="-I${P}/include" --extra-ldflags="-L${P}/lib ${rpath}"
