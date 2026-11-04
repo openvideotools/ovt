@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Licence policy (chapter 15 §15.4.2). WI-0.601 writes only the [directories] table; WI-0.602 adds the
+# allow/deny lists, [distribution], [vcpkg_overrides], [gradle_license_names] and [[exceptions]].
+
+[directories]               # SPDX id required in file headers; longest prefix wins
+"core/include/ovt/abi" = "BSD-2-Clause"
+"core/schema" = "BSD-2-Clause"
+"core" = "LGPL-2.1-or-later"
+"render" = "LGPL-2.1-or-later"
+"cli" = "GPL-3.0-or-later"
+"app" = "GPL-3.0-or-later"
+"android" = "GPL-3.0-or-later"
+"python" = "GPL-3.0-or-later"
+"plugins/ovt-plugin-aom" = "BSD-2-Clause"
+"plugins/ovt-plugin-de265" = "LGPL-3.0-or-later"
+"plugins/ovt-plugin-ffmpeg" = "LGPL-2.1-or-later"
+"plugins/ovt-plugin-hm" = "BSD-3-Clause"
+"tools" = "LGPL-2.1-or-later"
+"tests" = "LGPL-2.1-or-later"
+"cmake" = "LGPL-2.1-or-later"
+"third_party" = "LGPL-2.1-or-later"
+"docs" = "CC-BY-SA-4.0"
+# SPEC-ASSUMPTION(#22): §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); the
+# §15.4.2 table leaves them out. "" is the repository root, the shortest prefix of every path.
+".github" = "LGPL-2.1-or-later"
+"plugins" = "LGPL-2.1-or-later"
+"" = "LGPL-2.1-or-later"
