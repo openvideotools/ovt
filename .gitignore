@@ -1,0 +1,22 @@
+# Build trees (CMake presets write to build/<preset>/)
+/build/
+/out/
+/.cache/
+CMakeUserPresets.json
+compile_commands.json
+
+# vcpkg
+/vcpkg_installed/
+
+# Corpora are fetched, never committed
+/tests/corpora/cache/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
