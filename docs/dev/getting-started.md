@@ -90,7 +90,7 @@ On every `git commit` they check the staged files:
 | `shellcheck` | shell scripts | Lint. |
 | `pretty-format-kotlin` | `*.kt` | ktlint; needs a JDK. |
 | `check-versions-md` | `third_party/` | `tools/check_versions_md.py`: every `third_party/*.cmake` script has a `VERSIONS.md` row, and the scripts read their pins from `versions.cmake`. |
-| `reuse-lint-file` | source files | SPDX header check. Manual until WI-0.600 adds `LICENSES/`. |
+| `reuse-lint-file` | source files | SPDX header present and its licence text in `LICENSES/` (`docs/licensing.md`). |
 
 A hook that reformats a file fails the commit and leaves the fix in your working tree. Look at the change,
 `git add` it and commit again.

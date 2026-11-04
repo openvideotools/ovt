@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Licensing of the files that cannot carry an SPDX header (REUSE specification 3.3; chapter 15 §15.1,
+# FR-GEN-107; WI-0.600). Files with their own header keep it: the default precedence "closest" lets a
+# header win over these annotations. Licence texts live in LICENSES/.
+version = 1
+
+# Documentation prose: CC-BY-SA-4.0. Code snippets inside the documents are BSD-2-Clause (docs/LICENSE.md).
+[[annotations]]
+path = ["**/*.md"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# The specification is CC-BY-4.0 (owner decision on #20), so implementers can reuse its text without
+# ShareAlike. Comes after the entry above: in REUSE.toml the last matching annotation applies.
+[[annotations]]
+path = ["docs/spec/**/*.md"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+# JSON has no comment syntax: presets, the vcpkg manifest, Renovate, corpora manifests, goldens and
+# schemas. They are build and test inputs, licensed like tools/, tests/ and cmake/ (§15.1).
+[[annotations]]
+path = ["**/*.json", "**/*.json.gz", "**/*.jsonl"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+# Repository metadata and one-line data files.
+[[annotations]]
+path = ["VERSION", ".gitattributes", ".gitignore", ".gitmodules", "**/.gitkeep"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+# Golden outputs other than JSON (text dumps, CSV, compressed blobs) are test data (tests/ licence).
+[[annotations]]
+path = ["tests/golden/**", "core/tests/golden/**", "**/tests/data/**"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+# Generated sources get their header from the generator when it can write one; these entries cover the
+# generated files that are committed or shipped without it (WI-0.601 notes).
+[[annotations]]
+path = ["core/**/*_generated.h", "core/include/ovt/schema/**"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = ["app/**/Branding.qml"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Binary assets of the application (icons, images, fonts); app/ and android/ are GPL-3.0-or-later.
+[[annotations]]
+path = ["app/**/*.png", "app/**/*.svg", "app/**/*.ico", "app/**/*.icns", "android/**/*.png", "android/**/*.webp",
+        "android/**/*.svg"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# libaom's PATENTS file (the AOM Patent License 1.0), shipped next to every binary of the aom plugin
+# (§15.2, POL-PAT-6). Byte-identical to LICENSES/LicenseRef-AOM-Patent-License-1.0.txt and to the libaom
+# archive's PATENTS (its SHA-256 is in the libaom row of third_party/VERSIONS.md).
+# SPEC-ASSUMPTION(#20): this file is what makes the LicenseRef text "used" for REUSE until WI-2.155.
+[[annotations]]
+path = ["plugins/ovt-plugin-aom/PATENTS"]
+SPDX-FileCopyrightText = "Alliance for Open Media"
+SPDX-License-Identifier = "LicenseRef-AOM-Patent-License-1.0"
