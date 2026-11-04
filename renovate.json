@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency-update cadence of chapter 13 §13.3.8 (WI-0.007): weekly grouped PRs for GitHub Actions SHAs, Gradle/AGP/Kotlin/AndroidX, Python requirements, pre-commit hook revisions and the vcpkg baseline. Qt, the NDK, compileSdk/targetSdk, the macOS deployment target and the third_party/VERSIONS.md decoder pins are never updated automatically.",
+  "extends": ["config:recommended", ":disableDependencyDashboard"],
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 6,
+  "labels": ["deps"],
+  "commitMessagePrefix": "deps:",
+  "enabledManagers": ["github-actions", "gradle", "gradle-wrapper", "pip_requirements", "pre-commit", "git-submodules", "custom.regex"],
+  "pre-commit": { "enabled": true },
+  "git-submodules": { "enabled": true },
+  "pip_requirements": { "fileMatch": ["(^|/)requirements[^/]*\\.txt$"] },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "vcpkg.json builtin-baseline follows the microsoft/vcpkg default branch, moved together with the third_party/vcpkg submodule.",
+      "fileMatch": ["^vcpkg\\.json$"],
+      "matchStrings": ["\"builtin-baseline\"\\s*:\\s*\"(?<currentDigest>[0-9a-f]{40})\""],
+      "depNameTemplate": "microsoft/vcpkg",
+      "packageNameTemplate": "https://github.com/microsoft/vcpkg",
+      "currentValueTemplate": "master",
+      "datasourceTemplate": "git-refs"
+    }
+  ],
+  "packageRules": [
+    { "matchManagers": ["github-actions"], "pinDigests": true, "groupName": "GitHub Actions" },
+    { "matchManagers": ["gradle", "gradle-wrapper"], "groupName": "Gradle, AGP, Kotlin and AndroidX" },
+    { "matchManagers": ["pip_requirements"], "groupName": "Python requirements" },
+    { "matchManagers": ["pre-commit"], "groupName": "pre-commit hooks" },
+    {
+      "matchManagers": ["git-submodules", "custom.regex"],
+      "matchDepNames": ["microsoft/vcpkg", "third_party/vcpkg"],
+      "groupName": "vcpkg baseline",
+      "commitMessageExtra": "(run `vcpkg x-update-baseline`; the submodule commit and builtin-baseline must stay equal)"
+    },
+    { "matchManagers": ["git-submodules"], "matchDepNames": ["!third_party/vcpkg"], "enabled": false },
+    {
+      "description": "Never automatic (§13.3.8 item 4): the Qt Gradle plugin and Qt itself follow tools/install_qt.py; the NDK and SDK levels change by maintainer PR.",
+      "matchPackageNames": ["org.qtproject.qt.gradleplugin{/,}**", "com.android.ndk{/,}**"],
+      "enabled": false
+    }
+  ]
+}
