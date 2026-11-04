@@ -17,14 +17,17 @@ work="${1:-/tmp/build/hm}"
 mkdir -p "${work}"
 cd "${work}" || exit 1
 ovt_git_fetch https://vcgit.hhi.fraunhofer.de/jvet/HM.git "refs/tags/${HM_VERSION}" "${HM_COMMIT}" stock
+# HM builds with -Werror; GCC 13 reports false array-bounds positives in TComLoopFilter.cpp. Warnings stay on.
+grep -rl --include=CMakeLists.txt --include='*.cmake' -e '-Werror' stock |
+  xargs -r sed -i -E 's/[[:space:]]*-Werror([[:space:]")]|$)/\1/g'
 cp -a stock trace
 
 ovt_enable_macro trace/source ENC_DEC_TRACE
 
 # HM's CMake writes the executables under <source>/bin/; find them by exact name.
 hm_build() {
-  local flags=""
-  [[ "$1" == trace ]] && flags="-DENC_DEC_TRACE=1"
+  local flags="-Wno-error"
+  [[ "$1" == trace ]] && flags+=" -DENC_DEC_TRACE=1"
   cmake -S "$1" -B "$1/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS="${flags}"
   cmake --build "$1/build" -j "${OVT_ORACLES_JOBS}" --target "${@:2}"
 }
