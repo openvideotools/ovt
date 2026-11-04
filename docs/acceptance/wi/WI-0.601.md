@@ -27,6 +27,8 @@ Automated: `test_repository_passes`. Result: pass.
 
 ## Test 2: a GPL header in `core/src/x.cpp` fails pre-commit with `E-HEADER`
 
+<!-- REUSE-IgnoreStart -->
+
 ```console
 $ printf '// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors\n// SPDX-License-Identifier: GPL-3.0-or-later\nint x;\n' > core/src/x.cpp
 $ git add core/src/x.cpp && pre-commit run --files core/src/x.cpp; echo "exit $?"
@@ -72,3 +74,5 @@ Automated: `test_shebang_python_gets_the_header_on_line_2`. Result: pass.
 The two tools quote SPDX header lines in their code, so the code after their own header sits between
 `REUSE-IgnoreStart`/`REUSE-IgnoreEnd`. `reuse lint` on this branch: "Congratulations! Your project is
 compliant with version 3.3 of the REUSE Specification :-)".
+
+<!-- REUSE-IgnoreEnd -->
