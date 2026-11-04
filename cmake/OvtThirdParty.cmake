@@ -8,9 +8,34 @@
 
 include_guard(GLOBAL)
 
-include(OvtThirdPartyCommon)   # ExternalProject conventions (§13.3.4), filled by WI-0.010
-include(OvtMeson)              # Meson wrapper (§13.3.5), filled by WI-0.011
+include(OvtThirdPartyCommon) # ExternalProject conventions (§13.3.4), filled by WI-0.010
+include(OvtMeson) # Meson wrapper (§13.3.5), WI-0.011
 
+# ---- dav1d (WI-0.011) -------------------------------------------------------------------------------
+# tp::dav1d from third_party/dav1d.cmake, or from the system library with OVT_SYSTEM_DAV1D=ON.
+# SPEC-ASSUMPTION(#44): while the dav1d row of VERSIONS.md has no SHA-256 (`<sha>`, filled by
+# `tools/versions_to_cmake.py --update-hashes`, which needs network access to code.videolan.org) the build
+# is skipped with a status message instead of failing every configure.
+if(OVT_SYSTEM_DAV1D)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(ovt_system_dav1d REQUIRED IMPORTED_TARGET dav1d)
+  add_library(tp::dav1d INTERFACE IMPORTED GLOBAL)
+  target_link_libraries(tp::dav1d INTERFACE PkgConfig::ovt_system_dav1d)
+  ovt_set_dependency_license(
+    tp::dav1d
+    SOURCE
+    system
+    SPDX
+    "BSD-2-Clause"
+    VERSION
+    "${ovt_system_dav1d_VERSION}"
+    LINKAGE
+    shared)
+elseif(OVT_TP_dav1d_SHA256)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/dav1d.cmake")
+else()
+  message(STATUS "OVT: dav1d skipped, third_party/VERSIONS.md has no SHA-256 for it yet")
+endif()
 
 # ovt_find_package(<Package> SPDX <expr> TARGETS <target>... [NAMES <config-name>...] [PKG_CONFIG <module>]
 #                  [HEADER_ONLY] [OPTIONAL])
@@ -92,8 +117,16 @@ function(ovt_find_package package)
       set(linkage "")
     endif()
   endif()
-  ovt_set_dependency_license(${found_target} SOURCE ${source} SPDX "${arg_SPDX}" VERSION "${version}"
-                             LINKAGE ${linkage})
+  ovt_set_dependency_license(
+    ${found_target}
+    SOURCE
+    ${source}
+    SPDX
+    "${arg_SPDX}"
+    VERSION
+    "${version}"
+    LINKAGE
+    ${linkage})
   # The package's own helper targets and library files behind the found target (Catch2::Catch2 behind
   # Catch2::Catch2WithMain, the pkg-config target and .so path behind xxHash::xxhash) carry the same licence.
   _ovt_describe_package_closure(${found_target} ${source} "${arg_SPDX}" "${version}")
@@ -119,7 +152,7 @@ function(_ovt_describe_package_closure target source spdx version)
     if(NOT items)
       continue()
     endif()
-    foreach(item IN LISTS items)
+    foreach(item IN LISTS ITEMS)
       if(item MATCHES "^\\$<LINK_ONLY:(.+)>$")
         set(item "${CMAKE_MATCH_1}")
       endif()

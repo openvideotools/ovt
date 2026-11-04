@@ -11,10 +11,11 @@ cmake_minimum_required(VERSION 3.25)
 if(DEFINED OVT_USE_VCPKG AND NOT OVT_USE_VCPKG AND CMAKE_TOOLCHAIN_FILE MATCHES "/vcpkg\\.cmake$")
   set(CMAKE_TOOLCHAIN_FILE "" CACHE FILEPATH "Toolchain file (cleared: OVT_USE_VCPKG=OFF)" FORCE)
 elseif(CMAKE_TOOLCHAIN_FILE MATCHES "/vcpkg\\.cmake$" AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
-  message(FATAL_ERROR
-    "vcpkg toolchain not found: ${CMAKE_TOOLCHAIN_FILE}\n"
-    "Run `git submodule update --init third_party/vcpkg` (or tools/bootstrap.sh), "
-    "or configure with -DOVT_USE_VCPKG=OFF to use system packages.")
+  message(
+    FATAL_ERROR
+      "vcpkg toolchain not found: ${CMAKE_TOOLCHAIN_FILE}\n"
+      "Run `git submodule update --init third_party/vcpkg` (or tools/bootstrap.sh), "
+      "or configure with -DOVT_USE_VCPKG=OFF to use system packages.")
 endif()
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" OVT_VERSION_RAW)
@@ -24,11 +25,11 @@ project(OpenVideoTools VERSION ${OVT_VERSION} LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-include(OvtOptions)        # all options of §13.2.2 and their validation
-include(OvtVersion)        # OVT_VERSION_FULL = <VERSION>[<suffix>]+<git sha> (FR-GEN-010)
-include(OvtCompilerFlags)  # ovt::flags (§13.2.5)
-include(OvtThirdParty)     # dispatches to third_party/*.cmake unless OVT_SYSTEM_* (§13.3)
-include(OvtLicenseTags)    # ovt_set_license(<target> <SPDX>) and the ovt_license_manifest target
+include(OvtOptions) # all options of §13.2.2 and their validation
+include(OvtVersion) # OVT_VERSION_FULL = <VERSION>[<suffix>]+<git sha> (FR-GEN-010)
+include(OvtCompilerFlags) # ovt::flags (§13.2.5)
+include(OvtLicenseTags) # ovt_set_license(<target> <SPDX>) and the ovt_license_manifest target
+include(OvtThirdParty) # dispatches to third_party/*.cmake unless OVT_SYSTEM_* (§13.3)
 
 # Before any add_subdirectory(): module test directories (core/tests, …) register tests too.
 if(OVT_BUILD_TESTS)
@@ -53,4 +54,4 @@ if(OVT_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-include(OvtInstall)        # §13.2.6 export set
+include(OvtInstall) # §13.2.6 export set
