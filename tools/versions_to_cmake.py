@@ -252,9 +252,9 @@ def member_sha256(archive: Path, member_name: str) -> str | None:
                     return hashlib.sha256(z.read(info)).hexdigest()
         return None
     with tarfile.open(archive) as t:
-        for info in t:
-            if info.isfile() and top_level(info.name):
-                f = t.extractfile(info)
+        for member in t:
+            if member.isfile() and top_level(member.name):
+                f = t.extractfile(member)
                 return hashlib.sha256(f.read()).hexdigest() if f else None
     return None
 
