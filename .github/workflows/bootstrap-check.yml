@@ -40,7 +40,8 @@ jobs:
       - name: Install what bootstrap.sh asks for
         run: |
           tools/bootstrap.sh --print-install | tee install.sh
-          sudo bash -euxo pipefail install.sh
+          # sudo drops the job environment; without it tzdata waits for an answer on stdin
+          sudo env DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC bash -euxo pipefail install.sh
       - name: tools/bootstrap.sh --no-qt
         run: tools/bootstrap.sh --no-qt --no-corpora
       - name: Configure and build linux-x64-debug
