@@ -185,7 +185,7 @@ table PartitionInfo {
   header:SyntaxNode;               // slice_segment_header() / slice_header() / tile_group_obu header; null for Tile/Substream
   slice_type:ubyte = 255;          // codec numbering: H.264 slice_type 0..9 (7.4.3); HEVC slice_type 0=B 1=P 2=I (7.4.7.1); AV1: 255 (n/a)
   rect:Rect;                       // Tile: exact rectangle (luma); Slice/SliceSegment: bounding box of its CTBs/MBs (may include cells of other slices)
-  first_block_addr:uint;           // first_mb_in_slice / slice_segment_address (CTB raster) / MiRowStart*MiCols+MiColStart (AV1) 
+  first_block_addr:uint;           // first_mb_in_slice / slice_segment_address (CTB raster) / MiRowStart*MiCols+MiColStart (AV1)
   block_count:uint;                // number of MBs / CTBs / 4x4 MI units in the partition
   qp:short = -1;                   // H.264 SliceQPY = 26 + pic_init_qp_minus26 + slice_qp_delta (7.4.3); HEVC SliceQpY = 26 + init_qp_minus26 + slice_qp_delta (7.4.7.1); AV1 base_q_idx
   qp_delta:short = -1;             // slice_qp_delta as signalled; AV1: 0

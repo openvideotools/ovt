@@ -45,6 +45,14 @@ path = ["core/**/*_generated.h", "core/include/ovt/schema/**"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "BSD-2-Clause"
 
+# The FlatBuffers schemas are verbatim copies of the spec's fenced blocks (chapter 06 §6.3 ff., kept
+# identical by tools/check_schema_in_spec.py), so they carry the spec's SPDX-License-Identifier line but no
+# copyright line of their own; this entry supplies it (WI-0.080).
+[[annotations]]
+path = ["core/schema/*.fbs"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "BSD-2-Clause"
+
 [[annotations]]
 path = ["app/**/Branding.qml"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
