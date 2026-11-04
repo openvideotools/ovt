@@ -90,9 +90,13 @@ ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS zstd::libzstd_
 ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
 ovt_find_package(hwy SPDX "Apache-2.0" TARGETS hwy::hwy)
 ovt_find_package(xxHash SPDX "BSD-2-Clause" TARGETS xxHash::xxhash PKG_CONFIG libxxhash)
-target_link_libraries(ovt_core PRIVATE
-  ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET} ${hwy_TARGET}
-  ${xxHash_TARGET})
+# $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
+# (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
+foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET}
+             ${hwy_TARGET} ${xxHash_TARGET})
+  target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
+endforeach()
+unset(_dep)
 
 # One directory per module of chapter 0 §0.3 (NFR-030); each fills its own CMakeLists.txt.
 foreach(_module io bitreader container demux syntax index decode analysis model color metrics cache jobs api)

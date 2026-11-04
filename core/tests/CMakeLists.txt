@@ -1,13 +1,54 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Unit tests of libovt-core. WI-0.002 adds the first Catch2 test; WI-0.550 owns this file and adds the
-# framework (golden runner, test_support, tag-to-label mapping).
+# Unit tests of libovt-core (chapter 14 §14.2, WI-0.550).
+#
+# Catch2 linkage rule (D24, chapter 14 §14.2.1): every test executable links Catch2::Catch2WithMain and
+# has no main of its own, except the golden runner ovt_core_tests, which links Catch2::Catch2 and brings
+# main.cpp (logger hook, OVT_UPDATE_GOLDEN / OVT_REQUIRE_CORPORA / OVT_CORPORA_DIR).
+#
+# Tests are registered with ovt_catch_discover_tests() (cmake/OvtTesting.cmake): Catch2 tags become CTest
+# labels, so the lane presets of CMakePresets.json (pr = label fast, …) select them. Every test case
+# carries exactly one speed tag, [fast] or [slow] (chapter 14 §14.2.5).
+#
+# A module's tests go in core/tests/<module>/ with their own executable ovt_tests_<module> (linking
+# ovt_test_support and Catch2WithMain), or into ovt_core_tests when they compare golden files.
 
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-include(Catch)
+if(NOT TARGET Catch2::Catch2)
+  message(FATAL_ERROR "Catch2::Catch2 (without main) is required for the golden runner ovt_core_tests.")
+endif()
 
-add_executable(ovt_tests_core test_version.cpp)
-target_link_libraries(ovt_tests_core PRIVATE ovt::core ovt::flags ${Catch2_TARGET})
-ovt_set_license(ovt_tests_core "LGPL-2.1-or-later")
-catch_discover_tests(ovt_tests_core DISCOVERY_MODE PRE_TEST)
+# ---- Test support library: corpus lookup, golden comparison, normalisation -----------------------
+add_library(ovt_test_support STATIC
+  test_support/corpus.cpp
+  test_support/env.cpp
+  test_support/fb_normalize.cpp
+  test_support/golden.cpp)
+target_include_directories(ovt_test_support PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_compile_definitions(ovt_test_support PRIVATE "OVT_TEST_DEFAULT_CORPORA_DIR=\"${OVT_CORPORA_DIR}\"")
+# Catch2::Catch2 (not WithMain): the support code uses SKIP/FAIL/WARN; the executable decides about main.
+target_link_libraries(ovt_test_support
+  PUBLIC Catch2::Catch2
+  PRIVATE ovt::flags ${fmt_TARGET} ${flatbuffers_TARGET} ${nlohmann_json_TARGET})
+ovt_set_license(ovt_test_support "LGPL-2.1-or-later")
+
+# ---- Golden runner: the one test executable with its own main -------------------------------------
+add_executable(ovt_core_tests
+  main.cpp
+  test_support_corpus.cpp
+  test_support_flatbuffer.cpp
+  test_support_golden.cpp)
+target_link_libraries(ovt_core_tests PRIVATE ovt::core ovt::flags ovt_test_support Catch2::Catch2
+                                             ${flatbuffers_TARGET})
+target_compile_definitions(ovt_core_tests PRIVATE
+  "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+  "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+ovt_set_license(ovt_core_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_core_tests)
+
+# ---- Ordinary test executables (Catch2WithMain) ---------------------------------------------------
+add_executable(ovt_tests_version test_version.cpp)
+target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_version)

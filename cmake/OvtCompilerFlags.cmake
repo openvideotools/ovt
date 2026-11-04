@@ -83,23 +83,10 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
 endif()
 
 # ---- Sanitizers (OVT_SANITIZER) ----------------------------------------------------------------
-if(OVT_ENABLE_SANITIZERS)
-  if(OVT_SANITIZER STREQUAL "asan-ubsan")
-    set(_ovt_san -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1 -g)
-    set(_ovt_san_link -fsanitize=address,undefined)
-  elseif(OVT_SANITIZER STREQUAL "tsan")
-    set(_ovt_san -fsanitize=thread -O1 -g)
-    set(_ovt_san_link -fsanitize=thread)
-  else() # fuzz: instrumentation only; the fuzz executables add ${OVT_FUZZ_ENGINE} (WI-0.557).
-    set(_ovt_san -fsanitize=fuzzer-no-link,address,undefined)
-    set(_ovt_san_link -fsanitize=address,undefined)
-  endif()
-  target_compile_options(ovt_flags INTERFACE ${_ovt_san})
-  target_link_options(ovt_flags INTERFACE ${_ovt_san_link})
-  target_compile_definitions(ovt_flags INTERFACE OVT_SANITIZED=1)
-  unset(_ovt_san)
-  unset(_ovt_san_link)
-endif()
+# The flag sets live in cmake/OvtTesting.cmake (WI-0.004); applying them here gives them to every target
+# that links ovt::flags, together with the compile definition OVT_SANITIZED=1.
+include(OvtTesting)
+ovt_enable_sanitizers(ovt_flags)
 
 # ---- Coverage (OVT_COVERAGE, Clang only) -------------------------------------------------------
 if(OVT_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
