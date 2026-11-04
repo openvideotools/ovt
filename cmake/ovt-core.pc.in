@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+plugindir=${prefix}/@OVT_PLUGIN_DIR@
+
+Name: ovt-core
+Description: Open Video Tools core library (C API)
+Version: @PROJECT_VERSION@
+Libs: -L${libdir} -lovt_core
+Cflags: -I${includedir}
