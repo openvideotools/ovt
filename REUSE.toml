@@ -12,6 +12,13 @@ path = ["**/*.md"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
 
+# The specification is CC-BY-4.0 (owner decision on #20), so implementers can reuse its text without
+# ShareAlike. Comes after the entry above: in REUSE.toml the last matching annotation applies.
+[[annotations]]
+path = ["docs/spec/**/*.md"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "CC-BY-4.0"
+
 # JSON has no comment syntax: presets, the vcpkg manifest, Renovate, corpora manifests, goldens and
 # schemas. They are build and test inputs, licensed like tools/, tests/ and cmake/ (§15.1).
 [[annotations]]
