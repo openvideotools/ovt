@@ -31,18 +31,26 @@ function(_ovt_find_flatc)
   if(OVT_FLATC)
     set(_ovt_flatc "${OVT_FLATC}")
   else()
-    set(_hints "")
-    # vcpkg manifest mode: the host triplet's tools directory holds flatc (flatbuffers is a host dependency).
-    if(DEFINED VCPKG_HOST_TRIPLET AND DEFINED _VCPKG_INSTALLED_DIR)
-      list(APPEND _hints "${_VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/flatbuffers")
+    set(_ovt_flatc "")
+    # vcpkg manifest mode: the "host": true flatbuffers port puts flatc under installed/<host-triplet>/tools/
+    # flatbuffers, next to the target triplets' trees. The host triplet's name is not reliable to read back
+    # from the toolchain, so take the first candidate that RUNS on this machine: a target-triplet flatc
+    # (Android) cannot, which is exactly the one never to pick.
+    if(DEFINED _VCPKG_INSTALLED_DIR)
+      file(GLOB _candidates "${_VCPKG_INSTALLED_DIR}/*/tools/flatbuffers/flatc")
+      foreach(_c IN LISTS _candidates)
+        execute_process(COMMAND "${_c}" --version RESULT_VARIABLE _rc OUTPUT_QUIET ERROR_QUIET)
+        if(_rc EQUAL 0)
+          set(_ovt_flatc "${_c}")
+          break()
+        endif()
+      endforeach()
     endif()
-    if(DEFINED flatbuffers_DIR)
-      list(APPEND _hints "${flatbuffers_DIR}/../../../tools/flatbuffers" "${flatbuffers_DIR}/../../../bin")
+    if(NOT _ovt_flatc)
+      unset(_ovt_flatc_found CACHE)
+      find_program(_ovt_flatc_found NAMES flatc NO_CMAKE_FIND_ROOT_PATH)
+      set(_ovt_flatc "${_ovt_flatc_found}")
     endif()
-    unset(_ovt_flatc_found CACHE)
-    find_program(_ovt_flatc_found NAMES flatc HINTS ${_hints}
-                 NO_CMAKE_FIND_ROOT_PATH)
-    set(_ovt_flatc "${_ovt_flatc_found}")
   endif()
   if(NOT _ovt_flatc)
     message(FATAL_ERROR "flatc not found. It comes with the vcpkg 'flatbuffers' host port, or "
@@ -73,8 +81,8 @@ function(ovt_add_flatbuffers_schema target)
     add_custom_command(
       OUTPUT "${header}" "${stamp}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${gen_dir}/python" "${gen_dir}/kotlin"
-      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --scoped-enums
-              -I "${fbs_dir}" -o "${gen_dir}" "${fbs}"
+      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --scoped-enums -I
+              "${fbs_dir}" -o "${gen_dir}" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --python -I "${fbs_dir}" -o "${gen_dir}/python" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --kotlin -I "${fbs_dir}" -o "${gen_dir}/kotlin" "${fbs}"
       COMMAND "${CMAKE_COMMAND}" -E touch "${stamp}"
