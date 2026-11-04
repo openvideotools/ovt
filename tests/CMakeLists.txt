@@ -8,7 +8,7 @@
 # WI-0.004: deliberate heap overflow in ASan builds, label `canary` (run with `ctest -L canary`).
 ovt_add_sanitizer_canary()
 
-# SPEC-ASSUMPTION(#11): pytest for the Python tools (chapter 14 §14.2.1) is one CTest test with label `fast`, not a CI job,
+# pytest for the Python tools (chapter 14 §14.2.1, WI-0.550) is one CTest test with label `fast`, not a CI job,
 # so the `pr` lane runs it wherever pytest is installed (tools/requirements-test.txt). Registered only when
 # pytest imports.
 find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
