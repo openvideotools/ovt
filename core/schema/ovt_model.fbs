@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
-// SPDX-License-Identifier: LGPL-2.1-or-later
+// SPDX-License-Identifier: BSD-2-Clause
 //
 // STUB (WI-0.003). Just enough of chapter 0 §0.5.4 / chapter 6 §6.3 to exercise the code generation target:
 // the namespace, the FrameAnalysis root table and its file identifier. WI-0.080 replaces this file with
