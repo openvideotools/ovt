@@ -20,6 +20,14 @@
 
 namespace {
 
+// flatbuffers::GenerateText returns bool up to 2.x and an error string (null on success) from 24.x on.
+bool succeeded(bool ok) {
+  return ok;
+}
+bool succeeded(const char* error) {
+  return error == nullptr;
+}
+
 flatbuffers::DetachedBuffer build_record() {
   flatbuffers::FlatBufferBuilder fbb;
   const ovt::fb::smoke::Span span(100, 24);
@@ -67,7 +75,7 @@ TEST_CASE("smoke Record survives JSON and a rebuild", "[fast][schema]") {
   REQUIRE(parser.Parse(schema_text.c_str(), include_dirs, OVT_SMOKE_FBS_PATH));
 
   std::string json;
-  REQUIRE(flatbuffers::GenerateText(parser, buf.data(), &json));
+  REQUIRE(succeeded(flatbuffers::GenerateText(parser, buf.data(), &json)));
   CHECK(json.find("stream_index: 7") != std::string::npos);
   CHECK(json.find("codec: \"Av1\"") != std::string::npos);
 
