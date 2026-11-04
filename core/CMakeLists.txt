@@ -82,7 +82,7 @@ ovt_set_license(ovt_core "${OVT_CORE_LICENSE}")
 # Dependencies from the vcpkg manifest (WI-0.002, chapter 13 §13.3.2). The triplets build them as static
 # libraries that ovt_core absorbs, so they stay PRIVATE: a downstream find_package(ovt) never sees them
 # (chapter 13 §13.2.6). SPDX ids are the ports' "license" fields.
-# vcpkg.json carries only the ports some target links; later WIs add theirs (chapter 13 §13.3.2).
+# SPEC-ASSUMPTION(#8): vcpkg.json carries only the ports some target links; later WIs add theirs.
 ovt_find_package(fmt SPDX "MIT" TARGETS fmt::fmt)
 ovt_find_package(spdlog SPDX "MIT" TARGETS spdlog::spdlog)
 ovt_find_package(flatbuffers SPDX "Apache-2.0" TARGETS flatbuffers::flatbuffers NAMES FlatBuffers)

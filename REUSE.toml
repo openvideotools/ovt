@@ -60,7 +60,7 @@ SPDX-License-Identifier = "GPL-3.0-or-later"
 # libaom's PATENTS file (the AOM Patent License 1.0), shipped next to every binary of the aom plugin
 # (§15.2, POL-PAT-6). Byte-identical to LICENSES/LicenseRef-AOM-Patent-License-1.0.txt and to the libaom
 # archive's PATENTS (its SHA-256 is in the libaom row of third_party/VERSIONS.md).
-# Until WI-2.155 this file is what makes the LicenseRef text "used" for REUSE (chapter 15 WI-0.600).
+# SPEC-ASSUMPTION(#20): this file is what makes the LicenseRef text "used" for REUSE until WI-2.155.
 [[annotations]]
 path = ["plugins/ovt-plugin-aom/PATENTS"]
 SPDX-FileCopyrightText = "Alliance for Open Media"

@@ -232,9 +232,11 @@ def check_table(spec: Spec) -> list[str]:
                 errors.append(f"{wi}: dependency {dep} has no §16.4 row")
         if len(bl) == 1:
             text = bl[0].depends_text
+            m = re.match(r"all phase-([0-9A]) WIs", text)
             # Ids in parentheses only state ownership or context ("the libplacebo path arrives with
             # WI-A.401"); §16.4 does not list them as dependencies.
-            block_deps = expand_ranges(_strip_parentheses(text), known)
+            # SPEC-ASSUMPTION(#17): a gate WI's "all phase-N WIs" is ordering by milestone, written `none` in §16.4.
+            block_deps = [] if m else expand_ranges(_strip_parentheses(text), known)
             if not text:
                 errors.append(f"{wi}: {bl[0].file}:{bl[0].line} block has no **Depends on:** line")
             elif sorted(block_deps) != sorted(row.depends):
