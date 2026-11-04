@@ -29,6 +29,13 @@
 #       CMake arguments that forward the active toolchain (compilers, toolchain file, OSX/Android settings,
 #       build type) into CMake-based ExternalProjects.
 #
+#   OVT_TP_SANITIZER_C_FLAGS, OVT_TP_SANITIZER_LINK_FLAGS
+#       The -fsanitize/-fno-sanitize-recover/-fno-omit-frame-pointer flags of the active OVT_SANITIZER set (§13.2.5),
+#       space-separated, empty when OVT_ENABLE_SANITIZERS=OFF. OVT_TP_CMAKE_TOOLCHAIN_ARGS already carries them as
+#       CMAKE_{C,CXX}_FLAGS and CMAKE_{EXE,SHARED,MODULE}_LINKER_FLAGS; a script that does not use
+#       CMake (Meson, configure) passes these two variables on itself (§14.8.1, WI-0.558). A script must not add its
+#       own CMAKE_{C,CXX}_FLAGS to CMAKE_ARGS: the later -D replaces the other, silently dropping the sanitizer flags.
+#
 #   ovt_tp_import_static(<imported-target> <ep-target> <library-relpath> <include-relpath>)
 #       Creates the STATIC IMPORTED GLOBAL target <imported-target> (tp::aom, ...) for a library installed by
 #       ExternalProject <ep-target> under its INSTALL_DIR, makes it depend on the build, and describes it for
@@ -42,33 +49,28 @@ find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)
 set(_OVT_TP_ROOT "${CMAKE_CURRENT_LIST_DIR}/..")
 cmake_path(NORMAL_PATH _OVT_TP_ROOT)
 set(_OVT_TP_TOOLS "${_OVT_TP_ROOT}tools")
-set(OVT_TP_VERSIONS_MD "${_OVT_TP_ROOT}third_party/VERSIONS.md" CACHE FILEPATH
-    "Third-party pin table parsed into versions.cmake (chapter 13 §13.3.7)")
+set(OVT_TP_VERSIONS_MD "${_OVT_TP_ROOT}third_party/VERSIONS.md"
+    CACHE FILEPATH "Third-party pin table parsed into versions.cmake (chapter 13 §13.3.7)")
 set(OVT_TP_VERSIONS_CMAKE "${CMAKE_BINARY_DIR}/third_party/versions.cmake")
 
 execute_process(
-  COMMAND "${Python3_EXECUTABLE}" -I "${_OVT_TP_TOOLS}/versions_to_cmake.py"
-          --versions "${OVT_TP_VERSIONS_MD}" --out "${OVT_TP_VERSIONS_CMAKE}"
-  RESULT_VARIABLE _ovt_tp_rc
-  ERROR_VARIABLE _ovt_tp_err)
+  COMMAND "${Python3_EXECUTABLE}" -I "${_OVT_TP_TOOLS}/versions_to_cmake.py" --versions "${OVT_TP_VERSIONS_MD}" --out
+          "${OVT_TP_VERSIONS_CMAKE}" RESULT_VARIABLE _ovt_tp_rc ERROR_VARIABLE _ovt_tp_err)
 if(NOT _ovt_tp_rc EQUAL 0)
   message(FATAL_ERROR "tools/versions_to_cmake.py failed on ${OVT_TP_VERSIONS_MD}:\n${_ovt_tp_err}")
 endif()
 unset(_ovt_tp_rc)
 unset(_ovt_tp_err)
-set_property(DIRECTORY "${CMAKE_SOURCE_DIR}" APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-             "${OVT_TP_VERSIONS_MD}" "${_OVT_TP_TOOLS}/versions_to_cmake.py")
+set_property(DIRECTORY "${CMAKE_SOURCE_DIR}" APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${OVT_TP_VERSIONS_MD}"
+                                                             "${_OVT_TP_TOOLS}/versions_to_cmake.py")
 include("${OVT_TP_VERSIONS_CMAKE}")
 
 set(OVT_TP_PATCH "${Python3_EXECUTABLE}" -I "${_OVT_TP_TOOLS}/apply_patches.py" --check --dir)
 
 # ---- toolchain forwarding ---------------------------------------------------------------------------
 set(OVT_TP_CMAKE_TOOLCHAIN_ARGS
-    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
-    "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
-    "-DCMAKE_POSITION_INDEPENDENT_CODE=ON"
-    "-DCMAKE_C_VISIBILITY_PRESET=hidden"
-    "-DCMAKE_CXX_VISIBILITY_PRESET=hidden")
+    "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}" "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}"
+    "-DCMAKE_POSITION_INDEPENDENT_CODE=ON" "-DCMAKE_C_VISIBILITY_PRESET=hidden" "-DCMAKE_CXX_VISIBILITY_PRESET=hidden")
 if(CMAKE_BUILD_TYPE)
   # Third-party code is always built optimised; Debug presets debug OVT, not libaom.
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -77,9 +79,18 @@ if(CMAKE_BUILD_TYPE)
     list(APPEND OVT_TP_CMAKE_TOOLCHAIN_ARGS "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
   endif()
 endif()
-foreach(_var CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER CMAKE_OSX_ARCHITECTURES
-             CMAKE_OSX_DEPLOYMENT_TARGET CMAKE_OSX_SYSROOT CMAKE_SYSTEM_NAME CMAKE_SYSTEM_PROCESSOR
-             ANDROID_ABI ANDROID_PLATFORM ANDROID_STL)
+foreach(
+  _var
+  CMAKE_C_COMPILER_LAUNCHER
+  CMAKE_CXX_COMPILER_LAUNCHER
+  CMAKE_OSX_ARCHITECTURES
+  CMAKE_OSX_DEPLOYMENT_TARGET
+  CMAKE_OSX_SYSROOT
+  CMAKE_SYSTEM_NAME
+  CMAKE_SYSTEM_PROCESSOR
+  ANDROID_ABI
+  ANDROID_PLATFORM
+  ANDROID_STL)
   if(DEFINED ${_var} AND NOT "${${_var}}" STREQUAL "")
     list(APPEND OVT_TP_CMAKE_TOOLCHAIN_ARGS "-D${_var}=${${_var}}")
   endif()
@@ -91,6 +102,35 @@ elseif(CMAKE_TOOLCHAIN_FILE AND NOT CMAKE_TOOLCHAIN_FILE MATCHES "/vcpkg\\.cmake
   list(APPEND OVT_TP_CMAKE_TOOLCHAIN_ARGS "-DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}")
 endif()
 unset(_var)
+
+# ---- sanitizer flags --------------------------------------------------------------------------------
+# Third-party code is built with the same -fsanitize flags as OVT (§14.8.1); otherwise ASan reports false
+# positives at the ABI boundary (shadow memory of instrumented and uninstrumented code disagree) and TSan
+# misses races inside libaom and FFmpeg. Optimisation and debug flags stay with the build type above.
+include(OvtTesting)
+set(OVT_TP_SANITIZER_C_FLAGS "")
+set(OVT_TP_SANITIZER_LINK_FLAGS "")
+foreach(_flag IN LISTS OVT_SANITIZER_COMPILE_FLAGS)
+  if(_flag MATCHES "^-f(no-)?sanitize|^-fno-omit-frame-pointer$")
+    string(APPEND OVT_TP_SANITIZER_C_FLAGS " ${_flag}")
+  endif()
+endforeach()
+foreach(_flag IN LISTS OVT_SANITIZER_LINK_FLAGS)
+  string(APPEND OVT_TP_SANITIZER_LINK_FLAGS " ${_flag}")
+endforeach()
+string(STRIP "${OVT_TP_SANITIZER_C_FLAGS}" OVT_TP_SANITIZER_C_FLAGS)
+string(STRIP "${OVT_TP_SANITIZER_LINK_FLAGS}" OVT_TP_SANITIZER_LINK_FLAGS)
+unset(_flag)
+if(OVT_TP_SANITIZER_C_FLAGS)
+  list(
+    APPEND
+    OVT_TP_CMAKE_TOOLCHAIN_ARGS
+    "-DCMAKE_C_FLAGS=${OVT_TP_SANITIZER_C_FLAGS}"
+    "-DCMAKE_CXX_FLAGS=${OVT_TP_SANITIZER_C_FLAGS}"
+    "-DCMAKE_EXE_LINKER_FLAGS=${OVT_TP_SANITIZER_LINK_FLAGS}"
+    "-DCMAKE_SHARED_LINKER_FLAGS=${OVT_TP_SANITIZER_LINK_FLAGS}"
+    "-DCMAKE_MODULE_LINKER_FLAGS=${OVT_TP_SANITIZER_LINK_FLAGS}")
+endif()
 
 # ---- ovt_tp_declare ---------------------------------------------------------------------------------
 function(ovt_tp_declare dep)
@@ -113,7 +153,7 @@ function(ovt_tp_declare dep)
   set_property(GLOBAL PROPERTY OVT_TP_VERSION_tp_${dep} "${OVT_TP_${dep}_VERSION}")
   set_property(GLOBAL PROPERTY OVT_TP_LICENSE_FILES_tp_${dep} "${arg_LICENSE_FILES}")
   if(OVT_TP_${dep}_PATCHES)
-    set_property(GLOBAL PROPERTY OVT_TP_PATCHED_tp_${dep} TRUE)   # licence manifest: "modified"
+    set_property(GLOBAL PROPERTY OVT_TP_PATCHED_tp_${dep} TRUE) # licence manifest: "modified"
   endif()
   if(arg_NO_DOWNLOAD)
     return()
@@ -149,8 +189,7 @@ function(ovt_tp_declare dep)
     file(SHA256 "${archive}.part" have)
     if(NOT have STREQUAL sha)
       file(REMOVE "${archive}.part")
-      message(FATAL_ERROR "ovt_tp_declare(${dep}): SHA-256 mismatch for ${url}: got ${have}, ${row} pins "
-                          "${sha}.")
+      message(FATAL_ERROR "ovt_tp_declare(${dep}): SHA-256 mismatch for ${url}: got ${have}, ${row} pins " "${sha}.")
     endif()
     file(RENAME "${archive}.part" "${archive}")
   endif()
@@ -186,19 +225,27 @@ function(ovt_tp_import_static imported ep library include_dir)
     message(FATAL_ERROR "ovt_tp_import_static(${imported}): no ovt_tp_declare() for '${ep}' "
                         "(ExternalProject names are tp_<dep>).")
   endif()
-  ExternalProject_Get_Property(${ep} INSTALL_DIR)
+  externalproject_get_property(${ep} INSTALL_DIR)
   # INTERFACE_INCLUDE_DIRECTORIES must exist at generate time, before the build installs anything.
   file(MAKE_DIRECTORY "${INSTALL_DIR}/${include_dir}")
   add_library(${imported} STATIC IMPORTED GLOBAL)
-  set_target_properties(${imported} PROPERTIES
-    IMPORTED_LOCATION "${INSTALL_DIR}/${library}"
-    INTERFACE_INCLUDE_DIRECTORIES "${INSTALL_DIR}/${include_dir}")
+  set_target_properties(${imported} PROPERTIES IMPORTED_LOCATION "${INSTALL_DIR}/${library}"
+                                               INTERFACE_INCLUDE_DIRECTORIES "${INSTALL_DIR}/${include_dir}")
   add_dependencies(${imported} ${ep})
   set(patched "")
   get_property(was_patched GLOBAL PROPERTY OVT_TP_PATCHED_${ep})
   if(was_patched)
     set(patched PATCHED)
   endif()
-  ovt_set_dependency_license(${imported} SOURCE third_party SPDX "${spdx}" VERSION "${version}"
-                             LINKAGE static ${patched})
+  ovt_set_dependency_license(
+    ${imported}
+    SOURCE
+    third_party
+    SPDX
+    "${spdx}"
+    VERSION
+    "${version}"
+    LINKAGE
+    static
+    ${patched})
 endfunction()
