@@ -21,10 +21,10 @@
 namespace {
 
 // flatbuffers::GenerateText returns bool up to 2.x and an error string (null on success) from 24.x on.
-bool succeeded(bool ok) {
+[[maybe_unused]] bool succeeded(bool ok) {
   return ok;
 }
-bool succeeded(const char* error) {
+[[maybe_unused]] bool succeeded(const char* error) {
   return error == nullptr;
 }
 
