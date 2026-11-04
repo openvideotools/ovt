@@ -81,8 +81,8 @@ function(ovt_add_flatbuffers_schema target)
     add_custom_command(
       OUTPUT "${header}" "${stamp}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${gen_dir}/python" "${gen_dir}/kotlin"
-      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --scoped-enums
-              -I "${fbs_dir}" -o "${gen_dir}" "${fbs}"
+      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --scoped-enums -I
+              "${fbs_dir}" -o "${gen_dir}" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --python -I "${fbs_dir}" -o "${gen_dir}/python" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --kotlin -I "${fbs_dir}" -o "${gen_dir}/kotlin" "${fbs}"
       COMMAND "${CMAKE_COMMAND}" -E touch "${stamp}"
