@@ -45,8 +45,8 @@ the `clang-tidy` job runs the script after configuring `linux-x64-debug` and it 
 The whole-tree step (nightly in `static-analysis.yml`) was run once on this PR by a temporary commit
 (`e103d49`, switched off again in the final commit):
 
-```console
-$ run-clang-tidy-15 -p build/linux-x64-debug -quiet -extra-arg=-Wno-unknown-warning-option '^$PWD/(core|render|plugins|cli|app)/.*\.(cpp|cc)$'
+```sh
+run-clang-tidy-15 -p build/linux-x64-debug -quiet -extra-arg=-Wno-unknown-warning-option '^$PWD/(core|render|plugins|cli|app)/.*\.(cpp|cc)$'
 ```
 
 First run (`41856719263`) found 11 findings, all in `core/tests/` plus none in production code. After
