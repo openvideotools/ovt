@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Package configuration for find_package(ovt CONFIG) (chapter 13 §13.2.6).
+# Imported targets: ovt::core (always), ovt::render (when it was built).
+# Variables: OVT_PLUGIN_DIR (runtime plugins), OVT_SCHEMA_DIR (installed .fbs schemas).
+
+@PACKAGE_INIT@
+
+# Not set_and_check: the plugin directory exists only once a plugin is installed.
+set(OVT_PLUGIN_DIR "@PACKAGE_OVT_PLUGIN_DIR@")
+set(OVT_SCHEMA_DIR "@PACKAGE_OVT_SCHEMA_DIR@")
+
+include("${CMAKE_CURRENT_LIST_DIR}/ovt-targets.cmake")
+
+check_required_components(ovt)

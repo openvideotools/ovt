@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# CI skeleton (WI-0.000; chapter 13 §13.7.1). Work items add their jobs to the jobs map; WI-0.030
+# completes the matrix. Third-party actions are pinned by commit SHA, never by tag.
+name: ci
+
+on: [pull_request, push]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # SPEC-ASSUMPTION(#2): GitHub rejects an empty jobs map, so the skeleton carries one no-op job.
+  # WI-0.030 removes it when the real jobs exist.
+  skeleton:
+    runs-on: ubuntu-22.04
+    steps:
+      - run: echo "CI skeleton; jobs arrive with WI-0.030 and the M0.1 work items."
