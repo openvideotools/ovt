@@ -10,6 +10,8 @@
 #include <fstream>
 #include <string>
 
+#include <unistd.h>
+
 #include "test_support/corpus.h"
 
 namespace {
@@ -17,7 +19,9 @@ namespace {
 // A scratch corpus cache below the build tree, selected through OVT_CORPORA_DIR for one test case.
 class ScratchCorpora {
  public:
-  ScratchCorpora() : dir_(std::filesystem::path(OVT_TEST_BINARY_DIR) / "scratch_corpora") {
+  // ctest runs each test case in its own process, concurrently: the directory name carries the process id.
+  ScratchCorpora()
+      : dir_(std::filesystem::path(OVT_TEST_BINARY_DIR) / ("scratch_corpora_" + std::to_string(::getpid()))) {
     std::filesystem::remove_all(dir_);
     std::filesystem::create_directories(dir_);
     if (const char* old = std::getenv("OVT_CORPORA_DIR")) {  // NOLINT(concurrency-mt-unsafe)
