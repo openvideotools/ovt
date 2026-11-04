@@ -53,7 +53,7 @@ check dist_y4m dist.y4m ff -i syn_h265_amp_sao_on.265 -pix_fmt yuv420p dist.y4m
 check trace_headers trace_headers.txt sh -c 'ffmpeg -hide_banner -loglevel trace -i syn_h265_amp_sao_on.265 \
   -map 0:v:0 -c:v copy -bsf:v trace_headers -f null - 2> trace_headers.txt'
 check trace_headers_mp4 - sh -c 'ffmpeg -hide_banner -loglevel trace -i syn_h265.mp4 -map 0:v:0 -c:v copy \
-  -bsf:v hevc_mp4toannexb,trace_headers -f null - 2>&1 | grep -m1 nal_unit_header'
+  -bsf:v hevc_mp4toannexb,trace_headers -f null - 2>&1 | grep -m1 nal_unit_type'
 check mp4box_diso - MP4Box -diso -std syn_h265.mp4
 check mp4box_dts - MP4Box -dts -std syn_h265.mp4
 check mp4box_dnal - MP4Box -dnal 1 -std syn_h265.mp4
@@ -70,7 +70,7 @@ check mp4fragment syn_h265_frag.mp4 mp4fragment syn_h265.mp4 syn_h265_frag.mp4
 check mkvinfo - mkvinfo syn_h265.mkv
 check tsanalyze - tsanalyze syn_h265.ts
 check tstables - tstables syn_h265.ts
-check tsp - tsp -I file syn_h265.ts -P count -O drop
+check tsp tsp.stderr tsp -I file syn_h265.ts -P count -O drop # count reports on stderr
 check gst_codecparsers - pkg-config --cflags --libs gstreamer-codecparsers-1.0
 
 # --- §14.4.3-14.4.5 block-level oracles --------------------------------------------------------------------
@@ -90,7 +90,9 @@ check ffvmaf ffvmaf.json ff -i dist.y4m -i src_720p_8bit.y4m -lavfi \
 check vmaf vmaf.json vmaf --reference src_720p_8bit.y4m --distorted dist.y4m --model version=vmaf_v0.6.1 \
   --feature psnr --feature float_ssim --feature float_ms_ssim --feature psnr_hvs --feature ciede --feature cambi \
   --threads 4 --json --output vmaf.json
-check x264_cli_ssim - sh -c 'x264 --ssim --psnr --qp 0 --frames 5 -o /dev/null src_720p_8bit.y4m 2>&1 | grep "SSIM Mean Y"'
+# SPEC-ASSUMPTION(#49): x264 turns --ssim/--psnr off when --qp 0 makes the encode lossless (encoder.c),
+# so §14.4.12's `--qp 0` sanity command never prints SSIM; --qp 20 does.
+check x264_cli_ssim - sh -c 'x264 --ssim --psnr --qp 20 --frames 5 -o /dev/null src_720p_8bit.y4m 2>&1 | grep "SSIM Mean Y"'
 check dump_psnrhvs - dump_psnrhvs -y src_720p_8bit.y4m dist.y4m
 check dump_ciede2000 - dump_ciede2000 src_720p_8bit.y4m dist.y4m
 check bjontegaard - python3 -c 'import bjontegaard as bd

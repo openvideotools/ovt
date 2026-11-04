@@ -28,7 +28,8 @@ versions (`oracle_versions.py --check-pins` enforces it, the weekly `oracle-imag
 
 `Probe` runs in the image; `Expect` is the text the probe's output must contain. Tools that print no
 version (or the same version for every release) report the stamp their build script wrote under
-`$OVT_ORACLES_STAMPS`.
+`$OVT_ORACLES_STAMPS`. `vmaf --version` prints `git describe --match '?.*.*' --always`, which never matches
+the `v3.0.0` tag, so it reports the pinned commit's short hash.
 
 <!-- oracle-versions:begin -->
 | Tool | Version | Source | Licence | Probe | Expect |
@@ -41,13 +42,13 @@ version (or the same version for every release) report the stamp their build scr
 | aomdec | 3.12.1 | as aomenc | BSD-2-Clause + AOM patent licence | `aomdec --help` | `3.12.1` |
 | inspect | 3.12.1 | as aomenc, `CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1` | BSD-2-Clause + AOM patent licence | `cat "$OVT_ORACLES_STAMPS/inspect.version"` | `libaom v3.12.1` |
 | dav1d | 1.5.1 | <https://code.videolan.org/videolan/dav1d> `42b2b24fb8819f1ed3643aa9cf2a62f03868e3aa` | BSD-2-Clause | `dav1d --version` | `1.5.1` |
-| vmaf | 3.0.0 | <https://github.com/Netflix/vmaf> `17a67b238ce0539bdeafdc95961abac64fa16ea8`, `-Denable_float=true` | BSD-2-Clause-Patent | `vmaf --version` | `3.0.0` |
+| vmaf | 3.0.0 | <https://github.com/Netflix/vmaf> `17a67b238ce0539bdeafdc95961abac64fa16ea8`, `-Denable_float=true` | BSD-2-Clause-Patent | `vmaf --version` | `17a67b2` |
 | MP4Box | v2.4.0 | <https://github.com/gpac/gpac> `5d70253ac94e5840be7b86054131dd753af63cc7` | LGPL-2.1-or-later | `MP4Box -version` | `GPAC version 2.4` |
 | mp4dump | v1.6.0-641 | <https://github.com/axiomatic-systems/Bento4> `dc264854d1f76c370b65b18d9f303a95f7f21ab1` | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4dump.version"` | `Bento4 v1.6.0-641` |
 | mp4encrypt | v1.6.0-641 | as mp4dump | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4encrypt.version"` | `Bento4 v1.6.0-641` |
 | mp4fragment | v1.6.0-641 | as mp4dump | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4fragment.version"` | `Bento4 v1.6.0-641` |
 | mp4ff-info | v0.48.0 | `go install github.com/Eyevinn/mp4ff/cmd/mp4ff-info@v0.48.0` (`go.sum` checked) | MIT | `mp4ff-info -version` | `v0.48` |
-| mp4box.js | 1.5.0 | npm `mp4box@1.5.0`, [`package-lock.json`](package-lock.json) | BSD-3-Clause | `node -p "require('mp4box/package.json').version"` | `1.5.0` |
+| mp4box.js | 1.5.0 | npm `mp4box@1.5.0`, [`package-lock.json`](package-lock.json) | BSD-3-Clause | `node -p "require(process.env.NODE_PATH + '/mp4box/package.json').version"` | `1.5.0` |
 | node | v20.20.2 | see Base | MIT | `node --version` | `v20.20.2` |
 | mediainfo | 24.01 | Ubuntu 24.04 snapshot | BSD-2-Clause | `mediainfo --Version` | `v24.01` |
 | mkvinfo | 82.0 | Ubuntu 24.04 snapshot (`mkvtoolnix`) | GPL-2.0-or-later | `mkvinfo --version` | `v82.0` |

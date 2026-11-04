@@ -92,12 +92,16 @@ def report(rows: list[Row]) -> tuple[str, bool]:
     lines = ["| Tool | Pinned | Reported | Status |", "|---|---|---|---|"]
     ok = True
     for row in rows:
-        line = reported_line(run_probe(row.probe), row.expect)
+        output = run_probe(row.probe)
+        line = reported_line(output, row.expect)
         ok &= line is not None
-        lines.append(
-            f"| {row.tool} | {row.version} | {line or '(no line contains ' + row.expect + ')'} | "
-            f"{'ok' if line else 'MISMATCH'} |"
-        )
+        if line is None:
+            first = next((" ".join(x.split()) for x in output.splitlines() if x.strip()), "no output")
+            first = first[:120].replace("|", "\\|")
+            line_text = f"(no line contains {row.expect}; first line: {first})"
+        else:
+            line_text = line
+        lines.append(f"| {row.tool} | {row.version} | {line_text} | {'ok' if line else 'MISMATCH'} |")
     return "\n".join(lines) + "\n", ok
 
 

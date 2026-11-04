@@ -39,7 +39,7 @@ def test_report_prints_only_the_matching_line_and_flags_mismatches() -> None:
     assert not ok
     assert "| alpha | 1.2.3 | alpha version 1.2.3 (x) | ok |" in text
     assert "2026-01-01" not in text  # build dates never reach the report (acceptance test 3)
-    assert "| beta | 9 | (no line contains beta 9) | MISMATCH |" in text
+    assert "| beta | 9 | (no line contains beta 9; first line: beta 8) | MISMATCH |" in text
     assert "| pipe | 1 | b | ok |" in text
 
 
