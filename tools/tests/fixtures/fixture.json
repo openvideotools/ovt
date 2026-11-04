@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "fx_plain",
+      "source": "misc",
+      "url": "http://127.0.0.1:8080/plain.bin",
+      "sha256": "a1f259d4365ed4320c377ce26f5c8c56dcdc9a89e7b641bfd8eabfbbeac86654",
+      "size_bytes": 16384,
+      "licence": "test fixture",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "aliases": [
+        "plain_alias.bin"
+      ]
+    },
+    {
+      "id": "fx_zip",
+      "source": "misc",
+      "url": "http://127.0.0.1:8080/nested.zip",
+      "sha256": "58fc18aca2efbcc155017872affbae0b463df260356285692ccf033fd04afa1c",
+      "size_bytes": 16655,
+      "licence": "test fixture",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "extract": {
+        "archive": "zip",
+        "member": "dir/stream.264",
+        "md5_member": "dir/stream_yuv.md5"
+      }
+    },
+    {
+      "id": "fx_targz",
+      "source": "misc",
+      "url": "http://127.0.0.1:8080/archive.tar.gz",
+      "sha256": "77c94f9791194a9d7f571d455927f544573f58f541068edfb302864b1578ab70",
+      "size_bytes": 490,
+      "licence": "test fixture",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "extract": {
+        "archive": "tar.gz",
+        "member": "stream.obu"
+      }
+    },
+    {
+      "id": "fx_corrupt",
+      "source": "misc",
+      "url": "http://127.0.0.1:8080/corrupt.bin",
+      "sha256": "a1f259d4365ed4320c377ce26f5c8c56dcdc9a89e7b641bfd8eabfbbeac86654",
+      "size_bytes": 16384,
+      "licence": "test fixture",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true
+    }
+  ]
+}

@@ -16,3 +16,4 @@ pybind11-stubgen==2.5.1
 cmakelang==0.6.13
 pyyaml==6.0.2
 pre-commit==4.0.1
+py7zr==1.1.4

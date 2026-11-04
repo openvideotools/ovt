@@ -1,0 +1,321 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {
+      "id": "aom_av1_1_b8_01_size_16x16",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-01-size-16x16.ivf",
+      "sha256": "8bb6d2c4bfdddca26815e4545c829c8d25ed11341a8d2858ada792e50e4f1ee9",
+      "size_bytes": 318,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "aom_av1_1_b8_01_size_16x18",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-01-size-16x18.ivf",
+      "sha256": "b857b0a4b0d54bb0df6b237164217beb6027d6ec685b12f6f88cf5fd5d544394",
+      "size_bytes": 350,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "aom_av1_1_b8_01_size_66x66",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-01-size-66x66.ivf",
+      "sha256": "5f9285cbc417b0457c806df9154a1898f0f9ca09066abfdfd828cb3b2ba0371b",
+      "size_bytes": 466,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "aom_av1_1_b8_01_size_196x196",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-01-size-196x196.ivf",
+      "sha256": "ecacf9c2065eec1a02248395412be5e03ed7e3fedfd6653622e09e73d1cac747",
+      "size_bytes": 821,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "aom_av1_1_b8_01_size_226x226",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-01-size-226x226.ivf",
+      "sha256": "b5d9a30f24e33f8fa6a655961645650542dc2545fb7d557e2d55a043dac69f50",
+      "size_bytes": 1079,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "aom_av1_1_b8_02_allintra",
+      "source": "aom",
+      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://storage.googleapis.com/aom-test-data/av1-1-b8-02-allintra.ivf",
+      "sha256": "5fcd265fd9f9bdd0d3179340b4c4532f1422ca5e5d97741c7481b84cb5dc122f",
+      "size_bytes": 1488725,
+      "codecs": [
+        "av1"
+      ],
+      "containers": [
+        "ivf"
+      ],
+      "tests": [
+        "syntax",
+        "md5"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "jvt_BA1_Sony_D",
+      "source": "jvt",
+      "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted \u2014 do not mirror",
+      "licence_spdx": "LicenseRef-ITU-Conformance",
+      "redistributable": false,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/BA1_Sony_D.zip",
+      "unverified": true,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "annexb"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "extract": {
+        "archive": "auto",
+        "member": "BA1_Sony_D.264"
+      }
+    },
+    {
+      "id": "jvt_CABA1_SVA_B",
+      "source": "jvt",
+      "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted \u2014 do not mirror",
+      "licence_spdx": "LicenseRef-ITU-Conformance",
+      "redistributable": false,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/CABA1_SVA_B.zip",
+      "unverified": true,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "annexb"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "extract": {
+        "archive": "auto",
+        "member": "CABA1_SVA_B.264"
+      }
+    },
+    {
+      "id": "jctvc_AMP_A_Samsung_7",
+      "source": "jctvc",
+      "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted \u2014 do not mirror",
+      "licence_spdx": "LicenseRef-ITU-Conformance",
+      "redistributable": false,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/AMP_A_Samsung_7.zip",
+      "unverified": true,
+      "codecs": [
+        "h265"
+      ],
+      "containers": [
+        "annexb"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "extract": {
+        "archive": "auto",
+        "member": "AMP_A_Samsung_7.bit",
+        "md5_member": "AMP_A_Samsung_7_yuv.md5"
+      },
+      "features": [
+        "amp",
+        "main"
+      ]
+    },
+    {
+      "id": "mpegff_a1_foreman_qcif",
+      "source": "mpegff",
+      "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
+      "licence_spdx": "LicenseRef-MPEG-Conformance",
+      "redistributable": false,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/master/data/file_features/published/isobmff/a1-foreman-QCIF.mp4",
+      "unverified": true,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "aliases": [
+        "isom_basic.mp4"
+      ]
+    },
+    {
+      "id": "gpac_enc_cenc",
+      "source": "gpac",
+      "licence": "GPAC test suite media; per-file notices in media/README",
+      "licence_spdx": "LicenseRef-GPAC-Testsuite-Media",
+      "redistributable": false,
+      "url": "https://raw.githubusercontent.com/gpac/testsuite/master/media/encryption/enc_cenc.mp4",
+      "unverified": true,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "bento4_frag_cenc",
+      "source": "bento4",
+      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
+      "licence_spdx": "LicenseRef-Bento4-Test-Media",
+      "redistributable": false,
+      "url": "https://raw.githubusercontent.com/axiomatic-systems/Bento4/master/Test/Data/frag-cenc.mp4",
+      "unverified": true,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "netflix_src01_hrc00_576x324",
+      "source": "netflix",
+      "licence": "BSD-2-Clause-Patent (vmaf repository)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://raw.githubusercontent.com/Netflix/vmaf/master/python/test/resource/yuv/src01_hrc00_576x324.yuv",
+      "unverified": true,
+      "codecs": [],
+      "containers": [
+        "raw"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "post": {
+        "wrap_y4m": {
+          "width": 576,
+          "height": 324,
+          "fps": "25/1",
+          "pix_fmt": "yuv420p",
+          "frames": 48
+        }
+      }
+    },
+    {
+      "id": "netflix_src01_hrc01_576x324",
+      "source": "netflix",
+      "licence": "BSD-2-Clause-Patent (vmaf repository)",
+      "licence_spdx": "BSD-2-Clause-Patent",
+      "redistributable": true,
+      "url": "https://raw.githubusercontent.com/Netflix/vmaf/master/python/test/resource/yuv/src01_hrc01_576x324.yuv",
+      "unverified": true,
+      "codecs": [],
+      "containers": [
+        "raw"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "post": {
+        "wrap_y4m": {
+          "width": 576,
+          "height": 324,
+          "fps": "25/1",
+          "pix_fmt": "yuv420p",
+          "frames": 48
+        }
+      }
+    }
+  ]
+}
