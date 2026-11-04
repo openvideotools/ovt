@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# markdownlint settings for the `lint` job (chapter 13 §13.7.1). Prose wraps at 120 columns like the code;
+# tables and code blocks may be wider.
+default: true
+MD013:
+  line_length: 120
+  tables: false
+  code_blocks: false
