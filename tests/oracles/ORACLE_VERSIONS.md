@@ -70,6 +70,8 @@ version (or the same version for every release) report the stamp their build scr
 | tf2onnx | 1.17.0 | [`requirements.txt`](requirements.txt) | Apache-2.0 | `python-package:tf2onnx` | `1.17.0` |
 | bjontegaard | 1.3.0 | [`requirements.txt`](requirements.txt) | BSD-3-Clause | `python-package:bjontegaard` | `1.3.0` |
 | siti-tools | 0.6.0 | [`requirements.txt`](requirements.txt) | MIT | `python-package:siti-tools` | `0.6.0` |
+| scikit-image | 0.26.0 | [`requirements.txt`](requirements.txt) (for `dump_ciede2000`) | BSD-3-Clause | `python-package:scikit-image` | `0.26.0` |
+| y4m | 1.1.1 | [`requirements.txt`](requirements.txt) (for `dump_ciede2000`) | Apache-2.0 | `python-package:y4m` | `1.1.1` |
 <!-- oracle-versions:end -->
 
 The in-house oracle programs (`gst_parse_oracle`, `hm_cu_dump`, `ffmpeg_mvs`, `x264_ssim`, `mpv_capture.py`)

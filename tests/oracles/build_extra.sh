@@ -5,7 +5,7 @@
 # The remaining source-built oracles of chapter 14 §14.2.6 (WI-0.554), one per Dockerfile stage:
 #   build_extra.sh gpac    MP4Box (§14.4.6), static binary
 #   build_extra.sh bento4  mp4dump, mp4encrypt, mp4fragment (§14.3.3 recipes)
-#   build_extra.sh daala   dump_psnrhvs, dump_ciede2000 (§14.4.13)
+#   build_extra.sh daala   dump_psnrhvs, dump_ciede2000 (a Python script upstream; §14.4.13)
 #   build_extra.sh mpv     libplacebo (the third_party/VERSIONS.md pin) + mpv (§14.4.15); needs FFmpeg in the prefix
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
@@ -52,10 +52,11 @@ case "${tool}" in
     ./autogen.sh
     ./configure --disable-player --disable-shared --disable-unit-tests --disable-doc # static: no libtool wrappers
     make -j "${OVT_ORACLES_JOBS}" tools
-    for t in dump_psnrhvs dump_ciede2000; do
-      install -D -m 0755 "tools/${t}" "${P}/bin/${t}"
-      ovt_stamp "${t}" "Daala ${DAALA_COMMIT}"
-    done
+    install -D -m 0755 tools/dump_psnrhvs "${P}/bin/dump_psnrhvs"
+    # dump_ciede2000 is a Python script in Daala (numpy, scikit-image, y4m from requirements.txt).
+    sed '1s|.*|#!/usr/bin/env python3|' tools/dump_ciede2000.py >"${P}/bin/dump_ciede2000"
+    chmod 0755 "${P}/bin/dump_ciede2000"
+    for t in dump_psnrhvs dump_ciede2000; do ovt_stamp "${t}" "Daala ${DAALA_COMMIT}"; done
     ;;
   mpv)
     ovt_git_fetch https://code.videolan.org/videolan/libplacebo.git "refs/tags/${LIBPLACEBO_VERSION}" \
