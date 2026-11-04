@@ -117,22 +117,22 @@ def test_manifest_ok_and_zstd_choice(tmp_path: Path) -> None:
 
 
 def test_2_agpl_row_is_denied(tmp_path: Path) -> None:
-    code, data, err = run("--versions", str(FIX / "versions_agpl.md"), report=tmp_path / "r.json")
+    code, data, err = run("--versions", str(FIX / "versions_agpl.txt"), report=tmp_path / "r.json")
     assert code == 1
     assert [f for f in data["findings"] if f["code"] == "E-DENY" and f["license"] == "AGPL-3.0-only"]
     assert "E-DENY third_party/VERSIONS.md:MinIO AGPL-3.0-only" in err
 
 
 def test_3_zstd_or_expression_passes(tmp_path: Path) -> None:
-    code, data, _ = run("--versions", str(FIX / "versions_ok.md"), report=tmp_path / "r.json")
+    code, data, _ = run("--versions", str(FIX / "versions_ok.txt"), report=tmp_path / "r.json")
     assert code == 0
     assert next(e for e in data["inventory"] if e["component"] == "zstd")["chosen"] == "BSD-3-Clause"
 
 
 def test_4_bsl_is_not_busl(tmp_path: Path) -> None:
-    code, data, _ = run("--versions", str(FIX / "versions_ok.md"), report=tmp_path / "ok.json")
+    code, data, _ = run("--versions", str(FIX / "versions_ok.txt"), report=tmp_path / "ok.json")
     assert code == 0 and next(e for e in data["inventory"] if e["component"] == "Catch2")["chosen"] == "BSL-1.0"
-    code, data, _ = run("--versions", str(FIX / "versions_busl.md"), report=tmp_path / "bad.json")
+    code, data, _ = run("--versions", str(FIX / "versions_busl.txt"), report=tmp_path / "bad.json")
     assert code == 1 and "E-DENY" in codes(data)
 
 
@@ -232,7 +232,7 @@ def _run_with_policy(policy: Path, *args: str, report: Path) -> tuple[int, dict]
 def test_7_expired_exception(tmp_path: Path) -> None:
     policy = _policy_with_exception(tmp_path, "2026-01-01")
     code, data = _run_with_policy(
-        policy, "--versions", str(FIX / "versions_agpl.md"), "--today", "2026-11-04", report=tmp_path / "r.json"
+        policy, "--versions", str(FIX / "versions_agpl.txt"), "--today", "2026-11-04", report=tmp_path / "r.json"
     )
     assert code == 1 and sorted(codes(data)) == ["E-DENY", "E-EXPIRED"]
 
@@ -240,7 +240,7 @@ def test_7_expired_exception(tmp_path: Path) -> None:
 def test_live_exception_suppresses_finding(tmp_path: Path) -> None:
     policy = _policy_with_exception(tmp_path, "2027-06-30")
     code, data = _run_with_policy(
-        policy, "--versions", str(FIX / "versions_agpl.md"), "--today", "2026-11-04", report=tmp_path / "r.json"
+        policy, "--versions", str(FIX / "versions_agpl.txt"), "--today", "2026-11-04", report=tmp_path / "r.json"
     )
     assert code == 0 and data["findings"] == []
 
@@ -294,7 +294,7 @@ def test_usage_errors(tmp_path: Path) -> None:
 
 def test_script_runs_under_python_dash_i(tmp_path: Path) -> None:
     out = subprocess.run(
-        [sys.executable, "-I", str(GATE), "--policy", str(POLICY), "--versions", str(FIX / "versions_agpl.md")],
+        [sys.executable, "-I", str(GATE), "--policy", str(POLICY), "--versions", str(FIX / "versions_agpl.txt")],
         capture_output=True,
         text=True,
         check=False,
