@@ -15,13 +15,17 @@ Every `run:` block passes `shellcheck -S warning` (extracted with `${{ }}` expre
 
 ## Test 1: the three jobs run and pass on a PR
 
-The PR's own checks show the result. The jobs also run on `ci/m01-integration`, a branch that merges every
-open M0.1 pull request, to check the jobs against the complete M0.1 tree. The results are linked from the PR.
+Result: pass. On PR #28 at `821ee7f`, `lint`, `build-linux-x64` and `build-macos-arm64` all passed
+(2026-11-04). The same three jobs passed on `ci/m01-integration` at `b7f5409`, a branch that merges every
+open M0.1 pull request (run 41791237849). On the Mac Mini runner, `ctest` ran 8 of 8 tests and passed,
+including `downstream_consumer`.
 
 `build-macos-arm64` needs the self-hosted runner on the Mac Mini to be online with the labels
 `self-hosted, macOS, ARM64`. Without it, the job waits in the queue.
 
 ## Test 2: `build-linux-x64` finishes in at most 40 minutes with a warm cache
 
-Measured on the second run of the job, after the first run has saved the caches. The time is recorded in the
-PR.
+Result: pass. The cold run on PR #28 took 7 min 10 s (07:18:56 to 07:26:06 UTC). The warm run on
+`ci/m01-integration`, with the vcpkg and ccache caches restored, took 1 min 33 s (07:20:27 to 07:22:00 UTC).
+Both are well under the 40 min budget. The times will grow as the third-party builds of WI-0.011 to
+WI-0.015 land.
