@@ -66,9 +66,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         rows = [r for r in rows if r.dep in args.only]
     args.out.mkdir(parents=True, exist_ok=True)
-    errors = [e for e in (fetch(r, args.out) for r in rows) if e]
-    for e in errors:
-        print(f"error: {e}", file=sys.stderr)
+    errors = [err for err in (fetch(r, args.out) for r in rows) if err]
+    for err in errors:
+        print(f"error: {err}", file=sys.stderr)
     print(f"{len(rows) - len(errors)} of {len(rows)} archives verified in {args.out}")
     return 1 if errors else 0
 

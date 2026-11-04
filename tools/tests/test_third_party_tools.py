@@ -125,7 +125,7 @@ def configure_fixture(tmp_path: Path, versions: Path) -> subprocess.CompletedPro
         "include(OvtThirdPartyCommon)\novt_tp_declare(libfixture)\n"
         'message(STATUS "archive: ${OVT_TP_libfixture_ARCHIVE}")\n')
     return subprocess.run(
-        [CMAKE, "-S", str(project), "-B", str(tmp_path / "build"), f"-DOVT_TP_VERSIONS_MD={versions}",
+        [str(CMAKE), "-S", str(project), "-B", str(tmp_path / "build"), f"-DOVT_TP_VERSIONS_MD={versions}",
          f"-DOVT_TP_DOWNLOADS={tmp_path / 'dl'}", f"-DPython3_EXECUTABLE={sys.executable}"],
         capture_output=True, text=True, check=False)
 
