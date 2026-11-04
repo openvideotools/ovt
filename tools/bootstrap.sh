@@ -158,7 +158,7 @@ check_tools_linux() {
     case "$INSTALL_CMDS" in
       *add-apt-repository*|*kitware*)
         # the repositories above need these first
-        INSTALL_CMDS="apt-get update && apt-get install -y --no-install-recommends software-properties-common gpg curl ca-certificates
+        INSTALL_CMDS="apt-get update && apt-get install -y --no-install-recommends software-properties-common gpg gpg-agent curl ca-certificates
 $INSTALL_CMDS" ;;
     esac
     add_cmd "apt-get update"

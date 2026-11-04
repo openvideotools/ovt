@@ -74,7 +74,7 @@ The macOS branch of the host check was exercised on Linux through the host overr
 $ OVT_BOOTSTRAP_HOST=Darwin tools/bootstrap.sh --print-install
 xcode-select --install
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install cmake ninja ccache pkg-config nasm autoconf autoconf-archive automake libtool
+brew install cmake ninja ccache pkgconf nasm autoconf autoconf-archive automake libtool
 ```
 
 ## Lint

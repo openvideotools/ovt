@@ -3,11 +3,11 @@
 #
 # Homebrew formulae for a macOS build host (chapter 13 §13.1, §13.9.1; WI-0.006). tools/bootstrap.sh
 # prints the `brew install` line for the missing ones. Xcode >= 16 (or its command-line tools) is a
-# separate install: `xcode-select --install`.
+# separate install: `xcode-select --install`. `pkgconf` is the current name of the old `pkg-config` formula.
 cmake
 ninja
 ccache
-pkg-config
+pkgconf
 nasm
 python@3.12
 autoconf
