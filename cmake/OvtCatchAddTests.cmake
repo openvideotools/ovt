@@ -73,7 +73,10 @@ foreach(case IN LISTS cases)
   list(JOIN labels ";" labels)
 
   # Catch2 treats , [ ] \ * specially in a test spec; escape them so each test runs exactly itself.
-  string(REGEX REPLACE "([,\\[\\]\\\\*])" "\\\\\\1" spec "${name}")
+  string(REPLACE "\\" "\\\\" spec "${name}")
+  foreach(special "," "[" "]" "*")
+    string(REPLACE "${special}" "\\${special}" spec "${spec}")
+  endforeach()
   _ovt_bracket("${name}" qname)
   _ovt_bracket("${spec}" qspec)
   _ovt_bracket("${labels}" qlabels)
