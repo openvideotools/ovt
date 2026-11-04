@@ -43,9 +43,7 @@ def _load_reply(build_dir: Path) -> Path:
         query = api / "query"
         query.mkdir(parents=True, exist_ok=True)
         (query / "codemodel-v2").touch()
-        done = subprocess.run(
-            ["cmake", str(build_dir)], capture_output=True, text=True, check=False
-        )
+        done = subprocess.run(["cmake", str(build_dir)], capture_output=True, text=True, check=False)
         if done.returncode != 0:
             sys.stderr.write(done.stdout + done.stderr)
             raise SystemExit(2)
@@ -78,13 +76,9 @@ def violations(build_dir: Path, source_dir: Path) -> list[str]:
             if src.is_relative_to(source_dir.resolve())
             else None
         )
-        if rel is None or rel.parts[0] not in OVT_DIRS:
+        if rel is None or not rel.parts or rel.parts[0] not in OVT_DIRS:
             continue
-        defines = {
-            d["define"]
-            for g in target.get("compileGroups", [])
-            for d in g.get("defines", [])
-        }
+        defines = {d["define"] for g in target.get("compileGroups", []) for d in g.get("defines", [])}
         if MARKER not in defines:
             bad.append(f"{target['name']} ({rel})")
     return sorted(bad)

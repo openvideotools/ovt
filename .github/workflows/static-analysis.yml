@@ -37,39 +37,64 @@ jobs:
         with:
           fetch-depth: 0 # the PR diff against the base commit
 
-      - uses: ./.github/actions/setup-ovt
-        with:
-          preset: linux-x64-debug
-          triplet: x64-linux-ovt
-
-      - name: clang-tidy
-        run: |
-          sudo apt-get install -y -q --no-install-recommends clang-tidy-15
-          echo "/usr/lib/llvm-15/bin" >> "$GITHUB_PATH"
-
-      # Configure and build once: compile_commands.json and the generated sources (FlatBuffers headers) that
-      # clang-tidy needs.
-      - name: Configure and build
-        run: |
-          cmake --preset "$PRESET"
-          cmake --build --preset "$PRESET"
-
-      - name: Every OVT target links ovt::flags
-        run: python -I tools/check_ovt_flags.py --build-dir "build/$PRESET"
-
-      - name: clang-tidy on the changed lines
-        if: github.event_name == 'pull_request'
+      # Decide first, with only the checkout: a PR that changes neither C/C++ nor the CMake files skips the
+      # setup and the build (CI minutes on the Free plan).
+      - name: What changed
+        id: diff
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
+          EVENT: ${{ github.event_name }}
         run: |
-          diff_tool="$(ls /usr/lib/llvm-15/share/clang/clang-tidy-diff.py)"
+          if [ "$EVENT" != pull_request ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           specs=()
           for d in $OVT_DIRS; do
             for ext in cpp cc h hpp; do specs+=(":(glob)$d/**/*.$ext"); done
           done
           git diff -U0 "$BASE" HEAD -- "${specs[@]}" > "$RUNNER_TEMP/pr.diff"
+          cmake_changed="$(git diff --name-only "$BASE" HEAD -- ':(glob)**/CMakeLists.txt' 'cmake' CMakePresets.json tools/check_ovt_flags.py | wc -l)"
+          if [ -s "$RUNNER_TEMP/pr.diff" ] || [ "$cmake_changed" -gt 0 ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::no C/C++ or CMake changes; clang-tidy skipped"
+          fi
+
+      - uses: ./.github/actions/setup-ovt
+        if: steps.diff.outputs.run == 'true'
+        with:
+          preset: linux-x64-debug
+          triplet: x64-linux-ovt
+
+      - name: clang-tidy
+        if: steps.diff.outputs.run == 'true'
+        run: |
+          sudo apt-get install -y -q --no-install-recommends clang-tidy-15
+          echo "/usr/lib/llvm-15/bin" >> "$GITHUB_PATH"
+
+      - name: Configure
+        if: steps.diff.outputs.run == 'true'
+        run: cmake --preset "$PRESET"
+
+      # The configure step is enough for the file API reply.
+      - name: Every OVT target links ovt::flags
+        if: steps.diff.outputs.run == 'true'
+        run: python -I tools/check_ovt_flags.py --build-dir "build/$PRESET"
+
+      # Build once: the generated sources (FlatBuffers headers) that clang-tidy needs.
+      - name: Build
+        if: steps.diff.outputs.run == 'true'
+        run: cmake --build --preset "$PRESET"
+
+      # -Wno-unknown-warning-option: compile_commands.json comes from GCC 13, whose warning flags
+      # (-Wlogical-op, -Wuseless-cast, ...) clang does not know; under OVT_WERROR=ON they would be errors.
+      - name: clang-tidy on the changed lines
+        if: github.event_name == 'pull_request' && steps.diff.outputs.run == 'true'
+        run: |
           if [ ! -s "$RUNNER_TEMP/pr.diff" ]; then echo "no C/C++ changes"; exit 0; fi
-          python3 "$diff_tool" -p1 -path "build/$PRESET" -quiet -j "$(nproc)" < "$RUNNER_TEMP/pr.diff" | tee "$RUNNER_TEMP/tidy.txt"
+          diff_tool=/usr/lib/llvm-15/share/clang/clang-tidy-diff.py
+          test -f "$diff_tool"
+          python3 "$diff_tool" -p1 -path "build/$PRESET" -quiet -j "$(nproc)" \
+            -extra-arg=-Wno-unknown-warning-option < "$RUNNER_TEMP/pr.diff" | tee "$RUNNER_TEMP/tidy.txt"
           # clang-tidy-diff exits 0 on findings unless warnings-as-errors fires, so fail on any finding.
           if grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' "$RUNNER_TEMP/tidy.txt"; then
             echo "::error::clang-tidy findings on the changed lines"
@@ -80,6 +105,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           run-clang-tidy-15 -p "build/$PRESET" -quiet -warnings-as-errors='*' \
+            -extra-arg=-Wno-unknown-warning-option \
             "^$PWD/($(echo "$OVT_DIRS" | tr ' ' '|'))/.*\.(cpp|cc)$"
 
   cppcheck:

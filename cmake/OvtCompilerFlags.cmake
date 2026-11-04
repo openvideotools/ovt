@@ -39,34 +39,46 @@ set(_ovt_cxx "$<COMPILE_LANGUAGE:CXX>")
 set(_ovt_release "$<CONFIG:Release,RelWithDebInfo,MinSizeRel>")
 
 # ---- Common -------------------------------------------------------------------------------------
-target_compile_options(ovt_flags INTERFACE
-  -fvisibility=hidden
-  $<${_ovt_cxx}:-fvisibility-inlines-hidden>
-  -fno-strict-aliasing
-  -fstack-protector-strong
-  -fPIC
-  "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/ovt")
+target_compile_options(
+  ovt_flags INTERFACE -fvisibility=hidden $<${_ovt_cxx}:-fvisibility-inlines-hidden> -fno-strict-aliasing
+                      -fstack-protector-strong -fPIC "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=/ovt")
 target_compile_definitions(ovt_flags INTERFACE $<${_ovt_release}:_FORTIFY_SOURCE=2>)
 
 # ---- Warnings (all compilers) ------------------------------------------------------------------
-target_compile_options(ovt_flags INTERFACE
-  -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wsign-conversion
-  $<${_ovt_cxx}:-Wold-style-cast>
-  -Wcast-align -Wcast-qual -Wundef -Wunused
-  $<${_ovt_cxx}:-Woverloaded-virtual>
-  -Wnull-dereference -Wdouble-promotion -Wformat=2 -Wimplicit-fallthrough
-  $<${_ovt_cxx}:-Wnon-virtual-dtor>
-  -Wmisleading-indentation)
+target_compile_options(
+  ovt_flags
+  INTERFACE -Wall
+            -Wextra
+            -Wpedantic
+            -Wshadow
+            -Wconversion
+            -Wsign-conversion
+            $<${_ovt_cxx}:-Wold-style-cast>
+            -Wcast-align
+            -Wcast-qual
+            -Wundef
+            -Wunused
+            $<${_ovt_cxx}:-Woverloaded-virtual>
+            -Wnull-dereference
+            -Wdouble-promotion
+            -Wformat=2
+            -Wimplicit-fallthrough
+            $<${_ovt_cxx}:-Wnon-virtual-dtor>
+            -Wmisleading-indentation)
 
 # GCC additions.
-target_compile_options(ovt_flags INTERFACE
-  "$<$<COMPILE_LANG_AND_ID:C,GNU>:-Wduplicated-cond;-Wduplicated-branches;-Wlogical-op>"
-  "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wduplicated-cond;-Wduplicated-branches;-Wlogical-op;-Wuseless-cast>")
+target_compile_options(
+  ovt_flags
+  INTERFACE "$<$<COMPILE_LANG_AND_ID:C,GNU>:-Wduplicated-cond;-Wduplicated-branches;-Wlogical-op>"
+            "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wduplicated-cond;-Wduplicated-branches;-Wlogical-op;-Wuseless-cast>")
 
 # Clang / AppleClang additions.
-target_compile_options(ovt_flags INTERFACE
-  "$<$<COMPILE_LANG_AND_ID:C,Clang,AppleClang>:-Wthread-safety;-Wextra-semi;-Wunreachable-code-aggressive>"
-  "$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wthread-safety;-Wextra-semi;-Wunreachable-code-aggressive;-Wrange-loop-analysis>")
+target_compile_options(
+  ovt_flags
+  INTERFACE
+    "$<$<COMPILE_LANG_AND_ID:C,Clang,AppleClang>:-Wthread-safety;-Wextra-semi;-Wunreachable-code-aggressive>"
+    "$<$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>:-Wthread-safety;-Wextra-semi;-Wunreachable-code-aggressive;-Wrange-loop-analysis>"
+)
 
 if(OVT_WERROR)
   target_compile_options(ovt_flags INTERFACE -Werror)
@@ -83,7 +95,7 @@ if(APPLE)
   target_link_options(ovt_flags INTERFACE $<${_ovt_release}:LINKER:-dead_strip>)
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux|Android")
   target_link_options(ovt_flags INTERFACE
-    "$<${_ovt_release}:LINKER:--as-needed;LINKER:-z,relro,-z,now;LINKER:--gc-sections>")
+                      "$<${_ovt_release}:LINKER:--as-needed;LINKER:-z,relro,-z,now;LINKER:--gc-sections>")
 endif()
 
 # ---- Sanitizers (OVT_SANITIZER) ----------------------------------------------------------------
