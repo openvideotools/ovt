@@ -276,7 +276,7 @@ def check_expression(
         return None
     denied = False
     for ident in ids_of(node):
-        if is_denied(ident, policy) and (strict_or or _chosen_ids_contain(node, policy, ident)):
+        if is_denied(ident, policy) and (strict_or or _chosen_ids_contain(node, policy, ident, allowed)):
             rep.add("E-DENY", where, ident, f"{ident} is forbidden by the deny list")
             denied = True
     if denied:
@@ -295,9 +295,9 @@ def check_expression(
         return None
 
 
-def _chosen_ids_contain(node: Node, policy: dict, ident: str) -> bool:
+def _chosen_ids_contain(node: Node, policy: dict, ident: str, allowed: set[str]) -> bool:
     try:
-        return ident in ids_of(resolve_node(node, policy, all_allowed(policy))[0])
+        return ident in ids_of(resolve_node(node, policy, allowed)[0])
     except GateError:
         # no alternative is choosable, so a denied id in the expression is reported as denied
         return True
@@ -337,16 +337,14 @@ def read_versions(path: Path, rep: Report, policy: dict, strict_or: bool) -> Non
         where = f"third_party/VERSIONS.md:{name}"
         if name in skip or cell in ("", "-", "–"):
             continue
-        expr = None
-        for cand in (cell, re.sub(r"\s*\([^)]*\)", "", cell).strip()):
+        expr = overrides.get(name)  # a reviewed override always wins over the cell
+        for cand in () if expr else (cell, re.sub(r"\s*\([^)]*\)", "", cell).strip()):
             try:
                 parse(cand)
                 expr = cand
                 break
             except GateError:
                 continue
-        if expr is None:
-            expr = overrides.get(name)
         if expr is None:
             rep.add(
                 "E-UNKNOWN",
@@ -369,10 +367,11 @@ def read_versions(path: Path, rep: Report, policy: dict, strict_or: bool) -> Non
 
 
 COPYRIGHT_DENY = (
-    (re.compile(r"GNU AFFERO GENERAL PUBLIC LICENSE", re.I), "AGPL-3.0-only"),
-    (re.compile(r"Server Side Public License", re.I), "SSPL-1.0"),
-    (re.compile(r"Business Source License", re.I), "BUSL-1.1"),
-    (re.compile(r"non-?commercial", re.I), "LicenseRef-NonCommercial"),
+    # Title lines only: the GPL-3.0 text mentions the AGPL in its section 13, and permissive texts say "commercial
+    # or non-commercial use", so a loose match would deny every GPL-3 port.
+    (re.compile(r"^\s*GNU AFFERO GENERAL PUBLIC LICENSE\s*$", re.M), "AGPL-3.0-only"),
+    (re.compile(r"^\s*Server Side Public License\s*$", re.M), "SSPL-1.0"),
+    (re.compile(r"^\s*Business Source License 1\.1\s*$", re.M), "BUSL-1.1"),
 )
 
 
@@ -399,7 +398,7 @@ def read_vcpkg(root: Path, rep: Report, policy: dict, strict_or: bool) -> None:
                     val = pkg.get(key)
                     if expr is None and val and val not in ("NOASSERTION", "NONE"):
                         expr = val
-        if copyright_file.is_file():
+        if expr is None and copyright_file.is_file():  # heuristics only when the SPDX file gives no licence
             text = copyright_file.read_text(encoding="utf-8", errors="replace")
             for rx, ident in COPYRIGHT_DENY:  # heuristics only ever flag; they never grant a licence
                 if rx.search(text):

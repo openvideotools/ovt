@@ -347,11 +347,12 @@ def test_vcpkg_spdx_overrides_and_copyright_heuristic(tmp_path: Path) -> None:
 
     port("fmt", "MIT")
     port("mystery", "NOASSERTION")
-    port("evil", "MIT", "GNU AFFERO GENERAL PUBLIC LICENSE Version 3")
+    port("evil", "NOASSERTION", "  GNU AFFERO GENERAL PUBLIC LICENSE\n Version 3")
     code, data, _ = run("--vcpkg", str(vc), report=tmp_path / "r.json")
     assert code == 1
     assert sorted((f["code"], f["where"]) for f in data["findings"]) == [
         ("E-DENY", "vcpkg:evil"),
+        ("E-UNKNOWN", "vcpkg:evil"),
         ("E-UNKNOWN", "vcpkg:mystery"),
     ]
     policy_text = POLICY.read_text().replace('# zimg = "WTFPL"', 'mystery = "ISC"')
@@ -423,3 +424,33 @@ def test_default_report_next_to_manifest(tmp_path: Path) -> None:
     shutil.copy(FIX / "license_manifest_ok.json", tmp_path / "license_manifest.json")
     assert run("--manifest", str(tmp_path / "license_manifest.json"))[0] == 0
     assert (tmp_path / "license_gate_report.json").is_file()
+
+
+def test_vcpkg_gpl3_text_is_not_denied_but_agpl_title_is(tmp_path: Path) -> None:
+    vc = tmp_path / "vcpkg_installed"
+    gpl = "                    GNU GENERAL PUBLIC LICENSE\n13. Use with the GNU Affero General Public License.\n"
+    agpl = "                    GNU AFFERO GENERAL PUBLIC LICENSE\n                       Version 3\n"
+    for name, text in (("gplport", gpl), ("agplport", agpl)):
+        d = vc / "share" / name
+        d.mkdir(parents=True)
+        (d / "copyright").write_text(text)
+        (d / "vcpkg.spdx.json").write_text(json.dumps({"packages": [{"licenseConcluded": "NOASSERTION"}]}))
+    (vc / "share" / "gplport" / "vcpkg.spdx.json").write_text(json.dumps({"packages": [{"licenseConcluded": "MIT"}]}))
+    code, data, _ = run("--vcpkg", str(vc), report=tmp_path / "r.json")
+    assert code == 1
+    assert sorted((f["code"], f["where"]) for f in data["findings"]) == [
+        ("E-DENY", "vcpkg:agplport"),
+        ("E-UNKNOWN", "vcpkg:agplport"),
+    ]
+    # an SPDX licence is never second-guessed by the heuristics, even for the AGPL title
+    (vc / "share" / "agplport" / "vcpkg.spdx.json").write_text(json.dumps({"packages": [{"licenseConcluded": "MIT"}]}))
+    assert run("--vcpkg", str(vc), report=tmp_path / "r2.json")[0] == 0
+
+
+def test_versions_override_wins_over_parseable_cell(tmp_path: Path) -> None:
+    versions = tmp_path / "v.md"
+    versions.write_text(
+        "| Name | Version | Licence |\n|---|---|---|\n| FFmpeg | 1 | MIT (AGPL-3.0-only with a flag) |\n"
+    )
+    code, data, _ = run("--versions", str(versions), report=tmp_path / "r.json")
+    assert code == 0 and data["inventory"][0]["license"] == "LGPL-2.1-or-later OR GPL-2.0-or-later"
