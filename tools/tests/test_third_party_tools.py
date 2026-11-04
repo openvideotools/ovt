@@ -45,6 +45,7 @@ def make_archive(tmp: Path, name: str = "libfixture-1.2.3.tar.gz") -> tuple[Path
 
 # ---- versions_to_cmake.py -------------------------------------------------------------------------------
 
+
 def test_repository_table_emits_the_tp_spelling_only(tmp_path: Path) -> None:
     out = tmp_path / "versions.cmake"
     assert vtc.main(["--out", str(out)]) == 0
@@ -94,8 +95,9 @@ def test_placeholders_become_empty_hashes() -> None:
 def test_update_hashes_fills_sha_and_patents(tmp_path: Path) -> None:
     archive, sha = make_archive(tmp_path)
     versions = tmp_path / "VERSIONS.md"
-    versions.write_text(table(
-        f"| libaom | 1.2.3 | BSD-2-Clause | {archive.as_uri()} | – | `<sha>` | x | `PATENTS sha256=<sha>` |"))
+    versions.write_text(
+        table(f"| libaom | 1.2.3 | BSD-2-Clause | {archive.as_uri()} | – | `<sha>` | x | `PATENTS sha256=<sha>` |")
+    )
     assert vtc.main(["--versions", str(versions), "--update-hashes", "--downloads", str(tmp_path / "dl")]) == 0
     text = versions.read_text()
     patents = hashlib.sha256(b"patent grant\n").hexdigest()
@@ -106,7 +108,9 @@ def test_check_flags_a_script_that_spells_its_version(tmp_path: Path) -> None:
     (tmp_path / "third_party").mkdir()
     (tmp_path / "third_party" / "foo.cmake").write_text("set(URL https://e.org/foo-1.2.3.tar.gz)\n")
     versions = tmp_path / "VERSIONS.md"
-    versions.write_text(table("| foo | 1.2.3 | MIT | https://e.org/foo-1.2.3.tar.gz | – | `<sha>` | third_party/foo.cmake | |"))
+    versions.write_text(
+        table("| foo | 1.2.3 | MIT | https://e.org/foo-1.2.3.tar.gz | – | `<sha>` | third_party/foo.cmake | |")
+    )
     assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 1
     (tmp_path / "third_party" / "foo.cmake").write_text("URL ${OVT_TP_foo_URL} SHA ${OVT_TP_foo_SHA256}\n")
     assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 0
@@ -129,11 +133,23 @@ def configure_fixture(tmp_path: Path, versions: Path) -> subprocess.CompletedPro
         "cmake_minimum_required(VERSION 3.25)\nproject(tp_fixture NONE)\n"
         f'list(APPEND CMAKE_MODULE_PATH "{(REPO / "cmake").as_posix()}")\n'
         "include(OvtThirdPartyCommon)\novt_tp_declare(libfixture)\n"
-        'message(STATUS "archive: ${OVT_TP_libfixture_ARCHIVE}")\n')
+        'message(STATUS "archive: ${OVT_TP_libfixture_ARCHIVE}")\n'
+    )
     return subprocess.run(
-        [str(CMAKE), "-S", str(project), "-B", str(tmp_path / "build"), f"-DOVT_TP_VERSIONS_MD={versions}",
-         f"-DOVT_TP_DOWNLOADS={tmp_path / 'dl'}", f"-DPython3_EXECUTABLE={sys.executable}"],
-        capture_output=True, text=True, check=False)
+        [
+            str(CMAKE),
+            "-S",
+            str(project),
+            "-B",
+            str(tmp_path / "build"),
+            f"-DOVT_TP_VERSIONS_MD={versions}",
+            f"-DOVT_TP_DOWNLOADS={tmp_path / 'dl'}",
+            f"-DPython3_EXECUTABLE={sys.executable}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 @pytest.mark.skipif(CMAKE is None, reason="cmake not installed")
@@ -254,11 +270,16 @@ def test_source_inside_another_checkout_is_patched(tmp_path: Path) -> None:
 
 # ---- third_party_offline.py (acceptance test 3, with file:// URLs) ---------------------------------------
 
+
 def test_offline_fetch_verifies_every_archive(tmp_path: Path) -> None:
     archive, sha = make_archive(tmp_path)
     versions = tmp_path / "VERSIONS.md"
-    versions.write_text(table(f"| libfixture | 1.2.3 | MIT | {archive.as_uri()} | – | `{sha}` | x | |",
-                              "| tool | 1 | MIT | https://example.org/tool | – | – | x | |"))
+    versions.write_text(
+        table(
+            f"| libfixture | 1.2.3 | MIT | {archive.as_uri()} | – | `{sha}` | x | |",
+            "| tool | 1 | MIT | https://example.org/tool | – | – | x | |",
+        )
+    )
     out = tmp_path / "dl"
     assert third_party_offline.main(["--versions", str(versions), "--out", str(out)]) == 0
     assert third_party_offline.main(["--versions", str(versions), "--out", str(out)]) == 0  # cached
@@ -268,8 +289,12 @@ def test_offline_fetch_verifies_every_archive(tmp_path: Path) -> None:
 def test_offline_fetch_fails_on_mismatch_and_placeholder(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     archive, _ = make_archive(tmp_path)
     versions = tmp_path / "VERSIONS.md"
-    versions.write_text(table(f"| libfixture | 1.2.3 | MIT | {archive.as_uri()} | – | `{'1' * 64}` | x | |",
-                              "| other | 2.0 | MIT | https://example.org/other-2.0.tar.gz | – | `<sha>` | x | |"))
+    versions.write_text(
+        table(
+            f"| libfixture | 1.2.3 | MIT | {archive.as_uri()} | – | `{'1' * 64}` | x | |",
+            "| other | 2.0 | MIT | https://example.org/other-2.0.tar.gz | – | `<sha>` | x | |",
+        )
+    )
     assert third_party_offline.main(["--versions", str(versions), "--out", str(tmp_path / "dl")]) == 1
     err = capsys.readouterr().err
     assert "row 'libfixture'" in err and "mismatch" in err and "row 'other'" in err
