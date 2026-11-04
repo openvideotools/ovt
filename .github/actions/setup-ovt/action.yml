@@ -44,9 +44,10 @@ runs:
         # The self-hosted Mac runner has no write access to Homebrew; check what tools/brew-packages.txt
         # lists instead of installing it.
         missing=""
-        for tool in cmake ninja ccache pkg-config nasm; do
+        for tool in cmake ninja ccache nasm; do
           command -v "$tool" >/dev/null || missing="$missing $tool"
         done
+        command -v pkg-config >/dev/null || command -v pkgconf >/dev/null || missing="$missing pkgconf"
         if [ -n "$missing" ]; then
           echo "::error::missing on this runner:$missing (install from tools/brew-packages.txt)"
           exit 1
