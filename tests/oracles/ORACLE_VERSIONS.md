@@ -1,0 +1,84 @@
+# Oracle versions
+
+The tools of the oracle image `ghcr.io/openvideotools/ovt-oracles:<yyyymmdd>` (chapter 14 §14.2.6, built from
+[`Dockerfile`](Dockerfile) by WI-0.554). Golden files print these versions in their header
+(`# oracle: ffmpeg n7.1.1 ...`). Every source is a tag checked against its commit, an archive checked
+against its SHA-256, or a hash-locked package; nothing floats, so a rebuild a week later reports the same
+versions (`oracle_versions.py --check-pins` enforces it, the weekly `oracle-image` run compares reports).
+
+## Changing a pin
+
+1. Edit the pin in the build script, [`Dockerfile`](Dockerfile), [`requirements.in`](requirements.in) or
+   [`package.json`](package.json), and the matching row below, in one PR that touches nothing else.
+2. Python: `uv pip compile requirements.in --python-version 3.12 --python-platform x86_64-manylinux_2_28
+   --generate-hashes --no-header -o requirements.txt`. Node: `npm install --package-lock-only`.
+3. The `oracle-image` workflow rebuilds the image on the PR and runs `oracle-versions` and the smoke test.
+4. Goldens produced by the changed tool are regenerated in a follow-up PR (chapter 14 §14.4.0).
+
+## Base
+
+| Item | Pin |
+|---|---|
+| Base image | `ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852` |
+| Ubuntu archive snapshot (all apt packages) | `20261101T000000Z` (<https://snapshot.ubuntu.com>) |
+| Node.js | `v20.20.2`, `node-v20.20.2-linux-x64.tar.xz` sha256 `df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d` |
+| Python | 3.12 from the snapshot; packages hash-locked in [`requirements.txt`](requirements.txt) |
+
+## Tools
+
+`Probe` runs in the image; `Expect` is the text the probe's output must contain. Tools that print no
+version (or the same version for every release) report the stamp their build script wrote under
+`$OVT_ORACLES_STAMPS`.
+
+<!-- oracle-versions:begin -->
+| Tool | Version | Source | Licence | Probe | Expect |
+|---|---|---|---|---|---|
+| ffmpeg | n7.1.1 | <https://github.com/FFmpeg/FFmpeg> `db69d06eeeab4f46da15030a80d539efb4503ca8` | GPL-2.0-or-later (this build) | `ffmpeg -hide_banner -version` | `ffmpeg version n7.1.1` |
+| ffprobe | n7.1.1 | as ffmpeg | GPL-2.0-or-later (this build) | `ffprobe -hide_banner -version` | `ffprobe version n7.1.1` |
+| x264 | r3191 | <https://code.videolan.org/videolan/x264> `4613ac3c15fd75cebc4b9f65b7fb95e70a3acce1` | GPL-2.0-or-later | `x264 --version` | `0.164.3191 4613ac3` |
+| x265 | 4.1 | <https://bitbucket.org/multicoreware/x265_git> `1d117bed4747758b51bd2c124d738527e30392cb` | GPL-2.0-or-later | `x265 --version` | `encoder version 4.1` |
+| aomenc | 3.12.1 | `libaom-3.12.1.tar.gz` sha256 `9e9775180dec7dfd61a79e00bda3809d43891aee6b2e331ff7f26986207ea22e` (tag v3.12.1, `10aece4157eb79315da205f39e19bf6ab3ee30d0`) | BSD-2-Clause + AOM patent licence | `aomenc --help` | `3.12.1` |
+| aomdec | 3.12.1 | as aomenc | BSD-2-Clause + AOM patent licence | `aomdec --help` | `3.12.1` |
+| inspect | 3.12.1 | as aomenc, `CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1` | BSD-2-Clause + AOM patent licence | `cat "$OVT_ORACLES_STAMPS/inspect.version"` | `libaom v3.12.1` |
+| dav1d | 1.5.1 | <https://code.videolan.org/videolan/dav1d> `42b2b24fb8819f1ed3643aa9cf2a62f03868e3aa` | BSD-2-Clause | `dav1d --version` | `1.5.1` |
+| vmaf | 3.0.0 | <https://github.com/Netflix/vmaf> `17a67b238ce0539bdeafdc95961abac64fa16ea8`, `-Denable_float=true` | BSD-2-Clause-Patent | `vmaf --version` | `3.0.0` |
+| MP4Box | v2.4.0 | <https://github.com/gpac/gpac> `5d70253ac94e5840be7b86054131dd753af63cc7` | LGPL-2.1-or-later | `MP4Box -version` | `GPAC version 2.4` |
+| mp4dump | v1.6.0-641 | <https://github.com/axiomatic-systems/Bento4> `dc264854d1f76c370b65b18d9f303a95f7f21ab1` | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4dump.version"` | `Bento4 v1.6.0-641` |
+| mp4encrypt | v1.6.0-641 | as mp4dump | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4encrypt.version"` | `Bento4 v1.6.0-641` |
+| mp4fragment | v1.6.0-641 | as mp4dump | GPL-2.0-or-later | `cat "$OVT_ORACLES_STAMPS/mp4fragment.version"` | `Bento4 v1.6.0-641` |
+| mp4ff-info | v0.48.0 | `go install github.com/Eyevinn/mp4ff/cmd/mp4ff-info@v0.48.0` (`go.sum` checked) | MIT | `mp4ff-info -version` | `v0.48` |
+| mp4box.js | 1.5.0 | npm `mp4box@1.5.0`, [`package-lock.json`](package-lock.json) | BSD-3-Clause | `node -p "require('mp4box/package.json').version"` | `1.5.0` |
+| node | v20.20.2 | see Base | MIT | `node --version` | `v20.20.2` |
+| mediainfo | 24.01 | Ubuntu 24.04 snapshot | BSD-2-Clause | `mediainfo --Version` | `v24.01` |
+| mkvinfo | 82.0 | Ubuntu 24.04 snapshot (`mkvtoolnix`) | GPL-2.0-or-later | `mkvinfo --version` | `v82.0` |
+| mkvmerge | 82.0 | Ubuntu 24.04 snapshot (`mkvtoolnix`) | GPL-2.0-or-later | `mkvmerge --version` | `v82.0` |
+| tsp | 3.45-4798 | `tsduck_3.45-4798.ubuntu24_amd64.deb` sha256 `0023689f76e75b64e45253771208bcf8ca95b91fbfd0900da097c729f3c39fde` | BSD-2-Clause | `tsp --version` | `3.45-4798` |
+| tstables | 3.45-4798 | as tsp | BSD-2-Clause | `tstables --version` | `3.45-4798` |
+| tsanalyze | 3.45-4798 | as tsp | BSD-2-Clause | `tsanalyze --version` | `3.45-4798` |
+| gstreamer-codecparsers | 1.24.2 | Ubuntu 24.04 snapshot (`libgstreamer-plugins-bad1.0-dev`) | LGPL-2.1-or-later | `pkg-config --modversion gstreamer-codecparsers-1.0` | `1.24.2` |
+| ldecod | 19.0 | <https://iphome.hhi.de/suehring/tml/download/jm19.0.zip> sha256 `0000000000000000000000000000000000000000000000000000000000000000`, `TRACE 1` | ITU-T/ISO reference software licence | `cat "$OVT_ORACLES_STAMPS/ldecod.version"` | `JM 19.0 TRACE=1` |
+| lencod | 19.0 | as ldecod (stock) | ITU-T/ISO reference software licence | `cat "$OVT_ORACLES_STAMPS/lencod.version"` | `JM 19.0` |
+| TAppEncoder | HM-18.0 | <https://vcgit.hhi.fraunhofer.de/jvet/HM> `0000000000000000000000000000000000000000` | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppEncoder.version"` | `HM-18.0` |
+| TAppDecoder | HM-18.0 | as TAppEncoder | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppDecoder.version"` | `HM-18.0` |
+| TAppDecoder_trace | HM-18.0 | as TAppEncoder, `ENC_DEC_TRACE 1` | BSD-3-Clause | `cat "$OVT_ORACLES_STAMPS/TAppDecoder_trace.version"` | `HM-18.0` |
+| dump_psnrhvs | 24f889aa | <https://gitlab.xiph.org/xiph/daala> `24f889aaabe33bc390b993d737d830b8dd367e61` (master; no releases) | BSD-2-Clause | `cat "$OVT_ORACLES_STAMPS/dump_psnrhvs.version"` | `Daala 24f889aaabe33bc390b993d737d830b8dd367e61` |
+| dump_ciede2000 | 24f889aa | as dump_psnrhvs | BSD-2-Clause | `cat "$OVT_ORACLES_STAMPS/dump_ciede2000.version"` | `Daala 24f889aaabe33bc390b993d737d830b8dd367e61` |
+| mpv | v0.39.0 | <https://github.com/mpv-player/mpv> `a0fba7be57f3822d967b04f0f6b6d6341e7516e7` | GPL-2.0-or-later (this build) | `mpv --no-config --version` | `mpv v0.39.0` |
+| libplacebo | v7.349.0 | <https://code.videolan.org/videolan/libplacebo> `1fd3c7bde7b943fe8985c893310b5269a09b46c5` | LGPL-2.1-or-later | `pkg-config --modversion libplacebo` | `7.349.0` |
+| uvq | d563abfa | <https://github.com/google/uvq> `d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2` (last TensorFlow revision) | Apache-2.0 | `cat "$OVT_ORACLES_STAMPS/uvq.version"` | `google/uvq d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2` |
+| tensorflow-cpu | 2.19.0 | [`requirements.txt`](requirements.txt) | Apache-2.0 | `python-package:tensorflow-cpu` | `2.19.0` |
+| tf2onnx | 1.17.0 | [`requirements.txt`](requirements.txt) | Apache-2.0 | `python-package:tf2onnx` | `1.17.0` |
+| bjontegaard | 1.3.0 | [`requirements.txt`](requirements.txt) | BSD-3-Clause | `python-package:bjontegaard` | `1.3.0` |
+| siti-tools | 0.6.0 | [`requirements.txt`](requirements.txt) | MIT | `python-package:siti-tools` | `0.6.0` |
+<!-- oracle-versions:end -->
+
+The in-house oracle programs (`gst_parse_oracle`, `hm_cu_dump`, `ffmpeg_mvs`, `x264_ssim`, `mpv_capture.py`)
+are added to the image's `oracles` stage, and to this table, by WI-0.562, WI-0.563, WI-0.565 and WI-1.575.
+
+## Licences and distribution
+
+The image holds GPL builds (FFmpeg with x264/x265, mpv, Bento4, MKVToolNix) and the patent-encumbered
+H.264/HEVC encoders x264, x265, JM `lencod` and HM `TAppEncoder`. It is a test tool: it is never shipped
+with OVT and nothing in it is linked into OVT. The GHCR package stays private (internal use); publishing it
+needs the GPL source offer (the build scripts plus the pinned upstream sources) and the owner's patent
+check first (project rules; chapter 15).

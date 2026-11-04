@@ -1,0 +1,120 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# The oracle image ghcr.io/openvideotools/ovt-oracles:<yyyymmdd> (chapter 14 §14.2.6, WI-0.554).
+# Build context: tests/oracles/.   docker build -t ovt-oracles tests/oracles
+#
+# Stages: toolchain (pinned Ubuntu snapshot) -> one build stage per source-built oracle -> `oracles`, the
+# final image. Every tool is installed into /opt/ovt-oracles and on PATH; `oracle-versions` prints the
+# version table of ORACLE_VERSIONS.md and `oracle-smoke-test` runs the §14.4 commands once.
+# The in-house oracle programs are added to the `oracles` stage by WI-0.562, WI-0.563, WI-0.565 and WI-1.575.
+# Pins live in the build scripts and the ARGs below; ORACLE_VERSIONS.md records every one of them.
+
+FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852 AS toolchain
+
+# Every apt package comes from one dated archive snapshot, so a rebuild installs the same versions.
+ARG UBUNTU_SNAPSHOT="20261101T000000Z"
+ENV DEBIAN_FRONTEND=noninteractive \
+    OVT_ORACLES_PREFIX=/opt/ovt-oracles \
+    OVT_ORACLES_STAMPS=/opt/ovt-oracles/share/ovt-oracles/stamps \
+    PKG_CONFIG_PATH=/opt/ovt-oracles/lib/pkgconfig \
+    NODE_PATH=/opt/ovt-oracles/node/node_modules \
+    PATH=/opt/ovt-oracles/bin:/opt/ovt-oracles/venv/bin:/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# ca-certificates first (snapshot.ubuntu.com is HTTPS-only); everything after that is the snapshot.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && printf 'APT::Snapshot "%s";\n' "${UBUNTU_SNAPSHOT}" > /etc/apt/apt.conf.d/50ovt-snapshot \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential pkg-config git curl unzip xz-utils xxd cmake ninja-build meson nasm \
+      autoconf automake libtool python3 python3-dev python3-venv \
+      golang-go \
+      libnuma-dev zlib1g-dev libssl-dev libogg-dev libpng-dev libjpeg-dev \
+      libvulkan-dev libshaderc-dev liblcms2-dev libass-dev \
+      libx11-dev libxext-dev libxrandr-dev libxpresent-dev libxss-dev libxinerama-dev libxkbcommon-dev \
+      mesa-vulkan-drivers xvfb \
+      mediainfo mkvtoolnix libgstreamer-plugins-bad1.0-dev \
+ && rm -rf /var/lib/apt/lists/* \
+ && echo /opt/ovt-oracles/lib > /etc/ld.so.conf.d/ovt-oracles.conf
+
+# --- libaom, x264, x265, dav1d, libvmaf/vmaf, FFmpeg ------------------------------------------------------
+FROM toolchain AS codecs
+COPY lib.sh build_libaom_inspect.sh /src/
+RUN bash /src/build_libaom_inspect.sh && ldconfig
+COPY build_ffmpeg_oracle.sh /src/
+RUN bash /src/build_ffmpeg_oracle.sh && ldconfig
+
+# --- libplacebo + mpv (links the FFmpeg above) -----------------------------------------------------------
+FROM codecs AS mpv
+COPY build_extra.sh /src/
+RUN bash /src/build_extra.sh mpv
+
+# --- independent oracles ----------------------------------------------------------------------------------
+FROM toolchain AS gpac
+COPY lib.sh build_extra.sh /src/
+RUN bash /src/build_extra.sh gpac
+
+FROM toolchain AS bento4
+COPY lib.sh build_extra.sh /src/
+RUN bash /src/build_extra.sh bento4
+
+FROM toolchain AS daala
+COPY lib.sh build_extra.sh /src/
+RUN bash /src/build_extra.sh daala
+
+FROM toolchain AS jm
+COPY lib.sh build_jm.sh /src/
+RUN bash /src/build_jm.sh
+
+FROM toolchain AS hm
+COPY lib.sh build_hm.sh /src/
+RUN bash /src/build_hm.sh
+
+FROM toolchain AS mp4ff
+ARG MP4FF_VERSION="v0.48.0"
+# GOTOOLCHAIN=local: never download another Go; the module checksums come from sum.golang.org.
+RUN GOTOOLCHAIN=local GOFLAGS=-trimpath GOBIN=/opt/ovt-oracles/bin GOPATH=/tmp/go \
+      go install "github.com/Eyevinn/mp4ff/cmd/mp4ff-info@${MP4FF_VERSION}" \
+ && rm -rf /tmp/go
+
+# --- the oracle image -------------------------------------------------------------------------------------
+FROM toolchain AS oracles
+COPY --from=mpv /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=gpac /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=bento4 /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=daala /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=jm /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=hm /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=mp4ff /opt/ovt-oracles/ /opt/ovt-oracles/
+RUN ldconfig
+
+COPY lib.sh install_tsduck.sh /src/
+RUN apt-get update && bash /src/install_tsduck.sh && rm -rf /var/lib/apt/lists/*
+
+ARG NODE_VERSION="v20.20.2"
+ARG NODE_SHA256="df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d"
+RUN bash -c 'source /src/lib.sh \
+ && ovt_download "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" "${NODE_SHA256}" /tmp/node.tar.xz \
+ && mkdir -p /opt/node && tar xJf /tmp/node.tar.xz -C /opt/node --strip-components=1 && rm /tmp/node.tar.xz'
+COPY package.json package-lock.json /opt/ovt-oracles/node/
+RUN cd /opt/ovt-oracles/node && npm ci --ignore-scripts --no-audit --no-fund
+
+COPY requirements.txt /src/
+RUN python3 -m venv /opt/ovt-oracles/venv \
+ && pip install --no-cache-dir --require-hashes --no-deps -r /src/requirements.txt
+
+# SPEC-ASSUMPTION(#47): google/uvq at its last TensorFlow revision (D11); HEAD moved to PyTorch (UVQ 1.5).
+# The SavedModels are part of the repository.
+ARG UVQ_COMMIT="d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2"
+RUN bash -c 'source /src/lib.sh \
+ && ovt_git_fetch https://github.com/google/uvq.git "${UVQ_COMMIT}" "${UVQ_COMMIT}" /opt/ovt-oracles/uvq \
+ && rm -rf /opt/ovt-oracles/uvq/.git && ovt_stamp uvq "google/uvq ${UVQ_COMMIT}"'
+
+COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh /opt/ovt-oracles/share/ovt-oracles/
+RUN ln -s ../share/ovt-oracles/oracle_versions.py /opt/ovt-oracles/bin/oracle-versions \
+ && ln -s ../share/ovt-oracles/smoke_test.sh /opt/ovt-oracles/bin/oracle-smoke-test \
+ && chmod 0755 /opt/ovt-oracles/share/ovt-oracles/*.py /opt/ovt-oracles/share/ovt-oracles/*.sh
+
+WORKDIR /work
+CMD ["oracle-versions"]
