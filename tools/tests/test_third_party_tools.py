@@ -73,6 +73,12 @@ def test_url_with_a_version_prefix_is_accepted() -> None:
     assert rows[0].url == "https://download.qt.io/qt/6.8/"
 
 
+def test_angle_bracket_autolink_url_is_unwrapped() -> None:
+    # markdownlint MD034 wants bare URLs written as <url>; the brackets are not part of the URL.
+    rows = vtc.parse(table("| Qt | 6.8.3 | LGPL-3.0-only | <https://download.qt.io/qt/6.8/> | – | – | x | |"))
+    assert rows[0].url == "https://download.qt.io/qt/6.8/"
+
+
 def test_duplicate_ids_and_bad_hashes_are_rejected() -> None:
     with pytest.raises(vtc.VersionsError, match="already used"):
         vtc.parse(table("| Foo | 1 | MIT | – | – | – | x | |", "| foo | 1 | MIT | – | – | – | x | |"))

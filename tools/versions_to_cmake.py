@@ -50,7 +50,7 @@ ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", "
 COLUMNS = ("Name", "Version", "Licence", "URL", "Patches", "SHA-256", "Build", "Notes")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
-_URL_RE = re.compile(r"(?:https?|file)://[^\s`|)]+")  # file:// for local mirrors and tests
+_URL_RE = re.compile(r"(?:https?|file)://[^\s`|)<>]+")  # file:// for local mirrors and tests
 _VERSION_TOKEN_RE = re.compile(r"(?<![0-9.])\d+(?:\.\d+)+(?![0-9])")
 
 

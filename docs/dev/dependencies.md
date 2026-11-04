@@ -16,7 +16,7 @@ manifest's end state; each later work item adds its ports in the PR that first u
 
 ## How vcpkg is wired in
 
-- `third_party/vcpkg` is a git submodule of https://github.com/microsoft/vcpkg, checked out at the commit
+- `third_party/vcpkg` is a git submodule of <https://github.com/microsoft/vcpkg>, checked out at the commit
   that `vcpkg.json`'s `builtin-baseline` names (tag `2026.10.16`, commit
   `9eec002df1cd109f8f104cd966a763daf9751489`). The two must always be equal.
 - The presets pass `third_party/vcpkg/scripts/buildsystems/vcpkg.cmake` as the toolchain file and turn on
