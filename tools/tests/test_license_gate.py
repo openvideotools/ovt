@@ -26,7 +26,7 @@ POLICY = TOOLS / "license_policy.toml"
 GATE = TOOLS / "license_gate.py"
 
 
-def run(*args: str, report: Path | None = None) -> tuple[int, dict | None, str]:
+def run(*args: str, report: Path | None = None) -> tuple[int, dict, str]:
     """Run the gate in-process; returns (exit code, report, stderr)."""
     import contextlib
     import io
@@ -35,7 +35,7 @@ def run(*args: str, report: Path | None = None) -> tuple[int, dict | None, str]:
     extra = ["--report", str(report)] if report else []
     with contextlib.redirect_stderr(err):
         code = lg.main(["--policy", str(POLICY), *extra, *args])
-    data = json.loads(report.read_text()) if report and report.exists() else None
+    data = json.loads(report.read_text()) if report and report.exists() else {}
     return code, data, err.getvalue()
 
 

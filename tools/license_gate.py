@@ -457,7 +457,7 @@ def pip_metadata_license(name: str) -> str | None:
         md = metadata.metadata(name)
     except metadata.PackageNotFoundError:
         return None
-    lic = md.get("License-Expression") or md.get("License")
+    lic = md["License-Expression"] if "License-Expression" in md else (md["License"] if "License" in md else None)
     return lic if lic and len(lic) <= 100 and "\n" not in lic else None
 
 
