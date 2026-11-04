@@ -58,6 +58,25 @@ All of them are linked `PRIVATE`. The `*-ovt` triplets build static libraries, s
 `flatbuffers` is listed twice in `vcpkg.json`: once with `"host": true` for the `flatc` compiler, which must
 run on the build machine, and once for the target library. Android cross builds need both.
 
+## FlatBuffers code generation
+
+`cmake/OvtFlatBuffers.cmake` provides `ovt_add_flatbuffers_schema(<target> <fbs>...)`. `core/schema/CMakeLists.txt`
+calls it for every `core/schema/*.fbs`, which creates the target `ovt_schemas`. Building it runs the host `flatc`
+and writes, below `build/<preset>/generated/` (never into the source tree):
+
+| Output | Path |
+|---|---|
+| C++ | `<schema>_generated.h` (`--gen-object-api --gen-compare --reflect-names --scoped-enums`) |
+| Python | `python/ovt/fb/<Type>.py` and `__init__.py` (`PYTHONPATH=build/<preset>/generated/python`) |
+| Kotlin | `kotlin/` |
+
+Link `ovt_schemas` to use the header: `#include "ovt_model_generated.h"`. The generated directory is a SYSTEM
+include, so flatc's code does not trip `-Werror`. `flatc` comes from the vcpkg host port; `-DOVT_FLATC=<path>`
+overrides it (for example with `flatbuffers-compiler` from apt when building with `-DOVT_USE_VCPKG=OFF`).
+
+`tools/check_schema_compat.py` compares the schemas with the last release tag and exits 1, naming the field,
+when a field was removed or retyped (chapter 6 principle P7). It reports nothing to compare until the first tag.
+
 ## Building without vcpkg
 
 `-DOVT_USE_VCPKG=OFF` drops the vcpkg toolchain and resolves the same packages with plain

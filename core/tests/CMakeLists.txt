@@ -52,3 +52,6 @@ add_executable(ovt_tests_version test_version.cpp)
 target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
+
+# ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
+add_subdirectory(schema)

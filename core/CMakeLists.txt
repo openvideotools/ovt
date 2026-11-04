@@ -98,6 +98,9 @@ foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET}
 endforeach()
 unset(_dep)
 
+# FlatBuffers schemas and their generated code: target ovt_schemas (WI-0.003).
+add_subdirectory(schema)
+
 # One directory per module of chapter 0 §0.3 (NFR-030); each fills its own CMakeLists.txt.
 foreach(_module io bitreader container demux syntax index decode analysis model color metrics cache jobs api)
   add_subdirectory(src/${_module})
