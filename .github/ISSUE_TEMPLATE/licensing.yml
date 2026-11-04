@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: Licensing question
+description: A question about OVT's licences, a dependency's licence or a distribution channel.
+labels: ["licensing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read [docs/licensing.md](https://github.com/openvideotools/ovt/blob/main/docs/licensing.md) first. Its answers are not legal advice.
+
+        **Do not discuss specific patents or patent claims here.** Such issues are closed with a pointer to the
+        project's patent policy and forwarded to the owner privately (POL-PAT-8).
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      options:
+        - Licence of a directory or file
+        - A third-party dependency
+        - Plugins and the GPL
+        - Redistribution or packaging
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+      description: Name the files, dependency (with version) or channel it is about.
+    validations:
+      required: true

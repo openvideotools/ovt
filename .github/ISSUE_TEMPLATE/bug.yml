@@ -1,0 +1,64 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+name: Bug report
+description: Something in OVT does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A crash, hang or memory error on a crafted or damaged file is a **security bug**. Do not file it here;
+        report it privately as described in [SECURITY.md](https://github.com/openvideotools/ovt/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: OVT version
+      description: Output of `ovt --version`, or the About dialog of OVT Studio.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple silicon)
+        - macOS (Intel)
+        - Linux x86-64
+        - Linux arm64
+        - Android
+        - ChromeOS
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: codec
+    attributes:
+      label: Codec
+      multiple: true
+      options:
+        - AV1
+        - H.265/HEVC
+        - H.264/AVC
+        - Not codec-specific
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact command or the clicks, and the file you used. Attach a small sample if you can share it.
+      placeholder: "ovt dump clip.mp4 --frames 0-10"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Include the error code and message (for example `DEC-PLUGIN-0001 …`) and any log output.
+      render: text
+    validations:
+      required: true

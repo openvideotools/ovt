@@ -1,0 +1,100 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Store and package listing texts, one table per distribution channel (chapter 15 §15.8, WI-0.608).
+# Consumed by tools/release/collect.py --check-listings (chapter 13 WI-0.036) and by
+# tools/release/gen_metainfo.py (Flathub metainfo). Checked by tools/tests/test_listing_texts.py.
+#
+#   short          one line; Play and F-Droid allow 80 characters/bytes, the strictest limit applies to all
+#   long           Play allows 4000 characters
+#   licence_line   states the licence and links the source tag; {version} is replaced at release time
+#   patent_notice  true only where the listed artefact contains the codec pack (then the PATENT_NOTICE.md
+#                  text of §15.5.3 is appended); the default downloads carry no AVC/HEVC decoder (POL-PAT-2)
+
+[product]
+name = "OVT Studio"
+project_license = "GPL-3.0-or-later"
+source_url = "https://github.com/openvideotools/ovt/tree/v{version}"
+
+[channels.play]
+short = "Inspect AV1, HEVC and H.264 video: syntax, blocks, HDR and quality metrics"
+long = """
+OVT Studio is a free video analysis suite for codec engineers and video teams. Open an AV1, H.265/HEVC \
+or H.264/AVC file and look inside it: the container boxes, every syntax element of every frame, block \
+partitions, prediction modes and motion vectors drawn over the picture, and each plane on its own.
+
+• Bitstream inspection: headers and per-frame syntax trees with byte offsets
+• Block views: partitions, modes, motion vectors and quantiser maps as overlays
+• HDR: PQ and HLG content displayed with correct tone mapping on HDR-capable screens
+• Quality metrics: PSNR, SSIM and VMAF between a reference and a test clip
+• Works with tablets, Chromebooks, keyboards and mice; resizable windows
+
+AV1 analysis is built in. H.264 and H.265 decoding comes as a separate, optional codec pack, because \
+those formats are covered by patents; the base app contains no AVC or HEVC decoder.
+
+OVT Studio is free software under the GNU General Public License, version 3 or later.
+"""
+licence_line = "Free software under GPL-3.0-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = false
+
+[channels.fdroid]
+short = "Video analysis for AV1, HEVC and H.264: syntax, blocks, HDR, metrics"
+long = """
+OVT Studio is a free video analysis suite. Open an AV1, H.265/HEVC or H.264/AVC file and inspect its \
+container, every syntax element, block partitions, prediction modes and motion vectors as overlays, \
+the individual planes, HDR (PQ/HLG) display, and PSNR, SSIM and VMAF quality metrics.
+
+This build is made from source by F-Droid and is reproducible. It contains no AVC or HEVC decoder; \
+those come in the separate app org.openvideotools.studio.codecpack, because the formats are \
+covered by patents.
+"""
+licence_line = "GPL-3.0-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = false
+
+[channels.flathub]
+short = "Inspect AV1, HEVC and H.264 video bitstreams, blocks, HDR and metrics"
+long = """
+OVT Studio is a free video analysis suite for codec engineers and video teams. It shows the \
+container structure and every syntax element of AV1, H.265/HEVC and H.264/AVC streams, draws block \
+partitions, prediction modes and motion vectors over the picture, displays HDR (PQ and HLG) content \
+and computes PSNR, SSIM and VMAF.
+
+H.264 and H.265 decoding is provided by the optional org.openvideotools.Studio.Codecs extension, \
+because those formats are covered by patents.
+"""
+licence_line = "GPL-3.0-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = false
+
+[channels.homebrew]
+# Cask `desc`: Homebrew wants a short phrase without the product name and without a final full stop.
+short = "Video analysis suite for AV1, HEVC and H.264 bitstreams"
+long = """
+OVT Studio and the ovt command-line tool inspect AV1, H.265/HEVC and H.264/AVC video: container \
+structure, syntax elements, block-level overlays, HDR display and quality metrics. The cask installs \
+no AVC or HEVC decoder; `brew install --cask ovt-codec-pack` adds them.
+"""
+licence_line = "GPL-3.0-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = false
+
+[channels.pypi]
+short = "Read and analyse AV1, HEVC and H.264 bitstreams from Python"
+long = """
+`ovt` is the Python interface of Open Video Tools. It opens AV1, H.265/HEVC and H.264/AVC files, \
+exposes the stream index, syntax elements and per-block analysis as Python objects, \
+and computes PSNR, SSIM and VMAF.
+
+The wheel contains no AVC or HEVC decoder. `pip install "ovt[codecs]"` downloads the codec pack from \
+the project's GitHub release on first use, checks its hash and shows its patent notice.
+"""
+licence_line = "GPL-3.0-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = false
+
+[channels.github]
+short = "Free video analysis suite for AV1, HEVC and H.264"
+long = """
+Release artefacts of Open Video Tools: OVT Studio and the ovt command-line tool for macOS, Linux and \
+Android, the Python wheels, the separate codec pack with the H.264/AVC and H.265/HEVC decoders, \
+SHA256SUMS, minisign signatures and the Corresponding Source archive.
+"""
+licence_line = "GPL-3.0-or-later; the library layer is LGPL-2.1-or-later. Source code: https://github.com/openvideotools/ovt/tree/v{version}"
+patent_notice = true
