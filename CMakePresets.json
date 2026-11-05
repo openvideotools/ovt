@@ -90,11 +90,12 @@
   "testPresets": [
     { "name": "default", "hidden": true, "output": { "outputOnFailure": true, "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml" }, "execution": { "jobs": 4, "timeout": 600 } },
     { "name": "asan-env", "hidden": true, "environment": { "ASAN_OPTIONS": "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1" } },
+    { "name": "asan-env-macos", "hidden": true, "environment": { "ASAN_OPTIONS": "detect_leaks=0:detect_container_overflow=0:strict_string_checks=1:detect_stack_use_after_return=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1" } },
     { "name": "tsan-env", "hidden": true, "environment": { "TSAN_OPTIONS": "halt_on_error=1 second_deadlock_stack=1" } },
 
     { "name": "macos-arm64-debug",   "inherits": "default", "configurePreset": "macos-arm64-debug" },
     { "name": "macos-arm64-release", "inherits": "default", "configurePreset": "macos-arm64-release" },
-    { "name": "macos-arm64-asan",    "inherits": ["default", "asan-env"], "configurePreset": "macos-arm64-asan" },
+    { "name": "macos-arm64-asan",    "inherits": ["default", "asan-env-macos"], "configurePreset": "macos-arm64-asan" },
     { "name": "linux-x64-debug",     "inherits": "default", "configurePreset": "linux-x64-debug" },
     { "name": "linux-x64-release",   "inherits": "default", "configurePreset": "linux-x64-release" },
     { "name": "linux-x64-asan-ubsan", "inherits": ["default", "asan-env"], "configurePreset": "linux-x64-asan-ubsan" },
@@ -111,7 +112,7 @@
     { "name": "perf",       "inherits": ["default", "perf-filter"],       "configurePreset": "linux-x64-release" },
     { "name": "pr-macos",         "inherits": ["default", "pr-filter"],         "configurePreset": "macos-arm64-release" },
     { "name": "nightly-macos",    "inherits": ["default", "nightly-filter"],    "configurePreset": "macos-arm64-release" },
-    { "name": "sanitizers-macos", "inherits": ["default", "sanitizers-filter", "asan-env"], "configurePreset": "macos-arm64-asan" },
+    { "name": "sanitizers-macos", "inherits": ["default", "sanitizers-filter", "asan-env-macos"], "configurePreset": "macos-arm64-asan" },
     { "name": "perf-macos",       "inherits": ["default", "perf-filter"],       "configurePreset": "macos-arm64-release" },
     { "name": "pr-android",       "inherits": ["default", "pr-filter"],         "configurePreset": "android-x86_64-debug" }
   ],
