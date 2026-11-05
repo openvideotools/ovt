@@ -50,7 +50,7 @@ ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", "
 COLUMNS = ("Name", "Version", "Licence", "URL", "Patches", "SHA-256", "Build", "Notes")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
-_URL_RE = re.compile(r"(?:https?|file)://[^\s`|)]+")  # file:// for local mirrors and tests
+_URL_RE = re.compile(r"(?:https?|file)://[^\s`|)<>]+")  # file:// for local mirrors and tests
 _VERSION_TOKEN_RE = re.compile(r"(?<![0-9.])\d+(?:\.\d+)+(?![0-9])")
 
 
@@ -104,7 +104,7 @@ class Row:
 def dep_id(name: str) -> str:
     """Row Name -> the <dep> of OVT_TP_<dep>_*: lower case, runs of other characters become '_'.
 
-    SPEC-ASSUMPTION(#15): §13.3.7 says only "lower-cased"; names with spaces need the '_' mapping.
+    The mapping of chapter 13 §13.3.7 (`vcpkg baseline` -> `vcpkg_baseline`, `Gradle / AGP` -> `gradle_agp`).
     """
     ident = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
     if not ident:
@@ -183,7 +183,8 @@ def check_url_version(row: Row) -> None:
     for token in _VERSION_TOKEN_RE.findall(row.url):
         if token != version and not version.startswith(token + "."):
             raise VersionsError(
-                f"{row.where()}: URL {row.url} embeds version {token}, but the Version column is {version}")
+                f"{row.where()}: URL {row.url} embeds version {token}, but the Version column is {version}"
+            )
 
 
 def _cmake_quote(value: str, keep_list: bool = False) -> str:
@@ -217,6 +218,7 @@ def write_if_changed(path: Path, content: str) -> None:
 
 # ---- downloads ---------------------------------------------------------------------------------------
 
+
 def sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -241,6 +243,7 @@ def download(url: str, dest: Path) -> None:
 def member_sha256(archive: Path, member_name: str) -> str | None:
     """SHA-256 of the first archive member whose basename is member_name and that sits at the top of the
     archive's root directory, or None."""
+
     def top_level(name: str) -> bool:
         parts = [p for p in name.split("/") if p not in ("", ".")]
         return len(parts) <= 2 and parts[-1] == member_name
@@ -299,6 +302,7 @@ def update_hashes(path: Path, downloads: Path) -> int:
 
 # ---- consistency check (WI-0.007 hooks it) -------------------------------------------------------------
 
+
 def check_scripts(rows: list[Row], source_dir: Path) -> list[str]:
     problems = []
     for row in rows:
@@ -314,8 +318,9 @@ def check_scripts(rows: list[Row], source_dir: Path) -> list[str]:
                 problems.append(f"{row.where()}: {m.group(0)} does not use {var}")
         version = _version_value(row.version)
         if re.search(r"\d", version) and version in body:
-            problems.append(f"{row.where()}: {m.group(0)} spells the version {version} literally; "
-                            f"use OVT_TP_{row.dep}_VERSION")
+            problems.append(
+                f"{row.where()}: {m.group(0)} spells the version {version} literally; " f"use OVT_TP_{row.dep}_VERSION"
+            )
         if re.search(r"\bOVT_[A-Z0-9]+_(VERSION|URL|SHA256)\b", body.replace("OVT_TP_", "")):
             problems.append(f"{m.group(0)}: uses an OVT_<DEP>_* spelling; only OVT_TP_<dep>_* exists")
     return problems
@@ -328,8 +333,12 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--out", type=Path, help="write the CMake variables to this file")
     mode.add_argument("--update-hashes", action="store_true", help="fill the <sha> placeholders")
     mode.add_argument("--check", action="store_true", help="validate the table and the consuming scripts")
-    ap.add_argument("--downloads", type=Path, default=REPO_ROOT / "build" / "third_party" / "downloads",
-                    help="archive cache for --update-hashes (OVT_TP_DOWNLOADS)")
+    ap.add_argument(
+        "--downloads",
+        type=Path,
+        default=REPO_ROOT / "build" / "third_party" / "downloads",
+        help="archive cache for --update-hashes (OVT_TP_DOWNLOADS)",
+    )
     ap.add_argument("--source-dir", type=Path, default=REPO_ROOT, help="repository root for --check")
     args = ap.parse_args(argv)
     try:

@@ -52,3 +52,6 @@ if(TARGET tp::dav1d)
   ovt_set_license(ovt_tests_dav1d_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_dav1d_probe)
 endif()
+
+# ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
+add_subdirectory(schema)

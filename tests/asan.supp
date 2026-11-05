@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# LeakSanitizer suppressions (chapter 14 §14.8.1, WI-0.558).
+#
+# Read through LSAN_OPTIONS=suppressions=tests/asan.supp; lines such as 'leak:<function-or-file-substring>'.
+# LSan kinds only: ASan's own kinds (interceptor_*, odr_violation) are read through ASAN_OPTIONS, and a file
+# mixing both makes either runtime abort with "failed to parse suppressions".
+#
+# Every entry sits in a block directly under a comment that links the upstream issue (https://...), with no
+# blank line between the comment and the entry. tools/check_suppressions.py enforces this. Procedure:
+# docs/dev/sanitizers.md. Keep entries narrow (one function or one file); never suppress OVT code here,
+# fix it instead.

@@ -17,11 +17,13 @@ foreach(_t ovt_core ovt_render)
   endif()
 endforeach()
 
-install(TARGETS ${_ovt_export_targets} EXPORT OvtTargets
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ovt)
+install(
+  TARGETS ${_ovt_export_targets}
+  EXPORT OvtTargets
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ovt)
 
 if(TARGET ovt_cli)
   install(TARGETS ovt_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT cli)
@@ -39,20 +41,22 @@ endif()
 
 if(OVT_INSTALL_DEV)
   # C11 headers only; ovt/cxx/*.hpp are in-tree C++ helpers (chapter 12 §12.3.1 rule 1, D22).
-  install(DIRECTORY "${CMAKE_SOURCE_DIR}/core/include/ovt/" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ovt
-          COMPONENT dev PATTERN "cxx" EXCLUDE)
-  install(EXPORT OvtTargets NAMESPACE ovt:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt
-          FILE ovt-targets.cmake COMPONENT dev)
-  configure_package_config_file("${CMAKE_SOURCE_DIR}/cmake/ovt-config.cmake.in"
-                                "${CMAKE_BINARY_DIR}/ovt-config.cmake"
-                                INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt
-                                PATH_VARS OVT_PLUGIN_DIR OVT_SCHEMA_DIR)
+  install(DIRECTORY "${CMAKE_SOURCE_DIR}/core/include/ovt/" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ovt COMPONENT dev
+          PATTERN "cxx" EXCLUDE)
+  install(
+    EXPORT OvtTargets
+    NAMESPACE ovt::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt
+    FILE ovt-targets.cmake
+    COMPONENT dev)
+  configure_package_config_file(
+    "${CMAKE_SOURCE_DIR}/cmake/ovt-config.cmake.in" "${CMAKE_BINARY_DIR}/ovt-config.cmake"
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt PATH_VARS OVT_PLUGIN_DIR OVT_SCHEMA_DIR)
   # The package version is the C API version (OVT_API_VERSION, which also sets the SONAME), not the
   # 0.x product version: find_package(ovt 1 CONFIG REQUIRED) asks for API major 1 (chapter 13 §13.2.6).
-  # SPEC-ASSUMPTION(#13): package version = C API version.
   get_target_property(_ovt_api_version ovt_core VERSION)
-  write_basic_package_version_file("${CMAKE_BINARY_DIR}/ovt-config-version.cmake"
-                                   VERSION ${_ovt_api_version} COMPATIBILITY SameMajorVersion)
+  write_basic_package_version_file("${CMAKE_BINARY_DIR}/ovt-config-version.cmake" VERSION ${_ovt_api_version}
+                                   COMPATIBILITY SameMajorVersion)
   unset(_ovt_api_version)
   install(FILES "${CMAKE_BINARY_DIR}/ovt-config.cmake" "${CMAKE_BINARY_DIR}/ovt-config-version.cmake"
           DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt COMPONENT dev)

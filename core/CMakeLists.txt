@@ -16,17 +16,12 @@ unset(_ovt_api_lines)
 unset(_part)
 unset(_m)
 
-add_library(ovt_core SHARED
-  src/status.cpp
-  src/version.cpp)
+add_library(ovt_core SHARED src/status.cpp src/version.cpp)
 add_library(ovt::core ALIAS ovt_core)
 
-target_include_directories(ovt_core
-  PUBLIC
-    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-  PRIVATE
-    "${OVT_GENERATED_DIR}")
+target_include_directories(
+  ovt_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE "${OVT_GENERATED_DIR}")
 target_link_libraries(ovt_core PRIVATE ovt::flags)
 add_dependencies(ovt_core ovt_version_header)
 
@@ -61,28 +56,29 @@ else()
   set(_profile "default")
 endif()
 
-target_compile_definitions(ovt_core PRIVATE
-  OVT_VERSION_MAJOR_VALUE=${PROJECT_VERSION_MAJOR}
-  OVT_VERSION_MINOR_VALUE=${PROJECT_VERSION_MINOR}
-  OVT_VERSION_PATCH_VALUE=${PROJECT_VERSION_PATCH}
-  "OVT_VERSION_STRING_VALUE=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\""
-  "OVT_BUILD_PROFILE_VALUE=\"${_profile}\""
-  "OVT_BUILD_PLATFORM_VALUE=\"${_os}-${_arch}\"")
+target_compile_definitions(
+  ovt_core
+  PRIVATE OVT_VERSION_MAJOR_VALUE=${PROJECT_VERSION_MAJOR}
+          OVT_VERSION_MINOR_VALUE=${PROJECT_VERSION_MINOR}
+          OVT_VERSION_PATCH_VALUE=${PROJECT_VERSION_PATCH}
+          "OVT_VERSION_STRING_VALUE=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\""
+          "OVT_BUILD_PROFILE_VALUE=\"${_profile}\""
+          "OVT_BUILD_PLATFORM_VALUE=\"${_os}-${_arch}\"")
 unset(_os)
 unset(_arch)
 unset(_profile)
 
-set_target_properties(ovt_core PROPERTIES
-  OUTPUT_NAME ovt_core
-  EXPORT_NAME core
-  VERSION "${OVT_API_VERSION_MAJOR}.${OVT_API_VERSION_MINOR}.${OVT_API_VERSION_PATCH}"
-  SOVERSION "${OVT_API_VERSION_MAJOR}")
+set_target_properties(
+  ovt_core
+  PROPERTIES OUTPUT_NAME ovt_core EXPORT_NAME core
+             VERSION "${OVT_API_VERSION_MAJOR}.${OVT_API_VERSION_MINOR}.${OVT_API_VERSION_PATCH}"
+             SOVERSION "${OVT_API_VERSION_MAJOR}")
 ovt_set_license(ovt_core "${OVT_CORE_LICENSE}")
 
 # Dependencies from the vcpkg manifest (WI-0.002, chapter 13 §13.3.2). The triplets build them as static
 # libraries that ovt_core absorbs, so they stay PRIVATE: a downstream find_package(ovt) never sees them
 # (chapter 13 §13.2.6). SPDX ids are the ports' "license" fields.
-# SPEC-ASSUMPTION(#8): vcpkg.json carries only the ports some target links; later WIs add theirs.
+# vcpkg.json carries only the ports some target links; later WIs add theirs (chapter 13 §13.3.2).
 ovt_find_package(fmt SPDX "MIT" TARGETS fmt::fmt)
 ovt_find_package(spdlog SPDX "MIT" TARGETS spdlog::spdlog)
 ovt_find_package(flatbuffers SPDX "Apache-2.0" TARGETS flatbuffers::flatbuffers NAMES FlatBuffers)
@@ -92,14 +88,32 @@ ovt_find_package(hwy SPDX "Apache-2.0" TARGETS hwy::hwy)
 ovt_find_package(xxHash SPDX "BSD-2-Clause" TARGETS xxHash::xxhash PKG_CONFIG libxxhash)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
-foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET}
-             ${hwy_TARGET} ${xxHash_TARGET})
+foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET} ${hwy_TARGET}
+             ${xxHash_TARGET})
   target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
 endforeach()
 unset(_dep)
 
+# FlatBuffers schemas and their generated code: target ovt_schemas (WI-0.003).
+add_subdirectory(schema)
+
 # One directory per module of chapter 0 §0.3 (NFR-030); each fills its own CMakeLists.txt.
-foreach(_module io bitreader container demux syntax index decode analysis model color metrics cache jobs api)
+foreach(
+  _module
+  io
+  bitreader
+  container
+  demux
+  syntax
+  index
+  decode
+  analysis
+  model
+  color
+  metrics
+  cache
+  jobs
+  api)
   add_subdirectory(src/${_module})
 endforeach()
 unset(_module)

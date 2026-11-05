@@ -1,0 +1,28 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: BSD-2-Clause
+//
+// STUB (WI-0.003). Just enough of chapter 0 §0.5.4 / chapter 6 §6.3 to exercise the code generation target:
+// the namespace, the FrameAnalysis root table and its file identifier. WI-0.080 replaces this file with
+// the schema of chapter 6 §6.3, copied verbatim; nothing may depend on the stub's fields.
+
+namespace ovt.fb;
+
+enum StubCodec : ubyte { Unknown = 0, Avc = 1, Hevc = 2, Av1 = 3 }
+
+struct StubSpan {
+  offset:uint64;
+  size:uint64;
+}
+
+table FrameAnalysis {
+  schema_version:uint = 1;
+  stream_index:uint32;
+  display_order:int64;
+  codec:StubCodec = Unknown;
+  span:StubSpan;
+  note:string;
+  payload:[ubyte];
+}
+
+root_type FrameAnalysis;
+file_identifier "OVTA";

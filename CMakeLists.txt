@@ -30,6 +30,7 @@ include(OvtVersion) # OVT_VERSION_FULL = <VERSION>[<suffix>]+<git sha> (FR-GEN-0
 include(OvtCompilerFlags) # ovt::flags (§13.2.5)
 include(OvtLicenseTags) # ovt_set_license(<target> <SPDX>) and the ovt_license_manifest target
 include(OvtThirdParty) # dispatches to third_party/*.cmake unless OVT_SYSTEM_* (§13.3)
+include(OvtFlatBuffers) # ovt_add_flatbuffers_schema(<target> <fbs>...) (WI-0.003)
 
 # Before any add_subdirectory(): module test directories (core/tests, …) register tests too.
 if(OVT_BUILD_TESTS)

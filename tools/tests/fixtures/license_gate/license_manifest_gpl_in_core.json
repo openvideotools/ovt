@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "preset": "linux-x64-release",
+  "options": {},
+  "targets": [
+    {
+      "name": "ovt_core",
+      "type": "SHARED",
+      "spdx": "LGPL-2.1-or-later",
+      "directory": "core/",
+      "links": [
+        {
+          "name": "fmt",
+          "source": "vcpkg",
+          "version": "11.0.2",
+          "spdx": "MIT",
+          "linkage": "static"
+        },
+        {
+          "name": "zstd",
+          "source": "vcpkg",
+          "version": "1.5.6",
+          "spdx": "BSD-3-Clause OR GPL-2.0-only",
+          "linkage": "static"
+        },
+        {
+          "name": "libfoo",
+          "source": "vcpkg",
+          "version": "1.0",
+          "spdx": "GPL-3.0-only",
+          "linkage": "static"
+        }
+      ]
+    },
+    {
+      "name": "ovt_cli",
+      "type": "EXECUTABLE",
+      "spdx": "GPL-3.0-or-later",
+      "directory": "cli/",
+      "links": [
+        {
+          "name": "fmt",
+          "source": "vcpkg",
+          "version": "11.0.2",
+          "spdx": "MIT",
+          "linkage": "static"
+        },
+        {
+          "name": "kddockwidgets",
+          "source": "third_party",
+          "version": "2.2.0",
+          "spdx": "GPL-2.0-only OR GPL-3.0-only",
+          "linkage": "static"
+        }
+      ]
+    },
+    {
+      "name": "ovt_plugin_de265",
+      "type": "MODULE",
+      "spdx": "LGPL-3.0-or-later",
+      "directory": "plugins/ovt-plugin-de265/",
+      "links": [
+        {
+          "name": "libde265",
+          "source": "third_party",
+          "version": "1.0.15",
+          "spdx": "LGPL-3.0-or-later",
+          "linkage": "static",
+          "patched": true
+        }
+      ]
+    }
+  ]
+}
