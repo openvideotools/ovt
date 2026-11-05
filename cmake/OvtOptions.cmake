@@ -56,7 +56,10 @@ option(OVT_UNIVERSAL "macOS: lipo arm64+x86_64 artefacts (§13.5.1)" OFF)
 # ---- Licensing-relevant options (chapter 15 §15.4) ------------------------------------------------
 option(OVT_FFMPEG_GPL "Configure FFmpeg with --enable-gpl" OFF)
 option(OVT_FFMPEG_GPL_PLUGIN_ONLY "With OVT_FFMPEG_GPL=ON: apply --enable-gpl to the plugin flavour only" OFF)
-option(OVT_FFMPEG_GPL_CORE_ACK "Acknowledge that a GPL FFmpeg may be linked into ovt_core (whole build becomes GPL-3.0-or-later; never in official builds)" OFF)
+option(
+  OVT_FFMPEG_GPL_CORE_ACK
+  "Acknowledge that a GPL FFmpeg may be linked into ovt_core (whole build becomes GPL-3.0-or-later; never in official builds)"
+  OFF)
 option(OVT_PATENT_CODECS_IN_CORE "Enable h264/hevc decoders in the core FFmpeg flavour (distro/user builds)" OFF)
 
 # ---- Dependencies ---------------------------------------------------------------------------------
@@ -68,17 +71,18 @@ option(OVT_USE_VCPKG "Use the vcpkg toolchain; OFF = plain find_package/pkg-conf
 option(OVT_ONNXRUNTIME_PREBUILT "Use the pinned prebuilt ONNX Runtime archive instead of the vcpkg port" OFF)
 # The presets' binaryDir is build/<preset>, so the binary directory's name stands in for the preset name.
 get_filename_component(OVT_PRESET_NAME "${CMAKE_BINARY_DIR}" NAME)
-set(OVT_THIRD_PARTY_PREFIX "${CMAKE_SOURCE_DIR}/build/third_party/${OVT_PRESET_NAME}" CACHE PATH
-    "Install prefix of the third_party/*.cmake builds (set per preset)")
-set(OVT_TP_DOWNLOADS "${CMAKE_SOURCE_DIR}/build/third_party/downloads" CACHE PATH
-    "Archive download cache for third_party/*.cmake")
-set(OVT_CORPORA_DIR "${CMAKE_SOURCE_DIR}/build/corpora" CACHE PATH
-    "Where tools/fetch_corpora.py put the corpora; tests skip when a set is missing")
+set(OVT_THIRD_PARTY_PREFIX "${CMAKE_SOURCE_DIR}/build/third_party/${OVT_PRESET_NAME}"
+    CACHE PATH "Install prefix of the third_party/*.cmake builds (set per preset)")
+set(OVT_TP_DOWNLOADS "${CMAKE_SOURCE_DIR}/build/third_party/downloads"
+    CACHE PATH "Archive download cache for third_party/*.cmake")
+set(OVT_CORPORA_DIR "${CMAKE_SOURCE_DIR}/build/corpora"
+    CACHE PATH "Where tools/fetch_corpora.py put the corpora; tests skip when a set is missing")
 
 # ---- Install and branding -------------------------------------------------------------------------
 include(GNUInstallDirs)
-set(OVT_PLUGIN_DIR "${CMAKE_INSTALL_LIBDIR}/ovt/plugins" CACHE STRING
-    "Install-time plugin directory (relative to the prefix), compiled into ovt_core as a default search path")
+set(OVT_PLUGIN_DIR "${CMAKE_INSTALL_LIBDIR}/ovt/plugins"
+    CACHE STRING
+          "Install-time plugin directory (relative to the prefix), compiled into ovt_core as a default search path")
 set(OVT_PRODUCT_NAME "OVT Studio" CACHE STRING "Product name compiled into the GUI/CLI")
 set(OVT_CLI_NAME "ovt" CACHE STRING "CLI name compiled into the GUI/CLI")
 set(OVT_VERSION_SUFFIX "" CACHE STRING "Appended to the version (-dev, -rc1)")
@@ -87,10 +91,11 @@ set(OVT_GIT_SHA "" CACHE STRING "Git sha to embed when the source tree has no .g
 # ---- Validation -----------------------------------------------------------------------------------
 # An LGPL ovt_core must never link a GPL FFmpeg (chapter 13 §13.2.2, chapter 15 §15.4).
 if(OVT_FFMPEG_GPL AND NOT OVT_FFMPEG_GPL_PLUGIN_ONLY AND NOT OVT_FFMPEG_GPL_CORE_ACK)
-  message(FATAL_ERROR
-    "OVT_FFMPEG_GPL=ON would link a GPL FFmpeg into the LGPL-2.1-or-later ovt_core. "
-    "Set OVT_FFMPEG_GPL_PLUGIN_ONLY=ON to apply --enable-gpl to the plugin flavour only (intended use), "
-    "or OVT_FFMPEG_GPL_CORE_ACK=ON to accept a GPL-3.0-or-later core (never in official builds).")
+  message(
+    FATAL_ERROR
+      "OVT_FFMPEG_GPL=ON would link a GPL FFmpeg into the LGPL-2.1-or-later ovt_core. "
+      "Set OVT_FFMPEG_GPL_PLUGIN_ONLY=ON to apply --enable-gpl to the plugin flavour only (intended use), "
+      "or OVT_FFMPEG_GPL_CORE_ACK=ON to accept a GPL-3.0-or-later core (never in official builds).")
 endif()
 if(OVT_FFMPEG_GPL_PLUGIN_ONLY AND NOT OVT_FFMPEG_GPL)
   message(WARNING "OVT_FFMPEG_GPL_PLUGIN_ONLY=ON has no effect without OVT_FFMPEG_GPL=ON.")
@@ -126,6 +131,19 @@ endif()
 # OVT_BUILD_GUI defaults to ON but turns OFF (with a warning, not an error) when Qt 6 is not found on a
 # desktop host. Android always builds the GUI shell.
 if(OVT_BUILD_GUI AND NOT ANDROID)
+  # Qt 6.8's FindWrapOpenGL.cmake links the AGL framework on Apple, and Xcode 26's SDK no longer has it
+  # (`ld: framework 'AGL' not found`, found on the Mac Mini for WI-0.019). Qt takes a cached WrapOpenGL_AGL
+  # as is, so pointing it at OpenGL.framework (already linked) drops AGL. This has to run before the first
+  # find_package(Qt6). Remove it once the Qt pin carries the upstream fix.
+  if(APPLE)
+    find_library(WrapOpenGL_AGL NAMES AGL)
+    if(NOT WrapOpenGL_AGL)
+      find_library(OVT_OPENGL_FRAMEWORK NAMES OpenGL)
+      if(OVT_OPENGL_FRAMEWORK)
+        set(WrapOpenGL_AGL "${OVT_OPENGL_FRAMEWORK}" CACHE FILEPATH "AGL stand-in (the SDK has no AGL)" FORCE)
+      endif()
+    endif()
+  endif()
   find_package(Qt6 QUIET COMPONENTS Core Quick)
   if(NOT Qt6_FOUND)
     message(WARNING "Qt 6 not found (set QT_ROOT_DIR or CMAKE_PREFIX_PATH); building with OVT_BUILD_GUI=OFF.")
