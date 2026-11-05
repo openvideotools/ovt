@@ -53,6 +53,12 @@ path = ["core/schema/*.fbs"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "BSD-2-Clause"
 
+# Fuzz seeds and crash regressions are binary test inputs (WI-0.557): tests/ licence.
+[[annotations]]
+path = ["core/tests/fuzz/corpus/**", "core/tests/fuzz/regressions/**"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
 [[annotations]]
 path = ["app/**/Branding.qml"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"

@@ -1,0 +1,94 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Fuzz smoke (chapter 13 §13.7.1 `fuzz-smoke`, chapter 14 §14.7.3, WI-0.557): build the linux-x64-fuzz preset
+# and run every ovt_fuzz_* target for 60 s from its committed seeds. Four shards split the targets (target i
+# runs in shard i mod 4); a crash, timeout or OOM fails the shard and uploads the reproducer.
+# The nightly 20-minute run is WI-0.033's. Third-party actions are pinned by commit SHA, never by tag.
+name: fuzz-smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  PRESET: linux-x64-fuzz
+
+jobs:
+  fuzz-smoke:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-fuzz
+          triplet: x64-linux-ovt
+
+      # The preset names clang-16 / clang++-16 (chapter 13 §13.2.4); jammy has up to clang-15, so take 16 and
+      # its libFuzzer runtime from apt.llvm.org.
+      - name: Clang 16
+        run: |
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-16.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
+
+      - name: Configure and build
+        run: |
+          cmake --preset "$PRESET"
+          cmake --build --preset "$PRESET"
+
+      - name: Replay regressions
+        run: ctest --test-dir "build/$PRESET" -L fuzz-regress --output-on-failure
+
+      # The corpus cache is the FIRST corpus directory: libFuzzer writes new units into it, not into the
+      # checkout. The committed seeds are the second, read-only one.
+      - name: Restore corpus cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: corpus_cache
+          key: fuzz-corpus-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.shard }}-
+
+      - name: Fuzz 60 s per target
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          mkdir -p fuzz-artifacts
+          i=0
+          for bin in "build/$PRESET"/fuzz/ovt_fuzz_*; do
+            [ -x "$bin" ] || continue
+            if [ $((i % 4)) -eq "$SHARD" ]; then
+              t="${bin##*/ovt_fuzz_}"
+              mkdir -p "corpus_cache/$t"
+              echo "::group::$t"
+              "$bin" -max_total_time=60 -max_len=1048576 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1 \
+                -artifact_prefix=fuzz-artifacts/ "corpus_cache/$t" "core/tests/fuzz/corpus/$t"
+              echo "::endgroup::"
+            fi
+            i=$((i + 1))
+          done
+
+      - name: Upload reproducers
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-crashes-shard-${{ matrix.shard }}
+          path: fuzz-artifacts/
+          if-no-files-found: warn
