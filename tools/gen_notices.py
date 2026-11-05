@@ -18,8 +18,7 @@ Licence texts are looked up, in this order, and never fetched from the network:
                                           `<licenses-dir>/<key>/share/ovt/licenses/<key>/*`)
   2. `<vcpkg-share>/<key>/copyright`     (vcpkg ports)
   3. `<qt-licenses>/*GPL*`               (component `Qt` only)
-`<key>` is the component name in lower case with runs of other characters replaced by `-` (`ONNX Runtime`
--> `onnx-runtime`). A component with no text is a build failure: `E-NOTICE-MISSING <dep>`, exit 1.
+`<key>` is `versions_to_cmake.dep_id(name)` (`ONNX Runtime` -> `onnx_runtime`). A component with no text is a build failure: `E-NOTICE-MISSING <dep>`, exit 1.
 Exit 2 is a usage error. Run with `python -I`; the standard library only.
 """
 
@@ -35,11 +34,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python -I` drops the script directory
 
 import license_gate as lg  # noqa: E402
+from versions_to_cmake import dep_id  # noqa: E402
 
 # SPEC-ASSUMPTION(#57): the artefact component set comes from tools/release/manifest.toml (chapter 13 WI-0.036,
-# M0.5), which does not exist yet. Until it does, every component of the gate inventory is listed, minus
-# these build-only rows of third_party/VERSIONS.md that no artefact contains.
-BUILD_ONLY = frozenset({"vcpkg baseline", "gradle / agp", "android ndk", "conformance corpora"})
+# M0.5), which does not exist yet. Until it does, the components listed are those some build target links: gate
+# inventory rows with a non-empty `targets` (license_manifest.json `targets[].links`, §15.6). WI-0.036 narrows
+# that set per artefact.
 
 # §15.5.3, verbatim.
 AV1_SENTENCE = (
@@ -70,8 +70,32 @@ class UsageError(Exception):
     pass
 
 
+# CMake target or library names of the manifest -> the port / dependency they come from, where stripping the
+# namespace and `lib` prefix is not enough.
+ALIASES = {"hwy": "highway", "libzstd_static": "zstd", "libzstd_shared": "zstd"}
+
+
 def key_of(name: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    """The <dep> id of a component (`versions_to_cmake.dep_id`), also the staging directory name.
+
+    Rows of third_party/VERSIONS.md give `ONNX Runtime` -> `onnx_runtime`. Names from license_manifest.json are CMake
+    targets or libraries: `fmt::fmt` -> `fmt`, `PkgConfig::_ovt_pc_xxHash` and `/usr/lib/libxxhash.so` -> `xxhash`,
+    `zstd::libzstd_static` -> `zstd`, so one component reached by several spellings is one key.
+    """
+    n = name
+    if "/" in n:  # a library file
+        n = re.sub(r"\.(so|a|dylib|lib)(\.[\d.]+)?$", "", n.rsplit("/", 1)[1])
+        n = re.sub(r"^lib", "", n)
+    elif "::" in n:
+        n = n.rsplit("::", 1)[1]
+        n = re.sub(r"^_ovt_pc_", "", n)
+        n = re.sub(r"^lib(?=\w+_(static|shared)$)", "", n)
+        n = re.sub(r"_(static|shared)$", "", n)
+    try:
+        key = dep_id(n)
+    except Exception:  # a name without letters or digits  # noqa: BLE001
+        return ""
+    return ALIASES.get(key, key)
 
 
 def cell(text: str) -> str:
@@ -109,7 +133,7 @@ def read_pins(path: Path, root: Path) -> dict[str, dict]:
         patches = []
         for p in re.findall(r"[^\s,`]+\.patch", cells[i_patch]):
             patches.append((Path(p).name, upstream_status(root / p)))
-        pins[cells[i_name]] = {"url": m.group(0) if m else "", "patches": patches}
+        pins[key_of(cells[i_name])] = {"url": m.group(0) if m else "", "patches": patches}
     return pins
 
 
@@ -139,15 +163,11 @@ def read_derived(path: Path | None) -> list[dict]:
 
 
 def components(report: dict) -> list[dict]:
-    """Inventory entries, one per component, sorted by name."""
+    """Inventory rows that some build target links, one per component, sorted by name."""
     seen: dict[str, dict] = {}
     for e in lg.inventory(report):
-        name = e["component"]
-        if name.lower() in BUILD_ONLY:
-            continue
-        if re.match(r"^in \S+$", str(e.get("version", ""))):
-            continue  # "VMAF models: in libvmaf" is covered by the libvmaf entry
-        seen.setdefault(name, e)
+        if e.get("targets"):
+            seen.setdefault(key_of(e["component"]), e)
     return sorted(seen.values(), key=lambda e: (e["component"].lower(), e["component"]))
 
 
@@ -164,15 +184,18 @@ def regular(d: Path, pattern: str = "*") -> list[Path]:
 
 def find_texts(name: str, args: argparse.Namespace) -> list[tuple[str, str]]:
     key = key_of(name)
+    spellings = [key, key.replace("_", "-")]  # vcpkg ports use hyphens (`nlohmann-json`)
     for base in args.licenses_dir:
-        for d in (base / key, base / key / "share" / "ovt" / "licenses" / key):
-            files = regular(d)
+        for k in spellings:
+            for d in (base / k, base / k / "share" / "ovt" / "licenses" / k):
+                files = regular(d)
+                if files:
+                    return read_files(files)
+    if args.vcpkg_share:
+        for k in spellings:
+            files = regular(args.vcpkg_share / k, "copyright")
             if files:
                 return read_files(files)
-    if args.vcpkg_share:
-        files = regular(args.vcpkg_share / key, "copyright")
-        if files:
-            return read_files(files)
     if key == "qt" and args.qt_licenses:
         files = [p for p in regular(args.qt_licenses) if "gpl" in p.name.lower()]
         if files:
@@ -217,7 +240,7 @@ def render(args: argparse.Namespace, report: dict, pins: dict, derived: list[dic
     out.append("| Component | Version | Licence | Modified | Homepage |")
     out.append("|---|---|---|---|---|")
     for c in comps:
-        pin = pins.get(c["component"], {})
+        pin = pins.get(key_of(c["component"]), {})
         lic = c.get("chosen") or c["license"]
         out.append(
             f"| {cell(c['component'])} | {cell(str(c.get('version', '')))} | {cell(lic)} | "

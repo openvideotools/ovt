@@ -28,14 +28,15 @@ VERSIONS = """\
 """
 
 
-def entry(name: str, version: str, lic: str) -> dict:
+def entry(name: str, version: str, lic: str, targets: list[str] | None = None) -> dict:
+    src = "versions" if targets is None else "third_party"
     return {
         "component": name,
         "version": version,
         "license": lic,
         "chosen": lic,
-        "source": "versions",
-        "targets": [],
+        "source": src,
+        "targets": targets or [],
     }
 
 
@@ -44,9 +45,10 @@ def tree(tmp_path: Path) -> dict:
     report = {
         "inventory": [
             entry("vcpkg baseline", "abc", "MIT"),
-            entry("libde265", "1.0.15", "LGPL-3.0-or-later"),
-            entry("libaom", "3.12.1", "BSD-2-Clause"),
-            entry("ONNX Runtime", "1.20.1", "MIT"),
+            entry("libde265", "1.0.15", "LGPL-3.0-or-later", ["ovt_plugin_de265"]),
+            entry("libaom", "3.12.1", "BSD-2-Clause", ["ovt_plugin_aom"]),
+            entry("ONNX Runtime", "1.20.1", "MIT", ["ovt_core"]),
+            entry("HM", "HM-18.0", "BSD-3-Clause"),  # in VERSIONS.md but linked by no target
             entry("VMAF models", "in libvmaf", "BSD-2-Clause-Patent"),
         ]
     }
@@ -57,7 +59,7 @@ def tree(tmp_path: Path) -> dict:
     for dep, text in (
         ("libaom", "libaom BSD text\r\n"),
         ("libde265", "LGPL text\n\n\n"),
-        ("onnx-runtime", "MIT text\n"),
+        ("onnx_runtime", "MIT text\n"),
     ):
         (lic / dep).mkdir(parents=True)
         (lic / dep / "LICENSE").write_text(text, newline="")
@@ -95,7 +97,7 @@ def test_two_runs_are_byte_identical(tree: dict, tmp_path: Path) -> None:
 
 
 def test_missing_licence_text_fails_with_code(tree: dict, tmp_path: Path) -> None:
-    (tree["lic"] / "onnx-runtime" / "LICENSE").unlink()
+    (tree["lic"] / "onnx_runtime" / "LICENSE").unlink()
     out = tmp_path / "N.md"
     code, err = run(tree, out)
     assert code == 1
@@ -114,11 +116,26 @@ def test_content(tree: dict, tmp_path: Path) -> None:
         "| libaom",
         "| libde265",
         "| ONNX Runtime",
-    ]  # sorted; build-only and "in libvmaf" rows dropped
+    ]  # sorted; rows no target links are dropped
     assert "**yes** — patches: 0001-api.patch (Upstream-Status: Submitted https://example.org/pr/1)" in text
     assert "**PATENTS**" in text and "libaom BSD text\n" in text
     assert "None." in text
     assert (tmp_path / "PATENT_NOTICE.md").read_text().count("H.264/AVC") == 1
+
+
+def test_only_linked_components_need_texts(tree: dict, tmp_path: Path) -> None:
+    """HM has no licence text and no target links it: the run still succeeds and HM is not listed."""
+    out = tmp_path / "N.md"
+    code, err = run(tree, out)
+    assert code == 0, err
+    assert "HM" not in [ln.split(" | ")[0].lstrip("| ") for ln in out.read_text().splitlines()]
+
+
+def test_staging_key_matches_dep_id() -> None:
+    import versions_to_cmake as v2c
+
+    for name in ("ONNX Runtime", "Qt Gradle Plugin", "libaom", "Gradle / AGP"):
+        assert gn.key_of(name) == v2c.dep_id(name)
 
 
 def test_no_patent_notice_by_default(tree: dict, tmp_path: Path) -> None:
@@ -129,12 +146,12 @@ def test_no_patent_notice_by_default(tree: dict, tmp_path: Path) -> None:
 
 
 def test_vcpkg_and_qt_fallbacks(tree: dict, tmp_path: Path) -> None:
-    (tree["lic"] / "onnx-runtime" / "LICENSE").unlink()
-    share = tmp_path / "share" / "onnx-runtime"
+    (tree["lic"] / "onnx_runtime" / "LICENSE").unlink()
+    share = tmp_path / "share" / "onnx_runtime"
     share.mkdir(parents=True)
     (share / "copyright").write_text("vcpkg MIT\n")
     report = json.loads((tree["root"] / "report.json").read_text())
-    report["inventory"].append(entry("Qt", "6.8.3", "LGPL-3.0-only"))
+    report["inventory"].append(entry("Qt", "6.8.3", "LGPL-3.0-only", ["ovt_studio"]))
     (tree["root"] / "report.json").write_text(json.dumps(report))
     qt = tmp_path / "qt"
     qt.mkdir()
@@ -171,3 +188,32 @@ def test_repository_derived_file_parses() -> None:
 
 def test_fence_longer_than_text_backticks() -> None:
     assert gn.fence_for("a ``` b") == "````"
+
+
+@pytest.mark.parametrize(
+    ("name", "key"),
+    [
+        ("fmt::fmt", "fmt"),
+        ("PkgConfig::_ovt_pc_xxHash", "xxhash"),
+        ("xxHash::xxhash", "xxhash"),
+        ("/usr/lib/x86_64-linux-gnu/libxxhash.so", "xxhash"),
+        ("zstd::libzstd_static", "zstd"),
+        ("hwy::hwy", "highway"),
+        ("CLI11::CLI11", "cli11"),
+    ],
+)
+def test_manifest_names_map_to_one_key(name: str, key: str) -> None:
+    assert gn.key_of(name) == key
+
+
+def test_hyphenated_vcpkg_port_is_found(tree: dict, tmp_path: Path) -> None:
+    report = json.loads((tree["root"] / "report.json").read_text())
+    report["inventory"].append(entry("nlohmann_json::nlohmann_json", "3.11.3", "MIT", ["ovt_core"]))
+    (tree["root"] / "report.json").write_text(json.dumps(report))
+    share = tmp_path / "share" / "nlohmann-json"
+    share.mkdir(parents=True)
+    (share / "copyright").write_text("json MIT\n")
+    out = tmp_path / "N.md"
+    code, err = run(tree, out, "--vcpkg-share", str(tmp_path / "share"))
+    assert code == 0, err
+    assert "json MIT" in out.read_text()
