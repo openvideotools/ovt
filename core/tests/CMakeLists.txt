@@ -46,6 +46,7 @@ ovt_catch_discover_tests(ovt_tests_version)
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
 add_subdirectory(bitreader)
+add_subdirectory(model)
 
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
 add_subdirectory(schema)
