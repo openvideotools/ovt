@@ -4,7 +4,7 @@ The tools of the oracle image `ghcr.io/openvideotools/ovt-oracles:<yyyymmdd>` (c
 [`Dockerfile`](Dockerfile) by WI-0.554). Golden files print these versions in their header
 (`# oracle: ffmpeg n7.1.1 ...`). Every source is a tag checked against its commit, an archive checked
 against its SHA-256, or a hash-locked package; nothing floats, so a rebuild a week later reports the same
-versions (`oracle_versions.py --check-pins` enforces it, the weekly `oracle-image` run compares reports).
+versions (`oracle_versions.py --check-pins` enforces it, the monthly `oracle-image` run compares reports).
 
 ## Changing a pin
 

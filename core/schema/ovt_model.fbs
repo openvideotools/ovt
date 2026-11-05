@@ -1,28 +1,760 @@
-// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// core/schema/ovt_model.fbs — Open Video Tools neutral analysis model + codec extensions.
 // SPDX-License-Identifier: BSD-2-Clause
-//
-// STUB (WI-0.003). Just enough of chapter 0 §0.5.4 / chapter 6 §6.3 to exercise the code generation target:
-// the namespace, the FrameAnalysis root table and its file identifier. WI-0.080 replaces this file with
-// the schema of chapter 6 §6.3, copied verbatim; nothing may depend on the stub's fields.
+// schema_version (major) = 1. Rules: additive-only within a major (append fields / enum values; never
+// remove, rename, retype, renumber; structs are frozen). See docs/spec/06-data-model.md §6.1 P7.
 
 namespace ovt.fb;
 
-enum StubCodec : ubyte { Unknown = 0, Avc = 1, Hevc = 2, Av1 = 3 }
+// ===== backbone §0.5.1 (verbatim) =====
+enum Codec : ubyte { Unknown = 0, H264 = 1, H265 = 2, AV1 = 3, VP9 = 4, H266 = 5, MPEG2 = 6 }
 
-struct StubSpan {
-  offset:uint64;
-  size:uint64;
+struct Rect { x:int; y:int; w:int; h:int; }            // luma samples, coded-picture coordinates
+
+struct ByteSpan { offset:ulong; length:ulong; }          // file byte range
+struct BitSpan  { bit_offset:ulong; bit_length:uint; }   // bits from start of the owning unit: NAL header bit 0 + RBSP (H.26x), or obu_header bit 0 (AV1, whole OBU) — see §6.2.7 / ch. 7 §7.2
+
+// Frame identity. decode_index counts every coded frame (AV1 hidden frames included);
+// display_index counts only shown/output frames in output order. -1 = not shown / unknown.
+struct FrameId { decode_index:int; display_index:int; }
+
+// ===== backbone §0.5.2 (verbatim) =====
+enum SyntaxValueKind : ubyte { None, UInt, Int, Bool, Bytes, String, Enum, Fixed /* fixed-point as int+scale */ }
+
+table SyntaxNode {
+  name:string (required);         // exact spec syntax element name, e.g. "log2_max_pic_order_cnt_lsb_minus4"
+  descriptor:string;              // spec descriptor, e.g. "ue(v)", "u(8)", "f(1)", "le(n)", "ns(n)", "su(1+6)"
+  kind:SyntaxValueKind;
+  uvalue:ulong; ivalue:long; bvalue:bool; bytes:[ubyte]; svalue:string;
+  enum_name:string;               // human name for enum values, e.g. "PART_2NxN"
+  derived:string;                 // optional derived/explained value, e.g. "CtbSizeY = 64"
+  span:BitSpan;                   // position inside the owning unit (see Unit.epb_positions for raw mapping)
+  spec_ref:string;                // e.g. "H.265 7.3.2.2.1"
+  children:[SyntaxNode];
+  array_index:int = -1;           // when this node is an element of a syntax array
+  diagnostics:[Diagnostic];
 }
+
+enum Severity : ubyte { Info, Warning, Error, Fatal }
+table Diagnostic { severity:Severity; code:string; message:string; span:BitSpan; spec_ref:string; }
+
+// ===== backbone §0.5.3 (verbatim) =====
+table Unit {                       // one NAL unit (H.26x) or OBU (AV1) or raw sample
+  index:uint;                      // 0-based in decode order
+  file_span:ByteSpan;              // raw bytes in the file, start code / length prefix excluded
+  prefix_span:ByteSpan;            // start code or length field
+  type:ubyte;                      // nal_unit_type / obu_type
+  type_name:string;                // "IDR_W_RADL", "OBU_FRAME", ...
+  layer_id:ubyte; temporal_id:ubyte;
+  epb_positions:[uint];            // byte offsets (within file_span) of removed emulation-prevention bytes; empty for AV1
+  frame:FrameId;                   // owning frame, or decode_index = -1 for non-VCL units
+  header:SyntaxNode;               // parsed header (parameter set, slice header, OBU header + frame header, SEI...)
+  sample_index:int = -1;           // container sample this unit belongs to, when demuxed from a container
+  diagnostics:[Diagnostic];        // diagnostics raised while scanning or parsing THIS unit (chapter 7 §7.3); StreamIndex.diagnostics holds stream-level ones
+}
+
+enum FrameType : ubyte { I, P, B, Key, Inter, IntraOnly, Switch, Unknown }
+enum PictureStructure : ubyte { Frame, TopField, BottomField, Mbaff }
+
+table FrameInfo {
+  id:FrameId;
+  type:FrameType;                  // codec-native; I/P/B for H.26x (slice-majority), Key/Inter/IntraOnly/Switch for AV1
+  shown:bool; show_existing_of:int = -1;
+  structure:PictureStructure;
+  temporal_id:ubyte; layer_id:ubyte;
+  is_rap:bool;                     // random access point (IDR/CRA/BLA/Key)
+  poc:long;                        // PicOrderCntVal / frame_num-derived / order_hint
+  pts:long; dts:long; timebase_num:int; timebase_den:int;
+  size_bytes:ulong;                // AU size: Σ over the frame's units of (file_span.length + prefix_span.length), i.e. start codes / length prefixes INCLUDED and the AUD/SEI/parameter-set units that precede the first VCL unit of the frame included (ch. 7 §7.4.2 step S7 is normative); the payload-only sum is Σ units[i].file_span.length
+  units:[uint];                    // Unit.index list
+  coded_size:Rect; crop:Rect;      // crop = conformance window / render size
+  chroma_format:ubyte;             // 0=400,1=420,2=422,3=444
+  bit_depth_luma:ubyte; bit_depth_chroma:ubyte;
+  qp_base:short;                   // slice QP of first slice / base_q_idx
+  declared_refs:[int];             // decode_index of frames referenced per headers (ref lists / ref_frame_idx)
+  dpb_after:[int];                 // decode_index of frames in DPB after decoding this frame (if derivable)
+  // --- extension (ch. 6) ---
+  ref_state:[ubyte];               // nested FlatBuffer: HevcRps / Av1RefState / AvcRefMarking (header-derived reference structure)
+  ref_state_type:string;           // "HevcRps" | "Av1RefState" | "AvcRefMarking" | "" (none)
+  frame_num:int = -1;              // H.264 frame_num (7.4.3); AV1 current_frame_id when frame_id_numbers_present_flag; -1 otherwise
+  slice_count:ushort;              // number of slices / slice segments / tile groups in this frame (0 = unknown)
+}
+
+table StreamIndex {
+  codec:Codec;
+  schema_version:uint;             // = 1
+  source_hash:[ubyte];             // 32-byte SHA-256 per §6.2.8 (first 1 MiB ∥ LE64 size ∥ LE64 mtime_ns) — cache key; the ONLY definition
+  units:[Unit];
+  frames:[FrameInfo];              // decode order
+  display_order:[int];             // decode_index per display slot
+  parameter_sets:[Unit];           // convenience: all VPS/SPS/PPS/sequence headers
+  sei:[Unit];                      // all SEI / metadata OBUs
+  diagnostics:[Diagnostic];
+}
+
+// ===== backbone §0.5.4 (verbatim) =====
+enum PredKind : ubyte { None, Intra, Inter, Skip, IntraBC, PCM, Palette }
+
+// Structure-of-arrays grid over 4x4 luma cells. All vectors have length cells_w * cells_h
+// (row-major) unless empty (= not provided by this plugin). -1 / 0xFF mean "not applicable".
+table CellGrid {
+  cells_w:uint; cells_h:uint;                  // ceil(coded_w/4), ceil(coded_h/4)
+  block_id:[uint];                             // leaf Block owning this cell
+  partition_id:[ushort];                       // slice / tile index
+  pred:[ubyte];                                // PredKind
+  qp:[short];                                  // final luma QP (H.26x) or qindex (AV1)
+  intra_mode_y:[short]; intra_mode_c:[short];  // codec-numbered
+  mv0_x:[short]; mv0_y:[short]; mv1_x:[short]; mv1_y:[short];   // 1/16 luma sample units
+  ref0:[byte]; ref1:[byte];                    // RefSlot.index into FrameAnalysis.refs; -1 none. AV1: equals the reference type LAST_FRAME..ALTREF_FRAME (1..7) because refs[0] is the INTRA placeholder (6.3.1); never 0 for a cell
+  tx_log2_w:[ubyte]; tx_log2_h:[ubyte]; tx_type:[ubyte]; cbf:[ubyte];   // cbf bit0=Y bit1=Cb bit2=Cr
+  bits_x8:[uint];                              // estimated entropy cost ×8 for the owning block, stored at every cell of the block divided by cell count (so the sum over cells = block cost)
+  deblock_bs_v:[ubyte]; deblock_bs_h:[ubyte];  // boundary strength on left / top edge of the cell
+  filter_idx:[ubyte];                          // SAO type (HEVC) / cdef_idx (AV1) / 0
+}
+
+enum BlockKind : ubyte { MB, SubMB, CTU, CU, PU, TU, SB, Block, TXB, Other }
+
+table Block {
+  id:uint; parent:int = -1; children:[uint];
+  kind:BlockKind; rect:Rect; level:ubyte;
+  partition_type:ubyte;            // codec numbering (mb_type/sub_mb_type, PartMode, PARTITION_*)
+  pred:PredKind; skip:bool; merge_or_direct:bool;
+  qp:short; bits_x8:uint;          // exact-as-available cost for this block incl. children
+  ext_type:string;                 // "AvcMb", "HevcCu", "HevcPu", "HevcTu", "Av1Block", "Av1Txb"
+  ext:[ubyte];                     // nested FlatBuffer of the codec extension table named by ext_type
+}
+
+table MotionVector {
+  block_id:uint; list:ubyte;       // 0 = L0 / first ref, 1 = L1 / second ref
+  ref:byte;                        // index into refs
+  rect:Rect;                       // the prediction block
+  mv_x:short; mv_y:short;          // 1/16 luma sample units
+  mvd_x:short; mvd_y:short;        // signalled difference (if available), same units
+  predictor:string;                // "merge[2]", "amvp[0]", "spatial_direct", "NEARESTMV", "GLOBALMV", ...
+  flags:ushort;                    // bit0 bi-pred, bit1 weighted, bit2 global/warped, bit3 sub-block (affine/OBMC), bit4 field
+}
+
+table RefSlot { index:ubyte; frame:FrameId; name:string; /* "L0[0]", "LAST", "ALTREF", "INTRA" */ is_long_term:bool; usage_cells:uint;
+                slot:byte = -1;   /* AV1 only: the DPB slot ref_frame_idx[index - 1] (0..7) this reference type was mapped to; -1 for H.26x and for the INTRA placeholder (6.3.1) */ }
+
+enum PlaneStage : ubyte { Reconstruction, Prediction, Residual, PreDeblock, PreSaoOrCdef, PreLoopRestoration, Coefficients }
+
+table PlaneRef {                   // planes are not stored in the FlatBuffer; this describes a shared-memory / file blob
+  stage:PlaneStage; plane:ubyte;   // 0=Y 1=U 2=V
+  width:uint; height:uint; stride_bytes:uint; bit_depth:ubyte; sample_bytes:ubyte; is_signed:bool;   // `signed` is a reserved word in several generated languages
+  blob_id:string;                  // key into the Picture store
+}
+
+table SymbolCost { x4:ushort; y4:ushort; symbol_id:ushort; bits_x8:uint; count:uint; }
 
 table FrameAnalysis {
-  schema_version:uint = 1;
-  stream_index:uint32;
-  display_order:int64;
-  codec:StubCodec = Unknown;
-  span:StubSpan;
-  note:string;
-  payload:[ubyte];
+  schema_version:uint;             // = 1
+  plugin_id:string; plugin_version:string;
+  frame:FrameInfo;
+  grid:CellGrid;
+  blocks:[Block];                  // blocks[0] children are the top-level CTUs/SBs/MBs in raster order
+  mvs:[MotionVector];
+  refs:[RefSlot];
+  partitions:[PartitionInfo];      // slices / tiles / tile groups with byte ranges and headers
+  filter_params:[ubyte]; filter_params_type:string;   // nested codec table: HevcFilterParams / Av1FilterParams / AvcFilterParams
+  planes:[PlaneRef];
+  symbols:[SymbolCost]; symbol_names:[string];
+  qp_hist:[uint];                  // 256 bins
+  diagnostics:[Diagnostic];
 }
+
+// =====================================================================================
+// ch. 6 additions — partitions
+// =====================================================================================
+
+enum PartitionKind : ubyte {
+  Slice = 0,          // H.264 slice (7.3.3); HEVC independent slice segment that starts a slice
+  SliceSegment = 1,   // HEVC dependent slice segment (dependent_slice_segment_flag = 1)
+  Tile = 2,           // HEVC tile (6.3.1) / AV1 tile (6.10.1)
+  TileGroup = 3,      // AV1 tile_group_obu (5.11.1)
+  Substream = 4       // HEVC WPP substream delimited by entry_point_offset_minus1 (7.4.7.1)
+}
+
+table PartitionInfo {
+  kind:PartitionKind;
+  index:ushort;                    // 0-based in decode order within the frame; equals CellGrid.partition_id values for Slice/SliceSegment/Tile
+  parent:short = -1;               // index of the enclosing partition (Tile -> TileGroup, Substream -> SliceSegment, SliceSegment -> Slice); -1 none
+  unit_index:uint;                 // Unit.index carrying this partition (slice NAL / OBU_TILE_GROUP or OBU_FRAME)
+  file_span:ByteSpan;              // exact bytes of this partition's data in the file (slice NAL payload / tile bytes incl. tile_size_minus_1 field)
+  data_bit_offset:uint;            // RBSP bit position where slice_data()/tile data starts inside unit (after slice header + byte_alignment); 0 for AV1 tiles
+  bit_count:ulong;                 // EXACT bit length of the entropy-coded data (slice_data incl. trailing bits; AV1 tile size*8). Not an estimate.
+  header:SyntaxNode;               // slice_segment_header() / slice_header() / tile_group_obu header; null for Tile/Substream
+  slice_type:ubyte = 255;          // codec numbering: H.264 slice_type 0..9 (7.4.3); HEVC slice_type 0=B 1=P 2=I (7.4.7.1); AV1: 255 (n/a)
+  rect:Rect;                       // Tile: exact rectangle (luma); Slice/SliceSegment: bounding box of its CTBs/MBs (may include cells of other slices)
+  first_block_addr:uint;           // first_mb_in_slice / slice_segment_address (CTB raster) / MiRowStart*MiCols+MiColStart (AV1)
+  block_count:uint;                // number of MBs / CTBs / 4x4 MI units in the partition
+  qp:short = -1;                   // H.264 SliceQPY = 26 + pic_init_qp_minus26 + slice_qp_delta (7.4.3); HEVC SliceQpY = 26 + init_qp_minus26 + slice_qp_delta (7.4.7.1); AV1 base_q_idx
+  qp_delta:short = -1;             // slice_qp_delta as signalled; AV1: 0
+  deblocking_disable:ubyte = 255;  // H.264 disable_deblocking_filter_idc 0..2; HEVC slice_deblocking_filter_disabled_flag 0/1; AV1 255
+  deblock_alpha_or_beta_offset_div2:byte = 0;  // H.264 slice_alpha_c0_offset_div2 (7.4.3) / HEVC slice_beta_offset_div2 (7.4.7.1); 0 when not present
+  deblock_beta_or_tc_offset_div2:byte = 0;     // H.264 slice_beta_offset_div2 / HEVC slice_tc_offset_div2; 0 when not present
+  loop_filter_across_slices:ubyte = 255;       // HEVC slice_loop_filter_across_slices_enabled_flag; 255 n/a
+  sao_luma:ubyte = 255; sao_chroma:ubyte = 255;  // HEVC slice_sao_luma_flag / slice_sao_chroma_flag
+  tile_row:ushort = 65535; tile_col:ushort = 65535;  // Tile only: TileRow / TileCol (AV1 6.10.1; HEVC tile scan 6.5.1)
+  num_entry_points:ushort;         // HEVC num_entry_point_offsets; AV1 NumTiles in the tile group; 0 otherwise
+  cabac_init:ubyte = 255;          // H.264 cabac_init_idc 0..2; HEVC cabac_init_flag 0/1; AV1 255
+  max_num_merge_cand:ubyte = 255;  // HEVC MaxNumMergeCand = 5 - five_minus_max_num_merge_cand (7.4.7.1)
+  num_ref_idx_active:[ubyte];      // [L0, L1] after override: num_ref_idx_l0_active_minus1+1, num_ref_idx_l1_active_minus1+1; empty for AV1
+  diagnostics:[Diagnostic];
+}
+
+// =====================================================================================
+// ch. 6 additions — H.264 / AVC extension tables
+// Spec: ITU-T H.264 (08/2021). Sentinels: -1 (signed), 255 (ubyte), 65535 (ushort).
+// =====================================================================================
+
+// Unified mb_type numbering. The spec numbers mb_type per slice type (Tables 7-11, 7-13, 7-14); OVT stores the
+// raw value in AvcMb.mb_type_raw and this unified code in AvcMb.mb_type. Mapping from (slice_type, raw):
+//   I/SI slice: unified = raw (SI slice raw 0 -> SI, raw>=1 -> raw-1 as I type)
+//   P/SP slice: raw <  5 -> unified = raw + 26 ; raw >= 5 -> unified = raw - 5  (I type, Table 7-13 note)
+//   B slice   : raw < 23 -> unified = raw + 31 ; raw >= 23 -> unified = raw - 23 (I type, Table 7-14 note)
+//   inferred  : P_Skip = 54, B_Skip = 55 (mb_skip_flag / mb_skip_run, 7.4.4), SI = 56 (Table 7-12)
+enum AvcMbType : ubyte {
+  I_NxN = 0,                                                             // Table 7-11 (I_4x4 or I_8x8 per transform_size_8x8_flag)
+  I_16x16_0_0_0 = 1, I_16x16_1_0_0 = 2, I_16x16_2_0_0 = 3, I_16x16_3_0_0 = 4,
+  I_16x16_0_1_0 = 5, I_16x16_1_1_0 = 6, I_16x16_2_1_0 = 7, I_16x16_3_1_0 = 8,
+  I_16x16_0_2_0 = 9, I_16x16_1_2_0 = 10, I_16x16_2_2_0 = 11, I_16x16_3_2_0 = 12,
+  I_16x16_0_0_1 = 13, I_16x16_1_0_1 = 14, I_16x16_2_0_1 = 15, I_16x16_3_0_1 = 16,
+  I_16x16_0_1_1 = 17, I_16x16_1_1_1 = 18, I_16x16_2_1_1 = 19, I_16x16_3_1_1 = 20,
+  I_16x16_0_2_1 = 21, I_16x16_1_2_1 = 22, I_16x16_2_2_1 = 23, I_16x16_3_2_1 = 24,  // I_16x16_<predmode>_<cbpchroma>_<cbpluma 0|15>
+  I_PCM = 25,
+  P_L0_16x16 = 26, P_L0_L0_16x8 = 27, P_L0_L0_8x16 = 28, P_8x8 = 29, P_8x8ref0 = 30,       // Table 7-13 raw 0..4
+  B_Direct_16x16 = 31, B_L0_16x16 = 32, B_L1_16x16 = 33, B_Bi_16x16 = 34,                  // Table 7-14 raw 0..22
+  B_L0_L0_16x8 = 35, B_L0_L0_8x16 = 36, B_L1_L1_16x8 = 37, B_L1_L1_8x16 = 38,
+  B_L0_L1_16x8 = 39, B_L0_L1_8x16 = 40, B_L1_L0_16x8 = 41, B_L1_L0_8x16 = 42,
+  B_L0_Bi_16x8 = 43, B_L0_Bi_8x16 = 44, B_L1_Bi_16x8 = 45, B_L1_Bi_8x16 = 46,
+  B_Bi_L0_16x8 = 47, B_Bi_L0_8x16 = 48, B_Bi_L1_16x8 = 49, B_Bi_L1_8x16 = 50,
+  B_Bi_Bi_16x8 = 51, B_Bi_Bi_8x16 = 52, B_8x8 = 53,
+  P_Skip = 54, B_Skip = 55, SI = 56,
+  AvcMbType_Unknown = 255
+}
+
+// Unified sub_mb_type: P types Table 7-17 raw 0..3 -> 0..3 ; B types Table 7-18 raw 0..12 -> raw + 4.
+enum AvcSubMbType : ubyte {
+  P_L0_8x8 = 0, P_L0_8x4 = 1, P_L0_4x8 = 2, P_L0_4x4 = 3,
+  B_Direct_8x8 = 4, B_L0_8x8 = 5, B_L1_8x8 = 6, B_Bi_8x8 = 7,
+  B_L0_8x4 = 8, B_L0_4x8 = 9, B_L1_8x4 = 10, B_L1_4x8 = 11, B_Bi_8x4 = 12, B_Bi_4x8 = 13,
+  B_L0_4x4 = 14, B_L1_4x4 = 15, B_Bi_4x4 = 16,
+  AvcSubMbType_Unknown = 255
+}
+
+enum AvcIntra4x4PredMode : ubyte {      // Intra4x4PredMode / Intra8x8PredMode, Table 8-2 / 8-3
+  Vertical = 0, Horizontal = 1, DC = 2, Diagonal_Down_Left = 3, Diagonal_Down_Right = 4,
+  Vertical_Right = 5, Horizontal_Down = 6, Vertical_Left = 7, Horizontal_Up = 8, AvcIntra4x4_Unknown = 255
+}
+enum AvcIntra16x16PredMode : ubyte { I16_Vertical = 0, I16_Horizontal = 1, I16_DC = 2, I16_Plane = 3, AvcIntra16x16_Unknown = 255 }   // Table 8-4
+enum AvcIntraChromaPredMode : ubyte { Chroma_DC = 0, Chroma_Horizontal = 1, Chroma_Vertical = 2, Chroma_Plane = 3, AvcIntraChroma_Unknown = 255 }   // Table 7-16
+
+// One macroblock. Block.kind = MB. Block.partition_type = AvcMb.mb_type (unified).
+table AvcMb {
+  mb_addr:uint;                            // CurrMbAddr (7.4.4), raster in frame / field; MBAFF: 2*pairAddr + (bottom?1:0)
+  mb_type_raw:ubyte = 255;                 // mb_type as signalled (7.3.5); 255 for skipped MBs (not signalled)
+  mb_type:AvcMbType = AvcMbType_Unknown;   // unified (see enum comment)
+  mb_skip_flag:ubyte = 255;                // 7.3.4 (CABAC) or inferred from mb_skip_run (CAVLC); 0/1
+  mb_field_decoding_flag:ubyte = 255;      // 7.3.4; MBAFF only; 255 when not MBAFF
+  pair_parity:ubyte = 255;                 // MBAFF field MB pair: 0 = top field MB, 1 = bottom field MB (OVT-derived, see 6.2.4); 255 otherwise
+  transform_size_8x8_flag:ubyte = 255;     // 7.3.5; 255 = not present (inferred 0)
+  coded_block_pattern:ubyte = 255;         // 7.4.5: CodedBlockPatternLuma = cbp % 16 (bit n = 8x8 block n), CodedBlockPatternChroma = cbp / 16 (0..2)
+  mb_qp_delta:byte = 0;                    // 7.4.5; 0 when not present
+  QPY:byte = -1;                           // derived QPY (7.4.5 eq. 7-37), 0..51 (-QpBdOffsetY..51 for high bit depth)
+  QPC_cb:byte = -1; QPC_cr:byte = -1;      // QPC per component via Table 8-15 with chroma_qp_index_offset / second_chroma_qp_index_offset
+  sub_mb_type:[AvcSubMbType];              // 4 entries for P_8x8 / P_8x8ref0 / B_8x8 (7.3.5.2); empty otherwise
+  intra4x4_pred_mode:[AvcIntra4x4PredMode];   // 16 entries, Intra4x4PredMode[luma4x4BlkIdx] (8.3.1.1), luma4x4BlkIdx order (6.4.3); empty unless I_NxN with transform_size_8x8_flag = 0
+  intra8x8_pred_mode:[AvcIntra4x4PredMode];   // 4 entries, Intra8x8PredMode[luma8x8BlkIdx] (8.3.2.1); empty unless I_NxN with transform_size_8x8_flag = 1
+  prev_intra_pred_mode_flag:[ubyte];       // 16 or 4 entries: prev_intra4x4_pred_mode_flag / prev_intra8x8_pred_mode_flag (7.3.5.1); "predicted mode used" overlay
+  rem_intra_pred_mode:[ubyte];             // 16 or 4 entries: rem_intra4x4_pred_mode / rem_intra8x8_pred_mode; 255 where prev flag = 1
+  Intra16x16PredMode:AvcIntra16x16PredMode = AvcIntra16x16_Unknown;  // derived from mb_type (7.4.5 Table 7-11)
+  intra_chroma_pred_mode:AvcIntraChromaPredMode = AvcIntraChroma_Unknown;   // 7.3.5.1 / Table 7-16
+  ref_idx_l0:[byte]; ref_idx_l1:[byte];    // 4 entries each (per mbPartIdx / 8x8), ref_idx_lX (7.3.5.1); -1 = not used for that list
+  mvd_l0_x:[short]; mvd_l0_y:[short];      // 16 entries each (per 4x4, luma4x4BlkIdx order): mvd_l0[mbPartIdx][subMbPartIdx] replicated over the 4x4s it covers; quarter-sample units (NOT ×4) ; -32768 = n/a
+  mvd_l1_x:[short]; mvd_l1_y:[short];      // same for list 1
+  mvL0_x:[short]; mvL0_y:[short];          // 16 entries: derived mvL0 per 4x4 (8.4.1), quarter-sample units (NOT ×4); -32768 = predFlagL0 = 0
+  mvL1_x:[short]; mvL1_y:[short];          // 16 entries: derived mvL1
+  pred_flag:[ubyte];                       // 16 entries: bit0 = predFlagL0, bit1 = predFlagL1 (8.4.1.2)
+  direct_8x8:[ubyte];                      // 4 entries: 1 if the 8x8 is B_Direct (B_Direct_16x16 or sub_mb_type B_Direct_8x8), 0 otherwise
+  direct_spatial_mv_pred_flag:ubyte = 255; // from slice header 7.3.3; applies to direct MBs
+  total_coeff:[ubyte];                     // 16 (luma 4x4) + 8 (chroma 4x4 of Cb then Cr, 4:2:0) entries: TotalCoeff(coeff_token) for CAVLC, number of non-zero levels for CABAC; empty when unknown
+  i16_dc_nonzero:ubyte = 255;              // I_16x16: 1 if the Intra16x16DCLevel block has any non-zero coefficient
+  pcm_sample_luma:[ushort];                // I_PCM only: 256 pcm_sample_luma values (7.3.5); empty otherwise
+  pcm_sample_chroma:[ushort];              // I_PCM only: 2*MbWidthC*MbHeightC values
+  bs_vertical:[ubyte];                     // 16 entries: bS of the LEFT edge of each 4x4 (8.7.2.1), luma4x4BlkIdx order; 255 = unknown
+  bs_horizontal:[ubyte];                   // 16 entries: bS of the TOP edge of each 4x4
+  filterLeftMbEdgeFlag:ubyte = 255; filterTopMbEdgeFlag:ubyte = 255;   // 8.7
+  bit_position_start:ulong = 0; bit_position_end:ulong = 0;   // CAVLC: exact RBSP bit positions of macroblock_layer(); CABAC: arithmetic decoder read-pointer positions (8 * bytes consumed - bits in range register) — an estimate; 0/0 = unknown
+  slice_index:ushort;                      // PartitionInfo.index of the owning slice
+}
+
+// Sub-macroblock partition (one 8x8 of a P_8x8/B_8x8 MB, or a 16x8/8x16 partition). Block.kind = SubMB,
+// Block.partition_type = AvcSubMb.sub_mb_type (unified) or 255 for 16x8/8x16 halves.
+table AvcSubMb {
+  mbPartIdx:ubyte;                         // 0..3 (6.4.2.1)
+  sub_mb_type:AvcSubMbType = AvcSubMbType_Unknown;   // 255 for 16x8/8x16 partitions of a non-8x8 MB
+  ref_idx_l0:byte = -1; ref_idx_l1:byte = -1;        // for this partition
+  NumSubMbPart:ubyte = 1;                  // Table 7-17 / 7-18 column (1, 2, 4)
+  SubMbPartWidth:ubyte; SubMbPartHeight:ubyte;       // Table 7-17 / 7-18
+}
+
+// Per-slice deblocking parameters and picture-level filter state for H.264. FrameAnalysis.filter_params_type = "AvcFilterParams".
+table AvcFilterParams {
+  deblocking_filter_control_present_flag:ubyte;   // PPS 7.3.2.2
+  disable_deblocking_filter_idc:[ubyte];          // per slice (PartitionInfo.index order), 7.3.3
+  slice_alpha_c0_offset_div2:[byte];              // per slice
+  slice_beta_offset_div2:[byte];                  // per slice
+  chroma_qp_index_offset:byte;                    // PPS 7.4.2.2
+  second_chroma_qp_index_offset:byte;             // PPS 7.4.2.2 (equal to chroma_qp_index_offset when not present)
+  FilterOffsetA:[byte]; FilterOffsetB:[byte];     // per slice: slice_alpha_c0_offset_div2 << 1, slice_beta_offset_div2 << 1 (8.7.2.2)
+  film_grain_characteristics:SyntaxNode;          // film grain characteristics SEI (D.2.20 / D.3.20) if present (parsed), else null
+}
+
+// Decoded reference picture marking state after this picture (H.264 8.2.5). FrameInfo.ref_state_type = "AvcRefMarking".
+table AvcMmco {
+  memory_management_control_operation:ubyte;      // 7.4.3.3 Table 7-9: 1..6
+  difference_of_pic_nums_minus1:int = -1;
+  long_term_pic_num:int = -1;
+  long_term_frame_idx:int = -1;
+  max_long_term_frame_idx_plus1:int = -1;
+}
+table AvcRefPic {                                 // one DPB entry
+  frame:FrameId;
+  FrameNum:int; FrameNumWrap:int;                 // 8.2.4.1
+  PicNum:int = -1; LongTermPicNum:int = -1;       // 8.2.4.1 (field-aware when field decoding)
+  is_long_term:bool; is_reference:bool; is_output_needed:bool;
+  structure:PictureStructure;                     // which fields are reference (Frame = both)
+  TopFieldOrderCnt:int; BottomFieldOrderCnt:int;  // 8.2.1
+}
+table AvcRefMarking {
+  frame_num:uint;                                 // 7.4.3
+  idr_pic_id:int = -1;                            // IDR pictures only
+  no_output_of_prior_pics_flag:ubyte = 255; long_term_reference_flag:ubyte = 255;   // IDR dec_ref_pic_marking (7.3.3.3)
+  adaptive_ref_pic_marking_mode_flag:ubyte = 255;
+  mmco:[AvcMmco];                                 // MMCO operations in signalled order (empty for sliding window)
+  RefPicList0:[byte]; RefPicList1:[byte];         // indices into dpb_after, after modification (8.2.4.3); first slice's lists
+  ref_pic_list_modification_l0:SyntaxNode; ref_pic_list_modification_l1:SyntaxNode;   // 7.3.3.1 as parsed (null if absent)
+  dpb_after:[AvcRefPic];                          // DPB content after marking (8.2.5) and before bumping
+  max_num_ref_frames:ubyte;                       // SPS 7.4.2.1.1
+  gaps_in_frame_num_detected:bool;                // 8.2.5.2 invoked
+}
+
+// =====================================================================================
+// ch. 6 additions — H.265 / HEVC extension tables
+// Spec: ITU-T H.265 (09/2023).
+// =====================================================================================
+
+enum HevcPartMode : ubyte {                      // Table 7-10
+  PART_2Nx2N = 0, PART_2NxN = 1, PART_Nx2N = 2, PART_NxN = 3,
+  PART_2NxnU = 4, PART_2NxnD = 5, PART_nLx2N = 6, PART_nRx2N = 7, HevcPartMode_Unknown = 255
+}
+enum HevcPredMode : ubyte { MODE_INTER = 0, MODE_INTRA = 1, MODE_SKIP = 2, HevcPredMode_Unknown = 255 }   // 7.4.9.5 (MODE_SKIP = cu_skip_flag)
+enum HevcInterPredIdc : ubyte { PRED_L0 = 0, PRED_L1 = 1, PRED_BI = 2, HevcInterPredIdc_Unknown = 255 }   // Table 7-11
+// IntraPredModeY / IntraPredModeC: 0 = INTRA_PLANAR, 1 = INTRA_DC, 2..34 = INTRA_ANGULAR2..34 (Table 8-1). Stored as ubyte, 255 = n/a.
+enum HevcSaoType : ubyte { SAO_NOT_APPLIED = 0, SAO_BAND = 1, SAO_EDGE = 2, HevcSaoType_Unknown = 255 }   // SaoTypeIdx, Table 7-8
+enum HevcMergeCandSource : ubyte {                // OVT-derived "why this MV": origin of the selected merge / AMVP candidate (8.5.3.2.2 / 8.5.3.2.6)
+  MC_Unknown = 0, MC_SpatialA0 = 1, MC_SpatialA1 = 2, MC_SpatialB0 = 3, MC_SpatialB1 = 4, MC_SpatialB2 = 5,
+  MC_Temporal = 6, MC_CombinedBi = 7, MC_Zero = 8, MC_AmvpA = 9, MC_AmvpB = 10, MC_AmvpTemporal = 11, MC_AmvpZero = 12
+}
+
+// Coding tree unit. Block.kind = CTU. Block.partition_type = 255.
+table HevcCtu {
+  CtbAddrInRs:uint; CtbAddrInTs:uint;             // 6.5.1
+  slice_segment_idx:ushort; tile_idx:ushort = 65535;   // PartitionInfo.index of slice segment / tile
+  end_of_slice_segment_flag:ubyte = 255;          // 7.3.8.1
+  // SAO per component (7.3.8.3), index 0 = Y, 1 = Cb, 2 = Cr. Vectors have 3 entries or are empty (SAO off / unknown).
+  sao_merge_left_flag:ubyte = 255; sao_merge_up_flag:ubyte = 255;
+  SaoTypeIdx:[HevcSaoType];                       // derived (merge resolved)
+  sao_offset_abs:[ubyte];                         // 3 * 4 entries, [cIdx*4 + i]
+  sao_offset_sign:[ubyte];                        // 3 * 4 entries (band offset only; 0 for edge)
+  SaoOffsetVal:[short];                           // 3 * 4 entries derived (7.4.9.3.2: offsetSign * sao_offset_abs << log2OffsetScale, with log2OffsetScale = log2_sao_offset_scale_luma / _chroma from the PPS range extension, 0 without it)
+  sao_band_position:[ubyte];                      // 3 entries (band only)
+  sao_eo_class:[ubyte];                           // 3 entries: SaoEoClass 0..3 (edge only; chroma shares one value stored at 1 and 2)
+  bit_count_x8:uint;                              // estimated CABAC cost of coding_tree_unit() in 1/8 bits (0 = unknown)
+}
+
+// Coding unit. Block.kind = CU. Block.partition_type = HevcCu.part_mode.
+table HevcCu {
+  CtDepth:ubyte;                                  // 7.4.9.4 (0..3)
+  log2CbSize:ubyte;                               // 3..6
+  cu_transquant_bypass_flag:ubyte = 255;          // 7.3.8.5
+  cu_skip_flag:ubyte = 255;                       // 7.3.8.5
+  pred_mode_flag:ubyte = 255;                     // 7.3.8.5 as signalled (255 when inferred)
+  CuPredMode:HevcPredMode = HevcPredMode_Unknown; // derived (7.4.9.5)
+  palette_mode_flag:ubyte = 255;                  // 7.3.8.5 (SCC)
+  part_mode:HevcPartMode = HevcPartMode_Unknown;  // PartMode (Table 7-10) derived from part_mode + CuPredMode
+  pcm_flag:ubyte = 255;                           // 7.3.8.5
+  pcm_sample_luma:[ushort]; pcm_sample_chroma:[ushort];   // 7.3.8.7, when pcm_flag = 1
+  rqt_root_cbf:ubyte = 255;                       // 7.3.8.5 (255 when not present -> inferred 1)
+  cu_qp_delta_abs:ubyte = 255; cu_qp_delta_sign_flag:ubyte = 255;   // 7.3.8.14 (first TU with cbf in the quantization group)
+  CuQpDeltaVal:short = 0;                         // 7.4.9.14
+  IsCuQpDeltaCoded:ubyte = 255;                   // 7.4.9.14
+  qPY_PRED:byte = -1;                             // 8.6.1 eq. 8-284 (predicted luma QP for the quantization group)
+  QpY:byte = -1;                                  // 8.6.1 eq. 8-285 (-QpBdOffsetY..51)
+  QpY_prime:byte = -1;                            // Qp'Y = QpY + QpBdOffsetY (8.6.1)
+  QpC_cb_prime:byte = -1; QpC_cr_prime:byte = -1; // Qp'Cb / Qp'Cr (8.6.1, Table 8-10 for ChromaArrayType 1)
+  cu_chroma_qp_offset_flag:ubyte = 255; cu_chroma_qp_offset_idx:ubyte = 255;   // 7.3.8.14 (RExt)
+  CuQpOffsetCb:byte = 0; CuQpOffsetCr:byte = 0;   // 7.4.9.14
+  quant_group_x:ushort; quant_group_y:ushort;     // top-left of the quantization group (8.6.1, Log2MinCuQpDeltaSize)
+  intra_chroma_pred_mode:[ubyte];                 // 7.3.8.5: 1 entry (ChromaArrayType != 3) or 4 entries (ChromaArrayType = 3 with PART_NxN); values 0..4
+  IntraPredModeC:[ubyte];                         // derived (8.4.3, Table 8-2/8-3), same count
+  palette:[ubyte];                                // nested HevcPalette FlatBuffer when palette_mode_flag = 1 (SCC); empty otherwise
+  bit_count_x8:uint;                              // estimated CABAC cost of coding_unit() incl. its PUs/TUs in 1/8 bits (0 = unknown)
+}
+
+// SCC palette (7.3.8.13). Nested in HevcCu.palette.
+table HevcPalette {
+  palette_predictor_run:[uint]; num_signalled_palette_entries:ubyte; new_palette_entries:[ushort];   // [cIdx][i] flattened per component
+  palette_escape_val_present_flag:ubyte; num_palette_indices_minus1:uint; palette_index_idc:[ubyte];
+  copy_above_indices_for_final_run_flag:ubyte; palette_transpose_flag:ubyte;
+  CurrentPaletteEntries:[ushort];                 // [cIdx][idx] flattened, numComps * CurrentPaletteSize
+  PaletteIndexMap:[ubyte];                        // nCbS*nCbS indices, raster
+}
+
+// Prediction unit. Block.kind = PU. Block.partition_type = partIdx (0..3).
+table HevcPu {
+  partIdx:ubyte;                                  // 0..3 (7.3.8.6 invocation order)
+  // intra (7.3.8.5; luma PB)
+  prev_intra_luma_pred_flag:ubyte = 255; mpm_idx:ubyte = 255; rem_intra_luma_pred_mode:ubyte = 255;
+  IntraPredModeY:ubyte = 255;                     // derived 8.4.2 (0..34)
+  candModeList:[ubyte];                           // 3 entries: the MPM candidates derived in 8.4.2 (for "predicted mode used" overlay); empty if unknown
+  // inter (7.3.8.6)
+  merge_flag:ubyte = 255; merge_idx:ubyte = 255;
+  inter_pred_idc:HevcInterPredIdc = HevcInterPredIdc_Unknown;
+  ref_idx_l0:byte = -1; ref_idx_l1:byte = -1;
+  mvd_l0_x:short = -32768; mvd_l0_y:short = -32768;   // mvd_coding(x0,y0,0) result MvdL0 (7.4.9.9), quarter-sample units (NOT ×4); -32768 n/a. Note mvd_l1_zero_flag forces MvdL1 = 0 for PRED_BI.
+  mvd_l1_x:short = -32768; mvd_l1_y:short = -32768;
+  mvp_l0_flag:ubyte = 255; mvp_l1_flag:ubyte = 255;
+  mvL0_x:short = -32768; mvL0_y:short = -32768;   // derived mvL0 (8.5.3.2), quarter-sample units (NOT ×4)
+  mvL1_x:short = -32768; mvL1_y:short = -32768;
+  predFlagL0:ubyte = 255; predFlagL1:ubyte = 255; // 8.5.3.2.1
+  refIdxL0:byte = -1; refIdxL1:byte = -1;         // derived (merge may differ from signalled ref_idx)
+  merge_cand_source:HevcMergeCandSource = MC_Unknown;     // origin of the selected merge candidate (or of mvpLX for AMVP)
+  ref_poc_l0:int = -2147483648; ref_poc_l1:int = -2147483648;  // PicOrderCntVal of the referenced pictures (INT_MIN = none)
+  // weighted prediction actually applied (8.5.3.3.4.3): per component luma, cb, cr
+  weighted:ubyte = 255;                           // 0 default, 1 explicit WP applied
+  LumaWeightL0:short = -32768; luma_offset_l0:short = -32768; LumaWeightL1:short = -32768; luma_offset_l1:short = -32768;
+  ChromaWeightL0:[short]; ChromaOffsetL0:[short]; ChromaWeightL1:[short]; ChromaOffsetL1:[short];   // 2 entries (Cb, Cr) or empty
+}
+
+// Transform unit (one node of the transform tree). Block.kind = TU. Block.partition_type = trafoDepth.
+table HevcTu {
+  trafoDepth:ubyte;                               // 7.3.8.8
+  log2TrafoSize:ubyte;                            // 2..5
+  blkIdx:ubyte;                                   // 0..3 within parent
+  split_transform_flag:ubyte = 255;               // 7.3.8.8 (255 = inferred, see interSplitFlag / intra NxN)
+  interSplitFlag:ubyte = 255;                     // 7.4.9.8 derived
+  cbf_luma:ubyte = 255;                           // 7.3.8.8
+  cbf_cb:[ubyte]; cbf_cr:[ubyte];                 // 1 entry, or 2 entries for ChromaArrayType = 2 (second chroma TB at y0 + (1 << (log2TrafoSize-1))); empty = not present/inferred 0
+  transform_skip_flag:[ubyte];                    // 3 entries [Y, Cb, Cr] (7.3.8.11); 255 where not present
+  explicit_rdpcm_flag:[ubyte]; explicit_rdpcm_dir_flag:[ubyte];   // 3 entries each (RExt 7.3.8.11)
+  last_sig_coeff_x:[ubyte]; last_sig_coeff_y:[ubyte];   // 3 entries: LastSignificantCoeffX/Y (7.4.9.11) per component; 255 if cbf = 0
+  num_nonzero:[ushort];                           // 3 entries [Y, Cb, Cr]: count of non-zero TransCoeffLevel per component (4:2:2: both chroma TBs of a component summed)
+  coeff_abs_sum:[uint];                           // 3 entries: sum of |TransCoeffLevel| per component (coefficient energy proxy)
+  sign_data_hiding_used:[ubyte];                  // 3 entries: 1 if signHidden was 1 in any sub-block (7.4.9.11)
+  dst_used:ubyte = 255;                           // 1 when the 4x4 luma intra DST-VII (8.6.4.2 trType = 1) was applied
+  cross_component_prediction_alpha:[byte];        // 2 entries (Cb, Cr): ResScaleVal (RExt 7.4.9.12); empty if disabled
+  scaling_list_used:ubyte = 255;                  // 1 if scaling_list_enabled_flag and not transform skip / bypass (8.6.4.2 m[x][y] != 16)
+  coeff_blob_id:string;                           // PlaneStage.Coefficients blob holding this TU's dequantised coefficients (empty if not exported)
+  bit_count_x8:uint;                              // estimated CABAC cost of transform_unit() incl. residual_coding() in 1/8 bits (0 = unknown)
+}
+
+// Picture-level filter parameters for HEVC. FrameAnalysis.filter_params_type = "HevcFilterParams".
+table HevcFilterParams {
+  // deblocking (7.4.3.3.1 PPS, 7.4.7.1 slice)
+  pps_deblocking_filter_disabled_flag:ubyte; pps_beta_offset_div2:byte; pps_tc_offset_div2:byte;
+  deblocking_filter_override_enabled_flag:ubyte;
+  slice_deblocking_filter_disabled_flag:[ubyte];  // per slice segment (PartitionInfo.index order)
+  slice_beta_offset_div2:[byte]; slice_tc_offset_div2:[byte];   // per slice segment
+  pps_loop_filter_across_slices_enabled_flag:ubyte; loop_filter_across_tiles_enabled_flag:ubyte;
+  pcm_loop_filter_disabled_flag:ubyte;            // SPS 7.4.3.2.1
+  // SAO (7.4.3.2.1 / 7.4.7.1)
+  sample_adaptive_offset_enabled_flag:ubyte;
+  slice_sao_luma_flag:[ubyte]; slice_sao_chroma_flag:[ubyte];   // per slice segment
+  // deblocking edge map: 1 bit per 8x8 grid edge, 0 = not filtered. Layout: edges_v has (cells_w/2) x (cells_h/2) bits raster for vertical edges at x multiple of 8, edges_h same for horizontal edges.
+  edge_flags_v:[ubyte]; edge_flags_h:[ubyte];     // bit-packed, LSB first; empty = unknown (per-cell bS is in CellGrid.deblock_bs_*)
+  film_grain_characteristics:SyntaxNode;          // film grain characteristics SEI (D.2.13 / D.3.13) if present
+}
+
+// Reference picture set state for HEVC (8.3.2). FrameInfo.ref_state_type = "HevcRps".
+table HevcRpsPic { frame:FrameId; PicOrderCntVal:int; used_by_curr_pic:bool; is_long_term:bool; delta_poc_msb_present_flag:ubyte = 255; }
+table HevcRps {
+  PicOrderCntVal:int;                             // 8.3.1
+  short_term_ref_pic_set_sps_flag:ubyte = 255; short_term_ref_pic_set_idx:ubyte = 255;   // 7.3.6.1
+  st_ref_pic_set:SyntaxNode;                      // st_ref_pic_set(num_short_term_ref_pic_sets) as parsed when signalled in the slice header
+  NumPicTotalCurr:ubyte;                          // 7.4.7.2
+  RefPicSetStCurrBefore:[HevcRpsPic]; RefPicSetStCurrAfter:[HevcRpsPic]; RefPicSetStFoll:[HevcRpsPic];
+  RefPicSetLtCurr:[HevcRpsPic]; RefPicSetLtFoll:[HevcRpsPic];    // 8.3.2 (entries with decode_index = -1 are "no reference picture")
+  RefPicList0:[HevcRpsPic]; RefPicList1:[HevcRpsPic];            // 8.3.4, after list modification; first independent slice segment
+  collocated_from_l0_flag:ubyte = 255; collocated_ref_idx:ubyte = 255;   // 7.3.6.1 (TMVP collocated picture)
+  NoRaslOutputFlag:ubyte = 255; pic_output_flag:ubyte = 255;     // 8.1.3 / 7.4.7.1
+  dpb_fullness_after:ubyte;                       // number of pictures in the DPB after this picture (C.5.2.2)
+  sps_max_dec_pic_buffering_minus1:ubyte; sps_max_num_reorder_pics:ubyte; sps_max_latency_increase_plus1:uint;   // for HighestTid (7.4.3.2.1)
+}
+
+// =====================================================================================
+// ch. 6 additions — AV1 extension tables
+// Spec: AV1 Bitstream & Decoding Process Specification v1.0.0 Errata 1. Constants per spec Section 3 / 6.10.
+// =====================================================================================
+
+enum Av1Partition : ubyte {                       // 6.10.4
+  PARTITION_NONE = 0, PARTITION_HORZ = 1, PARTITION_VERT = 2, PARTITION_SPLIT = 3,
+  PARTITION_HORZ_A = 4, PARTITION_HORZ_B = 5, PARTITION_VERT_A = 6, PARTITION_VERT_B = 7,
+  PARTITION_HORZ_4 = 8, PARTITION_VERT_4 = 9, Av1Partition_Unknown = 255
+}
+enum Av1BlockSize : ubyte {                       // 6.10.4 (BLOCK_* / subSize)
+  BLOCK_4X4 = 0, BLOCK_4X8 = 1, BLOCK_8X4 = 2, BLOCK_8X8 = 3, BLOCK_8X16 = 4, BLOCK_16X8 = 5, BLOCK_16X16 = 6,
+  BLOCK_16X32 = 7, BLOCK_32X16 = 8, BLOCK_32X32 = 9, BLOCK_32X64 = 10, BLOCK_64X32 = 11, BLOCK_64X64 = 12,
+  BLOCK_64X128 = 13, BLOCK_128X64 = 14, BLOCK_128X128 = 15, BLOCK_4X16 = 16, BLOCK_16X4 = 17, BLOCK_8X32 = 18,
+  BLOCK_32X8 = 19, BLOCK_16X64 = 20, BLOCK_64X16 = 21, Av1BlockSize_Unknown = 255
+}
+enum Av1YMode : ubyte {                           // 6.10.22 (YMode) — intra 0..12, UV_CFL_PRED 13 (uv only), inter 13..24 (same numeric space as the spec)
+  DC_PRED = 0, V_PRED = 1, H_PRED = 2, D45_PRED = 3, D135_PRED = 4, D113_PRED = 5, D157_PRED = 6, D203_PRED = 7,
+  D67_PRED = 8, SMOOTH_PRED = 9, SMOOTH_V_PRED = 10, SMOOTH_H_PRED = 11, PAETH_PRED = 12,
+  NEARESTMV = 13, NEARMV = 14, GLOBALMV = 15, NEWMV = 16,
+  NEAREST_NEARESTMV = 17, NEAR_NEARMV = 18, NEAREST_NEWMV = 19, NEW_NEARESTMV = 20, NEAR_NEWMV = 21, NEW_NEARMV = 22,
+  GLOBAL_GLOBALMV = 23, NEW_NEWMV = 24, Av1YMode_Unknown = 255
+}
+// UVMode shares 0..12 with Av1YMode and adds UV_CFL_PRED = 13 (6.10.22).
+enum Av1FilterIntraMode : ubyte { FILTER_DC_PRED = 0, FILTER_V_PRED = 1, FILTER_H_PRED = 2, FILTER_D157_PRED = 3, FILTER_PAETH_PRED = 4, Av1FilterIntraMode_Unknown = 255 }   // 6.10.23
+enum Av1InterIntraMode : ubyte { II_DC_PRED = 0, II_V_PRED = 1, II_H_PRED = 2, II_SMOOTH_PRED = 3, Av1InterIntraMode_Unknown = 255 }   // 6.10.28
+enum Av1MotionMode : ubyte { SIMPLE = 0, OBMC = 1, LOCALWARP = 2, Av1MotionMode_Unknown = 255 }   // 6.10.27
+enum Av1CompoundType : ubyte { COMPOUND_WEDGE = 0, COMPOUND_DIFFWTD = 1, COMPOUND_AVERAGE = 2, COMPOUND_INTRA = 3, COMPOUND_DISTANCE = 4, Av1CompoundType_Unknown = 255 }   // 6.10.31
+enum Av1CompRefType : ubyte { UNIDIR_COMP_REFERENCE = 0, BIDIR_COMP_REFERENCE = 1, Av1CompRefType_Unknown = 255 }   // 6.10.25
+enum Av1InterpFilter : ubyte { EIGHTTAP = 0, EIGHTTAP_SMOOTH = 1, EIGHTTAP_SHARP = 2, BILINEAR = 3, SWITCHABLE = 4, Av1InterpFilter_Unknown = 255 }   // 6.8.9 / 6.10.33
+enum Av1TxSize : ubyte {                          // 6.10.16 / Section 3 constants (TX_*)
+  TX_4X4 = 0, TX_8X8 = 1, TX_16X16 = 2, TX_32X32 = 3, TX_64X64 = 4, TX_4X8 = 5, TX_8X4 = 6, TX_8X16 = 7, TX_16X8 = 8,
+  TX_16X32 = 9, TX_32X16 = 10, TX_32X64 = 11, TX_64X32 = 12, TX_4X16 = 13, TX_16X4 = 14, TX_8X32 = 15, TX_32X8 = 16,
+  TX_16X64 = 17, TX_64X16 = 18, Av1TxSize_Unknown = 255
+}
+enum Av1TxType : ubyte {                          // 6.10.19 (TxType)
+  DCT_DCT = 0, ADST_DCT = 1, DCT_ADST = 2, ADST_ADST = 3, FLIPADST_DCT = 4, DCT_FLIPADST = 5, FLIPADST_FLIPADST = 6,
+  ADST_FLIPADST = 7, FLIPADST_ADST = 8, IDTX = 9, V_DCT = 10, H_DCT = 11, V_ADST = 12, H_ADST = 13, V_FLIPADST = 14, H_FLIPADST = 15,
+  WHT_WHT = 16,                                   // OVT: lossless (Lossless = 1 uses the Walsh-Hadamard transform, 7.13.2.10); not a TxType symbol
+  Av1TxType_Unknown = 255
+}
+enum Av1RefFrame : byte { NONE = -1, INTRA_FRAME = 0, LAST_FRAME = 1, LAST2_FRAME = 2, LAST3_FRAME = 3, GOLDEN_FRAME = 4, BWDREF_FRAME = 5, ALTREF2_FRAME = 6, ALTREF_FRAME = 7 }   // 6.10.24
+enum Av1RestorationType : ubyte { RESTORE_NONE = 0, RESTORE_WIENER = 1, RESTORE_SGRPROJ = 2, RESTORE_SWITCHABLE = 3, Av1RestorationType_Unknown = 255 }   // 6.10.15 (FrameRestorationType); per-unit restoration_type uses 0..2
+enum Av1GmType : ubyte { IDENTITY = 0, TRANSLATION = 1, ROTZOOM = 2, AFFINE = 3 }   // 6.8.17 (GmType)
+enum Av1FrameType : ubyte { KEY_FRAME = 0, INTER_FRAME = 1, INTRA_ONLY_FRAME = 2, SWITCH_FRAME = 3 }   // 6.8.2
+
+// One AV1 block (decode_block, 5.11.5). Block.kind = SB for the superblock node (ext_type "Av1Block" with is_superblock = 1),
+// Block for every other partition node and leaf. Block.partition_type = Av1Block.partition (the partition symbol read AT this node;
+// PARTITION_NONE for leaves).
+table Av1Block {
+  MiRow:uint; MiCol:uint;                         // 5.11.5 (4x4 units == cell coordinates)
+  bsize:Av1BlockSize = Av1BlockSize_Unknown;      // MiSize (6.10.5)
+  partition:Av1Partition = Av1Partition_Unknown;  // partition symbol read at this square node (5.11.4); PARTITION_NONE for leaves
+  is_superblock:ubyte = 0;                        // 1 for the 64x64/128x128 root node (use_128x128_superblock, 5.5.2)
+  tile_idx:ushort = 65535;                        // PartitionInfo.index of the tile
+  // mode info (5.11.6–5.11.8)
+  skip_mode:ubyte = 255;                          // 5.11.10
+  skip:ubyte = 255;                               // 5.11.11 (no residual)
+  segment_id:ubyte = 255; seg_id_predicted:ubyte = 255;   // 5.11.9 / 5.11.19
+  is_inter:ubyte = 255;                           // 5.11.20
+  use_intrabc:ubyte = 255;                        // 5.11.7
+  CurrentQIndex:short = -1;                       // 6.10.13 after delta_qindex (0..255); equals base_q_idx when delta_q_present = 0
+  delta_qindex:byte = 0;                          // delta_q_abs/sign resolved (5.11.12) read at this block (0 if none)
+  DeltaLF:[byte];                                 // 4 entries: DeltaLF[0..3] after delta_lf (5.11.13); empty if delta_lf_present = 0
+  qindex_dc_y:short = -1; qindex_ac_y:short = -1; // Dc_Qlookup/Ac_Qlookup results for this block's qindex (7.12.2) — the actual quantizer step
+  Lossless:ubyte = 255;                           // LosslessArray[segment_id] (6.8.10)
+  // intra (5.11.22–5.11.24, 5.11.42–5.11.45)
+  YMode:Av1YMode = Av1YMode_Unknown;              // intra_frame_y_mode / y_mode (6.10.22)
+  AngleDeltaY:byte = 0; AngleDeltaUV:byte = 0;    // angle_delta_y / angle_delta_uv (-3..3), 5.11.42
+  UVMode:ubyte = 255;                             // uv_mode 0..13 (13 = UV_CFL_PRED)
+  CflAlphaU:byte = 0; CflAlphaV:byte = 0;         // derived from cfl_alpha_signs / cfl_alpha_u / cfl_alpha_v (5.11.44), -16..16
+  cfl_alpha_signs:ubyte = 255;
+  use_filter_intra:ubyte = 255; filter_intra_mode:Av1FilterIntraMode = Av1FilterIntraMode_Unknown;   // 5.11.24
+  PaletteSizeY:ubyte = 0; PaletteSizeUV:ubyte = 0;   // 5.11.45 (0 = no palette; 2..8)
+  palette:[ubyte];                                // nested Av1Palette FlatBuffer when PaletteSizeY or PaletteSizeUV > 0
+  use_intrabc_mv_x:short = -32768; use_intrabc_mv_y:short = -32768;   // intra block copy Mv in 1/8 units (multiples of 8)
+  // inter (5.11.25–5.11.33)
+  RefFrame:[byte];                                // 2 entries: RefFrame[0], RefFrame[1] (Av1RefFrame; -1 NONE)
+  comp_mode:ubyte = 255;                          // 5.11.25: 0 SINGLE_REFERENCE, 1 COMPOUND_REFERENCE
+  comp_ref_type:Av1CompRefType = Av1CompRefType_Unknown;
+  drl_mode_idx:ubyte = 255;                       // RefMvIdx after read_drl_mode (5.11.23)
+  NumMvFound:ubyte = 255;                         // 7.10.2 (size of the MV stack) for "why this MV" views
+  Mv:[short];                                     // 4 entries: Mv[0].row, Mv[0].col, Mv[1].row, Mv[1].col — 1/8 luma units (NOT ×2). Empty for intra.
+  Mvd:[short];                                    // 4 entries, same order: signalled diff from read_mv (5.11.32) in 1/8 units; -32768 where not NEWMV
+  mv_joint:[ubyte];                               // up to 2 entries (per ref list that used NEWMV): MvJoint (6.10.29)
+  interintra:ubyte = 255; interintra_mode:Av1InterIntraMode = Av1InterIntraMode_Unknown; wedge_interintra:ubyte = 255;
+  wedge_index:ubyte = 255; wedge_sign:ubyte = 255;   // 5.11.28 / 5.11.31
+  mask_type:ubyte = 255;                          // COMPOUND_DIFFWTD mask_type (5.11.31)
+  motion_mode:Av1MotionMode = Av1MotionMode_Unknown;   // 5.11.27
+  LocalValid:ubyte = 255; LocalWarpParams:[int];  // 6 entries (7.11.3.8 warpEstimation) when motion_mode = LOCALWARP
+  comp_group_idx:ubyte = 255; compound_idx:ubyte = 255;   // 5.11.31
+  compound_type:Av1CompoundType = Av1CompoundType_Unknown;   // derived CompoundType (6.10.31)
+  FwdWeight:ubyte = 255; BckWeight:ubyte = 255;   // COMPOUND_DISTANCE weights (7.11.3.15), 0..16
+  interp_filter:[Av1InterpFilter];                // 2 entries: interp_filter[dir] as read in inter_block_mode_info (5.11.23; both equal when enable_dual_filter = 0 or is_filter_switchable = 0)
+  is_global:ubyte = 255;                          // 1 when the MV came from gm_params (GLOBALMV / GLOBAL_GLOBALMV with GmType > TRANSLATION)
+  // transform (5.11.15–5.11.17)
+  TxSize:Av1TxSize = Av1TxSize_Unknown;           // luma TxSize at the block level (read_block_tx_size / read_tx_size)
+  tx_depth:ubyte = 255;                           // 5.11.16 (intra / non-var-tx)
+  txfm_split_tree:[ubyte];                        // var-tx tree (5.11.17): pre-order list of txfm_split flags; empty if not used
+  TxType:Av1TxType = Av1TxType_Unknown;           // first luma TXB's TxType (per-TXB values in Av1Txb)
+  // CDEF index for the 64x64 containing this block (5.11.56)
+  cdef_idx:byte = -1;
+  // reference order hints of the block's refs, for display ("LAST (hint 12)")
+  RefOrderHint:[int];                             // 2 entries (-1 when RefFrame NONE/INTRA)
+  bit_count_x8:uint;                              // accounting: sum of AccountingSymbol.bits for symbols with context (MiRow, MiCol) in this block, 1/8 bits (0 = unknown)
+}
+
+// Palette colours and index map (5.11.45, 5.11.49). Nested in Av1Block.palette.
+table Av1Palette {
+  palette_colors_y:[ushort];                      // PaletteSizeY entries (palette_colors_y[], 5.11.45)
+  palette_colors_u:[ushort]; palette_colors_v:[ushort];   // PaletteSizeUV entries each
+  ColorMapY:[ubyte];                              // bw*bh indices (7.11.4), raster, block-sized; empty if not exported
+  ColorMapUV:[ubyte];                             // chroma block indices
+}
+
+// One transform block (transform_block, 5.11.35 / coeffs 5.11.39). Block.kind = TXB. Block.partition_type = plane (0 Y, 1 U, 2 V).
+table Av1Txb {
+  plane:ubyte;                                    // 0 Y, 1 U, 2 V
+  startX:uint; startY:uint;                       // in samples of the plane (5.11.35)
+  txSz:Av1TxSize = Av1TxSize_Unknown;             // TxSize of this TXB (chroma: get_tx_size(plane, txSz), 5.11.37)
+  TxType:Av1TxType = Av1TxType_Unknown;           // compute_tx_type result (5.11.40)
+  all_zero:ubyte = 255;                           // 5.11.39
+  eob:ushort = 0;                                 // end of block position (number of coefficients coded), 5.11.39
+  dc_sign:ubyte = 255;                            // sign of the DC coefficient (0 +, 1 -), 255 when dc = 0
+  dc_level:int = 0;                               // Dequant[0][0] (dequantised DC)
+  coeff_abs_sum:uint = 0;                         // sum |Quant[i]| (pre-dequant levels) — energy proxy
+  num_nonzero:ushort = 0;
+  qmLevel:ubyte = 255;                            // quantizer matrix level in use (qm_y/qm_u/qm_v) when using_qmatrix; 255 none
+  coeff_blob_id:string;                           // PlaneStage.Coefficients blob for this TXB (empty if not exported)
+  bit_count_x8:uint;                              // accounting cost of this TXB's symbols (0 = unknown)
+}
+
+// Loop filter / CDEF / LR / superres / film grain for one AV1 frame. FrameAnalysis.filter_params_type = "Av1FilterParams".
+table Av1LrUnit {                                 // one loop restoration unit (5.11.57 / 5.11.58)
+  plane:ubyte; unitRow:ushort; unitCol:ushort;    // 7.17 (unit grid per plane, LoopRestorationSize)
+  rect:Rect;                                      // luma-coordinate rectangle of the unit (chroma units scaled to luma for display)
+  restoration_type:Av1RestorationType = Av1RestorationType_Unknown;   // RESTORE_NONE / WIENER / SGRPROJ (per-unit, 5.11.57)
+  LrWiener:[short];                               // 6 entries: LrWiener[plane][unitRow][unitCol][pass 0..1][0..2] (7 symmetric taps; 5.11.58)
+  LrSgrSet:ubyte = 255;                           // 5.11.58 (0..15)
+  LrSgrXqd:[short];                               // 2 entries: LrSgrXqd[..][0..1]
+}
+table Av1CdefParams {
+  cdef_damping_minus_3:ubyte; cdef_bits:ubyte;    // 5.9.19
+  CdefDamping:ubyte;                              // = cdef_damping_minus_3 + 3
+  cdef_y_pri_strength:[ubyte]; cdef_y_sec_strength:[ubyte];   // (1 << cdef_bits) entries each; sec strength 3 means 4 (5.9.19)
+  cdef_uv_pri_strength:[ubyte]; cdef_uv_sec_strength:[ubyte];
+  cdef_idx:[byte];                                // one entry per 64x64 in raster order (ceil(w/64)*ceil(h/64)); -1 = not signalled (all skip)
+  cdef_dir:[ubyte];                               // derived direction per 8x8 (7.15.2), raster, (cells_w/2)*(cells_h/2) entries; empty if not exported
+  cdef_var:[uint];                                // derived variance per 8x8 (7.15.2); empty if not exported
+}
+table Av1GmParams { ref:Av1RefFrame; GmType:Av1GmType; gm_params:[int]; }   // 6 entries gm_params[ref][0..5] (5.9.24, 7.11.3.1 global motion warp)
+table Av1FilmGrainParams {                        // 5.9.30 / 6.8.20
+  apply_grain:ubyte; grain_seed:ushort; update_grain:ubyte = 255; film_grain_params_ref_idx:ubyte = 255;
+  num_y_points:ubyte; point_y_value:[ubyte]; point_y_scaling:[ubyte];
+  chroma_scaling_from_luma:ubyte; num_cb_points:ubyte; point_cb_value:[ubyte]; point_cb_scaling:[ubyte];
+  num_cr_points:ubyte; point_cr_value:[ubyte]; point_cr_scaling:[ubyte];
+  grain_scaling_minus_8:ubyte; ar_coeff_lag:ubyte;
+  ar_coeffs_y_plus_128:[ubyte]; ar_coeffs_cb_plus_128:[ubyte]; ar_coeffs_cr_plus_128:[ubyte];
+  ar_coeff_shift_minus_6:ubyte; grain_scale_shift:ubyte;
+  cb_mult:ubyte; cb_luma_mult:ubyte; cb_offset:ushort; cr_mult:ubyte; cr_luma_mult:ubyte; cr_offset:ushort;
+  overlap_flag:ubyte; clip_to_restricted_range:ubyte;
+}
+table Av1FilterParams {
+  // deblocking (5.9.11 loop_filter_params)
+  loop_filter_level:[ubyte];                      // 4 entries: [0] Y vertical, [1] Y horizontal, [2] U, [3] V
+  loop_filter_sharpness:ubyte;
+  loop_filter_delta_enabled:ubyte; loop_filter_delta_update:ubyte;
+  loop_filter_ref_deltas:[byte];                  // 8 entries (INTRA_FRAME..ALTREF_FRAME)
+  loop_filter_mode_deltas:[byte];                 // 2 entries
+  delta_lf_present:ubyte; delta_lf_res:ubyte; delta_lf_multi:ubyte;   // 5.9.18
+  lvl_per_cell:[ubyte];                           // derived filter level per 4x4 for Y vertical edges (7.14.4); empty if not exported
+  // CDEF (5.9.19)
+  enable_cdef:ubyte; cdef:Av1CdefParams;
+  // loop restoration (5.9.20)
+  enable_restoration:ubyte;
+  FrameRestorationType:[Av1RestorationType];      // 3 entries per plane (6.10.15)
+  LoopRestorationSize:[ushort];                   // 3 entries: 64 / 128 / 256 per plane
+  lr_units:[Av1LrUnit];                           // every unit of every plane, plane-major then raster
+  // superres (5.9.8)
+  use_superres:ubyte; coded_denom:ubyte = 255; SuperresDenom:ubyte = 8; FrameWidth:uint; UpscaledWidth:uint;   // FrameWidth = downscaled coded width
+  // quantization (5.9.12) — frame level
+  base_q_idx:ubyte; DeltaQYDc:byte; DeltaQUDc:byte; DeltaQUAc:byte; DeltaQVDc:byte; DeltaQVAc:byte;
+  using_qmatrix:ubyte; qm_y:ubyte = 255; qm_u:ubyte = 255; qm_v:ubyte = 255;
+  delta_q_present:ubyte; delta_q_res:ubyte;      // 5.9.17
+  // segmentation (5.9.14)
+  segmentation_enabled:ubyte; segmentation_update_map:ubyte = 255; segmentation_temporal_update:ubyte = 255;
+  FeatureEnabled:[ubyte];                         // 8 segments * 8 features, [seg*8 + feature]; feature ids per Section 3 constants: SEG_LVL_ALT_Q = 0, SEG_LVL_ALT_LF_Y_V = 1, ALT_LF_Y_H = 2, ALT_LF_U = 3, ALT_LF_V = 4, SEG_LVL_REF_FRAME = 5, SEG_LVL_SKIP = 6, SEG_LVL_GLOBALMV = 7
+  FeatureData:[short];                            // 64 entries, same layout
+  // TX mode / reference modes (5.9.21–5.9.23)
+  TxMode:ubyte;                                   // 0 ONLY_4X4, 1 TX_MODE_LARGEST, 2 TX_MODE_SELECT (6.8.21)
+  reference_select:ubyte; skip_mode_present:ubyte; SkipModeFrame:[byte];   // 2 entries (6.8.22) or empty
+  allow_warped_motion:ubyte; reduced_tx_set:ubyte;
+  interpolation_filter:Av1InterpFilter = Av1InterpFilter_Unknown;   // frame-level (5.9.10)
+  // global motion (5.9.24)
+  gm:[Av1GmParams];                               // 7 entries (LAST_FRAME..ALTREF_FRAME)
+  // film grain (5.9.30)
+  film_grain:Av1FilmGrainParams;                  // null when film_grain_params_present = 0 or apply_grain = 0
+}
+
+// Reference slot state after this frame (7.20 reference frame update). FrameInfo.ref_state_type = "Av1RefState".
+table Av1RefSlot {
+  slot:ubyte;                                     // 0..7
+  RefValid:ubyte; RefFrameId:int = -1; RefFrameType:Av1FrameType; RefOrderHint:int = -1;   // 7.20
+  frame:FrameId;                                  // the frame stored in this slot (decode_index -1 if invalid)
+  RefUpscaledWidth:uint; RefFrameHeight:uint; RefRenderWidth:uint; RefRenderHeight:uint; RefMiCols:uint; RefMiRows:uint;
+  RefBitDepth:ubyte; RefSubsamplingX:ubyte; RefSubsamplingY:ubyte;
+  saved_gm_valid:bool; saved_segmentation:bool; saved_film_grain:bool;   // which side state was saved (7.20)
+}
+table Av1RefState {
+  frame_type:Av1FrameType; show_frame:ubyte; showable_frame:ubyte; show_existing_frame:ubyte; frame_to_show_map_idx:ubyte = 255;
+  error_resilient_mode:ubyte; disable_cdf_update:ubyte; primary_ref_frame:ubyte;   // 5.9.2 (primary_ref_frame 7 = PRIMARY_REF_NONE)
+  refresh_frame_flags:ubyte;                      // 5.9.2 bit mask (after this frame)
+  OrderHint:int; ref_order_hint:[int];            // 8 entries ref_order_hint[i] when signalled (error resilient), else empty
+  ref_frame_idx:[ubyte];                          // 7 entries: slot used for LAST_FRAME..ALTREF_FRAME (5.9.2); empty for intra frames
+  OrderHints:[int];                               // 8 entries: OrderHints[refFrame] for INTRA_FRAME..ALTREF_FRAME (6.8.2); -1 when not applicable
+  RefFrameSignBias:[ubyte];                       // 8 entries (6.8.2, via get_relative_dist() 5.9.3): 0 = forward (past) reference, 1 = backward (future)
+  use_ref_frame_mvs:ubyte; allow_high_precision_mv:ubyte; force_integer_mv:ubyte;
+  SkipModeFrame:[byte];                           // 2 entries or empty (6.8.22)
+  slots_after:[Av1RefSlot];                       // 8 entries: slot state after reference frame update (7.20)
+  current_frame_id:int = -1;                      // 5.9.2 when frame_id_numbers_present_flag
+  temporal_id:ubyte; spatial_id:ubyte;            // from obu_extension_header
+}
+
+// =====================================================================================
+// CLI / API report tables (consumed by chapter 12; defined here because chapter 06 owns every schema).
+// Root tables carry their own file_identifier (§6.1.1); the others are nested or streamed as records
+// inside a CliEnvelope stream (chapter 12 §12.1.4).
+// =====================================================================================
+table CliEnvelope {                              // used by chapter 12 §12.1.4 (first record of every fb/json stream)
+  ovt_version:string; schema_version:uint; command:string; input_path:string; input_size:ulong; source_hash:[ubyte];
+  record_count:uint;                             // number of result records that follow
+  diagnostics:[Diagnostic]; status:string;
+}
+table FrameHash     { frame:FrameId; md5:string; }                                     // used by chapter 12 §12.2.6 (`ovt dump --md5`)
+table DumpOutput    { stage:PlaneStage; path:string; container:string; width:uint; height:uint; chroma_format:ubyte; bit_depth:ubyte;
+                      frames_written:uint; md5:[FrameHash];
+                      sequence_md5:string; }                                           // used by chapter 12 §12.2.6; sequence_md5 = MD5 over all per-frame hashed bytes in output order (`--md5` last line `sequence,<md5>`)
+table DumpManifest  { outputs:[DumpOutput]; decoder_id:string; decoder_version:string; order:string; crop:bool; }   // used by chapter 12 §12.2.6
+table ExtractManifest { path:string; format:string; units:[uint]; bytes:ulong; frames:[FrameId]; decode_chain_length:uint; }   // used by chapter 12 §12.2.7
+table PluginInfo    { id:string; kind:string /* "analysis","metric","decoder" */; codec:Codec; version:string; license:string;
+                      abi_version:uint; path:string /* "(built-in)" for static */; sha256:string; plane_stages:[string]; grid_fields:[string];
+                      bit_exact:bool; has_symbol_accounting:bool; notes:string; }      // used by chapter 12 §12.2.14, §12.3.11
+table PluginList    { plugins:[PluginInfo]; search_paths:[string]; }                   // root table, file_identifier "OVTP"; used by chapter 12 §12.2.14
+table HdrFrameMeasure { frame:FrameId; max_nits:float; fall_nits:float; p99_nits:float; min_nits:float; pct_above_threshold:float; histogram:[uint]; }   // used by chapter 12 §12.2.11
+table HdrDynamicRecord { frame:FrameId; kind:string /* "hdr10plus","dv_rpu" */; present:bool; profile:ubyte; level:ubyte; raw_size:uint; }          // used by chapter 12 §12.2.11
+table HdrReport     { declared:[ubyte] /* ovt_ColorDescription as little-endian struct image, sizeof = 44 bytes for the §0.5.6 layout with the leading uint32_t struct_size (D4) */; declared_json:string; sources:[string];
+                      conflicts:[Diagnostic]; measures:[HdrFrameMeasure]; max_cll_measured:float; max_fall_measured:float;
+                      dynamic:[HdrDynamicRecord]; threshold_nits:float; }              // used by chapter 12 §12.2.11 (`ovt hdr`)
+table VerifyFrame   { frame:FrameId; ok:bool; plane_mismatch_mask:ubyte; max_abs_diff:uint; first_mismatch_x:int; first_mismatch_y:int;
+                      declared_hash:string; computed_hash:string; }                    // used by chapter 12 §12.2.12
+table VerifyCheck   { name:string /* "hash", "levels", "against" */; status:string /* "pass" | "fail" | "skipped" */; detail:string; }   // used by chapter 12 §12.2.12
+table VerifyReport  { mode:string /* "hash_sei","against" */; plugin:string; oracle:string; tolerance:uint; frames:[VerifyFrame];
+                      frames_ok:uint; frames_failed:uint; checks:[VerifyCheck]; }       // used by chapter 12 §12.2.12 (`ovt verify`); one VerifyCheck per requested check
+table CacheEntry    { key:string; kind:string; source_basename:string; size_bytes:ulong; created:string; last_used:string; }   // used by chapter 12 §12.2.13
+table CacheReport   { dir:string; entries:[CacheEntry]; total_bytes:ulong; max_bytes:ulong; hits:ulong; misses:ulong; }        // used by chapter 12 §12.2.13 (`ovt cache`)
+table HrdPoint      { decode_index:uint; init_arrival_time_90k:ulong; final_arrival_time_90k:ulong; removal_time_90k:ulong;
+                      cpb_fullness_bits:ulong; overflow:bool; underflow:bool; }                 // one access unit of the CPB trace; times in 90 kHz ticks (chapter 7 §7.4.8)
+table HrdTrace      { frame:[HrdPoint]; bit_rate_bps:ulong; cpb_size_bits:ulong; sched_sel_idx:ubyte; nal_hrd:bool /* false = VCL HRD */;
+                      cbr:bool; low_delay_hrd:bool; conformance_type:ubyte /* 1 = type I, 2 = type II */; underflow_count:uint; overflow_count:uint;
+                      diagnostics:[Diagnostic]; }                                      // used by chapter 12 §12.2.21 (`ovt hrd`); built by chapter 7 WI-4.112
+table DoctorReport  { build_json:string; plugins:PluginList; hw_decoders:[string]; gpu_json:string; displays_json:string; cpu_features:[string];
+                      env:[string]; cache:CacheReport; }                                // used by chapter 12 §12.2.16 (`ovt doctor`)
 
 root_type FrameAnalysis;
 file_identifier "OVTA";
+file_extension "fa";
