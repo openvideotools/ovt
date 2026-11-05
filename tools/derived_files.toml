@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Files derived from other projects (chapter 15 §15.1.1, §15.6). tools/gen_notices.py lists them in
+# THIRD_PARTY_NOTICES.md under "Files derived from other projects". Empty until the first YUView-derived
+# file lands (phases 2-4). One entry per file, all four keys required:
+#
+# [[files]]
+# path = "app/src/items/DifferenceItem.cpp"   # file in this repository
+# upstream = "YUView"                         # upstream project
+# commit = "<full sha of the upstream commit>"
+# license = "GPL-3.0-only"                    # SPDX id of the upstream file

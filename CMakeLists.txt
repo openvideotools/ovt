@@ -56,3 +56,4 @@ if(OVT_BUILD_TESTS)
 endif()
 
 include(OvtInstall) # §13.2.6 export set
+include(OvtNotices) # ovt_notices target and install rules (§15.6, WI-0.603)
