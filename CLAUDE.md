@@ -82,9 +82,10 @@ Do not guess silently (§16.2.4).
 Do not ask spec questions in chat. `spec-question` issues are triaged daily:
 
 - **Low risk and low uncertainty, no public interface change:** the triaging session accepts the
-  proposed answer with a comment on the issue. The next spec-amendment PR folds it into
-  `docs/spec/` and closes the issue. That PR merges on green CI and a separate reviewer's approve,
-  without the owner. The daily digest lists every answer accepted and every spec fix made this way.
+  proposed answer with a comment on the issue. A spec-amendment PR folds it into `docs/spec/` and
+  closes the issue. An amendment PR that contains only such accepted answers merges on green CI
+  and a separate reviewer's approve, without the owner; one that also carries other spec changes
+  waits for the owner's approval. The daily digest lists every answer accepted and every spec fix made this way.
 - **Uncertain, or changes a public interface** (public C headers under `core/include/`, the plugin
   ABI, the FlatBuffers schemas, the CLI grammar): the issue stays open for the owner. If the owner
   has not answered within 24 hours, the proposed answer stands, except for a public interface
