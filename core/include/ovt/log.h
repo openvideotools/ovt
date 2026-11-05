@@ -38,8 +38,8 @@ typedef void (*ovt_log_fn)(int level, const char* module, const char* msg, void*
 
 /**
  * Installs @p fn as the logger, with @p user passed back on every call (the library does not own
- * @p user). NULL restores the default logger, which drops every line (chapter 04 FR-API-006). MUST be
- * called before any other API call from any thread (chapter 12 §12.3.1 rule 4). A line already being
+ * @p user). NULL restores the default logger, which drops every line (chapter 04 FR-API-006). Optional;
+ * if used, call it before any other API call from any thread (chapter 12 §12.3.1 rule 4). A line already being
  * delivered on another thread may still reach the previous logger after this returns, so keep the previous
  * @p user valid until no other thread can be logging. Never fails.
  */

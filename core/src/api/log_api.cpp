@@ -16,6 +16,25 @@ void invoke(ovt_log_fn fn, int level, const char* module, const char* msg, void*
   fn(level, module, msg, user);  // MUST NOT throw (§12.3.1 rule 8); a throw terminates here
 }
 
+// Adapts one ovt::log line to the C callback. It runs inside the noexcept sink call, so running out of memory
+// while building the strings drops the line instead of terminating (§12.3.1 rule 8).
+void deliver(ovt_log_fn fn, void* user, ovt::log::Level l, std::string_view module, std::string_view code,
+             std::string_view message) noexcept {
+  std::string text;
+  std::string mod;
+  try {
+    if (!code.empty()) {
+      text.reserve(code.size() + 3 + message.size());
+      text.append("[").append(code).append("] ");
+    }
+    text.append(message);
+    mod.assign(module);
+  } catch (...) {  // NOLINT(bugprone-empty-catch): std::bad_alloc, the line is dropped
+    return;
+  }
+  invoke(fn, static_cast<int>(l), mod.c_str(), text.c_str(), user);
+}
+
 }  // namespace
 
 extern "C" {
@@ -26,16 +45,8 @@ OVT_API void ovt_set_logger(ovt_log_fn fn, void* user) {
       ovt::log::set_sink({});
       return;
     }
-    ovt::log::set_sink(
-        [fn, user](ovt::log::Level l, std::string_view module, std::string_view code, std::string_view message) {
-          std::string text;
-          if (!code.empty()) {
-            text.reserve(code.size() + 3 + message.size());
-            text.append("[").append(code).append("] ");
-          }
-          text.append(message);
-          invoke(fn, static_cast<int>(l), std::string(module).c_str(), text.c_str(), user);
-        });
+    ovt::log::set_sink([fn, user](ovt::log::Level l, std::string_view module, std::string_view code,
+                                  std::string_view message) { deliver(fn, user, l, module, code, message); });
   } catch (...) {  // NOLINT(bugprone-empty-catch): out of memory; the previous logger stays installed
   }
 }

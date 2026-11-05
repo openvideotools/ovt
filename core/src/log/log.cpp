@@ -112,8 +112,13 @@ std::string format_line(Level l, std::string_view module, std::string_view code,
 Sink stderr_sink(std::FILE* out) {
   auto lock = std::make_shared<std::mutex>();
   return [out, lock](Level l, std::string_view module, std::string_view code, std::string_view message) {
-    std::string line = format_line(l, module, code, message, std::chrono::system_clock::now());
-    line.push_back('\n');
+    std::string line;
+    try {
+      line = format_line(l, module, code, message, std::chrono::system_clock::now());
+      line.push_back('\n');
+    } catch (...) {  // NOLINT(bugprone-empty-catch): std::bad_alloc inside a noexcept sink call; drop the line
+      return;
+    }
     std::FILE* f = out != nullptr ? out : stderr;
     const std::lock_guard<std::mutex> guard(*lock);
     static_cast<void>(std::fwrite(line.data(), 1, line.size(), f));  // nowhere to report a failed log write
