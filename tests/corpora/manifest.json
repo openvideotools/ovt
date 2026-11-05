@@ -322,6 +322,44 @@
           "frames": 48
         }
       }
+    },
+    {
+      "id": "mpegff_video_cenc_128iv",
+      "source": "mpegff",
+      "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
+      "licence_spdx": "LicenseRef-MPEG-Conformance",
+      "redistributable": false,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067/data/file_features/under_consideration/cenc/video_cenc_128iv.mp4",
+      "sha256": "992761f16ae8375c46ed64c47fb2ca1c5ce7c0c009617e764257747cf511a80b",
+      "size_bytes": 134037,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "mpegff_video_cenc_roll_frag1s",
+      "source": "mpegff",
+      "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
+      "licence_spdx": "LicenseRef-MPEG-Conformance",
+      "redistributable": false,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067/data/file_features/under_consideration/cenc/video_cenc_roll_frag1s.mp4",
+      "sha256": "ba61a9b8acb9045c895b6d58dafedd559a3c3195cea09914cecca5060d36f2ab",
+      "size_bytes": 134554,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
     }
   ]
 }
