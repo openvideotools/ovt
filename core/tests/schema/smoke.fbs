@@ -1,0 +1,27 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// Test-only schema of WI-0.003's smoke test. It is independent of core/schema/ so that the real schemas
+// (WI-0.080) can change freely; the code generation target is exercised the same way.
+
+namespace ovt.fb.smoke;
+
+enum Codec : ubyte { Unknown = 0, Avc = 1, Hevc = 2, Av1 = 3 }
+
+struct Span {
+  offset:uint64;
+  size:uint64;
+}
+
+table Record {
+  schema_version:uint = 1;
+  stream_index:uint32;
+  display_order:int64;
+  codec:Codec = Unknown;
+  span:Span;
+  note:string;
+  payload:[ubyte];
+}
+
+root_type Record;
+file_identifier "OVTS";

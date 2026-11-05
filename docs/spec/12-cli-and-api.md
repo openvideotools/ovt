@@ -871,15 +871,16 @@ Conventions (normative, in addition to §0.4 naming):
 #define OVT_API_VERSION_MINOR 0
 #define OVT_API_VERSION_PATCH 0
 #define OVT_API_VERSION ((OVT_API_VERSION_MAJOR << 16) | (OVT_API_VERSION_MINOR << 8) | OVT_API_VERSION_PATCH)
-/* Runtime values of the loaded library (may be newer than the headers compiled against). */
+/* Runtime values of the loaded library (may be newer than the headers compiled against). These are the
+ * PRODUCT version from the repository's VERSION file (0.1.0 at WI-0.000; FR-GEN-010), not OVT_API_VERSION. */
 void        ovt_version(int* out_major, int* out_minor, int* out_patch);       /* never fails */
-const char* ovt_version_string(void);                                           /* "1.2.0" */
+const char* ovt_version_string(void);                                           /* product version, e.g. "0.1.0" */
 const char* ovt_build_info_json(void);  /* {"commit":"...","profile":"release","platform":"macos-arm64","features":["aom","vmaf",...]} */
 /* Returns OVT_OK if the running library is ABI-compatible with the given header version (same major, minor >= requested). */
 ovt_status  ovt_check_version(uint32_t header_api_version);
 ```
 
-**ABI stability policy.** The C API follows semantic versioning on `OVT_API_VERSION` independently of the product version printed by `ovt --version` (they are kept equal while both are 1.x for simplicity). *Patch*: no header change. *Minor*: new functions, new enum values at the end, new structs; existing symbols and struct layouts unchanged; new FlatBuffers fields only appended (FlatBuffers forward/backward compatibility). *Major*: anything else. The shared library SONAME is `libovt_core.so.<major>` / `libovt_core.<major>.dylib`; all symbols are exported via a version script `core/ovt_core.map` (Linux) / exported-symbols list (macOS) and `OVT_API` visibility macro; nothing not in these headers is exported. Plugin ABIs (`abi/*.h`) are versioned separately by `OVT_ANALYSIS_ABI_VERSION` / `OVT_METRIC_ABI_VERSION` and are never modified: a change produces `analysis_decoder_v2.h` with a new entry point `ovt_analysis_decoder_v2()`; the host keeps loading v1 plugins for at least two product major versions. Deprecations are marked with `OVT_DEPRECATED("use ovt_x")` and kept for one major version.
+**ABI stability policy.** The C API follows semantic versioning on `OVT_API_VERSION` independently of the product version printed by `ovt --version`. The two differ until the product reaches 1.0: the product version is `0.1.0` (the `VERSION` file, chapter 13 WI-0.000) while `OVT_API_VERSION_*` is `1.0.0` as defined above. `ovt_version()` / `ovt_version_string()` return the **product** version; `ovt_check_version(OVT_API_VERSION)` compares only the API version; the SONAME follows the API major (`libovt_core.so.1`); and `ovt --version` prints `ovt 0.1.0+<sha> (core 0.1.0, api 1.0.0)` per §12.2 (issue #4). *Patch*: no header change. *Minor*: new functions, new enum values at the end, new structs; existing symbols and struct layouts unchanged; new FlatBuffers fields only appended (FlatBuffers forward/backward compatibility). *Major*: anything else. The shared library SONAME is `libovt_core.so.<major>` / `libovt_core.<major>.dylib`; all symbols are exported via a version script `core/ovt_core.map` (Linux) / exported-symbols list (macOS) and `OVT_API` visibility macro; nothing not in these headers is exported. Plugin ABIs (`abi/*.h`) are versioned separately by `OVT_ANALYSIS_ABI_VERSION` / `OVT_METRIC_ABI_VERSION` and are never modified: a change produces `analysis_decoder_v2.h` with a new entry point `ovt_analysis_decoder_v2()`; the host keeps loading v1 plugins for at least two product major versions. Deprecations are marked with `OVT_DEPRECATED("use ovt_x")` and kept for one major version.
 
 ### 12.3.3 `ovt/status.h`
 

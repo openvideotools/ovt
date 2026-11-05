@@ -1,4 +1,36 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Stub created by WI-0.000. WI-0.559 owns the content (chapter 13 §13.7.1 clang-tidy job).
+# clang-tidy configuration (chapter 14 §14.8.2, WI-0.559). The warning set for the compiler is the
+# ovt::flags target (chapter 13 §13.2.5), not this file. Parser directories (core/src/syntax, container,
+# bitreader) override this file with their own .clang-tidy that turns pointer arithmetic into an error
+# (§0.7.1: no raw pointer arithmetic on input data).
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cert-*,
+  -cert-err58-cpp,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+  cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  cppcoreguidelines-narrowing-conversions,
+  cppcoreguidelines-init-variables,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  performance-*,
+  portability-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length
+# WarningsAsErrors is empty on purpose: the errors are set by the callers. The PR job
+# (.github/workflows/static-analysis.yml) fails on ANY finding on a changed line, the nightly run uses
+# -warnings-as-errors='*', and the parser directories promote pointer arithmetic here.
+WarningsAsErrors: ""
+# SPEC-ASSUMPTION(#29): core/include (the public C headers) is left out of the header filter. They are C, so
+# modernize-use-using cannot be satisfied there; §14.8.2 says "^(core|render|plugins|cli|app)/".
+HeaderFilterRegex: '^(core/(src|tests)|render|plugins|cli|app)/'
+FormatStyle: file
