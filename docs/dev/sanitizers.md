@@ -22,7 +22,7 @@ Two `ASAN_OPTIONS` differ on macOS arm64, because the default ones abort every i
 - `detect_container_overflow=0`: libc++ annotates `std::vector` for ASan, and the vcpkg packages (Catch2 among them)
   are built without `-fsanitize`. Where instrumented and plain code share a vector, ASan reports a false
   `container-overflow` (<https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow>). Linux uses
-  libstdc++, which does not annotate by default, so it keeps the check. Building the vcpkg packages with ASan
+  libstdc++, so the option is left on there, though it only fires with `_GLIBCXX_SANITIZE_VECTOR`. Building the vcpkg packages with ASan
   (a sanitizer triplet) would let macOS turn the check back on.
 
 ## Third-party code is sanitized too
