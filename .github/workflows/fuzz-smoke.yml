@@ -69,7 +69,11 @@ jobs:
       - name: Fuzz 60 s per target
         env:
           SHARD: ${{ matrix.shard }}
+        # An explicit `shell: bash` runs `bash -eo pipefail`; the default for a bare `run:` is `bash -e`, which
+        # would lose the fuzzer's exit status behind `| tee`.
+        shell: bash
         run: |
+          set -o pipefail
           mkdir -p fuzz-artifacts
           shopt -s nullglob
           bins=("build/$PRESET"/fuzz/ovt_fuzz_*)
@@ -83,7 +87,7 @@ jobs:
               t="${bin##*/ovt_fuzz_}"
               mkdir -p "corpus_cache/$t"
               echo "::group::$t"
-              # pipefail (the default bash -e -o pipefail) keeps the fuzzer's exit status through tee.
+              # pipefail (set above) keeps the fuzzer's exit status through tee.
               "$bin" -max_total_time=60 -max_len=1048576 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1 \
                 -artifact_prefix=fuzz-artifacts/ "corpus_cache/$t" "core/tests/fuzz/corpus/$t" 2>&1 | tee "fuzz-artifacts/$t.log"
               echo "::endgroup::"
