@@ -83,7 +83,7 @@ def key_of(name: str) -> str:
     `zstd::libzstd_static` -> `zstd`, so one component reached by several spellings is one key.
     """
     n = name
-    if "/" in n:  # a library file
+    if n.startswith("/"):  # a library file
         n = re.sub(r"\.(so|a|dylib|lib)(\.[\d.]+)?$", "", n.rsplit("/", 1)[1])
         n = re.sub(r"^lib", "", n)
     elif "::" in n:
