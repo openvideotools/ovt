@@ -132,17 +132,22 @@ endif()
 # desktop host. Android always builds the GUI shell.
 if(OVT_BUILD_GUI AND NOT ANDROID)
   # Qt 6.8's FindWrapOpenGL.cmake links the AGL framework on Apple, and Xcode 26's SDK no longer has it
-  # (`ld: framework 'AGL' not found`, found on the Mac Mini for WI-0.019). Qt takes a cached WrapOpenGL_AGL
-  # as is, so pointing it at OpenGL.framework (already linked) drops AGL. This has to run before the first
-  # find_package(Qt6). Remove it once the Qt pin carries the upstream fix.
+  # (`ld: framework 'AGL' not found`, found on the Mac Mini for WI-0.019). find_library() can't decide it:
+  # the host's /System/Library/Frameworks still has AGL while ld resolves frameworks in the SDK. So test
+  # the SDK and, without AGL, cache WrapOpenGL_AGL (which Qt takes as is) as the SDK's OpenGL.framework,
+  # already linked. FORCE replaces a host path an earlier configure cached. This has to run before the
+  # first find_package(Qt6). Remove it once the Qt pin carries the upstream fix.
   if(APPLE)
-    find_library(WrapOpenGL_AGL NAMES AGL)
-    if(NOT WrapOpenGL_AGL)
-      find_library(OVT_OPENGL_FRAMEWORK NAMES OpenGL)
-      if(OVT_OPENGL_FRAMEWORK)
-        set(WrapOpenGL_AGL "${OVT_OPENGL_FRAMEWORK}" CACHE FILEPATH "AGL stand-in (the SDK has no AGL)" FORCE)
-      endif()
+    set(_ovt_sdk "${CMAKE_OSX_SYSROOT}")
+    if(NOT _ovt_sdk)
+      execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE _ovt_sdk OUTPUT_STRIP_TRAILING_WHITESPACE
+                                                                             ERROR_QUIET)
     endif()
+    if(_ovt_sdk AND NOT EXISTS "${_ovt_sdk}/System/Library/Frameworks/AGL.framework")
+      set(WrapOpenGL_AGL "${_ovt_sdk}/System/Library/Frameworks/OpenGL.framework"
+          CACHE FILEPATH "AGL stand-in (the SDK has no AGL)" FORCE)
+    endif()
+    unset(_ovt_sdk)
   endif()
   find_package(Qt6 QUIET COMPONENTS Core Quick)
   if(NOT Qt6_FOUND)
