@@ -20,30 +20,20 @@ if(NOT TARGET Catch2::Catch2)
 endif()
 
 # ---- Test support library: corpus lookup, golden comparison, normalisation -----------------------
-add_library(ovt_test_support STATIC
-  test_support/corpus.cpp
-  test_support/env.cpp
-  test_support/fb_normalize.cpp
-  test_support/golden.cpp)
+add_library(ovt_test_support STATIC test_support/corpus.cpp test_support/env.cpp test_support/fb_normalize.cpp
+                                    test_support/golden.cpp)
 target_include_directories(ovt_test_support PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(ovt_test_support PRIVATE "OVT_TEST_DEFAULT_CORPORA_DIR=\"${OVT_CORPORA_DIR}\"")
 # Catch2::Catch2 (not WithMain): the support code uses SKIP/FAIL/WARN; the executable decides about main.
-target_link_libraries(ovt_test_support
-  PUBLIC Catch2::Catch2
-  PRIVATE ovt::flags ${fmt_TARGET} ${flatbuffers_TARGET} ${nlohmann_json_TARGET})
+target_link_libraries(ovt_test_support PUBLIC Catch2::Catch2 PRIVATE ovt::flags ${fmt_TARGET} ${flatbuffers_TARGET}
+                                                                     ${nlohmann_json_TARGET})
 ovt_set_license(ovt_test_support "LGPL-2.1-or-later")
 
 # ---- Golden runner: the one test executable with its own main -------------------------------------
-add_executable(ovt_core_tests
-  main.cpp
-  test_support_corpus.cpp
-  test_support_flatbuffer.cpp
-  test_support_golden.cpp)
-target_link_libraries(ovt_core_tests PRIVATE ovt::core ovt::flags ovt_test_support Catch2::Catch2
-                                             ${flatbuffers_TARGET})
-target_compile_definitions(ovt_core_tests PRIVATE
-  "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
-  "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+add_executable(ovt_core_tests main.cpp test_support_corpus.cpp test_support_flatbuffer.cpp test_support_golden.cpp)
+target_link_libraries(ovt_core_tests PRIVATE ovt::core ovt::flags ovt_test_support Catch2::Catch2 ${flatbuffers_TARGET})
+target_compile_definitions(ovt_core_tests PRIVATE "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+                                                  "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 ovt_set_license(ovt_core_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_core_tests)
 
@@ -52,3 +42,6 @@ add_executable(ovt_tests_version test_version.cpp)
 target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
+
+# ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
+add_subdirectory(schema)
