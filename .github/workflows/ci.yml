@@ -122,6 +122,7 @@ jobs:
         with:
           preset: linux-x64-release
           triplet: x64-linux-ovt
+          qt: "true" # ovt_studio and its --self-test CTest test (WI-0.019)
 
       # configure, build and the linux-x64-release test preset; JUnit at build/linux-x64-release/junit.xml.
       # The `pr` lane preset is bound to linux-x64-debug (§13.2.4), which this job does not build; the release
@@ -161,6 +162,7 @@ jobs:
         with:
           preset: macos-arm64-release
           triplet: arm64-osx-ovt
+          qt: "true" # ovt_studio and its --self-test CTest test (WI-0.019)
 
       - name: Configure, build, test
         run: cmake --workflow --preset ci-macos-arm64 # JUnit at build/macos-arm64-release/junit.xml
@@ -176,7 +178,8 @@ jobs:
           if [ -n "$app" ]; then
             ditto "$app" "dist/ovt-macos-arm64/OVT Studio.app"
           else
-            echo "::notice::OVT Studio.app is not built yet (chapter 11); the artefact holds the CLI only"
+            echo "::error::OVT Studio.app was not built (is Qt missing? OVT_BUILD_GUI turns off without it)"
+            exit 1
           fi
           for item in dist/ovt-macos-arm64/*; do codesign --force --deep --sign - "$item"; done
           dist/ovt-macos-arm64/ovt --version

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: GPL-3.0-or-later
+
+Placeholder application icon of OVT Studio (WI-0.019): a frame with a waveform trace. The final artwork and
+the platform icon sets (.icns, Android mipmaps) come with the branding work items (chapter 15 §15.9).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect x="16" y="16" width="224" height="224" rx="48" fill="#1f2a44"/>
+  <rect x="48" y="64" width="160" height="112" rx="12" fill="none" stroke="#e8edf5" stroke-width="12"/>
+  <polyline points="64,148 92,148 108,100 128,164 148,88 164,148 192,148" fill="none" stroke="#4fc3a1"
+            stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="88" y="192" width="80" height="12" rx="6" fill="#e8edf5"/>
+</svg>

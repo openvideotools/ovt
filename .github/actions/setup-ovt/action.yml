@@ -14,7 +14,7 @@ inputs:
     description: vcpkg target triplet of the preset (for example x64-linux-ovt).
     required: true
   qt:
-    description: "'true' installs Qt with tools/install_qt.py into QT_ROOT_DIR (only once the GUI exists)."
+    description: "'true' installs Qt with tools/install_qt.py and sets QT_ROOT_DIR, so the GUI (ovt_studio) builds."
     default: "false"
   python-version:
     description: Python used by configure-time tools (needs >= 3.11).
@@ -139,5 +139,13 @@ runs:
       if: inputs.qt == 'true'
       shell: bash
       run: |
-        echo "QT_ROOT_DIR=${RUNNER_TEMP}/Qt" >> "$GITHUB_ENV"
-        python -I tools/install_qt.py --target desktop --dest "${RUNNER_TEMP}/Qt"  # WI-0.018
+        # WI-0.018: the last stdout line is QT_ROOT_DIR=<dest>/6.8.3 (the aqt layout); CMakePresets.json
+        # appends the kit directory (gcc_64, macos) to it.
+        out="$(python -I tools/install_qt.py --target desktop --dest "${RUNNER_TEMP}/Qt")"
+        printf '%s\n' "$out"
+        root="$(printf '%s\n' "$out" | sed -n 's/^QT_ROOT_DIR=//p' | tail -n 1)"
+        if [ -z "$root" ] || [ ! -d "$root" ]; then
+          echo "::error::tools/install_qt.py printed no usable QT_ROOT_DIR"
+          exit 1
+        fi
+        echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
