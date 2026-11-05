@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/corpora-manifest-1.json",
+  "title": "OVT corpora manifest (docs/spec/14-testing.md section 14.2.4)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "entries"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "entries": { "type": "array", "items": { "$ref": "#/$defs/entry" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "relpath": { "type": "string", "minLength": 1, "maxLength": 255 },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "source", "licence", "licence_spdx", "redistributable"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[A-Za-z0-9_]{1,64}$" },
+        "source": {
+          "enum": [
+            "jvt", "jctvc", "aom", "argon", "mpegff", "gpac", "bento4", "dashif", "cta", "apple", "netflix",
+            "ytugc", "hdr", "heif", "ts", "mkv", "misc", "syn"
+          ]
+        },
+        "url": { "type": "string", "pattern": "^(https://|gs://|http://127\\.0\\.0\\.1(:[0-9]+)?/)" },
+        "vcs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["git", "lfs_path"],
+          "properties": { "git": { "type": "string" }, "lfs_path": { "type": "string" } }
+        },
+        "manual_download": { "type": "boolean" },
+        "unverified": {
+          "type": "boolean",
+          "description": "true while sha256 is not yet recorded (WI-0.552 fills it); the fetcher refuses such entries."
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "licence": { "type": "string", "minLength": 1 },
+        "licence_spdx": { "type": "string", "pattern": "^(LicenseRef-[A-Za-z0-9.-]+|[A-Za-z0-9.+-]+)$" },
+        "redistributable": { "type": "boolean" },
+        "codecs": { "type": "array", "items": { "type": "string" } },
+        "containers": { "type": "array", "items": { "type": "string" } },
+        "extract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["archive", "member"],
+          "properties": {
+            "archive": { "enum": ["zip", "tar.gz", "7z", "auto"] },
+            "member": { "$ref": "#/$defs/relpath" },
+            "md5_member": { "$ref": "#/$defs/relpath" }
+          }
+        },
+        "post": {
+          "type": "object",
+          "additionalProperties": false,
+          "minProperties": 1,
+          "properties": {
+            "ffmpeg_trim_seconds": { "type": "integer", "minimum": 1 },
+            "wrap_y4m": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["width", "height", "fps", "pix_fmt"],
+              "properties": {
+                "width": { "type": "integer", "minimum": 1 },
+                "height": { "type": "integer", "minimum": 1 },
+                "fps": { "type": "string", "pattern": "^[0-9]+(/[0-9]+)?$" },
+                "pix_fmt": { "type": "string" },
+                "frames": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        },
+        "sha256_post": { "$ref": "#/$defs/sha256" },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "tests": { "type": "array", "items": { "type": "string" } },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "aliases": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "unverified": { "const": true } }, "required": ["unverified"] },
+          "then": { "not": { "required": ["sha256"] } },
+          "else": {
+            "if": { "required": ["url"] },
+            "then": { "required": ["sha256", "size_bytes"] }
+          }
+        }
+      ]
+    }
+  }
+}
