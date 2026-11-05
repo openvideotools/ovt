@@ -44,6 +44,7 @@ ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
 
 # ---- Module tests ---------------------------------------------------------------------------------
+add_subdirectory(io)
 add_subdirectory(model)
 
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
