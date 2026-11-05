@@ -4,8 +4,9 @@
 # Oracle image (chapter 14 §14.2.6, WI-0.554): builds tests/oracles/Dockerfile, runs `oracle-versions` and
 # the smoke test, and on main pushes ghcr.io/openvideotools/ovt-oracles:<yyyymmdd> (plus the moving `main`).
 #   pull_request / push to main   when tests/oracles/** or this file changes
-#   schedule (weekly)              rebuild without cache and require the same `oracle-versions` report as
-#                                  the published `main` image (acceptance test 3: nothing floats)
+#   schedule (monthly)             rebuild without cache and require the same `oracle-versions` report as
+#                                  the published `main` image (acceptance test 3: nothing floats); monthly,
+#                                  not weekly, to save Actions minutes (a no-cache build takes about 2 h)
 #   workflow_dispatch              rebuild and push
 # Third-party actions are pinned by commit SHA, never by tag; Renovate keeps the pins fresh.
 name: oracle-image
@@ -17,7 +18,7 @@ on:
     branches: [main]
     paths: ["tests/oracles/**", ".github/workflows/oracle-image.yml"]
   schedule:
-    - cron: "17 4 * * 1"
+    - cron: "17 4 1 * *" # 04:17 UTC on the 1st of each month
   workflow_dispatch:
 
 concurrency:
@@ -94,7 +95,7 @@ jobs:
       - name: smoke test (every §14.4 command on syn_h265_amp_sao_on.265)
         run: docker run --rm ovt-oracles:ci oracle-smoke-test /tmp/smoke
 
-      - name: same report as the published image (weekly rebuild)
+      - name: same report as the published image (monthly rebuild)
         if: github.event_name == 'schedule'
         run: |
           docker run --rm "${IMAGE}:main" oracle-versions > published.md
@@ -109,6 +110,29 @@ jobs:
             docker push "${IMAGE}:${t}"
           done
           echo "pushed ${IMAGE}:${tag}" >> "$GITHUB_STEP_SUMMARY"
+
+      # The image holds GPL builds and patent-encumbered encoders (ORACLE_VERSIONS.md, "Licences and
+      # distribution"), so the package must stay private, and the Free plan cannot forbid public packages at the
+      # org level. Anonymous access must be refused: GHCR denies the anonymous token (401) and then the tag
+      # listing (401/403/404). Any other answer (200 = public, or no answer) fails the run.
+      - name: the GHCR package is private
+        run: |
+          token="$(curl -sS "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull" |
+            python3 -c 'import json, sys; print(json.load(sys.stdin).get("token", ""))' || true)"
+          code="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${token}" \
+            "https://ghcr.io/v2/${IMAGE#ghcr.io/}/tags/list")"
+          echo "anonymous tag listing of ${IMAGE} -> HTTP ${code}"
+          case "${code}" in
+            401 | 403 | 404) ;;
+            200)
+              echo "::error::${IMAGE} is public; set it to private in the package settings (GPL + patent-encumbered encoders)"
+              exit 1
+              ;;
+            *)
+              echo "::error::could not verify that ${IMAGE} is private (HTTP ${code})"
+              exit 1
+              ;;
+          esac
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
