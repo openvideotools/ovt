@@ -64,6 +64,7 @@ jobs:
         with:
           preset: linux-x64-debug
           triplet: x64-linux-ovt
+          qt: "true" # app/ sources need Qt in the compilation database (WI-0.019)
 
       - name: clang-tidy
         if: steps.diff.outputs.run == 'true'
@@ -125,6 +126,7 @@ jobs:
         with:
           preset: linux-x64-debug
           triplet: x64-linux-ovt
+          qt: "true" # app/ sources need Qt in the compilation database (WI-0.019)
 
       - name: Configure
         run: |
