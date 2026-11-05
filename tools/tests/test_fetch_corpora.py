@@ -177,6 +177,36 @@ def test_acceptance_4_verify_only_offline_and_fast(files: Path, tmp_path: Path) 
     assert time.monotonic() - start < 1.0  # 16 KiB; the streaming hash scales linearly (well below 1 s/GiB)
 
 
+def test_verify_only_throughput(files: Path, tmp_path: Path) -> None:
+    """Acceptance 4 on 64 MiB: --verify-only costs about one streaming SHA-256 pass.
+
+    The absolute "< 1 s per GiB" depends on the machine's SHA-256 speed, so the test compares with a plain
+    ``hashlib`` pass over the same bytes on the same machine (overhead factor, not wall-clock).
+    """
+    cache = tmp_path / "cache"
+    big = cache / "big"
+    big.mkdir(parents=True)
+    data = b"\x5a" * (64 << 20)
+    (big / "big.bin").write_bytes(data)
+    start = time.monotonic()
+    digest = hashlib.sha256(data).hexdigest()
+    baseline = time.monotonic() - start
+    (big / ".ok").write_text(json.dumps({"sha256": digest, "primary": "big.bin", "files": {"big.bin": digest}}))
+    e = entry("big", files, "plain.bin", sha256=digest)
+    manifest = write_manifest(tmp_path / "m.json", [e], "http://127.0.0.1:1/")
+    start = time.monotonic()
+    assert run(manifest, cache, "--verify-only") == 0
+    assert time.monotonic() - start < baseline * 2 + 0.2
+
+
+def test_download_larger_than_size_bytes_is_aborted(files: Path, tmp_path: Path) -> None:
+    with serve(files) as base:
+        e = entry("small", files, "plain.bin", size_bytes=10)
+        manifest = write_manifest(tmp_path / "m.json", [e], base)
+        assert run(manifest, tmp_path / "cache") == 3
+    assert not (tmp_path / "cache" / "small" / ".ok").exists()
+
+
 def test_verify_only_detects_damage_and_missing(files: Path, tmp_path: Path) -> None:
     cache = tmp_path / "cache"
     with serve(files) as base:

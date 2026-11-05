@@ -171,8 +171,12 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def download(url: str, dest: Path) -> str:
-    """Stream ``url`` into ``dest`` and return its SHA-256. Raises NetworkError."""
+def download(url: str, dest: Path, max_bytes: int | None = None) -> str:
+    """Stream ``url`` into ``dest`` and return its SHA-256. Raises NetworkError.
+
+    Stops with NetworkError once more than ``max_bytes`` (the manifest ``size_bytes``) arrived, which caps what a
+    hijacked URL can write.
+    """
     if url.startswith("gs://"):
         url = "https://storage.googleapis.com/" + url[len("gs://") :]
     request = urllib.request.Request(url, headers={"User-Agent": "ovt-fetch-corpora/1"})
@@ -185,6 +189,8 @@ def download(url: str, dest: Path) -> str:
                 digest.update(chunk)
                 out.write(chunk)
                 received += len(chunk)
+                if max_bytes is not None and received > max_bytes:
+                    raise NetworkError(f"{url}: more than the manifest size_bytes ({max_bytes}) received")
     except urllib.error.HTTPError as exc:
         raise NetworkError(f"{url}: HTTP {exc.code}") from exc
     except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
@@ -325,7 +331,7 @@ def fetch_entry(entry: dict[str, Any], cache: Path, retries: int, verify_only: b
         for attempt in range(1, max(retries, 1) + 1):
             part = tmp / "download.part"
             try:
-                digest = download(entry["url"], part)
+                digest = download(entry["url"], part, entry["size_bytes"])
                 if digest != entry["sha256"]:
                     raise HashMismatch(f"{entry['id']}: sha256 {digest} != expected {entry['sha256']}")
                 last = None
