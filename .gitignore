@@ -21,6 +21,8 @@ __pycache__/
 .idea/
 .DS_Store
 /android/local.properties
+/android/app/src/main/assets/licenses/
+
 
 # aqtinstall (tools/install_qt.py) writes its log into the current directory
 aqtinstall.log
