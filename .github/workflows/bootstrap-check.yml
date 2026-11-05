@@ -47,6 +47,9 @@ jobs:
           sudo env DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC bash -euxo pipefail install.sh
       - name: tools/bootstrap.sh --no-qt
         run: tools/bootstrap.sh --no-qt --no-corpora
+      - name: Put the bootstrap .venv on PATH
+        # ovt_tp_meson() (dav1d, WI-0.011) looks for meson and ninja on PATH; bootstrap.sh installs them in .venv.
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Configure and build linux-x64-debug
         env:
           CC: gcc-13                     # Ubuntu 22.04's default gcc is 11; bootstrap.sh installed gcc-13
@@ -67,6 +70,9 @@ jobs:
           bash -euxo pipefail install.sh
       - name: tools/bootstrap.sh --no-qt
         run: tools/bootstrap.sh --no-qt --no-corpora
+      - name: Put the bootstrap .venv on PATH
+        # ovt_tp_meson() (dav1d, WI-0.011) looks for meson and ninja on PATH; bootstrap.sh installs them in .venv.
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Configure and build macos-arm64-debug
         run: |
           cmake --preset macos-arm64-debug

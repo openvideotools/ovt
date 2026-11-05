@@ -10,6 +10,8 @@
 #include <fstream>
 #include <string>
 
+#include <unistd.h>
+
 #include "test_support/corpus.h"
 
 namespace {
@@ -17,7 +19,9 @@ namespace {
 // A scratch corpus cache below the build tree, selected through OVT_CORPORA_DIR for one test case.
 class ScratchCorpora {
  public:
-  ScratchCorpora() : dir_(std::filesystem::path(OVT_TEST_BINARY_DIR) / "scratch_corpora") {
+  // ctest runs each test case in its own process, concurrently: the directory name carries the process id.
+  ScratchCorpora()
+      : dir_(std::filesystem::path(OVT_TEST_BINARY_DIR) / ("scratch_corpora_" + std::to_string(::getpid()))) {
     std::filesystem::remove_all(dir_);
     std::filesystem::create_directories(dir_);
     if (const char* old = std::getenv("OVT_CORPORA_DIR")) {  // NOLINT(concurrency-mt-unsafe)
@@ -38,12 +42,12 @@ class ScratchCorpora {
   ScratchCorpora(const ScratchCorpora&) = delete;
   ScratchCorpora& operator=(const ScratchCorpora&) = delete;
 
-  void add(const std::string& id, const std::string& file, bool verified) const {
+  void add(const std::string& id, const std::string& file, bool verified, const std::string& ok = "") const {
     const auto entry = dir_ / id;
     std::filesystem::create_directories(entry);
     std::ofstream(entry / file) << "payload";
     if (verified) {
-      std::ofstream(entry / ".ok") << "";
+      std::ofstream(entry / ".ok") << ok;
     }
   }
   [[nodiscard]] const std::filesystem::path& dir() const { return dir_; }
@@ -69,6 +73,24 @@ TEST_CASE("test_support/corpus: finds verified entries only", "[test_support][fa
 
   CHECK_FALSE(ovt::test::corpus_path("syn_unverified").has_value());  // no .ok marker
   CHECK_FALSE(ovt::test::corpus_path("syn_absent").has_value());
+}
+
+TEST_CASE("test_support/corpus: the .ok record names the primary file", "[test_support][fast]") {
+  const ScratchCorpora corpora;
+  corpora.add("syn_two", "stream.264", true, R"({"primary": "stream.264", "files": {}})");
+  std::ofstream(corpora.dir() / "syn_two" / "stream_yuv.md5") << "md5";
+  const auto two = ovt::test::corpus_path("syn_two");
+  REQUIRE(two.has_value());
+  CHECK(two->filename() == "stream.264");
+
+  corpora.add("syn_bare_two", "a.bin", true);  // bare marker and two files: ambiguous
+  std::ofstream(corpora.dir() / "syn_bare_two" / "b.bin") << "x";
+  CHECK_FALSE(ovt::test::corpus_path("syn_bare_two").has_value());
+
+  corpora.add("syn_escape", "a.bin", true, R"({"primary": "../a.bin"})");
+  CHECK_FALSE(ovt::test::corpus_path("syn_escape").has_value());
+  corpora.add("syn_missing", "a.bin", true, R"({"primary": "gone.bin"})");
+  CHECK_FALSE(ovt::test::corpus_path("syn_missing").has_value());
 }
 
 TEST_CASE("test_support/corpus: rejects ids that are not plain names", "[test_support][fast]") {

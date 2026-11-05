@@ -17,8 +17,9 @@ namespace ovt::test {
 /// CMake option compiled into the test support library (default build/corpora).
 std::filesystem::path corpora_dir();
 
-/// The verified file of corpus entry @p id: the single regular file in <cache>/<id>/ other than .ok,
-/// provided <cache>/<id>/.ok exists. std::nullopt when the entry is absent or unverified.
+/// The verified file of corpus entry @p id: the file named by "primary" in the JSON record <cache>/<id>/.ok
+/// (written by tools/fetch_corpora.py); for a bare .ok marker, the single regular file other than .ok. std::nullopt
+/// when the entry is absent or unverified.
 std::optional<std::filesystem::path> corpus_path(std::string_view id);
 
 /// True when OVT_REQUIRE_CORPORA=1: a missing corpus file fails the test instead of skipping it.
