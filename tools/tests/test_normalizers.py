@@ -150,6 +150,25 @@ def test_jm_qp_accumulates_mb_qp_delta() -> None:
     assert i_frame["mbs"][2]["intra4x4_pred_mode"] == [-1] * 16
 
 
+def test_jm_pcm_macroblock_keeps_the_running_qp(tmp_path: Path) -> None:
+    """I_PCM has QP_Y = QP_Y,PRED; the MBs after it keep accumulating from there, not from 0."""
+    lines = (FIX / "jm_trace_skip.txt").read_text(encoding="utf-8").splitlines()
+    out, mb = [], -1
+    for line in lines:
+        if line.startswith("*********** POC: 0 "):
+            mb += 1
+        if mb == 2 and "intra4x4_pred_mode" in line:
+            continue  # MB 2 of the I frame becomes an I_PCM macroblock
+        if mb == 2 and "mb_qp_delta" in line:
+            line = "@200   pcm_sample_luma                                                1 ( 77)"
+        out.append(line)
+    trace = tmp_path / "pcm.txt"
+    trace.write_text("\n".join(out) + "\n", encoding="utf-8")
+    mbs = normalise("jm_trace", str(trace))["frames"][0]["mbs"]
+    assert [m["qp"] for m in mbs] == [24, 23, 23, 23]
+    assert mbs[2]["pcm"] == 1 and "mb_qp_delta" not in mbs[2]
+
+
 # -- ffmpeg_mvs (§14.4.3a) ---------------------------------------------------------------------------------
 
 

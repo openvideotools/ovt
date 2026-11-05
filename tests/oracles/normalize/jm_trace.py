@@ -72,9 +72,9 @@ def convert(args: argparse.Namespace) -> dict[str, Any]:
             return
         if "mb_type" not in mb:
             mb["mb_type"] = SKIP_NAME.get(slice_type, "P_Skip")
-        if mb.pop("_pcm", False):
-            qp = 0
-        elif "mb_qp_delta" in mb:
+        # I_PCM carries no mb_qp_delta: QP_Y = QP_Y,PRED (7.4.5), so the running QP is unchanged. The 0 that
+        # H.264 8.7.2.2 uses for an I_PCM edge is a deblocking rule, not the macroblock's QP_Y.
+        if "mb_qp_delta" in mb:
             qp = (qp + mb["mb_qp_delta"] + 52 + 2 * qp_off) % (52 + qp_off) - qp_off
         mb["qp"] = qp
         frames[-1].mbs.append(mb)
@@ -162,7 +162,7 @@ def convert(args: argparse.Namespace) -> dict[str, Any]:
         key = mb_keys.get(re.sub(r"\s+", " ", name))
         if key is None:
             if name.startswith("pcm_sample"):
-                mb["_pcm"] = True
+                mb["pcm"] = 1
             continue
         if key == "mb_skip_flag":
             continue
