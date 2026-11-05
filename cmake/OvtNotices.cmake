@@ -17,7 +17,8 @@
 #   * vcpkg ports: <vcpkg installed dir>/<triplet>/share/<port>/copyright;
 #   * Qt: ${QT_ROOT_DIR}/Licenses.
 #
-# Install rules (component `notices`): Linux, AppImage and Flatpak -> share/doc/ovt/; macOS -> the bundle's
+# Install rules (component `notices`, OPTIONAL so a plain `cmake --install` works without building ovt_notices;
+# release jobs must build the target first): Linux, AppImage and Flatpak -> share/doc/ovt/; macOS -> the bundle's
 # Contents/Resources/ when the ovt_studio target is a bundle, else share/doc/ovt/; Android -> the Gradle assets
 # directory android/app/src/main/assets/licenses/ (copied after the build, git-ignored); Python wheel ->
 # python/pyproject.toml sets scikit-build-core `wheel.license-files` to the generated file (that file is created
@@ -111,8 +112,9 @@ if(ANDROID)
     VERBATIM)
   unset(_ovt_notices_assets)
 elseif(APPLE AND TARGET ovt_studio)
-  install(FILES ${_ovt_notices_files} DESTINATION "$<TARGET_BUNDLE_CONTENT_DIR:ovt_studio>/Resources" COMPONENT notices)
+  install(FILES ${_ovt_notices_files} DESTINATION "$<TARGET_BUNDLE_CONTENT_DIR:ovt_studio>/Resources" COMPONENT notices
+          OPTIONAL)
 else()
-  install(FILES ${_ovt_notices_files} DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/ovt" COMPONENT notices)
+  install(FILES ${_ovt_notices_files} DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/ovt" COMPONENT notices OPTIONAL)
 endif()
 unset(_ovt_notices_files)
