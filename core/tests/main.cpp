@@ -8,6 +8,7 @@
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_session.hpp>
+#include <catch2/interfaces/catch_interfaces_capture.hpp>  // UNSCOPED_INFO needs Catch::getResultCapture
 
 #include <cstdio>
 #include <string>
@@ -32,8 +33,8 @@ std::thread::id g_test_thread;
 // what the library logged before it (chapter 12 §12.3.4 signature). The logger may run on any thread;
 // Catch2 macros are only safe on the test thread, so lines from other threads go to stderr instead.
 void catch2_logger(int level, const char* module, const char* msg, void* /*user*/) {
-  const std::string line = "[ovt " + std::to_string(level) + " " + (module != nullptr ? module : "-") + "] " +
-                           (msg != nullptr ? msg : "");
+  const std::string line =
+      "[ovt " + std::to_string(level) + " " + (module != nullptr ? module : "-") + "] " + (msg != nullptr ? msg : "");
   if (std::this_thread::get_id() == g_test_thread) {
     UNSCOPED_INFO(line);
   } else {

@@ -105,6 +105,9 @@ target_include_directories(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:${CMAKE_CU
 target_compile_definitions(ovt_core_objects PUBLIC "$<$<PLATFORM_ID:Linux>:_FILE_OFFSET_BITS=64>")
 find_package(Threads REQUIRED)
 target_link_libraries(ovt_core_objects PUBLIC Threads::Threads PRIVATE ovt::flags)
+# The module headers use fmt (ovt/cxx/log.hpp, WI-1.512), so module code and the tests that link the objects
+# need it: PUBLIC, and inside BUILD_INTERFACE so it never reaches an export set (core-objects rule 1, #62).
+target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:${fmt_TARGET}>")
 ovt_set_license(ovt_core_objects "${OVT_CORE_LICENSE}")
 target_link_libraries(ovt_core PRIVATE ovt_core_objects)
 
@@ -115,6 +118,7 @@ add_subdirectory(schema)
 foreach(
   _module
   io
+  log
   bitreader
   container
   demux

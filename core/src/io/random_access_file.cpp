@@ -10,13 +10,13 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <atomic>
 #include <cerrno>
 #include <string>
 #include <system_error>
 #include <utility>
 
 #include "io_backends.hpp"
+#include "ovt/cxx/log.hpp"
 
 namespace ovt::io {
 
@@ -82,8 +82,6 @@ class FdCloser {
   int fd_;
 };
 
-std::atomic<detail::LogHook> g_log_hook{nullptr};
-
 }  // namespace
 
 std::unique_ptr<RandomAccessFile> RandomAccessFile::open(std::string_view path, OpenMode mode) {
@@ -124,7 +122,7 @@ std::unique_ptr<RandomAccessFile> RandomAccessFile::open(std::string_view path, 
     if (mapped) {
       return mapped;  // guard closes fd
     }
-    detail::log(2, "io: mmap failed (" + errno_text(err) + "), using pread");
+    OVT_LOG(ovt::log::Level::Info, "io", "mmap failed ({}), using pread", errno_text(err));
   }
   auto file = detail::make_pread_file(fd, /*owns_fd=*/true, std::move(info));
   guard.release();
@@ -139,19 +137,5 @@ std::unique_ptr<RandomAccessFile> RandomAccessFile::open_fd(
   // Implemented by WI-1.101 (chapter 7 §7.8); declared here because the header is §7.1.2 verbatim.
   throw IoError(OVT_E_UNSUPPORTED, 0, "io: open_fd is not implemented yet (WI-1.101)");
 }
-
-namespace detail {
-
-void set_log_hook(LogHook hook) noexcept {
-  g_log_hook.store(hook, std::memory_order_release);
-}
-
-void log(int level, std::string_view message) {
-  if (LogHook hook = g_log_hook.load(std::memory_order_acquire); hook != nullptr) {
-    hook(level, message);
-  }
-}
-
-}  // namespace detail
 
 }  // namespace ovt::io
