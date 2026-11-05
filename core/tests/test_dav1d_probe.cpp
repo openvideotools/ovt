@@ -5,7 +5,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <dav1d/dav1d.h>
+// The header exists only once the dav1d build runs (SHA-256 pinned, #44); until then this file is not in
+// compile_commands.json and clang-tidy cannot resolve it.
+#include <dav1d/dav1d.h>  // NOLINT(clang-diagnostic-error)
 
 #include <cstring>
 
@@ -18,7 +20,7 @@ TEST_CASE("dav1d_version reports the linked library", "[fast][third_party]") {
 }
 
 TEST_CASE("dav1d opens and closes a decoder context", "[fast][third_party]") {
-  Dav1dSettings settings;
+  Dav1dSettings settings{};
   dav1d_default_settings(&settings);
   Dav1dContext* context = nullptr;
   REQUIRE(dav1d_open(&context, &settings) == 0);
