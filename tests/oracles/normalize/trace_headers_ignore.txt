@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# CBS syntax elements that trace_headers.py drops (chapter 14 §14.4.1): rbsp_trailing_bits(),
+# byte_alignment() and the slice-data alignment bits. One base name (no subscripts) per line.
+rbsp_stop_one_bit
+rbsp_alignment_zero_bit
+trailing_one_bit
+trailing_zero_bit
+alignment_bit_equal_to_one
+alignment_bit_equal_to_zero
+cabac_alignment_one_bit
