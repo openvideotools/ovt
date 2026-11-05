@@ -8,6 +8,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -122,7 +123,7 @@ TEST_CASE("HDR10+ T.35 SEI: all ST 2094-40 fields", "[fast][syntax][user_data]")
 TEST_CASE("HDR10+ with three windows and both luminance grids", "[fast][syntax][user_data]") {
   BitWriter w;
   w.put(4, 8).put(0, 8).put(3, 2);
-  for (unsigned i = 1; i < 3; ++i) {  // ellipse windows 1 and 2
+  for (uint64_t i = 1; i < 3; ++i) {  // ellipse windows 1 and 2
     w.put(10 * i, 16).put(20 * i, 16).put(30 * i, 16).put(40 * i, 16).put(50 * i, 16).put(60 * i, 16);
     w.put(7, 8).put(11, 16).put(12, 16).put(13, 16).put(i & 1U, 1);
   }
@@ -207,9 +208,10 @@ TEST_CASE("ATSC A/53 GA94 cc_data counts", "[fast][syntax][user_data]") {
   BitWriter w;
   w.put(0xB5, 8).put(0x0031, 16).put(0x47413934, 32).put(0x03, 8);
   w.put(0, 1).put(1, 1).put(0, 1).put(4, 5).put(0xFF, 8);  // flags, cc_count = 4, em_data
-  const struct {
+  struct Cc {
     unsigned valid, type, d1, d2;
-  } cc[] = {{1, 0, 0x14, 0x2C}, {1, 3, 0x61, 0x62}, {0, 2, 0, 0}, {1, 2, 0xC1, 0xC2}};
+  };
+  const std::array<Cc, 4> cc{{{1, 0, 0x14, 0x2C}, {1, 3, 0x61, 0x62}, {0, 2, 0, 0}, {1, 2, 0xC1, 0xC2}}};
   for (const auto& c : cc) {
     w.put(0x1F, 5).put(c.valid, 1).put(c.type, 2).put(c.d1, 8).put(c.d2, 8);
   }
