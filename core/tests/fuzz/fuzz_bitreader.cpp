@@ -22,7 +22,7 @@ namespace {
 
 constexpr std::array<unsigned, 8> kWidth = {0, 1, 7, 8, 16, 32, 57, 64};
 constexpr std::array<uint32_t, 8> kLimit = {0, 1, 2, 3, 5, 255, 65536, UINT32_MAX};
-constexpr unsigned kOpcodes = 28;
+constexpr unsigned kOpcodes = 27;
 volatile uint8_t g_touch = 0;
 
 void require(bool ok) {
@@ -123,9 +123,6 @@ void run_op(ovt::BitReader& br, unsigned op, unsigned param) {
       break;
     }
     case 25:
-      (void)br.L(n);
-      break;
-    case 26:
       (void)br.me(param & 3U, (param & 4U) != 0);
       break;
     default:

@@ -21,7 +21,7 @@ import random
 import sys
 from pathlib import Path
 
-OPCODES = 28  # fuzz_bitreader.cpp kOpcodes
+OPCODES = 27  # fuzz_bitreader.cpp kOpcodes
 SEEDS = 8
 MAX_SEED_BYTES = 4096  # keeps the 60 s smoke run reaching the parsers (WI-0.557 pitfalls)
 
@@ -43,7 +43,7 @@ def bitreader_seeds() -> dict[str, bytes]:
             21,
         ],  # leb128 uvlc su ns le delta_q trailing_bits byte_alignment
         "position": [10, 11, 15, 17, 23, 24],  # skip seek b8 remaining bytes
-        "string": [18, 12, 17, 25],  # st byte_align b8 L
+        "string": [18, 12, 17, 13],  # st byte_align b8 more_rbsp_data
     }
     out: dict[str, bytes] = {}
     names = [
