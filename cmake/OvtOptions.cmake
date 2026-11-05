@@ -25,7 +25,7 @@ option(OVT_INSTALL_DEV "Install headers, ovt-config.cmake and .pc files" ON)
 
 # ---- Quality tooling ------------------------------------------------------------------------------
 option(OVT_ENABLE_SANITIZERS "Enable the sanitizer set selected by OVT_SANITIZER" OFF)
-set(OVT_SANITIZER "asan-ubsan" CACHE STRING "Sanitizer set applied when OVT_ENABLE_SANITIZERS=ON")
+set(OVT_SANITIZER "" CACHE STRING "Sanitizer set applied when OVT_ENABLE_SANITIZERS=ON (empty: fuzz with OVT_ENABLE_FUZZ, else asan-ubsan)")
 set_property(CACHE OVT_SANITIZER PROPERTY STRINGS asan-ubsan tsan fuzz)
 option(OVT_ENABLE_FUZZ "Build the libFuzzer targets (Clang only)" OFF)
 set(OVT_FUZZ_ENGINE "-fsanitize=fuzzer" CACHE STRING "Link flags of the fuzz engine for ovt_fuzz_* targets")
@@ -111,6 +111,16 @@ else()
   set(OVT_CORE_LICENSE "LGPL-2.1-or-later")
 endif()
 
+# Empty means "pick the set that fits": libFuzzer targets need the fuzz set (coverage instrumentation,
+# -fsanitize=fuzzer-no-link), so a fuzz build that names no set gets it (WI-0.557). The preset
+# linux-x64-fuzz relies on this. A normal variable, so the cache keeps the user's empty choice.
+if(OVT_SANITIZER STREQUAL "")
+  if(OVT_ENABLE_FUZZ)
+    set(OVT_SANITIZER "fuzz")
+  else()
+    set(OVT_SANITIZER "asan-ubsan")
+  endif()
+endif()
 if(NOT OVT_SANITIZER MATCHES "^(asan-ubsan|tsan|fuzz)$")
   message(FATAL_ERROR "OVT_SANITIZER must be one of asan-ubsan, tsan, fuzz (got '${OVT_SANITIZER}').")
 endif()
