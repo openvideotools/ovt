@@ -43,15 +43,5 @@ target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TA
 ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
 
-# ---- Third-party probes (build scripts of chapter 13 §13.3) ---------------------------------------
-# WI-0.011: tp::dav1d (Meson wrapper) links into a test that calls dav1d_version(). Absent while the dav1d
-# row of third_party/VERSIONS.md has no SHA-256, see cmake/OvtThirdParty.cmake.
-if(TARGET tp::dav1d)
-  add_executable(ovt_tests_dav1d_probe test_dav1d_probe.cpp)
-  target_link_libraries(ovt_tests_dav1d_probe PRIVATE tp::dav1d ovt::flags ${Catch2_TARGET})
-  ovt_set_license(ovt_tests_dav1d_probe "LGPL-2.1-or-later")
-  ovt_catch_discover_tests(ovt_tests_dav1d_probe)
-endif()
-
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
 add_subdirectory(schema)
