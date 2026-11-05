@@ -43,9 +43,16 @@ target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TA
 ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
 
+# ovt::Result<T> (WI-1.512): header only; linked against the module objects for their include paths.
+add_executable(ovt_tests_result test_result.cpp)
+target_link_libraries(ovt_tests_result PRIVATE ovt_core_objects ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_tests_result "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_result)
+
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
 add_subdirectory(bitreader)
+add_subdirectory(log)
 
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
 add_subdirectory(schema)
