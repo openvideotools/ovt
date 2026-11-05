@@ -3,8 +3,10 @@
 SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 SPDX-License-Identifier: GPL-3.0-or-later
 
-Info.plist of OVT Studio.app (chapter 13 §13.5.2; WI-0.019). CMake fills the ${MACOSX_BUNDLE_*} values from
-app/CMakeLists.txt. The document types and the bundle icon arrive with WI-0.060 (bundle script).
+Info.plist of OVT Studio.app (chapter 13 §13.5.2; WI-0.019). CMake fills in the values from the
+MACOSX_BUNDLE_<NAME> target properties set in app/CMakeLists.txt. The document types and the bundle icon
+arrive with WI-0.060 (bundle script). Write no dollar-brace sequence in this comment: configure_file
+expands it.
 -->
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
