@@ -83,7 +83,7 @@ template <class... Args>
 void write_fmt(Level l, std::string_view module, std::string_view code, fmt::format_string<Args...> f,
                Args&&... args) noexcept {
   try {
-    write(l, module, code, fmt::vformat(f, fmt::make_format_args(args...)));
+    write(l, module, code, fmt::format(f, std::forward<Args>(args)...));
   } catch (...) {  // NOLINT(bugprone-empty-catch): formatting failed (bad_alloc); a log line is not worth more
   }
 }
