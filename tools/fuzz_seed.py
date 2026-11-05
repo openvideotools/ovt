@@ -23,9 +23,7 @@ from pathlib import Path
 
 OPCODES = 28  # fuzz_bitreader.cpp kOpcodes
 SEEDS = 8
-MAX_SEED_BYTES = (
-    4096  # keeps the 60 s smoke run reaching the parsers (WI-0.557 pitfalls)
-)
+MAX_SEED_BYTES = 4096  # keeps the 60 s smoke run reaching the parsers (WI-0.557 pitfalls)
 
 
 def bitreader_seeds() -> dict[str, bytes]:
@@ -60,10 +58,7 @@ def bitreader_seeds() -> dict[str, bytes]:
     ]
     for i, fam in enumerate(names):
         pool = families.get(fam, list(range(OPCODES)))
-        tape = bytes(
-            rng.choice(pool) | (rng.randrange(8) << 5)
-            for _ in range(rng.randrange(24, 64))
-        )
+        tape = bytes(rng.choice(pool) | (rng.randrange(8) << 5) for _ in range(rng.randrange(24, 64)))
         payload = bytearray(rng.randrange(256) for _ in range(rng.randrange(48, 160)))
         if fam == "string":
             payload[rng.randrange(8, 24)] = 0  # a terminator for st()
@@ -76,9 +71,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--target", required=True)
     ap.add_argument("--out", type=Path)
-    ap.add_argument(
-        "--check", action="store_true", help="compare only; exit 1 on a difference"
-    )
+    ap.add_argument("--check", action="store_true", help="compare only; exit 1 on a difference")
     args = ap.parse_args()
     if args.target != "bitreader":
         print(
@@ -86,21 +79,12 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    out = (
-        args.out
-        or Path(__file__).resolve().parent.parent / "core/tests/fuzz/corpus/bitreader"
-    )
+    out = args.out or Path(__file__).resolve().parent.parent / "core/tests/fuzz/corpus/bitreader"
     seeds = bitreader_seeds()
     if args.check:
-        have = (
-            {p.name: p.read_bytes() for p in out.glob("*") if p.is_file()}
-            if out.is_dir()
-            else {}
-        )
+        have = {p.name: p.read_bytes() for p in out.glob("*") if p.is_file()} if out.is_dir() else {}
         if have != seeds:
-            print(
-                f"fuzz_seed.py: {out} is stale; rerun without --check", file=sys.stderr
-            )
+            print(f"fuzz_seed.py: {out} is stale; rerun without --check", file=sys.stderr)
             return 1
         return 0
     out.mkdir(parents=True, exist_ok=True)
