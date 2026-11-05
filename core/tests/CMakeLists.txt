@@ -43,6 +43,9 @@ target_link_libraries(ovt_tests_version PRIVATE ovt::core ovt::flags ${Catch2_TA
 ovt_set_license(ovt_tests_version "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_version)
 
+# ---- Module tests ---------------------------------------------------------------------------------
+add_subdirectory(io)
+
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
 add_subdirectory(schema)
 
