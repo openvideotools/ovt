@@ -42,8 +42,6 @@ void check_schema(const Expected& e) {
   CHECK(schema->root_table()->name()->string_view() == e.root);
   CHECK(ovt::model::root_table_name(e.id) == e.root);
   CHECK(ovt::model::schema_major(e.id) == e.major);
-  // --bfbs-comments: the root table keeps its /// documentation.
-  CHECK(schema->root_table()->documentation() != nullptr);
 }
 
 }  // namespace
@@ -53,6 +51,17 @@ TEST_CASE("test_bfbs_resources: Model and Container .bfbs root tables, names and
                               Expected{SchemaId::Container, "ovt.fb.ContainerRoot", 1});
   CAPTURE(e.root);
   check_schema(e);
+}
+
+TEST_CASE("test_bfbs_resources: --bfbs-comments keeps the /// documentation", "[model][fast]") {
+  // ovt_model.fbs has no /// comments; ovt_container.fbs documents every table, e.g. ContainerRoot.
+  const auto bytes = ovt::model::bfbs(SchemaId::Container);
+  REQUIRE_FALSE(bytes.empty());
+  const reflection::Schema* schema = reflection::GetSchema(bytes.data());
+  const reflection::Object* root = schema->root_table();
+  REQUIRE(root != nullptr);
+  REQUIRE(root->documentation() != nullptr);
+  CHECK(root->documentation()->size() > 0);
 }
 
 TEST_CASE("test_bfbs_resources: Metrics .bfbs root table, name and major", "[model][fast]") {
