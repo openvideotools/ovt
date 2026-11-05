@@ -87,7 +87,7 @@ repos:
         files: (\.(c|h|cpp|hpp|mm|fbs|py|kt|kts|qml|js|cmake|sh|toml|yml|yaml|rb)|(^|/)CMakeLists\.txt)$
       - id: check-schema-in-spec
         name: core/schema/*.fbs equals its fenced block in chapter 06 (tools/check_schema_in_spec.py)
-        entry: python3 -I tools/check_schema_in_spec.py docs/spec/06-data-model.md core/schema/ovt_model.fbs
+        entry: python3 -I tools/check_schema_in_spec.py docs/spec/06-data-model.md core/schema
         language: system
         files: ^(core/schema/.*\.fbs|docs/spec/06-data-model\.md|tools/check_schema_in_spec\.py)$
         pass_filenames: false

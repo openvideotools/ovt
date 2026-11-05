@@ -106,8 +106,8 @@ jobs:
           python -I tools/check_versions_md.py
           python -I tools/check_wi_refs.py --table
 
-      - name: Schema text equals the spec (WI-0.080)
-        run: python -I tools/check_schema_in_spec.py docs/spec/06-data-model.md core/schema/ovt_model.fbs
+      - name: Schema text equals the spec (WI-0.080, WI-0.081)
+        run: python -I tools/check_schema_in_spec.py docs/spec/06-data-model.md core/schema
 
       - name: Tool tests
         run: python -m pytest -q tools/tests
