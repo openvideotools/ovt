@@ -92,13 +92,12 @@ void count_callback(const ovt_JobProgress* p, void* user) {
 ovt_status pool_task_throwing_cancelled() {
   Pool pool(2);
   std::atomic<bool> started{false};
-  ovt::jobs::JobHandle h = pool.submit("throwing", [&](Cancel& c, const Pool::ProgressSink& /*report*/) {
+  ovt::jobs::JobHandle h = pool.submit("throwing", [&](Cancel& c, const Pool::ProgressSink& /*report*/) -> ovt_status {
     started = true;
     for (;;) {
       c.throw_if_requested();
       std::this_thread::sleep_for(milliseconds(1));
     }
-    return OVT_OK;
   });
   while (!started) {
     std::this_thread::sleep_for(milliseconds(1));
