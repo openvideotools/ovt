@@ -11,15 +11,14 @@
 
 #include "ovt/status.h"
 
-// SPEC-ASSUMPTION(#4): ovt_version*() report the product version (VERSION file); OVT_API_VERSION_* is the
-// independent C API version (1.0.0) and sets the SONAME.
+// ovt_version*() report the product version (VERSION file); OVT_API_VERSION_* is the independent C API
+// version (1.0.0) and sets the SONAME (chapter 12 §12.3.2).
 
 /** Version of the C API these headers describe (semantic versioning, chapter 12 §12.3.2 policy). */
 #define OVT_API_VERSION_MAJOR 1
 #define OVT_API_VERSION_MINOR 0
 #define OVT_API_VERSION_PATCH 0
-#define OVT_API_VERSION \
-  ((OVT_API_VERSION_MAJOR << 16) | (OVT_API_VERSION_MINOR << 8) | OVT_API_VERSION_PATCH)
+#define OVT_API_VERSION ((OVT_API_VERSION_MAJOR << 16) | (OVT_API_VERSION_MINOR << 8) | OVT_API_VERSION_PATCH)
 
 #ifdef __cplusplus
 extern "C" {

@@ -22,8 +22,8 @@
 "cmake" = "LGPL-2.1-or-later"
 "third_party" = "LGPL-2.1-or-later"
 "docs" = "CC-BY-SA-4.0"
-# SPEC-ASSUMPTION(#22): §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); the
-# §15.4.2 table leaves them out. "" is the repository root, the shortest prefix of every path.
+# §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); "" is the repository root,
+# the shortest prefix of every path (§15.4.2).
 ".github" = "LGPL-2.1-or-later"
 "plugins" = "LGPL-2.1-or-later"
 "" = "LGPL-2.1-or-later"

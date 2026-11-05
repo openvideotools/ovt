@@ -8,17 +8,16 @@
 # WI-0.004: deliberate heap overflow in ASan builds, label `canary` (run with `ctest -L canary`).
 ovt_add_sanitizer_canary()
 
-# SPEC-ASSUMPTION(#11): pytest for the Python tools (chapter 14 §14.2.1) is one CTest test with label `fast`, not a CI job,
+# pytest for the Python tools (chapter 14 §14.2.1, WI-0.550) is one CTest test with label `fast`, not a CI job,
 # so the `pr` lane runs it wherever pytest is installed (tools/requirements-test.txt). Registered only when
 # pytest imports.
 find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
-  execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest"
-                  RESULT_VARIABLE _ovt_no_pytest OUTPUT_QUIET ERROR_QUIET)
+  execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest" RESULT_VARIABLE _ovt_no_pytest OUTPUT_QUIET
+                                                                                                    ERROR_QUIET)
   if(_ovt_no_pytest EQUAL 0)
-    add_test(NAME tools_pytest
-             COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider "${PROJECT_SOURCE_DIR}/tools/tests"
-             WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+    add_test(NAME tools_pytest COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
+                                       "${PROJECT_SOURCE_DIR}/tools/tests" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_tests_properties(tools_pytest PROPERTIES LABELS "fast;tools")
   else()
     message(STATUS "pytest not found for ${Python3_EXECUTABLE}: tools/tests not registered "
