@@ -4,8 +4,9 @@
 // ovt::io::RandomAccessFile: the single bounds-checked file access class of libovt-core (chapter 7 §7.1,
 // WI-1.100). C++ helper header (D22): semi-public, no ABI promise, never included from a C header.
 //
-// The public declarations below are chapter 7 §7.1.2 verbatim. The protected section (the FileInfo the
-// non-virtual info() returns) is the only addition; backends derive from this class in core/src/io/.
+// The public declarations below are chapter 7 §7.1.2 verbatim, plus [[nodiscard]] on the getters and view()
+// (clang-tidy modernize-use-nodiscard) and deleted copy/move. The protected section (the FileInfo the
+// non-virtual info() returns) is the only other addition; backends derive from this class in core/src/io/.
 
 #ifndef OVT_CXX_IO_RANDOM_ACCESS_FILE_HPP
 #define OVT_CXX_IO_RANDOM_ACCESS_FILE_HPP
@@ -48,8 +49,8 @@ class RandomAccessFile {
   RandomAccessFile(RandomAccessFile&&) = delete;
   RandomAccessFile& operator=(RandomAccessFile&&) = delete;
 
-  const FileInfo& info() const noexcept;
-  uint64_t size() const noexcept { return info().size; }
+  [[nodiscard]] const FileInfo& info() const noexcept;
+  [[nodiscard]] uint64_t size() const noexcept { return info().size; }
 
   // Copies min(len, size-offset) bytes into dst. Returns bytes copied (0 at/after EOF).
   // offset > size() → returns 0 (never throws for a short read). I/O failure → throws IoError.
@@ -62,14 +63,14 @@ class RandomAccessFile {
     std::shared_ptr<const void> keepalive;
     std::span<const uint8_t> bytes;
   };
-  virtual Holder view(uint64_t offset, size_t len) const = 0;
+  [[nodiscard]] virtual Holder view(uint64_t offset, size_t len) const = 0;
 
   // Hint only. mmap backend: madvise(MADV_WILLNEED / MADV_SEQUENTIAL / MADV_RANDOM). pread backend: no-op.
   enum class Access { Normal, Sequential, Random, WillNeed, DontNeed };
   virtual void advise(uint64_t offset, uint64_t len, Access) const noexcept = 0;
 
   // True when `view()` is zero-copy (mmap backend).
-  virtual bool is_mapped() const noexcept = 0;
+  [[nodiscard]] virtual bool is_mapped() const noexcept = 0;
 
  protected:
   explicit RandomAccessFile(FileInfo info) : info_(std::move(info)) {}
