@@ -102,6 +102,7 @@ void JobHandle::wait() {
       int expected = detail::kQueued;
       if (s.phase.compare_exchange_strong(expected, detail::kDone, std::memory_order_acq_rel)) {
         s.status = OVT_E_CANCELLED;
+        s.fn = nullptr;  // never runs; its captures may reference the caller's stack
         lock.unlock();
         s.cv.notify_all();
         return;
@@ -217,8 +218,9 @@ Pool::~Pool() {
     never_started.swap(impl_->queue);
   }
   impl_->cv.notify_all();
+  // Do not touch s->cancel here: a waiter may already have claimed a cancelled queued job, and its
+  // caller may then have freed the token. A job that never starts needs no token set.
   for (const std::shared_ptr<detail::JobState>& s : never_started) {
-    s->cancel->request();
     int expected = detail::kQueued;
     if (s->phase.compare_exchange_strong(expected, detail::kDone, std::memory_order_acq_rel)) {
       s->fn = nullptr;

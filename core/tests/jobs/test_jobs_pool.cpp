@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -115,6 +116,33 @@ std::vector<JobHandle> destroy_busy_pool() {
   return handles;  // ~Pool runs here and must not take 10 s
 }
 
+// A queued job is cancelled and claimed by its waiter, its external token is freed, and then the
+// pool is destroyed while the stale queue entry is still there. Fails under ASan if ~Pool touches
+// the freed token.
+bool destroy_pool_after_freeing_claimed_token() {
+  auto pool = std::make_unique<Pool>(1);
+  std::atomic<bool> started{false};
+  std::atomic<bool> release{false};
+  JobHandle blocker = pool->submit("block", [&](Cancel& c, const Pool::ProgressSink&) {
+    started = true;
+    while (!release && !c.requested()) {
+      std::this_thread::sleep_for(milliseconds(1));
+    }
+    return OVT_OK;
+  });
+  wait_for(started);
+  ovt_status queued_status = OVT_OK;
+  {
+    auto token = std::make_unique<Cancel>();
+    JobHandle h = pool->submit("queued", *token, [](Cancel&, const Pool::ProgressSink&) { return OVT_OK; });
+    token->request();
+    h.wait();
+    queued_status = h.status();
+  }  // token freed, as ovt_job_free would
+  pool.reset();
+  return queued_status == OVT_E_CANCELLED && blocker.done();
+}
+
 int error_lines_for_throwing_job(ovt_status& status) {
   std::atomic<int> errors{0};
   ovt::log::set_sink([&](ovt::log::Level l, std::string_view module, std::string_view, std::string_view msg) {
@@ -187,6 +215,10 @@ TEST_CASE("destroying a Pool cancels running and queued jobs and joins", "[jobs]
   CHECK(handles[0].status() == OVT_E_CANCELLED);
   CHECK(handles[1].done());
   CHECK(handles[1].status() == OVT_E_CANCELLED);
+}
+
+TEST_CASE("destroying a Pool after a claimed queued job freed its token is safe", "[jobs][fast]") {
+  CHECK(destroy_pool_after_freeing_claimed_token());
 }
 
 TEST_CASE("a throwing job logs at level 4", "[jobs][fast]") {
