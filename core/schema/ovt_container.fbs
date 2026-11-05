@@ -1,0 +1,265 @@
+// core/schema/ovt_container.fbs — container tree and derived views (ISOBMFF first; IVF/Annex B/OBU/Y4M/EBML/TS reuse the same nodes).
+// SPDX-License-Identifier: BSD-2-Clause
+// schema_version (major) = 1. Same evolution rules as ovt_model.fbs (§6.1).
+// Normative text: chapter 06 §6.4. Derivation and validation rules: chapter 08 §8.4.
+
+include "ovt_model.fbs";   // SyntaxValueKind, ByteSpan, BitSpan, Diagnostic, SyntaxNode, Codec, FrameId
+
+namespace ovt.fb;
+
+// ===================================== backbone §0.5.5 (verbatim) =====================================
+
+/// One decoded field of a box payload (ISOBMFF, EBML element or TS header); children hold nested structures and array entries.
+table Field { name:string; kind:SyntaxValueKind; uvalue:ulong; ivalue:long; svalue:string; bytes:[ubyte];
+              span:BitSpan /* relative to BoxNode.file_span.offset */; spec_ref:string; children:[Field]; }
+/// One box (or EBML element / TS structure) of the container tree with its byte span, decoded fields and children.
+table BoxNode {
+  fourcc:string; uuid:[ubyte];     // uuid set when fourcc == "uuid"
+  file_span:ByteSpan;              // whole box incl. header
+  header_length:ubyte;             // 8, 16 (largesize), +16 for uuid
+  version:short = -1; flags:int = -1;   // FullBox
+  fields:[Field];                  // decoded payload fields; empty for undecoded boxes
+  payload_span:ByteSpan;           // undecoded remainder for hex display
+  children:[BoxNode];
+  spec_ref:string; description:string;   // from registry
+  diagnostics:[Diagnostic];
+}
+/// The container tree: top-level boxes plus the per-track summaries that `ovt_stream_open` selects from (chapter 8 §8.1.1).
+table ContainerTree { format:string /* "isobmff","ivf","annexb","obu","y4m","raw","ebml","mpegts" */; root:[BoxNode]; tracks:[TrackInfo]; diagnostics:[Diagnostic]; }
+
+// ===================================== Tracks (chapter 8 §8.1.3) =====================================
+
+/// hdlr.handler_type mapped to a closed enum; `handler_fourcc` on TrackInfo keeps the written value.
+enum HandlerType : ubyte { Unknown = 0, Video = 1, Audio = 2, Subtitle = 3, Text = 4, Metadata = 5, Hint = 6, Timecode = 7, Auxiliary = 8 }
+
+/// One codec configuration child of a sample entry; `bytes` is exactly what `ovt_AnalysisDecoderApi.create()` receives as codec_private.
+table CodecPrivate { fourcc:string;        /* "avcC", "hvcC", "av1C", "vpcC", "esds", "dOps", "dvcC", "dvvC", "dvwC" */
+                     bytes:[ubyte];         /* box payload WITHOUT the 8/16-byte box header */
+                     box_offset:ulong; }    /* file offset of the box, for hex linking */
+
+/// One `tref` reference type and the track_IDs it points to.
+table TrackReference { type:string; /* "cdsc", "hint", "vdep", "tmcd", "chap", "auxl", "subt", "font", "hind", "vplx", "sbas", "scal" */ track_ids:[uint]; }
+
+/// Per-track summary built from `moov` (chapter 8 §8.1.3, WI-1.217). Derived views (SampleTable, EditList, FragmentTimeline,
+/// EncryptionInfo, HdrMetadata) are separate tables keyed by `track_id` and fetched through `ovt_container_*` (chapter 12 §12.3).
+table TrackInfo {
+  index:uint;                      // 0-based position among trak boxes in moov order (what ovt_stream_open takes)
+  track_id:uint;                   // tkhd.track_ID
+  handler:HandlerType;
+  handler_fourcc:string;           // hdlr.handler_type as written ("vide", "soun", "sbtl", "subt", "text", "meta", "hint", "tmcd", "auxv")
+  codec:Codec;                     // ovt.fb.Codec (backbone §0.5.1); Unknown for non-video
+  sample_entry_fourcc:string;      // "avc1", "hev1", "dvh1", "av01", "mp4a", "Opus", ...
+  original_format:string;          // frma.data_format when sample entry is enc*/resv; else same as sample_entry_fourcc
+  sample_entry_count:uint;         // stsd.entry_count
+  codec_string:string;             // RFC 6381 codecs= value of the first sample entry, e.g. "avc1.640028", "hvc1.2.4.L153.B0", "av01.0.08M.10.0.110.09.16.09.0" (rules: chapter 8 §8.1.3)
+  timescale:uint;                  // mdhd.timescale
+  duration:ulong;                  // mdhd.duration in timescale units (0xFFFFFFFF / all-ones = unknown)
+  duration_seconds:double;         // derived; -1 if unknown
+  movie_timescale:uint;            // mvhd.timescale
+  tkhd_duration:ulong;             // tkhd.duration (movie timescale)
+  language:string;                 // ISO 639-2/T from mdhd (3 letters) or elng if present
+  enabled:bool; in_movie:bool; in_preview:bool;   // tkhd.flags bits 0,1,2
+  width:double; height:double;     // tkhd 16.16 → double (presentation size)
+  coded_width:uint; coded_height:uint;             // VisualSampleEntry.width/height
+  matrix:[int];                    // tkhd.matrix, 9 entries, raw (16.16 / 2.30 fixed point)
+  rotation:ushort;                 // derived from matrix: 0, 90, 180 or 270 = CLOCKWISE rotation to apply when displaying (FFmpeg `rotate` tag convention: rotation = (360 - av_display_rotation_get(matrix)) mod 360, rounded to a multiple of 90). tkhd (a,b,c,d) in 16.16: (1,0,0,1) -> 0; (0,1,-1,0) -> 90 (portrait phone recording); (-1,0,0,-1) -> 180; (0,-1,1,0) -> 270. Any other matrix (flip, skew, scale) -> 0 and the raw `matrix` is left to the consumer
+  pixel_aspect:[uint];             // pasp hSpacing, vSpacing (2 entries) or empty
+  clean_aperture:[uint];           // clap: cleanApertureWidthN/D, HeightN/D, horizOffN/D, vertOffN/D (8 entries) or empty
+  channel_count:uint; sample_rate:double; sample_size:uint;   // audio
+  sample_count:ulong;              // stsz/stz2 sample_count + sum of trun sample_count over all fragments
+  bitrate_avg_bps:uint; bitrate_max_bps:uint;     // btrt avgBitrate/maxBitrate if present, else derived from sizes and durations (0 when unknown)
+  is_fragmented:bool;              // movie has mvex/trex for this track_ID
+  is_encrypted:bool;               // sample entry is enc*/ sinf present
+  edit_list_present:bool;
+  codec_private:[CodecPrivate];    // in stsd child order; first entry is what create() receives
+  avstream_index:int = -1;         // libavformat stream index after §8.1.4 matching; -1 = unmatched
+  references:[TrackReference];     // from tref
+  trak_offset:ulong;               // file offset of the trak box (link into the tree)
+  diagnostics:[Diagnostic];
+}
+
+// ===================================== Sample table (chapter 8 §8.4.1) =====================================
+
+/// One sbgp/sgpd pair expanded to a per-sample description index.
+table GroupMembership { grouping_type:string; grouping_type_parameter:uint;
+                        description_index:[uint];   /* per sample; 0 = none; ≥ 0x10001 = fragment-local (index − 0x10000 into the traf's sgpd) */
+                        sgpd_offset:ulong; }         /* file offset of the sgpd that defines the entries */
+
+/// Per-sample table, structure-of-arrays (one entry per sample in every vector unless stated). Sample indices are 0-based in OVT
+/// (ISOBMFF sample_number = index + 1). Built once per track (chapter 8 §8.4.1); fragments are appended in file order.
+table SampleTable {
+  track_id:uint; timescale:uint;
+  count:ulong;
+  dts:[long];                  // decode time, track timescale, from 0 (moov) or from tfdt (fragments)
+  cts_offset:[int];            // CTS − DTS (composition offset); 0 when no ctts/trun offsets
+  duration:[uint];
+  offset:[ulong];              // absolute file offset of the first byte of the sample
+  size:[uint];
+  is_sync:[bool];              // stss / !sample_is_non_sync_sample; all true when stss absent and not fragmented
+  is_partial_sync:[bool];      // stps (QuickTime), empty if no stps
+  sample_description_index:[ushort];  // 1-based into stsd
+  chunk_index:[uint];          // moov tables: stsc-derived chunk number (1-based); fragments: 0
+  fragment_index:[int];        // -1 for moov samples; else index into FragmentTimeline.fragments
+  sdtp:[ubyte];                // raw sdtp byte or trun sample_flags bits 4..11 packed the same way; empty if neither present
+  degradation_priority:[ushort];      // stdp / trun sample_degradation_priority; empty if absent
+  groups:[GroupMembership];
+  has_subsamples:bool;         // subs present
+  composition_to_dts_shift:long;      // cslg or derived min(cts_offset) negated when negative
+  diagnostics:[Diagnostic];
+}
+
+// ===================================== Edit list (chapter 8 §8.4.2) =====================================
+
+/// One elst entry resolved onto the presentation timeline and the samples it covers.
+table EditSegment { segment_duration:ulong /* movie timescale */; media_time:long /* track timescale; -1 empty */; media_rate:double;
+                    presentation_start:ulong; presentation_end:ulong;  /* movie timescale, cumulative */
+                    first_sample:long; last_sample:long;               /* sample indices covered, -1 if empty edit */
+                    kind:string; /* "normal", "empty", "dwell", "rate" */ }
+/// The edit list of one track with the derived presentation offset (chapter 8 §8.4.2).
+table EditList { track_id:uint; segments:[EditSegment]; total_presentation_duration:ulong;
+                 implied_start_offset:long;  /* media_time of first normal segment in track timescale; 0 = none */
+                 negative_cts_compensation:bool; /* true when the first edit removes exactly the initial composition delay */
+                 diagnostics:[Diagnostic]; }
+
+// ===================================== Fragments (chapter 8 §8.4.3) =====================================
+
+/// One trun with its resolved first-sample offset and sums.
+table TrunInfo { trun_offset:ulong; flags:uint; sample_count:uint; data_offset:int; first_sample_offset:ulong /* absolute */; duration_sum:ulong; size_sum:ulong; }
+/// One traf (tfhd + tfdt + truns) with defaults resolved against trex and the base-offset rule applied.
+table TrafInfo { track_id:uint; tfhd_flags:uint; base_data_offset:ulong; default_sample_duration:uint; default_sample_size:uint; default_sample_flags:uint;
+                 has_tfdt:bool; tfdt:ulong; computed_dts_start:ulong; /* when no tfdt */ truns:[TrunInfo]; senc_offset:ulong; saio_resolved:[ulong]; }
+/// One moof + mdat pair (14496-12 §8.8) with its sidx link and DTS continuity check.
+table FragmentInfo { index:uint; moof_offset:ulong; moof_size:ulong; mdat_offset:ulong; mdat_size:ulong; sequence_number:uint; trafs:[TrafInfo];
+                     styp_offset:long; /* -1 none */ sidx_reference_index:int; /* -1 none */ expected_dts:ulong; dts_gap:long; /* tfdt − expected; 0 ok */ }
+/// One sidx reference with the absolute byte range it resolves to and the measured size/duration (−1 unknown).
+table SidxRef { reference_type:ubyte; referenced_size:uint; subsegment_duration:uint; starts_with_sap:bool; sap_type:ubyte; sap_delta_time:uint;
+                abs_offset:ulong; abs_end:ulong; actual_size:long; /* -1 unknown */ actual_duration:long; }
+/// One sidx box.
+table SidxInfo { sidx_offset:ulong; reference_id:uint; timescale:uint; earliest_presentation_time:ulong; first_offset:ulong;
+                 refs:[SidxRef]; }
+/// All fragments of one track in file order plus the sidx boxes that reference it.
+table FragmentTimeline { track_id:uint; fragments:[FragmentInfo]; sidx:[SidxInfo]; diagnostics:[Diagnostic]; }
+
+// ===================================== Common encryption (chapter 8 §8.4.4; ISO/IEC 23001-7) =====================================
+
+/// One clear/protected pair of a subsample-encrypted sample.
+table SubsampleRange { clear_bytes:uint; protected_bytes:uint; }
+/// Per-sample encryption record after seig/tenc resolution (senc or saio/saiz addressed).
+table SampleEncryption { sample_index:ulong; is_protected:bool; kid:[ubyte]; iv:[ubyte]; /* 8 or 16 bytes (constant IV copied) */
+                         scheme:string; /* cenc,cbc1,cens,cbcs */ crypt_byte_block:ubyte; skip_byte_block:ubyte;
+                         subsamples:[SubsampleRange]; senc_entry_offset:ulong; /* file offset of this sample's IV in senc/aux data */ }
+/// One pssh box (moov or moof). `kids` is the concatenation of `kid_count` 16-byte KIDs (FlatBuffers has no vector of vectors).
+table PsshInfo { box_offset:ulong; system_id:[ubyte]; /* 16 bytes */ system_name:string; /* "Widevine","PlayReady","FairPlay","Common" from a fixed table, else "" */
+                 version:ubyte; kid_count:uint; kids:[ubyte]; /* 16 × kid_count */ data_size:uint; summary:string; location:string; /* "moov" | "moof[<index>]" */ }
+/// Track-level encryption summary (schm/tenc/frma/pssh) plus the per-sample map for the ranges requested so far.
+table EncryptionInfo { track_id:uint; scheme_type:string; scheme_version:uint; original_format:string; default_kid:[ubyte];
+                       default_iv_size:ubyte; default_is_protected:bool; default_constant_iv:[ubyte]; pattern_crypt:ubyte; pattern_skip:ubyte;
+                       pssh:[PsshInfo]; samples:[SampleEncryption]; /* may be partial: only requested ranges */ diagnostics:[Diagnostic]; }
+
+// ===================================== HDR / colour summary (chapter 8 §8.4.6) =====================================
+
+/// Final HDR classification of a track (rules: chapter 8 §8.4.6 step 3).
+enum HdrKind : ubyte { Unknown = 0, SDR = 1, HDR10 = 2, HDR10Plus = 3, HLG = 4, DolbyVision = 5, PQ_NoStatic = 6 }
+/// One place where HDR/colour information was found or looked for (box or bitstream).
+table HdrSignal { source:string; /* "colr", "mdcv", "clli", "dvcC", "dvvC", "av1C", "vpcC", "sps_vui", "sei_137", "sei_144", "sei_t35_hdr10plus", "nal_62_rpu", "obu_metadata_1", "obu_metadata_2", "obu_metadata_4" */
+                  box_offset:long; /* -1 for bitstream */ sample_index:long; /* -1 for box */ unit_index:long; present:bool; summary:string; }
+/// Container-level HDR/colour summary of one track, merged from boxes and a bounded bitstream probe (WI-1.223). Consumed by the GUI HDR
+/// panel (chapter 11 §11.3.14), `ovt probe --hdr` / `ovt info` (chapter 12) and the render colour pipeline (chapter 10).
+table HdrMetadata {
+  track_id:uint;
+  kind:HdrKind;                       // final classification (rules in chapter 8 §8.4.6)
+  color:[ubyte];                      // ovt_ColorDescription (backbone §0.5.6) as little-endian struct image, 44 bytes (incl. the leading uint32_t struct_size, D4); same convention as HdrReport.declared (§6.3) and NormalizationConfig (§6.5). Boxes win over bitstream for primaries/transfer/matrix/full_range when colr exists.
+  dv_profile:ubyte; dv_level:ubyte; dv_bl_compat_id:ubyte; dv_rpu_present:bool; dv_el_present:bool; dv_bl_present:bool;
+  hdr10plus_application_version:ubyte; hdr10plus_num_windows:ubyte;
+  signals:[HdrSignal];                // every place HDR info was found or looked for
+  box_vs_bitstream_mismatch:bool;
+  probed_samples:uint;                // how many samples were inspected (0 = box-level only)
+  diagnostics:[Diagnostic];
+}
+
+// ===================================== Raw video / Y4M format (chapter 8 §8.6.5–§8.6.6) =====================================
+
+/// Pixel format of a headerless raw YUV file or a Y4M stream (grammar of `pix_fmt`: chapter 8 §8.6.6); one per file.
+table RawVideoFormat { width:uint; height:uint; pix_fmt:string; fps_num:uint; fps_den:uint;
+                       chroma_format:ubyte; bit_depth:ubyte; little_endian:bool; planar:bool; interleaved_uv:bool; /* nv12/nv21/p010 */
+                       frame_bytes:ulong; frame_count:ulong; header_bytes:ulong; /* skipped prefix, e.g. 0 */
+                       color:[ubyte]; /* ovt_ColorDescription struct image (44 bytes, §0.5.6 with struct_size); empty when unknown */ }
+
+// ===================================== HEIF / AVIF items (chapter 8 §8.3.6, WI-1.214 / WI-4.213; phase 4) =====================================
+
+/// One `iref` edge: this item references `to_item_id` with the 4CC `type` (`dimg`, `thmb`, `auxl`, `cdsc`, …).
+table ItemReference { type:string; to_item_id:uint; }
+/// One `meta` item (`iinf`/`infe` + `iloc` + `ipma`/`ipco`), derived once per file; `ContainerRoot.items`.
+table ItemInfo { item_id:uint; type:string; /* infe item_type 4CC, "mime" or "uri " */ name:string;
+                 properties:[string];        /* ipco property 4CCs associated through ipma, in association order */
+                 extents:[ByteSpan];         /* iloc extents resolved to absolute file spans (construction_method 0/1) */
+                 references:[ItemReference]; is_primary:bool; is_hidden:bool;
+                 derived_of:[uint];          /* `dimg` source item ids for grid/iden/iovl items */
+                 width:uint; height:uint; }  /* from ispe when present; 0 otherwise */
+
+// ===================================== MPEG-TS derived views (chapter 8 §8.6.7, WI-4.206/4.207; phase 4) =====================================
+
+table TsPcrPoint   { packet_index:ulong; pcr:ulong; }                      /* 27 MHz PCR at the given 188/192/204-byte packet */
+table TsPtsPoint   { pid:ushort; packet_index:ulong; pts:long = -1; dts:long = -1; }   /* 90 kHz; -1 absent */
+table TsPidBitrate { pid:ushort; window_ms:uint; bps:[uint]; }             /* bitrate per window */
+/// PCR/PTS/DTS timing and per-PID bitrate of one transport stream (`ContainerRoot.ts_timing`).
+table TsTiming { pcr:[TsPcrPoint]; pts_dts:[TsPtsPoint]; bitrate_per_pid:[TsPidBitrate]; pcr_pid:ushort; packet_size:ubyte; }
+table TsCheck { id:string; /* ETSI TR 101 290 check id, e.g. "1.1" */ name:string; count:ulong; first_packet_index:ulong; first_offset:ulong; }
+/// TR 101 290 priority-1/2 report of one transport stream (`ovt probe --tr101290`, chapter 12 §12.2.2; `ContainerRoot.ts_report`).
+table TsReport { checks:[TsCheck]; packets:ulong; diagnostics:[Diagnostic]; }
+
+// ===================================== DASH / HLS virtual file (chapter 8 §8.6.7, phase 4) =====================================
+
+/// Parsed manifest (DASH MPD or HLS master + media playlists) before representation selection; `DashHlsContext.manifest` (WI-4.208/4.209).
+table ManifestSegment { url:string; byte_range:ByteSpan; /* length 0 = whole resource */ start_time:long = -1; duration:long = -1; number:long = -1; is_init:bool; }
+table ManifestEncryption { method:string; /* "cenc", "cbcs", "AES-128", "SAMPLE-AES", … */ key_uri:string; iv:[ubyte]; default_kid:[ubyte]; }
+table ManifestRepresentation { id:string; bandwidth:uint; codecs:string; mime_type:string; width:uint; height:uint; frame_rate:string;
+                               video_range:string; /* HLS VIDEO-RANGE: "SDR", "PQ", "HLG" */ timescale:uint; segments:[ManifestSegment]; encryption:[ManifestEncryption]; }
+table ManifestAdaptationSet { id:string; content_type:string; lang:string; representations:[ManifestRepresentation]; }
+table ManifestPeriod { id:string; start:long = -1; duration:long = -1; adaptation_sets:[ManifestAdaptationSet]; }
+table Manifest { kind:string; /* "dash-mpd" | "hls-m3u8" */ url:string; periods:[ManifestPeriod]; /* HLS: one period, one adaptation set per media type */
+                 encryption:[ManifestEncryption]; /* manifest-level keys (HLS #EXT-X-KEY, DASH ContentProtection) */ diagnostics:[Diagnostic]; }
+
+/// One segment of a virtual file: where it came from and where it sits in the concatenated byte space.
+table SegmentRef { url:string; byte_range:ByteSpan; /* length 0 = whole resource */ virtual_span:ByteSpan; /* position in the virtual concatenated file */
+                   kind:ubyte; /* 0 init, 1 media, 2 index (sidx) */ time:long = -1; duration:long = -1; /* segment timeline, in timescale */ number:long = -1; /* $Number$ */ }
+/// How a logical stream was assembled from a DASH MPD or HLS playlist (null for local files).
+table DashHlsContext {
+  manifest_url:string; manifest_kind:string;      // "dash-mpd" | "hls-m3u8"
+  period_id:string; adaptation_set_id:string; representation_id:string;   // DASH
+  variant_uri:string; rendition_group_id:string;  // HLS
+  timescale:uint; presentation_time_offset:long;
+  bandwidth:uint; codecs:string; mime_type:string;
+  segments:[SegmentRef];                           // in virtual-file order; segments[0] is the init segment
+  manifest_text:string;                            // the MPD / playlist as fetched (for display); may be truncated to 1 MiB
+  manifest:Manifest;                               // parsed form (phase 4, WI-4.208/4.209); null until the virtual file layer is built
+  fetched_at_unix:long;                            // metadata only (not part of any analysis record)
+}
+
+// ===================================== Root =====================================
+
+/// File-level root written to the cache (`container.fb.zst`, §6.7) and emitted by `ovt probe -f fb`. Derived views are stored once per
+/// track that has them and are matched to `tree.tracks[]` by `track_id`; absent vectors mean "not built yet" (lazy, chapter 8 §8.4).
+table ContainerRoot {
+  schema_version:uint;             // = 1
+  tree:ContainerTree;
+  file_size:ulong; file_name:string;  // basename only (no directories, determinism)
+  source_hash:[ubyte];             // same 32-byte hash as StreamIndex.source_hash
+  brands:[string];                 // ftyp major_brand then compatible_brands; styp brands excluded
+  is_fragmented:bool; is_cmaf:bool; has_sidx:bool; has_mfra:bool; is_encrypted:bool;
+  sample_tables:[SampleTable];
+  edit_lists:[EditList];
+  fragment_timelines:[FragmentTimeline];
+  encryption:[EncryptionInfo];
+  hdr:[HdrMetadata];
+  raw_format:RawVideoFormat;       // y4m / raw only; null otherwise
+  dash_hls:DashHlsContext;         // null for local files
+  items:[ItemInfo];                // HEIF/AVIF `meta` items (chapter 8 §8.3.6); empty for non-HEIF files
+  ts_timing:TsTiming;              // MPEG-TS only (phase 4); null otherwise
+  ts_report:TsReport;              // MPEG-TS TR 101 290 report (phase 4); null otherwise
+  diagnostics:[Diagnostic];
+}
+
+root_type ContainerRoot;
+file_identifier "OVTC";
+file_extension "fc";

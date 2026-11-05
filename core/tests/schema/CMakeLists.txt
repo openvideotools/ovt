@@ -19,8 +19,9 @@ find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
   set(_ovt_import_check
       "import importlib.util, sys; sys.exit(77) if importlib.util.find_spec('flatbuffers') is None else None")
-  add_test(NAME schema_python_import COMMAND "${Python3_EXECUTABLE}" -c
-                                             "${_ovt_import_check}; import ovt.fb.FrameAnalysis, ovt.fb.smoke.Record")
+  add_test(NAME schema_python_import
+           COMMAND "${Python3_EXECUTABLE}" -c
+                   "${_ovt_import_check}; import ovt.fb.FrameAnalysis, ovt.fb.ContainerRoot, ovt.fb.smoke.Record")
   set_tests_properties(schema_python_import PROPERTIES ENVIRONMENT "PYTHONPATH=${OVT_GENERATED_DIR}/python" LABELS
                                                        "fast;schema" SKIP_RETURN_CODE 77)
 endif()
@@ -41,3 +42,31 @@ add_test(NAME test_model_schema_generated_outputs
          COMMAND "${CMAKE_COMMAND}" -D "OVT_GENERATED_DIR=${OVT_GENERATED_DIR}" -P
                  "${CMAKE_CURRENT_SOURCE_DIR}/check_generated_outputs.cmake")
 set_tests_properties(test_model_schema_generated_outputs PROPERTIES LABELS "fast;unit;schema")
+
+# ---- WI-0.081: test_container_schema. Acceptance test 2 compares the §6.4 table list with the compiled
+# .bfbs, so this test compiles both schemas to binary schemas with the same flatc that ovt_schemas uses.
+# The files stay in this test's build directory: embedding .bfbs in ovt_core is WI-0.083's job
+# (cmake/OvtFlatBuffers.cmake), not this test's.
+
+set(_ovt_schema_dir "${PROJECT_SOURCE_DIR}/core/schema")
+set(_ovt_test_bfbs "")
+foreach(_stem IN ITEMS ovt_model ovt_container)
+  add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/bfbs/${_stem}.bfbs"
+    COMMAND "${OVT_FLATC_EXECUTABLE}" --binary --schema --reflect-names -I "${_ovt_schema_dir}" -o
+            "${CMAKE_CURRENT_BINARY_DIR}/bfbs" "${_ovt_schema_dir}/${_stem}.fbs"
+    DEPENDS "${_ovt_schema_dir}/ovt_model.fbs" "${_ovt_schema_dir}/ovt_container.fbs"
+    COMMENT "flatc: ${_stem}.fbs -> ${_stem}.bfbs (test_container_schema)"
+    VERBATIM)
+  list(APPEND _ovt_test_bfbs "${CMAKE_CURRENT_BINARY_DIR}/bfbs/${_stem}.bfbs")
+endforeach()
+add_custom_target(test_container_schema_bfbs DEPENDS ${_ovt_test_bfbs})
+
+add_executable(test_container_schema test_container_schema.cpp)
+add_dependencies(test_container_schema test_container_schema_bfbs)
+target_link_libraries(test_container_schema PRIVATE ovt_schemas ovt::flags ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  test_container_schema PRIVATE "OVT_MODEL_BFBS_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/bfbs/ovt_model.bfbs\""
+                                "OVT_CONTAINER_BFBS_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/bfbs/ovt_container.bfbs\"")
+ovt_set_license(test_container_schema "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_container_schema)
