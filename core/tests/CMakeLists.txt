@@ -54,6 +54,7 @@ add_subdirectory(io)
 add_subdirectory(bitreader)
 add_subdirectory(log)
 add_subdirectory(model)
+add_subdirectory(syntax)
 
 # ---- Schema code generation (WI-0.003) ---------------------------------------------------------------
 add_subdirectory(schema)
