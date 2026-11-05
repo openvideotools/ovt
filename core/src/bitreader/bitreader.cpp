@@ -31,8 +31,12 @@ constexpr unsigned kSingleStepWidth = 57;
 constexpr unsigned kMaxUeLeadingZeros = 31;
 constexpr size_t kMaxStringBytes = 65535;
 
-// H.264 Table 9-4: codeNum → coded_block_pattern. Column (a) for ChromaArrayType 1 or 2, column (b) for
-// ChromaArrayType 0 or 3; each with the Intra_4x4/Intra_8x8 and the Inter prediction mode.
+// Source: ITU-T Rec. H.264 (08/2021), clause 9.1.2 "Mapping process for coded block pattern", Table 9-4
+// "Assignment of codeNum to values of coded_block_pattern for macroblock prediction modes"
+// (https://www.itu.int/rec/T-REC-H.264; the edition pinned by spec appendix B). The values are copied from
+// that table, not from any decoder. Table 9-4(a) is for ChromaArrayType 1 or 2 (kCbp*Chroma, codeNum 0..47),
+// Table 9-4(b) for ChromaArrayType 0 or 3 (kCbp*Mono, codeNum 0..15). The Intra column applies to the
+// Intra_4x4 and Intra_8x8 prediction modes, the Inter column to Inter. Array index = codeNum.
 constexpr std::array<uint8_t, 48> kCbpIntraChroma = {47, 31, 15, 0,  23, 27, 29, 30, 7,  11, 13, 14, 39, 43, 45, 46,
                                                      16, 3,  5,  10, 12, 19, 21, 26, 28, 35, 37, 42, 44, 1,  2,  4,
                                                      8,  17, 18, 20, 24, 6,  9,  22, 25, 32, 33, 34, 36, 40, 38, 41};
