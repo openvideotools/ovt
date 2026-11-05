@@ -1,8 +1,63 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Licence policy (chapter 15 §15.4.2). WI-0.601 writes only the [directories] table; WI-0.602 adds the
-# allow/deny lists, [distribution], [vcpkg_overrides], [gradle_license_names] and [[exceptions]].
+# Licence policy (chapter 15 §15.4.2), read by tools/license_gate.py with tomllib. WI-0.601 wrote
+# [directories]; WI-0.602 added the rest. Explanation of every table: docs/dev/license-gate.md.
+# Adding a permissive or weak-copyleft licence is a one-line change reviewed by a licence reviewer (§15.4.1).
+schema_version = 1
+
+[deny]                      # regex on SPDX ids (case-insensitive); any match anywhere fails
+patterns = [
+  "^AGPL", "^SSPL", "^BUSL", "^Elastic-2", "Commons-Clause", "^CC-BY-NC", "NonCommercial",
+  "LicenseRef-.*(NC|Proprietary|Evaluation)", "^JSON$", "^Hippocratic",
+]
+
+[allow]
+# Most-permissive-first ordering used to resolve SPDX `OR` expressions (algorithm step 1).
+# An `OR` alternative whose id is not in this list cannot be chosen; if no alternative is listed -> E-UNKNOWN.
+permissiveness = [
+  "0BSD", "Unlicense", "CC0-1.0", "WTFPL", "MIT-0", "MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent",
+  "Zlib", "libpng-2.0", "BSL-1.0", "NCSA", "Beerware", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MPL-2.0",
+  "LGPL-2.1-or-later", "LGPL-2.1-only", "LGPL-3.0-or-later", "LGPL-3.0-only",
+  "GPL-2.0-or-later", "GPL-3.0-or-later", "GPL-3.0-only", "GPL-2.0-only",
+  # SPEC-ASSUMPTION(#31): ids below are allowed in `any` but were missing from the §15.4.2 ordering, so an OR
+  # containing them could never be chosen; they rank with their closest siblings.
+  "LicenseRef-AOM-Patent-License-1.0", "GPL-3.0-only WITH Bison-exception-2.2",
+  "GPL-3.0-or-later WITH Autoconf-exception-3.0", "OFL-1.1", "CC-BY-4.0", "CC-BY-SA-4.0",
+]
+
+[allow.any]                 # permitted in any directory/target
+ids = [
+  "MIT", "MIT-0", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent", "ISC", "Zlib", "libpng-2.0", "BSL-1.0",
+  "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MPL-2.0", "CC0-1.0", "Unlicense", "0BSD",
+  # WTFPL (zimg): permissive, not OSI-approved; some corporate scanners flag it. Allowed by owner decision.
+  "WTFPL",
+  "Beerware",
+  "LGPL-2.1-or-later", "LGPL-2.1-only", "LicenseRef-AOM-Patent-License-1.0",
+  # SPDX 3.x spellings; the deprecated `GPL-3.0-with-bison-exception` / `GPL-3.0-with-autoconf-exception` are rejected.
+  "GPL-3.0-only WITH Bison-exception-2.2",
+  "GPL-3.0-or-later WITH Autoconf-exception-3.0",
+  "NCSA", "OFL-1.1", "CC-BY-4.0", "CC-BY-SA-4.0",
+]
+
+[allow.gpl_targets]         # additionally permitted for targets whose own licence is GPL-3.0-or-later (cli, app, android, python)
+ids = ["GPL-3.0-only", "GPL-3.0-or-later", "GPL-2.0-or-later", "LGPL-3.0-only", "LGPL-3.0-or-later"]
+# `GPL-2.0-only OR GPL-3.0-only` (KDDockWidgets) is an expression, not an id: the OR rule picks GPL-3.0-only.
+
+[allow.plugin_targets]      # per-plugin own licence must be one of these; a plugin's link graph must be compatible with its own licence
+ids = ["BSD-2-Clause", "BSD-3-Clause", "LGPL-2.1-or-later", "LGPL-3.0-or-later", "GPL-2.0-or-later", "GPL-3.0-or-later"]
+
+[targets]                   # own licence per target (must match ovt_set_license)
+ovt_core = "LGPL-2.1-or-later"
+ovt_render = "LGPL-2.1-or-later"
+ovt_cli = "GPL-3.0-or-later"
+ovt_cli_lib = "GPL-3.0-or-later"
+ovt_studio = "GPL-3.0-or-later"
+ovt_py = "GPL-3.0-or-later"
+ovt_plugin_aom = "BSD-2-Clause"
+ovt_plugin_de265 = "LGPL-3.0-or-later"
+ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
+ovt_plugin_hm = "BSD-3-Clause"
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
@@ -22,8 +77,40 @@
 "cmake" = "LGPL-2.1-or-later"
 "third_party" = "LGPL-2.1-or-later"
 "docs" = "CC-BY-SA-4.0"
-# SPEC-ASSUMPTION(#22): §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); the
-# §15.4.2 table leaves them out. "" is the repository root, the shortest prefix of every path.
+# §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); "" is the repository root,
+# the shortest prefix of every path (§15.4.2).
 ".github" = "LGPL-2.1-or-later"
 "plugins" = "LGPL-2.1-or-later"
 "" = "LGPL-2.1-or-later"
+
+[distribution]              # artefact rules (ADR-015); artefact ids are those of tools/release/manifest.toml (chapter 13 §13.8.1)
+default_download_forbidden_plugins = ["ovt_plugin_ffmpeg", "ovt_plugin_de265", "ovt_plugin_hm"]
+codec_pack_plugins = ["ovt_plugin_ffmpeg", "ovt_plugin_de265"]
+required_notices = ["LICENSES/LicenseRef-AOM-Patent-License-1.0.txt", "THIRD_PARTY_NOTICES.md"]
+
+[vcpkg_overrides]           # ports whose vcpkg.spdx.json says NOASSERTION; reviewed by a licence reviewer
+# zimg = "WTFPL"
+
+[gradle_license_names]      # free-text licence names of the Gradle report -> SPDX id
+"The Apache Software License, Version 2.0" = "Apache-2.0"
+"Apache License, Version 2.0" = "Apache-2.0"
+"Apache-2.0" = "Apache-2.0"
+
+[pip_overrides]             # Python packages whose installed metadata has no usable licence field
+# SPEC-ASSUMPTION(#31): the spec names the pip input but not how a requirements file yields licences.
+
+# SPEC-ASSUMPTION(#31): several Licence cells of third_party/VERSIONS.md carry prose next to the SPDX id, which the gate
+# cannot parse. Rather than editing the pins file (a protected area) the reviewed expression is recorded here, by Name.
+[versions_overrides]
+FFmpeg = "LGPL-2.1-or-later OR GPL-2.0-or-later"     # core flavour is LGPL; GPL only in the plugin flavour (OVT_FFMPEG_GPL)
+Qt = "LGPL-3.0-only AND GPL-3.0-only"                # most modules LGPL-3.0-only, qtgraphs GPL-3.0-only (ADR-002)
+
+[versions_skip]             # rows whose Licence cell is not a redistributed licence: build-only tools and test data
+names = ["Android NDK", "Conformance corpora"]
+
+# [[exceptions]]            # explicit, reviewed, expiring; none today. Entry shape:
+# id = "GPL-2.0-only"
+# where = "tests/oracles/bento4"                    # prefix of a finding's `where`
+# reason = "oracle binary invoked as subprocess, never linked"
+# expires = "2027-06-30"
+# approved_by = ["<maintainer>", "<maintainer>"]

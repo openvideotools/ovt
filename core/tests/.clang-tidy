@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Test code (WI-0.559). Same list as the parent, minus the checks that fight test idiom: indexing argv and
+# fixture buffers directly, unchecked std::optional after a REQUIRE, recursion in small helpers, discarded
+# stdio results. The checks are about production code paths; bugprone-*, cert-* (otherwise) and
+# clang-analyzer-* still apply here.
+# SPEC-ASSUMPTION(#29): §14.8.2 does not say whether tests are analysed; they are, with this relaxation.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -bugprone-unchecked-optional-access,
+  -cert-err33-c,
+  -misc-no-recursion,
+  -misc-const-correctness,
+  -modernize-return-braced-init-list

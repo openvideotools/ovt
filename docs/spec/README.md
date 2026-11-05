@@ -1,4 +1,4 @@
-# Open Video Tools: specification (1.0-rc1, 2026-11-04)
+# Open Video Tools: specification (1.0-rc2, 2026-11-04)
 
 This folder holds the Requirements and Architecture Specification for Open Video Tools (OVT), one file per chapter. It is the single source of truth for building OVT. Agents follow the reading rule in the repository's `CLAUDE.md` and never load the whole specification.
 
