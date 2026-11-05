@@ -94,6 +94,11 @@ repos:
         language: system
         files: ^(third_party/|tools/versions_to_cmake\.py|tools/check_versions_md\.py)
         pass_filenames: false
+      - id: check-patches
+        name: decoder patch headers and Upstream-Status ageing (tools/check_patches.py)
+        entry: python3 -I tools/check_patches.py
+        language: system
+        files: (^|/)patches/.*\.patch$
       - id: check-wi-refs
         name: commit message references a WI id or an issue
         entry: python3 -I tools/check_wi_refs.py --commit-msg
