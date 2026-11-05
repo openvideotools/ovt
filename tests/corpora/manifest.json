@@ -145,8 +145,9 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted \u2014 do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/BA1_Sony_D.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/BA1_Sony_D.zip",
+      "sha256": "399eae2eb03f82fc291bdc4fe9cedd110b40a96368ffe1e1bcf9ff6436fa9df7",
+      "size_bytes": 1766668,
       "codecs": [
         "h264"
       ],
@@ -158,7 +159,7 @@
       ],
       "extract": {
         "archive": "auto",
-        "member": "BA1_Sony_D.264"
+        "member": "BA1_Sony_D.jsv"
       }
     },
     {
@@ -167,8 +168,9 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted \u2014 do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/CABA1_SVA_B.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CABA1_SVA_B.zip",
+      "sha256": "d0cf94006df2319a6c98683a6013f85ea5a1c0d382c796523b751c263e8c8989",
+      "size_bytes": 960760,
       "codecs": [
         "h264"
       ],
@@ -190,7 +192,8 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/AMP_A_Samsung_7.zip",
-      "unverified": true,
+      "sha256": "3b8c7e4f77759351893470d87cd5c8252146ae19523786510914a9e8d5c7e340",
+      "size_bytes": 266095,
       "codecs": [
         "h265"
       ],
@@ -202,8 +205,8 @@
       ],
       "extract": {
         "archive": "auto",
-        "member": "AMP_A_Samsung_7.bit",
-        "md5_member": "AMP_A_Samsung_7_yuv.md5"
+        "member": "AMP_A_Samsung_7.bin",
+        "md5_member": "AMP_A_Samsung_7.md5"
       },
       "features": [
         "amp",
@@ -216,8 +219,9 @@
       "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
       "licence_spdx": "LicenseRef-MPEG-Conformance",
       "redistributable": false,
-      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/master/data/file_features/published/isobmff/a1-foreman-QCIF.mp4",
-      "unverified": true,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067/data/file_features/published/isobmff/a1-foreman-QCIF.mp4",
+      "sha256": "cad789a5b38cd4fd6dbe9b8a24a1b4df06d9a5104f4ee48c1a08e587654b41eb",
+      "size_bytes": 475988,
       "codecs": [
         "h264"
       ],
@@ -273,8 +277,9 @@
       "licence": "BSD-2-Clause-Patent (vmaf repository)",
       "licence_spdx": "BSD-2-Clause-Patent",
       "redistributable": true,
-      "url": "https://raw.githubusercontent.com/Netflix/vmaf/master/python/test/resource/yuv/src01_hrc00_576x324.yuv",
-      "unverified": true,
+      "url": "https://raw.githubusercontent.com/Netflix/vmaf_resource/5e7b853baf97cea275ce8175d80c6f3c817169d4/python/test/resource/yuv/src01_hrc00_576x324.yuv",
+      "sha256": "e04985582622186fa7533e0115e473845d3360c91c77994a10d2220f0642aae1",
+      "size_bytes": 13436928,
       "codecs": [],
       "containers": [
         "raw"
@@ -298,8 +303,9 @@
       "licence": "BSD-2-Clause-Patent (vmaf repository)",
       "licence_spdx": "BSD-2-Clause-Patent",
       "redistributable": true,
-      "url": "https://raw.githubusercontent.com/Netflix/vmaf/master/python/test/resource/yuv/src01_hrc01_576x324.yuv",
-      "unverified": true,
+      "url": "https://raw.githubusercontent.com/Netflix/vmaf_resource/5e7b853baf97cea275ce8175d80c6f3c817169d4/python/test/resource/yuv/src01_hrc01_576x324.yuv",
+      "sha256": "7d420a485c1da6b341fd9c3c86f24aaa46e1adb0fa4b214aacaa730ec99dfae1",
+      "size_bytes": 13436928,
       "codecs": [],
       "containers": [
         "raw"
@@ -316,6 +322,44 @@
           "frames": 48
         }
       }
+    },
+    {
+      "id": "mpegff_video_cenc_128iv",
+      "source": "mpegff",
+      "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
+      "licence_spdx": "LicenseRef-MPEG-Conformance",
+      "redistributable": false,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067/data/file_features/under_consideration/cenc/video_cenc_128iv.mp4",
+      "sha256": "992761f16ae8375c46ed64c47fb2ca1c5ce7c0c009617e764257747cf511a80b",
+      "size_bytes": 134037,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "mpegff_video_cenc_roll_frag1s",
+      "source": "mpegff",
+      "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
+      "licence_spdx": "LicenseRef-MPEG-Conformance",
+      "redistributable": false,
+      "url": "https://media.githubusercontent.com/media/MPEGGroup/FileFormatConformance/767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067/data/file_features/under_consideration/cenc/video_cenc_roll_frag1s.mp4",
+      "sha256": "ba61a9b8acb9045c895b6d58dafedd559a3c3195cea09914cecca5060d36f2ab",
+      "size_bytes": 134554,
+      "codecs": [
+        "h264"
+      ],
+      "containers": [
+        "isobmff"
+      ],
+      "tags": [
+        "fast"
+      ]
     }
   ]
 }
