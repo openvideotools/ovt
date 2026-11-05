@@ -60,8 +60,9 @@ TEST_CASE("test_bfbs_resources: --bfbs-comments keeps the /// documentation", "[
   const reflection::Schema* schema = reflection::GetSchema(bytes.data());
   const reflection::Object* root = schema->root_table();
   REQUIRE(root != nullptr);
-  REQUIRE(root->documentation() != nullptr);
-  CHECK(root->documentation()->size() > 0);
+  const auto* doc = root->documentation();
+  REQUIRE(doc != nullptr);
+  CHECK(doc->begin() != doc->end());  // non-empty; flatbuffers::Vector has no empty() before 23.x
 }
 
 TEST_CASE("test_bfbs_resources: Metrics .bfbs root table, name and major", "[model][fast]") {
