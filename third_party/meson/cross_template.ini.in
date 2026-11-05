@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Meson cross file template of ovt_tp_meson() (chapter 13 §13.3.5, WI-0.011). cmake/OvtMeson.cmake fills the
+# OVT_MESON_* placeholders from the active CMake toolchain with configure_file(@ONLY) and writes
+# <binary>/third_party/<name>-cross.ini. Every list value is already a Meson array body ('a', 'b').
+[binaries]
+c = [@OVT_MESON_C@]
+cpp = [@OVT_MESON_CXX@]
+ar = [@OVT_MESON_AR@]
+strip = [@OVT_MESON_STRIP@]
+pkg-config = [@OVT_MESON_PKG_CONFIG@]
+
+[host_machine]
+system = '@OVT_MESON_SYSTEM@'
+cpu_family = '@OVT_MESON_CPU_FAMILY@'
+cpu = '@OVT_MESON_CPU@'
+endian = 'little'
+
+[built-in options]
+c_args = [@OVT_MESON_C_ARGS@]
+cpp_args = [@OVT_MESON_CXX_ARGS@]
+c_link_args = [@OVT_MESON_LINK_ARGS@]
+cpp_link_args = [@OVT_MESON_LINK_ARGS@]
+pkg_config_path = [@OVT_MESON_PKG_CONFIG_PATH@]
+
+[properties]
+needs_exe_wrapper = @OVT_MESON_NEEDS_EXE_WRAPPER@
