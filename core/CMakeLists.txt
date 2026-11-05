@@ -94,6 +94,20 @@ foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET}
 endforeach()
 unset(_dep)
 
+# Module sources (WI-1.100 onwards) compile once into the OBJECT library ovt_core_objects, which ovt_core
+# absorbs. The unit tests of core/tests/<module>/ link ovt_core_objects directly: ovt_core is built with
+# hidden visibility and exports only the C API (chapter 12 §12.3.2), so the C++ classes of the modules are
+# not reachable through the shared library. SPEC-ASSUMPTION(#62): this layout.
+add_library(ovt_core_objects OBJECT)
+target_include_directories(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+                                                   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>")
+# size_t/off_t are 64-bit everywhere (chapter 7 WI-1.100 notes).
+target_compile_definitions(ovt_core_objects PUBLIC "$<$<PLATFORM_ID:Linux>:_FILE_OFFSET_BITS=64>")
+find_package(Threads REQUIRED)
+target_link_libraries(ovt_core_objects PUBLIC Threads::Threads PRIVATE ovt::flags)
+ovt_set_license(ovt_core_objects "${OVT_CORE_LICENSE}")
+target_link_libraries(ovt_core PRIVATE ovt_core_objects)
+
 # FlatBuffers schemas and their generated code: target ovt_schemas (WI-0.003).
 add_subdirectory(schema)
 
