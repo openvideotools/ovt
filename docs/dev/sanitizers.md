@@ -5,11 +5,25 @@ from WI-0.031; this page covers how third-party code is built and how a suppress
 
 | Preset | Sanitizers | Runtime options |
 |---|---|---|
-| `linux-x64-asan-ubsan`, `macos-arm64-asan` | `-fsanitize=address,undefined` | `ASAN_OPTIONS` and `UBSAN_OPTIONS` of the `asan-env` test preset |
+| `linux-x64-asan-ubsan` | `-fsanitize=address,undefined` | `ASAN_OPTIONS` and `UBSAN_OPTIONS` of the `asan-env` test preset |
+| `macos-arm64-asan` | `-fsanitize=address,undefined` | the `asan-env-macos` test preset: as `asan-env`, plus `detect_leaks=0` and `detect_container_overflow=0` (see below) |
 | `linux-x64-tsan` | `-fsanitize=thread` | `TSAN_OPTIONS=halt_on_error=1 suppressions=tests/tsan.supp` |
 
 Run the lane locally with `tools/ctest.sh sanitizers` (or `ctest --preset sanitizers`). Run the canary with
 `ctest --preset sanitizers -L canary`; it must fail, otherwise ASan is not active.
+
+## macOS differences
+
+Two `ASAN_OPTIONS` differ on macOS arm64, because the default ones abort every instrumented binary there:
+
+- `detect_leaks=0`: Apple's ASan runtime has no LeakSanitizer on arm64 and aborts at start-up with
+  `AddressSanitizer: detect_leaks is not supported on this platform`. CTest's Catch2 discovery then fails too, so
+  the unit tests are not even registered. Leaks are checked on Linux only.
+- `detect_container_overflow=0`: libc++ annotates `std::vector` for ASan, and the vcpkg packages (Catch2 among them)
+  are built without `-fsanitize`. Where instrumented and plain code share a vector, ASan reports a false
+  `container-overflow` (<https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow>). Linux uses
+  libstdc++, which does not annotate by default, so it keeps the check. Building the vcpkg packages with ASan
+  (a sanitizer triplet) would let macOS turn the check back on.
 
 ## Third-party code is sanitized too
 
