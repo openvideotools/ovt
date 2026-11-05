@@ -55,10 +55,8 @@ class Result {
 template <>
 class Result<void> {
  public:
-  static Result ok() { return Result(OVT_OK, {}); }
-  static Result error(ovt_status s, std::string msg) {
-    return Result(s == OVT_OK ? OVT_E_INTERNAL : s, std::move(msg));
-  }
+  static Result ok() { return {OVT_OK, {}}; }
+  static Result error(ovt_status s, std::string msg) { return {s == OVT_OK ? OVT_E_INTERNAL : s, std::move(msg)}; }
 
   [[nodiscard]] bool has_value() const noexcept { return status_ == OVT_OK; }
   explicit operator bool() const noexcept { return has_value(); }

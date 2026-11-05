@@ -33,6 +33,7 @@ extern "C" {
  * the pointer given to ovt_set_logger(). The callback MAY be invoked from any thread, concurrently, and
  * MUST NOT call back into OVT or throw (chapter 12 §12.3.1 rules 4 and 8).
  */
+/* NOLINTNEXTLINE(modernize-use-using): a C11 header */
 typedef void (*ovt_log_fn)(int level, const char* module, const char* msg, void* user);
 
 /**
