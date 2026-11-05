@@ -153,6 +153,7 @@ a malformed hash.
 `tools/apply_patches.py` checks every patch (`git apply --check`) before applying any, requires an
 `Upstream-Status:` header, and writes a `.ovt-patched` marker holding the series hash, so a rebuild does not
 apply the patches a second time.
+The header fields every patch carries, and the `Pending` ageing rule, are in [patches.md](patches.md).
 
 ### Filling hashes and building offline
 
