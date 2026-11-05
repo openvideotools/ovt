@@ -76,6 +76,15 @@ runs:
         echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
         exit 1
 
+    - name: Python tools (meson for the third_party Meson builds)
+      shell: bash
+      run: |
+        # A venv works on the hosted images and on the self-hosted Mac (whose Homebrew Python refuses
+        # system-wide pip installs). tools/requirements.txt pins meson (chapter 13 §13.3.5).
+        python3 -m venv "${RUNNER_TEMP}/ovt-venv"
+        "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt
+        echo "${RUNNER_TEMP}/ovt-venv/bin" >> "$GITHUB_PATH"
+
     - name: vcpkg checkout and bootstrap
       shell: bash
       run: |
