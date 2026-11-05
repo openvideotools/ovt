@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Fixture for the E-DIST tests of tools/license_gate.py: a release manifest in the shape of
+# chapter 13 §13.8.1. `bad-default` puts a codec-pack plugin into a default download.
+schema_version = 1
+
+[artifacts.good-default]
+platform = "macos"
+arch = "arm64"
+kind = "dmg"
+preset = "macos-arm64-release"
+file = "OVT-Studio-{version}-arm64.dmg"
+components = ["ovt_core", "ovt_plugin_aom", "ffmpeg-core"]
+default_download = true
+codec_pack = false
+notices = true
+sign = "developer-id"
+
+[artifacts.good-codec-pack]
+platform = "macos"
+arch = "arm64"
+kind = "zip"
+preset = "macos-arm64-release"
+file = "ovt-codec-pack-{version}-macos-arm64.zip"
+components = ["ovt_plugin_ffmpeg", "ovt_plugin_de265"]
+default_download = false
+codec_pack = true
+notices = true
+sign = "developer-id"
+
+[artifacts.bad-default]
+platform = "linux"
+arch = "x86_64"
+kind = "tgz"
+preset = "linux-x64-release"
+file = "ovt-{version}-linux-x86_64.tar.gz"
+components = ["ovt_core", "ovt_plugin_ffmpeg"]
+default_download = true
+codec_pack = false
+notices = true
+sign = "minisign"

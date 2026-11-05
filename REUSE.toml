@@ -77,3 +77,9 @@ SPDX-License-Identifier = "LicenseRef-DCO-verbatim"
 path = "CODE_OF_CONDUCT.md"
 SPDX-FileCopyrightText = "2014-2021 Coraline Ada Ehmke and the Contributor Covenant contributors"
 SPDX-License-Identifier = "CC-BY-4.0"
+
+# Licence-gate test fixtures that cannot carry a header (plain-text VERSIONS.md look-alikes; WI-0.602).
+[[annotations]]
+path = ["tools/tests/fixtures/license_gate/*.txt"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
