@@ -32,7 +32,7 @@ void require(bool ok) {
 }
 
 struct Sink final : ovt::BitReader::DiagnosticSink {
-  void reader_warning(std::string_view, std::string_view, uint64_t) override {}
+  void reader_warning(std::string_view /*code*/, std::string_view /*message*/, uint64_t /*bit_offset*/) override {}
 };
 
 void run_op(ovt::BitReader& br, unsigned op, unsigned param) {
