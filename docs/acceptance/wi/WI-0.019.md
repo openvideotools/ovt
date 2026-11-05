@@ -24,32 +24,37 @@ Result: pass (0.07 s, budget 5 s). The CTest test has `TIMEOUT 5`.
 
 ## Test 2: macOS, ad-hoc-signed `OVT Studio.app` shows the main window
 
-Machine: the owner's Mac Mini (M4, macOS 15.7.3, Xcode 26.3 with SDK 26.2, CMake 4.4.5, Qt 6.8.3 from
-`tools/install_qt.py`), user `ovt-build`. Date: 2026-11-05. Commit: efe106e, plus the two fixes this PR then
-received (the `Info.plist.in` comment, and the AGL stand-in in `cmake/OvtOptions.cmake`).
+Machine: the owner's Mac Mini (M4, macOS 15.7.3, Xcode 26.3 with SDK 26.2, Qt 6.8.3 from
+`tools/install_qt.py`), user `ovt-build`. Date: 2026-11-05. Commit: 7be202f (clean build, no manual
+workarounds).
 
 ```console
-$ cmake --workflow --preset ci-macos-arm64        # with the two fixes applied by hand
-100% tests passed, 0 tests failed out of 56
+$ cmake --workflow --preset ci-macos-arm64
+100% tests passed, 0 tests failed out of 56      (16.5 s)
+$ grep WrapOpenGL_AGL build/macos-arm64-release/CMakeCache.txt
+WrapOpenGL_AGL:FILEPATH=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/OpenGL.framework
 $ codesign --force --deep --sign - "build/macos-arm64-release/app/OVT Studio.app"   # OK
-$ open "build/macos-arm64-release/app/OVT Studio.app"
-launchd error 125 (ovt-build has no GUI session)
+$ otool -L "build/macos-arm64-release/app/OVT Studio.app/Contents/MacOS/OVT Studio" | grep -c AGL
+0
 $ QT_QPA_PLATFORM=offscreen "build/macos-arm64-release/app/OVT Studio.app/Contents/MacOS/OVT Studio" --self-test
 OVT Studio: self-test passed (first frame, platform offscreen, core 0.1.0)
-rc=0 (0.02 s)
+rc=0
+$ open "build/macos-arm64-release/app/OVT Studio.app"
+launchd error 125 (ovt-build has no GUI session)
 ```
 
-Bugs found by this run and fixed in this PR:
+The earlier runs on efe106e and e4f9756 found two bugs, and this PR fixes both:
 
 1. `configure_file` expanded the `${MACOSX_BUNDLE_*}` text in the header comment of `Info.plist.in`, and
    CMake failed at generate time.
-2. Xcode 26's SDK has no AGL framework, but Qt 6.8.3's `FindWrapOpenGL.cmake` links it, so the link failed
-   with `ld: framework 'AGL' not found`. `cmake/OvtOptions.cmake` now points `WrapOpenGL_AGL` at
-   `OpenGL.framework` when AGL is missing.
+2. Qt 6.8.3's `FindWrapOpenGL.cmake` links AGL, which Xcode 26's SDK no longer has, so the link failed with
+   `ld: framework 'AGL' not found`. The host's `/System/Library/Frameworks` still has AGL, so
+   `find_library` can't detect this. `cmake/OvtOptions.cmake` checks the SDK instead and caches the SDK's
+   `OpenGL.framework` as `WrapOpenGL_AGL`.
 
-Result: **partial**. The bundle builds, signs and passes the offscreen self-test. Nobody has yet seen the
-main window appear, because `ovt-build` has no desktop session. That check needs Karl logged in to
-`ovt-build`'s desktop (or the bundle opened from his own session).
+Result: **partial**. The bundle builds, signs, has no AGL reference and passes the offscreen self-test.
+Nobody has seen the main window yet, because `ovt-build` has no desktop session. That check needs Karl
+logged in to `ovt-build`'s desktop, or the bundle opened from his own session.
 
 ## Test 3: Android presets produce the library for both ABIs
 
