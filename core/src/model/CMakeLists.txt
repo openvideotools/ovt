@@ -27,7 +27,8 @@ unset(_ovt_hash_rc)
 unset(_ovt_hash_len)
 
 # WI-0.084: the model helpers of ovt/cxx/model/{grid,tree,units,labels}.hpp.
-target_sources(ovt_core_objects PRIVATE bfbs_resources.cpp grid.cpp labels.cpp tree.cpp units.cpp)
+# WI-0.087: the PictureStore and PlaneBlob of ovt/cxx/model/{picture_store,plane}.hpp.
+target_sources(ovt_core_objects PRIVATE bfbs_resources.cpp grid.cpp labels.cpp picture_store.cpp tree.cpp units.cpp)
 # ovt_schemas orders the build after flatc/embed_bfbs and adds ${OVT_GENERATED_DIR} (SYSTEM) to the
 # include path, which is where both .inc fragments and the generated headers live. PUBLIC since WI-0.084:
 # the helper headers include ovt_model_generated.h and the flatbuffers headers, so every target that links
