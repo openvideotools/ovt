@@ -41,3 +41,5 @@ libx11-xcb-dev
 libgl1-mesa-dev
 libegl1-mesa-dev
 libva-dev
+# FFmpeg flavours (third_party/ffmpeg.cmake, --enable-zlib)
+zlib1g-dev

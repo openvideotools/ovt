@@ -62,6 +62,10 @@ ovt_plugin_de265 = "LGPL-3.0-or-later"
 ovt_plugin_de265_probe_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
 ovt_plugin_hm = "BSD-3-Clause"
+# Test targets of the FFmpeg flavours (WI-0.012): the two probe executables and the plugin symbol-leak fixture.
+ovt_tests_ffmpeg_probe = "LGPL-2.1-or-later"
+ovt_tests_ffmpeg_plugin_probe = "LGPL-2.1-or-later"
+ovt_ffmpeg_symbol_leak_fixture = "LGPL-2.1-or-later"
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
