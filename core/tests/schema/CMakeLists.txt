@@ -19,9 +19,12 @@ find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
   set(_ovt_import_check
       "import importlib.util, sys; sys.exit(77) if importlib.util.find_spec('flatbuffers') is None else None")
-  add_test(NAME schema_python_import
-           COMMAND "${Python3_EXECUTABLE}" -c
-                   "${_ovt_import_check}; import ovt.fb.FrameAnalysis, ovt.fb.ContainerRoot, ovt.fb.smoke.Record")
+  add_test(
+    NAME schema_python_import
+    COMMAND
+      "${Python3_EXECUTABLE}" -c
+      "${_ovt_import_check}; import ovt.fb.FrameAnalysis, ovt.fb.ContainerRoot, ovt.fb.MetricsReport, ovt.fb.smoke.Record"
+  )
   set_tests_properties(schema_python_import PROPERTIES ENVIRONMENT "PYTHONPATH=${OVT_GENERATED_DIR}/python" LABELS
                                                        "fast;schema" SKIP_RETURN_CODE 77)
 endif()
@@ -70,3 +73,11 @@ target_compile_definitions(
                                 "OVT_CONTAINER_BFBS_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/bfbs/ovt_container.bfbs\"")
 ovt_set_license(test_container_schema "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_container_schema)
+
+# ---- WI-0.082: test_metrics_schema. A MetricsReport round trip through the generated C++ code of
+# ovt_metrics.fbs (which includes ovt_model.fbs), linked like test_model_schema.
+
+add_executable(test_metrics_schema test_metrics_schema.cpp)
+target_link_libraries(test_metrics_schema PRIVATE ovt_schemas ovt::flags ${flatbuffers_TARGET} ${Catch2_TARGET})
+ovt_set_license(test_metrics_schema "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_metrics_schema)

@@ -8,6 +8,10 @@
 # The -Werror warning set itself is the ovt::flags target (chapter 13 §13.2.5); the CI presets build with
 # OVT_WERROR=ON in build-linux-x64 / build-macos-arm64, not here.
 # Third-party actions are pinned by commit SHA, never by tag.
+#
+# Runners: clang-tidy runs on the owner's Mac Mini (self-hosted, label macos-arm64) with Homebrew llvm@19 (the
+# same LLVM major as the clang-format pin) on the macos-arm64-debug compilation database; never for fork pull
+# requests. cppcheck needs Linux and skips when the repository variable OVT_HOSTED_RUNNERS is `off` (ci.yml).
 name: static-analysis
 
 on:
@@ -24,13 +28,16 @@ permissions:
   contents: read
 
 env:
-  PRESET: linux-x64-debug
+  PRESET: macos-arm64-debug
+  LLVM: /opt/homebrew/opt/llvm@19 # brew install llvm@19 (keg-only; never on PATH)
   # Directories that hold OVT code (header filter of .clang-tidy); third_party is never analysed.
   OVT_DIRS: core render plugins cli app
 
 jobs:
   clang-tidy:
-    runs-on: ubuntu-22.04
+    # Never run a fork's code on the Mini.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 60 # the PR run on changed lines must stay under 10 minutes once the build cache is warm
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -62,15 +69,21 @@ jobs:
       - uses: ./.github/actions/setup-ovt
         if: steps.diff.outputs.run == 'true'
         with:
-          preset: linux-x64-debug
-          triplet: x64-linux-ovt
+          preset: macos-arm64-debug
+          triplet: arm64-osx-ovt
           qt: "true" # app/ sources need Qt in the compilation database (WI-0.019)
 
+      # The compilation database comes from AppleClang; Homebrew's clang-tidy needs the SDK named explicitly.
       - name: clang-tidy
         if: steps.diff.outputs.run == 'true'
         run: |
-          sudo apt-get install -y -q --no-install-recommends clang-tidy-15
-          echo "/usr/lib/llvm-15/bin" >> "$GITHUB_PATH"
+          if [ ! -x "$LLVM/bin/clang-tidy" ]; then
+            echo "::error::$LLVM/bin/clang-tidy is missing on this runner (brew install llvm@19)"
+            exit 1
+          fi
+          "$LLVM/bin/clang-tidy" --version
+          echo "SDKROOT=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
+          echo "JOBS=$(getconf _NPROCESSORS_ONLN)" >> "$GITHUB_ENV"
 
       - name: Configure
         if: steps.diff.outputs.run == 'true'
@@ -86,16 +99,16 @@ jobs:
         if: steps.diff.outputs.run == 'true'
         run: cmake --build --preset "$PRESET"
 
-      # -Wno-unknown-warning-option: compile_commands.json comes from GCC 13, whose warning flags
-      # (-Wlogical-op, -Wuseless-cast, ...) clang does not know; under OVT_WERROR=ON they would be errors.
+      # -Wno-unknown-warning-option: AppleClang and LLVM 19 do not know the same warning flags; under
+      # OVT_WERROR=ON an unknown one would be an error.
       - name: clang-tidy on the changed lines
         if: github.event_name == 'pull_request' && steps.diff.outputs.run == 'true'
         run: |
           if [ ! -s "$RUNNER_TEMP/pr.diff" ]; then echo "no C/C++ changes"; exit 0; fi
-          diff_tool=/usr/lib/llvm-15/share/clang/clang-tidy-diff.py
+          diff_tool="$LLVM/share/clang/clang-tidy-diff.py"
           test -f "$diff_tool"
-          python3 "$diff_tool" -p1 -path "build/$PRESET" -quiet -j "$(nproc)" \
-            -extra-arg=-Wno-unknown-warning-option < "$RUNNER_TEMP/pr.diff" | tee "$RUNNER_TEMP/tidy.txt"
+          python3 "$diff_tool" -p1 -path "build/$PRESET" -quiet -j "$JOBS" -clang-tidy-binary "$LLVM/bin/clang-tidy" \
+            -extra-arg=-Wno-unknown-warning-option -extra-arg="-isysroot$SDKROOT" < "$RUNNER_TEMP/pr.diff" | tee "$RUNNER_TEMP/tidy.txt"
           # clang-tidy-diff exits 0 on findings unless warnings-as-errors fires, so fail on any finding.
           if grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' "$RUNNER_TEMP/tidy.txt"; then
             echo "::error::clang-tidy findings on the changed lines"
@@ -105,8 +118,9 @@ jobs:
       - name: clang-tidy on the whole tree
         if: github.event_name != 'pull_request'
         run: |
-          # run-clang-tidy 15 has no -warnings-as-errors: fail on any finding, as the PR job does.
-          run-clang-tidy-15 -p "build/$PRESET" -quiet -extra-arg=-Wno-unknown-warning-option \
+          # Fail on any finding, as the PR job does.
+          "$LLVM/bin/run-clang-tidy" -p "build/$PRESET" -quiet -j "$JOBS" -clang-tidy-binary "$LLVM/bin/clang-tidy" \
+            -extra-arg=-Wno-unknown-warning-option -extra-arg="-isysroot$SDKROOT" \
             "^$PWD/($(echo "$OVT_DIRS" | tr ' ' '|'))/.*\.(cpp|cc)$" | tee "$RUNNER_TEMP/tidy-all.txt" || true
           if grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' "$RUNNER_TEMP/tidy-all.txt"; then
             echo "::error::clang-tidy findings in the whole tree"
@@ -115,10 +129,12 @@ jobs:
 
   cppcheck:
     # Non-blocking and nightly only (§14.8.4): it becomes a PR check only if the owner decides so.
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     continue-on-error: true
+    env:
+      PRESET: linux-x64-debug
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 

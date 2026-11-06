@@ -38,12 +38,6 @@ std::unique_ptr<RandomAccessFile> make_mmap_file(int fd, FileInfo info, int& err
 // Reads through pread(2). Closes `fd` in its destructor when `owns_fd` is true.
 std::unique_ptr<RandomAccessFile> make_pread_file(int fd, bool owns_fd, FileInfo info);
 
-// Log hook for this module until ovt::log (WI-1.512) exists. Silent by default (FR-API-006).
-// SPEC-ASSUMPTION(#63): io logs through this hook; WI-1.512 replaces its one call site with OVT_LOG.
-using LogHook = void (*)(int level, std::string_view message);
-void set_log_hook(LogHook hook) noexcept;
-void log(int level, std::string_view message);
-
 }  // namespace ovt::io::detail
 
 #endif  // OVT_SRC_IO_IO_BACKENDS_HPP
