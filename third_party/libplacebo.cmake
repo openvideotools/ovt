@@ -135,6 +135,7 @@ ovt_tp_meson(
   PATCH_COMMAND
   ${_ovt_pl_patch}
   OPTIONS
+  -Db_ndebug=true
   -Dvulkan=enabled
   -Dvk-proc-addr=enabled
   -Dvulkan-registry=${OVT_VULKAN_REGISTRY_XML}
