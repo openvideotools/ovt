@@ -24,6 +24,8 @@ env:
 
 jobs:
   fuzz-smoke:
+    # The owner's switch for when GitHub-hosted runners are unavailable (ci.yml header).
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     strategy:

@@ -118,7 +118,7 @@ endif()
 # linux-x64-fuzz relies on this. A normal variable, so the cache keeps the user's empty choice.
 # SPEC-ASSUMPTION(#106): the spec's preset names no set.
 if(OVT_SANITIZER STREQUAL "")
-  if(OVT_ENABLE_FUZZ)
+  if(OVT_ENABLE_FUZZ AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(OVT_SANITIZER "fuzz")
   else()
     set(OVT_SANITIZER "asan-ubsan")
