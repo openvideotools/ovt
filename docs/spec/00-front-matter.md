@@ -57,4 +57,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 0.9.3 | Review round 2 (4 reviewers, about 170 findings) applied; decisions D19–D32. |
 | 1.0-rc1 (2026-11-04) | Final consistency pass (cross-chapter requests, dependency table, fixture registry, open items); release candidate for owner review. |
 | 1.0-rc2 (2026-11-04) | Accepted answers of the M0.1 `spec-question` issues #2, #3, #4, #6, #8, #11, #13, #15, #17, #20, #22, #25 and #27 folded into chapters 12–16 (see `CHANGELOG.md`). |
-| 1.0-rc3 (2026-11-06) | Accepted answer of `spec-question` #119 (synthetic generator reproducibility) folded into chapter 14 §14.3.3 (see `CHANGELOG.md`). |
+| 1.0-rc3 (2026-11-06) | Accepted answers of `spec-question` #119 (synthetic generator reproducibility, chapter 14 §14.3.3) and #123 (licence gate `--corpora` mode, chapter 14 §14.3.4) folded in (see `CHANGELOG.md`). |

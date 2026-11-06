@@ -37,6 +37,7 @@ struct JobPtr {
 
 ovt_JobProgress progress_of(const ovt_Job* job) {
   ovt_JobProgress p{};
+  p.struct_size = sizeof(p);
   ovt_job_progress(job, &p);
   return p;
 }
@@ -206,6 +207,21 @@ TEST_CASE("ovt_Job functions accept NULL", "[jobs][fast]") {
   ovt_job_set_progress_callback(nullptr, nullptr, nullptr);
   ovt_job_progress(nullptr, nullptr);
   CHECK(ovt_job_is_cancelled(nullptr) == 0);
+}
+
+TEST_CASE("ovt_job_progress honours the caller struct_size", "[jobs][fast]") {
+  const JobPtr j;
+  ovt_JobProgress small{};
+  small.struct_size = sizeof(ovt_JobProgress) - 1;  // below v1: nothing is written
+  small.fraction = 7.0;
+  ovt_job_progress(j.job, &small);
+  CHECK(small.struct_size == sizeof(ovt_JobProgress) - 1);
+  CHECK(small.fraction == 7.0);
+  ovt_JobProgress big{};
+  big.struct_size = sizeof(ovt_JobProgress) + 64;  // newer caller: library writes its own size
+  ovt_job_progress(j.job, &big);
+  CHECK(big.struct_size == sizeof(ovt_JobProgress));
+  CHECK(big.fraction == -1.0);
 }
 
 TEST_CASE("a fresh job reports unknown progress", "[jobs][fast]") {
