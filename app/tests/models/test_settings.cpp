@@ -123,9 +123,9 @@ TEST_CASE("Settings::validate: type, range and required keys", "[fast][gui][sett
   general.insert(QStringLiteral("recent_files_count"), 1000);
   document.insert(QStringLiteral("general"), general);
   CHECK_FALSE(Settings::validate(document, &reason));
-  CHECK(reason.startsWith(QStringLiteral("/general/recent_files_count")));
+  CHECK(reason == QStringLiteral("/general/recent_files_count: above the maximum"));
   CHECK_FALSE(Settings::validate(QJsonObject(), &reason));
-  CHECK(reason.contains(QStringLiteral("settings_version")));
+  CHECK(reason == QStringLiteral("/: missing \"settings_version\""));
 }
 
 TEST_CASE("Platform: OVT_CONFIG_DIR overrides the configuration directory", "[fast][gui][platform]") {

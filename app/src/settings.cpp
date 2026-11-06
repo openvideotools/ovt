@@ -102,7 +102,8 @@ QString scalar_violation(const QJsonValue& value, const QJsonObject& schema) {
 bool check_object(const QJsonObject& object, const QJsonObject& schema, const QString& where, QString* reason) {
   for (const QJsonValue name : schema.value(QStringLiteral("required")).toArray()) {
     if (!object.contains(name.toString())) {
-      *reason = where + QStringLiteral(": missing \"%1\"").arg(name.toString());
+      *reason =
+          (where.isEmpty() ? QStringLiteral("/") : where) + QStringLiteral(": missing \"%1\"").arg(name.toString());
       return false;
     }
   }
