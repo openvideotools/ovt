@@ -20,8 +20,13 @@
 namespace {
 
 constexpr std::uint32_t kMachO64 = 0xfeedfacfU;  // MH_MAGIC_64, stored in host (little-endian) order
-constexpr std::uint32_t kCpuArm64 = 0x0100000cU;
-constexpr std::uint32_t kCpuX86_64 = 0x01000007U;
+#if defined(__arm64__)
+constexpr std::uint32_t kExpectedCpu = 0x0100000cU;  // CPU_TYPE_ARM64
+#elif defined(__x86_64__)
+constexpr std::uint32_t kExpectedCpu = 0x01000007U;  // CPU_TYPE_X86_64
+#else
+#error "the MoltenVK probe runs on macOS only"
+#endif
 
 }  // namespace
 
@@ -33,13 +38,7 @@ TEST_CASE("libMoltenVK.dylib is a thin Mach-O of the built architecture", "[fast
   REQUIRE(file.gcount() == static_cast<std::streamsize>(sizeof header));
   // A universal ("fat") file starts with 0xcafebabe (big-endian), which reads as 0xbebafeca here.
   REQUIRE(header[0] == kMachO64);
-#if defined(__arm64__)
-  CHECK(header[1] == kCpuArm64);
-#elif defined(__x86_64__)
-  CHECK(header[1] == kCpuX86_64);
-#else
-  FAIL("the MoltenVK probe runs on macOS only");
-#endif
+  CHECK(header[1] == kExpectedCpu);
 }
 
 TEST_CASE("MoltenVK reports a Vulkan 1.2 instance", "[fast][third_party]") {
