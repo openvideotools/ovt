@@ -51,9 +51,27 @@ Automated: `ffmpeg_plugin_symbol_leak` (`plugins/ovt-plugin-ffmpeg/tests/test_sy
 
 ## Test 3: macOS plugin flavour reports `--enable-videotoolbox`
 
-Pending: the Mac Mini run (`ctest --preset pr-macos -R "ffmpeg plugin probe" -V`), recorded below when it is done.
-The check is automated in `ovt_tests_ffmpeg_plugin_probe` (`--enable-videotoolbox` on Apple with
-`OVT_ENABLE_HW_DECODE=ON`).
+Machine: the Mac Mini build host (macOS, Apple silicon), 2026-11-06, head `10d32c2`, the pinned ffmpeg.org n7.1.1
+tarball. The run was relayed from the Mac Mini thread; this record gives its results, not a verbatim log.
+
+```console
+$ cmake --preset macos-arm64-debug && cmake --build --preset macos-arm64-debug
+$ ctest --test-dir build/macos-arm64-debug -R ffmpeg -V
+```
+
+`pr-macos` is the test preset of `macos-arm64-release` (CMakePresets.json, chapter 13 §13.2.4), so a debug build is
+run with `--test-dir`.
+
+- `ffmpeg plugin probe: avcodec_configuration is printed and names the flavour`: passed. The plugin flavour's
+  `avcodec_configuration()` contains `--enable-videotoolbox`. So does the core flavour's.
+- The other core and plugin probe cases passed. `avformat opens an MP4 of the corpus` was skipped: corpus entry
+  `mpegff_a1_foreman_qcif` is not fetched on the Mini.
+- `ffmpeg_plugin_symbol_leak` failed because of the script, not because of a leak. BSD grep rejected the empty
+  alternative in `^(…|)$`, so the export list came out empty. `nm -gU` on the fixture shows exactly
+  `_ovt_analysis_decoder_v1` and `_ovt_plugin_describe`. The script is fixed in the commit after `10d32c2`
+  (blank lines are filtered by a separate `grep -v '^$'`), and the Mac CI job on the PR re-runs it.
+
+Result: pass (acceptance test 3). Test 2 on macOS: no leak; the script fix is verified by CI.
 
 ## Test 4: Android arm64 on the emulator
 

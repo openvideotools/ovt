@@ -25,7 +25,8 @@ if [ "$(uname -s)" = "Darwin" ]; then
 else
   exports=$("$nm_tool" -D --defined-only "$lib" | awk 'NF >= 3 { print $3 }')
 fi
-exports=$(printf '%s\n' "$exports" | grep -v -E '^(_init|_fini|_edata|_end|__bss_start|)$' | sort -u)
+# Two greps: BSD grep (macOS) rejects an empty alternative such as `(a|)`.
+exports=$(printf '%s\n' "$exports" | grep -v -E '^(_init|_fini|_edata|_end|__bss_start)$' | grep -v '^$' | sort -u)
 
 expected=$(printf '%s\n' ovt_analysis_decoder_v1 ovt_plugin_describe)
 
