@@ -28,7 +28,7 @@ typedef struct ovt_Job ovt_Job;
 /** Progress snapshot (chapter 12 §12.3.1 rule 7: begins with struct_size, fields are only appended). */
 /* NOLINTNEXTLINE(modernize-use-using): a C11 header */
 typedef struct ovt_JobProgress {
-  uint32_t struct_size; /**< Set by the library to sizeof(ovt_JobProgress). */
+  uint32_t struct_size; /**< Set by the caller before ovt_job_progress(); see there. Library-built callback arguments carry sizeof. */
   double fraction;      /**< 0.0 to 1.0, or -1.0 when the total is unknown. */
   uint64_t done;        /**< Work units done. */
   uint64_t total;       /**< Work units in total; 0 when unknown. */
@@ -68,6 +68,11 @@ OVT_API int ovt_job_is_cancelled(const ovt_Job* job);
 /**
  * Writes a thread-safe snapshot of the job's progress to *@p out, which the caller owns; out->stage is
  * owned by the job and stays valid until the job is freed. NULL arguments are ignored.
+ *
+ * The caller MUST set out->struct_size = sizeof(ovt_JobProgress) first (chapter 12 §12.3.1 rule 7). The
+ * library writes only the leading fields that fit in that size and then sets out->struct_size to the
+ * smaller of the caller's value and its own sizeof. A struct_size below the first version (the size of
+ * the struct as of v1) writes nothing.
  */
 OVT_API void ovt_job_progress(const ovt_Job* job, ovt_JobProgress* out);
 
