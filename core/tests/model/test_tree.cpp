@@ -172,6 +172,28 @@ TEST_CASE("test_tree: leaf_at and ancestors on the §6.10 example", "[fast][mode
   CHECK(walker.block(14) == nullptr);
 }
 
+TEST_CASE("test_tree: leaf_at returns the leaf TU of a split transform tree", "[fast][model]") {
+  // §6.3.2 rule 3: CU 2 (8×8) has a root TU 3 (trafoDepth 0) split into four 4×4 TUs 4..7.
+  const std::vector<BlockSpec> specs{
+      {0, -1, {1}, BlockKind::Other, {0, 0, 8, 8}, 0, 0, 0},
+      {1, 0, {2}, BlockKind::CTU, {0, 0, 8, 8}, 1, 32, 0},
+      {2, 1, {3}, BlockKind::CU, {0, 0, 8, 8}, 2, 32, 1},
+      {3, 2, {4, 5, 6, 7}, BlockKind::TU, {0, 0, 8, 8}, 3, 32, 0},
+      {4, 3, {}, BlockKind::TU, {0, 0, 4, 4}, 4, 32, 0},
+      {5, 3, {}, BlockKind::TU, {4, 0, 4, 4}, 4, 32, 0},
+      {6, 3, {}, BlockKind::TU, {0, 4, 4, 4}, 4, 32, 0},
+      {7, 3, {}, BlockKind::TU, {4, 4, 4, 4}, 4, 32, 0},
+  };
+  const auto bytes = build_frame(specs, 2, 2, {2, 2, 2, 2});
+  const ovt::model::TreeWalker walker{verified(bytes)};
+  CHECK(walker.leaf_at(5, 5, BlockKind::TU)->id() == 7);
+  CHECK(walker.leaf_at(0, 0, BlockKind::TU)->id() == 4);
+  CHECK(walker.leaf_at(7, 0, BlockKind::TU)->id() == 5);
+  CHECK(walker.leaf_at(1, 6, BlockKind::TU)->id() == 6);
+  CHECK(walker.leaf_at(5, 5, BlockKind::CU)->id() == 2);
+  CHECK(ids_of(walker.ancestors(7)) == std::vector<std::uint32_t>{3, 2, 1, 0});
+}
+
 TEST_CASE("test_tree: pre_order visits the §6.10 tree in pre-order with depths", "[fast][model]") {
   const auto bytes = build_frame(section_6_10_blocks(), 4, 4, kSection610BlockIds);
   const ovt::model::TreeWalker walker{verified(bytes)};

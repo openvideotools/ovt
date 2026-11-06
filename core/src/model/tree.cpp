@@ -22,19 +22,24 @@ bool rect_contains(const fb::Rect& rect, int x, int y) noexcept {
   return x >= x0 && y >= y0 && x < x0 + rect.w() && y < y0 + rect.h();
 }
 
-// Depth-first search below blocks[root] over the children whose rect contains (x, y), for the first block of
-// kind @p kind (root itself excluded). Same robustness rules as pre_order.
+// Depth-first search below blocks[root] over the children whose rect contains (x, y), for the DEEPEST block of
+// kind @p kind (root itself excluded; the first in pre-order on a tie). Deepest, because HEVC transform trees
+// nest TUs (§6.3.2 rule 3): the TU at a sample is the leaf TU, not the trafoDepth-0 root. Same robustness
+// rules as pre_order.
 const fb::Block* find_below(const flatbuffers::Vector<flatbuffers::Offset<fb::Block>>& blocks, std::uint32_t root,
                             int x, int y, fb::BlockKind kind) {
   std::vector<bool> seen(blocks.size(), false);
-  std::vector<std::uint32_t> stack{root};
+  std::vector<std::pair<std::uint32_t, int>> stack{{root, 0}};
   seen[root] = true;
+  const fb::Block* best = nullptr;
+  int best_depth = 0;
   while (!stack.empty()) {
-    const std::uint32_t id = stack.back();
+    const auto [id, depth] = stack.back();
     stack.pop_back();
     const fb::Block& node = *blocks.Get(id);
-    if (id != root && node.kind() == kind) {
-      return &node;
+    if (id != root && node.kind() == kind && depth > best_depth) {
+      best = &node;
+      best_depth = depth;
     }
     const auto* children = node.children();
     if (children == nullptr) {
@@ -50,10 +55,10 @@ const fb::Block* find_below(const flatbuffers::Vector<flatbuffers::Offset<fb::Bl
         continue;
       }
       seen[child] = true;
-      stack.push_back(child);
+      stack.emplace_back(child, depth + 1);
     }
   }
-  return nullptr;
+  return best;
 }
 
 }  // namespace

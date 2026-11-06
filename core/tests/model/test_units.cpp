@@ -80,6 +80,9 @@ TEST_CASE("test_units: mv_from_neutral inverts exactly or throws", "[fast][model
   CHECK_THROWS_AS(ovt::model::mv_from_neutral(7, Codec::AV1), std::invalid_argument);
   CHECK_THROWS_AS(ovt::model::mv_from_neutral(13, Codec::H264), std::invalid_argument);
   CHECK_THROWS_AS(ovt::model::mv_from_neutral(32767, Codec::H265), std::invalid_argument);  // a clamped value
+  // The "MVD not available" sentinel is not a vector.
+  CHECK_THROWS_AS(ovt::model::mv_from_neutral(ovt::model::kMvdUnavailable, Codec::H264), std::invalid_argument);
+  CHECK_THROWS_AS(ovt::model::mv_from_neutral(ovt::model::kMvdUnavailable, Codec::AV1), std::invalid_argument);
   for (std::int32_t v = -100; v <= 100; ++v) {
     CHECK(ovt::model::mv_from_neutral(ovt::model::mv_to_neutral(v, Codec::AV1), Codec::AV1) == v);
     CHECK(ovt::model::mv_from_neutral(ovt::model::mv_to_neutral(v, Codec::H264), Codec::H264) == v);

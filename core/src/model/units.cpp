@@ -116,6 +116,9 @@ std::int16_t mv_to_neutral(std::int32_t spec_mv, fb::Codec codec) {
 
 std::int32_t mv_from_neutral(std::int16_t neutral, fb::Codec codec) {
   const int factor = mv_factor(codec);
+  if (neutral == kMvdUnavailable) {
+    throw std::invalid_argument("ovt::model::mv_from_neutral: -32768 is the 'MVD not available' sentinel");
+  }
   if (neutral % factor != 0) {
     throw std::invalid_argument("ovt::model::mv_from_neutral: value is not a multiple of the codec's factor");
   }

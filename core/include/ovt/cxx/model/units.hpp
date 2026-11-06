@@ -39,7 +39,8 @@ inline constexpr int kNeutralUnitsPerLumaSample = 16;
 [[nodiscard]] std::int16_t mv_to_neutral(std::int32_t spec_mv, fb::Codec codec);
 
 /// Inverse of mv_to_neutral: @p neutral / factor. The division must be exact; a remainder means the producer
-/// stored unscaled values (e.g. AV1 1/8-pel values), and the function throws std::invalid_argument.
+/// stored unscaled values (e.g. AV1 1/8-pel values), and the function throws std::invalid_argument. It also
+/// throws for kMvdUnavailable (-32768), which is a sentinel, not a vector.
 // SPEC-ASSUMPTION(#98): WI-0.084 says "asserts divisibility"; this throws instead of assert() so that the
 // check also holds in release builds and can be tested.
 [[nodiscard]] std::int32_t mv_from_neutral(std::int16_t neutral, fb::Codec codec);

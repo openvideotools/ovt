@@ -34,8 +34,9 @@ struct TreeWalker {
   void pre_order(const std::function<void(const fb::Block&, int depth)>& visit) const;
 
   /// The block of kind @p preferred that contains luma sample (@p luma_x, @p luma_y): starts from the grid
-  /// leaf `grid.block_id[cell]` (§6.3.2 rule 4), searches its subtree for the first block of that kind whose
-  /// rect contains the sample (e.g. the PU or TU of a CU), then its ancestors (e.g. the CTU). When no block
+  /// leaf `grid.block_id[cell]` (§6.3.2 rule 4), searches its subtree for the deepest block of that kind whose
+  /// rect contains the sample (e.g. the PU of a CU, or the leaf TU of a split transform tree), then its
+  /// ancestors, nearest first (e.g. the CTU). When no block
   /// of that kind is on the path, returns the grid leaf itself. Returns nullptr when the sample lies outside
   /// the grid, or the grid has no `block_id` vector, or the cell names a block outside `blocks`.
   // SPEC-ASSUMPTION(#98): the fallback to the grid leaf when @p preferred is not on the path.
