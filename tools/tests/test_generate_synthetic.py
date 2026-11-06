@@ -23,8 +23,8 @@ SYNTH = REPO / "tests" / "corpora" / "synthetic"
 sys.path.insert(0, str(SYNTH))
 sys.path.insert(0, str(REPO / "tools"))
 
-import check_fast_subset
-import generate
+import check_fast_subset  # noqa: E402
+import generate  # noqa: E402
 
 FAKE = """#!{python}
 import hashlib, os, sys
