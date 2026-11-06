@@ -48,9 +48,35 @@ def test_filter_names_respect_quotes_and_labels():
     }
 
 
+def empty_need():
+    return {k: set() for k in ("encoders", "bsfs", "filters", "formats", "devices")}
+
+
 def test_muxer_from_output_name():
     mod = load()
-    need = {k: set() for k in ("encoders", "bsfs", "filters", "formats")}
+    need = empty_need()
     mod.ffmpeg_needs(["ffmpeg", "-i", "a.265", "-c", "copy", "out.mkv"], need)
     assert need["formats"] == {"matroska"}
     assert need["encoders"] == set()
+    need = empty_need()
+    mod.ffmpeg_needs(["ffmpeg", "-i", "a.mp4", "-c", "copy", "out.m4a"], need)
+    assert need["formats"] == {"ipod"}
+
+
+def test_input_format_does_not_hide_the_output_muxer():
+    mod = load()
+    need = empty_need()
+    mod.ffmpeg_needs(["ffmpeg", "-f", "rawvideo", "-s", "64x64", "-i", "x.yuv", "-c:v", "libx264", "out.mp4"], need)
+    assert need["formats"] == {"rawvideo", "mp4"}
+    need = empty_need()
+    mod.ffmpeg_needs(["ffmpeg", "-i", "x.y4m", "-f", "hevc", "out.bin"], need)
+    assert need["formats"] == {"hevc"}
+
+
+def test_lavfi_input_needs_the_lavfi_device():
+    mod = load()
+    need = empty_need()
+    mod.ffmpeg_needs(["ffmpeg", "-f", "lavfi", "-i", "testsrc2=size=64x64", "out.y4m"], need)
+    assert need["devices"] == {"lavfi"}
+    assert need["filters"] == {"testsrc2"}
+    assert need["formats"] == {"yuv4mpegpipe"}
