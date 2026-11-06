@@ -181,6 +181,68 @@ def scan_chapter(path: Path, reg: Registry) -> list[str]:
     return problems
 
 
+# Stems that §14.3.2 mentions as examples of a *wrong* spelling, not as fixtures (spelling rule of the jvt bullet).
+NOT_FIXTURES = {"jvt_FRExt1_Panasonic_C", "jvt_HPCAFL_BCRM_C"}
+PROSE = {
+    "profile0_core",
+    "no_output_of_prior_pics_flag",
+    "RPS_A_docomo",
+    "RPS_F_docomo",
+    "professional_profiles",
+}  # prose, not stems
+PUBLIC = tuple(s for s in SOURCES if s != "syn")
+
+
+def named_public_ids(ch14: str) -> dict[str, str]:
+    """Every public-corpus id the catalogue names: id -> where (§14.3.1 fixture table or §14.3.2 bullet).
+
+    §14.3.2 bullets that carry ``(`<source>`)`` list upstream stems (`FRExt/X` is id ``<source>_X``; a bare
+    ``-16x18`` is the previous name with its size suffix replaced); the ISOBMFF/metrics bullets and the
+    §14.3.1 fixture table name ids directly. Wildcards (``*``) and ``X`` ranges are skipped or expanded.
+    """
+    found: dict[str, str] = {}
+    table = section(ch14, "**Named public-corpus fixtures.**", "### 14.3.2")
+    for row in table.splitlines():
+        cells = row.split("|")
+        if len(cells) < 4 or cells[1].strip().startswith(("Fixture", "---")):
+            continue
+        ticks = [t for t in TICK.findall(cells[1]) if re.fullmatch(rf"(?:{'|'.join(PUBLIC)})_[A-Za-z0-9_]+", t)]
+        if len(ticks) == 2 and "…" in cells[1]:  # `mkv_test1` … `mkv_test8`
+            stem = re.fullmatch(r"(.*?)(\d+)", ticks[0])
+            last = re.search(r"\d+$", ticks[1])
+            assert stem is not None and last is not None
+            lo, hi = int(stem.group(2)), int(last.group(0))
+            ticks = [f"{stem.group(1)}{n}" for n in range(lo, hi + 1)]
+        found.update({t: "§14.3.1 fixture table" for t in ticks})
+    for bullet in re.findall(r"^- .*$", section(ch14, "### 14.3.2", "### 14.3.3"), re.MULTILINE):
+        src = re.search(r"\(`([a-z0-9]+)`\)", bullet)
+        previous = ""
+        for tick in TICK.findall(bullet):
+            for name in expand_braces(tick):
+                if "*" in name or not re.fullmatch(r"-?[A-Za-z0-9_./-]+", name) or name.endswith(("_", "/")):
+                    continue
+                if not re.search(r"[\d_/]", name) or "golden" in name or name.endswith((".py", ".cc")) or name in PROSE:
+                    continue  # a tag, a tool or a corpus name; stems carry a digit, an underscore or a folder
+                if re.fullmatch(rf"(?:{'|'.join(PUBLIC)})_[A-Za-z0-9_]+", name):
+                    found[name] = "§14.3.2 bullet"
+                elif src and src.group(1) in PUBLIC:
+                    if name.startswith("-"):
+                        name = re.sub(r"-?\d+x\d+$", "", previous) + name  # `-16x18` after `…-size-16x16`
+                    previous = name
+                    found[to_id(src.group(1), name)] = "§14.3.2 bullet"
+    return {k: v for k, v in found.items() if k not in NOT_FIXTURES}
+
+
+def check_named(manifest: dict, ch14: str) -> list[str]:
+    """Acceptance 3 of WI-0.552: every stream named in §14.3.1/§14.3.2 has a manifest entry (id or alias)."""
+    have = {e["id"] for e in manifest["entries"]} | {a for e in manifest["entries"] for a in e.get("aliases", [])}
+    return [
+        f"manifest.json: {i} ({where}) has no entry"
+        for i, where in sorted(named_public_ids(ch14).items())
+        if i not in have
+    ]
+
+
 def check_registry(reg: Registry, manifest: dict, recipes: dict) -> list[str]:
     problems = []
     entries = {e["id"]: e for e in manifest["entries"] if e["source"] == "syn" and e.get("kind", "stream") == "stream"}
@@ -206,15 +268,24 @@ def check_registry(reg: Registry, manifest: dict, recipes: dict) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--all-chapters", action="store_true", help="grep every chapter for cited fixtures")
+    ap.add_argument(
+        "--all-chapters",
+        action="store_true",
+        help="grep every chapter for cited fixtures",
+    )
     ap.add_argument("--spec-dir", type=Path, default=REPO / "docs" / "spec")
     ap.add_argument("--manifest", type=Path, default=REPO / "tests" / "corpora" / "manifest.json")
-    ap.add_argument("--recipes", type=Path, default=REPO / "tests" / "corpora" / "synthetic" / "recipes.json")
+    ap.add_argument(
+        "--recipes",
+        type=Path,
+        default=REPO / "tests" / "corpora" / "synthetic" / "recipes.json",
+    )
     args = ap.parse_args(argv)
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
     recipes = json.loads(args.recipes.read_text(encoding="utf-8"))
     reg = Registry(args.spec_dir, manifest, recipes)
     problems = check_registry(reg, manifest, recipes)
+    problems += check_named(manifest, (args.spec_dir / "14-testing.md").read_text(encoding="utf-8"))
     if args.all_chapters:
         for path in sorted(args.spec_dir.glob("*.md")):
             if path.name != "CHANGELOG.md":

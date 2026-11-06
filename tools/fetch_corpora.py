@@ -24,6 +24,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,7 @@ import tarfile
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -115,6 +117,22 @@ def load_manifest(path: Path) -> dict[str, Any]:
             if "md5_member" in entry["extract"]:
                 safe_member(entry["extract"]["md5_member"])
     return manifest
+
+
+def entry_url(entry: dict[str, Any]) -> str | None:
+    """The download URL of an entry: ``url``, or for a ``vcs`` entry (WI-0.552) the Git LFS media URL.
+
+    SPEC-ASSUMPTION(#41): ``vcs.rev`` (a commit id) is added so the URL is pinned; only github.com origins resolve.
+    """
+    if "url" in entry:
+        return entry["url"]
+    vcs = entry.get("vcs")
+    if not vcs or "rev" not in vcs:
+        return None
+    m = re.fullmatch(r"https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?", vcs["git"])
+    if m is None:
+        return None
+    return f"https://media.githubusercontent.com/media/{m.group(1)}/{vcs['rev']}/{urllib.parse.quote(vcs['lfs_path'])}"
 
 
 def safe_member(name: str) -> str:
@@ -331,7 +349,7 @@ def fetch_entry(entry: dict[str, Any], cache: Path, retries: int, verify_only: b
         for attempt in range(1, max(retries, 1) + 1):
             part = tmp / "download.part"
             try:
-                digest = download(entry["url"], part, entry["size_bytes"])
+                digest = download(entry_url(entry) or "", part, entry["size_bytes"])
                 if digest != entry["sha256"]:
                     raise HashMismatch(f"{entry['id']}: sha256 {digest} != expected {entry['sha256']}")
                 last = None
@@ -354,7 +372,7 @@ def fetch_entry(entry: dict[str, Any], cache: Path, retries: int, verify_only: b
                 files[path.name] = sha256_file(path)
             primary = PurePosixPath(ex["member"]).name
         else:
-            name = PurePosixPath(entry["url"].split("?", 1)[0]).name or entry["id"]
+            name = PurePosixPath((entry_url(entry) or "").split("?", 1)[0]).name or entry["id"]
             primary = safe_member(name)
             shutil.move(str(part), entry_dir / primary)
             files[primary] = entry["sha256"]
@@ -404,7 +422,7 @@ def main(argv: list[str] | None = None) -> int:
         entries = select_entries(manifest, ids, sources, tags)
         todo = []
         for entry in entries:
-            if "url" not in entry or entry.get("unverified") or entry.get("manual_download"):
+            if entry_url(entry) is None or entry.get("unverified") or entry.get("manual_download"):
                 if entry["id"] in ids:
                     raise ManifestError(f"{entry['id']}: not fetchable (no url, manual download or unverified hash)")
                 log(f"skip {entry['id']}: not fetchable by URL (manual download, vcs or hash pending)")
