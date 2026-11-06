@@ -428,9 +428,9 @@ Rules for `generate.py`: every command above is stored verbatim in `recipes.json
 
 ### 14.3.4 Corpora licence check
 
-`tools/license_gate.py --corpora` (also run as part of the dependency gate) enforces:
+`tools/license_gate.py --corpora` enforces the rules below. It is a separate mode: `--manifest` then names the corpora manifest (default `tests/corpora/manifest.json`), and the dependency inputs are not read. The `license-gate` job runs it as its own step next to the dependency check. Exit 0 clean, 1 violation of rule 2, 4 or 5, 4 for an unreadable manifest or a rule-1 failure:
 
-1. every manifest entry has `licence`, `licence_spdx`, `redistributable`;
+1. every manifest entry has `licence`, `licence_spdx`, `redistributable` (a missing field exits 4);
 2. `redistributable=true` requires `licence_spdx` ∈ {`CC0-1.0`, `CC-BY-4.0`, `BSD-2-Clause`, `BSD-3-Clause`, `BSD-2-Clause-Patent`, `MIT`, `Apache-2.0`} (extend by PR, never by CI override);
 3. entries with `redistributable=false` are never copied into release artefacts, Docker images or caches that are publicly readable (the GitHub Actions cache is private to the repo; that is allowed);
 4. no entry has `licence_spdx` containing `AGPL`, `SSPL`, `BUSL` or `NonCommercial`;

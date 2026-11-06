@@ -553,3 +553,43 @@ def test_corpora_missing_manifest_exits_4(tmp_path: Path) -> None:
 
 def test_write_licenses_md_needs_corpora() -> None:
     assert run("--write-licenses-md")[0] == 2
+
+
+DENIED_REFS = [
+    "LicenseRef-Foo-NC",
+    "LicenseRef-NC-1.0",
+    "LicenseRef-Acme-NC4",
+    "LicenseRef-Foo-nc",
+    "LicenseRef-AcmeProprietary",
+    "LicenseRef-Proprietary2",
+    "LicenseRef-Acme-EvaluationOnly",
+    "LicenseRef-Foo-NC AND MIT",
+    "(LicenseRef-Foo-NC OR MIT)",
+    "LicenseRef-Foo-NC WITH x",
+]
+PASSING_REFS = [
+    "LicenseRef-ITU-Conformance",
+    "LicenseRef-MPEG-Conformance",
+    "LicenseRef-AOM-Patent-License-1.0",
+    "LicenseRef-GPAC-Testsuite-Media",
+    "LicenseRef-Bento4-Test-Media",
+    "LicenseRef-Foo-NCSA",
+]
+
+
+@pytest.mark.parametrize("ref", DENIED_REFS)
+def test_deny_patterns_catch_licenseref_variants(ref: str, policy: dict) -> None:
+    assert lg.is_denied(ref, policy), ref
+
+
+@pytest.mark.parametrize("ref", PASSING_REFS)
+def test_deny_patterns_pass_ordinary_licenseref(ref: str, policy: dict) -> None:
+    assert not lg.is_denied(ref, policy), ref
+
+
+def test_corpora_denies_compound_expression(tmp_path: Path) -> None:
+    manifest = _corpora(
+        tmp_path, [_corpus(id="bad_nc", licence_spdx="LicenseRef-Foo-NC AND MIT", redistributable=False)]
+    )
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 1 and "E-DENY corpora:bad_nc" in err

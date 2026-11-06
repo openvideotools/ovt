@@ -7,9 +7,10 @@
 schema_version = 1
 
 [deny]                      # regex on SPDX ids (case-insensitive); any match anywhere fails
+# `NC` is the only LicenseRef token that collides with ordinary words ("Conformance"), so it must be a whole word.
 patterns = [
   "^AGPL", "^SSPL", "^BUSL", "^Elastic-2", "Commons-Clause", "^CC-BY-NC", "NonCommercial",
-  "LicenseRef-(.*[-.])?(NC|Proprietary|Evaluation)([-.].*)?$", "^JSON$", "^Hippocratic",
+  "LicenseRef-.*(Proprietary|Evaluation)", "LicenseRef-(\\S*[-.])?NC(?![A-Za-z])", "^JSON$", "^Hippocratic",
 ]
 
 [allow]
