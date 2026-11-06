@@ -78,7 +78,7 @@
       {"cmd": ["aomenc", "--threads=1", "--codec=av1", "--cpu-used=6", "--end-usage=q", "--cq-level=40", "--kf-max-dist=10", "--annexb=1", "--obu", "-o", "syn_av1_annexb.obu", "src_720p_8bit.y4m"]},
       {"cmd": ["aomenc", "--threads=1", "--codec=av1", "--cpu-used=6", "--end-usage=q", "--cq-level=40", "--kf-max-dist=10", "--annexb=0", "--obu", "-o", "syn_av1_lowoverhead.obu", "src_720p_8bit.y4m"]}]},
     {"recipe": "19", "id": "syn_av1_superres_scaled_refs", "features": ["superres", "reference_scaling", "render_size"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_av1_superres.ivf"], "steps": [
-      {"cmd": ["aomenc", "--threads=1", "--codec=av1", "--cpu-used=4", "--end-usage=q", "--cq-level=35", "--superres-mode=1", "--superres-denominator=12", "--resize-mode=1", "--resize-denominator=12", "--kf-max-dist=30", "--ivf", "-o", "syn_av1_superres.ivf", "src_720p_8bit.y4m"]}]},
+      {"cmd": ["aomenc", "--threads=1", "--codec=av1", "--cpu-used=4", "--end-usage=q", "--cq-level=35", "--superres-mode=1", "--superres-denominator=12", "--resize-mode=1", "--resize-denominator=9", "--kf-max-dist=30", "--ivf", "-o", "syn_av1_superres.ivf", "src_720p_8bit.y4m"]}]},
     {"recipe": "20", "id": "syn_mp4_edit_list_frag_cenc", "features": ["elst", "fragmented", "sidx", "cenc_cbcs", "pssh"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_mp4_elst.mp4", "syn_mp4_frag.mpd", "seg_*.m4s", "syn_mp4_cenc_cbcs.mp4"], "steps": [
       {"cmd": ["MP4Box", "-for-test", "-add", "syn_h264_multislice_cavlc.264:fps=30:delay=500", "-new", "syn_mp4_elst.mp4"]},
       {"cmd": ["MP4Box", "-for-test", "-dash", "1000", "-frag", "500", "-rap", "-segment-name", "seg_", "-out", "syn_mp4_frag.mpd", "syn_mp4_elst.mp4"]},
@@ -259,7 +259,7 @@
       {"cmd": ["MP4Box", "-for-test", "-crypt", "{repo}/tests/corpora/synthetic/drm_cbcs_keyrot.xml", "syn_h264_gop60_1080p.mp4", "-out", "syn_mp4_cbcs_keyrot.mp4"]}]},
     {"recipe": "68", "id": "syn_mp4_cenc_widevine", "features": ["cenc", "pssh", "widevine"], "tags": ["fast"], "needs": ["syn_h264_multislice_cavlc_mp4"], "files": ["syn_mp4_cenc_widevine.mp4"], "aliases": ["bento4_widevine.mp4"], "note": "fixed IV instead of the spec's ':random', so the hash is reproducible", "steps": [
       {"cmd": ["mp4fragment", "syn_h264_multislice_cavlc.mp4", "f_widevine.mp4"]},
-      {"cmd": ["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "--pssh", "edef8ba9-79d6-4ace-a3c8-27dcd51d21ed:{repo}/tests/corpora/synthetic/widevine_pssh.bin", "f_widevine.mp4", "syn_mp4_cenc_widevine.mp4"]}]},
+      {"cmd": ["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "--pssh", "edef8ba979d64acea3c827dcd51d21ed:{repo}/tests/corpora/synthetic/widevine_pssh.bin", "f_widevine.mp4", "syn_mp4_cenc_widevine.mp4"]}]},
     {"recipe": "69", "id": "syn_mp4_piff", "features": ["piff", "smooth"], "needs": ["syn_h264_multislice_cavlc_mp4"], "files": ["syn_mp4_piff.ismv"], "aliases": ["smooth_piff.ismv"], "steps": [
       {"cmd": ["mp4fragment", "syn_h264_multislice_cavlc.mp4", "f_piff.mp4"]},
       {"cmd": ["mp4encrypt", "--method", "PIFF-CTR", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "f_piff.mp4", "syn_mp4_piff.ismv"]}]},

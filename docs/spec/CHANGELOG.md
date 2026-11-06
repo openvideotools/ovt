@@ -2,6 +2,14 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc10 — 2026-11-06
+
+PATCH-level: recipe commands fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 recipe 19 `syn_av1_superres_scaled_refs` — `--resize-denominator=12` → `9`: with `--superres-denominator=12` the combined scale was 2.25x, over AV1's 2x reference-scaling limit, and aomenc pass 2 failed ("Can't find at least one reference frame with valid size"); 9 × 12 gives 1.6875x and keeps `superres`, `reference_scaling` and `render_size`. The row states the R × S ≤ 128 rule, which generate.py now enforces — WI-0.553
+- 14 §14.3.3 recipe 68 `syn_mp4_cenc_widevine` — the `mp4encrypt --pssh` system ID is written as 32 hex digits without dashes (`edef8ba979d64acea3c827dcd51d21ed:<file>`); Bento4 requires `arg[32] == ':'` and rejected the dashed UUID ("invalid argument syntax for --pssh") — WI-0.553
+- 14 §14.3.3 reproducibility rule 6 (new) — a recipe whose `{corpus:ID}` input is a `manual_download` corpus missing from the cache (recipe 71 `syn_mkv_dv_p5` ← `hdr_dovi_p5`) is skipped with a logged reason and stays `unverified`, instead of failing the whole run — WI-0.553
+
 ## 1.0.0-rc9 — 2026-11-06
 
 PATCH-level: an aomenc option name in two recipe commands, found by the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
