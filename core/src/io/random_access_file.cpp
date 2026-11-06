@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // RandomAccessFile::open with the backend choice and mmap → pread fallback of chapter 7 §7.1.3, and the
-// error rules of §7.1.4 (WI-1.100). open_fd is WI-1.101.
+// error rules of §7.1.4 (WI-1.100), and open_fd (WI-1.101).
 
 #include "ovt/cxx/io/random_access_file.hpp"
 
@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <cstdint>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -82,6 +83,70 @@ class FdCloser {
   int fd_;
 };
 
+// The backend for a checked descriptor: mmap when `try_mmap`, falling back to pread (§7.1.3). An owned fd is
+// handed to the pread backend, or closed by `guard` once the mapping exists (the mapping outlives it).
+std::unique_ptr<RandomAccessFile> make_backend(int fd, FdCloser& guard, bool owns_fd, FileInfo info, bool try_mmap) {
+  if (try_mmap) {
+    if (info.size > detail::kMaxMappedSize) {
+      throw IoError(OVT_E_UNSUPPORTED, 0,
+                    "io: file larger than 2^47 bytes cannot be mapped: '" + info.display_name + "'");
+    }
+    int err = 0;
+    auto mapped = detail::make_mmap_file(fd, info, err);
+    if (mapped) {
+      return mapped;
+    }
+    OVT_LOG(ovt::log::Level::Info, "io", "mmap failed ({}), using pread", errno_text(err));
+  }
+  auto file = detail::make_pread_file(fd, owns_fd, std::move(info));
+  if (owns_fd) {
+    guard.release();
+  }
+  return file;
+}
+
+// What open_fd learns about a descriptor before choosing a backend.
+struct FdFacts {
+  FileInfo info;
+  bool mappable = false;  // a regular file whose bytes cover info.size (a mapping past EOF raises SIGBUS)
+};
+
+// Checks `fd` and resolves an unknown size with fstat(2) (§7.1.2). Throws IoError; `guard` closes an owned fd.
+FdFacts describe_fd(int fd, uint64_t size, std::string display_name, FdCloser& guard) {
+  struct stat st{};
+  if (::fstat(fd, &st) != 0) {
+    const int err = errno;
+    if (err == EBADF) {
+      guard.release();  // nothing to close; closing the number again could hit a descriptor another thread reused
+      throw_os(OVT_E_IO, err, "bad descriptor", display_name);  // §7.1.4 rule 2
+    }
+    // SPEC-ASSUMPTION(#110): both UINT64_MAX (chapter 7 §7.1.2) and 0 (chapter 12 §12.3.6) mean "size unknown,
+    // use fstat(2)". An explicit 0 could never be opened anyway (§7.1.4 rule 4: empty files are rejected).
+    if (size == 0 || size == UINT64_MAX) {
+      throw_os(OVT_E_IO, err, "cannot stat", display_name);
+    }
+    return {FileInfo{size, 0, std::move(display_name)}, false};  // trust the caller's size; mtime unknown
+  }
+  const bool is_regular = S_ISREG(st.st_mode);
+  if (S_ISDIR(st.st_mode)) {
+    throw IoError(OVT_E_INVALID_ARG, 0, "io: not a regular file / empty: '" + display_name + "'");
+  }
+  if (size == 0 || size == UINT64_MAX) {
+    // A pipe or socket reports no usable size; the shell copies such content to a file first (WI-1.101 notes).
+    if (!is_regular || st.st_size <= 0) {
+      throw IoError(OVT_E_INVALID_ARG, 0, "io: not a regular file / empty: '" + display_name + "'");
+    }
+    size = static_cast<uint64_t>(st.st_size);
+  }
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): fcntl(2) is variadic
+  const int flags = ::fcntl(fd, F_GETFL);
+  if (flags >= 0 && (flags & O_ACCMODE) == O_WRONLY) {
+    throw IoError(OVT_E_INVALID_ARG, 0, "io: descriptor is not open for reading: '" + display_name + "'");
+  }
+  const bool mappable = is_regular && size <= static_cast<uint64_t>(st.st_size);
+  return {FileInfo{size, mtime_ns_of(st), std::move(display_name)}, mappable};
+}
+
 }  // namespace
 
 std::unique_ptr<RandomAccessFile> RandomAccessFile::open(std::string_view path, OpenMode mode) {
@@ -113,29 +178,24 @@ std::unique_ptr<RandomAccessFile> RandomAccessFile::open(std::string_view path, 
 
   FileInfo info{static_cast<uint64_t>(st.st_size), mtime_ns_of(st), cpath};
 
-  if (resolve_auto(mode) == OpenMode::Mmap) {
-    if (info.size > detail::kMaxMappedSize) {
-      throw IoError(OVT_E_UNSUPPORTED, 0, "io: file larger than 2^47 bytes cannot be mapped: '" + cpath + "'");
-    }
-    int err = 0;
-    auto mapped = detail::make_mmap_file(fd, info, err);  // the mapping outlives the descriptor
-    if (mapped) {
-      return mapped;  // guard closes fd
-    }
-    OVT_LOG(ovt::log::Level::Info, "io", "mmap failed ({}), using pread", errno_text(err));
-  }
-  auto file = detail::make_pread_file(fd, /*owns_fd=*/true, std::move(info));
-  guard.release();
-  return file;
+  return make_backend(fd, guard, /*owns_fd=*/true, std::move(info), resolve_auto(mode) == OpenMode::Mmap);
 }
 
-// §7.1.2 signature; the body is WI-1.101.
-std::unique_ptr<RandomAccessFile> RandomAccessFile::open_fd(
-    int /*fd*/, uint64_t /*size*/, bool /*take_ownership*/,
-    std::string /*display_name*/,  // NOLINT(performance-unnecessary-value-param)
-    OpenMode /*mode*/) {
-  // Implemented by WI-1.101 (chapter 7 §7.8); declared here because the header is §7.1.2 verbatim.
-  throw IoError(OVT_E_UNSUPPORTED, 0, "io: open_fd is not implemented yet (WI-1.101)");
+std::unique_ptr<RandomAccessFile> RandomAccessFile::open_fd(int fd, uint64_t size, bool take_ownership,
+                                                            std::string display_name, OpenMode mode) {
+  if (fd < 0) {
+    throw IoError(OVT_E_INVALID_ARG, 0, "io: open_fd with a negative descriptor");
+  }
+  // SPEC-ASSUMPTION(#110): an adopted descriptor is closed on every failure path too, so a caller that
+  // handed over ParcelFileDescriptor.detachFd() never has to clean up after an error.
+  FdCloser guard(take_ownership ? fd : -1);
+  if (display_name.empty()) {
+    display_name = "fd:" + std::to_string(fd);
+  }
+  FdFacts facts = describe_fd(fd, size, std::move(display_name), guard);
+  // §7.1.3: mmap only for a regular file; anything else, e.g. a DocumentsProvider pipe, is read with pread(2).
+  const bool try_mmap = resolve_auto(mode) == OpenMode::Mmap && facts.mappable;
+  return make_backend(fd, guard, take_ownership, std::move(facts.info), try_mmap);
 }
 
 }  // namespace ovt::io
