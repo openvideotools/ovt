@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+#
+# Patches applied to the pristine libde265 tarball (third_party/VERSIONS.md row "libde265"), in this order,
+# by tools/apply_patches.py from third_party/libde265.cmake (chapter 13 §13.3.6). One path per line,
+# relative to this file. Chapter 07 §7.6 adds 0002 and 0003 here.
+0001-de265-internals-api.patch
