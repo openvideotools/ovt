@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "app.h"
+#include "completions.h"
 #include "exit_codes.h"
 
 namespace {
@@ -55,6 +56,7 @@ Result invoke(const std::vector<std::string>& args, const std::map<std::string, 
     const auto it = env.find(name);
     return it == env.end() ? std::nullopt : std::optional<std::string>(it->second);
   };
+  ctx.completions = ovt::cli::embedded_completions();
   Result r;
   r.code = ovt::cli::run(args, ctx);
   r.out = slurp(out);
@@ -89,6 +91,13 @@ TEST_CASE("AT2: ovt --version --format json has the keys ovt core api build feat
   CHECK(j["features"].is_array());
 }
 
+TEST_CASE("AT3: --format fb on a terminal is refused with exit 2", "[fast][cli]") {
+  const Result r = invoke({"--format", "fb", "--version"}, {}, true);
+  CHECK(r.code == 2);
+  CHECK(r.out.empty());
+  CHECK(contains(r.err, "error: CLI-0010 refusing to write binary to a terminal; use -o"));
+}
+
 TEST_CASE("AT4: --log-level error wins over OVT_LOG_LEVEL=trace", "[fast][cli]") {
   const Result flag = invoke({"--log-level", "error", "--version"}, {{"OVT_LOG_LEVEL", "trace"}});
   CHECK(flag.code == 0);
@@ -97,6 +106,23 @@ TEST_CASE("AT4: --log-level error wins over OVT_LOG_LEVEL=trace", "[fast][cli]")
   const Result env = invoke({"--version"}, {{"OVT_LOG_LEVEL", "trace"}});
   CHECK(env.code == 0);
   CHECK_FALSE(env.err.empty());
+}
+
+TEST_CASE("AT5: ovt completion zsh begins with compdef", "[fast][cli]") {
+  const Result zsh = invoke({"completion", "zsh"});
+  CHECK(zsh.code == 0);
+  CHECK(zsh.out.starts_with("#compdef ovt\n"));
+  CHECK(contains(invoke({"completion", "bash"}).out, "complete -F _ovt ovt"));
+  CHECK(contains(invoke({"completion", "fish"}).out, "complete -c ovt"));
+}
+
+TEST_CASE("Completion scripts list subcommands and IsMember choices", "[fast][cli]") {
+  const std::string bash = invoke({"completion", "bash"}).out;
+  CHECK(contains(bash, "completion"));
+  CHECK(contains(bash, "json fb csv yuview text aom-inspect mv-csv vmaf-json"));
+  CHECK_FALSE(contains(bash, "yuview-csv"));
+  CHECK(contains(bash, "bash zsh fish"));
+  CHECK(contains(invoke({"completion", "zsh"}).out, "--flatbuffers"));
 }
 
 TEST_CASE("Version text on a terminal names core and api", "[fast][cli]") {
@@ -135,24 +161,39 @@ TEST_CASE("An unsupported format is CLI-0002 naming the supported ones", "[fast]
   const Result r = invoke({"--format", "csv", "--version"});
   CHECK(r.code == 2);
   CHECK(contains(r.err, "CLI-0002 format 'csv' is not supported by '--version'; supported: json, text"));
-  CHECK(invoke({"--version"}, {{"OVT_FORMAT", "fb"}}).code == 2);
+  const Result c = invoke({"completion", "fish", "-f", "json"});
+  CHECK(c.code == 2);
+  CHECK(contains(c.err, "supported: text. See 'ovt completion --help'."));
+  CHECK(invoke({"completion", "fish"}, {{"OVT_FORMAT", "json"}}).code == 0);  // only a flag is checked
 }
 
 TEST_CASE("Unknown options and subcommands are CLI-0001 with a spelling hint", "[fast][cli]") {
   const Result opt = invoke({"--jsno", "--version"});
   CHECK(opt.code == 2);
   CHECK(contains(opt.err, "error: CLI-0001 unknown option '--jsno' for 'ovt' (did you mean '--json'?)"));
-  const Result sub = invoke({"bogus"});
+  const Result sub = invoke({"completoin"});
   CHECK(sub.code == 2);
-  CHECK(contains(sub.err, "error: CLI-0001 unknown subcommand 'bogus'. See 'ovt --help'."));
+  CHECK(contains(sub.err, "unknown subcommand 'completoin' (did you mean 'completion'?). See 'ovt --help'."));
+  CHECK(invoke({"completion", "tcsh"}).code == 2);
+}
+
+TEST_CASE("Global options are accepted after the subcommand", "[fast][cli]") {
+  const Result r = invoke({"completion", "bash", "--text", "--log-level", "off"});
+  CHECK(r.code == 0);
+  CHECK(r.out.starts_with("# bash completion"));
+  const Result bad = invoke({"completion", "bash", "--bogus"});
+  CHECK(bad.code == 2);
+  CHECK(contains(bad.err, "unknown option '--bogus' for 'ovt completion'"));
 }
 
 TEST_CASE("Help prints to stdout and exits 0", "[fast][cli]") {
   const Result top = invoke({"--help"});
   CHECK(top.code == 0);
-  CHECK(contains(top.out, "Global options"));
-  CHECK(contains(top.out, "--log-level"));
+  CHECK(contains(top.out, "completion"));
   CHECK(contains(top.out, "Aliases"));
+  const Result sub = invoke({"completion", "--help"});
+  CHECK(sub.code == 0);
+  CHECK(contains(sub.out, "bash"));
 }
 
 TEST_CASE("Flags beat environment variables beat defaults", "[fast][cli]") {
@@ -167,7 +208,9 @@ TEST_CASE("Flags beat environment variables beat defaults", "[fast][cli]") {
   CHECK(contains(xdg.err, "cache /x/ovt/"));
 #endif
   CHECK(invoke({"--version", "-q"}, env).err.empty());
-  CHECK(invoke({"--version"}, {{"OVT_THREADS", "many"}}).code == 2);
+  const Result bad_env = invoke({"--version"}, {{"OVT_THREADS", "many"}});
+  CHECK(bad_env.code == 2);
+  CHECK(contains(bad_env.err, "error: CLI-0011 invalid value 'many' in OVT_THREADS"));
 }
 
 TEST_CASE("Log lines are JSON Lines under --format json", "[fast][cli]") {
@@ -200,7 +243,16 @@ TEST_CASE("Exit codes map from ovt_status as in the table", "[fast][cli]") {
   CHECK(from_status(OVT_E_CORRUPT) == ExitCode::Corrupt);
   CHECK(from_status(OVT_E_CANCELLED) == ExitCode::Cancelled);
   CHECK(from_status(OVT_E_NOMEM) == ExitCode::Error);
-  CHECK(ovt::cli::exit_code_name(ExitCode::Partial) == "PARTIAL");
+}
+
+TEST_CASE("Exit code numbers and names", "[fast][cli]") {
+  using ovt::cli::exit_code_name;
+  CHECK(static_cast<int>(ExitCode::Unsupported) == 4);
+  CHECK(static_cast<int>(ExitCode::Plugin) == 6);
+  CHECK(static_cast<int>(ExitCode::Partial) == 9);
+  CHECK(exit_code_name(ExitCode::Mismatch) == "MISMATCH");
+  CHECK(ovt::cli::from_status(OVT_E_UNSUPPORTED) == ExitCode::Unsupported);
+  CHECK(ovt::cli::from_status(OVT_E_PLUGIN) == ExitCode::Plugin);
 }
 
 namespace {
@@ -236,4 +288,32 @@ TEST_CASE("A second signal exits with 130", "[fast][cli]") {
   REQUIRE(waitpid(pid, &status, 0) == pid);
   CHECK(WIFEXITED(status));
   CHECK(WEXITSTATUS(status) == 130);
+}
+
+TEST_CASE("Progress without a TTY is one JSON line per percent step", "[fast][cli]") {
+  std::FILE* err = std::tmpfile();
+  REQUIRE(err != nullptr);
+  ovt::cli::ProgressReporter p(err, false, "index", "frames", [] { return 0.0; });
+  p.update(0.421, 1200, 2850);
+  p.update(0.425, 1210, 2850);  // same percent: no line
+  p.update(0.43, 1225, 2850);
+  p.finish();
+  const std::string s = slurp(err);
+  static_cast<void>(std::fclose(err));
+  CHECK(s ==
+        "{\"progress\":0.42,\"done\":1200,\"total\":2850,\"stage\":\"index\"}\n"
+        "{\"progress\":0.43,\"done\":1225,\"total\":2850,\"stage\":\"index\"}\n");
+}
+
+TEST_CASE("Progress on a TTY rewrites one line with an ETA", "[fast][cli]") {
+  std::FILE* err = std::tmpfile();
+  REQUIRE(err != nullptr);
+  double now = 0.0;
+  ovt::cli::ProgressReporter p(err, true, "index", "frames", [&now] { return now; });
+  now = 8.7;
+  p.update(0.42, 1200, 2850);
+  p.finish();
+  const std::string s = slurp(err);
+  static_cast<void>(std::fclose(err));
+  CHECK(s == "\r[####      ] 42% frames 1200/2850 ETA 00:12\n");
 }

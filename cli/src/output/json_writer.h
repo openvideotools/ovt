@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,6 +19,10 @@
 #include "output/envelope.h"
 
 namespace ovt::cli {
+
+// #101 (accepted by Karl 2026-11-06): the envelope schema lives on the project domain ovt.dev.
+inline constexpr std::string_view kEnvelopeSchemaUrl = "https://ovt.dev/schema/ovt-cli-1.json";
+inline constexpr std::uint32_t kEnvelopeSchemaVersion = 1;
 
 class JsonWriter {
  public:
@@ -62,8 +67,15 @@ class JsonWriter {
 
 // JSON string escaping (RFC 8259): quotes, backslash and control characters; UTF-8 passes through.
 [[nodiscard]] std::string json_quote(std::string_view s);
+[[nodiscard]] std::string to_hex(const std::vector<std::uint8_t>& bytes);
 
 void write_diagnostic(JsonWriter& w, const Diagnostic& d);
+
+// #100 (accepted): `result` will write ovt_fb_to_json text through raw() once WI-0.088 exists.
+// Writes the whole envelope document; `result` writes the value of the "result" member (it must write
+// exactly one value). A null `result` writes an empty object.
+bool write_json_envelope(std::FILE* out, bool pretty, const Envelope& env,
+                         const std::function<void(JsonWriter&)>& result);
 
 }  // namespace ovt::cli
 

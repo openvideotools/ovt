@@ -24,6 +24,7 @@
 #include <tuple>
 #include <utility>
 
+#include "output/fb_writer.h"
 #include "output/json_writer.h"
 #include "ovt/log.h"
 #include "ovt/version.h"
@@ -39,7 +40,7 @@ constexpr unsigned kMaxDefaultThreads = 16;
 constexpr std::array<std::string_view, 7> kLevelNames = {"trace", "debug", "info", "warn", "error", "fatal", "off"};
 
 struct UsageError {
-  std::string code;     // CLI-* code; empty for the messages SPEC-ASSUMPTION(#101) leaves without one
+  std::string code;     // CLI-* code (§12.1.3 registry)
   std::string message;  // without the trailing "See '...'." part
   std::string command;  // "ovt" or "ovt <sub>"
 };
@@ -196,8 +197,8 @@ std::optional<UsageError> resolve_format(const Cli& cli, const Context& ctx, Glo
     g.format_from_flag = true;
   } else if (const auto env = env_value(ctx, "OVT_FORMAT"); env && !env->empty()) {
     const auto f = parse_format(*env);
-    if (!f) {  // SPEC-ASSUMPTION(#101): a bad environment value is a usage error without a code
-      return UsageError{"", fmt::format("invalid value '{}' in OVT_FORMAT", *env), std::string(kName)};
+    if (!f) {  // #101 (accepted): CLI-0011
+      return UsageError{"CLI-0011", fmt::format("invalid value '{}' in OVT_FORMAT", *env), std::string(kName)};
     }
     g.format = *f;
   } else {
@@ -217,7 +218,7 @@ void resolve_paths(const Cli& cli, const Context& ctx, Globals& g) {
     g.cache_dir = default_cache_dir(ctx);
   }
   g.no_cache = r.no_cache;
-  if (cli.given("plugin-dir")) {  // SPEC-ASSUMPTION(#101): the flag replaces OVT_PLUGIN_PATH
+  if (cli.given("plugin-dir")) {  // #101 (accepted): the flag replaces OVT_PLUGIN_PATH
     g.plugin_dirs = r.plugin_dirs;
   } else if (const auto env = env_value(ctx, "OVT_PLUGIN_PATH")) {
     std::string_view rest(*env);
@@ -238,25 +239,29 @@ Resolved resolve(const Cli& cli, const Context& ctx) {
     return {std::nullopt, std::move(err)};
   }
   g.output = r.output;
+  if (g.format == Format::Fb && g.output == "-" && ctx.stdout_tty) {
+    return {std::nullopt, UsageError{"CLI-0010", std::string(kRefuseBinaryOnTty), std::string(kName)}};
+  }
   resolve_paths(cli, ctx, g);
   if (cli.given("threads")) {
     g.threads = r.threads;
   } else if (const auto env = env_value(ctx, "OVT_THREADS"); env && !env->empty()) {
     const auto v = parse_unsigned(*env);
     if (!v) {
-      return {std::nullopt, UsageError{"", fmt::format("invalid value '{}' in OVT_THREADS", *env), std::string(kName)}};
+      return {std::nullopt,
+              UsageError{"CLI-0011", fmt::format("invalid value '{}' in OVT_THREADS", *env), std::string(kName)}};
     }
     g.threads = *v;
   }
   if (cli.given("log-level")) {
     g.log_level = parse_level(r.log_level).value_or(OVT_LOG_WARN);  // IsMember-checked
-  } else if (r.quiet) {  // SPEC-ASSUMPTION(#101): --log-level > --quiet > OVT_LOG_LEVEL
+  } else if (r.quiet) {  // #101 (accepted): --log-level > --quiet > OVT_LOG_LEVEL
     g.log_level = OVT_LOG_ERROR;
   } else if (const auto env = env_value(ctx, "OVT_LOG_LEVEL"); env && !env->empty()) {
     const auto level = parse_level(*env);
     if (!level) {
       return {std::nullopt,
-              UsageError{"", fmt::format("invalid value '{}' in OVT_LOG_LEVEL", *env), std::string(kName)}};
+              UsageError{"CLI-0011", fmt::format("invalid value '{}' in OVT_LOG_LEVEL", *env), std::string(kName)}};
     }
     g.log_level = *level;
   }
@@ -269,7 +274,7 @@ Resolved resolve(const Cli& cli, const Context& ctx) {
   return {std::move(g), std::nullopt};
 }
 
-// SPEC-ASSUMPTION(#101): exit-2 messages are always one human line, even under --format json.
+// #101 (accepted): exit-2 messages are always one human line, even under --format json.
 void print_usage_error(const Context& ctx, const UsageError& e) {
   const std::string code = e.code.empty() ? "" : e.code + " ";
   const std::string line = fmt::format("error: {}{}. See '{} --help'.\n", code, e.message, e.command);
@@ -404,6 +409,13 @@ bool write_version(const Globals& g, std::FILE* out) {
   return w.finish();
 }
 
+std::string_view completion_script(const Context& ctx, std::string_view shell) {
+  if (shell == "bash") {
+    return ctx.completions.bash;
+  }
+  return shell == "zsh" ? ctx.completions.zsh : ctx.completions.fish;
+}
+
 std::atomic<int> g_signal_count{0};
 std::atomic<void (*)(void*)> g_cancel_fn{nullptr};
 std::atomic<void*> g_cancel_arg{nullptr};
@@ -463,20 +475,17 @@ std::optional<int> parse(Cli& cli, const std::vector<std::string>& args, Context
   return static_cast<int>(ExitCode::Usage);
 }
 
-// An option restricted to `accepted` (CLI::IsMember): a bad value is a CLI11 parse failure, so CLI-0001.
-CLI::Option* add_choice(CLI::App& app, const std::string& name, std::string& var, const std::string& help,
-                        const std::vector<std::string>& accepted) {
-  return app.add_option(name, var, help)->check(CLI::IsMember(accepted));
-}
-
 int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
   const bool version = cli.raw().version;
-  if (!version) {
+  if (!version && !cli.completion()->parsed()) {
     print_usage_error(ctx, UsageError{"CLI-0001", "a subcommand is required", std::string(kName)});
     return static_cast<int>(ExitCode::Usage);
   }
-  // SPEC-ASSUMPTION(#101): --version supports text and json only.
-  if (const auto bad = check_format(g, "--version", {Format::Json, Format::Text})) {
+  const bool completion = !version;
+  // #101 (accepted): --version supports text/json; completion rejects only a --format flag.
+  const auto bad = version ? check_format(g, "--version", {Format::Json, Format::Text})
+                           : (g.format_from_flag ? check_format(g, "completion", {Format::Text}) : std::nullopt);
+  if (bad) {
     print_usage_error(ctx, *bad);
     return static_cast<int>(ExitCode::Usage);
   }
@@ -485,7 +494,13 @@ int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
     report(ctx, g, *d);
     return static_cast<int>(ExitCode::Io);
   }
-  const bool ok = write_version(g, target.stream());
+  bool ok = true;
+  if (completion) {
+    const std::string_view script = completion_script(ctx, cli.raw().shell);
+    ok = std::fwrite(script.data(), 1, script.size(), target.stream()) == script.size();
+  } else {
+    ok = write_version(g, target.stream());
+  }
   const ExitCode code = cancel_requested() ? ExitCode::Cancelled : ExitCode::Ok;
   const auto closed = target.close(code);
   if (!ok || closed) {
@@ -541,6 +556,20 @@ unsigned effective_threads(const Globals& g) noexcept {
   return std::clamp(std::thread::hardware_concurrency(), 1U, kMaxDefaultThreads);
 }
 
+CLI::Option* Cli::add_choice(CLI::App& app, const std::string& name, std::string& var, const std::string& help,
+                             std::vector<std::string> canonical, std::vector<std::string> extra) {
+  std::vector<std::string> accepted = canonical;
+  accepted.insert(accepted.end(), extra.begin(), extra.end());
+  CLI::Option* opt = app.add_option(name, var, help)->check(CLI::IsMember(accepted));
+  choices_[opt] = std::move(canonical);
+  return opt;
+}
+
+const std::vector<std::string>* Cli::choices(const CLI::Option* opt) const {
+  const auto it = choices_.find(opt);
+  return it == choices_.end() ? nullptr : &it->second;
+}
+
 bool Cli::given(std::string_view long_name) const {
   const CLI::Option* opt = app_.get_option_no_throw("--" + std::string(long_name));
   return opt != nullptr && opt->count() > 0;
@@ -554,7 +583,7 @@ Cli::Cli()
   app_.set_help_flag("-h,--help", "Help for the tool or the subcommand")->group("Global options");
   app_.option_defaults()->group("Global options");
   add_choice(app_, "-f,--format", raw_.format, "Output encoding (default: json if stdout is not a TTY, else text)",
-             {"json", "fb", "csv", "yuview", "text", "aom-inspect", "mv-csv", "vmaf-json", "yuview-csv"});
+             {"json", "fb", "csv", "yuview", "text", "aom-inspect", "mv-csv", "vmaf-json"}, {"yuview-csv"});
   app_.add_flag("--pretty", raw_.pretty, "2-space-indented JSON regardless of the TTY test");
   app_.add_flag("--compact", raw_.compact, "Single-line JSON regardless of the TTY test");
   app_.add_option("-o,--output", raw_.output, "Write the result to a file instead of stdout");
@@ -576,6 +605,10 @@ Cli::Cli()
   app_.add_flag("--json", raw_.json, "Alias of --format json")->group("Aliases");
   app_.add_flag("--text", raw_.text, "Alias of --format text")->group("Aliases");
   app_.add_flag("--flatbuffers", raw_.flatbuffers, "Alias of --format fb")->group("Aliases");
+
+  completion_ = app_.add_subcommand("completion", "Shell completion scripts (bash, zsh, fish)");
+  add_choice(*completion_, "shell", raw_.shell, "Shell to print the completion script for", {"bash", "zsh", "fish"})
+      ->required();
 }
 
 int run(const std::vector<std::string>& args, Context& ctx) {
@@ -639,6 +672,47 @@ void set_cancel_hook(void (*fn)(void*), void* arg) noexcept {
 void reset_cancel_state_for_testing() noexcept {
   g_signal_count.store(0);
   set_cancel_hook(nullptr, nullptr);
+}
+
+ProgressReporter::ProgressReporter(std::FILE* err, bool tty, std::string stage, std::string unit, Clock clock)
+    : err_(err), tty_(tty), stage_(std::move(stage)), unit_(std::move(unit)), clock_(std::move(clock)) {
+  if (!clock_) {
+    clock_ = [] { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); };
+  }
+  start_ = clock_();
+}
+
+void ProgressReporter::update(double fraction, std::uint64_t done, std::uint64_t total) {
+  const double f = std::clamp(fraction, 0.0, 1.0);
+  const int percent = static_cast<int>(f * 100.0);
+  if (percent <= last_percent_) {
+    return;
+  }
+  last_percent_ = percent;
+  std::string line;
+  if (tty_) {
+    constexpr int kBar = 10;
+    const int filled = percent * kBar / 100;
+    std::string eta = "--:--";
+    if (f > 0.0) {
+      const auto left = std::llround((clock_() - start_) * (1.0 - f) / f);
+      eta = left >= 3600 ? fmt::format("{:02}:{:02}:{:02}", left / 3600, left / 60 % 60, left % 60)
+                         : fmt::format("{:02}:{:02}", left / 60, left % 60);
+    }
+    line = fmt::format("\r[{}{}] {}% {} {}/{} ETA {}", std::string(static_cast<std::size_t>(filled), '#'),
+                       std::string(static_cast<std::size_t>(kBar - filled), ' '), percent, unit_, done, total, eta);
+  } else {
+    line = fmt::format("{{\"progress\":{},\"done\":{},\"total\":{},\"stage\":{}}}\n", percent / 100.0, done, total,
+                       json_quote(stage_));
+  }
+  static_cast<void>(std::fwrite(line.data(), 1, line.size(), err_));
+  static_cast<void>(std::fflush(err_));
+}
+
+void ProgressReporter::finish() {
+  if (tty_ && last_percent_ >= 0) {
+    static_cast<void>(std::fputc('\n', err_));
+  }
 }
 
 }  // namespace ovt::cli
