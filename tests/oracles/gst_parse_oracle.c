@@ -78,12 +78,12 @@ static void print_value(FILE* out, const uint8_t* p, GfKind kind) {
 }
 
 static void print_array(FILE* out, const uint8_t* base, const GfField* f, int level, size_t first_count) {
-  if (level >= GF_MAX_RANK) {
-    return;  // the generator rejects rank > GF_MAX_RANK; this only keeps the compiler's bounds analysis honest
-  }
   if (level == f->rank) {
     print_value(out, base, f->kind);
     return;
+  }
+  if (level >= GF_MAX_RANK) {
+    return;  // the generator rejects rank > GF_MAX_RANK; this only keeps the compiler's bounds analysis honest
   }
   size_t n = level == 0 ? first_count : f->count[level];
   fputc('[', out);
