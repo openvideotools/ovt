@@ -98,9 +98,7 @@ def srgb_eotf(e: np.ndarray) -> np.ndarray:
 
 def srgb_oetf(v: np.ndarray | float) -> np.ndarray:
     v = np.asarray(v, dtype=np.float64)
-    return np.where(
-        v <= 0.0031308, 12.92 * v, 1.055 * np.power(np.maximum(v, 0.0), 1 / 2.4) - 0.055
-    )
+    return np.where(v <= 0.0031308, 12.92 * v, 1.055 * np.power(np.maximum(v, 0.0), 1 / 2.4) - 0.055)
 
 
 # --------------------------------------------------------------------------------------------------------
@@ -119,9 +117,7 @@ BT2020 = Matrix("bt2020nc", 0.2627, 0.0593)
 
 def luma_code(e: np.ndarray | float) -> np.ndarray:
     """Limited-range 10-bit luma code of a non-linear value: ``round(876 * E' + 64)``."""
-    return np.floor(876.0 * np.asarray(e, dtype=np.float64) + 64.0 + 0.5).astype(
-        np.int64
-    )
+    return np.floor(876.0 * np.asarray(e, dtype=np.float64) + 64.0 + 0.5).astype(np.int64)
 
 
 def full_luma_code(e: np.ndarray | float) -> np.ndarray:
@@ -162,12 +158,8 @@ class Canvas:
         self.cb = np.full((HEIGHT // 2, WIDTH // 2), 512, dtype=np.uint16)
         self.cr = np.full((HEIGHT // 2, WIDTH // 2), 512, dtype=np.uint16)
 
-    def fill(
-        self, x0: int, x1: int, y0: int, y1: int, code: tuple[int, int, int]
-    ) -> None:
-        assert x0 % 2 == 0 and x1 % 2 == 0 and y0 % 2 == 0 and y1 % 2 == 0, (
-            "regions must be 4:2:0 aligned"
-        )
+    def fill(self, x0: int, x1: int, y0: int, y1: int, code: tuple[int, int, int]) -> None:
+        assert x0 % 2 == 0 and x1 % 2 == 0 and y0 % 2 == 0 and y1 % 2 == 0, "regions must be 4:2:0 aligned"
         self.y[y0:y1, x0:x1] = code[0]
         self.cb[y0 // 2 : y1 // 2, x0 // 2 : x1 // 2] = code[1]
         self.cr[y0 // 2 : y1 // 2, x0 // 2 : x1 // 2] = code[2]
@@ -177,9 +169,7 @@ class Canvas:
 
 
 def y4m_bytes(canvas: Canvas) -> bytes:
-    header = (
-        f"YUV4MPEG2 W{WIDTH} H{HEIGHT} F{FPS} Ip A1:1 C420p10 XYSCSS=420P10\n".encode()
-    )
+    header = f"YUV4MPEG2 W{WIDTH} H{HEIGHT} F{FPS} Ip A1:1 C420p10 XYSCSS=420P10\n".encode()
     frame = b"FRAME\n" + canvas.frame_bytes()
     return header + frame * FRAMES
 
@@ -206,9 +196,7 @@ def _band_fractions(nits_and_area: list[tuple[float, int]]) -> list[float]:
     return [c / total for c in acc]
 
 
-def _grey_nits_from_codes(
-    codes: np.ndarray, eotf: Callable[[np.ndarray], np.ndarray]
-) -> np.ndarray:
+def _grey_nits_from_codes(codes: np.ndarray, eotf: Callable[[np.ndarray], np.ndarray]) -> np.ndarray:
     """Luminance in nits that a decoder reconstructs from limited-range 10-bit codes (grey: R'=G'=B'=Y')."""
     return eotf(np.clip((np.asarray(codes, dtype=np.float64) - 64.0) / 876.0, 0.0, 1.0))
 
@@ -219,12 +207,8 @@ def pattern_pq_patches() -> tuple[Canvas, dict, Tags]:
     w = WIDTH // n  # 320: even, so chroma is exact
     codes = [int(luma_code(pq_oetf(v))) for v in PQ_NITS]
     full = [int(full_luma_code(pq_oetf(v))) for v in PQ_NITS]
-    assert codes == PQ_LIMITED_CODES, (
-        f"PQ limited codes {codes} differ from the spec list {PQ_LIMITED_CODES}"
-    )
-    assert full == PQ_FULL_CODES, (
-        f"PQ full-range codes {full} differ from the spec list {PQ_FULL_CODES}"
-    )
+    assert codes == PQ_LIMITED_CODES, f"PQ limited codes {codes} differ from the spec list {PQ_LIMITED_CODES}"
+    assert full == PQ_FULL_CODES, f"PQ full-range codes {full} differ from the spec list {PQ_FULL_CODES}"
     for i, code in enumerate(codes):
         c.fill(i * w, (i + 1) * w, 0, HEIGHT, (code, 512, 512))
     area = w * HEIGHT
@@ -304,9 +288,7 @@ def pattern_hlg_patches() -> tuple[Canvas, dict, Tags]:
         "fall_nits": float(fall_decoded),
         "fall_definition": "mean over all pixels of max(R,G,B) display nits reconstructed from the limited codes",
         "band_edges_nits": BAND_EDGES,
-        "band_fractions": _band_fractions(
-            [(v, area) for v in nits] + [(float(v), ramp_rows) for v in ramp_nits]
-        ),
+        "band_fractions": _band_fractions([(v, area) for v in nits] + [(float(v), ramp_rows) for v in ramp_nits]),
         "band_fractions_basis": "display nits reconstructed from the codes (Lw = 1000); ramp columns weigh ramp_rows",
         "out_of_gamut_709_samples": 0,
         "saturated_area_samples": 0,
@@ -378,16 +360,11 @@ def pattern_p3_saturation() -> tuple[Canvas, dict, Tags]:
     oog_total = 0
     for i, (name, rgb) in enumerate(stripes):
         code = rgb_to_ycbcr10(np.array(rgb, dtype=np.float64), BT709)
-        c.fill(
-            i * w, (i + 1) * w, 0, HEIGHT, (int(code[0]), int(code[1]), int(code[2]))
-        )
+        c.fill(i * w, (i + 1) * w, 0, HEIGHT, (int(code[0]), int(code[1]), int(code[2])))
         decoded = ycbcr10_to_rgb(code.astype(np.float64), BT709)
         lin_p3 = srgb_eotf(np.clip(decoded, 0.0, 1.0))
         lin_709 = _P3_TO_709 @ lin_p3
-        outside = bool(
-            np.any(lin_709 < -GAMUT_TOLERANCE)
-            or np.any(lin_709 > 1.0 + GAMUT_TOLERANCE)
-        )
+        outside = bool(np.any(lin_709 < -GAMUT_TOLERANCE) or np.any(lin_709 > 1.0 + GAMUT_TOLERANCE))
         samples = w * HEIGHT if outside else 0
         oog_total += samples
         entries.append(
@@ -444,9 +421,7 @@ def pattern_siting_checker() -> tuple[Canvas, dict, Tags]:
         "chroma_siting": "left (chroma_sample_loc_type 0), signalled in the HEVC VUI",
         "chroma_rule": "chroma sample (cx, cy): odd = (cx + cy) & 1; Cb = 768 if odd else 256; Cr = 256 if odd else 768",
         "chroma_values": {"high": hi, "low": lo},
-        "chroma_planes_sha256": hashlib.sha256(
-            c.cb.astype("<u2").tobytes() + c.cr.astype("<u2").tobytes()
-        ).hexdigest(),
+        "chroma_planes_sha256": hashlib.sha256(c.cb.astype("<u2").tobytes() + c.cr.astype("<u2").tobytes()).hexdigest(),
         "out_of_gamut_709_samples": 0,
         "saturated_area_samples": 0,
     }
@@ -592,19 +567,11 @@ def generate(out: Path, names: list[str], encoder_pin: dict | None) -> dict[str,
         version = encode_mp4(y4m, mp4, tags)
         if encoder_pin is not None and version != encoder_pin["x265"]:
             mp4.unlink(missing_ok=True)
-            raise EncoderMismatch(
-                f"x265 {version} differs from the pinned {encoder_pin['x265']}"
-            )
+            raise EncoderMismatch(f"x265 {version} differs from the pinned {encoder_pin['x265']}")
         versions[name] = version
-        if decode_raw(mp4) != y4m_payload(
-            data
-        ):  # step 5 pitfall: the lossless round trip must be exact
-            raise RuntimeError(
-                f"{name}: decoded mp4 differs from the generated Y4M (not lossless)"
-            )
-        (out / f"{name}.expected.json").write_text(
-            dump_json(expected), encoding="utf-8"
-        )
+        if decode_raw(mp4) != y4m_payload(data):  # step 5 pitfall: the lossless round trip must be exact
+            raise RuntimeError(f"{name}: decoded mp4 differs from the generated Y4M (not lossless)")
+        (out / f"{name}.expected.json").write_text(dump_json(expected), encoding="utf-8")
     return versions
 
 
@@ -646,12 +613,8 @@ def update_manifest(manifest: Path, out: Path, names: list[str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--out", type=Path, default=REPO / "tests/corpora/patterns")
-    ap.add_argument(
-        "--manifest", type=Path, default=REPO / "tests/corpora/manifest.json"
-    )
-    ap.add_argument(
-        "--no-manifest", action="store_true", help="do not touch the corpora manifest"
-    )
+    ap.add_argument("--manifest", type=Path, default=REPO / "tests/corpora/manifest.json")
+    ap.add_argument("--no-manifest", action="store_true", help="do not touch the corpora manifest")
     ap.add_argument(
         "--check",
         action="store_true",
@@ -666,9 +629,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     names = args.only or list(PATTERNS)
     pin_path = args.out / "encoder.json"
-    pin = (
-        json.loads(pin_path.read_text(encoding="utf-8")) if pin_path.exists() else None
-    )
+    pin = json.loads(pin_path.read_text(encoding="utf-8")) if pin_path.exists() else None
 
     if args.check:
         with tempfile.TemporaryDirectory() as tmp:
@@ -684,21 +645,12 @@ def main(argv: list[str] | None = None) -> int:
                     if not b.exists() or a.read_bytes() != b.read_bytes():
                         bad.append(b.name)
             if not args.no_manifest and args.manifest.exists():
-                doc = {
-                    e["id"]: e
-                    for e in json.loads(args.manifest.read_text(encoding="utf-8"))[
-                        "entries"
-                    ]
-                }
+                doc = {e["id"]: e for e in json.loads(args.manifest.read_text(encoding="utf-8"))["entries"]}
                 for name in names:
-                    if doc.get(f"syn_pat_{name}") != manifest_entry(
-                        name, Path(tmp) / f"{name}.mp4"
-                    ):
+                    if doc.get(f"syn_pat_{name}") != manifest_entry(name, Path(tmp) / f"{name}.mp4"):
                         bad.append(f"manifest:syn_pat_{name}")
             if bad:
-                print(
-                    "gen_hdr_patterns.py: differs: " + ", ".join(bad), file=sys.stderr
-                )
+                print("gen_hdr_patterns.py: differs: " + ", ".join(bad), file=sys.stderr)
                 return 1
         print("gen_hdr_patterns.py: all patterns match")
         return 0

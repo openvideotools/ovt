@@ -17,11 +17,9 @@ TOOLS = Path(__file__).resolve().parent.parent
 REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
-pytest.importorskip(
-    "numpy"
-)  # NumPy is a pytest-lane requirement (tools/requirements-test.txt)
+pytest.importorskip("numpy")  # NumPy is a pytest-lane requirement (tools/requirements-test.txt)
 
-import gen_hdr_patterns as gen
+import gen_hdr_patterns as gen  # noqa: E402
 
 PATTERN_DIR = REPO / "tests/corpora/patterns"
 MANIFEST = REPO / "tests/corpora/manifest.json"
@@ -40,9 +38,7 @@ def _has_libx265() -> bool:
     return "libx265" in out.stdout
 
 
-needs_x265 = pytest.mark.skipif(
-    not _has_libx265(), reason="ffmpeg with libx265 not available"
-)
+needs_x265 = pytest.mark.skipif(not _has_libx265(), reason="ffmpeg with libx265 not available")
 
 
 def test_pq_codes_match_the_spec() -> None:
@@ -77,9 +73,7 @@ def test_hlg_75_percent_is_203_nits() -> None:
 
 def test_pq_expected_json_content() -> None:
     """Acceptance 2: nits per patch, limited codes and FALL = area-weighted mean."""
-    exp = json.loads(
-        (PATTERN_DIR / "pq_patches_1000.expected.json").read_text(encoding="utf-8")
-    )
+    exp = json.loads((PATTERN_DIR / "pq_patches_1000.expected.json").read_text(encoding="utf-8"))
     assert exp["nits"] == [1, 100, 203, 1000, 4000, 10000]
     assert exp["codes_limited"] == [195, 509, 573, 723, 855, 940]
     assert exp["fall_nits"] == pytest.approx(sum(exp["nits"]) / 6)
@@ -88,18 +82,14 @@ def test_pq_expected_json_content() -> None:
 
 
 def test_p3_saturation_has_saturated_area() -> None:
-    exp = json.loads(
-        (PATTERN_DIR / "p3_saturation.expected.json").read_text(encoding="utf-8")
-    )
+    exp = json.loads((PATTERN_DIR / "p3_saturation.expected.json").read_text(encoding="utf-8"))
     assert exp["saturated_area_samples"] > 0
     assert exp["out_of_gamut_709_samples"] == exp["saturated_area_samples"]
 
 
 def test_manifest_has_every_pattern_entry() -> None:
     """Acceptance 3 (until tools/check_fast_subset.py of WI-0.553 exists): entry, tag and SHA-256 per pattern."""
-    entries = {
-        e["id"]: e for e in json.loads(MANIFEST.read_text(encoding="utf-8"))["entries"]
-    }
+    entries = {e["id"]: e for e in json.loads(MANIFEST.read_text(encoding="utf-8"))["entries"]}
     for name in gen.PATTERNS:
         entry = entries[f"syn_pat_{name}"]
         mp4 = PATTERN_DIR / f"{name}.mp4"
@@ -112,9 +102,7 @@ def test_manifest_has_every_pattern_entry() -> None:
 
 def test_manifest_validates_against_schema() -> None:
     jsonschema = pytest.importorskip("jsonschema")
-    schema = json.loads(
-        (REPO / "tests/corpora/manifest.schema.json").read_text(encoding="utf-8")
-    )
+    schema = json.loads((REPO / "tests/corpora/manifest.schema.json").read_text(encoding="utf-8"))
     jsonschema.validate(json.loads(MANIFEST.read_text(encoding="utf-8")), schema)
 
 
@@ -126,9 +114,7 @@ def test_run_twice_is_byte_identical(tmp_path: Path) -> None:
         gen.generate(a, [name], None)
         gen.generate(b, [name], None)
         for suffix in (".y4m", ".mp4", ".expected.json"):
-            assert (a / f"{name}{suffix}").read_bytes() == (
-                b / f"{name}{suffix}"
-            ).read_bytes(), suffix
+            assert (a / f"{name}{suffix}").read_bytes() == (b / f"{name}{suffix}").read_bytes(), suffix
 
 
 @needs_x265
