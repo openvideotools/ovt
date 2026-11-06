@@ -252,6 +252,45 @@ void dump_picture(TComPic* pic, bool first) {
   std::printf("   }}");
 }
 
+// TAppDecTop releases a picture once it has written it (xWriteOutput, xFlushOutput): the picture is no longer needed
+// for output and, unless it is still a reference, no longer holds a reconstruction. Nothing is written here, so every
+// picture is released as soon as it has been dumped.
+void release_pictures(TComList<TComPic*>* pic_list) {
+  if (pic_list == nullptr) {
+    return;
+  }
+  for (TComPic* pic : *pic_list) {
+    if (pic->getOutputMark() && pic->getReconMark() && !pic->getSlice(0)->isReferenced()) {
+      pic->setReconMark(false);
+      pic->getPicYuvRec()->setBorderExtension(false);
+    }
+    pic->setOutputMark(false);
+  }
+}
+
+// TAppDecTop::xFlushOutput minus the writes: release every picture, then destroy them and empty the decoded picture
+// buffer. TAppDecTop flushes at an IDR or BLA picture and at the end of the stream; without the flush at an IDR the
+// pictures of the previous coded video sequence stay marked as reconstructed with POCs above the IDR's, and HM's
+// TComSlice::checkLeadingPictureRestrictions asserts (rpcPic->getPOC() < this->getPOC()).
+void flush_pictures(TComList<TComPic*>* pic_list) {
+  if (pic_list == nullptr || pic_list->empty()) {
+    return;
+  }
+  release_pictures(pic_list);
+  for (TComPic*& pic : *pic_list) {
+    pic->destroy();
+    delete pic;
+    pic = nullptr;
+  }
+  pic_list->clear();
+}
+
+bool is_idr_or_bla(NalUnitType type) {
+  return type == NAL_UNIT_CODED_SLICE_IDR_W_RADL || type == NAL_UNIT_CODED_SLICE_IDR_N_LP ||
+         type == NAL_UNIT_CODED_SLICE_BLA_N_LP || type == NAL_UNIT_CODED_SLICE_BLA_W_RADL ||
+         type == NAL_UNIT_CODED_SLICE_BLA_W_LP;
+}
+
 }  // namespace
 
 // Older HM releases (16.0 .. 16.15) define this decode-hash flag in TAppDecTop.cpp, which is not linked here, and
@@ -321,12 +360,8 @@ int main(int argc, char** argv) {
           dump_picture(dec.m_pcPic, first);
           first = false;
         }
-        // Nothing is written to a file, so no picture is ever "output": release every picture for reuse.
-        if (pic_list != nullptr) {
-          for (TComPic* pic : *pic_list) {
-            pic->setOutputMark(false);
-          }
-        }
+        // Nothing is written to a file: release every dumped picture where TAppDecTop would write it.
+        release_pictures(pic_list);
       }
       loop_filtered = (nalu.m_nalUnitType == NAL_UNIT_EOS);
       if (nalu.m_nalUnitType == NAL_UNIT_EOS) {
@@ -336,8 +371,23 @@ int main(int argc, char** argv) {
                dec.getFirstSliceInSequence()) {
       dec.setFirstSliceInPicture(true);
     }
+
+    // The picture-buffer steps of TAppDecTop::decode that follow the loop filter, minus the writes.
+    if (pic_list != nullptr) {
+      if ((new_picture || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA) && dec.getNoOutputPriorPicsFlag()) {
+        dec.checkNoOutputPriorPics(pic_list);
+        dec.setNoOutputPriorPicsFlag(false);
+      }
+      if (new_picture && is_idr_or_bla(nalu.m_nalUnitType)) {
+        flush_pictures(pic_list);
+      }
+      if (nalu.m_nalUnitType == NAL_UNIT_EOS) {
+        dec.setFirstSliceInPicture(false);
+      }
+    }
   }
 
+  flush_pictures(pic_list);
   std::printf("\n]}\n");
   dec.deletePicBuffer();
   return std::fflush(stdout) == 0 ? 0 : 1;
