@@ -13,6 +13,7 @@
 #include <fmt/format.h>
 
 #include <cstdio>
+#include <exception>
 #include <span>
 #include <string>
 #include <string_view>
@@ -240,10 +241,7 @@ std::string as_array(std::string_view id, std::string_view text) {
   return out + "\n    0};\n";
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  const std::span<char*> args(argv, static_cast<std::size_t>(argc));
+int generate(std::span<char*> args) {
   if (args.size() < 2) {
     static_cast<void>(std::fputs("usage: gen_completions <output-dir> [<cli-name>]\n", stderr));
     return 2;
@@ -278,4 +276,17 @@ int main(int argc, char** argv) {
     return 1;
   }
   return 0;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return generate(std::span<char*>(argv, static_cast<std::size_t>(argc)));
+  } catch (const std::exception& e) {
+    static_cast<void>(std::fprintf(stderr, "gen_completions: %s\n", e.what()));
+  } catch (...) {
+    static_cast<void>(std::fputs("gen_completions: unknown exception\n", stderr));
+  }
+  return 1;
 }
