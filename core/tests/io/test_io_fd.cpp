@@ -5,23 +5,31 @@
 // chapter 12 §12.3.6; WI-1.101). Android's content:// path (acceptance test 3) runs in WI-0.051's
 // instrumentation tests; here a descriptor of a temporary file stands in for ParcelFileDescriptor.detachFd().
 
+#if defined(__APPLE__)
+#include <sys/fcntl.h>  // macOS declares open(2), fcntl(2) and the O_/F_ constants here
+#else
 #include <fcntl.h>
+#endif
 #include <unistd.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
 #include <array>
 #include <cerrno>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <memory>
 #include <random>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/io.h"
+#include "ovt/status.h"
 
 namespace {
 

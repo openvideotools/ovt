@@ -6,18 +6,24 @@
 
 #include "ovt/cxx/io/random_access_file.hpp"
 
+#if defined(__APPLE__)
+#include <sys/fcntl.h>  // macOS declares open(2), fcntl(2) and the O_/F_ constants here
+#else
 #include <fcntl.h>
+#endif
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <system_error>
 #include <utility>
 
 #include "io_backends.hpp"
 #include "ovt/cxx/log.hpp"
+#include "ovt/status.h"
 
 namespace ovt::io {
 
@@ -125,7 +131,8 @@ FdFacts describe_fd(int fd, uint64_t size, std::string display_name, FdCloser& g
     if (size == 0 || size == UINT64_MAX) {
       throw_os(OVT_E_IO, err, "cannot stat", display_name);
     }
-    return {FileInfo{size, 0, std::move(display_name)}, false};  // trust the caller's size; mtime unknown
+    return {.info = FileInfo{.size = size, .mtime_ns = 0, .display_name = std::move(display_name)},
+            .mappable = false};  // trust the caller's size; mtime unknown
   }
   const bool is_regular = S_ISREG(st.st_mode);
   if (S_ISDIR(st.st_mode)) {
@@ -144,7 +151,8 @@ FdFacts describe_fd(int fd, uint64_t size, std::string display_name, FdCloser& g
     throw IoError(OVT_E_INVALID_ARG, 0, "io: descriptor is not open for reading: '" + display_name + "'");
   }
   const bool mappable = is_regular && size <= static_cast<uint64_t>(st.st_size);
-  return {FileInfo{size, mtime_ns_of(st), std::move(display_name)}, mappable};
+  return {.info = FileInfo{.size = size, .mtime_ns = mtime_ns_of(st), .display_name = std::move(display_name)},
+          .mappable = mappable};
 }
 
 }  // namespace

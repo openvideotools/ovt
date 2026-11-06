@@ -8,7 +8,7 @@
 #ifndef OVT_OVT_H
 #define OVT_OVT_H
 
-#include "ovt/io.h"
+#include "ovt/io.h"  // IWYU pragma: export
 #include "ovt/log.h"
 #include "ovt/status.h"
 #include "ovt/version.h"

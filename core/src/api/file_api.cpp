@@ -6,7 +6,11 @@
 // SPEC-ASSUMPTION(#110): both opens use OpenMode::Pread; ovt_file_open_fd dup()s a borrowed fd; an
 // IoError maps to its own code (INVALID_ARG, IO or UNSUPPORTED).
 
+#if defined(__APPLE__)
+#include <sys/fcntl.h>  // macOS declares open(2), fcntl(2) and the O_/F_ constants here
+#else
 #include <fcntl.h>
+#endif
 #include <unistd.h>
 
 #include <cstddef>
@@ -19,6 +23,7 @@
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/cxx/log.hpp"
 #include "ovt/io.h"
+#include "ovt/status.h"
 
 struct ovt_File {
   std::unique_ptr<ovt::io::RandomAccessFile> file;

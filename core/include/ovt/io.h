@@ -12,6 +12,9 @@
 #ifndef OVT_IO_H
 #define OVT_IO_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #include "ovt/status.h"
 
 #ifdef __cplusplus
