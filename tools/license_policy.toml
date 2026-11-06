@@ -7,9 +7,10 @@
 schema_version = 1
 
 [deny]                      # regex on SPDX ids (case-insensitive); any match anywhere fails
+# `NC` is the only LicenseRef token that collides with ordinary words ("Conformance"), so it must be a whole word.
 patterns = [
   "^AGPL", "^SSPL", "^BUSL", "^Elastic-2", "Commons-Clause", "^CC-BY-NC", "NonCommercial",
-  "LicenseRef-.*(NC|Proprietary|Evaluation)", "^JSON$", "^Hippocratic",
+  "LicenseRef-.*(Proprietary|Evaluation)", "LicenseRef-(\\S*[-.])?NC(?![A-Za-z])", "^JSON$", "^Hippocratic",
 ]
 
 [allow]
@@ -82,6 +83,11 @@ ovt_plugin_hm = "BSD-3-Clause"
 ".github" = "LGPL-2.1-or-later"
 "plugins" = "LGPL-2.1-or-later"
 "" = "LGPL-2.1-or-later"
+
+[corpora]                   # chapter 14 §14.3.4 rule 2, read by `license_gate.py --corpora` (WI-0.561)
+# `redistributable = true` needs one of these ids. Extend by PR, never by CI override. Rule 4 (AGPL, SSPL, BUSL,
+# NonCommercial) uses [deny] above.
+redistributable_spdx = ["CC0-1.0", "CC-BY-4.0", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent", "MIT", "Apache-2.0"]
 
 [distribution]              # artefact rules (ADR-015); artefact ids are those of tools/release/manifest.toml (chapter 13 §13.8.1)
 default_download_forbidden_plugins = ["ovt_plugin_ffmpeg", "ovt_plugin_de265", "ovt_plugin_hm"]
