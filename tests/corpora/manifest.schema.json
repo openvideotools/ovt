@@ -77,7 +77,23 @@
         "features": { "type": "array", "items": { "type": "string" } },
         "tests": { "type": "array", "items": { "type": "string" } },
         "tags": { "type": "array", "items": { "type": "string" } },
-        "aliases": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" } }
+        "aliases": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" } },
+        "kind": {
+          "enum": ["stream", "fixture"],
+          "description": "source syn only: a generated stream (recipe of section 14.3.3) or a non-stream fixture"
+        },
+        "recipe": { "type": "string", "pattern": "^[0-9]+[a-z]?$", "description": "section 14.3.3 recipe number" },
+        "path": { "$ref": "#/$defs/relpath", "description": "kind fixture: repository-relative path of the file" },
+        "local_only": {
+          "type": "boolean",
+          "description": "generated on the perf runner by generate.py, never fetched (section 14.3.3 recipe 27)"
+        },
+        "files": {
+          "type": "object",
+          "description": "source syn: SHA-256 of every file of the id; sha256 is the primary (first) file",
+          "propertyNames": { "pattern": "^[A-Za-z0-9_.-]+$" },
+          "additionalProperties": { "$ref": "#/$defs/sha256" }
+        }
       },
       "allOf": [
         {
