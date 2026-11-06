@@ -43,17 +43,20 @@ Menu {
 
     // Called by the creator once createObject() has returned: building the submenus from the component that is
     // still being completed would fail ("Cannot create new component instance before completing the previous").
+    // Native menus (the macOS style) have no content item; the objects then just belong to the menu.
+    readonly property QtObject menuParent: menu.contentItem ?? menu
+
     function populate() {
         for (let i = 0; i < entries.length; ++i) {
             const entry = entries[i]
             if (entry.separator === true) {
-                menu.addItem(separatorComponent.createObject(menu.contentItem))
+                menu.addItem(separatorComponent.createObject(menuParent))
             } else if (entry.items !== undefined) {
-                const sub = menuComponent.createObject(menu.contentItem, {"title": entry.text, "entries": entry.items, "actions": menu.actions, "menuComponent": menu.menuComponent})
+                const sub = menuComponent.createObject(menuParent, {"title": entry.text, "entries": entry.items, "actions": menu.actions, "menuComponent": menu.menuComponent})
                 sub.populate()
                 menu.addMenu(sub)
             } else {
-                menu.addItem(itemComponent.createObject(menu.contentItem, {"entry": entry}))
+                menu.addItem(itemComponent.createObject(menuParent, {"entry": entry}))
             }
         }
     }

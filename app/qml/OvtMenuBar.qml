@@ -19,7 +19,7 @@ MenuBar {
 
     Component.onCompleted: {
         for (const entry of actions.menus) {
-            const menu = menuComponent.createObject(bar.contentItem, {"title": entry.text, "entries": entry.items, "actions": bar.actions, "menuComponent": menuComponent})
+            const menu = menuComponent.createObject(bar.contentItem ?? bar, {"title": entry.text, "entries": entry.items, "actions": bar.actions, "menuComponent": menuComponent})
             menu.populate()
             bar.addMenu(menu)
         }

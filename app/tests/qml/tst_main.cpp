@@ -6,6 +6,7 @@
 
 #include <QtQuickTest/quicktest.h>
 #include <QObject>
+#include <QQuickStyle>
 #include <QTemporaryDir>
 #include <QtGlobal>
 
@@ -20,6 +21,8 @@ class Setup : public QObject {
       qputenv("OVT_CONFIG_DIR", config_dir_.path().toLocal8Bit());
     }
     ovt::app::Platform::selectGraphicsApi();
+    // As in main.cpp: the default style on macOS is the native one, whose menus have no content item.
+    QQuickStyle::setStyle(QStringLiteral("Fusion"));
   }
 
  private:
