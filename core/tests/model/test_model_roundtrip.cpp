@@ -44,7 +44,9 @@ std::string read_text(const std::string& name) {
 
 Bytes repack(const fb::FrameAnalysis& root, bool size_prefixed) {
   flatbuffers::FlatBufferBuilder builder;  // ForceDefaults stays false
-  const auto offset = fb::FrameAnalysis::Pack(builder, std::unique_ptr<fb::FrameAnalysisT>(root.UnPack()).get());
+  fb::FrameAnalysisT native;  // stack object: no raw owning pointer for the static analyzer to track
+  root.UnPackTo(&native);
+  const auto offset = fb::FrameAnalysis::Pack(builder, &native);
   if (size_prefixed) {
     fb::FinishSizePrefixedFrameAnalysisBuffer(builder, offset);
   } else {
