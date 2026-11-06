@@ -24,7 +24,7 @@ function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
   set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml")
+                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -52,12 +52,16 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/platform/platform.cpp"
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
+    "${app_dir}/src/models/jobs_model.h"
+    "${app_dir}/src/models/jobs_model.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
     "${schema}")
   # src/platform too: the generated type registration includes the headers by file name.
-  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform")
-  target_link_libraries(${target} PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 ovt::flags)
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
+  # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
+  target_link_libraries(${target} PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 ovt::core
+                                          ovt::flags)
   # No QSettings anywhere in app/ (D8) and no Qt keyword macros (the headers use Q_SIGNALS).
   target_compile_definitions(${target} PRIVATE QT_NO_KEYWORDS)
 endfunction()
