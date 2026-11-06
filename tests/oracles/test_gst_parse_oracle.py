@@ -77,11 +77,7 @@ def test_h264_multislice(exe: str, work: Path, enc: str) -> None:
     assert rc == 0
     check_header_struct(units)
     sps = [u for u in units if "sps" in u]
-    assert (
-        sps
-        and sps[0]["sps"]["profile_idc"] == 66
-        and sps[0]["sps"]["frame_mbs_only_flag"] == 1
-    )
+    assert sps and sps[0]["sps"]["profile_idc"] == 66 and sps[0]["sps"]["frame_mbs_only_flag"] == 1
     # Acceptance 1: 4 slice headers per frame with first_mb_in_slice increasing.
     frames: list[list[int]] = []
     for u in units:
@@ -143,16 +139,8 @@ def test_av1_tiles(exe: str, work: Path, enc: str) -> None:
     if r.returncode == 0:
         rc, obu_units = oracle(exe, "--codec", "av1", "--obu", str(obu))
         assert rc == 0
-        strip = [
-            {k: v for k, v in u.items() if k != "unit"}
-            for u in obu_units
-            if "frame_header" in u
-        ]
-        ivf = [
-            {k: v for k, v in u.items() if k != "unit"}
-            for u in units
-            if "frame_header" in u
-        ]
+        strip = [{k: v for k, v in u.items() if k != "unit"} for u in obu_units if "frame_header" in u]
+        ivf = [{k: v for k, v in u.items() if k != "unit"} for u in units if "frame_header" in u]
         assert strip == ivf
 
 
@@ -168,9 +156,7 @@ def test_h265(exe: str, work: Path, enc: str) -> None:
     kinds = {k for u in units for k in u if k != "unit"}
     assert {"vps", "sps", "pps", "slice_header"} <= kinds
     sps = next(u["sps"] for u in units if "sps" in u)
-    assert (
-        sps["profile_tier_level"]["profile_idc"] == 1 and sps["chroma_format_idc"] == 1
-    )
+    assert sps["profile_tier_level"]["profile_idc"] == 1 and sps["chroma_format_idc"] == 1
     slices = [u["slice_header"] for u in units if "slice_header" in u]
     assert slices[0]["first_slice_segment_in_pic_flag"] == 1
 
@@ -180,9 +166,7 @@ def test_errors(exe: str, work: Path) -> None:
     assert run([exe, "--codec", "h264", "--obu", "x"]).returncode == 2
     assert run([exe, "--codec", "h264", str(work / "missing")]).returncode == 3
     junk = work / "junk.264"
-    junk.write_bytes(
-        b"\x00\x00\x01\x67" + b"\xff" * 5
-    )  # an SPS NAL unit that cannot be parsed
+    junk.write_bytes(b"\x00\x00\x01\x67" + b"\xff" * 5)  # an SPS NAL unit that cannot be parsed
     rc, units = oracle(exe, "--codec", "h264", str(junk))
     assert rc == 1 and units and "error" in units[0]
 
@@ -193,9 +177,7 @@ def main() -> int:
         return 2
     exe = sys.argv[1]
     enc = encoders()
-    if not enc and not (
-        os.environ.get("OVT_GST_ORACLE_H264") and os.environ.get("OVT_GST_ORACLE_AV1")
-    ):
+    if not enc and not (os.environ.get("OVT_GST_ORACLE_H264") and os.environ.get("OVT_GST_ORACLE_AV1")):
         print("SKIP: ffmpeg not found")
         return SKIP
     with tempfile.TemporaryDirectory(prefix="gst_oracle_") as tmp:

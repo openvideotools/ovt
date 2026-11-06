@@ -51,29 +51,20 @@ def test_parse_structs_strips_comments_and_preprocessor(tmp_path: Path) -> None:
     assert names[:3] == ["id", "flags", "nested"]
     assert "x" not in names  # inline struct members stay inside the pair member
     assert next(m for m in structs["Outer"] if m.name == "flags").dims == ["2", "4"]
-    assert next(m for m in structs["Outer"] if m.name == "dims").dims == [
-        "GST_MAX_THING + 1"
-    ]
+    assert next(m for m in structs["Outer"] if m.name == "dims").dims == ["GST_MAX_THING + 1"]
 
 
 def test_flatten_shapes(tmp_path: Path) -> None:
     structs = _structs(tmp_path)
     skipped: list[str] = []
-    leaves = {
-        ".".join(le.json_path): le for le in gen.flatten(structs, "Outer", skipped)
-    }
+    leaves = {".".join(le.json_path): le for le in gen.flatten(structs, "Outer", skipped)}
     assert leaves["id"].kind == "GF_I32" and leaves["id"].counts == []
     flags = leaves["flags"]
     assert flags.c_path == "flags[0][0]" and len(flags.counts) == 2
-    assert (
-        flags.counts[1] == "GF_N(Outer, flags[0])"
-        and flags.strides[0] == "GF_SZ(Outer, flags[0])"
-    )
+    assert flags.counts[1] == "GF_N(Outer, flags[0])" and flags.strides[0] == "GF_SZ(Outer, flags[0])"
     assert leaves["nested.b"].c_path == "nested.b[0]"
     # An array of structs becomes one array per member, with the struct stride first.
-    assert leaves["list.a"].c_path == "list[0].a" and leaves["list.a"].strides == [
-        "GF_SZ(Outer, list[0])"
-    ]
+    assert leaves["list.a"].c_path == "list[0].a" and leaves["list.a"].strides == ["GF_SZ(Outer, list[0])"]
     assert leaves["list.b"].counts[1] == "GF_N(Outer, list[0].b)"
     # A union stands for its first member; a pointer is skipped; an inline struct is entered; an enum is an int.
     assert leaves["value"].c_path == "value.first" and leaves["value"].kind == "GF_U32"
@@ -98,9 +89,10 @@ def test_limits_resolve_to_the_count_member() -> None:
         ],
     ) == (["dec_ref_pic_marking", "n_ref_pic_marking"], 0)
     # HRD arrays are trimmed by the count next to them, wherever the HRD structure sits.
-    assert gen.find_limit(
-        "h264", "sps", ["vui_parameters", "nal_hrd_parameters", "cbr_flag"]
-    ) == (["vui_parameters", "nal_hrd_parameters", "cpb_cnt_minus1"], 1)
+    assert gen.find_limit("h264", "sps", ["vui_parameters", "nal_hrd_parameters", "cbr_flag"]) == (
+        ["vui_parameters", "nal_hrd_parameters", "cpb_cnt_minus1"],
+        1,
+    )
     assert gen.find_limit("h264", "sps", ["profile_idc"]) is None
 
 
