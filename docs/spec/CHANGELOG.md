@@ -4,9 +4,9 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc8 — 2026-11-06
 
-PATCH-level: a tool option name in a recipe command, found by the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image (an option name HM 18.0 does not know, and slice sizes that produced one slice per picture). No requirement sentence, acceptance line or WI scope changes.
 
-- 14 §14.3.3 recipe 12 `syn_h265_multislice_wp` — HM 18.0 `TAppEncoder` has no `--DependentSliceMode`/`--DependentSliceArgument`; the dependent slice segments are now `--SliceSegmentMode=1 --SliceSegmentArgument=100` (same meaning: a slice segment every 100 CTUs inside 300-CTU slices) — WI-0.553
+- 14 §14.3.3 recipe 12 `syn_h265_multislice_wp` — HM 18.0 `TAppEncoder` has no `--DependentSliceMode`/`--DependentSliceArgument`; dependent slice segments are now `--SliceSegmentMode=1 --SliceSegmentArgument=40`, and slices shrink from 300 to 100 CTUs (`--SliceArgument=100`): a 1280x720 picture has 240 64x64 CTUs, so 300-CTU slices gave one slice per picture and the `multiple_slices` feature was never produced — WI-0.553
 
 ## 1.0.0-rc7 — 2026-11-06
 
