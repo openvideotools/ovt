@@ -16,15 +16,22 @@
 
 #include <filesystem>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "test_support/fb_normalize.h"
 
 namespace ovt::test {
 
 struct CompareOptions {
   /// Absolute tolerance per path pattern. A pattern is a path without the leading "$." in which array indices
   /// are written "[]": "frames[].psnr_y" covers $.frames[0].psnr_y, $.frames[1].psnr_y, ... No entry means 0.
+  /// A tolerance applies only when at least one of the two numbers is a double. Two integers are always compared
+  /// exactly, so a tolerance entry for an integer field has no effect. Without a tolerance, doubles are equal when they
+  /// print the same with "%.6f", which also makes values below 5e-7 equal to each other (1e-7 == 4e-7): a family with
+  /// tiny values (MSE near 0) needs a scaled field, not this comparer.
   std::map<std::string, double> tolerances;
   /// Used for numbers without a tolerances entry. 0 = equal at "%.6f" precision.
   double default_tolerance = 0.0;
@@ -43,6 +50,11 @@ std::vector<Difference> compare_canonical(const nlohmann::json& golden, const nl
 /// Reads a tolerance map: a JSON object {"<pattern>": <tolerance>, ...}; the key "default" sets default_tolerance.
 /// Throws std::invalid_argument on a malformed file.
 CompareOptions load_compare_options(const std::filesystem::path& file);
+
+/// Checks the top-level shape of a canonical document of @p family (§14.4.0: box-tree is an array of
+/// {path,offset,size,fields}, block-grid has w4/h4/fields, ...). Returns the problem, or std::nullopt when the shape
+/// is right. Run on both the golden and the OVT output so a malformed golden cannot pass silently.
+std::optional<std::string> check_family_shape(Family family, const nlohmann::json& document);
 
 /// Unified diff (3 lines of context) of two texts, "" when they are equal.
 std::string unified_diff(std::string_view expected, std::string_view actual, std::string_view expected_label = "golden",

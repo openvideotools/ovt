@@ -1,0 +1,90 @@
+[
+  {
+    "fields": {
+      "major_brand": "isom",
+      "minor_version": 512
+    },
+    "offset": 0,
+    "path": "ftyp",
+    "size": 28
+  },
+  {
+    "fields": {},
+    "offset": 28,
+    "path": "moov",
+    "size": 357
+  },
+  {
+    "fields": {
+      "duration": 4000,
+      "timescale": 1000
+    },
+    "offset": 36,
+    "path": "moov/mvhd",
+    "size": 108
+  },
+  {
+    "fields": {},
+    "offset": 144,
+    "path": "moov/trak",
+    "size": 241
+  },
+  {
+    "fields": {
+      "track_id": 1
+    },
+    "offset": 152,
+    "path": "moov/trak/tkhd",
+    "size": 96
+  },
+  {
+    "fields": {},
+    "offset": 248,
+    "path": "moov/trak/mdia",
+    "size": 137
+  },
+  {
+    "fields": {
+      "duration": 360000,
+      "timescale": 90000
+    },
+    "offset": 256,
+    "path": "moov/trak/mdia/mdhd",
+    "size": 32
+  },
+  {
+    "fields": {
+      "handler_type": "vide"
+    },
+    "offset": 288,
+    "path": "moov/trak/mdia/hdlr",
+    "size": 45
+  },
+  {
+    "fields": {},
+    "offset": 333,
+    "path": "moov/trak/mdia/minf",
+    "size": 52
+  },
+  {
+    "fields": {},
+    "offset": 341,
+    "path": "moov/trak/mdia/minf/stbl",
+    "size": 44
+  },
+  {
+    "fields": {
+      "sample_count": 4,
+      "sample_size": 0
+    },
+    "offset": 349,
+    "path": "moov/trak/mdia/minf/stbl/stsz",
+    "size": 36
+  },
+  {
+    "fields": {},
+    "offset": 385,
+    "path": "mdat",
+    "size": 1663
+  }
+]
