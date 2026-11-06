@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Entry point of OVT Studio (WI-0.019): an empty Qt Quick window titled OVT_PRODUCT_NAME, and
-// `--self-test`, which exits 0 once the first frame has been rendered (CI smoke, chapter 13 §13.7.1).
-// WI-1.450 extends this file in place with the application shell (chapter 16 §16.3).
+// Entry point of OVT Studio (WI-0.019, WI-1.450): the main window of chapter 11 §11.2 (menus, toolbar, status bar),
+// `--version`, and `--self-test`, which exits 0 once the first frame has been rendered (CI smoke, chapter 13
+// §13.7.1). Start-up order: `--version` (needs no display) → high-DPI policy → QGuiApplication → RHI backend
+// (Platform::selectGraphicsApi) → style → QML. Settings load when QML first uses the Settings singleton.
 
 #include <QByteArray>
 #include <QCommandLineOption>
@@ -13,8 +14,8 @@
 #include <QIcon>
 #include <QObject>
 #include <QQmlApplicationEngine>
+#include <QQuickStyle>
 #include <QQuickWindow>
-#include <QSGRendererInterface>
 #include <QString>
 #include <QTimer>
 #include <QUrl>
@@ -22,9 +23,11 @@
 #include <QtGlobal>
 
 #include <cstdio>
+#include <cstring>
 
 #include "ovt/ovt.h"
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
+#include "platform/platform.h"
 
 namespace {
 
@@ -35,23 +38,26 @@ constexpr int kExitFailure = 1;
 // hang (no frame, no event) into a failure with a message instead of a CTest timeout.
 constexpr int kSelfTestWatchdogMs = 4000;
 
-// The offscreen platform plugin (QT_QPA_PLATFORM=offscreen, used by CI and the self-test) has no GPU
-// context on a headless machine, so the RHI backends cannot start there. Use the software scene graph
-// unless the caller chose a backend explicitly.
-void choose_scene_graph_backend() {
-  if (QGuiApplication::platformName() != QLatin1String("offscreen")) {
-    return;
-  }
-  if (qEnvironmentVariableIsSet("QSG_RHI_BACKEND") || qEnvironmentVariableIsSet("QT_QUICK_BACKEND")) {
-    return;
-  }
-  QQuickWindow::setGraphicsApi(QSGRendererInterface::Software);
-}
-
 // Diagnostics go to stderr with the product name; there is no logger in the GUI yet (WI-1.512 brings ovt::log).
 void report(const QString& message) {
   const QByteArray line = (QStringLiteral(OVT_PRODUCT_NAME_VALUE ": ") + message + QLatin1Char('\n')).toLocal8Bit();
   static_cast<void>(std::fputs(line.constData(), stderr));  // best effort: nothing to do if stderr is closed
+}
+
+// `--version` runs before the QGuiApplication exists, so it works without a display.
+bool wants_version(int argc, char* argv[]) {
+  for (int i = 1; i < argc; ++i) {
+    if (std::strcmp(argv[i], "--version") == 0 || std::strcmp(argv[i], "-v") == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+int print_version() {
+  static_cast<void>(std::printf(OVT_PRODUCT_NAME_VALUE " %s\ncore %s\nQt %s (built with " QT_VERSION_STR ")\n",
+                                OVT_VERSION_FULL, ovt_version_string(), qVersion()));
+  return kExitOk;
 }
 
 }  // namespace
@@ -59,6 +65,12 @@ void report(const QString& message) {
 // Exported: on Android this binary is libovt_studio_<ABI>.so and Qt finds main() with dlsym(), but
 // ovt::flags compiles with -fvisibility=hidden (chapter 13 §13.2.5).
 Q_DECL_EXPORT int main(int argc, char* argv[]) {
+  if (wants_version(argc, argv)) {
+    return print_version();
+  }
+  // Before the application object (WI-1.450): the scale factor is passed through unrounded, so 125 % stays 125 %.
+  // Qt::AA_EnableHighDpiScaling is a no-op in Qt 6 and is not used.
+  QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
   QGuiApplication app(argc, argv);
   QGuiApplication::setApplicationName(QStringLiteral(OVT_PRODUCT_NAME_VALUE));
   QGuiApplication::setApplicationDisplayName(QStringLiteral(OVT_PRODUCT_NAME_VALUE));
@@ -69,14 +81,14 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   QCommandLineParser parser;
   parser.setApplicationDescription(QStringLiteral(OVT_PRODUCT_NAME_VALUE));
   parser.addHelpOption();
-  parser.addVersionOption();
   const QCommandLineOption self_test(QStringLiteral("self-test"),
                                      QStringLiteral("Open the main window, exit 0 after the first rendered frame."));
   parser.addOption(self_test);
-  parser.process(app);  // exits on --help, --version and unknown options
+  parser.process(app);  // exits on --help and unknown options; --version was handled above
   const bool self_testing = parser.isSet(self_test);
 
-  choose_scene_graph_backend();
+  ovt::app::Platform::selectGraphicsApi();
+  QQuickStyle::setStyle(QStringLiteral("Fusion"));  // OvtStyle.qml supplies the palette (§11.4.5)
 
   QQmlApplicationEngine engine;
   engine.setInitialProperties({{QStringLiteral("title"), QStringLiteral(OVT_PRODUCT_NAME_VALUE)}});
