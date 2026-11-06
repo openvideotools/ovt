@@ -2,6 +2,10 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## Unreleased (folded into the next version bump)
+
+- 14 §14.3.4, WI-0.561 — `--corpora` is its own mode, `--manifest` names the corpora manifest there, rule-1 failures exit 4, the dependency check and the corpora check are separate steps of the `license-gate` job (#123) — WI-0.561
+
 ## 1.0.0-rc2 — 2026-11-04
 
 Accepted answers of the `spec-question` issues raised by the M0.1 work items (owner decisions of 2026-11-04). MINOR-level changes (WI Produces/acceptance lines); no WI is re-opened, because every affected WI is merged and already implements the amended line.
