@@ -90,6 +90,10 @@ check ldecod_mbaff - sh -c 'ldecod -p InputFile=syn_h264_mbaff.264 -p OutputFile
 check ffmpeg_mvs - ffmpeg_mvs syn_h264.264
 check ffmpeg_mvs_qp ffmpeg_qp.csv ffmpeg_mvs --qp ffmpeg_qp.csv syn_h264.264
 check hm_cu_dump - hm_cu_dump -b syn_h265_amp_sao_on.265
+# The encoder configs of the {jm_cfg} and {hm_cfg} recipes (tests/corpora/synthetic/generate.py).
+check jm_cfg - ls "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/jm/cfg/encoder_main.cfg"
+check hm_cfg - ls "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/hm/cfg/encoder_randomaccess_main.cfg" \
+  "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/hm/cfg/encoder_lowdelay_main.cfg"
 check inspect - inspect -A -a syn_av1.ivf
 check dav1d dav1d.y4m dav1d -q -i syn_av1.ivf -o dav1d.y4m
 

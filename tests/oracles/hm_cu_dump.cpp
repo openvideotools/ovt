@@ -39,6 +39,8 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 #include "TLibCommon/CommonDef.h"
 #include "TLibCommon/NAL.h"
 #include "TLibCommon/TComList.h"
@@ -216,6 +218,10 @@ void dump_ctu(TComDataCU* cu, unsigned ctu_x4, unsigned ctu_y4, unsigned w4, uns
   }
 }
 
+// The JSON goes to the original stdout through this stream. HM prints a log line per picture (and other chatter) with
+// printf, so main() points file descriptor 1 at stderr and keeps the original stdout for the JSON only.
+FILE* g_json = nullptr;
+
 // Prints one picture as a JSON object (no trailing newline).
 void dump_picture(TComPic* pic, bool first) {
   auto sps = pic->getSlice(0)->getSPS();
@@ -239,17 +245,57 @@ void dump_picture(TComPic* pic, bool first) {
     dump_ctu(pic->getCtu(addr), cx * (ctu_size / 4), cy * (ctu_size / 4), w4, h4, log2_ctu, chroma, &cols);
   }
 
-  std::printf(
+  std::fprintf(
+      g_json,
       "%s\n  {\"poc\": %d, \"w4\": %u, \"h4\": %u, \"log2_ctu_size\": %u, \"chroma_format\": %d,\n   \"cells\": {\n",
       first ? "" : ",", pic->getPOC(), w4, h4, log2_ctu, static_cast<int>(chroma));
   for (int i = 0; i < kColumnCount; ++i) {
-    std::printf("    \"%s\": [", cols[i].name);
+    std::fprintf(g_json, "    \"%s\": [", cols[i].name);
     for (size_t n = 0; n < cols[i].cells.size(); ++n) {
-      std::printf("%s%d", n == 0 ? "" : ",", cols[i].cells[n]);
+      std::fprintf(g_json, "%s%d", n == 0 ? "" : ",", cols[i].cells[n]);
     }
-    std::printf("]%s\n", i + 1 == kColumnCount ? "" : ",");
+    std::fprintf(g_json, "]%s\n", i + 1 == kColumnCount ? "" : ",");
   }
-  std::printf("   }}");
+  std::fprintf(g_json, "   }}");
+}
+
+// TAppDecTop releases a picture once it has written it (xWriteOutput, xFlushOutput): the picture is no longer needed
+// for output and, unless it is still a reference, no longer holds a reconstruction. Nothing is written here, so every
+// picture is released as soon as it has been dumped.
+void release_pictures(TComList<TComPic*>* pic_list) {
+  if (pic_list == nullptr) {
+    return;
+  }
+  for (TComPic* pic : *pic_list) {
+    if (pic->getOutputMark() && pic->getReconMark() && !pic->getSlice(0)->isReferenced()) {
+      pic->setReconMark(false);
+      pic->getPicYuvRec()->setBorderExtension(false);
+    }
+    pic->setOutputMark(false);
+  }
+}
+
+// TAppDecTop::xFlushOutput minus the writes: release every picture, then destroy them and empty the decoded picture
+// buffer. TAppDecTop flushes at an IDR or BLA picture and at the end of the stream; without the flush at an IDR the
+// pictures of the previous coded video sequence stay marked as reconstructed with POCs above the IDR's, and HM's
+// TComSlice::checkLeadingPictureRestrictions asserts (rpcPic->getPOC() < this->getPOC()).
+void flush_pictures(TComList<TComPic*>* pic_list) {
+  if (pic_list == nullptr || pic_list->empty()) {
+    return;
+  }
+  release_pictures(pic_list);
+  for (TComPic*& pic : *pic_list) {
+    pic->destroy();
+    delete pic;
+    pic = nullptr;
+  }
+  pic_list->clear();
+}
+
+bool is_idr_or_bla(NalUnitType type) {
+  return type == NAL_UNIT_CODED_SLICE_IDR_W_RADL || type == NAL_UNIT_CODED_SLICE_IDR_N_LP ||
+         type == NAL_UNIT_CODED_SLICE_BLA_N_LP || type == NAL_UNIT_CODED_SLICE_BLA_W_RADL ||
+         type == NAL_UNIT_CODED_SLICE_BLA_W_LP;
 }
 
 }  // namespace
@@ -279,12 +325,21 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Keep HM's stdout chatter out of the JSON: duplicate the real stdout for the JSON, then send fd 1 to stderr.
+  std::fflush(stdout);
+  const int json_fd = dup(STDOUT_FILENO);
+  g_json = json_fd >= 0 ? fdopen(json_fd, "w") : nullptr;
+  if (g_json == nullptr || dup2(STDERR_FILENO, STDOUT_FILENO) < 0) {
+    std::fprintf(stderr, "hm_cu_dump: cannot redirect stdout\n");
+    return 1;
+  }
+
   TDecTop dec;
   dec.create();
   dec.init();
   InputByteStream bytestream(bitstream_file);
 
-  std::printf("{\"frames\": [");
+  std::fprintf(g_json, "{\"frames\": [");
   bool first = true;
   bool loop_filtered = false;
   int poc = 0;
@@ -321,12 +376,8 @@ int main(int argc, char** argv) {
           dump_picture(dec.m_pcPic, first);
           first = false;
         }
-        // Nothing is written to a file, so no picture is ever "output": release every picture for reuse.
-        if (pic_list != nullptr) {
-          for (TComPic* pic : *pic_list) {
-            pic->setOutputMark(false);
-          }
-        }
+        // Nothing is written to a file: release every dumped picture where TAppDecTop would write it.
+        release_pictures(pic_list);
       }
       loop_filtered = (nalu.m_nalUnitType == NAL_UNIT_EOS);
       if (nalu.m_nalUnitType == NAL_UNIT_EOS) {
@@ -336,9 +387,25 @@ int main(int argc, char** argv) {
                dec.getFirstSliceInSequence()) {
       dec.setFirstSliceInPicture(true);
     }
+
+    // The picture-buffer steps of TAppDecTop::decode that follow the loop filter, minus the writes.
+    if (pic_list != nullptr) {
+      if ((new_picture || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA) && dec.getNoOutputPriorPicsFlag()) {
+        dec.checkNoOutputPriorPics(pic_list);
+        dec.setNoOutputPriorPicsFlag(false);
+      }
+      if (new_picture && is_idr_or_bla(nalu.m_nalUnitType)) {
+        flush_pictures(pic_list);
+      }
+      if (nalu.m_nalUnitType == NAL_UNIT_EOS) {
+        dec.setFirstSliceInPicture(false);
+      }
+    }
   }
 
-  std::printf("\n]}\n");
+  flush_pictures(pic_list);
+  std::fprintf(g_json, "\n]}\n");
   dec.deletePicBuffer();
-  return std::fflush(stdout) == 0 ? 0 : 1;
+  std::fflush(stdout);
+  return std::fclose(g_json) == 0 ? 0 : 1;
 }

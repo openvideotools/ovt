@@ -5,6 +5,7 @@
 # JM 19.0 H.264 reference software for the oracle image (chapter 14 §14.4.3, §14.3.3; WI-0.554):
 #   ldecod  built with TRACE 1 (writes trace_dec.txt in the working directory)
 #   lencod  stock (the canonical PAFF generator of §14.3.3 recipe 2)
+#   share/jm/cfg  the JM encoder configs (encoder_main.cfg, ...)
 # Pitfall: JM 19.0 defines globals in headers, so modern GCC (default -fno-common) needs -fcommon.
 # Source: the JM-19.0 tag of the HHI GitLab, commit-checked. The jm19.0.zip of §14.4.3 is not used because
 # iphome.hhi.de serves an incomplete TLS certificate chain (curl error 60).
@@ -32,6 +33,14 @@ for tool in ldecod lencod; do
   [[ -n "${bin}" ]] || ovt_die "${tool} was not built"
   install -D -m 0755 "${bin}" "${OVT_ORACLES_PREFIX}/bin/${tool}"
 done
+
+# The encoder configs ({jm_cfg} of tests/corpora/synthetic/recipes.json, §14.3.3 rule 4): lencod -d
+# ${OVT_ORACLES_PREFIX}/share/jm/cfg/encoder_main.cfg. JM keeps them in cfg/ (bin/ has copies of a few).
+jm_cfg="$(find "${src}" -type f -name encoder_main.cfg -not -path "${src}/bin/*" | head -n 1)"
+[[ -n "${jm_cfg}" ]] || jm_cfg="$(find "${src}" -type f -name encoder_main.cfg | head -n 1)"
+[[ -n "${jm_cfg}" ]] || ovt_die "JM has no encoder_main.cfg"
+mkdir -p "${OVT_ORACLES_PREFIX}/share/jm/cfg"
+cp -a "$(dirname "${jm_cfg}")/." "${OVT_ORACLES_PREFIX}/share/jm/cfg/"
 
 ovt_stamp ldecod "JM ${JM_VERSION} TRACE=1 (${JM_COMMIT})"
 ovt_stamp lencod "JM ${JM_VERSION} (${JM_COMMIT})"

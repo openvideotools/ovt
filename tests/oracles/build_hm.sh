@@ -6,6 +6,7 @@
 #   TAppEncoder, TAppDecoder  stock build
 #   TAppDecoder_trace         ENC_DEC_TRACE=1 in TypeDef.h (writes TraceDec.txt)
 #   hm_cu_dump                the getter dumper of WI-0.563 (hm_cu_dump.cpp), linked against the stock libraries
+#   share/hm/cfg              HM's encoder configs (encoder_randomaccess_main.cfg, ...)
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
@@ -58,6 +59,13 @@ done
 g++ -std=c++14 -O2 -Wall -I stock/source/Lib -I stock/source/Lib/TLibCommon -I stock/source/Lib/TLibDecoder \
   -o hm_cu_dump "${here}/hm_cu_dump.cpp" -Wl,--start-group "${hm_libs[@]}" -Wl,--end-group
 install -D -m 0755 hm_cu_dump "${OVT_ORACLES_PREFIX}/bin/hm_cu_dump"
+
+# The encoder configs ({hm_cfg} of tests/corpora/synthetic/recipes.json, §14.3.3 rule 4): TAppEncoder -c
+# ${OVT_ORACLES_PREFIX}/share/hm/cfg/encoder_randomaccess_main.cfg and the rest of HM's cfg/ tree.
+[[ -f stock/cfg/encoder_randomaccess_main.cfg && -f stock/cfg/encoder_lowdelay_main.cfg ]] ||
+  ovt_die "HM has no cfg/encoder_*_main.cfg"
+mkdir -p "${OVT_ORACLES_PREFIX}/share/hm/cfg"
+cp -a stock/cfg/. "${OVT_ORACLES_PREFIX}/share/hm/cfg/"
 
 for tool in TAppEncoder TAppDecoder; do ovt_stamp "${tool}" "${HM_VERSION} (${HM_COMMIT})"; done
 ovt_stamp hm_cu_dump "hm_cu_dump (OVT tests/oracles) on ${HM_VERSION} (${HM_COMMIT})"
