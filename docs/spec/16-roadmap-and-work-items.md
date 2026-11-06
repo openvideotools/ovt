@@ -110,7 +110,7 @@ Each phase below states: theme, **entry criterion** (what must be true to start)
 | 2 | GUI: open the sample, press F1, F2, F3, F5, F6, F7 in turn (coding flow/partitions, prediction, motion vectors, QP map, bits heatmap, reference indices; chapter 11 §11.4.2) | each toggle redraws within one frame; panning at 4K stays at 60 fps on the M1 (`bench_overlay_4k_mv_arrows` p95 ≤ 16 ms) |
 | 3 | Click a block | Selection Info lists every extension-table field with its spec name; values equal `ovt analyze <f> --frames N --format json` for that `block_id` |
 | 4 | Press `Tab`/`Shift+Tab` (level cycling; `[`/`]` are difference gain) | selection moves CTU→CU→PU→TU (HEVC), MB→partition (H.264), SB→block→TXB (AV1) and the overlay outline follows |
-| 5 | Block Presenter: switch Reconstruction / Prediction / Residual / Pre-deblock | planes change; `Reconstruction` equals the playback frame bit-exactly (`ovt dump --stage recon --md5` equals `ovt dump --md5`) |
+| 5 | Block Samples: switch Reconstruction / Prediction / Residual / Pre-deblock | planes change; `Reconstruction` equals the playback frame bit-exactly (`ovt dump --stage recon --md5` equals `ovt dump --md5`) |
 | 6 | Reference / GOP graph | `declared_refs` edges shown; the AV1 hidden ALTREF appears as an unshown node; clicking an edge selects the referenced frame |
 | 7 | Statistics panel | per-frame bits, QP histogram, block-size distribution; CSV export equals `ovt analyze --format csv` |
 | 8 | `ovt analyze f --frames 7 --format fb` twice | byte-identical files; `threads=1` vs `threads=4` byte-identical |
@@ -163,7 +163,7 @@ Each phase below states: theme, **entry criterion** (what must be true to start)
 |---|---|---|
 | 1 | `test_xplugin_h264_ffmpeg_vs_jm` (full mode) on the `jvt` fast subset | every `AvcMb` field equals the JM trace |
 | 2 | `ovt verify --hash-sei` (D21) on `jctvc` (incl. RExt) and on the corrupted set `tests/golden/h265/corrupt/*.bit` (made by `tools/corrupt.py`, chapter 14 WI-4.596) | 100 % match on `jctvc`; the corrupted picture is localised by `decode_index` |
-| 3 | Block Presenter → Coefficients for a selected TU | values equal HM `TraceDec.txt` for that TU (3 TUs spot-checked and recorded) |
+| 3 | Block Samples → Coefficients for a selected TU | values equal HM `TraceDec.txt` for that TU (3 TUs spot-checked and recorded) |
 | 4 | HRD/buffer graph on `jctvc_HRD_A_Fujitsu_3`, then on a copy with halved `bit_rate_value_minus1` | no underflow, then an underflow flagged |
 | 5 | Open an MKV and a TS built from `syn_*` | trees match `mediainfo --Details=1` offsets; MKV element ids/sizes match `mkvinfo -v -v -z` |
 | 6 | Open the `dashif` MPD and the `apple` master playlist | init + first 3 segments appear as one stream; segment provenance shown per sample |
@@ -689,7 +689,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-2.480 | 11 §11.10 | Analysis orchestration and `FrameAnalysisStore` | M | 2 | M2.1 | WI-2.150, WI-2.151, WI-2.152, WI-1.453 | FR-GUI-029, FR-PLN-005 |
 | WI-2.481 | 11 §11.10 | Overlay modes F1–F12, toggles, Legend panel | M | 2 | M2.2 | WI-2.480, WI-2.431, WI-2.432, WI-2.433, WI-2.434, WI-2.435, WI-2.436, WI-2.439 | FR-GUI-019 |
 | WI-2.482 | 11 §11.10 | Selection Info panel with reflection-based extension display and level cycling | M | 2 | M2.2 | WI-2.480, WI-0.083 | FR-BLK-019, FR-GUI-009, FR-GUI-011, FR-GUI-102 |
-| WI-2.483 | 11 §11.10 | Block Presenter panel | M | 2 | M2.3 | WI-2.482, WI-2.523, WI-2.158, WI-2.166 | FR-BLK-023, FR-GUI-010 |
+| WI-2.483 | 11 §11.10 | Block Samples panel | M | 2 | M2.3 | WI-2.482, WI-2.523, WI-2.158, WI-2.166 | FR-BLK-023, FR-GUI-010 |
 | WI-2.484 | 11 §11.10 | Reference / GOP graph panel | M | 2 | M2.3 | WI-1.455 | FR-DEC-011, FR-GUI-018 |
 | WI-2.485 | 11 §11.10 | Statistics panel (Qt Graphs 2D) | M | 2 | M2.3 | WI-2.480 | FR-BLK-020, FR-BLK-021, FR-GUI-031 |
 | WI-2.486 | 11 §11.10 | Compare modes UI and B-side selection | M | 2 | M2.3 | WI-1.410, WI-1.456 | FR-PLN-009 |
@@ -929,7 +929,7 @@ A gate is green when every automated line is green on the nightly run of the ref
 | 6 | Overlay perf: `bench_overlay_4k_mv_arrows` p95 ≤ 16 ms, `bench_overlay_build` ≤ 8 ms; 8K instance texture ≤ 48 MB | WI-2.438, WI-2.584 | automated (nightly) |
 | 7 | Analysis budgets: de265 ≤ 1 500 ms, aom ≤ 3 000 ms, ffmpeg ≤ 1 000 ms, cached ≤ 30 ms | WI-2.151, WI-2.152 | automated (nightly) |
 | 8 | Memory: `bench_memory_4k_stream` ≤ 2 GiB desktop | WI-2.152, WI-2.523 | automated (nightly) |
-| 9 | GUI phase-2 tests (overlay toggles, Selection Info, Block Presenter screenshots) green | WI-2.584 | automated |
+| 9 | GUI phase-2 tests (overlay toggles, Selection Info, Block Samples screenshots) green | WI-2.584 | automated |
 | 10 | CLI goldens for `analyze` (json/csv/yuview/aom-inspect) and `plugins --check` negative test | WI-2.521, WI-2.520, WI-1.510 | automated |
 | 11 | Upstream submissions recorded: libaom extension (WI-2.160), libde265 patch 0001 PR (WI-2.167) with URLs in `docs/dev/upstream.md` | WI-2.160, WI-2.167 | manual |
 | 12 | YUView loads `--format yuview` output identically (screenshot) | WI-2.521 | manual |
