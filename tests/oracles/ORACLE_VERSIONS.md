@@ -43,6 +43,7 @@ the `v3.0.0` tag, so it reports the pinned commit's short hash.
 | aomenc | 3.12.1 | `libaom-3.12.1.tar.gz` sha256 `9e9775180dec7dfd61a79e00bda3809d43891aee6b2e331ff7f26986207ea22e` (tag v3.12.1, `10aece4157eb79315da205f39e19bf6ab3ee30d0`) | BSD-2-Clause + AOM patent licence | `aomenc --help` | `3.12.1` |
 | aomdec | 3.12.1 | as aomenc | BSD-2-Clause + AOM patent licence | `aomdec --help` | `3.12.1` |
 | inspect | 3.12.1 | as aomenc, `CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1` | BSD-2-Clause + AOM patent licence | `cat "$OVT_ORACLES_STAMPS/inspect.version"` | `libaom v3.12.1` |
+| scalable_encoder | 3.12.1 | as aomenc, `examples/scalable_encoder` of the stock build (§14.3.3 recipe 16) | BSD-2-Clause + AOM patent licence | `cat "$OVT_ORACLES_STAMPS/scalable_encoder.version"` | `libaom v3.12.1` |
 | dav1d | 1.5.1 | <https://code.videolan.org/videolan/dav1d> `42b2b24fb8819f1ed3643aa9cf2a62f03868e3aa` | BSD-2-Clause | `dav1d --version` | `1.5.1` |
 | vmaf | 3.0.0 | <https://github.com/Netflix/vmaf> `17a67b238ce0539bdeafdc95961abac64fa16ea8`, `-Denable_float=true` | BSD-2-Clause-Patent | `vmaf --version` | `17a67b2` |
 | MP4Box | v2.4.0 | <https://github.com/gpac/gpac> `5d70253ac94e5840be7b86054131dd753af63cc7` | LGPL-2.1-or-later | `MP4Box -version` | `GPAC version 2.4` |
