@@ -33,7 +33,7 @@ RUN apt-get update \
       build-essential pkg-config git curl unzip xz-utils xxd cmake ninja-build meson nasm \
       autoconf automake libtool python3 python3-dev python3-venv \
       golang-go \
-      libnuma-dev zlib1g-dev libssl-dev libogg-dev libpng-dev libjpeg-dev \
+      libnuma-dev zlib1g-dev libssl-dev libogg-dev libopus-dev libpng-dev libjpeg-dev \
       libvulkan-dev libshaderc-dev liblcms2-dev libass-dev \
       libx11-dev libxext-dev libxrandr-dev libxpresent-dev libxss-dev libxinerama-dev libxkbcommon-dev \
       mesa-vulkan-drivers xvfb \

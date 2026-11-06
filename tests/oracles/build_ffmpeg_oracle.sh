@@ -8,6 +8,7 @@
 #   x265  (8-bit main library linking the 10- and 12-bit libraries; -DENABLE_HDR10_PLUS=ON)
 #   dav1d (library and CLI), libvmaf + `vmaf` CLI (-Denable_float=true)
 #   FFmpeg --enable-gpl --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d
+#          --enable-libopus (Ubuntu libopus-dev, BSD-3-Clause; the libopus encoder of the WebM-Opus recipe)
 # Then `ffmpeg_mvs` (WI-0.563, ffmpeg_mvs.c): the motion-vector and QP exporter linked against that FFmpeg.
 # The binaries are oracles only: GPL, never linked into OVT.
 
@@ -79,7 +80,7 @@ ovt_git_fetch https://github.com/FFmpeg/FFmpeg.git "refs/tags/${FFMPEG_VERSION}"
 (
   cd ffmpeg || exit 1
   ./configure --prefix="${P}" --enable-gpl --enable-shared --disable-static --disable-doc --disable-debug \
-    --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d \
+    --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d --enable-libopus \
     --extra-cflags="-I${P}/include" --extra-ldflags="-L${P}/lib ${rpath}"
   make -j "${OVT_ORACLES_JOBS}"
   make install
