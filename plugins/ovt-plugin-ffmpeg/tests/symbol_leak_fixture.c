@@ -6,6 +6,8 @@
 // the ABI declarations (core/include/ovt/abi/, WI-2.150): only the symbol names matter here.
 
 #include <libavcodec/avcodec.h>
+#include <libavcodec/codec.h>
+#include <libavcodec/codec_id.h>
 
 #define OVT_FIXTURE_EXPORT __attribute__((visibility("default")))
 

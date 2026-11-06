@@ -19,7 +19,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Android" OR CMAKE_CROSSCOMPILING)
 endif()
 
 add_library(ovt_ffmpeg_symbol_leak_fixture MODULE symbol_leak_fixture.c)
-target_link_libraries(ovt_ffmpeg_symbol_leak_fixture PRIVATE tp::ffmpeg_plugin)
+target_link_libraries(ovt_ffmpeg_symbol_leak_fixture PRIVATE tp::ffmpeg_plugin ovt::flags)
 ovt_ffmpeg_hide_symbols(ovt_ffmpeg_symbol_leak_fixture)
 ovt_set_license(ovt_ffmpeg_symbol_leak_fixture "LGPL-2.1-or-later")
 

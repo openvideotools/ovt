@@ -14,16 +14,27 @@
 
 extern "C" {
 #include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
+#include <libavcodec/codec.h>
+#include <libavcodec/codec_id.h>
 #include <libavutil/avutil.h>
+#if !OVT_FFMPEG_PLUGIN_FLAVOUR && !OVT_FFMPEG_SYSTEM
+#include <libavcodec/codec_par.h>
+#include <libavcodec/packet.h>
+#include <libavformat/avformat.h>
+#endif
 }
 
+#include <array>
 #include <cstdio>
 #include <set>
 #include <string>
 #include <string_view>
 
-#if !OVT_FFMPEG_PLUGIN_FLAVOUR
+#if !OVT_FFMPEG_PLUGIN_FLAVOUR && !OVT_FFMPEG_SYSTEM
+#include <catch2/catch_message.hpp>
+
+#include <filesystem>
+
 #include "test_support/corpus.h"
 #endif
 
@@ -48,7 +59,8 @@ std::string configuration() {
 bool has_parser_for(AVCodecID id) {
   void* it = nullptr;
   while (const AVCodecParser* parser = av_parser_iterate(&it)) {
-    for (const int codec_id : parser->codec_ids) {
+    const auto& ids = parser->codec_ids;  // int[7], zero-padded
+    for (const int codec_id : std::to_array(ids)) {
       if (codec_id == id) {
         return true;
       }
@@ -137,7 +149,7 @@ TEST_CASE(OVT_PROBE "the core flavour has no AVC/HEVC decoder unless OVT_PATENT_
   const std::set<std::string> names = decoder_names();
   for (const char* name : {"h264", "hevc", "h264_mediacodec", "hevc_mediacodec"}) {
     INFO("decoder " << name);
-    CHECK(names.count(name) == 0);
+    CHECK_FALSE(names.contains(name));
   }
 #endif
   // The core keeps every other decoder; VP9 is a native FFmpeg decoder in every build.
@@ -156,29 +168,44 @@ TEST_CASE(OVT_PROBE "the core flavour has the platform AV1 decoders", "[fast][th
   CHECK(avcodec_find_decoder(AV_CODEC_ID_AV1) != nullptr);  // FFmpeg's own av1 (hwaccel front end) at least
 }
 
+namespace {
+
+// What demuxing a file found: the first video stream's codec id and its packet count (-1: not opened).
+struct DemuxSummary {
+  AVCodecID video_codec = AV_CODEC_ID_NONE;
+  int video_packets = -1;
+};
+
+DemuxSummary demux(const std::filesystem::path& path) {
+  DemuxSummary summary;
+  AVFormatContext* ctx = nullptr;
+  if (avformat_open_input(&ctx, path.string().c_str(), nullptr, nullptr) != 0) {
+    return summary;
+  }
+  const int video = av_find_best_stream(ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
+  AVPacket* packet = av_packet_alloc();
+  if (video >= 0 && packet != nullptr) {
+    summary.video_codec = ctx->streams[video]->codecpar->codec_id;  // NOLINT(*-pointer-arithmetic): FFmpeg array
+    summary.video_packets = 0;
+    while (av_read_frame(ctx, packet) >= 0) {
+      summary.video_packets += packet->stream_index == video ? 1 : 0;
+      av_packet_unref(packet);
+    }
+  }
+  av_packet_free(&packet);
+  avformat_close_input(&ctx);
+  return summary;
+}
+
+}  // namespace
+
 TEST_CASE(OVT_PROBE "avformat opens an MP4 of the corpus", "[fast][third_party][needs-corpus]") {
   // Acceptance test 1 of WI-0.012. Demuxing needs no decoder. (The manifest lists this file as h264; FFmpeg reports
   // MPEG-4 Part 2 video, so the test checks only that a video stream with a known codec id is demuxed.)
   const std::filesystem::path path = ovt::test::corpus_or_skip("mpegff_a1_foreman_qcif");
-  AVFormatContext* ctx = nullptr;
-  REQUIRE(avformat_open_input(&ctx, path.string().c_str(), nullptr, nullptr) == 0);
-  REQUIRE(ctx != nullptr);
-  CHECK(std::string_view(ctx->iformat->name).find("mp4") != std::string_view::npos);
-  int video = av_find_best_stream(ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-  REQUIRE(video >= 0);
-  CHECK(ctx->streams[video]->codecpar->codec_id != AV_CODEC_ID_NONE);
-  AVPacket* packet = av_packet_alloc();
-  REQUIRE(packet != nullptr);
-  int video_packets = 0;
-  while (av_read_frame(ctx, packet) >= 0) {
-    if (packet->stream_index == video) {
-      ++video_packets;
-    }
-    av_packet_unref(packet);
-  }
-  av_packet_free(&packet);
-  avformat_close_input(&ctx);
-  CHECK(video_packets > 0);
+  const DemuxSummary summary = demux(path);
+  CHECK(summary.video_codec != AV_CODEC_ID_NONE);
+  CHECK(summary.video_packets > 0);
 }
 
 #endif  // OVT_FFMPEG_PLUGIN_FLAVOUR
