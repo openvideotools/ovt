@@ -4,6 +4,13 @@
 # Model unit tests (WI-0.083 onwards). Catch2's CHECK/REQUIRE macros expand to branches, so a table-driven
 # test case trips readability-function-cognitive-complexity on code with almost no control flow of its own.
 # Count only the test's own branches (same relaxation as core/tests/bitreader/, WI-1.102).
+#
+# WI-0.093: test_model_roundtrip calls the generated UnPackTo(). Apple clang's analyzer reports
+# clang-analyzer-cplusplus.NewDeleteLeaks inside that flatc-generated code (std::unique_ptr members assigned
+# from a freshly allocated native table); the object is owned by the unique_ptr, so it is a false positive in
+# code we do not write. Silenced for this directory only.
 InheritParentConfig: true
+Checks: >
+  -clang-analyzer-cplusplus.NewDeleteLeaks
 CheckOptions:
   readability-function-cognitive-complexity.IgnoreMacros: true
