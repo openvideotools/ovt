@@ -19,10 +19,10 @@ REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 sys.path.insert(0, str(TESTS))
 
-import check_fast_subset
-import fetch_corpora
-import manifest_add
-from fixture_server import serve
+import check_fast_subset  # noqa: E402
+import fetch_corpora  # noqa: E402
+import manifest_add  # noqa: E402
+from fixture_server import serve  # noqa: E402
 
 MANIFEST = REPO / "tests" / "corpora" / "manifest.json"
 FAST_BUDGET = 314_572_800

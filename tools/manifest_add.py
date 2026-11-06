@@ -208,29 +208,19 @@ def entries_from_git(
         sha, size = pointer or (file_sha256(path), path.stat().st_size)
         entry_id = make_id(source, path.stem, taken)
         taken.add(entry_id)
-        out.append(
-            {
-                "id": entry_id,
-                "source": source,
-                "licence": licence,
-                "licence_spdx": spdx,
-                "redistributable": redistributable,
-                **(
-                    {
-                        "vcs": {
-                            "git": f"https://github.com/{repo}",
-                            "lfs_path": rel,
-                            "rev": rev,
-                        }
-                    }
-                    if pointer
-                    else {"url": file_url(repo, rev, rel, False)}
-                ),
-                "sha256": sha,
-                "size_bytes": size,
-                "upstream_path": rel,
-            }
-        )
+        entry: dict[str, Any] = {
+            "id": entry_id,
+            "source": source,
+            "licence": licence,
+            "licence_spdx": spdx,
+            "redistributable": redistributable,
+        }
+        if pointer:
+            entry["vcs"] = {"git": f"https://github.com/{repo}", "lfs_path": rel, "rev": rev}
+        else:
+            entry["url"] = file_url(repo, rev, rel, False)
+        entry.update(sha256=sha, size_bytes=size, upstream_path=rel)
+        out.append(entry)
     return out
 
 
@@ -296,9 +286,9 @@ def cmd_add(args: argparse.Namespace) -> int:
 
 def cmd_fill(args: argparse.Namespace) -> int:
     doc = load(args.manifest)
-    ids = set(filter(None, args.ids.split(",")))
-    sources = set(filter(None, args.sources.split(",")))
-    tags = set(filter(None, args.tags.split(",")))
+    ids: set[str] = set(filter(None, args.ids.split(",")))
+    sources: set[str] = set(filter(None, args.sources.split(",")))
+    tags: set[str] = set(filter(None, args.tags.split(",")))
     todo = [
         e
         for e in doc["entries"]
