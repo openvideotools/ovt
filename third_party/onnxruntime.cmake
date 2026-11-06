@@ -48,7 +48,13 @@ else()
                       "${_ovt_ort_arch}.")
 endif()
 
-ovt_tp_declare(${_ovt_ort_dep} LICENSE_FILES LICENSE)
+# ThirdPartyNotices.txt carries the notices of the code bundled into libonnxruntime (protobuf, abseil, ...);
+# redistributing the library requires it next to LICENSE. "./LICENSE": a bare LICENSE would be read as the keyword.
+ovt_tp_declare(${_ovt_ort_dep} LICENSE_FILES ./LICENSE ThirdPartyNotices.txt)
+# cmake/OvtNotices.cmake stages the licence files of <dep> from the ExternalProject OVT_TP_EP_<dep> into the notices
+# directory OVT_TP_NOTICE_KEY_<dep>; the four rows are one component, `onnxruntime` (tools/gen_notices.py).
+set_property(GLOBAL PROPERTY OVT_TP_EP_${_ovt_ort_dep} tp_onnxruntime)
+set_property(GLOBAL PROPERTY OVT_TP_NOTICE_KEY_${_ovt_ort_dep} onnxruntime)
 set(_ovt_ort_licence "${OVT_TP_${_ovt_ort_dep}_LICENSE}")
 set(_ovt_ort_version "${OVT_TP_${_ovt_ort_dep}_VERSION}")
 
