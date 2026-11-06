@@ -4,8 +4,8 @@
 """Per-frame MaxCLL / FALL of a PQ Y4M in float64 -> ``scores`` (chapter 14 §14.4.15, WI-0.555).
 
 Input: a Y4M file of the decoded frames (``ffmpeg -i <in> -pix_fmt yuv420p10le -f yuv4mpegpipe out.y4m``;
-``C420p10``, ``C420p12``, ``C422p10``, ``C444p10``, ... 8-bit ``C420``/``C420jpeg``/``C420mpeg2``/``C420paldv``, or no ``C`` tag, which Y4M defines as 420jpeg). For each frame (or only ``--frame
-n``, 0-based):
+``C420p10``, ``C420p12``, ``C422p10``, ``C444p10``, ... or 8-bit ``C420``, ``C420jpeg``, ``C420mpeg2``,
+``C420paldv``, or no ``C`` tag, which Y4M defines as 420jpeg). For each frame (or only ``--frame n``, 0-based):
 
 1. Y'CbCr to normalised values: limited range ``Y' = (Y − 16·2^(b−8)) / (219·2^(b−8))``,
    ``C = (C − 128·2^(b−8)) / (224·2^(b−8))``, or full range (``--full-range`` or the Y4M
