@@ -144,7 +144,7 @@ void write_log_line(const LogTarget& t, int level, std::string_view module, std:
       const std::time_t secs = std::chrono::system_clock::to_time_t(now);
       const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count() % 1000;
       std::tm tm{};
-      gmtime_r(&secs, &tm);
+      static_cast<void>(gmtime_r(&secs, &tm));  // cannot fail for a time_t from system_clock
       std::string upper(name);
       std::transform(upper.begin(), upper.end(), upper.begin(), [](char c) { return static_cast<char>(c - 32); });
       const char* on =
