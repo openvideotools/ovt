@@ -82,7 +82,7 @@ nlohmann::json to_canonical(const fb::ContainerTree& tree, Family family = Famil
 nlohmann::json to_canonical(const fb::SampleTable& table, Family family = Family::kSampleTable);
 
 /// block-grid: `{"w4","h4","fields":{name:[int per cell]}}` from FrameAnalysis.grid. @p fields selects CellGrid
-/// vectors by name (empty = all vectors the grid carries, except block_id/partition_id). Unknown name:
+/// vectors by name (empty = all vectors the grid carries, except block_id). Unknown name:
 /// std::invalid_argument.
 nlohmann::json to_canonical(const fb::FrameAnalysis& analysis, Family family = Family::kBlockGrid,
                             const std::vector<std::string>& fields = {});
