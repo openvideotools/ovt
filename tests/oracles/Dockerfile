@@ -33,7 +33,7 @@ RUN apt-get update \
       build-essential pkg-config git curl unzip xz-utils xxd cmake ninja-build meson nasm \
       autoconf automake libtool python3 python3-dev python3-venv \
       golang-go \
-      libnuma-dev zlib1g-dev libssl-dev libogg-dev libpng-dev libjpeg-dev \
+      libnuma-dev zlib1g-dev libssl-dev libogg-dev libopus-dev libpng-dev libjpeg-dev \
       libvulkan-dev libshaderc-dev liblcms2-dev libass-dev \
       libx11-dev libxext-dev libxrandr-dev libxpresent-dev libxss-dev libxinerama-dev libxkbcommon-dev \
       mesa-vulkan-drivers xvfb \
@@ -128,9 +128,11 @@ RUN bash -c 'source /src/lib.sh \
  && ovt_git_fetch https://github.com/google/uvq.git "${UVQ_COMMIT}" "${UVQ_COMMIT}" /opt/ovt-oracles/uvq \
  && rm -rf /opt/ovt-oracles/uvq/.git /opt/ovt-oracles/uvq/models && ovt_stamp uvq "google/uvq ${UVQ_COMMIT}"'
 
-COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh /opt/ovt-oracles/share/ovt-oracles/
+COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh recipe_tools.py recipe_tools.json \
+     /opt/ovt-oracles/share/ovt-oracles/
 RUN ln -s ../share/ovt-oracles/oracle_versions.py /opt/ovt-oracles/bin/oracle-versions \
  && ln -s ../share/ovt-oracles/smoke_test.sh /opt/ovt-oracles/bin/oracle-smoke-test \
+ && ln -s ../share/ovt-oracles/recipe_tools.py /opt/ovt-oracles/bin/oracle-recipe-tools \
  && chmod 0755 /opt/ovt-oracles/share/ovt-oracles/*.py /opt/ovt-oracles/share/ovt-oracles/*.sh
 
 WORKDIR /work

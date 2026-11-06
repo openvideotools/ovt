@@ -97,6 +97,9 @@ check hm_cfg - ls "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/hm/cfg/encoder_
 check inspect - inspect -A -a syn_av1.ivf
 check dav1d dav1d.y4m dav1d -q -i syn_av1.ivf -o dav1d.y4m
 
+# --- every tool, pin and FFmpeg component the synthetic corpus recipes use (recipe_tools.json, WI-0.553) --------
+check recipe_tools - oracle-recipe-tools --check
+
 # --- §14.4.10-14.4.15 metric and render oracles ------------------------------------------------------------
 check ffpsnr ffpsnr.txt ff -i dist.y4m -i src_720p_8bit.y4m -lavfi "[0:v][1:v]psnr=stats_file=ffpsnr.txt" -f null -
 check ffvmaf ffvmaf.json ff -i dist.y4m -i src_720p_8bit.y4m -lavfi \
