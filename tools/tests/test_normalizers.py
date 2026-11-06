@@ -35,6 +35,13 @@ CASES = [
     ("ffmpeg_mvs", "ffmpeg_qp_10bit.csv", ["--qp", "--bit-depth", "10"], "block-grid"),
     ("hm_grid", "hm_cu_dump_16x8.json", [], "block-grid"),
     ("aom_inspect", "aom_inspect_8x8.json", [], "block-grid"),
+    ("mp4box_diso", "mp4box_diso_tiny.xml", [], "box-tree"),
+    ("mp4box_diso", "mp4box_diso_frag.xml", [], "box-tree"),
+    ("mp4box_dts", "mp4box_dts.txt", [], "sample-table"),
+    ("mp4ff_info", "mp4ff_info_frag.txt", [], "box-tree"),
+    ("mediainfo_trace", "mediainfo_trace_frag.xml", [], "box-tree"),
+    ("mediainfo_trace", "mediainfo_hdr10.json", ["--hdr"], "header-struct"),
+    ("mp4boxjs", "mp4boxjs_tiny.json", [], "box-tree"),
 ]
 
 
@@ -232,6 +239,126 @@ def test_aom_inspect_refuses_a_changed_key_set(tmp_path: Path) -> None:
     path.write_text(text.replace('"seg_id"', '"segment_id"'), encoding="utf-8")
     proc = run("aom_inspect", str(path))
     assert proc.returncode == canon.EXIT_INPUT and "segment_id" in proc.stderr
+
+
+# -- ISOBMFF oracles (§14.4.6-§14.4.9) ---------------------------------------------------------------------
+# tiny.mp4: 3 frames of 64x64 libx264, moov at the end; frag.mp4: the same remuxed with
+# -movflags frag_keyframe+empty_moov; hdr.mp4: 2 frames of x265 Main 10 with HDR10 SEI. Captured with GPAC
+# 2.2.1, mp4ff-info v0.48.0, MediaInfo 24.01 and, for mp4boxjs_tiny.json, a stand-in for WI-0.564's
+# mp4boxjs_dump.mjs written to §14.4.9 (mp4box 1.x). The MediaInfo trace drops its "Second pass" NAL block
+# and the MediaInfo JSON drops Encoded_Library_Settings; the rest is byte-exact.
+
+
+def by_path(doc: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {b["path"]: b for b in doc}
+
+
+def test_diso_paths_index_repeated_siblings_and_map_fields() -> None:
+    boxes = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    assert "moof[2]/traf/trun" in boxes and "mdat[1]" in boxes and "moov/trak" in boxes
+    assert "moov/udta/meta/ilst/\u00a9too" in boxes  # GPAC Type "A9too"
+    trun = boxes["moof[1]/traf/trun"]["fields"]
+    assert trun["sample_count"] == 2 and trun["data_offset"] == 128
+    assert trun["entries"] == [
+        {"sample_composition_time_offset": 512, "sample_size": 2314},
+        {"sample_composition_time_offset": 512, "sample_size": 972},
+    ]
+    assert boxes["moov/trak/tkhd"]["fields"]["width"] == 64 << 16  # 16.16 fixed point as the raw integer
+    avcc = boxes["moov/trak/mdia/minf/stbl/stsd/avc1/avcC"]["fields"]
+    assert avcc["lengthSizeMinusOne"] == 3 and avcc["pictureParameterSetNALUnit"] == ["68ce0f1920"]
+    assert all("offset" not in b for b in boxes.values())  # -diso prints no offsets
+
+
+def test_diso_tiny_entries() -> None:
+    boxes = by_path(normalise("mp4box_diso", "mp4box_diso_tiny.xml"))
+    stbl = "moov/trak/mdia/minf/stbl/"
+    assert boxes["ftyp"]["fields"]["compatible_brands"] == ["isom", "iso2", "avc1", "mp41"]
+    assert boxes[stbl + "stsz"]["fields"]["entries"] == [{"entry_size": s} for s in (2314, 972, 2404)]
+    assert boxes[stbl + "ctts"]["fields"]["entries"] == [{"sample_count": 3, "sample_offset": 512}]
+
+
+def test_gpac_fourcc_and_unknown_box(tmp_path: Path) -> None:
+    import mp4box_diso
+
+    assert mp4box_diso.gpac_fourcc("A9too") == "\u00a9too" and mp4box_diso.gpac_fourcc("url ") == "url "
+    assert mp4box_diso.gpac_fourcc("00000001") == "\x00\x00\x00\x01"
+    xml = tmp_path / "u.xml"
+    xml.write_text('<IsoMediaFile><UnknownBox Size="16" Type="abcd" Version="0" Foo="1"/></IsoMediaFile>')
+    assert normalise("mp4box_diso", str(xml)) == [{"path": "abcd", "size": 16}]
+
+
+def test_dts_rows_and_track_filter(tmp_path: Path) -> None:
+    rows = normalise("mp4box_dts", "mp4box_dts.txt")
+    assert rows[1] == {"i": 1, "dts": 512, "cts": 1024, "size": 972, "offset": 2362, "sync": 0}
+    assert [r["sync"] for r in rows] == [1, 0, 1]
+    two = tmp_path / "two.txt"
+    text = (FIX / "mp4box_dts.txt").read_text()
+    two.write_text(text + text.replace("track ID 1", "track ID 2"))
+    assert {r["track"] for r in normalise("mp4box_dts", str(two))} == {1, 2}
+    assert len(normalise("mp4box_dts", str(two), "--track", "2")) == 3
+    two.write_text(text.replace("CTS\tSize", "Size\tCTS"))
+    assert run("mp4box_dts", str(two)).returncode == canon.EXIT_INPUT
+
+
+def test_mp4ff_agrees_with_gpac_on_tree_and_shared_fields() -> None:
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    mp4ff = by_path(normalise("mp4ff_info", "mp4ff_info_frag.txt"))
+    assert {(p, b["size"]) for p, b in mp4ff.items()} == {(p, b["size"]) for p, b in gpac.items()}
+    for path, box in mp4ff.items():
+        theirs = gpac[path].get("fields", {})
+        shared = set(box.get("fields", {})) & set(theirs)
+        assert {k: box["fields"][k] for k in shared} == {k: theirs[k] for k in shared}, path
+    assert mp4ff["moov/trak/mdia/minf/stbl/stsd/avc1/pasp"]["fields"] == {"hSpacing": 1, "vSpacing": 1}
+    assert mp4ff["moof[1]/traf/trun"]["fields"]["first_sample_flags"] == 0x02000000
+    assert mp4ff["mfra/tfra"]["fields"]["entries"] == gpac["mfra/tfra"]["fields"]["entries"]
+
+
+def test_mediainfo_offsets_and_header_length() -> None:
+    boxes = by_path(normalise("mediainfo_trace", "mediainfo_trace_frag.xml"))
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    assert {p.replace("?", "\u00a9"): b["size"] for p, b in boxes.items()} == {p: b["size"] for p, b in gpac.items()}
+    moofs = [e["moof_offset"] for e in gpac["mfra/tfra"]["fields"]["entries"]]
+    assert [boxes["moof[1]"]["offset"], boxes["moof[2]"]["offset"]] == moofs  # two oracles, one offset
+    assert boxes["moov/mvhd"] == {"path": "moov/mvhd", "offset": 36, "size": 108, "header_length": 8}
+
+
+def test_mediainfo_hdr_units(tmp_path: Path) -> None:
+    hdr = normalise("mediainfo_trace", "mediainfo_hdr10.json", "--hdr")["hdr"]
+    assert (hdr["primaries"], hdr["transfer"], hdr["matrix"], hdr["full_range"]) == (9, 16, 9, 0)
+    assert hdr["mdcv_primaries"] == [[34000, 16000], [13250, 34500], [7500, 3000]]  # R, G, B
+    assert hdr["mdcv_white_point"] == [15635, 16450]
+    assert (hdr["mdcv_max_luminance"], hdr["mdcv_min_luminance"], hdr["max_cll"], hdr["max_fall"]) == (
+        10000000,
+        1,
+        1000,
+        400,
+    )
+    doc = json.loads((FIX / "mediainfo_hdr10.json").read_text())
+    video = doc["media"]["track"][1]
+    video["MasteringDisplay_ColorPrimaries"] = (
+        "R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000"
+    )
+    path = tmp_path / "mi.json"
+    path.write_text(json.dumps(doc))
+    again = normalise("mediainfo_trace", str(path), "--hdr")["hdr"]
+    assert again["mdcv_primaries"] == hdr["mdcv_primaries"] and again["mdcv_white_point"] == hdr["mdcv_white_point"]
+    video["transfer_characteristics"] = "Something new"
+    path.write_text(json.dumps(doc))
+    assert run("mediainfo_trace", str(path), "--hdr").returncode == canon.EXIT_INPUT
+
+
+def test_mp4boxjs_offsets_and_fullbox_header_length() -> None:
+    boxes = by_path(normalise("mp4boxjs", "mp4boxjs_tiny.json"))
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_tiny.xml"))
+    assert all(gpac[p]["size"] == b["size"] for p, b in boxes.items())  # mp4box.js lists a subset
+    assert boxes["moov/mvhd"]["offset"] == 5746 and boxes["moov/mvhd"]["header_length"] == 8  # hdr_size 12
+    assert boxes["moov/trak/mdia/mdhd"]["fields"]["language"] == "und"
+    assert boxes["moov/trak/tkhd"]["fields"]["track_ID"] == gpac["moov/trak/tkhd"]["fields"]["track_ID"]
+
+
+def test_box_paths_rejects_a_depth_jump() -> None:
+    with pytest.raises(canon.NormalizeError):
+        canon.box_paths([(0, "moov", {}), (2, "mvhd", {})])
 
 
 # -- canon (§14.4.0) ---------------------------------------------------------------------------------------

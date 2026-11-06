@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--MP4Box dump trace-->
+<IsoMediaFile xmlns="urn:mpeg:isobmff:schema:file:2016" Name="frag.mp4">
+<FileTypeBox Size="28" Type="ftyp" Specification="p12" Container="file otyp" MajorBrand="iso5" MinorVersion="512">
+<BrandEntry AlternateBrand="iso5"/>
+<BrandEntry AlternateBrand="iso6"/>
+<BrandEntry AlternateBrand="mp41"/>
+</FileTypeBox>
+<MovieBox Size="769" Type="moov" Specification="p12" Container="file" >
+<MovieHeaderBox Size="108" Type="mvhd" Version="0" Flags="0" Specification="p12" Container="moov" CreationTime="0" ModificationTime="0" TimeScale="1000" Duration="0" NextTrackID="2">
+</MovieHeaderBox>
+<TrackBox Size="515" Type="trak" Specification="p12" Container="moov" >
+<TrackHeaderBox Size="92" Type="tkhd" Version="0" Flags="3" Specification="p12" Container="trak" CreationTime="0" ModificationTime="0" TrackID="1" Duration="0" Width="64.00" Height="64.00">
+<Matrix m11="0x00010000" m12="0x00000000" m13="0x00000000" m21="0x00000000" m22="0x00010000" m23="0x00000000" m31="0x00000000" m32="0x00000000" m33="0x40000000"/>
+</TrackHeaderBox>
+<MediaBox Size="415" Type="mdia" Specification="p12" Container="trak" >
+<MediaHeaderBox Size="32" Type="mdhd" Version="0" Flags="0" Specification="p12" Container="mdia" CreationTime="0" ModificationTime="0" TimeScale="12800" Duration="0" LanguageCode="und">
+</MediaHeaderBox>
+<HandlerBox Size="45" Type="hdlr" Version="0" Flags="0" Specification="p12" Container="mdia meta minf" hdlrType="vide" Name="VideoHandler" reserved1="0" reserved2="data:application/octet-string,000000000000000000000000">
+</HandlerBox>
+<MediaInformationBox Size="330" Type="minf" Specification="p12" Container="mdia" >
+<VideoMediaHeaderBox Size="20" Type="vmhd" Version="0" Flags="1" Specification="p12" Container="minf" >
+</VideoMediaHeaderBox>
+<DataInformationBox Size="36" Type="dinf" Specification="p12" Container="minf meta" >
+<DataReferenceBox Size="28" Type="dref" Version="0" Flags="0" Specification="p12" Container="dinf" >
+<URLDataEntryBox Size="12" Type="url " Version="0" Flags="1" Specification="p12" Container="dref" >
+<!--Data is contained in the movie file-->
+</URLDataEntryBox>
+</DataReferenceBox>
+</DataInformationBox>
+<SampleTableBox Size="266" Type="stbl" Specification="p12" Container="minf" >
+<SampleDescriptionBox Size="190" Type="stsd" Version="0" Flags="0" Specification="p12" Container="stbl" >
+<AVCSampleEntryBox Size="174" Type="avc1" Specification="p15" Container="stsd"  DataReferenceIndex="1" Width="64" Height="64" XDPI="4718592" YDPI="4718592" BitDepth="24" CompressorName="Lavc60.31.102 libx264"
+>
+<AVCConfigurationBox Size="52" Type="avcC" Specification="p15" Container="avc1 avc2 avc3 avc4 encv resv ipco dva1 dvav" >
+<AVCDecoderConfigurationRecord configurationVersion="1" AVCProfileIndication="244" profile_compatibility="0" AVCLevelIndication="10" nal_unit_size="4" chroma_format="YUV 4:4:4" luma_bit_depth="8" chroma_bit_depth="8">
+<SequenceParameterSet size="24" content="data:application/octet-string,67F4000A919D884D808800000300080000030190789129C0"/>
+<PictureParameterSet size="5" content="data:application/octet-string,68CE0F1920"/>
+</AVCDecoderConfigurationRecord>
+</AVCConfigurationBox>
+<PixelAspectRatioBox Size="16" Type="pasp" Specification="p12" Container="video_sample_entry ipco" hSpacing="1" vSpacing="1" >
+</PixelAspectRatioBox>
+<BitRateBox Size="20" Type="btrt" Specification="p12" Container="sample_entry" BufferSizeDB="0" avgBitRate="379333" maxBitRate="379333">
+</BitRateBox>
+</AVCSampleEntryBox>
+</SampleDescriptionBox>
+<TimeToSampleBox Size="16" Type="stts" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="0">
+<!-- counted 0 samples in STTS entries -->
+</TimeToSampleBox>
+<SampleToChunkBox Size="16" Type="stsc" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="0">
+<!-- counted 0 samples in STSC entries (could be less than sample count) -->
+</SampleToChunkBox>
+<SampleSizeBox Size="20" Type="stsz" Version="0" Flags="0" Specification="p12" Container="stbl" SampleCount="0">
+<!--WARNING: No Sample Size indications-->
+</SampleSizeBox>
+<ChunkOffsetBox Size="16" Type="stco" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="0">
+<!--Warning: No Chunk Offsets indications-->
+</ChunkOffsetBox>
+</SampleTableBox>
+</MediaInformationBox>
+</MediaBox>
+</TrackBox>
+<MovieExtendsBox Size="40" Type="mvex" Specification="p12" Container="moov" >
+<TrackExtendsBox Size="32" Type="trex" Version="0" Flags="0" Specification="p12" Container="mvex" TrackID="1" SampleDescriptionIndex="1" SampleDuration="0" SampleSize="0">
+<DefaultSampleFlags IsLeading="0" SampleDependsOn="0" SampleIsDependedOn="0" SampleHasRedundancy="0" SamplePadding="0" SampleSync="1" SampleDegradationPriority="0"/>
+</TrackExtendsBox>
+</MovieExtendsBox>
+<UserDataBox Size="98" Type="udta" Specification="p12" Container="moov trak moof traf" >
+<MetaBox Size="90" Type="meta" Version="0" Flags="0" Specification="p12" Container="file moov trak moof traf udta" >
+<HandlerBox Size="33" Type="hdlr" Version="0" Flags="0" Specification="p12" Container="mdia meta minf" hdlrType="mdir" Name="" reserved1="0" reserved2="data:application/octet-string,6170706C0000000000000000">
+</HandlerBox>
+<ItemListBox Size="45" Type="ilst" Specification="apple" Container="meta" >
+<tool Size="37" Type="A9too" Specification="apple" Container="ilst data"  value="Lavf60.16.100" >
+<data Size="29" Type="data" Version="0" Flags="1" Specification="apple" Container="ilst *" >
+</data>
+</tool>
+</ItemListBox>
+</MetaBox>
+</UserDataBox>
+</MovieBox>
+<MovieFragmentBox Size="120" Type="moof" Specification="p12" Container="file" TrackFragments="1">
+<MovieFragmentHeaderBox Size="16" Type="mfhd" Version="0" Flags="0" Specification="p12" Container="moof" FragmentSequenceNumber="1">
+</MovieFragmentHeaderBox>
+<TrackFragmentBox Size="96" Type="traf" Specification="p12" Container="moof" >
+<TrackFragmentHeaderBox Size="28" Type="tfhd" Version="0" Flags="131128" Specification="p12" Container="traf" TrackID="1" BaseDataOffset="moof" SampleDuration="512" SampleSize="2314" SamplePadding="0" Sync="0" DegradationPriority="0" IsLeading="0" DependsOn="1" IsDependedOn="0" HasRedundancy="0">
+</TrackFragmentHeaderBox>
+<TrackFragmentBaseMediaDecodeTimeBox Size="20" Type="tfdt" Version="1" Flags="0" Specification="p12" Container="traf" baseMediaDecodeTime="0">
+</TrackFragmentBaseMediaDecodeTimeBox>
+<TrackRunBox Size="40" Type="trun" Version="0" Flags="2565" Specification="p12" Container="traf" SampleCount="2" DataOffset="128">
+<FirstSampleFlags IsLeading="0" SampleDependsOn="2" SampleIsDependedOn="0" SampleHasRedundancy="0" SamplePadding="0" SampleSync="1" SampleDegradationPriority="0"/>
+<TrackRunEntry Size="2314" CTSOffset="512"/>
+<TrackRunEntry Size="972" CTSOffset="512"/>
+</TrackRunBox>
+</TrackFragmentBox>
+</MovieFragmentBox>
+<MediaDataBox Size="3294" Type="mdat" Specification="p12" Container="file" dataSize="3286">
+</MediaDataBox>
+<MovieFragmentBox Size="108" Type="moof" Specification="p12" Container="file" TrackFragments="1">
+<MovieFragmentHeaderBox Size="16" Type="mfhd" Version="0" Flags="0" Specification="p12" Container="moof" FragmentSequenceNumber="2">
+</MovieFragmentHeaderBox>
+<TrackFragmentBox Size="84" Type="traf" Specification="p12" Container="moof" >
+<TrackFragmentHeaderBox Size="28" Type="tfhd" Version="0" Flags="131128" Specification="p12" Container="traf" TrackID="1" BaseDataOffset="moof" SampleDuration="512" SampleSize="2404" SamplePadding="0" Sync="0" DegradationPriority="0" IsLeading="0" DependsOn="1" IsDependedOn="0" HasRedundancy="0">
+</TrackFragmentHeaderBox>
+<TrackFragmentBaseMediaDecodeTimeBox Size="20" Type="tfdt" Version="1" Flags="0" Specification="p12" Container="traf" baseMediaDecodeTime="1024">
+</TrackFragmentBaseMediaDecodeTimeBox>
+<TrackRunBox Size="28" Type="trun" Version="0" Flags="2053" Specification="p12" Container="traf" SampleCount="1" DataOffset="116">
+<FirstSampleFlags IsLeading="0" SampleDependsOn="2" SampleIsDependedOn="0" SampleHasRedundancy="0" SamplePadding="0" SampleSync="1" SampleDegradationPriority="0"/>
+<TrackRunEntry CTSOffset="512"/>
+</TrackRunBox>
+</TrackFragmentBox>
+</MovieFragmentBox>
+<MediaDataBox Size="2412" Type="mdat" Specification="p12" Container="file" dataSize="2404">
+</MediaDataBox>
+<MovieFragmentRandomAccessBox Size="86" Type="mfra" Specification="p12" Container="file" >
+<TrackFragmentRandomAccessBox Size="62" Type="tfra" Version="1" Flags="0" Specification="p12" Container="mfra" TrackId="1" number_of_entries="2">
+<RandomAccessEntry time="512" moof_offset="797" traf="1" trun="1" sample="1"/>
+<RandomAccessEntry time="1536" moof_offset="4211" traf="1" trun="1" sample="1"/>
+</TrackFragmentRandomAccessBox>
+<MovieFragmentRandomAccessOffsetBox Size="16" Type="mfro" Version="0" Flags="0" Specification="p12" Container="mfra" container_size="86" >
+</MovieFragmentRandomAccessOffsetBox>
+</MovieFragmentRandomAccessBox>
+</IsoMediaFile>

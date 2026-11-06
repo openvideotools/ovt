@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--MP4Box dump trace-->
+<IsoMediaFile xmlns="urn:mpeg:isobmff:schema:file:2016" Name="tiny.mp4">
+<FileTypeBox Size="32" Type="ftyp" Specification="p12" Container="file otyp" MajorBrand="isom" MinorVersion="512">
+<BrandEntry AlternateBrand="isom"/>
+<BrandEntry AlternateBrand="iso2"/>
+<BrandEntry AlternateBrand="avc1"/>
+<BrandEntry AlternateBrand="mp41"/>
+</FileTypeBox>
+<FreeSpaceBox Size="8" Type="free" Specification="p12" Container="*" dataSize="0">
+</FreeSpaceBox>
+<MediaDataBox Size="5698" Type="mdat" Specification="p12" Container="file" dataSize="5690">
+</MediaDataBox>
+<MovieBox Size="849" Type="moov" Specification="p12" Container="file" >
+<MovieHeaderBox Size="108" Type="mvhd" Version="0" Flags="0" Specification="p12" Container="moov" CreationTime="0" ModificationTime="0" TimeScale="1000" Duration="120" NextTrackID="2">
+</MovieHeaderBox>
+<TrackBox Size="635" Type="trak" Specification="p12" Container="moov" >
+<TrackHeaderBox Size="92" Type="tkhd" Version="0" Flags="3" Specification="p12" Container="trak" CreationTime="0" ModificationTime="0" TrackID="1" Duration="120" Width="64.00" Height="64.00">
+<Matrix m11="0x00010000" m12="0x00000000" m13="0x00000000" m21="0x00000000" m22="0x00010000" m23="0x00000000" m31="0x00000000" m32="0x00000000" m33="0x40000000"/>
+</TrackHeaderBox>
+<EditBox Size="36" Type="edts" Specification="p12" Container="trak" >
+<EditListBox Size="28" Type="elst" Version="0" Flags="0" Specification="p12" Container="edts" EntryCount="1">
+<EditListEntry Duration="120" MediaTime="512" MediaRate="1"/>
+</EditListBox>
+</EditBox>
+<MediaBox Size="499" Type="mdia" Specification="p12" Container="trak" >
+<MediaHeaderBox Size="32" Type="mdhd" Version="0" Flags="0" Specification="p12" Container="mdia" CreationTime="0" ModificationTime="0" TimeScale="12800" Duration="1536" LanguageCode="und">
+</MediaHeaderBox>
+<HandlerBox Size="45" Type="hdlr" Version="0" Flags="0" Specification="p12" Container="mdia meta minf" hdlrType="vide" Name="VideoHandler" reserved1="0" reserved2="data:application/octet-string,000000000000000000000000">
+</HandlerBox>
+<MediaInformationBox Size="414" Type="minf" Specification="p12" Container="mdia" >
+<VideoMediaHeaderBox Size="20" Type="vmhd" Version="0" Flags="1" Specification="p12" Container="minf" >
+</VideoMediaHeaderBox>
+<DataInformationBox Size="36" Type="dinf" Specification="p12" Container="minf meta" >
+<DataReferenceBox Size="28" Type="dref" Version="0" Flags="0" Specification="p12" Container="dinf" >
+<URLDataEntryBox Size="12" Type="url " Version="0" Flags="1" Specification="p12" Container="dref" >
+<!--Data is contained in the movie file-->
+</URLDataEntryBox>
+</DataReferenceBox>
+</DataInformationBox>
+<SampleTableBox Size="350" Type="stbl" Specification="p12" Container="minf" >
+<SampleDescriptionBox Size="190" Type="stsd" Version="0" Flags="0" Specification="p12" Container="stbl" >
+<AVCSampleEntryBox Size="174" Type="avc1" Specification="p15" Container="stsd"  DataReferenceIndex="1" Width="64" Height="64" XDPI="4718592" YDPI="4718592" BitDepth="24" CompressorName="Lavc60.31.102 libx264"
+>
+<AVCConfigurationBox Size="52" Type="avcC" Specification="p15" Container="avc1 avc2 avc3 avc4 encv resv ipco dva1 dvav" >
+<AVCDecoderConfigurationRecord configurationVersion="1" AVCProfileIndication="244" profile_compatibility="0" AVCLevelIndication="10" nal_unit_size="4" chroma_format="YUV 4:4:4" luma_bit_depth="8" chroma_bit_depth="8">
+<SequenceParameterSet size="24" content="data:application/octet-string,67F4000A919D884D808800000300080000030190789129C0"/>
+<PictureParameterSet size="5" content="data:application/octet-string,68CE0F1920"/>
+</AVCDecoderConfigurationRecord>
+</AVCConfigurationBox>
+<PixelAspectRatioBox Size="16" Type="pasp" Specification="p12" Container="video_sample_entry ipco" hSpacing="1" vSpacing="1" >
+</PixelAspectRatioBox>
+<BitRateBox Size="20" Type="btrt" Specification="p12" Container="sample_entry" BufferSizeDB="0" avgBitRate="379333" maxBitRate="379333">
+</BitRateBox>
+</AVCSampleEntryBox>
+</SampleDescriptionBox>
+<TimeToSampleBox Size="24" Type="stts" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="1">
+<TimeToSampleEntry SampleDelta="512" SampleCount="3"/>
+<!-- counted 3 samples in STTS entries -->
+</TimeToSampleBox>
+<SyncSampleBox Size="24" Type="stss" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="2">
+<SyncSampleEntry sampleNumber="1"/>
+<SyncSampleEntry sampleNumber="3"/>
+</SyncSampleBox>
+<CompositionOffsetBox Size="24" Type="ctts" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="1">
+<CompositionOffsetEntry CompositionOffset="512" SampleCount="3"/>
+<!-- counted 3 samples in CTTS entries -->
+</CompositionOffsetBox>
+<SampleToChunkBox Size="28" Type="stsc" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="1">
+<SampleToChunkEntry FirstChunk="1" SamplesPerChunk="3" SampleDescriptionIndex="1"/>
+<!-- counted 3 samples in STSC entries (could be less than sample count) -->
+</SampleToChunkBox>
+<SampleSizeBox Size="32" Type="stsz" Version="0" Flags="0" Specification="p12" Container="stbl" SampleCount="3">
+<SampleSizeEntry Size="2314"/>
+<SampleSizeEntry Size="972"/>
+<SampleSizeEntry Size="2404"/>
+</SampleSizeBox>
+<ChunkOffsetBox Size="20" Type="stco" Version="0" Flags="0" Specification="p12" Container="stbl" EntryCount="1">
+<ChunkEntry offset="48"/>
+</ChunkOffsetBox>
+</SampleTableBox>
+</MediaInformationBox>
+</MediaBox>
+</TrackBox>
+<UserDataBox Size="98" Type="udta" Specification="p12" Container="moov trak moof traf" >
+<MetaBox Size="90" Type="meta" Version="0" Flags="0" Specification="p12" Container="file moov trak moof traf udta" >
+<HandlerBox Size="33" Type="hdlr" Version="0" Flags="0" Specification="p12" Container="mdia meta minf" hdlrType="mdir" Name="" reserved1="0" reserved2="data:application/octet-string,6170706C0000000000000000">
+</HandlerBox>
+<ItemListBox Size="45" Type="ilst" Specification="apple" Container="meta" >
+<tool Size="37" Type="A9too" Specification="apple" Container="ilst data"  value="Lavf60.16.100" >
+<data Size="29" Type="data" Version="0" Flags="1" Specification="apple" Container="ilst *" >
+</data>
+</tool>
+</ItemListBox>
+</MetaBox>
+</UserDataBox>
+</MovieBox>
+</IsoMediaFile>

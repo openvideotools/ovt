@@ -1,0 +1,5 @@
+#dumping track ID 1 timing:
+Num	DTS	CTS	Size	RAP	Offset	isLeading	DependsOn	DependedOn	Redundant	RAP-SampleGroup	Roll-SampleGroup	Roll-Distance
+Sample 1	DTS 0	CTS 512	2314	1	48	0	0	0	0	0	0	0
+Sample 2	DTS 512	CTS 1024	972	0	2362	0	0	0	0	0	0	0
+Sample 3	DTS 1024	CTS 1536	2404	1	3334	0	0	0	0	0	0	0
