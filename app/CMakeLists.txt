@@ -30,6 +30,9 @@ function(ovt_studio_add_qml_module target)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
   endforeach()
   set_source_files_properties("${app_dir}/qml/controls/OvtStyle.qml" PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+  # Qt 6.8 requires an alias on every absolute path used as a resource; the icon keeps its path under the module.
+  set_source_files_properties("${app_dir}/resources/icons/ovt-studio.svg" PROPERTIES QT_RESOURCE_ALIAS
+                                                                                     resources/icons/ovt-studio.svg)
   set(schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json")
   set_source_files_properties("${schema}" PROPERTIES QT_RESOURCE_ALIAS settings.schema.json)
   # qt_add_qml_module generates the QML type registration from moc's metatypes.
