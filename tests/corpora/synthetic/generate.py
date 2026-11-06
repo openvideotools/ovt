@@ -98,6 +98,34 @@ def wrap_step(es_file: str) -> dict[str, Any]:
     return {"cmd": ["ffmpeg", *rate, "-i", es_file, "-c", "copy", "-movflags", "+faststart", out]}
 
 
+def determinism_problem(argv: list[str]) -> str | None:
+    """Why ``argv`` would give different bytes on another machine or run, or None.
+
+    The x264/x265/libaom output depends on the thread count, which defaults to the CPU count; MP4Box and
+    mkvmerge stamp the wall-clock time and random UIDs unless told not to (#119).
+    """
+    tool, args = argv[0], argv[1:]
+    if tool == "x264" and "--threads" not in args:
+        return "x264 needs --threads N"
+    if tool == "x265" and not {"--frame-threads", "--pools"} <= set(args):
+        return "x265 needs --frame-threads N --pools N"
+    if tool == "aomenc" and not any(a.startswith("--threads=") for a in args):
+        return "aomenc needs --threads=N"
+    if tool == "MP4Box" and "-for-test" not in args:
+        return "MP4Box needs -for-test (no dates, no version string)"
+    if tool == "mkvmerge" and not {"--no-date", "--deterministic"} <= set(args):
+        return "mkvmerge needs --no-date --deterministic SEED"
+    if tool == "ffmpeg" and "-c:v" in args:
+        codec = args[args.index("-c:v") + 1]
+        if codec in ("libx264", "libaom-av1") and "-threads" not in args:
+            return f"ffmpeg {codec} needs -threads N"
+        if codec == "libx265":
+            params = args[args.index("-x265-params") + 1] if "-x265-params" in args else ""
+            if "frame-threads=" not in params or "pools=" not in params:
+                return "ffmpeg libx265 needs -x265-params ...:frame-threads=N:pools=N"
+    return None
+
+
 def load_recipes(path: Path) -> dict[str, Any]:
     """Load recipes.json and check its structure; raise GenError(4) on any problem."""
     try:
@@ -124,6 +152,9 @@ def load_recipes(path: Path) -> dict[str, Any]:
                 tool = argv[0]
                 if tool not in UNPINNED and tool not in doc["pins"]:
                     raise GenError(EXIT_INVALID, f"recipes.json: tool {tool!r} has no pin")
+                if problem := determinism_problem(argv):
+                    name = item.get("id", item.get("file"))
+                    raise GenError(EXIT_INVALID, f"recipes.json: {name}: not reproducible: {problem}")
     doc["_sources"], doc["_ids"] = sources, ids
     return doc
 

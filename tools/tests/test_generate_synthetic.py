@@ -88,6 +88,39 @@ def test_recipes_load_and_cover_every_numbered_recipe():
         assert generate.closure(doc, [rec["id"]])[-1]["id"] == rec["id"]
 
 
+@pytest.mark.parametrize(
+    ("argv", "problem"),
+    [
+        (["x264", "--crf", "20", "-o", "a.264", "s.y4m"], "x264 needs --threads"),
+        (["x265", "--frame-threads", "1", "--input", "s.y4m"], "x265 needs"),
+        (["aomenc", "--cpu-used=4", "-o", "a.ivf", "s.y4m"], "aomenc needs"),
+        (["ffmpeg", "-i", "s.y4m", "-c:v", "libx264", "a.264"], "libx264 needs -threads"),
+        (["ffmpeg", "-i", "s.y4m", "-c:v", "libx265", "-x265-params", "pools=1", "a.265"], "libx265 needs"),
+        (["ffmpeg", "-i", "s.y4m", "-c:v", "libaom-av1", "a.mp4"], "libaom-av1 needs -threads"),
+        (["MP4Box", "-add", "a.264", "-new", "a.mp4"], "MP4Box needs -for-test"),
+        (["mkvmerge", "--no-date", "-o", "a.mkv", "a.mp4"], "mkvmerge needs"),
+    ],
+)
+def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
+    """Thread counts change x264/x265/libaom output and muxers stamp dates, so recipes must pin both (#119)."""
+    assert problem in (generate.determinism_problem(argv) or "")
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text())
+    doc["recipes"][0]["steps"] = [{"cmd": argv}]
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(generate.GenError, match="not reproducible") as err:
+        generate.load_recipes(path)
+    assert err.value.code == 4
+
+
+def test_every_encoder_and_muxer_step_is_pinned():
+    doc = generate.load_recipes(generate.DEFAULT_RECIPES)  # raises on any unpinned step
+    steps = [s for item in [*doc["sources"], *doc["recipes"]] for s in item["steps"]]
+    argvs = [a for s in steps for a in generate.step_argvs(s)]
+    assert all(generate.determinism_problem(a) is None for a in argvs)
+    assert {"x264", "x265", "aomenc", "MP4Box", "mkvmerge"} <= {a[0] for a in argvs}
+
+
 def test_pins_match_oracle_versions_table():
     sys.path.insert(0, str(REPO / "tests" / "oracles"))
     import oracle_versions
