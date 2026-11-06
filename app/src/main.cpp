@@ -38,11 +38,14 @@ namespace {
 constexpr int kExitOk = 0;
 constexpr int kExitFailure = 1;
 
-// The watchdog turns a hang (no frame, no event) into a failure with a message instead of a CTest timeout. WI-0.019
-// acceptance test 1 asks for < 5 s on an idle machine; on the loaded Mac Mini runners (two builds at -j3 plus
-// ctest -j4) startup took longer and the old 4 s watchdog fired intermittently. 25 s still catches a real hang
-// and stays inside the 30 s CTest TIMEOUT. The elapsed time is reported so slow startups remain visible.
-constexpr int kSelfTestWatchdogMs = 25000;
+// The watchdog turns a hang (no frame, no event) into a failure with a message instead of a CTest timeout. The
+// budget is measured from the start of main(). WI-0.019 acceptance test 1 asks for < 5 s on Linux CI, so the
+// default stays 4 s; app/CMakeLists.txt raises it to 25 s on Apple platforms, where the loaded Mac Mini runners
+// (two builds at -j3 plus ctest -j4) made the 4 s budget fire intermittently.
+#ifndef OVT_SELF_TEST_WATCHDOG_MS
+#define OVT_SELF_TEST_WATCHDOG_MS 4000
+#endif
+constexpr int kSelfTestWatchdogMs = OVT_SELF_TEST_WATCHDOG_MS;
 
 // Diagnostics go to stderr with the product name; there is no logger in the GUI yet (WI-1.512 brings ovt::log).
 void report(const QString& message) {
@@ -68,6 +71,8 @@ int print_version() {
 // Exported: on Android this binary is libovt_studio_<ABI>.so and Qt finds main() with dlsym(), but
 // ovt::flags compiles with -fvisibility=hidden (chapter 13 §13.2.5).
 Q_DECL_EXPORT int main(int argc, char* argv[]) {
+  QElapsedTimer startup_clock; // covers QGuiApplication construction and engine.load(), where startup is slow
+  startup_clock.start();
   if (wants_version(std::span<char*>(argv, static_cast<std::size_t>(argc)))) {
     return print_version();
   }
@@ -107,8 +112,6 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   }
 
   QTimer watchdog;
-  QElapsedTimer startup_clock;
-  startup_clock.start();
   if (self_testing) {
     // Queued: leave the render loop before quitting. exit() is idempotent if a second frame arrives.
     QObject::connect(
@@ -130,7 +133,7 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
       report(QStringLiteral("self-test failed: no frame rendered within %1 ms").arg(kSelfTestWatchdogMs));
       QCoreApplication::exit(kExitFailure);
     });
-    watchdog.start(kSelfTestWatchdogMs);
+    watchdog.start(static_cast<int>(std::max<qint64>(1, kSelfTestWatchdogMs - startup_clock.elapsed())));
   }
 
   return QGuiApplication::exec();
