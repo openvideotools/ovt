@@ -11,11 +11,11 @@ Run on the macOS lane (`asan-ubsan-macos`, `ci-macos-asan`), because the Linux `
 ```console
 core/tests/test_version.cpp:57:26: runtime error: shift exponent 33 is too large for 32-bit type 'int'
 The following tests FAILED:
-	  8 - throwaway UB for WI-0.031 AT1 (Subprocess aborted) fast unit version
+    8 - throwaway UB for WI-0.031 AT1 (Subprocess aborted) fast unit version
 ##[error]Process completed with exit code 8.
 ```
 
-Run: https://github.com/openvideotools/ovt/actions/runs/42174498262/job/127749779284 (red, names the test).
+Run: <https://github.com/openvideotools/ovt/actions/runs/42174498262/job/127749779284> (red, names the test).
 The Linux `asan-ubsan` job (Clang 16) is untested until hosted runners return.
 
 ## Test 2: removed `ovt_*` symbol fails `abi-check` — deferred
