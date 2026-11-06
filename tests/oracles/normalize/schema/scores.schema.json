@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/scores.schema.json",
+  "title": "scores (chapter 14 §14.4.0)",
+  "description": "Per-frame (or per-chunk) metric values and pooled values. Numbers carry at most 6 decimals; an infinite value (identical frames under PSNR) is the string \"inf\".",
+  "type": "object",
+  "required": ["frames"],
+  "additionalProperties": false,
+  "properties": {
+    "frames": {"type": "array", "items": {
+      "type": "object",
+      "required": ["i"],
+      "properties": {"i": {"type": "integer", "minimum": 0}},
+      "additionalProperties": {"$ref": "#/$defs/score"}
+    }},
+    "pooled": {"type": "object", "additionalProperties": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/score"}
+    }}
+  },
+  "$defs": {
+    "score": {"anyOf": [{"type": "number"}, {"enum": ["inf", "-inf"]}]}
+  }
+}
