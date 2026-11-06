@@ -12,9 +12,11 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <exception>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -109,6 +111,7 @@ class Builder {
     return fields;
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): box nesting is bounded by the 2 KiB committed fixture; test-only walker.
   BoxOffsets walk(std::size_t begin, std::size_t end) {
     BoxOffsets boxes;
     std::size_t at = begin;
@@ -151,16 +154,10 @@ class Builder {
   flatbuffers::FlatBufferBuilder fbb_;
 };
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  if (argc != 2) {
-    std::cerr << "usage: ovt_golden_box_tree <file.mp4>\n";
-    return 2;
-  }
-  std::ifstream in(argv[1], std::ios::binary);
+int run(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
   if (!in) {
-    std::cerr << "ovt_golden_box_tree: cannot open " << argv[1] << "\n";
+    std::cerr << "ovt_golden_box_tree: cannot open " << path << "\n";
     return 2;
   }
   const Bytes file((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -170,4 +167,20 @@ int main(int argc, char** argv) {
   const auto* tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(builder.fbb().GetBufferPointer());
   std::cout << ovt::test::to_canonical(*tree).dump() << "\n";
   return 0;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  const std::span<char*> args(argv, static_cast<std::size_t>(argc));
+  if (args.size() != 2) {
+    std::cerr << "usage: ovt_golden_box_tree <file.mp4>\n";
+    return 2;
+  }
+  try {
+    return run(args[1]);
+  } catch (const std::exception& e) {
+    std::cerr << "ovt_golden_box_tree: " << e.what() << "\n";
+    return 2;
+  }
 }

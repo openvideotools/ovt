@@ -24,6 +24,13 @@
 namespace ovt::test {
 namespace {
 
+// True for a null or zero-length FlatBuffers string/vector. Uses size() because the apt
+// flatbuffers 2.0.8 used by local builds has no empty().
+template <typename T>
+bool fb_empty(const T* v) {
+  return v == nullptr || v->size() == 0;  // NOLINT(readability-container-size-empty)
+}
+
 void write_indent(std::string& out, int depth) {
   out.append(static_cast<std::size_t>(depth) * 2U, ' ');
 }
@@ -180,7 +187,7 @@ json node_value(const fb::SyntaxNode& node) {
     case fb::SyntaxValueKind::String:
       return str_of(node.svalue());
     case fb::SyntaxValueKind::Enum:
-      if (node.enum_name() != nullptr && node.enum_name()->size() > 0) {
+      if (!fb_empty(node.enum_name())) {
         return node.enum_name()->str();
       }
       return node.uvalue();
@@ -189,6 +196,9 @@ json node_value(const fb::SyntaxNode& node) {
   }
 }
 
+// SPEC-ASSUMPTION(#111): bit_offset/bit_length are written as the schema's BitSpan holds them (counted from the unit
+// start). §14.4.0 counts syntax-elements from the RBSP (H.26x) or OBU payload (AV1) start; converting between the two
+// bases is deferred to the first real syntax golden, WI-1.570.
 void collect_elements(const fb::SyntaxNode& node, uint32_t unit, json& out) {
   if (has_value(node)) {
     const fb::BitSpan* span = node.span();
@@ -244,7 +254,7 @@ class Members {
 };
 
 json header_struct_of(const fb::SyntaxNode& node) {
-  if (node.children() == nullptr || node.children()->size() == 0) {
+  if (fb_empty(node.children())) {
     return has_value(node) ? node_value(node) : json::object();
   }
   Members members;
@@ -260,9 +270,9 @@ json header_struct_of(const fb::SyntaxNode& node) {
 // ---- box-tree -----------------------------------------------------------------------------------
 
 json field_value(const fb::Field& field) {
-  if (field.children() != nullptr && field.children()->size() > 0) {
+  if (!fb_empty(field.children())) {
     const bool named = std::any_of(field.children()->begin(), field.children()->end(),
-                                   [](const fb::Field* c) { return c->name() != nullptr && c->name()->size() > 0; });
+                                   [](const fb::Field* c) { return !fb_empty(c->name()); });
     if (named) {
       Members members;
       for (const fb::Field* child : *field.children()) {

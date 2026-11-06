@@ -115,3 +115,15 @@ set_tests_properties(
   golden_update_refused_for_oracle_golden
   PROPERTIES ENVIRONMENT "OVT_UPDATE_GOLDEN=1" PASS_REGULAR_EXPRESSION
              "OVT_UPDATE_GOLDEN=1 refused: .* is an oracle golden" LABELS "fast;golden")
+
+# OVT_UPDATE_GOLDEN=1 is also refused under CI for an UPDATABLE golden (the oracle-golden check does not reach this
+# path). The run is refused before anything is written, so the golden is untouched.
+add_test(
+  NAME golden_update_refused_under_ci
+  COMMAND
+    ovt_golden_run --golden "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/ovt_min_structural.pybox.json" --family box-tree --out
+    "${CMAKE_CURRENT_BINARY_DIR}/golden_out/update_refused_ci.json" --updatable -- $<TARGET_FILE:ovt_golden_box_tree>
+    "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/ovt_min_structural.mp4")
+set_tests_properties(
+  golden_update_refused_under_ci PROPERTIES ENVIRONMENT "OVT_UPDATE_GOLDEN=1;CI=1" PASS_REGULAR_EXPRESSION
+                                            "refused: CI is set" LABELS "fast;golden")

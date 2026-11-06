@@ -17,14 +17,22 @@
 // (corpus file missing and OVT_REQUIRE_CORPORA is not 1; with it, a missing corpus is exit 1).
 
 #include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 
-#include <cstdio>
+#include <fcntl.h>
+#include <spawn.h>
+#include <sys/wait.h>
+
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
+#include <span>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "test_support/corpus.h"
@@ -32,19 +40,19 @@
 #include "test_support/golden.h"
 #include "test_support/golden_compare.h"
 
+extern char** environ;  // NOLINT(readability-redundant-declaration): POSIX, needed by posix_spawnp
+
 namespace {
 
-std::string shell_quote(const std::string& arg) {
-  std::string out = "'";
-  for (const char c : arg) {
-    if (c == '\'') {
-      out += "'\\''";
-    } else {
-      out += c;
-    }
-  }
-  return out + "'";
-}
+struct Args {
+  std::filesystem::path golden;
+  std::filesystem::path out;
+  std::filesystem::path tolerances;
+  std::string family;
+  std::string corpus;
+  std::vector<std::string> command;
+  bool updatable = false;
+};
 
 int usage(const std::string& problem) {
   std::cerr << "ovt_golden_run: " << problem << "\n"
@@ -53,128 +61,172 @@ int usage(const std::string& problem) {
   return 2;
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  std::filesystem::path golden;
-  std::filesystem::path out;
-  std::filesystem::path tolerances;
-  std::string family_text;
-  std::string corpus;
-  std::vector<std::string> command;
-  bool updatable = false;
-  for (int i = 1; i < argc; ++i) {
+// Returns an error text, or std::nullopt when @p args was parsed.
+std::optional<std::string> parse_args(std::span<char*> argv, Args& args) {
+  for (std::size_t i = 1; i < argv.size(); ++i) {
     const std::string arg = argv[i];
     if (arg == "--") {
-      command.assign(argv + i + 1, argv + argc);
+      for (std::size_t k = i + 1; k < argv.size(); ++k) {
+        args.command.emplace_back(argv[k]);
+      }
       break;
     }
     if (arg == "--updatable") {
-      updatable = true;
+      args.updatable = true;
       continue;
     }
-    if (i + 1 >= argc) {
-      return usage("missing value for " + arg);
+    if (i + 1 >= argv.size()) {
+      return "missing value for " + arg;
     }
     const std::string value = argv[++i];
     if (arg == "--golden") {
-      golden = value;
+      args.golden = value;
     } else if (arg == "--out") {
-      out = value;
+      args.out = value;
     } else if (arg == "--tolerances") {
-      tolerances = value;
+      args.tolerances = value;
     } else if (arg == "--family") {
-      family_text = value;
+      args.family = value;
     } else if (arg == "--corpus") {
-      corpus = value;
+      args.corpus = value;
     } else {
-      return usage("unknown option " + arg);
+      return "unknown option " + arg;
     }
   }
-  if (golden.empty() || out.empty() || command.empty()) {
-    return usage("--golden, --out and a command are required");
+  if (args.golden.empty() || args.out.empty() || args.command.empty()) {
+    return "--golden, --out and a command are required";
   }
-  const auto family = ovt::test::family_from_name(family_text);
-  if (!family) {
-    return usage("unknown family '" + family_text + "'");
-  }
+  return std::nullopt;
+}
 
-  if (ovt::test::update_golden()) {
-    if (!updatable) {
-      std::cerr << "ovt_golden_run: OVT_UPDATE_GOLDEN=1 refused: " << golden
-                << " is an oracle golden (register the test with UPDATABLE for an OVT-side golden)\n";
-      return 1;
-    }
-    if (std::getenv("CI") != nullptr) {
-      std::cerr << "ovt_golden_run: OVT_UPDATE_GOLDEN=1 refused: CI is set\n";
-      return 1;
-    }
+// OVT_UPDATE_GOLDEN=1 rewrites OVT-side goldens only, and never on CI. Returns the refusal, or std::nullopt.
+std::optional<std::string> update_refusal(const Args& args) {
+  if (!ovt::test::update_golden()) {
+    return std::nullopt;
   }
-
-  if (!corpus.empty()) {
-    const auto path = ovt::test::corpus_path(corpus);
-    if (!path) {
-      std::cerr << "corpus file missing: " << corpus << " (run tools/fetch_corpora.py)\n";
-      return ovt::test::require_corpora() ? 1 : 77;
-    }
-    for (std::string& arg : command) {
-      if (arg == "@CORPUS@") {
-        arg = path->string();
-      }
-    }
+  if (!args.updatable) {
+    return "OVT_UPDATE_GOLDEN=1 refused: " + args.golden.string() +
+           " is an oracle golden (register the test with UPDATABLE for an OVT-side golden)";
   }
+  // NOLINTNEXTLINE(concurrency-mt-unsafe): this tool is single-threaded.
+  if (std::getenv("CI") != nullptr) {
+    return "OVT_UPDATE_GOLDEN=1 refused: CI is set";
+  }
+  return std::nullopt;
+}
 
-  std::error_code ec;
-  std::filesystem::create_directories(out.parent_path(), ec);
-  std::string shell;
+// Runs @p command (no shell) with stdout redirected to @p out. Returns true when it exited with status 0.
+bool run_to_file(const std::vector<std::string>& command, const std::filesystem::path& out) {
+  std::vector<char*> argv;
+  argv.reserve(command.size() + 1);
   for (const std::string& arg : command) {
-    shell += shell_quote(arg) + " ";
+    argv.push_back(
+        const_cast<char*>(arg.c_str()));  // NOLINT(cppcoreguidelines-pro-type-const-cast): execvp takes char*
   }
-  shell += "> " + shell_quote(out.string());
-  if (std::system(shell.c_str()) != 0) {
-    std::cerr << "ovt_golden_run: command failed: " << shell << "\n";
-    return 2;
-  }
+  argv.push_back(nullptr);
 
-  const std::ifstream in(out, std::ios::binary);
+  posix_spawn_file_actions_t actions;
+  posix_spawn_file_actions_init(&actions);
+  posix_spawn_file_actions_addopen(&actions, 1, out.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  pid_t pid = 0;
+  const int rc = posix_spawnp(&pid, argv[0], &actions, nullptr, argv.data(), environ);
+  posix_spawn_file_actions_destroy(&actions);
+  if (rc != 0) {
+    return false;
+  }
+  int status = 0;
+  return waitpid(pid, &status, 0) == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+std::string read_text(const std::filesystem::path& path) {
+  const std::ifstream in(path, std::ios::binary);
   std::ostringstream text;
   text << in.rdbuf();
-  const nlohmann::json actual = nlohmann::json::parse(text.str(), nullptr, /*allow_exceptions=*/false);
+  return text.str();
+}
+
+// Replaces "@CORPUS@" in the command. Returns an exit code when the run must stop here, else std::nullopt.
+std::optional<int> resolve_corpus(Args& args) {
+  if (args.corpus.empty()) {
+    return std::nullopt;
+  }
+  const auto path = ovt::test::corpus_path(args.corpus);
+  if (!path) {
+    std::cerr << "corpus file missing: " << args.corpus << " (run tools/fetch_corpora.py)\n";
+    return ovt::test::require_corpora() ? 1 : 77;
+  }
+  for (std::string& arg : args.command) {
+    if (arg == "@CORPUS@") {
+      arg = path->string();
+    }
+  }
+  return std::nullopt;
+}
+
+int compare_with_golden(const Args& args, ovt::test::Family family) {
+  const nlohmann::json actual = nlohmann::json::parse(read_text(args.out), nullptr, /*allow_exceptions=*/false);
   if (actual.is_discarded()) {
-    std::cerr << "ovt_golden_run: output of the command is not valid JSON: " << out << "\n";
+    std::cerr << "ovt_golden_run: output of the command is not valid JSON: " << args.out << "\n";
     return 1;
   }
-  if (const auto problem = ovt::test::check_family_shape(*family, actual)) {
+  if (const auto problem = ovt::test::check_family_shape(family, actual)) {
     std::cerr << "ovt_golden_run: OVT output: " << *problem << "\n";
     return 1;
   }
-
   ovt::test::CompareOptions options;
-  if (!tolerances.empty()) {
-    try {
-      options = ovt::test::load_compare_options(tolerances);
-    } catch (const std::exception& e) {
-      return usage(e.what());
-    }
+  if (!args.tolerances.empty()) {
+    options = ovt::test::load_compare_options(args.tolerances);
   }
-  const auto result = ovt::test::compare_json_golden(golden, actual, options);
+  const auto result = ovt::test::compare_json_golden(args.golden, actual, options);
   if (!result.ok) {
     std::cerr << result.message;
     return 1;
   }
   if (result.updated) {
     std::cerr << result.message << "\n";
+    return 0;
   }
-  if (!result.updated) {
-    // A malformed golden must not pass because it is a subset of everything.
-    const std::ifstream golden_in(golden, std::ios::binary);
-    std::ostringstream golden_text;
-    golden_text << golden_in.rdbuf();
-    const nlohmann::json golden_json = nlohmann::json::parse(golden_text.str(), nullptr, false);
-    if (const auto problem = ovt::test::check_family_shape(*family, golden_json)) {
-      std::cerr << "ovt_golden_run: golden " << golden << ": " << *problem << "\n";
-      return 1;
-    }
+  // A malformed golden must not pass because it is a subset of everything.
+  const nlohmann::json golden = nlohmann::json::parse(read_text(args.golden), nullptr, /*allow_exceptions=*/false);
+  if (const auto problem = ovt::test::check_family_shape(family, golden)) {
+    std::cerr << "ovt_golden_run: golden " << args.golden << ": " << *problem << "\n";
+    return 1;
   }
   return 0;
+}
+
+int run(int argc, char** argv) {
+  Args args;
+  if (const auto error = parse_args(std::span<char*>(argv, static_cast<std::size_t>(argc)), args)) {
+    return usage(*error);
+  }
+  const auto family = ovt::test::family_from_name(args.family);
+  if (!family) {
+    return usage("unknown family '" + args.family + "'");
+  }
+  if (const auto refusal = update_refusal(args)) {
+    std::cerr << "ovt_golden_run: " << *refusal << "\n";
+    return 1;
+  }
+  if (const auto stop = resolve_corpus(args)) {
+    return *stop;
+  }
+  std::error_code ec;
+  std::filesystem::create_directories(args.out.parent_path(), ec);
+  if (!run_to_file(args.command, args.out)) {
+    std::cerr << "ovt_golden_run: command failed: " << args.command.front() << "\n";
+    return 2;
+  }
+  return compare_with_golden(args, *family);
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception& e) {
+    std::cerr << "ovt_golden_run: " << e.what() << "\n";
+    return 2;
+  }
 }

@@ -63,7 +63,9 @@ std::optional<Family> family_from_name(std::string_view name);
 /// syntax-elements: `[{"unit","name","bit_offset","bit_length","value"}]` sorted by (unit, bit_offset). Walks
 /// every Unit.header of @p index depth first; nodes without a value (kind None) are containers and are not
 /// listed. Value: UInt -> unsigned, Int/Fixed -> signed, Bool -> 0/1, Enum -> enum_name when set, else the
-/// integer, String -> string, Bytes -> lower-case hex string.
+/// integer, String -> string, Bytes -> lower-case hex string. bit_offset and bit_length are the schema's BitSpan
+/// values, counted from the unit start, NOT from the RBSP/OBU payload start of §14.4.0; the conversion is deferred to
+/// WI-1.570 (SPEC-ASSUMPTION(#111)).
 // SPEC-ASSUMPTION(#111): ch.6 has no SyntaxTree table; the input is StreamIndex (or one SyntaxNode below).
 nlohmann::json to_canonical(const fb::StreamIndex& index, Family family);
 
