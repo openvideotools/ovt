@@ -107,8 +107,10 @@ runs:
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: build/third_party/${{ inputs.preset }}
-        # Exact key only: a prefix restored from other pins or patches would not be reproducible.
-        key: tp-${{ runner.os }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
+        # Exact key only: a prefix restored from other pins or patches would not be reproducible. Per runner: the
+        # prefix holds CMake build trees (CMakeCache.txt names the checkout directory), which CMake refuses to
+        # reuse from another runner's workspace (the Mini's runners are actions-runner, -runner-2, ...).
+        key: tp-${{ runner.os }}-${{ runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
 
     - name: third_party downloads cache
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
