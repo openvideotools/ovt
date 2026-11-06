@@ -643,7 +643,7 @@ Codec-neutral vocabulary: OVT uses **block** for any codec's coding unit (H.264 
 - **ViewState** — zoom, pan, plane mode (0 YUV, 1 Y, 2 U, 3 V, 4 gray), tone map, `clip_nits`, `false_color` passed to `VideoSurface::render()`. [OVT: chapter 10 §10.2.3]
 - **Virtual file** (DASH/HLS) — the logical concatenation of an init segment and media segments addressed by one byte-offset space, presented as a `RandomAccessFile`/`ovt_File` with per-segment provenance (`DashHlsContext.segments[].virtual_span`). [OVT: chapter 8 §8.6.7; chapter 6 §6.4]
 - **VMAF** — Netflix's Video Multimethod Assessment Fusion (0–100): an SVM fusing VIF, ADM and motion features. Models: `vmaf_v0.6.1` (default, id `vmaf`; `phone` flag), `vmaf_v0.6.1neg` (`vmaf_neg`, no enhancement gain), `vmaf_4k_v0.6.1` (`vmaf_4k`), `vmaf_b_v0.6.3` (`vmaf_b`, bootstrapped confidence intervals), `vmaf_v1.0.16` (`vmaf_v1`). [OVT: chapter 9 §9.5.3]
-- **VP9 / VVC (H.266) / MPEG-2** — codecs OVT recognises in `Codec` (`VP9`, `H266`, `MPEG2`) for probing/playback via libavcodec but does not analyse at block level. [OVT: chapter 6 §6.3]
+- **VP9 / VVC (H.266) / MPEG-2** — codecs OVT recognises in `Codec` (`VP9`, `H266`, `MPEG2`) for probing via libavformat but does not analyse at block level; VP9 and MPEG-2 also play back via libavcodec, while the core FFmpeg flavour has no VVC decoder (pool-covered, chapter 13 §13.3.3). [OVT: chapter 6 §6.3]
 - **VUI** (video usability information) — the SPS appendix with aspect ratio, colour description (H.273 codes), timing and HRD parameters. [Spec: H.264 Annex E; H.265 Annex E]
 - **Vulkan** — the cross-platform GPU API OVT uses on Linux and (via MoltenVK) macOS; `lavapipe` provides it in CI. [OVT: chapter 10 §10.4.2]
 

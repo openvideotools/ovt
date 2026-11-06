@@ -94,3 +94,41 @@ IDENTICAL
 Result: pass. The first attempt differed in libavcodec: FFmpeg's `ffbuild/version.sh` ran `git describe` at make
 time and found the OVT checkout around the build tree, so the OVT commit leaked into `av_version_info()`.
 `GIT_CEILING_DIRECTORIES` is now set for configure, build and install; `av_version_info()` reports `7.1.1`.
+
+## Amendment: other pool-covered decoders left out of the core (owner decision on #132)
+
+Spec 1.0-rc5 (§13.3.3, POL-PAT-2) adds VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1 to the core flavour's
+`--disable-decoder=`/`--disable-hwaccel=` lists. The core probe case is renamed "the core flavour has no
+pool-covered decoder unless OVT_PATENT_CODECS_IN_CORE" and checks all of them; `ffmpeg_configure_flags` checks
+the new lists and that the plugin flavour names none of them.
+
+Configure and build check, 2026-11-06, Linux x86-64 cloud container (Ubuntu 24.04, gcc), FFmpeg n7.1.1 from the
+GitHub mirror, run with the core/linux flag list that `ovt_ffmpeg_configure_flags()` produces (HW off, no dav1d):
+
+```console
+$ grep -E "CONFIG_(VVC|AAC|AAC_FIXED|AAC_LATM|MPEG4|VC1|WMV3|H264|HEVC|VP9|MPEG2VIDEO|AV1)_DECODER |CONFIG_(AAC|VVC|MPEG4VIDEO|VC1)_PARSER " config_components.h
+#define CONFIG_H264_DECODER 0
+#define CONFIG_HEVC_DECODER 0
+#define CONFIG_MPEG2VIDEO_DECODER 1
+#define CONFIG_MPEG4_DECODER 0
+#define CONFIG_VC1_DECODER 0
+#define CONFIG_VP9_DECODER 1
+#define CONFIG_VVC_DECODER 0
+#define CONFIG_WMV3_DECODER 0
+#define CONFIG_AAC_DECODER 0
+#define CONFIG_AAC_FIXED_DECODER 0
+#define CONFIG_AAC_LATM_DECODER 0
+#define CONFIG_AV1_DECODER 1
+#define CONFIG_AAC_PARSER 1
+#define CONFIG_MPEG4VIDEO_PARSER 1
+#define CONFIG_VC1_PARSER 1
+#define CONFIG_VVC_PARSER 1
+$ nm libavcodec_ovt.so | grep -c -E "ff_(vvc|aac|mpeg4|vc1|wmv3)_decoder$"
+0
+```
+
+A program linked against the built `libavcodec_ovt.so` found no decoder for h264, hevc, vvc, aac, aac_latm, mpeg4,
+vc1 and wmv3, and found the vp9, mpeg2video, av1, mp3 and opus decoders. The body of the renamed probe case,
+compiled against the same build with `-Wall -Wextra -Werror`, passed. The full probe runs in the Mac CI job.
+
+Result: pass.

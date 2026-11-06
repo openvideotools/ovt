@@ -15,7 +15,8 @@
 #   build and are added by third_party/ffmpeg.cmake.
 #
 #   HW_DECODE              OVT_ENABLE_HW_DECODE: the platform hwaccels (VideoToolbox, VA-API, MediaCodec).
-#   PATENT_CODECS_IN_CORE  OVT_PATENT_CODECS_IN_CORE: the core flavour keeps the h264/hevc decoders and hwaccels.
+#   PATENT_CODECS_IN_CORE  OVT_PATENT_CODECS_IN_CORE: the core flavour keeps the h264/hevc decoders and hwaccels, and
+#                          the other pool-covered decoders (VVC, AAC, MPEG-4 Part 2, VC-1).
 #   GPL                    --enable-gpl for this flavour (ffmpeg.cmake derives it from OVT_FFMPEG_GPL*).
 #   DAV1D                  the core flavour links libdav1d (tp::dav1d or the system dav1d is available).
 #
@@ -53,6 +54,30 @@ set(OVT_FFMPEG_PATENT_MEDIACODEC_DECODERS h264_mediacodec hevc_mediacodec)
 set(OVT_FFMPEG_PATENT_HWACCELS_macos h264_videotoolbox hevc_videotoolbox)
 set(OVT_FFMPEG_PATENT_HWACCELS_linux h264_vaapi hevc_vaapi)
 set(OVT_FFMPEG_PATENT_HWACCELS_android "")
+
+# The other pool-covered decoders the core flavour leaves out (ADR-015, chapter 15 §15.5 POL-PAT-2; Karl's decision on
+# #132): H.266/VVC, AAC and HE-AAC (one FFmpeg decoder family: aac, aac_fixed, aac_latm, plus the AudioToolbox and
+# MediaCodec wrappers), MPEG-4 Part 2 Visual, and SMPTE VC-1 (vc1 and wmv3 are the same decoder; *image are its sprite
+# variants). No requirement asks the core to decode any of them: they are recognised and demuxed, never decoded,
+# because demuxers, parsers and bitstream filters stay on. The plugin flavour does not enable them either.
+# OVT_PATENT_CODECS_IN_CORE=ON keeps them, like h264/hevc. Names checked against libavcodec/allcodecs.c and
+# hwaccels.h of n7.1.1; the cuvid/qsv/mmal/v4l2m2m/nvdec/vdpau/d3d* variants are never built (--disable-autodetect
+# and no --enable for their APIs), so only the hwaccels of the APIs the core enables are listed.
+set(OVT_FFMPEG_POOL_DECODERS
+    vvc
+    aac
+    aac_fixed
+    aac_latm
+    aac_at
+    aac_mediacodec
+    mpeg4
+    mpeg4_mediacodec
+    vc1
+    vc1image
+    wmv3
+    wmv3image)
+set(OVT_FFMPEG_POOL_HWACCELS_macos mpeg4_videotoolbox)
+set(OVT_FFMPEG_POOL_HWACCELS_linux mpeg4_vaapi vc1_vaapi wmv3_vaapi)
 
 function(ovt_ffmpeg_configure_flags out_var)
   cmake_parse_arguments(PARSE_ARGV 1 arg "" "FLAVOUR;PLATFORM;HW_DECODE;PATENT_CODECS_IN_CORE;GPL;DAV1D" "")
@@ -97,8 +122,9 @@ function(ovt_ffmpeg_configure_flags out_var)
     if(NOT arg_PATENT_CODECS_IN_CORE)
       # Always the full list, whatever the platform: disabling a component configure does not build is a no-op, and
       # one list on every platform keeps avcodec_configuration() comparable across builds.
-      set(decoders ${OVT_FFMPEG_PATENT_DECODERS} ${OVT_FFMPEG_PATENT_MEDIACODEC_DECODERS})
-      set(hwaccels ${OVT_FFMPEG_PATENT_HWACCELS_macos} ${OVT_FFMPEG_PATENT_HWACCELS_linux})
+      set(decoders ${OVT_FFMPEG_PATENT_DECODERS} ${OVT_FFMPEG_PATENT_MEDIACODEC_DECODERS} ${OVT_FFMPEG_POOL_DECODERS})
+      set(hwaccels ${OVT_FFMPEG_PATENT_HWACCELS_macos} ${OVT_FFMPEG_PATENT_HWACCELS_linux}
+                   ${OVT_FFMPEG_POOL_HWACCELS_macos} ${OVT_FFMPEG_POOL_HWACCELS_linux})
       list(JOIN decoders "," decoders)
       list(JOIN hwaccels "," hwaccels)
       list(APPEND flags --disable-decoder=${decoders} --disable-hwaccel=${hwaccels})
