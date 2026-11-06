@@ -27,7 +27,7 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 # Golden glue (WI-0.556) and the perf harness (WI-0.560) add their directories when they land.
-foreach(_dir golden perf downstream)
+foreach(_dir golden oracles perf downstream)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/CMakeLists.txt")
     add_subdirectory(${_dir})
   endif()

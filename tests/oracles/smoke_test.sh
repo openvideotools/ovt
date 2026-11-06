@@ -72,6 +72,9 @@ check tsanalyze - tsanalyze syn_h265.ts
 check tstables - tstables syn_h265.ts
 check tsp tsp.stderr tsp -I file syn_h265.ts -P count -O drop # count reports on stderr
 check gst_codecparsers - pkg-config --cflags --libs gstreamer-codecparsers-1.0
+check gst_parse_h264 - gst_parse_oracle --codec h264 syn_h264.264
+check gst_parse_h265 - gst_parse_oracle --codec h265 syn_h265_amp_sao_on.265
+check gst_parse_av1 - gst_parse_oracle --codec av1 --ivf syn_av1.ivf
 
 # --- §14.4.3-14.4.5 block-level oracles --------------------------------------------------------------------
 check ldecod trace_dec.txt ldecod -p InputFile=syn_h264.264 -p OutputFile=ldecod.yuv -p RefOffset=0 -p POCScale=2 \
