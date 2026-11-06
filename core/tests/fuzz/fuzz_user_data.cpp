@@ -62,8 +62,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         break;
       }
     }
-  } catch (const ovt::ParseError&) {
-    // expected for malformed input
+  } catch (const ovt::ParseError&) {  // NOLINT(bugprone-empty-catch): the expected answer to malformed input
   }
   return 0;
 }

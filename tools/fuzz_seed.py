@@ -24,9 +24,7 @@ from pathlib import Path
 
 OPCODES = 27  # fuzz_bitreader.cpp kOpcodes
 SEEDS = 8
-MAX_SEED_BYTES = (
-    4096  # keeps the 60 s smoke run reaching the parsers (WI-0.557 pitfalls)
-)
+MAX_SEED_BYTES = 4096  # keeps the 60 s smoke run reaching the parsers (WI-0.557 pitfalls)
 
 
 def bitreader_seeds() -> dict[str, bytes]:
@@ -61,10 +59,7 @@ def bitreader_seeds() -> dict[str, bytes]:
     ]
     for i, fam in enumerate(names):
         pool = families.get(fam, list(range(OPCODES)))
-        tape = bytes(
-            rng.choice(pool) | (rng.randrange(8) << 5)
-            for _ in range(rng.randrange(24, 64))
-        )
+        tape = bytes(rng.choice(pool) | (rng.randrange(8) << 5) for _ in range(rng.randrange(24, 64)))
         payload = bytearray(rng.randrange(256) for _ in range(rng.randrange(48, 160)))
         if fam == "string":
             payload[rng.randrange(8, 24)] = 0  # a terminator for st()
@@ -124,20 +119,12 @@ def user_data_seeds() -> dict[str, bytes]:
     x264 = bytes.fromhex("DC45E9BDE6D948B7962CD820D923EEEF") + (
         b"x264 - core 164 - options: cabac=1 ref=3 deblock=1:0:0 wpp\x00"
     )
-    x265 = (
-        bytes.fromhex("2CA2DE09B51747DBBB55A4FE7FC2FC4E")
-        + b"x265 - options: wpp no-sao ctu=64\x00"
-    )
+    x265 = bytes.fromhex("2CA2DE09B51747DBBB55A4FE7FC2FC4E") + b"x265 - options: wpp no-sao ctu=64\x00"
     return {
-        "seed_0_hdr10plus_sei.bin": bytes([0, 0xB5, 0x00, 0x3C, 0x00, 0x01])
-        + hdr10plus,
-        "seed_1_hdr10plus_av1.bin": bytes([1, 0xB5, 0x00, 0x3C, 0x00, 0x01])
-        + hdr10plus
-        + b"\x80",
+        "seed_0_hdr10plus_sei.bin": bytes([0, 0xB5, 0x00, 0x3C, 0x00, 0x01]) + hdr10plus,
+        "seed_1_hdr10plus_av1.bin": bytes([1, 0xB5, 0x00, 0x3C, 0x00, 0x01]) + hdr10plus + b"\x80",
         "seed_2_ga94.bin": bytes([0]) + ga94,
-        "seed_3_dolby_av1.bin": bytes(
-            [1, 0xB5, 0x00, 0x3B, 0x00, 0x00, 0x08, 0x00, 0x12, 0x34, 0x80]
-        ),
+        "seed_3_dolby_av1.bin": bytes([1, 0xB5, 0x00, 0x3B, 0x00, 0x00, 0x08, 0x00, 0x12, 0x34, 0x80]),
         "seed_4_vivid.bin": bytes([0, 0x26, 0x00, 0x04, 0x00, 0x05, 0x01, 0x02]),
         "seed_5_x264.bin": bytes([2]) + x264,
         "seed_6_x265.bin": bytes([2]) + x265,
@@ -153,9 +140,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--target", required=True)
     ap.add_argument("--out", type=Path)
-    ap.add_argument(
-        "--check", action="store_true", help="compare only; exit 1 on a difference"
-    )
+    ap.add_argument("--check", action="store_true", help="compare only; exit 1 on a difference")
     args = ap.parse_args()
     if args.target not in SEED_GENERATORS:
         print(
@@ -163,23 +148,12 @@ def main() -> int:
             file=sys.stderr,
         )
         return 2
-    out = (
-        args.out
-        or Path(__file__).resolve().parent.parent
-        / "core/tests/fuzz/corpus"
-        / args.target
-    )
+    out = args.out or Path(__file__).resolve().parent.parent / "core/tests/fuzz/corpus" / args.target
     seeds = SEED_GENERATORS[args.target]()
     if args.check:
-        have = (
-            {p.name: p.read_bytes() for p in out.glob("*") if p.is_file()}
-            if out.is_dir()
-            else {}
-        )
+        have = {p.name: p.read_bytes() for p in out.glob("*") if p.is_file()} if out.is_dir() else {}
         if have != seeds:
-            print(
-                f"fuzz_seed.py: {out} is stale; rerun without --check", file=sys.stderr
-            )
+            print(f"fuzz_seed.py: {out} is stale; rerun without --check", file=sys.stderr)
             return 1
         return 0
     out.mkdir(parents=True, exist_ok=True)

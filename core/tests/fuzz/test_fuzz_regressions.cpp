@@ -11,8 +11,10 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <iterator>
 #include <string>
+#include <system_error>
 #include <vector>
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size);
@@ -36,14 +38,15 @@ bool collect(const fs::path& arg, std::vector<fs::path>& out) {
       found.push_back(entry.path());
     }
   }
-  std::sort(found.begin(), found.end());
+  std::ranges::sort(found);
   out.insert(out.end(), found.begin(), found.end());
   return !ec;
 }
 
 }  // namespace
 
-int main(int argc, char** argv) {
+// A throwing input (std::bad_alloc on a huge file) terminates the replay, which is a failed test as intended.
+int main(int argc, char** argv) {  // NOLINT(bugprone-exception-escape)
   std::vector<fs::path> inputs;
   for (int i = 1; i < argc; ++i) {
     if (!collect(argv[i], inputs)) {

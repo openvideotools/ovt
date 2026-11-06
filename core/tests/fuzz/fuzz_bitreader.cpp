@@ -85,7 +85,7 @@ void run_op(ovt::BitReader& br, unsigned op, unsigned param) {
       require(n == 64 || br.peek_bits(n) >> n == 0);
       break;
     case 15:
-      br.seek_bits(br.bit_pos() / 2 + (uint64_t{param} << 3));
+      br.seek_bits((br.bit_pos() / 2) + (uint64_t{param} << 3));
       break;
     case 16:
       (void)br.delta_q();
