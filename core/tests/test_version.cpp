@@ -51,9 +51,3 @@ TEST_CASE("version entry points", "[version][fast]") {
     CHECK(std::string(json).find("\"platform\"") != std::string::npos);
   }
 }
-
-TEST_CASE("throwaway UB for WI-0.031 AT1", "[version][fast]") {
-  volatile int shift = 33;
-  volatile int value = 1 << shift;
-  CHECK(value != 0);
-}
