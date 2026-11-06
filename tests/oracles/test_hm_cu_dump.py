@@ -71,9 +71,7 @@ def main() -> int:
         work = Path(tmp)
         stream = make_stream(work)
         if stream is None:
-            print(
-                "SKIP: no jctvc_AMP_A_Samsung_7 in OVT_CORPORA_DIR and no ffmpeg with libx265"
-            )
+            print("SKIP: no jctvc_AMP_A_Samsung_7 in OVT_CORPORA_DIR and no ffmpeg with libx265")
             return SKIP
 
         res = run([exe, "-b", str(stream)])
@@ -83,12 +81,7 @@ def main() -> int:
         assert len(frames) >= 2, len(frames)
 
         hm_map = json.loads((HERE / "normalize" / "hm_grid_map.json").read_text())
-        wanted = (
-            set(hm_map["copy"])
-            | set(hm_map["mv_quarter"])
-            | set(hm_map["derived_from"])
-            | set(hm_map["ignored"])
-        )
+        wanted = set(hm_map["copy"]) | set(hm_map["mv_quarter"]) | set(hm_map["derived_from"]) | set(hm_map["ignored"])
         for f in frames:
             assert set(f["cells"]) == wanted, set(f["cells"]) ^ wanted
             n = f["w4"] * f["h4"]

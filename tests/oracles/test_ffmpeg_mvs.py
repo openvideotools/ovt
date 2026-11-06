@@ -24,9 +24,7 @@ from pathlib import Path
 
 SKIP = 77
 HERE = Path(__file__).resolve().parent
-COLUMNS = "framenum,source,blockw,blockh,srcx,srcy,dstx,dsty,flags,motion_x,motion_y,motion_scale".split(
-    ","
-)
+COLUMNS = "framenum,source,blockw,blockh,srcx,srcy,dstx,dsty,flags,motion_x,motion_y,motion_scale".split(",")
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
@@ -85,9 +83,7 @@ def main() -> int:
         work = Path(tmp)
         stream = make_stream(work)
         if stream is None:
-            print(
-                "SKIP: no jvt_BA1_Sony_D in OVT_CORPORA_DIR and no ffmpeg with libx264"
-            )
+            print("SKIP: no jvt_BA1_Sony_D in OVT_CORPORA_DIR and no ffmpeg with libx264")
             return SKIP
 
         qp_path = work / "qp.csv"
@@ -96,9 +92,7 @@ def main() -> int:
         rows = list(csv.DictReader(res.stdout.splitlines()))
         assert rows, "no motion vector rows"
         assert list(rows[0].keys()) == COLUMNS, list(rows[0].keys())
-        assert all(int(r["motion_scale"]) == 4 for r in rows), (
-            "motion_scale must be 4 for H.264"
-        )
+        assert all(int(r["motion_scale"]) == 4 for r in rows), "motion_scale must be 4 for H.264"
         assert all(r["flags"].startswith("0x") for r in rows)
         with_rows = {int(r["framenum"]) for r in rows}
 
@@ -120,9 +114,7 @@ def main() -> int:
             "qp",
             "delta_qp",
         }
-        assert all(int(r["w"]) == 16 and int(r["h"]) == 16 for r in qp_rows), (
-            "H.264 QP blocks are macroblocks"
-        )
+        assert all(int(r["w"]) == 16 and int(r["h"]) == 16 for r in qp_rows), "H.264 QP blocks are macroblocks"
 
         # Without --qp the second file is not written and stdout is the same.
         again = run([exe, str(stream)])
