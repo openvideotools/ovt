@@ -21,3 +21,8 @@ the licence gate fails when this file is stale.
 | mpegff_video_cenc_roll_frag1s | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
 | netflix_src01_hrc00_576x324 | netflix | BSD-2-Clause-Patent (vmaf repository) | BSD-2-Clause-Patent | yes |
 | netflix_src01_hrc01_576x324 | netflix | BSD-2-Clause-Patent (vmaf repository) | BSD-2-Clause-Patent | yes |
+| syn_pat_hlg_patches | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
+| syn_pat_p3_saturation | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
+| syn_pat_pq_patches_1000 | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
+| syn_pat_sdr709_ramp | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
+| syn_pat_siting_checker | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
