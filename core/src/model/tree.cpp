@@ -73,10 +73,13 @@ const fb::Block* TreeWalker::block(std::uint32_t id) const noexcept {
 
 void TreeWalker::pre_order(const std::function<void(const fb::Block&, int depth)>& visit) const {
   const auto* blocks = fa.blocks();
-  if (blocks == nullptr || blocks->size() == 0) {
+  if (blocks == nullptr) {
     return;
   }
   std::vector<bool> seen(blocks->size(), false);
+  if (seen.empty()) {
+    return;
+  }
   std::vector<std::pair<std::uint32_t, int>> stack{{0U, 0}};
   seen[0] = true;
   while (!stack.empty()) {

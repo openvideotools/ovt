@@ -80,7 +80,7 @@ std::optional<std::string_view> take_segment(std::string_view& rest) noexcept {
   if (slash == std::string_view::npos) {
     return std::nullopt;
   }
-  const std::string_view segment = rest.substr(0, slash);
+  const std::string_view segment{rest.data(), slash};
   rest.remove_prefix(slash + 1);
   return segment;
 }
