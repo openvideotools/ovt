@@ -122,7 +122,7 @@
       {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "tile_64.y4m", "--frames", "1", "--output", "tile_64.265"]},
       {"cmd": ["{python}", "{repo}/tools/gen_heif_items.py", "--items", "1000", "--tile", "64", "--hevc", "tile_64.265", "--out", "syn_heif_1000items.heic"]}]},
     {"recipe": "33", "id": "syn_ts_cc_errors", "features": ["ts", "cc_errors"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_ts_cc_errors.ts", "syn_ts_clean.ts"], "steps": [
-      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-c:v", "libx264", "-threads", "1", "-g", "30", "-f", "mpegts", "syn_ts_clean.ts"]},
+      {"cmd": ["ffmpeg", "-stream_loop", "1", "-i", "src_720p_8bit.y4m", "-c:v", "libx264", "-threads", "1", "-g", "30", "-f", "mpegts", "syn_ts_clean.ts"]},
       {"cmd": ["{python}", "{repo}/tools/ts_inject_errors.py", "--cc-errors", "7", "--pcr-gap", "1", "syn_ts_clean.ts", "syn_ts_cc_errors.ts"]}]},
     {"recipe": "34", "id": "syn_mp4_broken_stco_beyond_eof", "features": ["broken", "stco"], "files": ["syn_mp4_broken_stco_beyond_eof.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--stco-beyond-eof", "-o", "syn_mp4_broken_stco_beyond_eof.mp4"]}]},
