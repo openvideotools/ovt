@@ -9,6 +9,7 @@
 #include <QCoreApplication>
 #include <QThread>
 
+#include <array>
 #include <chrono>
 #include <functional>
 
@@ -16,9 +17,9 @@ namespace ovt::app::testing {
 
 inline QCoreApplication& qt_app() {
   static int argc = 1;
-  static char name[] = "ovt_tests_app_models";
-  static char* argv[] = {name, nullptr};
-  static QCoreApplication app(argc, argv);
+  static std::array<char, 21> name{"ovt_tests_app_models"};
+  static std::array<char*, 2> argv{name.data(), nullptr};
+  static QCoreApplication app(argc, argv.data());
   return app;
 }
 

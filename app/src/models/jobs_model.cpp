@@ -93,7 +93,7 @@ JobsModel::~JobsModel() {
   pool_.waitForDone();
 }
 
-quint64 JobsModel::submit(const QString& name, JobBody body, const QString& owner) {
+quint64 JobsModel::enqueue(const QString& name, JobBody body, const QString& owner) {
   ovt_Job* raw = nullptr;
   auto shared = std::make_shared<JobContext::Shared>();
   const ovt_status created = ovt_job_create(&raw);

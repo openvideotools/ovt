@@ -96,7 +96,7 @@ class JobsModel : public QAbstractListModel {
   JobsModel& operator=(JobsModel&&) = delete;
 
   // Queues `body`. `owner` names the file the job belongs to ("" = none) for cancelOwner(). Returns the job id.
-  quint64 submit(const QString& name, JobBody body, const QString& owner = QString());
+  quint64 enqueue(const QString& name, JobBody body, const QString& owner = QString());
 
   Q_INVOKABLE void cancel(quint64 id);
   Q_INVOKABLE void cancelAll();

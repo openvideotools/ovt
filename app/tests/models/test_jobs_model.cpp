@@ -46,7 +46,7 @@ TEST_CASE("JobsModel: progress reaches the status bar within 100 ms", "[fast][gu
   JobsModel model(2, nullptr);
   std::atomic<bool> release{false};
   std::atomic<std::int64_t> reported_ns{0};
-  model.submit(QStringLiteral("Indexing"), [&](JobContext& ctx) {
+  model.enqueue(QStringLiteral("Indexing"), [&](JobContext& ctx) {
     ctx.report(1203, 2870, QStringLiteral("frames"));
     reported_ns =
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
@@ -71,7 +71,7 @@ TEST_CASE("JobsModel: progress reaches the status bar within 100 ms", "[fast][gu
 TEST_CASE("JobsModel: an unknown total is indeterminate", "[fast][gui][jobs]") {
   JobsModel model(1, nullptr);
   std::atomic<bool> release{false};
-  model.submit(QStringLiteral("Scanning"), [&](JobContext& ctx) {
+  model.enqueue(QStringLiteral("Scanning"), [&](JobContext& ctx) {
     ctx.report(10, 0, QStringLiteral("scanning units"));
     return wait_for(ctx, release);
   });
@@ -84,8 +84,8 @@ TEST_CASE("JobsModel: an unknown total is indeterminate", "[fast][gui][jobs]") {
 TEST_CASE("JobsModel: cancel and cancel all stop the jobs", "[fast][gui][jobs]") {
   JobsModel model(2, nullptr);
   std::atomic<bool> never{false};
-  const quint64 first = model.submit(QStringLiteral("A"), [&](JobContext& ctx) { return wait_for(ctx, never); });
-  model.submit(QStringLiteral("B"), [&](JobContext& ctx) { return wait_for(ctx, never); });
+  const quint64 first = model.enqueue(QStringLiteral("A"), [&](JobContext& ctx) { return wait_for(ctx, never); });
+  model.enqueue(QStringLiteral("B"), [&](JobContext& ctx) { return wait_for(ctx, never); });
   model.cancel(first);
   REQUIRE(spin_until([&] { return model.activeCount() == 1; }, 2000ms));
   CHECK(state_of(model, 0) == QStringLiteral("cancelled"));
@@ -98,9 +98,9 @@ TEST_CASE("JobsModel: a failed job keeps its error for five minutes", "[fast][gu
   JobsModel model(1, nullptr);
   int finished = 0;
   QObject::connect(&model, &JobsModel::jobFinished, &model, [&](quint64, int) { ++finished; });
-  model.submit(QStringLiteral("Failing"), [](JobContext&) { return OVT_E_IO; });
-  model.submit(QStringLiteral("Throwing"), [](JobContext&) -> ovt_status { throw 7; });
-  model.submit(QStringLiteral("Fine"), [](JobContext&) { return OVT_OK; });
+  model.enqueue(QStringLiteral("Failing"), [](JobContext&) { return OVT_E_IO; });
+  model.enqueue(QStringLiteral("Throwing"), [](JobContext&) -> ovt_status { throw 7; });
+  model.enqueue(QStringLiteral("Fine"), [](JobContext&) { return OVT_OK; });
   REQUIRE(spin_until([&] { return model.activeCount() == 0; }, 2000ms));
   REQUIRE(model.rowCount() == 3);
   CHECK(finished == 3);
@@ -123,8 +123,8 @@ TEST_CASE("JobsModel: closing a file waits, then detaches what did not stop", "[
   std::atomic<bool> started{false};
   // The first job honours the cancellation; the second ignores it until `stop`.
   std::atomic<bool> never{false};
-  model.submit(QStringLiteral("Polite"), [&](JobContext& ctx) { return wait_for(ctx, never); }, QStringLiteral("f0"));
-  model.submit(
+  model.enqueue(QStringLiteral("Polite"), [&](JobContext& ctx) { return wait_for(ctx, never); }, QStringLiteral("f0"));
+  model.enqueue(
       QStringLiteral("Stubborn"),
       [&](JobContext&) {
         started = true;
@@ -134,7 +134,7 @@ TEST_CASE("JobsModel: closing a file waits, then detaches what did not stop", "[
         return OVT_OK;
       },
       QStringLiteral("f0"));
-  model.submit(
+  model.enqueue(
       QStringLiteral("Other file"), [&](JobContext& ctx) { return wait_for(ctx, never); }, QStringLiteral("f1"));
   REQUIRE(spin_until([&] { return started.load(); }, 2000ms));
   model.cancelOwner(QStringLiteral("f0"), 100ms);
