@@ -7,10 +7,16 @@
 // and handling it in `trigger()`. The menu text is the specification's wording (§11.2.3), untranslated.
 
 import QtQuick
+import QtQuick.Controls
 import OvtStudio
 
 QtObject {
     id: actions
+
+    // The three theme actions are mutually exclusive, so clicking the active theme keeps its check mark.
+    readonly property ActionGroup themeGroup: ActionGroup {
+        exclusive: true
+    }
 
     // Ids that do something in this work item: Quit and the three themes.
     readonly property var enabledIds: ["file.quit", "view.theme.system", "view.theme.light", "view.theme.dark"]
@@ -34,7 +40,8 @@ QtObject {
 
     // Entries: {id, text, shortcut, checkable}, {separator: true} or {text, items: [...]} for a submenu.
     function item(id, text, shortcut, checkable) {
-        return {"id": id, "text": text, "shortcut": shortcut || "", "checkable": checkable === true}
+        return {"id": id, "text": text, "shortcut": shortcut || "", "checkable": checkable === true,
+                "group": id.indexOf("view.theme.") === 0 ? "theme" : ""}
     }
     readonly property var separator: ({"separator": true})
 
@@ -79,11 +86,14 @@ QtObject {
             {"text": "Panels", "items": [item("view.panels.none", "No panels yet")]},
             item("view.pictureOnly", "Picture only", "Ctrl+Shift+F"),
             item("view.dualView", "Dual view", "Ctrl+D", true),
+            {"text": "Arrangement", "items": [
+                item("view.arrangement.horizontal", "Horizontal", "", true),
+                item("view.arrangement.vertical", "Vertical", "", true)]},
             item("view.fullScreen", "Full screen", "F"),
             item("view.order", "Decode order / Display order", "O"),
             {"text": "Zoom", "items": [
-                item("view.zoom.in", "In"),
-                item("view.zoom.out", "Out"),
+                item("view.zoom.in", "In", "+"),
+                item("view.zoom.out", "Out", "-"),
                 item("view.zoom.fit", "Fit", "R"),
                 item("view.zoom.100", "100 %", "Ctrl+1"),
                 item("view.zoom.200", "200 %", "Ctrl+2"),
@@ -100,12 +110,30 @@ QtObject {
                 item("view.theme.light", "Light", "", true),
                 item("view.theme.dark", "Dark", "", true)]}]},
         {"text": "Overlays", "items": [
+            {"text": "Modes", "items": [
+                item("overlays.mode.f1", "Coding flow / partitions", "F1"),
+                item("overlays.mode.f2", "Prediction", "F2"),
+                item("overlays.mode.f3", "Motion vectors", "F3"),
+                item("overlays.mode.f4", "Transform / residual", "F4"),
+                item("overlays.mode.f5", "QP map", "F5"),
+                item("overlays.mode.f6", "Bits heatmap", "F6"),
+                item("overlays.mode.f7", "Reference indices", "F7"),
+                item("overlays.mode.f8", "Loop filter", "F8"),
+                item("overlays.mode.f9", "In-loop filter params (SAO / CDEF / LR)", "F9"),
+                item("overlays.mode.f10", "Metrics heatmap", "F10"),
+                item("overlays.mode.f11", "Plain picture", "F11"),
+                item("overlays.mode.f12", "HDR false colour", "F12")]},
+            separator,
             item("overlays.picture", "Picture", "P", true),
             item("overlays.info", "Info labels", "I", true),
             item("overlays.grid", "Grid", "G", true),
             item("overlays.motionVectors", "Motion vectors", "M", true),
             item("overlays.heatmap", "Heatmap", "T", true),
             item("overlays.legend", "Legend", "L", true),
+            item("overlays.hex", "Hex", "H", true),
+            item("overlays.dec", "Dec", "D", true),
+            {"text": "Heatmap colour map", "items": [
+                item("overlays.colourMap.viridis", "Viridis", "", true)]},
             separator,
             item("overlays.colourBlindSafe", "Colour-blind-safe palette", "", true)]},
         {"text": "Navigate", "items": [
@@ -113,6 +141,16 @@ QtObject {
             item("navigate.previous", "Previous frame", "Left"),
             item("navigate.next10", "Forward 10 frames", "Shift+Right"),
             item("navigate.previous10", "Back 10 frames", "Shift+Left"),
+            {"text": "Next frame of type", "items": [
+                item("navigate.nextType.i", "I"),
+                item("navigate.nextType.p", "P"),
+                item("navigate.nextType.b", "B"),
+                item("navigate.nextType.temporalId", "Same temporal id")]},
+            {"text": "Previous frame of type", "items": [
+                item("navigate.previousType.i", "I"),
+                item("navigate.previousType.p", "P"),
+                item("navigate.previousType.b", "B"),
+                item("navigate.previousType.temporalId", "Same temporal id")]},
             item("navigate.nextKey", "Next I/Key frame", "Ctrl+Right"),
             item("navigate.previousKey", "Previous I/Key frame", "Ctrl+Left"),
             separator,
@@ -123,7 +161,12 @@ QtObject {
             item("navigate.nextBookmark", "Next bookmark", "N"),
             item("navigate.previousBookmark", "Previous bookmark", "Shift+N"),
             separator,
-            item("navigate.playPause", "Play/Pause", "Space")]},
+            item("navigate.playPause", "Play/Pause", "Space"),
+            {"text": "Playback rate", "items": [
+                item("navigate.rate.025", "0.25×", "", true),
+                item("navigate.rate.05", "0.5×", "", true),
+                item("navigate.rate.1", "1×", "", true),
+                item("navigate.rate.2", "2×", "", true)]}]},
         {"text": "Analysis", "items": [
             item("analysis.frame", "Analyse current frame", "A"),
             item("analysis.gop", "Analyse GOP", "Shift+A"),
@@ -143,6 +186,13 @@ QtObject {
                 item("compare.difference", "Difference"),
                 item("compare.flicker", "Flicker")]},
             item("compare.swap", "Swap A/B", "X"),
+            {"text": "Difference gain", "items": [
+                item("compare.gain.1", "1", "", true),
+                item("compare.gain.2", "2", "", true),
+                item("compare.gain.4", "4", "", true),
+                item("compare.gain.8", "8", "", true),
+                item("compare.gain.16", "16", "", true),
+                item("compare.gain.32", "32", "", true)]},
             item("compare.falseColour", "False colour difference", "", true),
             item("compare.lockPanZoom", "Lock pan/zoom", "", true)]},
         {"text": "Help", "items": [

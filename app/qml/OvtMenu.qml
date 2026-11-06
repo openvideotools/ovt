@@ -27,6 +27,7 @@ Menu {
                 text: menuItem.entry.text
                 shortcut: menuItem.entry.shortcut
                 checkable: menuItem.entry.checkable
+                ActionGroup.group: menuItem.entry.group === "theme" ? menu.actions.themeGroup : null
                 enabled: menu.actions.isEnabled(menuItem.entry.id)
                 checked: menu.actions.isChecked(menuItem.entry.id)
                 onTriggered: menu.actions.trigger(menuItem.entry.id)

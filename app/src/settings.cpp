@@ -214,7 +214,10 @@ void Settings::setTheme(const QString& theme) {
   }
   document_ = candidate;
   Q_EMIT themeChanged();
-  save();
+  if (!save()) {
+    // No diagnostics model yet (WI-1.453): say so on stderr instead of failing silently.
+    static_cast<void>(std::fprintf(stderr, "settings: could not write %s\n", path_.toLocal8Bit().constData()));
+  }
 }
 
 bool Settings::save() {

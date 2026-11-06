@@ -68,4 +68,28 @@ TestCase {
         verify(!OvtStyle.dark)
         compare(Settings.theme, "light")
     }
+
+    // Clicking the active theme keeps its check mark (exclusive group), and the other themes stay unchecked.
+    function test_themeCheckMark() {
+        const window = createMain()
+        Settings.theme = "light"
+        const theme = window.menuBar.menuAt(2).itemAt(window.menuBar.menuAt(2).count - 1).subMenu
+        verify(theme !== null)
+        compare(theme.title, "Theme")
+        compare(theme.itemAt(1).text, "Light")
+        verify(theme.itemAt(1).checked)
+        theme.itemAt(1).action.trigger()
+        verify(theme.itemAt(1).checked)
+        verify(!theme.itemAt(0).checked)
+        verify(!theme.itemAt(2).checked)
+    }
+
+    // The §11.2.3 items without a feature yet are present and disabled.
+    function test_missingItemsPresent() {
+        const window = createMain()
+        const overlays = window.menuBar.menuAt(3)
+        compare(overlays.itemAt(0).subMenu.title, "Modes")
+        compare(overlays.itemAt(0).subMenu.count, 12)
+        verify(!overlays.itemAt(0).subMenu.itemAt(0).enabled)
+    }
 }
