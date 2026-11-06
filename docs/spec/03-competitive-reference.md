@@ -107,7 +107,7 @@ Legend: ● full, ◐ partial or edition-gated, ○ no. Columns: VQA = VQ Analyz
 | 38 | No-reference metric (EPSNR, NR-PSNR, TekMOS) | ○ | EPSNR | NR-PSNR | ○ | ○ | Aurora MOS | **3** (UVQ) |
 | 39 | Per-frame metric timeline with click-to-seek; cumulative average | ● | ● | ● | ○ | ● | ● | **3** |
 | 40 | Per-block PSNR/SSIM heat map overlay | ● | ◐ | ● | ○ | ○ | ● | **3** |
-| 41 | A/B, side-by-side, split, difference (Subtraction, Temperature) views | ● | ● | ○ | diff | ● | vooya ● | **3** |
+| 41 | A/B, side-by-side, split, difference and false-colour difference views | ● | ● | ○ | diff | ● | vooya ● | **3** |
 | 42 | Debug YUV load, first-mismatch finder | ● | ● | ○ | ◐ | ● | vooya ● | **3** |
 | 43 | Reference YUV format dialog with preview; alignment and scaling | ◐ | ◐ | ○ | ○ | ● | ○ | **3** |
 | 44 | ROI-restricted metrics | Probe | ● | ○ | ○ | ○ | ○ | **4** — open, **deferred** (FR-VQ-013, chapter 17 §17.4 OI-07) |
@@ -115,7 +115,7 @@ Legend: ● full, ◐ partial or edition-gated, ○ no. Columns: VQA = VQ Analyz
 | 46 | SI/TI, scene-change detection | Probe | ○ | ○ | ○ | ○ | ○ | **4** (FR-VQ-020, FR-VQ-021) |
 | 47 | Multi-file (≥ 5) simultaneous metric runs | ○ | ● | ○ | ○ | ○ | ○ | **3** |
 | 48 | GPU-accelerated metrics | Probe | ○ | ○ | ○ | ○ | ○ | **future** |
-| 49 | Dual-stream synchronised view / cross-process binding; shared comments | ● | ● | ○ | ○ | ● | ● | **2** (in-process dual view, FR-GUI-021, WI-2.489); cross-process **future** |
+| 49 | Dual-stream synchronised view / cross-application synchronisation; shared comments | ● | ● | ○ | ○ | ● | ● | **2** (in-process dual view, FR-GUI-021, WI-2.489); cross-process **future** |
 | 50 | NAL/OBU and sub-stream extraction; save selected portion | ● | ● | ○ | ○ | ○ | MTS4EA | **1** (FR-SYN-018, `ovt extract` WI-1.508) |
 | 51 | Bitstream editor | ○ | ○ | ○ | ○ | ○ | MTS4EA ● | **future** |
 | 52 | Export CSV / JSON / XML of analysis and metrics | CSV/txt | CSV/JSON | CSV/JSON | print | XML/PDF | Excel | **1** (JSON), **2** (YUView CSV), **3** (metrics CSV/JSON); a cross-version JSON compatibility *policy* is **deferred** (chapter 17 §17.4 OI-16; `CliEnvelope.ovt_version`/`$schema` are present from phase 1) |
@@ -161,7 +161,7 @@ The persona analysis of the commercial-tool survey (Appendix A) lists prioritise
 | # | Commercial must-have | OVT commitment | Phase | FR areas | FR ids (chapter 4) |
 |---|---|---|---|---|---|
 | B1 | PSNR (per plane + weighted), SSIM, MS-SSIM, VMAF (+NEG, phone) with per-frame timeline, cumulative average, click-to-seek | Own PSNR/SSIM kernels; libvmaf host for VMAF family and MS-SSIM; metrics timeline panel | 3 | VQ, GUI | FR-VQ-001…011, FR-VQ-016, FR-GUI-030 |
-| B2 | Side-by-side / split / overlay / difference views with Temperature and Subtraction, pixel-level zoom read-outs | `VideoSurface::set_compare(CompareMode)` (`Single`, `SideBySide`, `Split`, `Overlay`, `Difference`, `Flicker`; chapter 10 §10.2.4); pixel values drawn at ≥ 24 px per sample | 2 (compare), 1 (pixel read-out) | PLN, GUI | FR-PLN-003, FR-PLN-004, FR-PLN-007, FR-GUI-021 |
+| B2 | Side-by-side / split / overlay / difference views, including false-colour difference, pixel-level zoom read-outs | `VideoSurface::set_compare(CompareMode)` (`Single`, `SideBySide`, `Split`, `Overlay`, `Difference`, `Flicker`; chapter 10 §10.2.4); pixel values drawn at ≥ 24 px per sample | 2 (compare), 1 (pixel read-out) | PLN, GUI | FR-PLN-003, FR-PLN-004, FR-PLN-007, FR-GUI-021 |
 | B3 | Reference YUV/Y4M ingestion with explicit format dialog and preview | Raw-format dialog (phase 1) with live preview (phase 3); Y4M header auto-fill | 1 / 3 | VQ, GUI | FR-CNT-014, FR-CNT-105, FR-PLN-008 |
 | B4 | Automatic frame alignment and resolution-mismatch scaling | Normalisation stage: temporal alignment search with confidence, scaling with declared kernel, crop | 3 | VQ | FR-VQ-002, FR-VQ-003, FR-VQ-004 |
 | B5 | ROI-restricted metrics | Rectangular ROI list in `NormalizationConfig` | 4 — **deferred**, open | VQ | FR-VQ-013 (phase 4, open — chapter 17 §17.4 OI-07) |

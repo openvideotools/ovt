@@ -75,7 +75,7 @@ Rules:
 - Panels are tabs inside groups. Drag a tab header to: another group (insert as tab), an area edge (new group), or the window edge (desktop: float as a new `Window`). Drop targets highlight with `#39CCCC` 40 %.
 - Splitters: `SplitView` handles 6 dip wide (12 dip touch hit area on Android); double-click a handle resets to the layout default.
 - Keyboard: `Ctrl+Shift+[1-9]` focuses panel N in the current layout's tab order; `Ctrl+Tab`/`Ctrl+Shift+Tab` cycles tabs in the focused group; `Ctrl+Shift+F` toggles "Picture only" (hides Left/Right/Bottom); `Ctrl+Shift+L` toggles the Left area, `Ctrl+Shift+R` Right, `Ctrl+Shift+B` Bottom.
-- Named layout presets (View ▸ Layout): **Analyze** (default: Left = Container/Units, Right = Syntax/Selection Info/Block Presenter, Bottom = Timeline/Hex), **Syntax** (Left hidden, Right = Syntax wide, Bottom = Hex tall), **Quality** (Right = Metrics/Statistics, Bottom = Timeline with metric series), **HDR** (Right = HDR/Display Capabilities, Bottom = Timeline), **Compare** (Picture in Split mode, Right = Selection Info A/B, Bottom = Timeline). Users save custom layouts into the project and into `~/.config/ovt/layouts.json`.
+- Named layout presets (View ▸ Layout): **Analyze** (default: Left = Container/Units, Right = Syntax/Selection Info/Block Samples, Bottom = Timeline/Hex), **Syntax** (Left hidden, Right = Syntax wide, Bottom = Hex tall), **Quality** (Right = Metrics/Statistics, Bottom = Timeline with metric series), **HDR** (Right = HDR/Display Capabilities, Bottom = Timeline), **Compare** (Picture in Split mode, Right = Selection Info A/B, Bottom = Timeline). Users save custom layouts into the project and into `~/.config/ovt/layouts.json`.
 - State preservation: the Layout is saved on every change (debounced 500 ms) and restored on open; panel-internal state (scroll position, expanded nodes, filter text) is kept per panel instance in a `QVariantMap` `panelState` persisted with the project.
 
 ### 11.2.3 Menus
@@ -203,13 +203,13 @@ Common rules for every panel: (a) title bar with name, context menu (Detach / Cl
 
 **Zoom/pan rules.** Zoom levels: fit, then powers of two 1/32 … 64 (ViewState.zoom = device px per luma sample). Wheel zooms about the cursor (the image point under the cursor stays fixed: `pan' = ix − (px − w/2)/zoom'`); `+`/`−` zoom about the viewport centre; `R` fit; `Ctrl+1/2/4` = 100/200/400 %; double-click resets to fit. Drag with left button on empty area (or middle button/Space+drag) pans; pan clamps so ≥ 64 device px of picture stay visible. Pan/zoom are shared between A and B when "Lock pan/zoom" is on (default).
 **Plane selector.** `1–5` keys (YUV, Y, U, V, Gray = `plane_mode` 0–4) / segmented control → `ViewState.plane_mode`; Stage combo (visible when a `FrameAnalysis` with planes exists) chooses `PlaneStage` (Reconstruction default; Prediction, Residual (shown signed: mid-grey = 0), PreDeblock, PreSaoOrCdef, PreLoopRestoration) — Residual/Coefficients use a diverging LUT option.
-**Compare modes.** Compare combo / `C` cycles Single → Side by side → Split V → Split H → Overlay → Difference → Flicker (requires B: a file with role `reference`/`distorted` or "Picture ▸ Set as B from memory" which snapshots the current frame as B like StreamEye's Memory). Split divider draggable; Overlay alpha slider; Difference gain combo and false-colour toggle; the status strip shows region PSNR (`Measurements.region_psnr`).
+**Compare modes.** Compare combo / `C` cycles Single → Side by side → Split V → Split H → Overlay → Difference → Flicker (requires B: a file with role `reference`/`distorted` or "Picture ▸ Set as B from memory" which snapshots the current frame as B). Split divider draggable; Overlay alpha slider; Difference gain combo and false-colour toggle; the status strip shows region PSNR (`Measurements.region_psnr`).
 **Dual view (FR-GUI-021, phase 2).** View ▸ Dual view (`Ctrl+D`; arrangement Horizontal/Vertical) replaces the single Picture with two `VideoSurface` instances hosted by two `PictureHost` items in one panel: A left/top, B right/bottom, each with its own `ViewState` and `OverlayConfig` and its own `FrameAnalysis` overlays (B's analysis is requested from B's stream). A **sync set** {frame, zoom, pan, plane mode, overlay mode} is synchronised by default; each item is unlockable from a padlock row in the panel header (`Platform`-independent; persisted in `panel_state.dual.locks`). While locked, input on either surface writes `ViewState`/`SelectionModel` for both; unlocked properties diverge and the status strip shows both values. B's frame follows `SelectionB` (§11.4.1). The compare modes below remain available in single-surface mode only (Compare and Dual view are mutually exclusive; switching to Dual view sets `CompareMode::Single`). NATIVE HDR mode uses the first surface only; the second surface stays EMBEDDED (SDR badge). Delivered by WI-2.489.
 **Overlay toggles.** `P` picture on/off (overlays over a flat `#202020`), `I` labels, `G` grid, `M` motion vectors, `T` heatmap, `L` legend; the Mode combo selects the F1–F12 preset (§11.4.2). Each toggle maps to `OverlayLayer` bits (§11.4.2 table).
 **HDR toggle.** `Ctrl+H`/toolbar: requests NATIVE mode (Chapter 10 R-ARCH-2). Disabled with tooltip = `DisplayCaps.reason` when not capable. The tone-map/gamut/clip controls live in the HDR panel (§11.3.14).
 **Pixel probe.** Hover shows the read-out in the status bar; `Ctrl+click` (or long-press on touch) **pins** the probe (crosshair at the pixel; `OverlayConfig.probe_x/y`; the Selection Info panel shows the full `Pick` incl. nits/xy; `Esc` unpins). Pinned probes survive panning.
 **Selection rectangle.** `Shift+drag` draws a rect (luma samples, snapped to cells); the Statistics panel scopes to it when "Scope: selection" is chosen; `Esc` clears; context menu {Statistics for selection, Metrics for region, Export region as PNG/PGM, Copy rect}.
-**Block selection.** Left click → `Selection.block_id` at the cycle level (§11.3.9); repeated click on the same point cycles levels; `Tab`/`Shift+Tab` cycle too; right-click → Details context menu (Open in Block Presenter, Show in Syntax, Show in Hex, Copy block JSON, Follow MV to reference frame (seeks to `refs[ref].frame` and pins the probe at the displaced position)); hover → hover outline + tooltip (`CU 32×32 · Inter L0 (−12,+3) · QP 27 · 2,913 b`).
+**Block selection.** Left click → `Selection.block_id` at the cycle level (§11.3.9); repeated click on the same point cycles levels; `Tab`/`Shift+Tab` cycle too; right-click → Details context menu (Open in Block Samples, Show in Syntax, Show in Hex, Copy block JSON, Follow MV to reference frame (seeks to `refs[ref].frame` and pins the probe at the displaced position)); hover → hover outline + tooltip (`CU 32×32 · Inter L0 (−12,+3) · QP 27 · 2,913 b`).
 **States.** Empty (drop zone hint); loading (first frame decoding: dimmed previous frame + spinner); **analysis pending** (overlays requested but `FrameAnalysis` missing: picture shown, a hatched placeholder band at the top "Block data not analysed — press A", and a progress ring while the job runs); partial (plugin lacks some fields → affected overlays shown disabled in the Mode combo with "n/a (plugin)"); error (decode error → red badge, last decoded frame kept, message).
 **Performance.** All drawing in `libovt-render` (FR-BLK-018, NFR-003). The QML layer only handles input and the legend. Input events are coalesced: at most one `render()` per vsync; `pick()` on every mouse move (cheap). Thumbnail/scrub: while the timeline is being dragged, the Picture shows playback-path frames (HW decoder) and defers analysis until the drag ends (200 ms debounce).
 
@@ -339,7 +339,7 @@ Derived tabs: **Tracks** (id, handler, codec fourcc + profile string, dimensions
 **States.** "No selection" hint; "Analysis pending" with an Analyse button; partial (field vectors empty → rows "n/a (plugin ovt-plugin-ffmpeg does not export intra modes)").
 **Performance.** Reflection decoding of one block ≤ 1 ms; the panel re-renders only on selection change.
 
-### 11.3.10 Block Presenter
+### 11.3.10 Block Samples
 
 **Purpose.** Numeric sample grids of the selected block per pipeline stage.
 **Data source.** `FrameAnalysis.planes[]` (`PlaneRef` per stage/plane) read via `ovt_analysis_plane(blob_id)`; the selected `Block.rect`; chroma rect = luma rect scaled by the chroma format.
@@ -619,7 +619,7 @@ Manifest essentials: `android:resizeableActivity="true"`, `android:configChanges
 | 600–839 dp (10" portrait) | **Two-pane vertical**: Picture top (50 %) + tabbed area below; Timeline as a 96 dp strip between them | same tabs |
 | < 600 dp (phones — unsupported but MUST not crash) | **Single pane** with bottom navigation (Picture, Timeline, Info, More); panels full-screen one at a time | functional minimum |
 
-Dual view and the Block Presenter by width class: at ≥ 1200 dp both behave as on desktop; at 840–1199 dp Dual view is forced to the Vertical arrangement inside the Picture region and the Block Presenter becomes a tab of the Right tabbed area; below 840 dp Dual view is unavailable (the View ▸ Dual view action is disabled with the tooltip "needs a wider window", and an active Dual view falls back to single surface A, keeping `SelectionB` for Selection Info) and the Block Presenter opens as a full-height tab of the tabbed area.
+Dual view and the Block Samples by width class: at ≥ 1200 dp both behave as on desktop; at 840–1199 dp Dual view is forced to the Vertical arrangement inside the Picture region and the Block Samples becomes a tab of the Right tabbed area; below 840 dp Dual view is unavailable (the View ▸ Dual view action is disabled with the tooltip "needs a wider window", and an active Dual view falls back to single surface A, keeping `SelectionB` for Selection Info) and the Block Samples opens as a full-height tab of the tabbed area.
 
 Layout switches on `widthDp` change without losing state (§11.5.7). Dock drag-and-drop is disabled below 1200 dp (tabs reorderable by long-press instead). Floating panels never exist on Android.
 
@@ -696,7 +696,7 @@ Core handles (`ovt_File`, `ovt_Container`, `ovt_Stream`, caches) are owned by a 
 
 - **Welcome page** (shown in the Center area when no file is open): big "Open file… (Ctrl+O)" and "Open project…", drag-and-drop zone ("Drop a video, elementary stream or .ovtproj"), Recent files (name, path/URI, codec, last opened) with pin/remove, "Sample streams" (downloads from `tests/corpora/manifests` after an explicit consent dialog that shows size and licence), and a three-line "How it works" (Timeline → Picture → Syntax/Hex) with the keyboard map link.
 - **First run**: a one-time, dismissible banner "ovt-studio sends no data anywhere: no telemetry, no crash reporter." On Android an additional banner explains SAF file access and the cache location.
-- **Panel empty states** (one sentence each, `qsTr`): Timeline "Open a file to see its frames."; Picture (file open, nothing decoded yet) "Decoding first frame…"; Syntax "Select a unit in the Unit list or a frame."; Hex "Select bytes, a unit, a box or a syntax field."; Container "This file has no container (elementary stream)."; Selection Info "Click a block in the Picture (analysis required: press A)."; Block Presenter "Select a block."; Ref graph "Index in progress…"; Statistics "No analysed frames in scope — press A."; Metrics "Open a reference (Ctrl+Shift+O) or run a no-reference metric."; HDR "SDR content — measurements use 203 cd/m² reference white."; Display Capabilities (never empty); Diagnostics "No diagnostics."; Bookmarks "Press B to bookmark the current frame."
+- **Panel empty states** (one sentence each, `qsTr`): Timeline "Open a file to see its frames."; Picture (file open, nothing decoded yet) "Decoding first frame…"; Syntax "Select a unit in the Unit list or a frame."; Hex "Select bytes, a unit, a box or a syntax field."; Container "This file has no container (elementary stream)."; Selection Info "Click a block in the Picture (analysis required: press A)."; Block Samples "Select a block."; Ref graph "Index in progress…"; Statistics "No analysed frames in scope — press A."; Metrics "Open a reference (Ctrl+Shift+O) or run a no-reference metric."; HDR "SDR content — measurements use 203 cd/m² reference white."; Display Capabilities (never empty); Diagnostics "No diagnostics."; Bookmarks "Press B to bookmark the current frame."
 - **Second file opened while one is open**: dialog "Open as: [Replace] [Reference (B)] [Distorted (A), current becomes reference] [New window]".
 
 ---
@@ -898,7 +898,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Size:** S.
 **Notes / pitfalls:** the §11.4.3 table is the only source of defaults; chapter 3/4 bindings are not consulted.
 
-### Phase 2 — selection info, overlay modes, block presenter, ref graph, statistics
+### Phase 2 — selection info, overlay modes, block samples, ref graph, statistics
 
 ### WI-2.480 — Analysis orchestration and `FrameAnalysisStore`
 **Goal:** GUI-side LRU of `FrameAnalysis` per frame with GOP-local analysis jobs and the "analysis pending" affordance.
@@ -930,10 +930,10 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Size:** M.
 **Notes / pitfalls:** reflection uses the `ovt_model.bfbs` resource of WI-0.083, so new `ext` tables appear without GUI changes.
 
-### WI-2.483 — Block Presenter panel
+### WI-2.483 — Block Samples panel
 **Goal:** §11.3.10.
 **Depends on:** WI-2.482, WI-2.523 (`ovt_analysis_plane`), WI-2.158, WI-2.166 (plane export by the plugins).
-**Produces:** `app/src/models/block_grid_model.{h,cpp}`, `app/qml/panels/BlockPresenterPanel.qml`, `app/tests/models/test_block_grid_model.cpp`.
+**Produces:** `app/src/models/block_grid_model.{h,cpp}`, `app/qml/panels/BlockSamplesPanel.qml`, `app/tests/models/test_block_grid_model.cpp`.
 **Interface:** §11.3.10; `ovt_analysis_plane` (`PlaneStage`).
 **Steps:** 1. Grid model over plane blobs. 2. Stage/plane combos. 3. Hex/dec and signed display. 4. Compare-with-B column.
 **Acceptance tests:** 1. Given a 32×32 CU selected, When the Residual stage is chosen, Then the grid shows 1024 signed values equal to the plane blob at the rect (test reads the blob directly). 2. Given that grid, When the hex toggle is set, Then values render as `0x…`.

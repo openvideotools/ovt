@@ -26,7 +26,7 @@ OVT closes that gap with one architecture: a core library that produces every pi
 
 | # | Goal | How success is measured |
 |---|---|---|
-| G1 | Replicate the must-have functionality of VQ Analyzer and StreamEye Studio for H.264/AVC, H.265/HEVC and AV1. | Every row marked "must" in chapter 3 §3.3 is implemented and covered by an acceptance test by the end of Phase 4. |
+| G1 | Cover every feature area marked "must" in chapter 3 §3.3 for H.264/AVC, H.265/HEVC and AV1. | Every row marked "must" in chapter 3 §3.3 is implemented and covered by an acceptance test by the end of Phase 4. |
 | G2 | Run as a first-class application on macOS, Linux and Android tablets / Chromebooks. | Each phase demo in chapter 16 passes on an M1 MacBook, an Ubuntu 24.04 LTS desktop (`linux-x64-ref`; Ubuntu 22.04 LTS or later is supported, 24.04 is the reference), a Pixel Tablet (SDR) and an HDR-capable Android tablet or Chromebook (`android-hdr`/`chromebook-hdr`, chapter 14 §14.9.2). |
 | G3 | Display HDR content correctly. | PQ and HLG streams are shown with correct luminance on an EDR display (macOS) and a PQ-capable Android panel, tone-mapped on SDR displays, with MaxCLL/MaxFALL measurements within 1 nit of a reference computation (chapter 10). |
 | G4 | Prefer upstream libraries; stay maintainable. | No dependency is a long-lived fork. Every third-party patch is ≤ 500 changed lines (≤ 2 000 in total per decoder), behind a build flag, changes no decoding result, with an upstream submission recorded (chapter 7). Dependency updates are a version bump in `third_party/VERSIONS.md`. |
@@ -48,7 +48,7 @@ OVT closes that gap with one architecture: a core library that produces every pi
 
 | Persona | Typical questions | Primary chapters |
 |---|---|---|
-| **Codec engineer** (encoder/decoder developer, researcher) | Why did the encoder choose this partition? What are the MVs and references of this CU? How many bits did this superblock cost? Where does my decoder mismatch the reference? What does the SPS say exactly? | 7, 6, 11 (Selection Info, Block Presenter), 12 (`ovt analyze`, `ovt verify`) |
+| **Codec engineer** (encoder/decoder developer, researcher) | Why did the encoder choose this partition? What are the MVs and references of this CU? How many bits did this superblock cost? Where does my decoder mismatch the reference? What does the SPS say exactly? | 7, 6, 11 (Selection Info, Block Samples), 12 (`ovt analyze`, `ovt verify`) |
 | **Video quality engineer** | What is the VMAF/PSNR/SSIM of this encode against the source, per frame and per region? Are the two streams aligned? What is the BD-rate between two encoder versions? Does this UGC clip look bad (UVQ)? | 9, 11 (Metrics panel), 12 (`ovt metrics`, `ovt bdrate`) |
 | **Platform video engineer** (social media / streaming) | What exactly did the packager emit? Is the HDR metadata correct? Are fragments and edit lists consistent? Does this file play on this device (a device-compatibility check is **future** work, chapter 17 §17.4 OI-16; phases 0–4 answer it only indirectly through profile/level, HDR signalling and codec-string checks)? Why is this frame so large? | 8, 10, 11 (Container tree, Timeline, HDR panel), 12 (`ovt probe`, `ovt hdr`) |
 | **Tool developer / integrator** | How do I add a metric, a decoder plugin, a container format? How do I call OVT from Python or CI? | 5, 6, 7 §6, 9 §2, 12 |

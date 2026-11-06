@@ -4,7 +4,7 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc6 — 2026-11-06
 
-PATCH-level (editorial) amendment from the pre-public audit, owner-approved wording change; no requirement sentence, acceptance line, interface or WI scope changes, and no WI is re-opened.
+Amendment from the pre-public audit, owner-approved wording change. Editorial except one MINOR-level item: the WI-2.483 Produces path follows the panel rename below (WI-2.483 is not started, so no WI is re-opened). No requirement sentence, acceptance line or interface changes.
 
 - 00 §0.0 — the one-sentence goal names the feature areas OVT covers instead of saying it "reproduces the functionality of" two named commercial products — none
 - 01 §1.2, §1.4 — commercial analyzers named only as examples of the tool class; per-product price figures and sub-product lists removed; trademark and non-affiliation note added; the live-monitoring non-goal no longer names a product — none
@@ -13,6 +13,9 @@ PATCH-level (editorial) amendment from the pre-public audit, owner-approved word
 - 03 — trademark and independence note; §3.1 and §3.2 describe feature areas only (UI skeleton, mode list, CLI flag and price rows removed; "reproduces both idioms" and the UI-lineage claim removed); §3.5 conventions stated as OVT's own with no competitor provenance, UX-2 justified on its own terms (one key per overlay mode, default order from §11.4.2, all rebindable). Coordinator ruling: no binding is tied to a competitor; the F-key assignments, FR-GUI-008 and its acceptance lines are unchanged — none
 - 02 — "Binding mode" entry removed; "Primary benchmark" reworded — none
 - 04 GUI rationale — no longer cites competitor users' expectations — none
+- 01 §1.3 goal G1 — "Cover every feature area marked 'must' in chapter 3 §3.3" instead of "Replicate the must-have functionality of" two named products — none
+- 02, 11 §11.3.10, 16, 01 — the per-stage block sample panel is renamed **Block Samples** (was a competitor's panel name); WI-2.483 Produces `app/qml/panels/BlockSamplesPanel.qml`; the glossary entries "Block Samples" and "Bar-chart-as-timeline" no longer name competitors — WI-2.483
+- 10 FR-PLN-007 row, 03 rows 41 and B2, 11 §11.3.2 — compare modes described only with OVT's own `CompareMode` vocabulary; the informative mapping to other products' mode names is removed — none
 
 ## 1.0.0-rc5 — 2026-11-06
 
