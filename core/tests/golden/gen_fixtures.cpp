@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <span>
@@ -36,7 +37,7 @@ bool write_bytes(const std::filesystem::path& path, const ovt::golden::Bytes& by
 
 }  // namespace
 
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
   if (argc != 2) {
     std::fputs("usage: gen_fixtures <out-dir>\n", stderr);
     return 1;
@@ -61,4 +62,13 @@ int main(int argc, char** argv) {
     return 1;
   }
   return 0;
+}
+
+int main(int argc, char** argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception& e) {
+    std::fprintf(stderr, "gen_fixtures: %s\n", e.what());
+    return 1;
+  }
 }

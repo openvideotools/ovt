@@ -188,7 +188,8 @@ struct NodeSpec {
 [[nodiscard]] inline std::vector<std::uint32_t> qp_histogram(const std::vector<std::int16_t>& qp, int bias) {
   std::vector<std::uint32_t> hist(256, 0U);
   for (const auto value : qp) {
-    ++hist[static_cast<std::size_t>(value + bias)];
+    const int bin = value + bias;
+    ++hist[std::size_t{static_cast<unsigned>(bin)}];
   }
   return hist;
 }

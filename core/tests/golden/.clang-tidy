@@ -4,10 +4,13 @@
 # Golden fixture builders (WI-0.093). They are long straight-line code that fills one table field per line, so
 # the per-function complexity limit (which counts every ternary and loop) says nothing useful here. The schema's
 # `byte`/`int8` fields are small signed numbers (QP, reference index, sentinel -1), not characters, so the two
-# signed-char checks only produce noise on every assignment.
+# signed-char checks only produce noise on every assignment. The spec structs give every member an initializer
+# on purpose: GCC's -Wmissing-field-initializers (an error under -Werror) fires on designated initializers
+# that leave out a member without one.
 InheritParentConfig: true
 Checks: >
   -bugprone-signed-char-misuse,
-  -cert-str34-c
+  -cert-str34-c,
+  -readability-redundant-member-init
 CheckOptions:
   readability-function-cognitive-complexity.Threshold: 120
