@@ -9,8 +9,12 @@ first line says which). Every normaliser runs as `python -I <script>` the way th
 
 from __future__ import annotations
 
+import argparse
+import importlib.util
 import json
+import math
 import subprocess
+import types
 import sys
 from pathlib import Path
 from typing import Any
@@ -35,6 +39,29 @@ CASES = [
     ("ffmpeg_mvs", "ffmpeg_qp_10bit.csv", ["--qp", "--bit-depth", "10"], "block-grid"),
     ("hm_grid", "hm_cu_dump_16x8.json", [], "block-grid"),
     ("aom_inspect", "aom_inspect_8x8.json", [], "block-grid"),
+    ("mp4box_diso", "mp4box_diso_tiny.xml", [], "box-tree"),
+    ("mp4box_diso", "mp4box_diso_frag.xml", [], "box-tree"),
+    ("mp4box_dts", "mp4box_dts.txt", [], "sample-table"),
+    ("mp4ff_info", "mp4ff_info_frag.txt", [], "box-tree"),
+    ("mediainfo_trace", "mediainfo_trace_frag.xml", [], "box-tree"),
+    ("mediainfo_trace", "mediainfo_hdr10.json", ["--hdr"], "header-struct"),
+    ("mp4boxjs", "mp4boxjs_tiny.json", [], "box-tree"),
+    ("ffmetrics", "ffmetrics_psnr.txt", [], "scores"),
+    ("ffmetrics", "vmaf_v061.json", [], "scores"),
+    ("vmaf_json", "vmaf_v061.json", [], "scores"),
+    ("x264_ssim", "x264_ssim.txt", [], "scores"),
+    ("daala", "daala_psnrhvs.txt", ["--metric", "psnr_hvs"], "scores"),
+    ("daala", "daala_ciede.txt", ["--metric", "ciede2000"], "scores"),
+    ("uvq", "uvq_1p5.json", [], "scores"),
+    ("uvq", "uvq_1p0.json", [], "scores"),
+    pytest.param(
+        "bd_reference",
+        "bd_rd_4pt.json",
+        [],
+        "scores",
+        marks=pytest.mark.skipif(importlib.util.find_spec("bjontegaard") is None, reason="oracle image only"),
+    ),
+    ("nits_reference", "nits_pq_4x2.y4m", [], "scores"),
 ]
 
 
@@ -50,7 +77,11 @@ def normalise(script: str, fixture: str, *args: str) -> Any:
     return json.loads(proc.stdout)
 
 
-@pytest.mark.parametrize(("script", "fixture", "args", "family"), CASES, ids=[f"{c[0]}-{c[1]}" for c in CASES])
+@pytest.mark.parametrize(
+    ("script", "fixture", "args", "family"),
+    CASES,
+    ids=[f"{c[0]}-{c[1]}" if isinstance(c, tuple) else "bd_reference-bd_rd_4pt.json" for c in CASES],
+)
 def test_output_matches_family_schema_and_is_deterministic(
     script: str, fixture: str, args: list[str], family: str
 ) -> None:
@@ -232,6 +263,263 @@ def test_aom_inspect_refuses_a_changed_key_set(tmp_path: Path) -> None:
     path.write_text(text.replace('"seg_id"', '"segment_id"'), encoding="utf-8")
     proc = run("aom_inspect", str(path))
     assert proc.returncode == canon.EXIT_INPUT and "segment_id" in proc.stderr
+
+
+# -- ISOBMFF oracles (§14.4.6-§14.4.9) ---------------------------------------------------------------------
+# tiny.mp4: 3 frames of 64x64 libx264, moov at the end; frag.mp4: the same remuxed with
+# -movflags frag_keyframe+empty_moov; hdr.mp4: 2 frames of x265 Main 10 with HDR10 SEI. Captured with GPAC
+# 2.2.1, mp4ff-info v0.48.0, MediaInfo 24.01 and, for mp4boxjs_tiny.json, a stand-in for WI-0.564's
+# mp4boxjs_dump.mjs written to §14.4.9 (mp4box 1.x). The MediaInfo trace drops its "Second pass" NAL block
+# and the MediaInfo JSON drops Encoded_Library_Settings; the rest is byte-exact.
+
+
+def by_path(doc: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {b["path"]: b for b in doc}
+
+
+def test_diso_paths_index_repeated_siblings_and_map_fields() -> None:
+    boxes = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    assert "moof[2]/traf/trun" in boxes and "mdat[1]" in boxes and "moov/trak" in boxes
+    assert "moov/udta/meta/ilst/\u00a9too" in boxes  # GPAC Type "A9too"
+    trun = boxes["moof[1]/traf/trun"]["fields"]
+    assert trun["sample_count"] == 2 and trun["data_offset"] == 128
+    assert trun["entries"] == [
+        {"sample_composition_time_offset": 512, "sample_size": 2314},
+        {"sample_composition_time_offset": 512, "sample_size": 972},
+    ]
+    assert boxes["moov/trak/tkhd"]["fields"]["width"] == 64 << 16  # 16.16 fixed point as the raw integer
+    avcc = boxes["moov/trak/mdia/minf/stbl/stsd/avc1/avcC"]["fields"]
+    assert avcc["lengthSizeMinusOne"] == 3 and avcc["pictureParameterSetNALUnit"] == ["68ce0f1920"]
+    assert all("offset" not in b for b in boxes.values())  # -diso prints no offsets
+
+
+def test_diso_tiny_entries() -> None:
+    boxes = by_path(normalise("mp4box_diso", "mp4box_diso_tiny.xml"))
+    stbl = "moov/trak/mdia/minf/stbl/"
+    assert boxes["ftyp"]["fields"]["compatible_brands"] == ["isom", "iso2", "avc1", "mp41"]
+    assert boxes[stbl + "stsz"]["fields"]["entries"] == [{"entry_size": s} for s in (2314, 972, 2404)]
+    assert boxes[stbl + "ctts"]["fields"]["entries"] == [{"sample_count": 3, "sample_offset": 512}]
+
+
+def test_gpac_fourcc_and_unknown_box(tmp_path: Path) -> None:
+    import mp4box_diso
+
+    assert mp4box_diso.gpac_fourcc("A9too") == "\u00a9too" and mp4box_diso.gpac_fourcc("url ") == "url "
+    assert mp4box_diso.gpac_fourcc("00000001") == "\x00\x00\x00\x01"
+    xml = tmp_path / "u.xml"
+    xml.write_text('<IsoMediaFile><UnknownBox Size="16" Type="abcd" Version="0" Foo="1"/></IsoMediaFile>')
+    assert normalise("mp4box_diso", str(xml)) == [{"path": "abcd", "size": 16}]
+
+
+def test_dts_rows_and_track_filter(tmp_path: Path) -> None:
+    rows = normalise("mp4box_dts", "mp4box_dts.txt")
+    assert rows[1] == {"i": 1, "dts": 512, "cts": 1024, "size": 972, "offset": 2362, "sync": 0}
+    assert [r["sync"] for r in rows] == [1, 0, 1]
+    two = tmp_path / "two.txt"
+    text = (FIX / "mp4box_dts.txt").read_text()
+    two.write_text(text + text.replace("track ID 1", "track ID 2"))
+    assert {r["track"] for r in normalise("mp4box_dts", str(two))} == {1, 2}
+    assert len(normalise("mp4box_dts", str(two), "--track", "2")) == 3
+    two.write_text(text.replace("CTS\tSize", "Size\tCTS"))
+    assert run("mp4box_dts", str(two)).returncode == canon.EXIT_INPUT
+
+
+def test_mp4ff_agrees_with_gpac_on_tree_and_shared_fields() -> None:
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    mp4ff = by_path(normalise("mp4ff_info", "mp4ff_info_frag.txt"))
+    assert {(p, b["size"]) for p, b in mp4ff.items()} == {(p, b["size"]) for p, b in gpac.items()}
+    for path, box in mp4ff.items():
+        theirs = gpac[path].get("fields", {})
+        shared = set(box.get("fields", {})) & set(theirs)
+        assert {k: box["fields"][k] for k in shared} == {k: theirs[k] for k in shared}, path
+    assert mp4ff["moov/trak/mdia/minf/stbl/stsd/avc1/pasp"]["fields"] == {"hSpacing": 1, "vSpacing": 1}
+    assert mp4ff["moof[1]/traf/trun"]["fields"]["first_sample_flags"] == 0x02000000
+    assert mp4ff["mfra/tfra"]["fields"]["entries"] == gpac["mfra/tfra"]["fields"]["entries"]
+
+
+def test_mediainfo_offsets_and_header_length() -> None:
+    boxes = by_path(normalise("mediainfo_trace", "mediainfo_trace_frag.xml"))
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))
+    assert {p.replace("?", "\u00a9"): b["size"] for p, b in boxes.items()} == {p: b["size"] for p, b in gpac.items()}
+    moofs = [e["moof_offset"] for e in gpac["mfra/tfra"]["fields"]["entries"]]
+    assert [boxes["moof[1]"]["offset"], boxes["moof[2]"]["offset"]] == moofs  # two oracles, one offset
+    assert boxes["moov/mvhd"] == {"path": "moov/mvhd", "offset": 36, "size": 108, "header_length": 8}
+
+
+def test_mediainfo_hdr_units(tmp_path: Path) -> None:
+    hdr = normalise("mediainfo_trace", "mediainfo_hdr10.json", "--hdr")["hdr"]
+    assert (hdr["primaries"], hdr["transfer"], hdr["matrix"], hdr["full_range"]) == (9, 16, 9, 0)
+    assert hdr["mdcv_primaries"] == [[34000, 16000], [13250, 34500], [7500, 3000]]  # R, G, B
+    assert hdr["mdcv_white_point"] == [15635, 16450]
+    assert (hdr["mdcv_max_luminance"], hdr["mdcv_min_luminance"], hdr["max_cll"], hdr["max_fall"]) == (
+        10000000,
+        1,
+        1000,
+        400,
+    )
+    doc = json.loads((FIX / "mediainfo_hdr10.json").read_text())
+    video = doc["media"]["track"][1]
+    video["MasteringDisplay_ColorPrimaries"] = (
+        "R: x=0.680000 y=0.320000, G: x=0.265000 y=0.690000, B: x=0.150000 y=0.060000, White point: x=0.312700 y=0.329000"
+    )
+    path = tmp_path / "mi.json"
+    path.write_text(json.dumps(doc))
+    again = normalise("mediainfo_trace", str(path), "--hdr")["hdr"]
+    assert again["mdcv_primaries"] == hdr["mdcv_primaries"] and again["mdcv_white_point"] == hdr["mdcv_white_point"]
+    video["transfer_characteristics"] = "Something new"
+    path.write_text(json.dumps(doc))
+    assert run("mediainfo_trace", str(path), "--hdr").returncode == canon.EXIT_INPUT
+
+
+def test_mp4boxjs_offsets_and_fullbox_header_length() -> None:
+    boxes = by_path(normalise("mp4boxjs", "mp4boxjs_tiny.json"))
+    gpac = by_path(normalise("mp4box_diso", "mp4box_diso_tiny.xml"))
+    assert all(gpac[p]["size"] == b["size"] for p, b in boxes.items())  # mp4box.js lists a subset
+    assert boxes["moov/mvhd"]["offset"] == 5746 and boxes["moov/mvhd"]["header_length"] == 8  # hdr_size 12
+    assert boxes["moov/trak/mdia/mdhd"]["fields"]["language"] == "und"
+    assert boxes["moov/trak/tkhd"]["fields"]["track_ID"] == gpac["moov/trak/tkhd"]["fields"]["track_ID"]
+
+
+def test_box_paths_rejects_a_depth_jump() -> None:
+    with pytest.raises(canon.NormalizeError):
+        canon.box_paths([(0, "moov", {}), (2, "mvhd", {})])
+
+
+# -- metric oracles (§14.4.10-§14.4.15) -------------------------------------------------------------------
+# ffmetrics_psnr.txt: FFmpeg 6.1.1 psnr stats_file (testsrc2 64x48 vs its libx264 -qp 30 re-encode), trailing
+# blanks removed. The other metric fixtures are written from the tools' printf formats: libvmaf 3.0.0
+# src/output.c (JSON), Daala tools/dump_psnrhvs.c and dump_ciede2000.py at the pinned commit, google/uvq
+# uvq_inference.py at the pinned commit (the result dictionaries of uvq1p5.py / uvq1p0.py), the x264_ssim line
+# of §14.4.12; nits_pq_4x2.y4m is a hand-made 4x2 C420p10 file.
+
+
+def test_ffmpeg_psnr_stats_and_inf(tmp_path: Path) -> None:
+    doc = normalise("ffmetrics", "ffmetrics_psnr.txt")
+    assert [f["i"] for f in doc["frames"]] == [0, 1, 2] and "pooled" not in doc
+    assert doc["frames"][0]["psnr_y"] == 40.91 and doc["frames"][0]["mse_avg"] == 5.48
+    same = tmp_path / "same.txt"
+    same.write_text("n:1 mse_avg:0.00 mse_y:0.00 psnr_avg:inf psnr_y:inf \nn:3 mse_avg:0.00 mse_y:0.00 psnr_avg:inf\n")
+    assert run("ffmetrics", str(same)).returncode == canon.EXIT_INPUT  # frame 2 missing
+    same.write_text("n:1 mse_avg:0.00 mse_y:0.00 psnr_avg:inf psnr_y:inf \n")
+    assert normalise("ffmetrics", str(same))["frames"][0]["psnr_y"] == "inf"
+
+
+def test_vmaf_json_drops_null_fps_and_aggregate() -> None:
+    doc = normalise("vmaf_json", "vmaf_v061.json")
+    assert set(doc) == {"frames", "pooled"} and "psnr_cb" not in doc["frames"][1]
+    assert doc["frames"][1]["vmaf"] == 90.877402 and doc["pooled"]["vmaf"]["harmonic_mean"] == 91.070722
+    assert normalise("ffmetrics", "vmaf_v061.json") == doc  # the libvmaf filter log goes the same way
+
+
+def test_x264_ssim_planes() -> None:
+    frames = normalise("x264_ssim", "x264_ssim.txt")["frames"]
+    assert frames[2] == {"i": 2, "ssim_x264_y": 1.0, "ssim_x264_u": 1.0, "ssim_x264_v": 1.0}
+    assert frames[0]["ssim_x264_y"] == 0.986532  # %.9f rounded to the canonical 6 decimals
+
+
+def test_daala_psnrhvs_and_ciede(tmp_path: Path) -> None:
+    doc = normalise("daala", "daala_psnrhvs.txt", "--metric", "psnr_hvs")
+    assert doc["frames"][1]["psnr_hvs_cr"] == 40.889 and doc["pooled"]["psnr_hvs_y"] == {"total": 37.5757}
+    ciede = normalise("daala", "daala_ciede.txt", "--metric", "ciede2000")
+    assert [f["i"] for f in ciede["frames"]] == [0, 1] and ciede["pooled"]["ciede2000"] == {"mean": 38.421}
+    luma = tmp_path / "y.txt"
+    luma.write_text("00000000:  37.6402\n00000001:  37.5121\nTotal: 37.5757\n")
+    assert normalise("daala", str(luma), "--metric", "psnr_hvs")["frames"][0] == {"i": 0, "psnr_hvs_y": 37.6402}
+
+
+def test_uvq_versions() -> None:
+    v15 = normalise("uvq", "uvq_1p5.json")
+    assert [f["i"] for f in v15["frames"]] == [0, 25] and v15["pooled"]["uvq"] == {"mean": 3.812573}
+    v10 = normalise("uvq", "uvq_1p0.json")
+    assert v10["frames"] == [] and v10["pooled"]["uvq"]["compression_content_distortion"] == 3.84338
+
+
+def test_bd_reference_methods(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The plumbing with a stand-in package; the real one runs in the oracle image (CASES row)."""
+    import bd_reference
+
+    calls: list[tuple[str, str, int]] = []
+
+    def fake(kind: str) -> Any:
+        def call(ra: list[float], da: list[float], rt: list[float], dt: list[float], method: str) -> float:
+            calls.append((kind, method, len(ra)))
+            return float("nan") if method == "akima" and kind == "psnr" else -1.5
+
+        return call
+
+    monkeypatch.setitem(sys.modules, "bjontegaard", types.SimpleNamespace(bd_rate=fake("rate"), bd_psnr=fake("psnr")))
+    args = argparse.Namespace(input=str(FIX / "bd_rd_4pt.json"))
+    doc = bd_reference.convert(args)
+    assert doc["pooled"] == {
+        "bd_rate": {m: -1.5 for m in bd_reference.METHODS},
+        "bd_psnr_y": {"cubic": -1.5, "pchip": -1.5},
+    }
+    six = json.loads((FIX / "bd_rd_4pt.json").read_text())
+    for c in ("anchor", "test"):
+        six[c]["rate"] += [800.0, 500.0]
+        six[c]["dist"] += [34.0, 33.0]
+    (tmp_path / "six.json").write_text(json.dumps(six))
+    calls.clear()
+    doc = bd_reference.convert(argparse.Namespace(input=str(tmp_path / "six.json")))
+    assert "cubic" not in doc["pooled"]["bd_rate"] and {m for _, m, _ in calls} == {"pchip", "akima"}
+    assert canon.validate(doc, "scores") == []
+
+
+def pq(nits: float) -> float:
+    """ST 2084 inverse EOTF, independent of nits_reference.py."""
+    m1, m2, c1, c2, c3 = 0.1593017578125, 78.84375, 0.8359375, 18.8515625, 18.6875
+    y = (nits / 10000) ** m1
+    return ((c1 + c2 * y) / (1 + c3 * y)) ** m2
+
+
+def test_nits_reference(tmp_path: Path) -> None:
+    doc = normalise("nits_reference", "nits_pq_4x2.y4m")
+    assert doc["frames"][0] == {"i": 0, "max_cll_nits": 10000.0, "fall_nits": 2500.0}
+    assert doc["pooled"] == {"max_cll_nits": {"max": 10000.0}, "fall_nits": {"max": 2500.0}}
+    assert normalise("nits_reference", "nits_pq_4x2.y4m", "--frame", "1")["frames"] == [
+        {"i": 1, "max_cll_nits": 0.0, "fall_nits": 0.0}
+    ]
+    code = 64 + round(876 * pq(1000.0))  # grey near 1000 cd/m2, limited range
+    e = (code - 64) / 876
+    p = e ** (1 / 78.84375)
+    nits = 10000 * (max(p - 0.8359375, 0) / (18.8515625 - 18.6875 * p)) ** (1 / 0.1593017578125)
+    body = b"FRAME\n" + bytes(2 * 8).replace(b"\0\0", code.to_bytes(2, "little")) + (512).to_bytes(2, "little") * 4
+    grey = tmp_path / "grey.y4m"
+    grey.write_bytes(b"YUV4MPEG2 W4 H2 F25:1 C420p10\n" + body)
+    frame = normalise("nits_reference", str(grey))["frames"][0]
+    assert math.isclose(frame["max_cll_nits"], nits, abs_tol=1e-6) and 990 < nits < 1010
+    full = normalise("nits_reference", str(grey), "--full-range")["frames"][0]
+    assert full["max_cll_nits"] < frame["max_cll_nits"]  # code/1023 < (code-64)/876 for this code
+
+
+@pytest.mark.parametrize(
+    ("header", "ok"),
+    [
+        (b"C420", True),
+        (b"C420jpeg", True),
+        (b"C420mpeg2", True),
+        (b"C420paldv", True),
+        (b"C422", True),
+        (b"C444", True),
+        (b"C420p10", True),
+        (b"C444p12", True),
+        (b"", True),  # no C tag: Y4M default is 420jpeg
+        (b"Cmono", False),
+        (b"C420foo", False),
+    ],
+)
+def test_nits_reference_y4m_colour_tags(tmp_path: Path, header: bytes, ok: bool) -> None:
+    tag = header.decode()
+    depth = int(tag.rsplit("p", 1)[1]) if tag[-2:].isdigit() and "p" in tag[-4:] else 8
+    size = 2 if depth > 8 else 1
+    chroma = {"C422": 4, "C444": 8}.get(tag[:4], 2)
+    path = tmp_path / "t.y4m"
+    path.write_bytes(b"YUV4MPEG2 W4 H2 F25:1 " + header + b"\nFRAME\n" + bytes(size * (8 + 2 * chroma)))
+    if ok:
+        assert len(normalise("nits_reference", str(path))["frames"]) == 1
+    else:
+        proc = run("nits_reference", str(path))
+        assert proc.returncode != 0 and "unsupported Y4M colour space" in proc.stderr
 
 
 # -- canon (§14.4.0) ---------------------------------------------------------------------------------------

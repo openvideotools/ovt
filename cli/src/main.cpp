@@ -1,51 +1,24 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Minimal ovt entry point of WI-0.000: prints the version (FR-GEN-010 format) and nothing else.
-// Exit codes follow chapter 12 §12.1.3 (0 OK, 2 USAGE).
+// ovt entry point (chapter 12 §12.1, WI-1.500). Everything except the process environment lives in
+// ovt_cli_lib (app.cpp), so tests run the same code in-process.
+
+#include <unistd.h>
 
 #include <cstddef>
-#include <cstdio>
-#include <cstring>
 #include <span>
+#include <string>
+#include <vector>
 
-#include "ovt/ovt.h"
-#include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
-
-namespace {
-
-constexpr int kExitOk = 0;
-constexpr int kExitUsage = 2;
-
-void print_usage(std::FILE* out) {
-  static_cast<void>(std::fprintf(out,
-                                 "Usage: %s [--version | -V] [--help | -h]\n"
-                                 "\n"
-                                 "  -V, --version  print the version and exit\n"
-                                 "  -h, --help     print this help and exit\n",
-                                 OVT_CLI_NAME_VALUE));  // best effort: nothing to do if stdout is closed
-}
-
-}  // namespace
+#include "app.h"
 
 int main(int argc, char** argv) {
-  // argv as a span: no raw pointer arithmetic (cppcoreguidelines-pro-bounds-pointer-arithmetic).
-  const std::span<char*> args(argv, static_cast<std::size_t>(argc));
-  const auto argc_n = args.size();
-  if (argc_n == 2 && (std::strcmp(args[1], "--version") == 0 || std::strcmp(args[1], "-V") == 0)) {
-    std::printf("%s %s (core %s, api %d.%d.%d)\n", OVT_CLI_NAME_VALUE, OVT_VERSION_FULL, ovt_version_string(),
-                OVT_API_VERSION_MAJOR, OVT_API_VERSION_MINOR, OVT_API_VERSION_PATCH);
-    return kExitOk;
-  }
-  if (argc_n == 2 && (std::strcmp(args[1], "--help") == 0 || std::strcmp(args[1], "-h") == 0)) {
-    print_usage(stdout);
-    return kExitOk;
-  }
-  if (argc_n >= 2) {
-    static_cast<void>(std::fprintf(stderr, "error: CLI-0001 unknown option '%s' for '%s'. See '%s --help'.\n", args[1],
-                                   OVT_CLI_NAME_VALUE, OVT_CLI_NAME_VALUE));
-  } else {
-    print_usage(stderr);
-  }
-  return kExitUsage;
+  const std::span<char*> argv_span(argv, static_cast<std::size_t>(argc));
+  const std::vector<std::string> args(argv_span.begin() + (argc > 0 ? 1 : 0), argv_span.end());
+  ovt::cli::install_signal_handlers();
+  ovt::cli::Context ctx;
+  ctx.stdout_tty = isatty(STDOUT_FILENO) == 1;
+  ctx.stderr_tty = isatty(STDERR_FILENO) == 1;
+  return ovt::cli::run(args, ctx);
 }

@@ -1,0 +1,210 @@
+{
+  "bit_depth": 10,
+  "corpus_id": "syn_pat_p3_saturation",
+  "frames": 3,
+  "gamut_tolerance_linear": 0.002,
+  "height": 1080,
+  "matrix": "BT.709",
+  "out_of_gamut_709_samples": 1555200,
+  "pattern": "p3_saturation",
+  "primaries": "Display P3 (D65)",
+  "range": "limited",
+  "saturated_area_definition": "pixels of the stripes whose linear BT.709 components fall outside [0, 1]",
+  "saturated_area_samples": 1555200,
+  "stripes": [
+    {
+      "codes_ycbcr_limited": [
+        250,
+        409,
+        960
+      ],
+      "columns": [
+        0,
+        240
+      ],
+      "linear_709_rgb": [
+        1.224184,
+        -0.042031,
+        -0.019625
+      ],
+      "name": "red",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        1,
+        0,
+        0
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        691,
+        167,
+        105
+      ],
+      "columns": [
+        240,
+        480
+      ],
+      "linear_709_rgb": [
+        -0.224901,
+        1.042055,
+        -0.078529
+      ],
+      "name": "green",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        127,
+        960,
+        471
+      ],
+      "columns": [
+        480,
+        720
+      ],
+      "linear_709_rgb": [
+        0.0,
+        0.0,
+        1.097569
+      ],
+      "name": "blue",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        0,
+        0,
+        1
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        754,
+        615,
+        64
+      ],
+      "columns": [
+        720,
+        960
+      ],
+      "linear_709_rgb": [
+        -0.224914,
+        1.042056,
+        1.019637
+      ],
+      "name": "cyan",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        0,
+        1,
+        1
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        313,
+        857,
+        919
+      ],
+      "columns": [
+        960,
+        1200
+      ],
+      "linear_709_rgb": [
+        1.223785,
+        -0.042017,
+        1.075498
+      ],
+      "name": "magenta",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        1,
+        0,
+        1
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        877,
+        64,
+        553
+      ],
+      "columns": [
+        1200,
+        1440
+      ],
+      "linear_709_rgb": [
+        1.0,
+        1.0,
+        -0.09825
+      ],
+      "name": "yellow",
+      "out_of_gamut_709_samples": 259200,
+      "outside_709": true,
+      "p3_rgb": [
+        1,
+        1,
+        0
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        502,
+        512,
+        512
+      ],
+      "columns": [
+        1440,
+        1680
+      ],
+      "linear_709_rgb": [
+        0.214041,
+        0.214041,
+        0.214041
+      ],
+      "name": "grey50",
+      "out_of_gamut_709_samples": 0,
+      "outside_709": false,
+      "p3_rgb": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "codes_ycbcr_limited": [
+        940,
+        512,
+        512
+      ],
+      "columns": [
+        1680,
+        1920
+      ],
+      "linear_709_rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "name": "white",
+      "out_of_gamut_709_samples": 0,
+      "outside_709": false,
+      "p3_rgb": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "transfer": "IEC 61966-2-1 (sRGB)",
+  "width": 1920
+}
