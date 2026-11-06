@@ -5,8 +5,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <libplacebo/log.h>
 #include <libplacebo/config.h>
+#include <libplacebo/log.h>
 
 TEST_CASE("libplacebo creates and destroys a log context", "[fast][third_party]") {
   struct pl_log_params params = {};

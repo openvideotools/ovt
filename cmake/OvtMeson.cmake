@@ -209,7 +209,7 @@ endfunction()
 
 function(ovt_tp_meson dep)
   cmake_parse_arguments(PARSE_ARGV 1 arg "" "URL;URL_HASH;SOURCE_DIR;SOURCE_SUBDIR"
-                      "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS;EXTRA_C_ARGS;EXTRA_LINK_ARGS;PKG_CONFIG_PATH")
+                        "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS;EXTRA_C_ARGS;EXTRA_LINK_ARGS;PKG_CONFIG_PATH")
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_meson(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -228,11 +228,8 @@ function(ovt_tp_meson dep)
   set(cross_args "")
   set(env_args "")
   if(ANDROID_ABI OR APPLE OR OVT_MESON_FORCE_CROSS_FILE)
-    _ovt_meson_write_cross_file(
-      ${dep} cross_file
-      C_ARGS ${arg_EXTRA_C_ARGS}
-      LINK_ARGS ${arg_EXTRA_LINK_ARGS}
-      PKG_CONFIG_PATH ${arg_PKG_CONFIG_PATH})
+    _ovt_meson_write_cross_file(${dep} cross_file C_ARGS ${arg_EXTRA_C_ARGS} LINK_ARGS ${arg_EXTRA_LINK_ARGS}
+                                PKG_CONFIG_PATH ${arg_PKG_CONFIG_PATH})
     set(cross_args --cross-file "${cross_file}")
   else()
     set(env_args "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}")

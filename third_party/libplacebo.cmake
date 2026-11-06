@@ -43,11 +43,8 @@ if(OVT_USE_VCPKG AND VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
   set(_ovt_pl_hints HINTS "${_ovt_pl_root}" NO_DEFAULT_PATH)
 endif()
 
-find_file(
-  OVT_VULKAN_REGISTRY_XML vk.xml
-  ${_ovt_pl_hints}
-  PATH_SUFFIXES share/vulkan/registry
-  DOC "vk.xml of the Vulkan registry (vcpkg port vulkan-headers)")
+find_file(OVT_VULKAN_REGISTRY_XML vk.xml ${_ovt_pl_hints} PATH_SUFFIXES share/vulkan/registry
+          DOC "vk.xml of the Vulkan registry (vcpkg port vulkan-headers)")
 if(NOT OVT_VULKAN_REGISTRY_XML)
   message(FATAL_ERROR "libplacebo: share/vulkan/registry/vk.xml not found. It comes with the vcpkg port "
                       "`vulkan-headers` (or the distribution package vulkan-headers).")
@@ -98,13 +95,9 @@ if(APPLE OR ANDROID_ABI)
     set(_ovt_pl_vulkan_libs "${OVT_ANDROID_VULKAN_LIB}")
     set(_ovt_pl_vulkan_link "${OVT_ANDROID_VULKAN_LIB}")
   endif()
-  file(
-    WRITE "${_ovt_pl_pc_dir}/vulkan.pc"
-    "Name: vulkan\n"
-    "Description: Vulkan implementation OVT links directly (chapter 13 §13.3.1)\n"
-    "Version: 1.3.0\n"
-    "Libs: ${_ovt_pl_vulkan_libs}\n"
-    "Cflags: ${_ovt_pl_extra_c}\n")
+  file(WRITE "${_ovt_pl_pc_dir}/vulkan.pc"
+       "Name: vulkan\n" "Description: Vulkan implementation OVT links directly (chapter 13 §13.3.1)\n"
+       "Version: 1.3.0\n" "Libs: ${_ovt_pl_vulkan_libs}\n" "Cflags: ${_ovt_pl_extra_c}\n")
   list(APPEND _ovt_pl_pkg_path "${_ovt_pl_pc_dir}")
 else()
   # Linux: the Vulkan loader. vcpkg's vulkan-loader (static or shared) ships vulkan.pc; with
