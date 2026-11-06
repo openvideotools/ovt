@@ -5,36 +5,78 @@
 # `ovt-studio` (Linux) or the bundle `OVT Studio.app` (macOS, §13.5.2); Android builds produce the shared
 # library that QtQuickView loads (§13.4). WI-0.019 is only the skeleton: an empty window titled
 # OVT_PRODUCT_NAME and `--self-test`. WI-1.450 extends this file, src/main.cpp and qml/Main.qml in place
-# (chapter 16 §16.3); it adds QuickControls2, Svg, Graphs and ovt_render to the links of §13.2.1.
+# (chapter 16 §16.3): the application shell, Platform, Settings and QuickControls2 (Svg, Graphs and ovt_render follow).
 
 # The top-level OvtOptions.cmake already looked for Qt 6 (and turned OVT_BUILD_GUI off without it); Android
 # builds come here directly, so find the components again and fail when they are missing.
-# The pinned Qt is 6.8.3 (third_party/VERSIONS.md); 6.4 is the oldest the skeleton needs (Ubuntu 24.04's
-# packages), so distro builds of the skeleton work. WI-1.450 raises the floor when it needs newer Qt.
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick)
+# The pinned Qt is 6.8.3 (third_party/VERSIONS.md); 6.4 is the oldest the shell needs (Ubuntu 24.04's
+# packages), so distro builds work. WI-1.450 adds QuickControls2; Svg, Graphs and ovt_render follow with the
+# work items that use them (§13.2.1).
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+
+# The QML module "OvtStudio": the QML files, the C++ types they use (Platform, Settings) and the settings schema.
+# A function so that the QML test executable (app/tests/qml) builds the same module under the same URI. The QML
+# files sit in app/qml/ (chapter 0 §0.4), but the aliases put them at the module root, so Main.qml is
+# qrc:/qt/qml/OvtStudio/Main.qml on every Qt version (RESOURCE_PREFIX is explicit because the /qt/qml default is
+# policy QTP0001 of Qt 6.5+, and the pinned Qt is 6.8 while distro builds may be older). OvtStyle.qml is a
+# singleton; the schema is the one spec file (docs/spec/schemas) that the program embeds.
+function(ovt_studio_add_qml_module target)
+  # Absolute paths: the function is also called from app/tests/qml.
+  set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+  set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
+                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml")
+  foreach(file IN LISTS qml_files)
+    get_filename_component(alias "${file}" NAME)
+    set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
+  endforeach()
+  set_source_files_properties("${app_dir}/qml/controls/OvtStyle.qml" PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+  # Qt 6.8 requires an alias on every absolute path used as a resource; the icon keeps its path under the module.
+  set_source_files_properties("${app_dir}/resources/icons/ovt-studio.svg" PROPERTIES QT_RESOURCE_ALIAS
+                                                                                     resources/icons/ovt-studio.svg)
+  set(schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json")
+  set_source_files_properties("${schema}" PROPERTIES QT_RESOURCE_ALIAS settings.schema.json)
+  # qt_add_qml_module generates the QML type registration from moc's metatypes.
+  set_target_properties(${target} PROPERTIES AUTOMOC ON)
+  qt_add_qml_module(
+    ${target}
+    URI
+    OvtStudio
+    VERSION
+    1.0
+    RESOURCE_PREFIX
+    /qt/qml
+    QML_FILES
+    ${qml_files}
+    SOURCES
+    "${app_dir}/src/platform/platform.h"
+    "${app_dir}/src/platform/platform.cpp"
+    "${app_dir}/src/settings.h"
+    "${app_dir}/src/settings.cpp"
+    RESOURCES
+    "${app_dir}/resources/icons/ovt-studio.svg"
+    "${schema}")
+  # src/platform too: the generated type registration includes the headers by file name.
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform")
+  target_link_libraries(${target} PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 ovt::flags)
+  # No QSettings anywhere in app/ (D8) and no Qt keyword macros (the headers use Q_SIGNALS).
+  target_compile_definitions(${target} PRIVATE QT_NO_KEYWORDS)
+endfunction()
+
+# Generated code is not ours to fix: Qt's QML cache compiler (AOT) and type registration output trips -Wshadow and
+# friends on some Qt versions, which would fail the -Werror builds. Call after qt_finalize_executable().
+function(ovt_studio_silence_generated target)
+  get_target_property(sources ${target} SOURCES)
+  foreach(source IN LISTS sources)
+    if(source MATCHES "/\\.rcc/|qmltyperegistrations|/qrc_|_autogen/")
+      set_source_files_properties("${source}" PROPERTIES COMPILE_OPTIONS "-w")
+    endif()
+  endforeach()
+endfunction()
 
 qt_add_executable(ovt_studio MANUAL_FINALIZATION src/main.cpp)
-# qt_add_qml_module generates the QML type registration from moc's metatypes.
-set_target_properties(ovt_studio PROPERTIES AUTOMOC ON)
+ovt_studio_add_qml_module(ovt_studio)
 
-# Main.qml sits in app/qml/ (chapter 0 §0.4), but the alias puts it at the module root, so the resource
-# path is qrc:/qt/qml/OvtStudio/Main.qml on every Qt version (RESOURCE_PREFIX is explicit because the
-# /qt/qml default is policy QTP0001 of Qt 6.5+, and the pinned Qt is 6.8 while distro builds may be older).
-set_source_files_properties(qml/Main.qml PROPERTIES QT_RESOURCE_ALIAS Main.qml)
-qt_add_qml_module(
-  ovt_studio
-  URI
-  OvtStudio
-  VERSION
-  1.0
-  RESOURCE_PREFIX
-  /qt/qml
-  QML_FILES
-  qml/Main.qml
-  RESOURCES
-  resources/icons/ovt-studio.svg)
-
-target_link_libraries(ovt_studio PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick ovt::core ovt::flags)
+target_link_libraries(ovt_studio PRIVATE ovt::core)
 target_include_directories(ovt_studio PRIVATE "${OVT_GENERATED_DIR}")
 add_dependencies(ovt_studio ovt_version_header)
 # Every user-visible product name derives from OVT_PRODUCT_NAME (chapter 15 §15.7.4).
@@ -118,12 +160,21 @@ else()
 endif()
 
 qt_finalize_executable(ovt_studio)
+ovt_studio_silence_generated(ovt_studio)
 _ovt_studio_describe_qt(ovt_studio) # after finalisation: it adds the QML plugin and cache links
 
 # WI-0.019 acceptance test 1: `ovt-studio --self-test` with QT_QPA_PLATFORM=offscreen exits 0 in < 5 s. It
 # needs no display, so it is in the fast lane (no needs_display label); TIMEOUT encodes the 5 s budget.
 if(OVT_BUILD_TESTS AND NOT ANDROID AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME ovt_studio_self_test COMMAND ovt_studio --self-test)
-  set_tests_properties(ovt_studio_self_test PROPERTIES LABELS "fast;gui" TIMEOUT 5 ENVIRONMENT
-                                                       "QT_QPA_PLATFORM=offscreen")
+  # OVT_CONFIG_DIR keeps the test away from the user's own settings.json (§11.2.5).
+  set_tests_properties(
+    ovt_studio_self_test
+    PROPERTIES LABELS "fast;gui" TIMEOUT 5 ENVIRONMENT
+               "QT_QPA_PLATFORM=offscreen;OVT_CONFIG_DIR=${CMAKE_CURRENT_BINARY_DIR}/self_test_config")
+  # WI-1.450 acceptance test 1: --version prints the versions and exits 0, without a display (no QT_QPA_PLATFORM).
+  add_test(NAME ovt_studio_version COMMAND ovt_studio --version)
+  set_tests_properties(ovt_studio_version PROPERTIES LABELS "fast;gui" TIMEOUT 5 PASS_REGULAR_EXPRESSION
+                                                     "core [0-9][^\n]*\nQt [0-9]")
+  add_subdirectory(tests)
 endif()
