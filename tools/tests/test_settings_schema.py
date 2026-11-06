@@ -14,13 +14,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-SCHEMA_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "docs"
-    / "spec"
-    / "schemas"
-    / "settings.schema.json"
-)
+SCHEMA_PATH = Path(__file__).resolve().parents[2] / "docs" / "spec" / "schemas" / "settings.schema.json"
 
 
 @pytest.fixture(name="validator")
@@ -40,9 +34,7 @@ def test_defaults_validate(validator: jsonschema.Draft202012Validator) -> None:
 
 
 def test_unknown_keys_are_allowed(validator: jsonschema.Draft202012Validator) -> None:
-    validator.validate(
-        {"settings_version": 1, "future": {"x": 1}, "general": {"extra": True}}
-    )
+    validator.validate({"settings_version": 1, "future": {"x": 1}, "general": {"extra": True}})
 
 
 @pytest.mark.parametrize(
@@ -55,8 +47,6 @@ def test_unknown_keys_are_allowed(validator: jsonschema.Draft202012Validator) ->
         {"settings_version": 1, "general": {"confirm_on_close": "yes"}},
     ],
 )
-def test_invalid_documents_are_rejected(
-    validator: jsonschema.Draft202012Validator, document: dict
-) -> None:
+def test_invalid_documents_are_rejected(validator: jsonschema.Draft202012Validator, document: dict) -> None:
     with pytest.raises(jsonschema.ValidationError):
         validator.validate(document)
