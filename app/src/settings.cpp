@@ -98,9 +98,8 @@ QString scalar_violation(const QJsonValue& value, const QJsonObject& schema) {
 }
 
 // required and properties of an object value.
-bool check_object(const QJsonObject& object, const QJsonObject& schema,
-                  const QString& where,  // NOLINT(misc-no-recursion)
-                  QString* reason) {
+// NOLINTNEXTLINE(misc-no-recursion): the schema is a tree, as deep as the document
+bool check_object(const QJsonObject& object, const QJsonObject& schema, const QString& where, QString* reason) {
   for (const QJsonValue name : schema.value(QStringLiteral("required")).toArray()) {
     if (!object.contains(name.toString())) {
       *reason = where + QStringLiteral(": missing \"%1\"").arg(name.toString());
@@ -117,8 +116,8 @@ bool check_object(const QJsonObject& object, const QJsonObject& schema,
   return true;
 }
 
-bool check_items(const QJsonArray& array, const QJsonObject& items, const QString& where,  // NOLINT(misc-no-recursion)
-                 QString* reason) {
+// NOLINTNEXTLINE(misc-no-recursion): the schema is a tree, as deep as the document
+bool check_items(const QJsonArray& array, const QJsonObject& items, const QString& where, QString* reason) {
   for (int i = 0; i < array.size(); ++i) {
     if (!check(array.at(i), items, where + QLatin1Char('/') + QString::number(i), reason)) {
       return false;
@@ -130,8 +129,8 @@ bool check_items(const QJsonArray& array, const QJsonObject& items, const QStrin
 // Validates the subset of JSON Schema 2020-12 that settings.schema.json uses. Returns false and sets `reason`
 // ("/general/theme: not one of the allowed values") at the first violation. The schema is a tree, so the
 // recursion is as deep as the document.
-bool check(const QJsonValue& value, const QJsonObject& schema, const QString& where,
-           QString* reason) {  // NOLINT(misc-no-recursion)
+// NOLINTNEXTLINE(misc-no-recursion)
+bool check(const QJsonValue& value, const QJsonObject& schema, const QString& where, QString* reason) {
   const QString violation = scalar_violation(value, schema);
   if (!violation.isEmpty()) {
     *reason = (where.isEmpty() ? QStringLiteral("/") : where) + QStringLiteral(": ") + violation;
@@ -147,7 +146,8 @@ bool check(const QJsonValue& value, const QJsonObject& schema, const QString& wh
 }
 
 // Recursively overlays `over` onto `base`; objects merge, everything else is replaced. Unknown keys survive.
-QJsonObject merge(QJsonObject base, const QJsonObject& over) {  // NOLINT(misc-no-recursion): as deep as the document
+// NOLINTNEXTLINE(misc-no-recursion): as deep as the document
+QJsonObject merge(QJsonObject base, const QJsonObject& over) {
   for (auto it = over.begin(); it != over.end(); ++it) {
     if (it.value().isObject() && base.value(it.key()).isObject()) {
       base.insert(it.key(), merge(base.value(it.key()).toObject(), it.value().toObject()));
