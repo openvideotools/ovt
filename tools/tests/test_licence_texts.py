@@ -21,6 +21,7 @@ EXPECTED = {
     "BSD-3-Clause.txt",
     "CC-BY-SA-4.0.txt",
     "CC-BY-4.0.txt",  # docs/spec/ (#20) and CODE_OF_CONDUCT.md (WI-0.604)
+    "CC0-1.0.txt",  # generated corpus test patterns (WI-1.413)
     "LicenseRef-AOM-Patent-License-1.0.txt",
     "LicenseRef-DCO-verbatim.txt",  # DCO, taken verbatim (WI-0.604)
 }

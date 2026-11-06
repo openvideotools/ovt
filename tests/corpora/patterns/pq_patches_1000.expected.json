@@ -7,22 +7,22 @@
     4000.0
   ],
   "band_fractions": [
+    0.166666667,
+    0.166666667,
     0.0,
-    0.16666666666666666,
-    0.16666666666666666,
-    0.16666666666666666,
-    0.16666666666666666,
-    0.3333333333333333
+    0.166666667,
+    0.166666667,
+    0.333333333
   ],
-  "band_fractions_basis": "nominal patch nits; Table 10.7-1 bands, lower edge inclusive",
-  "band_fractions_from_decoded_codes": [
-    0.16666666666666666,
-    0.16666666666666666,
+  "band_fractions_nominal": [
     0.0,
-    0.16666666666666666,
-    0.16666666666666666,
-    0.3333333333333333
+    0.166666667,
+    0.166666667,
+    0.166666667,
+    0.166666667,
+    0.333333333
   ],
+  "band_fractions_nominal_basis": "nominal patch nits; three patches sit exactly on a Table 10.7-1 edge, so a renderer measures band_fractions instead",
   "bit_depth": 10,
   "codes_full": [
     153,
@@ -42,15 +42,15 @@
   ],
   "corpus_id": "syn_pat_pq_patches_1000",
   "decoded_nits_from_limited_codes": [
-    0.9921312639972388,
-    99.91279848944153,
-    203.70295787737396,
-    1004.1919039801087,
-    4014.7177018309767,
+    0.992131264,
+    99.912798489,
+    203.702957877,
+    1004.19190398,
+    4014.717701831,
     10000.0
   ],
   "fall_definition": "area-weighted mean of max(R,G,B) over the nominal patch nits (equal areas)",
-  "fall_nits": 2550.6666666666665,
+  "fall_nits": 2550.666666667,
   "frames": 3,
   "height": 1080,
   "max_cll_nits": 10000.0,
