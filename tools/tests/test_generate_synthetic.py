@@ -102,6 +102,8 @@ def test_recipes_load_and_cover_every_numbered_recipe():
         (["ffmpeg", "-threads", "1", "-i", "s.y4m", "-c:v", "libx264", "a.264"], "libx264 needs -threads N after"),
         (["ffmpeg", "-f", "lavfi", "-i", "life=s=64x64:mold=10", "a.y4m"], "lavfi life needs seed"),
         (["ffmpeg", "-f", "lavfi", "-i", "cellauto=s=64x64:rule=110,format=yuv420p", "a.y4m"], "lavfi cellauto"),
+        (["ffmpeg", "-f", "lavfi", "-i", "life", "a.y4m"], "lavfi life needs seed"),
+        (["ffmpeg", "-f", "lavfi", "-i", "cellauto,format=yuv420p", "a.y4m"], "lavfi cellauto"),
         (["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233:random", "f.mp4", "o.mp4"], "fixed IV"),
     ],
 )

@@ -18249,6 +18249,145 @@
       ]
     },
     {
+      "id": "syn_sei_h264_ga94_cc",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "syn_sei_h264_mastering_display_colour_volume",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "syn_sei_h264_content_light_level_info",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
+      "id": "syn_sei_h264_user_data_unregistered",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h264_recovery_point",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h265_mastering_display_colour_volume",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h265_content_light_level_info",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h265_alternative_transfer",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h265_user_data_unregistered",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
+      "id": "syn_sei_h265_recovery_point",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "47",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "sei"
+      ]
+    },
+    {
       "id": "syn_h265_hdr10plus",
       "source": "syn",
       "kind": "stream",
