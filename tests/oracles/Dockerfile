@@ -110,12 +110,13 @@ COPY requirements.txt /src/
 RUN python3 -m venv /opt/ovt-oracles/venv \
  && pip install --no-cache-dir --require-hashes --no-deps -r /src/requirements.txt
 
-# SPEC-ASSUMPTION(#47): google/uvq at its last TensorFlow revision (D11); HEAD moved to PyTorch (UVQ 1.5).
-# The SavedModels are part of the repository.
-ARG UVQ_COMMIT="d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2"
+# SPEC-ASSUMPTION(#47): google/uvq at a PyTorch revision; the reference CLI is
+# `uvq_inference.py --model_version 1.5` (Karl's answer on #47; D11 is revised at the next amendment pass).
+# The PyTorch checkpoints are part of the repository; the TensorFlow SavedModels under models/ are dropped.
+ARG UVQ_COMMIT="c204ecc04f093e90c941cb126c7ac3d5beca0414"
 RUN bash -c 'source /src/lib.sh \
  && ovt_git_fetch https://github.com/google/uvq.git "${UVQ_COMMIT}" "${UVQ_COMMIT}" /opt/ovt-oracles/uvq \
- && rm -rf /opt/ovt-oracles/uvq/.git && ovt_stamp uvq "google/uvq ${UVQ_COMMIT}"'
+ && rm -rf /opt/ovt-oracles/uvq/.git /opt/ovt-oracles/uvq/models && ovt_stamp uvq "google/uvq ${UVQ_COMMIT}"'
 
 COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh /opt/ovt-oracles/share/ovt-oracles/
 RUN ln -s ../share/ovt-oracles/oracle_versions.py /opt/ovt-oracles/bin/oracle-versions \

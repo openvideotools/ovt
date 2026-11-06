@@ -9,6 +9,8 @@
 #                                  not weekly, to save Actions minutes (a no-cache build takes about 2 h)
 #   workflow_dispatch              rebuild and push
 # Third-party actions are pinned by commit SHA, never by tag; Renovate keeps the pins fresh.
+# Runners: `pins` runs on the owner's Mac Mini (self-hosted, never for fork pull requests); `image` needs Linux
+# Docker and skips when the repository variable OVT_HOSTED_RUNNERS is `off` (ci.yml).
 name: oracle-image
 
 on:
@@ -33,7 +35,8 @@ env:
 
 jobs:
   pins:
-    runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -41,6 +44,7 @@ jobs:
         run: python3 -I tests/oracles/oracle_versions.py --check-pins
 
   image:
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     permissions:
