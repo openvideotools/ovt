@@ -270,6 +270,16 @@ TEST_CASE("test_tree: ext_as rejects a nested buffer that does not verify", "[fa
   const auto* block = flatbuffers::GetRoot<ovt::fb::Block>(fbb.GetBufferPointer());
   CHECK(ovt::model::ext_as<ovt::fb::HevcCu>(*block) == nullptr);
 
+  // ext_type set and an empty ext vector.
+  flatbuffers::FlatBufferBuilder fbb3;
+  const auto type3 = fbb3.CreateString("HevcCu");
+  const auto ext3 = fbb3.CreateVector(std::vector<std::uint8_t>{});
+  ovt::fb::BlockBuilder b3(fbb3);
+  b3.add_ext_type(type3);
+  b3.add_ext(ext3);
+  fbb3.Finish(b3.Finish());
+  CHECK(ovt::model::ext_as<ovt::fb::HevcCu>(*flatbuffers::GetRoot<ovt::fb::Block>(fbb3.GetBufferPointer())) == nullptr);
+
   // ext_type set but no ext bytes.
   flatbuffers::FlatBufferBuilder fbb2;
   const auto type2 = fbb2.CreateString("HevcCu");

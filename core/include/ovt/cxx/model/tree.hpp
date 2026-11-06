@@ -55,7 +55,7 @@ struct TreeWalker {
 template <class T>
 [[nodiscard]] const T* nested_as(const flatbuffers::Vector<std::uint8_t>* buffer,
                                  const flatbuffers::String* type_name) {
-  if (buffer == nullptr || type_name == nullptr || buffer->size() == 0) {
+  if (buffer == nullptr || type_name == nullptr) {  // an empty buffer fails verification below
     return nullptr;
   }
   constexpr std::string_view kNamespacePrefix = "ovt.fb.";
