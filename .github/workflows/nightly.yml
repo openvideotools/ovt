@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Nightly jobs (chapter 13 §13.7.1): tsan and macos-asan (WI-0.031). Later work items add the long fuzz lane
+# Nightly jobs (chapter 13 §13.7.1): tsan, macos-asan and the coverage run (WI-0.031). Later work items add the long fuzz lane
 # (WI-0.033), distro packaging (WI-0.073) and others to this file.
 # Third-party actions are pinned by commit SHA, never by tag.
 #
@@ -78,3 +78,12 @@ jobs:
           name: junit-macos-asan
           path: build/sanitizers-macos/junit.xml
           if-no-files-found: warn
+
+  coverage:
+    # Also on pushes to main (ci.yml); not on pull requests, the Mini is CPU-bound.
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/coverage

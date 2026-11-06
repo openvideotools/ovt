@@ -63,3 +63,20 @@ def test_files_outside_core_src_are_ignored(tmp_path: Path) -> None:
 
 def test_export_without_core_sources_is_unusable(tmp_path: Path) -> None:
     assert run(tmp_path, {"third_party/x.cpp": (10, 10)}).returncode == 2
+
+
+def test_flags_prefix_map_names_are_remapped(tmp_path: Path) -> None:
+    """ovt::flags compiles with -ffile-prefix-map=<source dir>=/ovt, so the export says /ovt/core/src/..."""
+    rows = {"core/src/bitreader/a.cpp": (100, 10), "core/src/model/b.cpp": (1000, 1000)}
+    files = [
+        {"filename": f"/ovt/{name}", "summary": {"lines": {"count": n, "covered": c}}} for name, (n, c) in rows.items()
+    ]
+    path = tmp_path / "export.json"
+    path.write_text(json.dumps({"data": [{"files": files}]}))
+    result = subprocess.run(
+        [sys.executable, "-I", str(SCRIPT), "check", "--summary", str(path), "--root", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 1 and "bitreader/: 10.0 %" in result.stdout

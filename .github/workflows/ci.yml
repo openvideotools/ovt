@@ -14,6 +14,7 @@ name: ci
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     # main for the artefacts; ci/** lets a maintainer try a stack of open PRs merged together.
     branches: [main, "ci/**"]
@@ -290,52 +291,14 @@ jobs:
 
   coverage:
     # Clang source-based coverage (OVT_COVERAGE, chapter 13 §13.2.2) of the unit tests, gated by
-    # tools/coverage_gate.py (chapter 04 NFR-028). The spec names Clang 16 on ubuntu-22.04; the Mini's Apple clang
-    # supports the same flags and is where CI runs while hosted runners are unavailable, so one job serves both.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # tools/coverage_gate.py (chapter 04 NFR-028); steps in .github/actions/coverage, shared with nightly.yml.
+    # The spec names Clang 16 on ubuntu-22.04 for every PR; the Mini's Apple clang supports the same flags. The Mini
+    # is CPU-bound, so the job runs on pushes to main (and nightly), not on every pull request; run it by hand with
+    # workflow_dispatch on a branch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 60
-    env:
-      PRESET: macos-arm64-debug
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: ./.github/actions/setup-ovt
-        with:
-          preset: macos-arm64-debug
-          triplet: arm64-osx-ovt
-
-      - name: Configure and build with coverage
-        run: |
-          cmake --preset "$PRESET" -DOVT_COVERAGE=ON -DOVT_BUILD_GUI=OFF
-          cmake --build --preset "$PRESET"
-
-      - name: Run the fast tests
-        run: |
-          rm -rf build/coverage && mkdir -p build/coverage
-          # %p-%m: one profile per process and binary; the tests start child processes.
-          export LLVM_PROFILE_FILE="$PWD/build/coverage/%p-%m.profraw"
-          ctest --preset "$PRESET" -L fast -LE "needs_display|needs_android|canary"
-
-      - name: Gate on core/src/
-        run: |
-          xcrun llvm-profdata merge -sparse build/coverage/*.profraw -o build/coverage/merged.profdata
-          objects="$(python -I tools/coverage_gate.py objects --test-dir "build/$PRESET")"
-          args=()
-          while IFS= read -r obj; do args+=("-object=$obj"); done <<< "$objects"
-          # The first binary is positional for llvm-cov; -object adds the rest.
-          xcrun llvm-cov export -summary-only -instr-profile=build/coverage/merged.profdata \
-            "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/export.json
-          xcrun llvm-cov report -instr-profile=build/coverage/merged.profdata \
-            "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/report.txt || true
-          python -I tools/coverage_gate.py check --summary build/coverage/export.json --root .
-
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: coverage
-          path: |
-            build/coverage/export.json
-            build/coverage/report.txt
-          if-no-files-found: warn
+      - uses: ./.github/actions/coverage

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Line-coverage gate for core/src/ (chapter 04 NFR-028, chapter 13 §13.7.1 `coverage`, WI-0.031).
 
-  coverage_gate.py check   --summary export.json [--root DIR]
+  coverage_gate.py check   --summary export.json [--root DIR] [--prefix-map OLD=NEW]
   coverage_gate.py objects --test-dir BUILD_DIR
 
 `check` reads the JSON of `llvm-cov export -summary-only` and fails (exit 1) when the line coverage of
@@ -44,12 +44,21 @@ def relative_to_root(filename: str, root: Path) -> str | None:
         return None
 
 
-def collect(summary: dict[str, Any], root: Path) -> dict[str, tuple[int, int]]:
+def remap(filename: str, prefix_map: str | None) -> str:
+    """Undo -ffile-prefix-map: ovt::flags compiles with CMAKE_SOURCE_DIR=/ovt, and that reaches the coverage mapping."""
+    if prefix_map:
+        old, _, new = prefix_map.partition("=")
+        if filename == old or filename.startswith(old + "/"):
+            return new + filename[len(old) :]
+    return filename
+
+
+def collect(summary: dict[str, Any], root: Path, prefix_map: str | None = None) -> dict[str, tuple[int, int]]:
     """Return {path relative to root: (lines, covered)} for the files under core/src/."""
     files: dict[str, tuple[int, int]] = {}
     for entry in summary["data"]:
         for item in entry.get("files", []):
-            rel = relative_to_root(item["filename"], root)
+            rel = relative_to_root(remap(item["filename"], prefix_map), root)
             if rel is None or not rel.startswith(SRC + "/"):
                 continue
             lines = item["summary"]["lines"]
@@ -91,7 +100,8 @@ def gate(files: dict[str, tuple[int, int]], root: Path) -> tuple[list[str], list
 def cmd_check(args: argparse.Namespace) -> int:
     try:
         summary = json.loads(Path(args.summary).read_text())
-        files = collect(summary, Path(args.root))
+        prefix_map = args.prefix_map or f"/ovt={Path(args.root).resolve()}"
+        files = collect(summary, Path(args.root), prefix_map)
     except (OSError, ValueError, KeyError, TypeError) as err:
         print(f"coverage_gate: cannot use {args.summary}: {err}", file=sys.stderr)
         return 2
@@ -107,6 +117,7 @@ def cmd_check(args: argparse.Namespace) -> int:
 
 
 def cmd_objects(args: argparse.Namespace) -> int:
+    test_dir = Path(args.test_dir).resolve()
     out = subprocess.run(
         ["ctest", "--test-dir", args.test_dir, "--show-only=json-v1"], capture_output=True, text=True, check=False
     )
@@ -116,7 +127,8 @@ def cmd_objects(args: argparse.Namespace) -> int:
     seen: dict[str, None] = {}
     for test in json.loads(out.stdout).get("tests", []):
         command = test.get("command") or []
-        if command and Path(command[0]).is_file():
+        # Only binaries built in the tree: ctest also lists python3 and cmake for the script tests.
+        if command and Path(command[0]).is_file() and Path(command[0]).resolve().is_relative_to(test_dir):
             seen[command[0]] = None
     # Tests that link the shared ovt::core run its code from the library, which llvm-cov needs as an object too.
     for lib in sorted(Path(args.test_dir).rglob("libovt_core*")):
@@ -132,6 +144,10 @@ def main(argv: list[str]) -> int:
     check = sub.add_parser("check")
     check.add_argument("--summary", required=True)
     check.add_argument("--root", default=".")
+    check.add_argument(
+        "--prefix-map",
+        help="OLD=NEW applied to export filenames (default /ovt=<root>, see cmake/OvtCompilerFlags.cmake)",
+    )
     check.set_defaults(func=cmd_check)
     objects = sub.add_parser("objects")
     objects.add_argument("--test-dir", required=True)
