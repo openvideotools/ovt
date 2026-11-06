@@ -99,6 +99,35 @@ def wrap_step(es_file: str) -> dict[str, Any]:
     return {"cmd": ["ffmpeg", *rate, "-i", es_file, "-c", "copy", "-movflags", "+faststart", out]}
 
 
+def aom_option(args: list[str], name: str, default: int) -> int:
+    for arg in args:
+        if arg.startswith(f"--{name}="):
+            try:
+                return int(arg.split("=", 1)[1])
+            except ValueError:
+                return default
+    return default
+
+
+def av1_scale_problem(argv: list[str]) -> str | None:
+    """Why an aomenc command would fail with "Can't find at least one reference frame with valid size", or None.
+
+    AV1 lets a reference frame be at most 2x the coded width of the frame predicting from it (the reference-scaling limit).
+    aomenc's frame resize (--resize-mode, denominator R/8) and superres (--superres-mode, coded width 8/S of the
+    upscaled width) multiply, while key frames keep the full size, so (R/8) * (S/8) must stay at or under 2
+    (R * S <= 128). Recipe 19 used R=S=12 (2.25x); it now uses R=9, S=12 (1.6875x).
+    """
+    if argv[0] != "aomenc":
+        return None
+    args = argv[1:]
+    resize = aom_option(args, "resize-denominator", 8) if aom_option(args, "resize-mode", 0) else 8
+    superres = aom_option(args, "superres-denominator", 8) if aom_option(args, "superres-mode", 0) else 8
+    if resize * superres > 128:
+        scale = resize * superres / 64
+        return f"resize {resize}/8 x superres {superres}/8 = {scale:g}x exceeds AV1's 2x reference scaling"
+    return None
+
+
 def determinism_problem(argv: list[str]) -> str | None:
     """Why ``argv`` would give different bytes on another machine or run, or None.
 
@@ -164,6 +193,9 @@ def load_recipes(path: Path) -> dict[str, Any]:
                 if problem := determinism_problem(argv):
                     name = item.get("id", item.get("file"))
                     raise GenError(EXIT_INVALID, f"recipes.json: {name}: not reproducible: {problem}")
+                if problem := av1_scale_problem(argv):
+                    name = item.get("id", item.get("file"))
+                    raise GenError(EXIT_INVALID, f"recipes.json: {name}: {problem}")
     doc["_sources"], doc["_ids"] = sources, ids
     return doc
 

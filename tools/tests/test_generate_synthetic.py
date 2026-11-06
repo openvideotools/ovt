@@ -125,6 +125,21 @@ def test_seeded_lavfi_and_fixed_iv_pass():
     assert generate.determinism_problem(["mp4encrypt", "--key", "1:0011:0a610676cb88f302", "f.mp4", "o"]) is None
 
 
+def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
+    """aomenc fails mid-encode when resize x superres exceeds AV1's 2x reference scaling (recipe 19, R=S=12)."""
+    base = ["aomenc", "--threads=1", "--superres-mode=1", "--superres-denominator=12", "--resize-mode=1"]
+    assert "exceeds" in generate.av1_scale_problem([*base, "--resize-denominator=12", "-o", "a.ivf", "s.y4m"])
+    assert generate.av1_scale_problem([*base, "--resize-denominator=9", "-o", "a.ivf", "s.y4m"]) is None
+    assert generate.av1_scale_problem(["aomenc", "--superres-mode=0", "--superres-denominator=16"]) is None
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text())
+    doc["recipes"][0]["steps"] = [{"cmd": [*base, "--resize-denominator=12", "-o", "a.ivf", "s.y4m"]}]
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(generate.GenError, match="reference scaling") as err:
+        generate.load_recipes(path)
+    assert err.value.code == 4
+
+
 def test_every_encoder_and_muxer_step_is_pinned():
     doc = generate.load_recipes(generate.DEFAULT_RECIPES)  # raises on any unpinned step
     steps = [s for item in [*doc["sources"], *doc["recipes"]] for s in item["steps"]]
