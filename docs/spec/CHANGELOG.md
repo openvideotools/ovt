@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc4 — 2026-11-06
+
+MINOR-level amendment (new optional manifest fields) made by the implementation of WI-0.552; no WI is re-opened.
+
+- 14 §14.2.4 — manifest entries may carry `upstream_path` (path at the origin) and `note` (pending steps, SPEC-ASSUMPTION remarks); a `vcs` entry carries `rev`, the pinned commit, and the fetcher resolves it to the Git LFS media URL (github.com origins only); an `unverified` entry may have no `url` when the file is still to be chosen or does not exist at its origin; `tools/manifest_add.py` fills hashes — WI-0.552
+
 ## 1.0.0-rc3 — 2026-11-06
 
 Accepted answers of `spec-question` #119 and #123 (coordinator, under the owner's level-3 autonomy). MINOR-level changes (recipe commands of WI-0.553, licence-gate interface of WI-0.561); no WI is re-opened.

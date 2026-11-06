@@ -29,7 +29,11 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["git", "lfs_path"],
-          "properties": { "git": { "type": "string" }, "lfs_path": { "type": "string" } }
+          "properties": {
+            "git": { "type": "string" },
+            "lfs_path": { "type": "string" },
+            "rev": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+          }
         },
         "manual_download": { "type": "boolean" },
         "unverified": {
@@ -77,6 +81,8 @@
         "features": { "type": "array", "items": { "type": "string" } },
         "tests": { "type": "array", "items": { "type": "string" } },
         "tags": { "type": "array", "items": { "type": "string" } },
+        "upstream_path": { "type": "string", "description": "path of the file inside the origin repository or bucket (informational)" },
+        "note": { "type": "string", "description": "free text: pending steps and SPEC-ASSUMPTION remarks (WI-0.552)" },
         "aliases": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" } },
         "kind": {
           "enum": ["stream", "fixture"],
@@ -100,7 +106,7 @@
           "if": { "properties": { "unverified": { "const": true } }, "required": ["unverified"] },
           "then": { "not": { "required": ["sha256"] } },
           "else": {
-            "if": { "required": ["url"] },
+            "if": { "anyOf": [{ "required": ["url"] }, { "required": ["vcs"] }] },
             "then": { "required": ["sha256", "size_bytes"] }
           }
         }
