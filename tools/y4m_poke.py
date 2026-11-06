@@ -14,6 +14,7 @@ the sample range is an error rather than a clamp, so ``b == a + delta`` always h
 from __future__ import annotations
 
 import argparse
+import re
 import json
 import sys
 from pathlib import Path
@@ -27,7 +28,8 @@ def plane_geometry(header: str) -> tuple[list[tuple[int, int]], int, int]:
     tags = {t[0]: t[1:] for t in header.split()[1:]}
     w, h = int(tags["W"]), int(tags["H"])
     cs = tags.get("C", "420jpeg")
-    depth = int(cs.split("p", 1)[1]) if "p" in cs and cs[-1].isdigit() else 8
+    m = re.search(r"(?:p|mono)(\d+)$", cs)  # 420p10, 444p16, mono10, mono16
+    depth = int(m.group(1)) if m else 8
     layout = next((v for k, v in LAYOUTS.items() if cs.startswith(k)), None)
     if layout is None:
         raise ValueError(f"unsupported colour space C{cs}")

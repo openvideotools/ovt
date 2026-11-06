@@ -198,7 +198,7 @@ Corpus files are never committed. `tools/fetch_corpora.py` downloads them on dem
 }
 ```
 
-Field rules: `id` unique; `url` is the exact download URL (HTTPS or a `gs://`/`https://storage.googleapis.com/` URL); `sha256` is the hash of the **downloaded file** (archive or stream); `extract` is optional and names the member to use; `licence` is a human sentence; `licence_spdx` is an SPDX id or a `LicenseRef-*`; `redistributable=false` means CI must download from the origin, never from an OVT mirror; `size_bytes` is used for the CI cache budget; `features` are lower-case feature tags from §14.3.3's vocabulary; `tests` names which golden suites consume the entry.
+Field rules (WI-0.552 additions: `vcs.rev` pins an LFS entry to a commit; `upstream_path` and `note` are informational; `unverified` entries may have no `url`): `id` unique; `url` is the exact download URL (HTTPS or a `gs://`/`https://storage.googleapis.com/` URL); `sha256` is the hash of the **downloaded file** (archive or stream); `extract` is optional and names the member to use; `licence` is a human sentence; `licence_spdx` is an SPDX id or a `LicenseRef-*`; `redistributable=false` means CI must download from the origin, never from an OVT mirror; `size_bytes` is used for the CI cache budget; `features` are lower-case feature tags from §14.3.3's vocabulary; `tests` names which golden suites consume the entry.
 
 **Fetcher CLI** (`tools/fetch_corpora.py`, Python ≥ 3.11, stdlib + `requests`):
 

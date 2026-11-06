@@ -91,6 +91,13 @@ def test_y4m_poke_16bit_and_range(tmp_path: Path) -> None:
     )
 
 
+def test_y4m_poke_mono_depths() -> None:
+    assert y4m_poke.plane_geometry("YUV4MPEG2 W8 H4 Cmono") == ([(8, 4)], 1, 255)
+    assert y4m_poke.plane_geometry("YUV4MPEG2 W8 H4 Cmono10") == ([(8, 4)], 2, 1023)
+    assert y4m_poke.plane_geometry("YUV4MPEG2 W8 H4 Cmono16") == ([(8, 4)], 2, 65535)
+    assert y4m_poke.plane_geometry("YUV4MPEG2 W8 H4 C420paldv")[1:] == (1, 255)
+
+
 # --- AV1 ------------------------------------------------------------------------------------------------------
 
 TAIL = "1011001110001111"  # stand-in for the rest of the sequence header
@@ -179,6 +186,18 @@ def make_ts(seconds: int = 4) -> bytes:
         out.append(ts_packet(0x101, cc, b"\x00\x00\x01\xe0" if i % 25 == 0 else b"", pusi=i % 25 == 0, pcr=pcr))
         cc = (cc + 1) & 15
     return b"".join(out)
+
+
+def test_ts_video_pid_skips_the_nit_entry() -> None:
+    pat = bytes([0x00, 0xB0, 17, 0, 1, 0xC1, 0, 0, 0, 0, 0xE0, 0x10, 0, 1, 0xE1, 0x00])  # program 0 = NIT PID 0x10
+    pmt = bytes([0x02, 0xB0, 18, 0, 1, 0xC1, 0, 0, 0xE1, 0x01, 0xF0, 0, 0x1B, 0xE1, 0x01, 0xF0, 0])
+    data = section_packet(0, pat) + section_packet(0x100, pmt) + make_ts()[2 * 188 :]
+    assert ts_inject_errors.video_pid(ts_inject_errors.packets(data)) == 0x101
+
+
+def test_ts_stripped_pcr_packets_are_not_dropped() -> None:
+    _, report = ts_inject_errors.inject(make_ts(), 100, 1)
+    assert report["pcr_removed"] and not set(report["dropped"]) & set(report["pcr_removed"])
 
 
 def test_ts_inject_errors() -> None:
