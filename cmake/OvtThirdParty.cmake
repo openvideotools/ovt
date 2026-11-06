@@ -37,6 +37,33 @@ else()
   message(STATUS "OVT: dav1d skipped, third_party/VERSIONS.md has no SHA-256 for it yet")
 endif()
 
+# ---- libde265 (WI-0.014) ----------------------------------------------------------------------------
+# tp::de265, the patched static libde265 of third_party/libde265.cmake (§13.3.6), for the HEVC analysis
+# plugin only (LGPL-3.0-or-later, chapter 15 §15.2). OVT_SYSTEM_DE265=ON (the distro preset) takes the
+# system library instead, which carries none of the OVT patches.
+# SPEC-ASSUMPTION(#114): the system bypass is kept for distro builds, reported unpatched; the plugin
+# work of chapter 07 decides whether it may build without the internals API.
+if(OVT_BUILD_PLUGIN_DE265)
+  if(OVT_SYSTEM_DE265)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_de265 REQUIRED IMPORTED_TARGET libde265)
+    add_library(tp::de265 INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::de265 INTERFACE PkgConfig::ovt_system_de265)
+    ovt_set_dependency_license(
+      tp::de265
+      SOURCE
+      system
+      SPDX
+      "LGPL-3.0-or-later"
+      VERSION
+      "${ovt_system_de265_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libde265.cmake")
+  endif()
+endif()
+
 # ovt_find_package(<Package> SPDX <expr> TARGETS <target>... [NAMES <config-name>...] [PKG_CONFIG <module>]
 #                  [HEADER_ONLY] [OPTIONAL])
 #

@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/block-grid.schema.json",
+  "title": "block-grid (chapter 14 §14.4.0)",
+  "description": "Per-stream file: one entry per frame in decode order. A frame carries the CellGrid of chapter 0 §0.5.4 (w4 x h4 cells of 4x4 luma samples, every field row-major with w4*h4 integers) and, for oracles that report per block rather than per cell, lists of macroblocks, motion vectors, QP blocks or accounting symbols.",
+  "type": "object",
+  "required": ["frames"],
+  "additionalProperties": false,
+  "properties": {
+    "frames": {"type": "array", "items": {"$ref": "#/$defs/frame"}}
+  },
+  "$defs": {
+    "int_or_list": {"anyOf": [
+      {"type": ["integer", "string"]},
+      {"type": "array", "items": {"$ref": "#/$defs/int_or_list"}}
+    ]},
+    "frame": {
+      "type": "object",
+      "required": ["frame"],
+      "additionalProperties": false,
+      "properties": {
+        "frame": {"type": "integer", "minimum": 0},
+        "poc": {"type": "integer"},
+        "w4": {"type": "integer", "minimum": 1},
+        "h4": {"type": "integer", "minimum": 1},
+        "header": {"type": "object", "additionalProperties": {"type": ["integer", "string"]}},
+        "fields": {"type": "object", "additionalProperties": {"type": "array", "items": {"type": "integer"}}},
+        "slices": {"type": "array", "items": {"type": "object", "additionalProperties": {"$ref": "#/$defs/int_or_list"}}},
+        "mbs": {"type": "array", "items": {
+          "type": "object",
+          "required": ["mb_addr"],
+          "additionalProperties": {"$ref": "#/$defs/int_or_list"}
+        }},
+        "mvs": {"type": "array", "items": {
+          "type": "object",
+          "required": ["list", "x", "y", "w", "h", "mv_x", "mv_y"],
+          "additionalProperties": false,
+          "properties": {
+            "list": {"enum": [0, 1]},
+            "x": {"type": "integer"}, "y": {"type": "integer"},
+            "w": {"type": "integer", "minimum": 1}, "h": {"type": "integer", "minimum": 1},
+            "mv_x": {"type": "integer"}, "mv_y": {"type": "integer"}
+          }
+        }},
+        "qp_blocks": {"type": "array", "items": {
+          "type": "object",
+          "required": ["x", "y", "w", "h", "qp"],
+          "additionalProperties": false,
+          "properties": {
+            "x": {"type": "integer"}, "y": {"type": "integer"},
+            "w": {"type": "integer", "minimum": 1}, "h": {"type": "integer", "minimum": 1},
+            "qp": {"type": "integer"}
+          }
+        }},
+        "symbols": {"type": "array", "items": {
+          "type": "object",
+          "required": ["x4", "y4", "name", "bits_x8", "count"],
+          "additionalProperties": false,
+          "properties": {
+            "x4": {"type": "integer"}, "y4": {"type": "integer"}, "name": {"type": "string"},
+            "bits_x8": {"type": "integer", "minimum": 0}, "count": {"type": "integer", "minimum": 0}
+          }
+        }}
+      }
+    }
+  }
+}

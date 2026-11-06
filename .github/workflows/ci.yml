@@ -14,6 +14,7 @@ name: ci
 
 on:
   pull_request:
+  workflow_dispatch:
   push:
     # main for the artefacts; ci/** lets a maintainer try a stack of open PRs merged together.
     branches: [main, "ci/**"]
@@ -55,7 +56,7 @@ jobs:
             if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
               "$py" -m venv "$RUNNER_TEMP/lint-venv"
               echo "$RUNNER_TEMP/lint-venv/bin" >> "$GITHUB_PATH"
-              "$RUNNER_TEMP/lint-venv/bin/python" -m pip install --quiet -r tools/requirements.txt pytest==8.3.4
+              "$RUNNER_TEMP/lint-venv/bin/python" -m pip install --quiet -r tools/requirements.txt pytest==8.3.4 numpy==2.2.1
               exit 0
             fi
           done
@@ -133,6 +134,28 @@ jobs:
       - name: Tool tests
         run: python -m pytest -q tools/tests
 
+  # Licence gate (chapter 15 §15.4.2, chapter 14 §14.3.4). Pure Python, so it runs on the Mini like lint. WI-0.561 adds
+  # the corpora step; the dependency steps (--versions, --sources, --manifest) join this job with their work items.
+  license-gate:
+    # SELF_HOSTED_OK: never run a fork's code on the Mini.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Corpora licences and tests/corpora/LICENSES.md
+        run: |
+          # The gate needs Python >= 3.11 (tomllib); the same search as the lint job.
+          for py in python3.13 python3.12 python3.11 python3; do
+            if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+              "$py" -I tools/license_gate.py --policy tools/license_policy.toml --corpora
+              exit $?
+            fi
+          done
+          echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
+          exit 1
+
   build-linux-x64:
     if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
     runs-on: ubuntu-22.04
@@ -178,6 +201,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 90
+    env:
+      # The Mini's 3 runners share 10 cores: 3 jobs each keeps the machine at about its core count.
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
+      VCPKG_MAX_CONCURRENCY: "3"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -227,3 +254,85 @@ jobs:
           name: ovt-macos-arm64
           path: dist/ovt-macos-arm64.zip
           retention-days: 30
+
+  asan-ubsan:
+    # chapter 13 §13.7.1 (WI-0.031): Clang 16 and the Linux sanitizer runtimes, so Linux-only; skipped when the
+    # owner has switched hosted runners off. asan-ubsan-macos below covers the gap on the Mini meanwhile.
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-asan-ubsan
+          triplet: x64-linux-ovt
+
+      - name: Clang 16
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm.sh -o "$RUNNER_TEMP/llvm.sh"
+          sudo bash "$RUNNER_TEMP/llvm.sh" 16
+
+      # configure + build with OVT_BUILD_GUI=OFF, then `ctest --preset sanitizers` (fast|golden under ASan+UBSan;
+      # the deliberate canary test is excluded by the preset).
+      - name: Configure, build, test (sanitizers)
+        run: cmake --workflow --preset ci-linux-asan-ubsan
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-asan-ubsan
+          path: build/sanitizers/junit.xml
+          if-no-files-found: warn
+
+  asan-ubsan-macos:
+    # The sanitizer gate while hosted Linux runners are off: the nightly macos-asan workflow preset (ASan+UBSan on
+    # Apple clang) run on every pull request, on the Mini. Not a §13.7.1 job; it disappears from the picture when
+    # the owner removes OVT_HOSTED_RUNNERS=off, and asan-ubsan above takes over.
+    if: >-
+      vars.OVT_HOSTED_RUNNERS == 'off' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 60
+    env:
+      # The Mini's 3 runners share 10 cores: 3 jobs each keeps the machine at about its core count.
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
+      VCPKG_MAX_CONCURRENCY: "3"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: macos-arm64-asan
+          triplet: arm64-osx-ovt
+
+      - name: Configure, build, test (sanitizers)
+        run: cmake --workflow --preset ci-macos-asan # ctest --preset sanitizers-macos
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-asan-ubsan-macos
+          path: build/sanitizers-macos/junit.xml
+          if-no-files-found: warn
+
+  coverage:
+    # Clang source-based coverage (OVT_COVERAGE, chapter 13 §13.2.2) of the unit tests, gated by
+    # tools/coverage_gate.py (chapter 04 NFR-028); steps in .github/actions/coverage, shared with nightly.yml.
+    # The spec names Clang 16 on ubuntu-22.04 for every PR; the Mini's Apple clang supports the same flags. The Mini
+    # is CPU-bound, so the job runs on pushes to main (and nightly), not on every pull request; run it by hand with
+    # workflow_dispatch on a branch.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 60
+    env:
+      # The Mini's 3 runners share 10 cores: 3 jobs each keeps the machine at about its core count.
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
+      VCPKG_MAX_CONCURRENCY: "3"
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/coverage

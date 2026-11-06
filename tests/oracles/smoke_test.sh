@@ -97,12 +97,12 @@ check dump_psnrhvs - dump_psnrhvs -y src_720p_8bit.y4m dist.y4m
 check dump_ciede2000 - dump_ciede2000 src_720p_8bit.y4m dist.y4m
 check bjontegaard - python3 -c 'import bjontegaard as bd
 print(bd.bd_rate([100, 200, 400, 800], [30, 33, 36, 39], [90, 180, 360, 720], [30, 33, 36, 39], method="pchip"))'
-run_uvq() {
-  (cd "${OVT_ORACLES_PREFIX}/uvq" && TF_DETERMINISTIC_OPS=1 python3 uvq_main.py \
-    --input_files="syn_h265,2,${out}/syn_h265.mp4" --output_dir="${out}/uvq_out" --model_dir=models \
-    --transcode=yes) && cat "${out}"/uvq_out/*/*.csv
+run_uvq() {  # run_uvq <model_version>: the reference CLI on CPU, one thread, all statistics as JSON
+  OMP_NUM_THREADS=1 python3 "${OVT_ORACLES_PREFIX}/uvq/uvq_inference.py" "${out}/syn_h265.mp4" \
+    --model_version "$1" --device cpu --threads 1 --output_all_stats
 }
-check uvq - run_uvq
+check uvq_1p5 - run_uvq 1.5
+check uvq_1p0 - run_uvq 1.0
 check mpv - mpv --no-config --vo=null --ao=null --frames=5 --msg-level=all=v syn_h265.mp4
 check oracle_versions - oracle-versions
 

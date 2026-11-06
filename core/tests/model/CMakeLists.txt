@@ -5,9 +5,12 @@
 # exports only the C API (#62).
 
 # WI-0.083 acceptance test 2: the embedded .bfbs resources and the schema identity accessors.
-add_executable(ovt_tests_model test_bfbs_resources.cpp)
-target_link_libraries(ovt_tests_model PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ${flatbuffers_TARGET}
-                                              ${Catch2_TARGET})
+# WI-0.084: the model helpers (grid, tree, units, labels); test_labels compares labels_golden.txt.
+add_executable(ovt_tests_model test_bfbs_resources.cpp test_grid.cpp test_labels.cpp test_tree.cpp test_units.cpp)
+target_link_libraries(ovt_tests_model PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
+                                              ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(ovt_tests_model
+                           PRIVATE "OVT_MODEL_LABELS_GOLDEN=\"${CMAKE_CURRENT_SOURCE_DIR}/labels_golden.txt\"")
 # ovt_metrics.fbs arrives with WI-0.082. Until then bfbs(Metrics) is empty and its check is skipped; once the
 # file exists the check is required (a schema that is present but not embedded fails).
 if(EXISTS "${PROJECT_SOURCE_DIR}/core/schema/ovt_metrics.fbs")

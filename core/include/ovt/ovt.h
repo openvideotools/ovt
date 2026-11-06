@@ -9,6 +9,7 @@
 #define OVT_OVT_H
 
 #include "ovt/io.h"  // IWYU pragma: export
+#include "ovt/jobs.h"
 #include "ovt/log.h"
 #include "ovt/status.h"
 #include "ovt/version.h"

@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Coverage of core/src/ on the Mac Mini (WI-0.031; chapter 13 §13.7.1 `coverage`, chapter 04 NFR-028): build
+# macos-arm64-debug with OVT_COVERAGE=ON, run the fast tests, gate with tools/coverage_gate.py. The caller has
+# already run actions/checkout. Used by ci.yml (push to main) and nightly.yml.
+name: coverage
+description: Build with Clang source-based coverage, run the fast tests and gate the line coverage of core/src/.
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-ovt
+      with:
+        preset: macos-arm64-debug
+        triplet: arm64-osx-ovt
+
+    - name: Configure and build with coverage
+      shell: bash
+      env:
+        PRESET: macos-arm64-debug
+      run: |
+        cmake --preset "$PRESET" -DOVT_COVERAGE=ON -DOVT_BUILD_GUI=OFF
+        cmake --build --preset "$PRESET"
+
+    - name: Run the fast tests
+      shell: bash
+      env:
+        PRESET: macos-arm64-debug
+      run: |
+        rm -rf build/coverage && mkdir -p build/coverage
+        # %p-%m: one profile per process and binary; the tests start child processes.
+        export LLVM_PROFILE_FILE="$PWD/build/coverage/%p-%m.profraw"
+        ctest --preset "$PRESET" -L fast -LE "needs_display|needs_android|canary"
+
+    - name: Gate on core/src/
+      shell: bash
+      env:
+        PRESET: macos-arm64-debug
+      run: |
+        xcrun llvm-profdata merge -sparse build/coverage/*.profraw -o build/coverage/merged.profdata
+        objects="$(python -I tools/coverage_gate.py objects --test-dir "build/$PRESET")"
+        args=()
+        while IFS= read -r obj; do args+=("-object=$obj"); done <<< "$objects"
+        # The first binary is positional for llvm-cov; -object adds the rest.
+        xcrun llvm-cov export -summary-only -instr-profile=build/coverage/merged.profdata \
+          "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/export.json
+        xcrun llvm-cov report -instr-profile=build/coverage/merged.profdata \
+          "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/report.txt || true
+        python -I tools/coverage_gate.py check --summary build/coverage/export.json --root .
+
+    - name: Upload coverage report
+      if: always()
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: coverage
+        path: |
+          build/coverage/export.json
+          build/coverage/report.txt
+        if-no-files-found: warn

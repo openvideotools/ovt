@@ -12,6 +12,7 @@
 #include <flatbuffers/idl.h>
 #include <flatbuffers/util.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -71,8 +72,8 @@ TEST_CASE("smoke Record survives JSON and a rebuild", "[fast][schema]") {
   std::string schema_text;
   REQUIRE(flatbuffers::LoadFile(OVT_SMOKE_FBS_PATH, false, &schema_text));
   flatbuffers::Parser parser;
-  const char* include_dirs[] = {OVT_SMOKE_DIR, nullptr};
-  REQUIRE(parser.Parse(schema_text.c_str(), include_dirs, OVT_SMOKE_FBS_PATH));
+  std::array<const char*, 2> include_dirs{OVT_SMOKE_DIR, nullptr};
+  REQUIRE(parser.Parse(schema_text.c_str(), include_dirs.data(), OVT_SMOKE_FBS_PATH));
 
   std::string json;
   REQUIRE(succeeded(flatbuffers::GenerateText(parser, buf.data(), &json)));
@@ -80,7 +81,7 @@ TEST_CASE("smoke Record survives JSON and a rebuild", "[fast][schema]") {
   CHECK(json.find("codec: \"Av1\"") != std::string::npos);
 
   flatbuffers::Parser reparse;
-  REQUIRE(reparse.Parse(schema_text.c_str(), include_dirs, OVT_SMOKE_FBS_PATH));
+  REQUIRE(reparse.Parse(schema_text.c_str(), include_dirs.data(), OVT_SMOKE_FBS_PATH));
   REQUIRE(reparse.Parse(json.c_str()));
   flatbuffers::Verifier verifier(reparse.builder_.GetBufferPointer(), reparse.builder_.GetSize());
   REQUIRE(ovt::fb::smoke::VerifyRecordBuffer(verifier));

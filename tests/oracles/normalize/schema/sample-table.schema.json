@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/sample-table.schema.json",
+  "title": "sample-table (chapter 14 §14.4.0)",
+  "description": "One entry per sample in decode order: index i (0-based), dts and cts in track timescale ticks (raw, no edit list), size and file offset in bytes, sync 0|1. track is the track_ID when the oracle dumps several tracks into one file.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["i", "dts", "cts", "size", "offset", "sync"],
+    "additionalProperties": false,
+    "properties": {
+      "track": {"type": "integer", "minimum": 1},
+      "i": {"type": "integer", "minimum": 0},
+      "dts": {"type": "integer"},
+      "cts": {"type": "integer"},
+      "size": {"type": "integer", "minimum": 0},
+      "offset": {"type": "integer", "minimum": 0},
+      "sync": {"enum": [0, 1]}
+    }
+  }
+}
