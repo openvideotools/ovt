@@ -126,7 +126,7 @@ ovt_status dispatch(ovt_Job* job, std::string_view name, Cancel& cancel, const P
       // Waiting on the pool from one of its own workers could deadlock a busy pool: run inline.
       return detail::run_guarded(name, cancel, body, [](const Progress& /*p*/) {});
     }
-    JobHandle handle = Pool::global().submit(std::string(name), cancel, body);
+    const JobHandle handle = Pool::global().submit(std::string(name), cancel, body);
     handle.wait();
     return handle.status();
   } catch (const std::bad_alloc&) {
