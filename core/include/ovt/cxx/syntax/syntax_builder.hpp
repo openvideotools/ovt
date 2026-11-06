@@ -101,10 +101,12 @@ class SyntaxBuilder final : public BitReader::DiagnosticSink {
   template <class T>
     requires(!std::is_convertible_v<const T&, std::string_view>)  // text goes to the overload above
   void derived(std::string_view name, T value) {
-    if (recording_) derived(name, std::string_view{fmt::format("{} = {}", name, value)});
+    if (recording_) {
+      derived(name, std::string_view{fmt::format("{} = {}", name, value)});
+    }
   }
   // Diagnostics attached to the current struct (or the last node if attach_to_last).
-  void diag(Severity, std::string_view code, std::string_view message, std::string_view spec_ref = {},
+  void diag(Severity severity, std::string_view code, std::string_view message, std::string_view spec_ref = {},
             bool attach_to_last = false);
   // Opaque remainder (slice_data / tile data): node kind Bytes with span [bit_pos, end) and no copy.
   void opaque_rest(std::string_view name);

@@ -62,8 +62,8 @@ SyntaxBufferState& SyntaxBuilder::state() {
 
 SyntaxNodeData* SyntaxBuilder::current() noexcept {
   for (size_t i = depth_; i > 0; --i) {
-    if (stack_.at(i - 1) != nullptr) {
-      return stack_.at(i - 1);
+    if (stack_[i - 1] != nullptr) {
+      return stack_[i - 1];
     }
   }
   return state_ ? &state_->root : nullptr;
@@ -97,7 +97,7 @@ void SyntaxBuilder::open(std::string_view name, std::string_view spec_ref, int a
     throw std::logic_error("SyntaxBuilder: structs nested deeper than kMaxDepth");
   }
   if (!recording_) {
-    stack_.at(depth_++) = nullptr;
+    stack_[depth_++] = nullptr;
     return;
   }
   SyntaxBufferState& st = state();
@@ -108,14 +108,14 @@ void SyntaxBuilder::open(std::string_view name, std::string_view spec_ref, int a
   n->span = BitSpan{br_.bit_pos(), 0};
   n->array_index = array_index;
   SyntaxBufferState::append_child(*parent, n);
-  stack_.at(depth_++) = n;
+  stack_[depth_++] = n;
 }
 
 void SyntaxBuilder::close() noexcept {
   if (depth_ == 0) {
     return;  // unbalanced end, or a Scope that outlives finish()
   }
-  SyntaxNodeData* n = stack_.at(--depth_);
+  SyntaxNodeData* n = stack_[--depth_];
   if (n != nullptr) {
     n->span.bit_length = saturate32(br_.bit_pos() - n->span.bit_offset);
   }
@@ -160,7 +160,7 @@ SyntaxBuilder::Scope SyntaxBuilder::scoped(std::string_view name, std::string_vi
 void SyntaxBuilder::begin_array_element(std::string_view name, int idx, std::string_view spec_ref) {
   open(name, spec_ref, idx);
   if (recording_) {
-    stack_.at(depth_ - 1)->array_element = true;
+    stack_[depth_ - 1]->array_element = true;
   }
 }
 
@@ -327,7 +327,7 @@ int32_t SyntaxBuilder::read_delta_q(std::string_view name) {
   // children of a node `name` that carries the resulting value.
   const auto m = br_.mark();
   open(name, {}, -1);
-  SyntaxNodeData* parent = stack_.at(depth_ - 1);
+  SyntaxNodeData* parent = stack_[depth_ - 1];
   struct Closer {
     SyntaxBuilder& b;
     explicit Closer(SyntaxBuilder& sb) noexcept : b(sb) {}
