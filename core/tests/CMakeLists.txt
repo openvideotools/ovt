@@ -55,7 +55,7 @@ ovt_catch_discover_tests(ovt_tests_result)
 
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
-# add_subdirectory(bitreader)
+add_subdirectory(bitreader)
 add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(jobs)
 add_subdirectory(log)
