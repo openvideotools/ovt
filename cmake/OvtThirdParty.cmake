@@ -64,6 +64,20 @@ if(OVT_BUILD_PLUGIN_DE265)
   endif()
 endif()
 
+# ---- MoltenVK (WI-0.017) ------------------------------------------------------------------------------
+# tp::moltenvk from third_party/moltenvk.cmake: the prebuilt libMoltenVK.dylib (single-architecture slice) that
+# ovt_render links directly on macOS (§13.5.6). Only fetched when the renderer is built.
+if(APPLE AND OVT_BUILD_RENDER)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/moltenvk.cmake")
+endif()
+
+# ---- ONNX Runtime prebuilt (WI-0.017) -----------------------------------------------------------------
+# tp::onnxruntime from third_party/onnxruntime.cmake when OVT_ONNXRUNTIME_PREBUILT=ON; otherwise the UVQ host
+# takes the vcpkg `onnxruntime` port (§13.3.1).
+if(OVT_ONNXRUNTIME_PREBUILT)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/onnxruntime.cmake")
+endif()
+
 # ovt_find_package(<Package> SPDX <expr> TARGETS <target>... [NAMES <config-name>...] [PKG_CONFIG <module>]
 #                  [HEADER_ONLY] [OPTIONAL])
 #

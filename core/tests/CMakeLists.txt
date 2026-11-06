@@ -73,3 +73,13 @@ if(TARGET tp::dav1d)
   ovt_set_license(ovt_tests_dav1d_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_dav1d_probe)
 endif()
+
+# WI-0.017: tp::onnxruntime (prebuilt fallback, OVT_ONNXRUNTIME_PREBUILT=ON) links into a plain C program that
+# calls OrtGetApiBase(); it exits 0 when the header is found and the library loads.
+if(TARGET tp::onnxruntime)
+  add_executable(ovt_tests_ort_probe test_ort_probe.c)
+  target_link_libraries(ovt_tests_ort_probe PRIVATE tp::onnxruntime ovt::flags)
+  ovt_set_license(ovt_tests_ort_probe "LGPL-2.1-or-later")
+  add_test(NAME ort_probe COMMAND ovt_tests_ort_probe)
+  set_tests_properties(ort_probe PROPERTIES LABELS "unit;fast;third_party")
+endif()
