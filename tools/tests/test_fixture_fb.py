@@ -52,8 +52,8 @@ class Reader:
             return self.t.String(pos).decode()
         if t.startswith("["):
             elem, start, n = t[1:-1], self.t.Vector(off), self.t.VectorLen(off)
-            if S.scalar(elem):
-                return np.frombuffer(self.buf, gf.NUMPY[S.scalar(elem)], n, start)
+            if (elem_scalar := S.scalar(elem)) is not None:
+                return np.frombuffer(self.buf, gf.NUMPY[elem_scalar], n, start)
             return [Reader(self.buf, self.t.Indirect(start + 4 * i), elem) for i in range(n)]
         return Reader(self.buf, self.t.Indirect(pos), t)
 
