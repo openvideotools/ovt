@@ -64,5 +64,15 @@ The Android toolchain wrapper is covered by `ffmpeg_configure_flags` with a fake
 
 ## Determinism
 
-Both flavours were built twice from an empty prefix and the installed libraries compared byte for byte; see
-the result below.
+Both flavours were built twice from an empty prefix (`rm -rf build/third_party/linux-x64-debug/ffmpeg-*`, then
+`cmake --build`) and the installed libraries compared byte for byte:
+
+```console
+$ sha256sum ffmpeg-core/lib/*.so.*.* ffmpeg-plugin/lib/*.a   # after each build; diff of the two lists is empty
+$ cmp first/libavcodec_ovt.so.61.19.101 second/libavcodec_ovt.so.61.19.101 && echo IDENTICAL
+IDENTICAL
+```
+
+Result: pass. The first attempt differed in libavcodec: FFmpeg's `ffbuild/version.sh` ran `git describe` at make
+time and found the OVT checkout around the build tree, so the OVT commit leaked into `av_version_info()`.
+`GIT_CEILING_DIRECTORIES` is now set for configure, build and install; `av_version_info()` reports `7.1.1`.

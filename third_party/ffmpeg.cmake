@@ -22,7 +22,7 @@
 #
 # Reproducibility (§13.3.3): configure runs with SOURCE_DATE_EPOCH (the environment's, else 0) and
 # -ffile-prefix-map for the source and build trees, so the build path does not reach the binaries, and with
-# GIT_CEILING_DIRECTORIES so FFmpeg's ffbuild/version.sh cannot pick up the git revision of the OVT checkout around
+# GIT_CEILING_DIRECTORIES (configure, build and install) so FFmpeg's ffbuild/version.sh cannot pick up the git revision of the OVT checkout around
 # the build tree (the release tarball's VERSION file names the version).
 
 include_guard(GLOBAL)
@@ -314,8 +314,8 @@ function(_ovt_ffmpeg_flavour flavour)
     DEPENDS ${depends}
     PATCH_COMMAND ${OVT_TP_PATCH} ${CMAKE_SOURCE_DIR}/third_party/patches/ffmpeg
     CONFIGURE_COMMAND sh ${script}
-    BUILD_COMMAND ${OVT_MAKE} -j${_ovt_ff_jobs}
-    INSTALL_COMMAND ${OVT_MAKE} install
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} -j${_ovt_ff_jobs}
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} install
     BUILD_BYPRODUCTS ${byproducts}
     LOG_CONFIGURE ON
     LOG_OUTPUT_ON_FAILURE ON)
