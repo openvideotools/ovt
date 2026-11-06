@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""Writes the structural MP4 fixture of WI-0.556 and its box-tree golden.
+"""Writes the 2 KiB structural MP4 of WI-0.556 and its box-tree golden (independent walker; `--check` verifies).
 
-    python3 tests/golden/isobmff/gen_min_mp4.py [--check]
-
-Output (next to this script): ovt_min_structural.mp4 (2048 bytes: ftyp, moov with one video track, mdat of
-zeros) and ovt_min_structural.pybox.json, the box-tree golden. The golden is produced by this script's own
-independent box walker, standing in for an oracle (MP4Box, mp4ff) until the oracle image generates goldens (WI-0.564).
-The golden lists only the fields the oracle decodes; OVT may report more (chapter 14 §14.4.0 step 3).
-With --check nothing is written; exit 1 if the committed files differ from what the script generates.
-Deterministic: stdlib only, no timestamps.
+The golden stands in for an oracle until the oracle image generates goldens (WI-0.564) and lists only the fields the
+oracle decodes; OVT may report more (chapter 14 §14.4.0 step 3). Deterministic, stdlib only.
 """
 
 import json

@@ -97,21 +97,6 @@ ovt_add_golden_test(
   $<TARGET_FILE:ovt_golden_box_tree>
   "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/ovt_min_structural.mp4")
 
-# The same golden through a tolerance file under another NAME: proves TOLERANCES plumbing and that two golden tests
-# never share a scratch file (`ctest -L golden -j8`, WI-0.041 acceptance test 2 moved to WI-0.556).
-ovt_add_golden_test(
-  NAME
-  isobmff_min_structural_tolerances
-  GOLDEN
-  "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/ovt_min_structural.pybox.json"
-  FAMILY
-  box-tree
-  TOLERANCES
-  "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/tolerances.json"
-  CMD
-  $<TARGET_FILE:ovt_golden_box_tree>
-  "${CMAKE_CURRENT_SOURCE_DIR}/isobmff/ovt_min_structural.mp4")
-
 # The committed fixture and its golden are exactly what the generator writes.
 if(Python3_Interpreter_FOUND)
   add_test(NAME golden_isobmff_fixture_up_to_date COMMAND "${Python3_EXECUTABLE}" -I

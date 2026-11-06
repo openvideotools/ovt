@@ -16,8 +16,7 @@ field in the golden must be present and equal in OVT's output; fields only OVT r
 | `sample-table` | `[{i, dts, cts, size, offset, sync}]` | `SampleTable` |
 | `scores` | `{frames: [{i, <metric>}], pooled: {<metric>: {mean, harmonic_mean, min}}}` | `MetricsResult` |
 
-The Python twins live in `tests/oracles/normalize/` (WI-0.555). Both sides print numbers the same way: integers as
-integers, every other number with `%.6f` (`normalize_json`).
+The Python twins are in `tests/oracles/normalize/`; both sides print non-integers with `%.6f`.
 
 ## Comparison
 
@@ -61,13 +60,11 @@ changed too, and say why in the PR.
 
 ## Limits of the comparison
 
-- A tolerance applies only when one of the two numbers is a double; two integers are always compared exactly.
-- Without a tolerance, doubles are equal when they print the same with `%.6f`, so values below 5e-7 are all equal to
-  each other. A family with tiny values (MSE near 0) needs a scaled field.
+A tolerance applies only when one number is a double (integers are exact). Without one, doubles are equal when their
+`%.6f` forms are equal, so values below 5e-7 are all equal; tiny-valued families need a scaled field.
 
 ## The first golden test
 
-`isobmff/ovt_min_structural.mp4` (2 KiB, committed) is walked by `isobmff/box_tree_main.cpp` into a `ContainerTree`
-FlatBuffer, converted by `to_canonical`, and compared with `isobmff/ovt_min_structural.pybox.json`, written by the
-independent Python walker `isobmff/gen_min_mp4.py` (`python3 tests/golden/isobmff/gen_min_mp4.py --check`). It proves
-the plumbing without the container parser; when that exists the test moves to `ovt probe`.
+`isobmff/ovt_min_structural.mp4` (2 KiB) is walked into a `ContainerTree` by `isobmff/box_tree_main.cpp`, converted by
+`to_canonical` and compared with `isobmff/ovt_min_structural.pybox.json`, written by the independent walker
+`isobmff/gen_min_mp4.py` (`--check` verifies both files). It moves to `ovt probe` when the container parser exists.
