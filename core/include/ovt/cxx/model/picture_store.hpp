@@ -62,7 +62,8 @@ class PictureStore {
   };
 
   /// Called once per evicted plane or map blob, outside the store's lock, from the thread whose put caused
-  /// the eviction. The view is valid for the duration of the call. Must not throw.
+  /// the eviction. The view is valid for the duration of the call. Should not throw: an exception escapes
+  /// from that put after the store is updated, and the rest of its evicted blobs go unreported.
   using EvictCallback = std::function<void(std::string_view blob_id, PlaneView view)>;
 
   /// Throws std::invalid_argument when a frame budget or the cap is 0.

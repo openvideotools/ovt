@@ -400,7 +400,7 @@ PictureStore::~PictureStore() = default;
 namespace {
 
 void notify(const std::shared_ptr<const PictureStore::EvictCallback>& callback,
-            const std::vector<std::shared_ptr<const PlaneBlob>>& evicted) noexcept {
+            const std::vector<std::shared_ptr<const PlaneBlob>>& evicted) {
   if (!callback || !*callback) {
     return;
   }
