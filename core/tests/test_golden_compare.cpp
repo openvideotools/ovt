@@ -9,11 +9,14 @@
 // case, so `ctest -j8` cannot collide.
 
 #include <catch2/catch_test_macros.hpp>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json.hpp>  // IWYU pragma: keep
+#include <nlohmann/json_fwd.hpp>
 
 #include <filesystem>
 #include <fstream>
+#include <ios>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 
 #include "test_support/fb_normalize.h"

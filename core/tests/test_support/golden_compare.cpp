@@ -4,14 +4,25 @@
 #include "test_support/golden_compare.h"
 
 #include <fmt/format.h>
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <nlohmann/json.hpp>  // IWYU pragma: keep
+#include <nlohmann/json_fwd.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
+#include <ios>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
 #include "test_support/fb_normalize.h"
 #include "test_support/golden.h"
@@ -31,7 +42,12 @@ std::string six_decimals(double d) {
 // "$.frames[3].psnr_y" -> "frames[].psnr_y"
 std::string pattern_of(const std::string& path) {
   std::string out;
-  std::size_t i = path.rfind("$.", 0) == 0 ? 2 : (path == "$" ? 1 : 0);
+  std::size_t i = 0;
+  if (path.starts_with("$.")) {
+    i = 2;
+  } else if (path == "$") {
+    i = 1;
+  }
   while (i < path.size()) {
     if (path[i] == '[') {
       const std::size_t close = path.find(']', i);
@@ -110,7 +126,9 @@ class Comparer {
     }
     if (golden.is_object()) {
       for (const auto& [key, value] : golden.items()) {
-        const std::string child = path + "." + key;
+        std::string child = path;
+        child += '.';
+        child += key;
         const auto it = actual.find(key);
         if (it == actual.end()) {
           add(child, "missing in OVT output (golden " + brief(value) + ")");
@@ -124,7 +142,11 @@ class Comparer {
         return;
       }
       for (std::size_t i = 0; i < golden.size(); ++i) {
-        run(golden[i], actual[i], path + "[" + std::to_string(i) + "]");
+        std::string child = path;
+        child += '[';
+        child += std::to_string(i);
+        child += ']';
+        run(golden[i], actual[i], child);
       }
     } else if (golden != actual) {
       add(path, "golden " + brief(golden) + ", OVT " + brief(actual));
@@ -161,60 +183,124 @@ struct Edit {
   std::size_t b;  // line index in actual (for ' ' and '+')
 };
 
+// Number of leading lines both sides share, then of trailing lines they share after that.
+struct Trim {
+  std::size_t prefix = 0;
+  std::size_t suffix = 0;
+};
+
+Trim common_ends(const std::vector<std::string>& a, const std::vector<std::string>& b) {
+  Trim trim;
+  while (trim.prefix < a.size() && trim.prefix < b.size() && a[trim.prefix] == b[trim.prefix]) {
+    ++trim.prefix;
+  }
+  const std::size_t room = std::min(a.size(), b.size()) - trim.prefix;
+  while (trim.suffix < room && a[a.size() - 1 - trim.suffix] == b[b.size() - 1 - trim.suffix]) {
+    ++trim.suffix;
+  }
+  return trim;
+}
+
+// Edits for a[from_a, to_a) against b[from_b, to_b) by a longest-common-subsequence table. Deletions come before
+// insertions, as diff(1) prints them.
+void lcs_edits(const std::vector<std::string>& a, const std::vector<std::string>& b, std::size_t offset, std::size_t n,
+               std::size_t m, std::vector<Edit>& script) {
+  const std::size_t width = m + 1;
+  std::vector<uint32_t> lcs((n + 1) * width, 0);
+  const auto cell = [&](std::size_t i, std::size_t j) -> uint32_t& { return lcs[(i * width) + j]; };
+  for (std::size_t i = n; i-- > 0;) {
+    for (std::size_t j = m; j-- > 0;) {
+      const bool same = a[offset + i] == b[offset + j];
+      cell(i, j) = same ? cell(i + 1, j + 1) + 1 : std::max(cell(i + 1, j), cell(i, j + 1));
+    }
+  }
+  std::size_t i = 0;
+  std::size_t j = 0;
+  while (i < n || j < m) {
+    if (i < n && j < m && a[offset + i] == b[offset + j]) {
+      script.push_back({' ', offset + i, offset + j});
+      ++i;
+      ++j;
+    } else if (i < n && (j == m || cell(i + 1, j) >= cell(i, j + 1))) {
+      script.push_back({'-', offset + i, 0});
+      ++i;
+    } else {
+      script.push_back({'+', 0, offset + j});
+      ++j;
+    }
+  }
+}
+
 // Edit script from common prefix/suffix trimming plus an LCS table on the middle (goldens are line-oriented JSON
 // of a few thousand lines at most; a huge middle degrades to one replace hunk).
 std::vector<Edit> edit_script(const std::vector<std::string>& a, const std::vector<std::string>& b) {
-  std::size_t prefix = 0;
-  while (prefix < a.size() && prefix < b.size() && a[prefix] == b[prefix]) {
-    ++prefix;
-  }
-  std::size_t suffix = 0;
-  while (suffix < a.size() - prefix && suffix < b.size() - prefix &&
-         a[a.size() - 1 - suffix] == b[b.size() - 1 - suffix]) {
-    ++suffix;
-  }
-  const std::size_t n = a.size() - prefix - suffix;
-  const std::size_t m = b.size() - prefix - suffix;
+  const Trim trim = common_ends(a, b);
+  const std::size_t n = a.size() - trim.prefix - trim.suffix;
+  const std::size_t m = b.size() - trim.prefix - trim.suffix;
   std::vector<Edit> script;
-  for (std::size_t i = 0; i < prefix; ++i) {
+  script.reserve(a.size() + b.size());
+  for (std::size_t i = 0; i < trim.prefix; ++i) {
     script.push_back({' ', i, i});
   }
-  constexpr std::size_t kMaxCells = 16U * 1024U * 1024U;
+  constexpr std::size_t kMaxCells = static_cast<std::size_t>(16) * 1024 * 1024;
   if (n * m > kMaxCells) {
     for (std::size_t i = 0; i < n; ++i) {
-      script.push_back({'-', prefix + i, 0});
+      script.push_back({'-', trim.prefix + i, 0});
     }
     for (std::size_t j = 0; j < m; ++j) {
-      script.push_back({'+', 0, prefix + j});
+      script.push_back({'+', 0, trim.prefix + j});
     }
   } else {
-    std::vector<uint32_t> lcs((n + 1) * (m + 1), 0);
-    const auto cell = [&](std::size_t i, std::size_t j) -> uint32_t& { return lcs[i * (m + 1) + j]; };
-    for (std::size_t i = n; i-- > 0;) {
-      for (std::size_t j = m; j-- > 0;) {
-        cell(i, j) = a[prefix + i] == b[prefix + j] ? cell(i + 1, j + 1) + 1 : std::max(cell(i + 1, j), cell(i, j + 1));
-      }
-    }
-    std::size_t i = 0;
-    std::size_t j = 0;
-    while (i < n || j < m) {
-      if (i < n && j < m && a[prefix + i] == b[prefix + j]) {
-        script.push_back({' ', prefix + i, prefix + j});
-        ++i;
-        ++j;
-      } else if (i < n && (j == m || cell(i + 1, j) >= cell(i, j + 1))) {
-        script.push_back({'-', prefix + i, 0});  // deletions before insertions, as diff(1) prints them
-        ++i;
-      } else {
-        script.push_back({'+', 0, prefix + j});
-        ++j;
-      }
-    }
+    lcs_edits(a, b, trim.prefix, n, m, script);
   }
-  for (std::size_t k = 0; k < suffix; ++k) {
-    script.push_back({' ', a.size() - suffix + k, b.size() - suffix + k});
+  for (std::size_t k = 0; k < trim.suffix; ++k) {
+    script.push_back({' ', a.size() - trim.suffix + k, b.size() - trim.suffix + k});
   }
   return script;
+}
+
+constexpr std::size_t kDiffContext = 3;
+
+// End (exclusive) of the hunk that starts at the change `first_change`: it extends past the last change that is
+// followed by fewer than 2 * context unchanged lines.
+std::size_t hunk_end(const std::vector<Edit>& script, std::size_t first_change) {
+  std::size_t last = first_change;
+  for (std::size_t scan = first_change; scan < script.size(); ++scan) {
+    if (script[scan].op != ' ') {
+      last = scan;
+    } else if (scan - last > 2 * kDiffContext) {
+      break;
+    }
+  }
+  return std::min(script.size(), last + kDiffContext + 1);
+}
+
+// One "@@ -a,n +b,m @@" hunk with its lines for script[first, end).
+std::string format_hunk(const std::vector<Edit>& script, const std::vector<std::string>& a,
+                        const std::vector<std::string>& b, std::size_t first, std::size_t end) {
+  std::optional<std::size_t> a_start;
+  std::optional<std::size_t> b_start;
+  std::size_t a_count = 0;
+  std::size_t b_count = 0;
+  std::string body;
+  for (std::size_t i = first; i < end; ++i) {
+    const Edit& e = script[i];
+    if (e.op != '+') {
+      a_start = a_start.value_or(e.a + 1);
+      ++a_count;
+    }
+    if (e.op != '-') {
+      b_start = b_start.value_or(e.b + 1);
+      ++b_count;
+    }
+    body += e.op;
+    body += e.op == '+' ? b[e.b] : a[e.a];
+    body += '\n';
+  }
+  // A side without any line (pure insertion or deletion with no context) starts at 0.
+  std::string out = fmt::format("@@ -{},{} +{},{} @@\n", a_start.value_or(0), a_count, b_start.value_or(0), b_count);
+  out += body;
+  return out;
 }
 
 bool read_text(const std::filesystem::path& path, std::string& out) {
@@ -267,7 +353,6 @@ std::string unified_diff(std::string_view expected, std::string_view actual, std
   const auto a = split_lines(expected);
   const auto b = split_lines(actual);
   const auto script = edit_script(a, b);
-  constexpr std::size_t kContext = 3;
 
   std::string out = fmt::format("--- {}\n+++ {}\n", expected_label, actual_label);
   std::size_t k = 0;
@@ -276,59 +361,9 @@ std::string unified_diff(std::string_view expected, std::string_view actual, std
       ++k;
       continue;
     }
-    // Hunk: from `kContext` lines before the first change to `kContext` lines after the last change, merging
-    // changes that are closer than 2*kContext lines.
-    std::size_t first = k >= kContext ? k - kContext : 0;
-    while (first < k && script[first].op != ' ') {
-      ++first;  // cannot happen (k is the first change after context) but keeps the bounds honest
-    }
-    first = k >= kContext ? k - kContext : 0;
-    std::size_t last = k;  // last change index
-    std::size_t scan = k;
-    while (scan < script.size()) {
-      if (script[scan].op != ' ') {
-        last = scan;
-      } else if (scan - last > 2 * kContext) {
-        break;
-      }
-      ++scan;
-    }
-    const std::size_t end = std::min(script.size(), last + kContext + 1);
-    std::size_t a_start = 0;
-    std::size_t b_start = 0;
-    std::size_t a_count = 0;
-    std::size_t b_count = 0;
-    bool seen_a = false;
-    bool seen_b = false;
-    std::string body;
-    for (std::size_t i = first; i < end; ++i) {
-      const Edit& e = script[i];
-      if (e.op != '+') {
-        if (!seen_a) {
-          a_start = e.a + 1;
-          seen_a = true;
-        }
-        ++a_count;
-      }
-      if (e.op != '-') {
-        if (!seen_b) {
-          b_start = e.b + 1;
-          seen_b = true;
-        }
-        ++b_count;
-      }
-      body += e.op;
-      body += e.op == '+' ? b[e.b] : a[e.a];
-      body += '\n';
-    }
-    if (!seen_a) {  // pure insertion hunk with no context: the start is the line before the insertion
-      a_start = 0;
-    }
-    if (!seen_b) {
-      b_start = 0;
-    }
-    out += fmt::format("@@ -{},{} +{},{} @@\n", a_start, a_count, b_start, b_count);
-    out += body;
+    const std::size_t first = k >= kDiffContext ? k - kDiffContext : 0;
+    const std::size_t end = hunk_end(script, k);
+    out += format_hunk(script, a, b, first, end);
     k = end;
   }
   return out;
