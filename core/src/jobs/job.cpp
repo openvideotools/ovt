@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
 #include <cstring>
 #include <string>
 
@@ -16,8 +17,10 @@ namespace ovt::jobs {
 
 namespace {
 
-// Size of ovt_JobProgress as of its first version: every field to date.
-constexpr uint32_t kJobProgressV1Size = sizeof(ovt_JobProgress);
+// Size of ovt_JobProgress as of its first version: the end of its last v1 field (`stage`). Pinned to the field
+// layout, not to sizeof, so appending fields in a later version does not raise the minimum caller size.
+constexpr uint32_t kJobProgressV1Size = offsetof(ovt_JobProgress, stage) + sizeof(const char*);
+static_assert(kJobProgressV1Size <= sizeof(ovt_JobProgress), "v1 size cannot exceed the current struct");
 
 double fraction_of(uint64_t done, uint64_t total) noexcept {
   if (total == 0) {
