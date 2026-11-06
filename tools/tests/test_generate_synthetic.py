@@ -99,6 +99,10 @@ def test_recipes_load_and_cover_every_numbered_recipe():
         (["ffmpeg", "-i", "s.y4m", "-c:v", "libaom-av1", "a.mp4"], "libaom-av1 needs -threads"),
         (["MP4Box", "-add", "a.264", "-new", "a.mp4"], "MP4Box needs -for-test"),
         (["mkvmerge", "--no-date", "-o", "a.mkv", "a.mp4"], "mkvmerge needs"),
+        (["ffmpeg", "-threads", "1", "-i", "s.y4m", "-c:v", "libx264", "a.264"], "libx264 needs -threads N after"),
+        (["ffmpeg", "-f", "lavfi", "-i", "life=s=64x64:mold=10", "a.y4m"], "lavfi life needs seed"),
+        (["ffmpeg", "-f", "lavfi", "-i", "cellauto=s=64x64:rule=110,format=yuv420p", "a.y4m"], "lavfi cellauto"),
+        (["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233:random", "f.mp4", "o.mp4"], "fixed IV"),
     ],
 )
 def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
@@ -111,6 +115,12 @@ def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
     with pytest.raises(generate.GenError, match="not reproducible") as err:
         generate.load_recipes(path)
     assert err.value.code == 4
+
+
+def test_seeded_lavfi_and_fixed_iv_pass():
+    assert generate.determinism_problem(["ffmpeg", "-f", "lavfi", "-i", "life=s=64x64:seed=1:mold=10", "a.y4m"]) is None
+    assert generate.determinism_problem(["ffmpeg", "-i", "cellauto=rule=110:seed=1", "a.y4m"]) is None
+    assert generate.determinism_problem(["mp4encrypt", "--key", "1:0011:0a610676cb88f302", "f.mp4", "o"]) is None
 
 
 def test_every_encoder_and_muxer_step_is_pinned():
