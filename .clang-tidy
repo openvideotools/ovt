@@ -25,7 +25,17 @@ Checks: >
   portability-*,
   readability-*,
   -readability-magic-numbers,
-  -readability-identifier-length
+  -readability-identifier-length,
+  -misc-include-cleaner,
+  -modernize-use-designated-initializers,
+  -modernize-use-ranges,
+  -readability-math-missing-parentheses,
+  -bugprone-unsafe-functions,
+  -cert-msc24-c,
+  -cert-msc33-c
+# The seven checks above did not exist in clang-tidy 15, the version this set was written against. CI now runs
+# clang-tidy 19 (Homebrew llvm@19 on the Mac Mini runners), whose wildcards above would turn them on. Enabling
+# any of them is its own decision, with the tree cleaned up in the same PR.
 # WarningsAsErrors is empty on purpose: the errors are set by the callers. The PR job
 # (.github/workflows/static-analysis.yml) fails on ANY finding on a changed line, the nightly run uses
 # -warnings-as-errors='*', and the parser directories promote pointer arithmetic here.
