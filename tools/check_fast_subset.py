@@ -183,10 +183,10 @@ def scan_chapter(path: Path, reg: Registry) -> list[str]:
 
 def check_registry(reg: Registry, manifest: dict, recipes: dict) -> list[str]:
     problems = []
-    entries = {e["id"]: e for e in manifest["entries"] if e["source"] == "syn" and e.get("kind") == "stream"}
+    entries = {e["id"]: e for e in manifest["entries"] if e["source"] == "syn" and e.get("kind", "stream") == "stream"}
     rec_ids = {r["id"]: r for r in recipes["recipes"]}
     problems += [f"recipes.json: {i} has no manifest entry" for i in rec_ids if i not in entries]
-    problems += [f"manifest.json: {i} has no recipe" for i in entries if i not in rec_ids]
+    problems += [f"manifest.json: {i} has no recipe" for i in entries if i not in rec_ids and "kind" in entries[i]]
     for cited, targets, fast in reg.alias_rows:
         # Path aliases (corpus/<dir>/<file>) are resolved by this checker, not by the fetcher; a row that maps
         # n names to n ids pairs them in order.

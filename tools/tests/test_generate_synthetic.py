@@ -237,6 +237,9 @@ def test_manifest_has_every_recipe_and_validates():
     syn = {e["id"]: e for e in manifest["entries"] if e["source"] == "syn"}
     doc = generate.load_recipes(generate.DEFAULT_RECIPES)
     for rec in doc["recipes"]:
+        if "kind" not in syn[rec["id"]]:
+            assert rec["recipe"] == "73", rec["id"]  # WI-1.413 owns the pattern entries
+            continue
         expected = generate.manifest_entry(rec)
         got = {k: v for k, v in syn[rec["id"]].items() if k not in ("sha256", "size_bytes", "files")}
         if "sha256" in syn[rec["id"]]:

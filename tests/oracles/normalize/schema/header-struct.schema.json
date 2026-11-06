@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/header-struct.schema.json",
+  "title": "header-struct (chapter 14 §14.4.0)",
+  "description": "Parsed header values without offsets: {\"sps\": {...}, \"pps\": {...}, \"slice_header\": {...}} with spec field names as keys and integers, strings or arrays as values; structures may nest.",
+  "type": "object",
+  "additionalProperties": {"$ref": "#/$defs/struct"},
+  "$defs": {
+    "value": {"anyOf": [
+      {"type": ["integer", "string"]},
+      {"type": "array", "items": {"$ref": "#/$defs/value"}},
+      {"$ref": "#/$defs/struct"}
+    ]},
+    "struct": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}}
+  }
+}

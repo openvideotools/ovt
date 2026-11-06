@@ -402,13 +402,18 @@ def compare(manifest: dict[str, Any], results: dict[str, dict[str, Any]]) -> lis
 
 
 def sync_manifest(path: Path, doc: dict[str, Any]) -> None:
-    """Write one manifest entry per recipe id from recipes.json, keeping recorded hashes; drop stale syn streams."""
+    """Write one manifest entry per recipe id from recipes.json, keeping recorded hashes; drop stale syn streams.
+
+    An entry without ``kind`` was written by another work item (the recipe-73 patterns of WI-1.413) and is kept.
+    """
     manifest = json.loads(path.read_text(encoding="utf-8"))
     old = {e["id"]: e for e in manifest["entries"]}
     kept = [e for e in manifest["entries"] if not (e["source"] == "syn" and e.get("kind") == "stream")]
     for rec in doc["recipes"]:
-        entry = manifest_entry(rec)
         prev = old.get(rec["id"], {})
+        if prev and "kind" not in prev:
+            continue  # written by the WI that owns the generator (recipe 73: WI-1.413); kept as it is
+        entry = manifest_entry(rec)
         if "sha256" in prev:
             entry.pop("unverified")
             entry.update({k: prev[k] for k in ("sha256", "size_bytes", "files") if k in prev})

@@ -1,0 +1,90 @@
+# JM 19.0 TRACE format (ldecod/src/filehandle.c tracebits, image.c MB header), written from those printf formats
+Annex B NALU w/ long startcode, len 10,  forbidden_bit 0, nal_reference_idc 3, nal_unit_type 7
+
+@0     SPS: profile_idc                                        01000010 ( 66)
+@8     SPS: constrained_set0_flag                                     1 (  1)
+@9     SPS: level_idc                                          00011110 ( 30)
+@17    SPS: seq_parameter_set_id                                      1 (  0)
+@18    SPS: log2_max_frame_num_minus4                                 1 (  0)
+@19    SPS: pic_order_cnt_type                                      011 (  2)
+@22    SPS: pic_width_in_mbs_minus1                               00100 (  3)
+@27    SPS: pic_height_in_map_units_minus1                            1 (  0)
+
+Annex B NALU w/ long startcode, len 5,  forbidden_bit 0, nal_reference_idc 3, nal_unit_type 8
+
+@0     PPS: pic_parameter_set_id                                      1 (  0)
+@1     PPS: seq_parameter_set_id                                      1 (  0)
+@2     PPS: entropy_coding_mode_flag                                  0 (  0)
+@3     PPS: num_ref_idx_l0_default_active_minus1                      1 (  0)
+@4     PPS: num_ref_idx_l1_default_active_minus1                      1 (  0)
+@5     PPS: pic_init_qp_minus26                                       1 (  0)
+
+Annex B NALU w/ long startcode, len 40,  forbidden_bit 0, nal_reference_idc 3, nal_unit_type 5
+
+@0     SH: first_mb_in_slice                                          1 (  0)
+@1     SH: slice_type                                           0001000 (  7)
+@8     SH: pic_parameter_set_id                                       1 (  0)
+@9     SH: frame_num                                               0000 (  0)
+@13    SH: idr_pic_id                                                 1 (  0)
+@14    SH: slice_qp_delta                                         00100 ( -2)
+
+*********** POC: 0 (I/P) MB: 0 Slice: 0 Type 2 **********
+@19    mb_type                                                    00110 (  5)
+@24    intra_chroma_pred_mode                                         1 (  0)
+@25    mb_qp_delta                                                    1 (  0)
+@26    Luma # c & tr.1s vlc=0 #c=0 #t1=0                              1 (  0)
+
+*********** POC: 0 (I/P) MB: 1 Slice: 0 Type 2 **********
+@27    mb_type                                                    00110 (  5)
+@32    intra_chroma_pred_mode                                         1 (  0)
+@33    mb_qp_delta                                                  010 ( -1)
+@36    Luma # c & tr.1s vlc=0 #c=0 #t1=0                              1 (  0)
+
+*********** POC: 0 (I/P) MB: 2 Slice: 0 Type 2 **********
+@37    mb_type                                                    00110 (  0)
+@42    intra4x4_pred_mode                                             1 ( -1)
+@43    intra4x4_pred_mode                                             1 ( -1)
+@44    intra4x4_pred_mode                                             1 ( -1)
+@45    intra4x4_pred_mode                                             1 ( -1)
+@46    intra4x4_pred_mode                                             1 ( -1)
+@47    intra4x4_pred_mode                                             1 ( -1)
+@48    intra4x4_pred_mode                                             1 ( -1)
+@49    intra4x4_pred_mode                                             1 ( -1)
+@50    intra4x4_pred_mode                                             1 ( -1)
+@51    intra4x4_pred_mode                                             1 ( -1)
+@52    intra4x4_pred_mode                                             1 ( -1)
+@53    intra4x4_pred_mode                                             1 ( -1)
+@54    intra4x4_pred_mode                                             1 ( -1)
+@55    intra4x4_pred_mode                                             1 ( -1)
+@56    intra4x4_pred_mode                                             1 ( -1)
+@57    intra4x4_pred_mode                                             1 ( -1)
+@58    intra_chroma_pred_mode                                         1 (  0)
+@59    mb_qp_delta                                                    1 (  0)
+@60    Luma # c & tr.1s vlc=0 #c=0 #t1=0                              1 (  0)
+
+*********** POC: 0 (I/P) MB: 3 Slice: 0 Type 2 **********
+@61    mb_type                                                    00110 (  5)
+@66    intra_chroma_pred_mode                                         1 (  0)
+@67    mb_qp_delta                                                    1 (  0)
+@68    Luma # c & tr.1s vlc=0 #c=0 #t1=0                              1 (  0)
+
+Annex B NALU w/ long startcode, len 12,  forbidden_bit 0, nal_reference_idc 2, nal_unit_type 1
+
+@0     SH: first_mb_in_slice                                          1 (  0)
+@1     SH: slice_type                                           0000110 (  5)
+@8     SH: pic_parameter_set_id                                       1 (  0)
+@9     SH: frame_num                                               0001 (  1)
+@13    SH: num_ref_idx_override_flag                                  0 (  0)
+@14    SH: slice_qp_delta                                             1 (  0)
+
+*********** POC: 2 (I/P) MB: 0 Slice: 0 Type 0 **********
+@15    mb_skip_run                                                  011 (  2)
+
+*********** POC: 2 (I/P) MB: 1 Slice: 0 Type 0 **********
+
+*********** POC: 2 (I/P) MB: 2 Slice: 0 Type 0 **********
+@18    mb_type                                                        1 (  0)
+@19    ref_idx_l0                                                     1 (  0)
+@20    mvd0_l0                                                      011 ( -1)
+@23    mvd1_l0                                                      010 (  1)
+@26    coded_block_pattern                                            1 (  0)

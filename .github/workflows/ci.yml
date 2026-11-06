@@ -178,6 +178,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 90
+    env:
+      # The Mini's 3 runners share 10 cores: 3 jobs each keeps the machine at about its core count.
+      CMAKE_BUILD_PARALLEL_LEVEL: "3"
+      VCPKG_MAX_CONCURRENCY: "3"
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
