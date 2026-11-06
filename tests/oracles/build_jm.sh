@@ -29,15 +29,15 @@ ovt_enable_macro "${src}" TRACE
 make -C "${src}/ldecod" -j "${OVT_ORACLES_JOBS}" CC="gcc -fcommon -DTRACE=1"
 
 for tool in ldecod lencod; do
-  bin="$(find "${src}/bin" -maxdepth 1 -type f -name "${tool}*" -perm -u+x | head -n 1)"
+  bin="$(find "${src}/bin" -maxdepth 1 -type f -name "${tool}*" -perm -u+x -print -quit)"
   [[ -n "${bin}" ]] || ovt_die "${tool} was not built"
   install -D -m 0755 "${bin}" "${OVT_ORACLES_PREFIX}/bin/${tool}"
 done
 
 # The encoder configs ({jm_cfg} of tests/corpora/synthetic/recipes.json, §14.3.3 rule 4): lencod -d
 # ${OVT_ORACLES_PREFIX}/share/jm/cfg/encoder_main.cfg. JM keeps them in cfg/ (bin/ has copies of a few).
-jm_cfg="$(find "${src}" -type f -name encoder_main.cfg -not -path "${src}/bin/*" | head -n 1)"
-[[ -n "${jm_cfg}" ]] || jm_cfg="$(find "${src}" -type f -name encoder_main.cfg | head -n 1)"
+jm_cfg="$(find "${src}" -type f -name encoder_main.cfg -not -path "${src}/bin/*" -print -quit)"
+[[ -n "${jm_cfg}" ]] || jm_cfg="$(find "${src}" -type f -name encoder_main.cfg -print -quit)"
 [[ -n "${jm_cfg}" ]] || ovt_die "JM has no encoder_main.cfg"
 mkdir -p "${OVT_ORACLES_PREFIX}/share/jm/cfg"
 cp -a "$(dirname "${jm_cfg}")/." "${OVT_ORACLES_PREFIX}/share/jm/cfg/"

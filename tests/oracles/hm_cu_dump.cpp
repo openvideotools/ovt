@@ -279,7 +279,7 @@ void release_pictures(TComList<TComPic*>* pic_list) {
 // buffer. TAppDecTop flushes at an IDR or BLA picture and at the end of the stream; without the flush at an IDR the
 // pictures of the previous coded video sequence stay marked as reconstructed with POCs above the IDR's, and HM's
 // TComSlice::checkLeadingPictureRestrictions asserts (rpcPic->getPOC() < this->getPOC()).
-void flush_pictures(TComList<TComPic*>* pic_list) {
+void flush_pictures(TComList<TComPic*>* pic_list, Int* poc_last_display) {
   if (pic_list == nullptr || pic_list->empty()) {
     return;
   }
@@ -290,6 +290,7 @@ void flush_pictures(TComList<TComPic*>* pic_list) {
     pic = nullptr;
   }
   pic_list->clear();
+  *poc_last_display = -MAX_INT;  // as xFlushOutput resets m_iPOCLastDisplay
 }
 
 bool is_idr_or_bla(NalUnitType type) {
@@ -395,7 +396,7 @@ int main(int argc, char** argv) {
         dec.setNoOutputPriorPicsFlag(false);
       }
       if (new_picture && is_idr_or_bla(nalu.m_nalUnitType)) {
-        flush_pictures(pic_list);
+        flush_pictures(pic_list, &poc_last_display);
       }
       if (nalu.m_nalUnitType == NAL_UNIT_EOS) {
         dec.setFirstSliceInPicture(false);
@@ -403,9 +404,10 @@ int main(int argc, char** argv) {
     }
   }
 
-  flush_pictures(pic_list);
+  flush_pictures(pic_list, &poc_last_display);
   std::fprintf(g_json, "\n]}\n");
   dec.deletePicBuffer();
   std::fflush(stdout);
-  return std::fclose(g_json) == 0 ? 0 : 1;
+  const bool write_error = std::ferror(g_json) != 0;  // a failed write of an earlier, buffered flush
+  return (std::fclose(g_json) == 0 && !write_error) ? 0 : 1;
 }

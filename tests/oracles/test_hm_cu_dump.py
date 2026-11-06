@@ -71,8 +71,10 @@ def check_closed_gop(exe: str, work: Path) -> None:
     """Closed GOPs (as in the smoke test's x265 --no-open-gop stream): an IDR every 4 pictures resets the POC while
     the trailing pictures of the previous GOP, with higher POCs, are still in HM's picture buffer. hm_cu_dump must
     flush the buffer at each IDR as TAppDecoder does, or HM asserts in checkLeadingPictureRestrictions."""
-    stream = x265_stream(work, "closed.265", "amp=1:rect=1:keyint=4:open-gop=0:bframes=3:ref=3")
+    # scenecut=0: the IDRs come from keyint alone, whatever x265 decides about scene cuts in testsrc2.
+    stream = x265_stream(work, "closed.265", "amp=1:rect=1:keyint=4:min-keyint=4:scenecut=0:open-gop=0:bframes=3:ref=3")
     if stream is None:
+        print("SKIP: closed-GOP check (no ffmpeg with libx265)")
         return
     res = run([exe, "-b", str(stream)])
     assert res.returncode == 0, res.stderr
