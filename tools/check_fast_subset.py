@@ -183,6 +183,7 @@ def scan_chapter(path: Path, reg: Registry) -> list[str]:
 
 # Stems that §14.3.2 mentions as examples of a *wrong* spelling, not as fixtures (spelling rule of the jvt bullet).
 NOT_FIXTURES = {"jvt_FRExt1_Panasonic_C", "jvt_HPCAFL_BCRM_C"}
+# Tokens of the §14.3.2 bullets that look like stems but are tags, corpus subset names or prose.
 PROSE = {
     "profile0_core",
     "no_output_of_prior_pics_flag",

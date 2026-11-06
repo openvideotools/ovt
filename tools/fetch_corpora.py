@@ -122,7 +122,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
 def entry_url(entry: dict[str, Any]) -> str | None:
     """The download URL of an entry: ``url``, or for a ``vcs`` entry (WI-0.552) the Git LFS media URL.
 
-    SPEC-ASSUMPTION(#41): ``vcs.rev`` (a commit id) is added so the URL is pinned; only github.com origins resolve.
+    SPEC-ASSUMPTION(#161): ``vcs.rev`` (a commit id) is added so the URL is pinned; only github.com origins resolve.
     """
     if "url" in entry:
         return entry["url"]
