@@ -109,8 +109,10 @@ function(ovt_add_flatbuffers_schema target)
     add_custom_command(
       OUTPUT "${header}" "${stamp}" "${bfbs}"
       COMMAND "${CMAKE_COMMAND}" -E make_directory "${gen_dir}/python" "${gen_dir}/kotlin"
-      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --scoped-enums -I
-              "${fbs_dir}" -o "${gen_dir}" "${fbs}"
+      # --gen-name-strings adds T::GetFullyQualifiedName(), which ovt::model::ext_as<T> compares against
+      # Block.ext_type (chapter 06 §6.3.3, WI-0.084).
+      COMMAND "${OVT_FLATC_EXECUTABLE}" --cpp --gen-object-api --gen-compare --reflect-names --gen-name-strings
+              --scoped-enums -I "${fbs_dir}" -o "${gen_dir}" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --python -I "${fbs_dir}" -o "${gen_dir}/python" "${fbs}"
       COMMAND "${OVT_FLATC_EXECUTABLE}" --kotlin -I "${fbs_dir}" -o "${gen_dir}/kotlin" "${fbs}"
       # --bfbs-filenames pins the declaration_file fields to paths relative to the schema directory
