@@ -19,6 +19,12 @@ inputs:
   python-version:
     description: Python used by configure-time tools (needs >= 3.11).
     default: "3.12"
+  corpora:
+    description: >-
+      Test corpora (chapter 14 §14.2.4): 'fast' fetches the PR-lane subset (tools/fetch_corpora.py --tags fast, at most
+      300 MiB), 'all' every manifest entry (nightly), 'none' nothing. Both restore a cache keyed by the manifest hash,
+      fetch what is missing, re-verify the hashes without network and export OVT_CORPORA_DIR.
+    default: "none"
 
 runs:
   using: composite
@@ -151,3 +157,33 @@ runs:
           exit 1
         fi
         echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
+
+    - name: Corpora cache
+      if: inputs.corpora != 'none'
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: build/corpora
+        # The manifest hash names the exact set of files; a stale prefix is still useful because the fetcher keeps
+        # every file whose SHA-256 matches and downloads only the rest. runner.os is in the key because post-steps
+        # (wrap_y4m, ffmpeg trim) write outputs that carry the producing OS's FFmpeg bytes (chapter 14 §14.2.4).
+        key: corpora-${{ inputs.corpora }}-${{ runner.os }}-${{ hashFiles('tests/corpora/manifest.json') }}
+        restore-keys: corpora-${{ inputs.corpora }}-${{ runner.os }}-
+
+    - name: Fetch corpora
+      if: inputs.corpora != 'none'
+      shell: bash
+      env:
+        CORPORA_SET: ${{ inputs.corpora }}
+      run: |
+        # /bin/bash 3.2 on the Mini: no arrays under set -u. The venv python of "Python tools" is first on PATH.
+        case "$CORPORA_SET" in
+          fast) filter="--tags fast --max-total-bytes 314572800" ;;
+          all) filter="" ;;
+          *) echo "::error::corpora must be none, fast or all (got $CORPORA_SET)"; exit 1 ;;
+        esac
+        mkdir -p build/corpora
+        # shellcheck disable=SC2086
+        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter
+        # shellcheck disable=SC2086
+        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --verify-only
+        echo "OVT_CORPORA_DIR=${GITHUB_WORKSPACE}/build/corpora" >> "$GITHUB_ENV"
