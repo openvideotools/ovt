@@ -164,9 +164,10 @@ runs:
       with:
         path: build/corpora
         # The manifest hash names the exact set of files; a stale prefix is still useful because the fetcher keeps
-        # every file whose SHA-256 matches and downloads only the rest.
-        key: corpora-${{ inputs.corpora }}-${{ hashFiles('tests/corpora/manifest.json') }}
-        restore-keys: corpora-${{ inputs.corpora }}-
+        # every file whose SHA-256 matches and downloads only the rest. runner.os is in the key because post-steps
+        # (wrap_y4m, ffmpeg trim) write outputs that carry the producing OS's FFmpeg bytes (chapter 14 §14.2.4).
+        key: corpora-${{ inputs.corpora }}-${{ runner.os }}-${{ hashFiles('tests/corpora/manifest.json') }}
+        restore-keys: corpora-${{ inputs.corpora }}-${{ runner.os }}-
 
     - name: Fetch corpora
       if: inputs.corpora != 'none'

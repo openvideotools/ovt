@@ -14,6 +14,9 @@ body, and reports each case that cites a slow-only manifest id without being tag
 both ``[fast]`` and ``[slow]``. A case may also cite a slow stream and stay ``[fast]`` if it carries the tag
 ``[slow-stream-ok]`` (for a test that only checks the id string).
 
+Limit: this is a static check of string literals. A suite that selects its streams at run time by manifest tag
+(for example a golden suite iterating every ``h264-slice-golden`` entry) needs a runtime fast-only rule instead.
+
 Exit codes: 0 consistent; 1 a mismatch (printed as file:line); 2 usage.
 """
 
