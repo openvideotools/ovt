@@ -39,6 +39,8 @@
 #include <string>
 #include <vector>
 
+#include <unistd.h>
+
 #include "TLibCommon/CommonDef.h"
 #include "TLibCommon/NAL.h"
 #include "TLibCommon/TComList.h"
@@ -216,6 +218,10 @@ void dump_ctu(TComDataCU* cu, unsigned ctu_x4, unsigned ctu_y4, unsigned w4, uns
   }
 }
 
+// The JSON goes to the original stdout through this stream. HM prints a log line per picture (and other chatter) with
+// printf, so main() points file descriptor 1 at stderr and keeps the original stdout for the JSON only.
+FILE* g_json = nullptr;
+
 // Prints one picture as a JSON object (no trailing newline).
 void dump_picture(TComPic* pic, bool first) {
   auto sps = pic->getSlice(0)->getSPS();
@@ -239,17 +245,18 @@ void dump_picture(TComPic* pic, bool first) {
     dump_ctu(pic->getCtu(addr), cx * (ctu_size / 4), cy * (ctu_size / 4), w4, h4, log2_ctu, chroma, &cols);
   }
 
-  std::printf(
+  std::fprintf(
+      g_json,
       "%s\n  {\"poc\": %d, \"w4\": %u, \"h4\": %u, \"log2_ctu_size\": %u, \"chroma_format\": %d,\n   \"cells\": {\n",
       first ? "" : ",", pic->getPOC(), w4, h4, log2_ctu, static_cast<int>(chroma));
   for (int i = 0; i < kColumnCount; ++i) {
-    std::printf("    \"%s\": [", cols[i].name);
+    std::fprintf(g_json, "    \"%s\": [", cols[i].name);
     for (size_t n = 0; n < cols[i].cells.size(); ++n) {
-      std::printf("%s%d", n == 0 ? "" : ",", cols[i].cells[n]);
+      std::fprintf(g_json, "%s%d", n == 0 ? "" : ",", cols[i].cells[n]);
     }
-    std::printf("]%s\n", i + 1 == kColumnCount ? "" : ",");
+    std::fprintf(g_json, "]%s\n", i + 1 == kColumnCount ? "" : ",");
   }
-  std::printf("   }}");
+  std::fprintf(g_json, "   }}");
 }
 
 // TAppDecTop releases a picture once it has written it (xWriteOutput, xFlushOutput): the picture is no longer needed
@@ -318,12 +325,21 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Keep HM's stdout chatter out of the JSON: duplicate the real stdout for the JSON, then send fd 1 to stderr.
+  std::fflush(stdout);
+  const int json_fd = dup(STDOUT_FILENO);
+  g_json = json_fd >= 0 ? fdopen(json_fd, "w") : nullptr;
+  if (g_json == nullptr || dup2(STDERR_FILENO, STDOUT_FILENO) < 0) {
+    std::fprintf(stderr, "hm_cu_dump: cannot redirect stdout\n");
+    return 1;
+  }
+
   TDecTop dec;
   dec.create();
   dec.init();
   InputByteStream bytestream(bitstream_file);
 
-  std::printf("{\"frames\": [");
+  std::fprintf(g_json, "{\"frames\": [");
   bool first = true;
   bool loop_filtered = false;
   int poc = 0;
@@ -388,7 +404,8 @@ int main(int argc, char** argv) {
   }
 
   flush_pictures(pic_list);
-  std::printf("\n]}\n");
+  std::fprintf(g_json, "\n]}\n");
   dec.deletePicBuffer();
-  return std::fflush(stdout) == 0 ? 0 : 1;
+  std::fflush(stdout);
+  return std::fclose(g_json) == 0 ? 0 : 1;
 }
