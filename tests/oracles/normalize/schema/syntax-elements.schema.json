@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/syntax-elements.schema.json",
+  "title": "syntax-elements (chapter 14 §14.4.0)",
+  "description": "One entry per syntax element read, sorted by (unit, bit_offset). bit_offset counts from the start of the unit's RBSP including the NAL header (H.26x) or from the first OBU payload bit (AV1; OBU header fields are negative), matching BitSpan of chapter 0 §0.5.1.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["unit", "name", "bit_offset", "bit_length", "value"],
+    "additionalProperties": false,
+    "properties": {
+      "unit": {"type": "integer", "minimum": 0},
+      "name": {"type": "string"},
+      "bit_offset": {"type": "integer"},
+      "bit_length": {"type": "integer", "minimum": 1},
+      "value": {"type": ["integer", "string"]}
+    }
+  }
+}

@@ -1,0 +1,5 @@
+# ffmpeg_mvs --qp format (framenum,src_x,src_y,w,h,qp,delta_qp), written from the WI-0.563 interface
+framenum,src_x,src_y,w,h,qp,delta_qp
+1,0,0,16,16,24,0
+1,16,0,16,16,24,2
+2,0,0,16,16,37,-1
