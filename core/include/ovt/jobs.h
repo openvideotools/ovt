@@ -28,7 +28,7 @@ typedef struct ovt_Job ovt_Job;
 /** Progress snapshot (chapter 12 §12.3.1 rule 7: begins with struct_size, fields are only appended). */
 /* NOLINTNEXTLINE(modernize-use-using): a C11 header */
 typedef struct ovt_JobProgress {
-  uint32_t struct_size; /**< Set by the caller before ovt_job_progress(); see there. Library-built callback arguments carry sizeof. */
+  uint32_t struct_size; /**< Caller-set for ovt_job_progress(); callbacks get sizeof. */
   double fraction;      /**< 0.0 to 1.0, or -1.0 when the total is unknown. */
   uint64_t done;        /**< Work units done. */
   uint64_t total;       /**< Work units in total; 0 when unknown. */
