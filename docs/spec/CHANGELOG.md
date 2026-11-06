@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc8 — 2026-11-06
+
+PATCH-level: a tool option name in a recipe command, found by the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 recipe 12 `syn_h265_multislice_wp` — HM 18.0 `TAppEncoder` has no `--DependentSliceMode`/`--DependentSliceArgument`; the dependent slice segments are now `--SliceSegmentMode=1 --SliceSegmentArgument=100` (same meaning: a slice segment every 100 CTUs inside 300-CTU slices) — WI-0.553
+
 ## 1.0.0-rc7 — 2026-11-06
 
 Owner decision on PR #132 (WI-0.012): the core FFmpeg flavour leaves out every pool-covered decoder, not only AVC/HEVC. MINOR-level change (configure flag list); no WI is re-opened.
