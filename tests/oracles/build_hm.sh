@@ -5,10 +5,11 @@
 # HM HEVC reference software for the oracle image (chapter 14 §14.4.4, §14.3.3; WI-0.554):
 #   TAppEncoder, TAppDecoder  stock build
 #   TAppDecoder_trace         ENC_DEC_TRACE=1 in TypeDef.h (writes TraceDec.txt)
-# WI-0.563 adds the getter dumper `hm_cu_dump` on top of the stock libraries built here.
+#   hm_cu_dump                the getter dumper of WI-0.563 (hm_cu_dump.cpp), linked against the stock libraries
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
+here="$(cd "$(dirname "$0")" && pwd)"
 
 HM_VERSION="HM-18.0"
 HM_COMMIT="fb4486d5ab5d0cd3b6a71659c7d5eb4509f2a4ce"
@@ -44,6 +45,21 @@ hm_install stock TAppDecoder TAppDecoder
 hm_build trace TAppDecoder
 hm_install trace TAppDecoder TAppDecoder_trace
 
+# hm_cu_dump.cpp includes HM's headers as "TLibCommon/..." and "TLibDecoder/..." (the source/Lib directory) and links the
+# static libraries of the stock build (not the trace build: ENC_DEC_TRACE would change TDecTop's layout).
+# HM-18.0 puts the libraries under <source>/lib or the build tree depending on the generator; find them by name.
+hm_lib_dir="$(dirname "$(find stock -type f -name libTLibDecoder.a | head -n 1)")"
+[[ -f "${hm_lib_dir}/libTLibDecoder.a" ]] || ovt_die "libTLibDecoder.a was not built in stock"
+hm_libs=()
+for lib in TLibDecoder TLibCommon libmd5 Utilities; do
+  found="$(find stock -type f \( -name "lib${lib}.a" -o -name "${lib}.a" \) | head -n 1)"
+  [[ -n "${found}" ]] && hm_libs+=("${found}")
+done
+g++ -std=c++14 -O2 -Wall -I stock/source/Lib -I stock/source/Lib/TLibCommon -I stock/source/Lib/TLibDecoder \
+  -o hm_cu_dump "${here}/hm_cu_dump.cpp" -Wl,--start-group "${hm_libs[@]}" -Wl,--end-group
+install -D -m 0755 hm_cu_dump "${OVT_ORACLES_PREFIX}/bin/hm_cu_dump"
+
 for tool in TAppEncoder TAppDecoder; do ovt_stamp "${tool}" "${HM_VERSION} (${HM_COMMIT})"; done
+ovt_stamp hm_cu_dump "hm_cu_dump (OVT tests/oracles) on ${HM_VERSION} (${HM_COMMIT})"
 ovt_stamp TAppDecoder_trace "${HM_VERSION} (${HM_COMMIT}) ENC_DEC_TRACE=1"
 rm -rf "${work}"
