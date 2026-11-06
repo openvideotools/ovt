@@ -55,6 +55,7 @@ ovt_catch_discover_tests(ovt_tests_result)
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
 add_subdirectory(bitreader)
+add_subdirectory(jobs)
 add_subdirectory(log)
 add_subdirectory(model)
 add_subdirectory(syntax)
