@@ -11,7 +11,9 @@ versions (`oracle_versions.py --check-pins` enforces it, the monthly `oracle-ima
 1. Edit the pin in the build script, [`Dockerfile`](Dockerfile), [`requirements.in`](requirements.in) or
    [`package.json`](package.json), and the matching row below, in one PR that touches nothing else.
 2. Python: `uv pip compile requirements.in --python-version 3.12 --python-platform x86_64-manylinux_2_28
-   --generate-hashes --no-header -o requirements.txt`. Node: `npm install --package-lock-only`.
+   --index-url https://pypi.org/simple --extra-index-url https://download.pytorch.org/whl/cpu
+   --index-strategy unsafe-best-match --emit-index-url --generate-hashes --no-header -o requirements.txt`
+   (the PyTorch index serves the CPU-only `torch` and `torchvision` wheels). Node: `npm install --package-lock-only`.
 3. The `oracle-image` workflow rebuilds the image on the PR and runs `oracle-versions` and the smoke test.
 4. Goldens produced by the changed tool are regenerated in a follow-up PR (chapter 14 §14.4.0).
 
@@ -66,9 +68,9 @@ the `v3.0.0` tag, so it reports the pinned commit's short hash.
 | dump_ciede2000 | 24f889aa | as dump_psnrhvs | BSD-2-Clause | `cat "$OVT_ORACLES_STAMPS/dump_ciede2000.version"` | `Daala 24f889aaabe33bc390b993d737d830b8dd367e61` |
 | mpv | v0.39.0 | <https://github.com/mpv-player/mpv> `a0fba7be57f3822d967b04f0f6b6d6341e7516e7` | GPL-2.0-or-later (this build) | `mpv --no-config --version` | `mpv v0.39.0` |
 | libplacebo | v7.349.0 | <https://code.videolan.org/videolan/libplacebo> `1fd3c7bde7b943fe8985c893310b5269a09b46c5` | LGPL-2.1-or-later | `pkg-config --modversion libplacebo` | `7.349.0` |
-| uvq | d563abfa | <https://github.com/google/uvq> `d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2` (last TensorFlow revision) | Apache-2.0 | `cat "$OVT_ORACLES_STAMPS/uvq.version"` | `google/uvq d563abfaabb8ed11c5bde9c721a8894b7d1ff0e2` |
-| tensorflow-cpu | 2.19.0 | [`requirements.txt`](requirements.txt) | Apache-2.0 | `python-package:tensorflow-cpu` | `2.19.0` |
-| tf2onnx | 1.17.0 | [`requirements.txt`](requirements.txt) | Apache-2.0 | `python-package:tf2onnx` | `1.17.0` |
+| uvq | c204ecc0 | <https://github.com/google/uvq> `c204ecc04f093e90c941cb126c7ac3d5beca0414` (PyTorch; UVQ 1.5 and 1.0) | Apache-2.0 | `cat "$OVT_ORACLES_STAMPS/uvq.version"` | `google/uvq c204ecc04f093e90c941cb126c7ac3d5beca0414` |
+| torch | 2.8.0+cpu | [`requirements.txt`](requirements.txt) (CPU build, <https://download.pytorch.org/whl/cpu>) | BSD-3-Clause | `python-package:torch` | `2.8.0+cpu` |
+| torchvision | 0.23.0+cpu | [`requirements.txt`](requirements.txt) (CPU build) | BSD-3-Clause | `python-package:torchvision` | `0.23.0+cpu` |
 | bjontegaard | 1.3.0 | [`requirements.txt`](requirements.txt) | BSD-3-Clause | `python-package:bjontegaard` | `1.3.0` |
 | siti-tools | 0.6.0 | [`requirements.txt`](requirements.txt) | MIT | `python-package:siti-tools` | `0.6.0` |
 | scikit-image | 0.26.0 | [`requirements.txt`](requirements.txt) (for `dump_ciede2000`) | BSD-3-Clause | `python-package:scikit-image` | `0.26.0` |
