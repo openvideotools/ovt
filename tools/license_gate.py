@@ -409,7 +409,7 @@ def read_vcpkg(root: Path, rep: Report, policy: dict, strict_or: bool) -> None:
                 version = version or str(pkg.get("versionInfo", ""))
                 for key in ("licenseConcluded", "licenseDeclared"):
                     val = pkg.get(key)
-                    if expr is None and val and val not in ("NOASSERTION", "NONE"):
+                    if expr is None and val and val not in ("NOASSERTION", "NONE", "LicenseRef-vcpkg-null"):  # vcpkg writes the last for `"license": null`
                         expr = val
         if expr is None and copyright_file.is_file():  # heuristics only when the SPDX file gives no licence
             text = copyright_file.read_text(encoding="utf-8", errors="replace")
