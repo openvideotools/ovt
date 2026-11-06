@@ -9,6 +9,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -33,9 +34,9 @@ constexpr std::uint32_t kExpectedCpu = 0x01000007U;  // CPU_TYPE_X86_64
 TEST_CASE("libMoltenVK.dylib is a thin Mach-O of the built architecture", "[fast][third_party]") {
   std::ifstream file(OVT_MOLTENVK_DYLIB, std::ios::binary);
   REQUIRE(file.is_open());
-  std::uint32_t header[2] = {0, 0};
-  file.read(reinterpret_cast<char*>(header), sizeof header);
-  REQUIRE(file.gcount() == static_cast<std::streamsize>(sizeof header));
+  std::array<std::uint32_t, 2> header{};
+  file.read(reinterpret_cast<char*>(header.data()), sizeof(std::uint32_t) * header.size());
+  REQUIRE(file.gcount() == static_cast<std::streamsize>(sizeof(std::uint32_t) * header.size()));
   // A universal ("fat") file starts with 0xcafebabe (big-endian), which reads as 0xbebafeca here.
   REQUIRE(header[0] == kMachO64);
   CHECK(header[1] == kExpectedCpu);
