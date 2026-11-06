@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tarfile
+import time
 from pathlib import Path
 
 import pytest
@@ -179,7 +181,15 @@ def test_changed_series_re_extracts_and_applies_the_new_one(tmp_path: Path) -> N
     build = Build(tmp_path, series)
     assert build.run().returncode == 0
     renamed = patch("0001-other.patch", "// line one", "// line one, patched again")
-    write_series(tmp_path, renamed)
+    changed = write_series(tmp_path, renamed)
+    # ExternalProject reruns a step when its inputs are newer than its stamp, and the build tree compares mtimes
+    # at the filesystem's granularity. The first build, the rewrite and the second build all fall within it, so
+    # make the order certain: the new series is in the future, the first build's stamps are in the past.
+    now = time.time()
+    for f in changed.parent.iterdir():
+        os.utime(f, (now + 60, now + 60))
+    for stamp in (tmp_path / "prefix").rglob("*-stamp/*"):
+        os.utime(stamp, (now - 60, now - 60))
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
     assert "apply_patches: applied 0001-other.patch" in result.stdout
