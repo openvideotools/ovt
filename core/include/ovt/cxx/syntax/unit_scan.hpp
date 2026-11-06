@@ -22,12 +22,10 @@
 #ifndef OVT_CXX_SYNTAX_UNIT_SCAN_HPP
 #define OVT_CXX_SYNTAX_UNIT_SCAN_HPP
 
-#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <span>
 #include <string>
-#include <string_view>
 
 namespace ovt::io {
 class RandomAccessFile;

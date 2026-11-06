@@ -5,6 +5,7 @@
 // Annex B scan against the single-span scan for many window sizes, a 4 GiB sparse file (acceptance test 3,
 // [slow]) and one AV1 IVF corpus stream.
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -15,11 +16,14 @@
 #include <filesystem>
 #include <fstream>
 #include <initializer_list>
+#include <ios>
 #include <memory>
 #include <random>
 #include <span>
 #include <stdexcept>
 #include <string>
+#include <system_error>
+#include <utility>
 #include <vector>
 
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -40,6 +44,12 @@ using Bytes = std::vector<uint8_t>;
 
 // A copy of one ScannedUnit (its byte view dies with the callback).
 struct Unit {
+  Unit(uint64_t off, Bytes b, uint64_t prefix_offset, uint64_t prefix_length, int64_t sample_index)
+      : file_offset(off),
+        bytes(std::move(b)),
+        prefix{.offset = prefix_offset, .length = prefix_length},
+        sample(sample_index) {}
+
   uint64_t file_offset;
   Bytes bytes;
   ByteRange prefix;
@@ -57,8 +67,8 @@ struct Collector {
 
   [[nodiscard]] ovt::syntax::UnitCallback on_unit() {
     return [this](const ScannedUnit& u) {
-      units.push_back(
-          Unit{u.file_offset, Bytes(u.bytes.begin(), u.bytes.end()), u.prefix_span, u.container_sample_index});
+      units.emplace_back(u.file_offset, Bytes(u.bytes.begin(), u.bytes.end()), u.prefix_span.offset,
+                         u.prefix_span.length, u.container_sample_index);
     };
   }
   [[nodiscard]] ovt::syntax::DiagnosticCallback on_diag() {
@@ -123,9 +133,9 @@ TEST_CASE("unit_scan_annexb_prefix_lengths", "[syntax][unit_scan][fast]") {
   // Acceptance test 1: 00 00 00 01 67 .. 00 00 01 68 .. 00 00 00 00 01 65 ..
   const Bytes data{0, 0, 0, 1, 0x67, 0xAA, 0xBB, 0, 0, 1, 0x68, 0xCC, 0, 0, 0, 0, 1, 0x65, 0xDD, 0xEE};
   const std::vector<Unit> expected{
-      {4, {0x67, 0xAA, 0xBB}, {0, 4}, kNoContainerSample},
-      {10, {0x68, 0xCC}, {7, 3}, kNoContainerSample},
-      {17, {0x65, 0xDD, 0xEE}, {12, 5}, kNoContainerSample},
+      {4, {0x67, 0xAA, 0xBB}, 0, 4, kNoContainerSample},
+      {10, {0x68, 0xCC}, 7, 3, kNoContainerSample},
+      {17, {0x65, 0xDD, 0xEE}, 12, 5, kNoContainerSample},
   };
   const Collector span = scan_span(data);
   CHECK(span.units == expected);
@@ -175,7 +185,7 @@ TEST_CASE("unit_scan_annexb_trailing_zeros_and_edges", "[syntax][unit_scan][fast
   SECTION("file offset and sample index are passed through") {
     const Collector c = scan_span({0, 0, 1, 0x41}, 1000, 7);
     REQUIRE(c.units.size() == 1);
-    CHECK(c.units[0] == Unit{1003, {0x41}, {1000, 3}, 7});
+    CHECK(c.units[0] == Unit{1003, {0x41}, 1000, 3, 7});
   }
 }
 
@@ -247,7 +257,7 @@ TEST_CASE("unit_scan_annexb_start_code_straddles_window", "[syntax][unit_scan][f
     data[0] = 0;
     data[1] = 0;
     data[2] = 1;
-    const size_t sc = kWindow * 2 - split;  // 00 00 00 01 starts `split` bytes before the boundary
+    const size_t sc = (kWindow * 2) - split;  // 00 00 00 01 starts `split` bytes before the boundary
     data[sc] = 0;
     data[sc + 1] = 0;
     data[sc + 2] = 0;
@@ -278,8 +288,8 @@ TEST_CASE("unit_scan_annexb_4gib_sparse_file", "[syntax][unit_scan][slow]") {
   Collector c;
   ovt::syntax::scan_annexb(*RandomAccessFile::open(path.str()), c.on_unit(), c.on_diag());
   REQUIRE(c.units.size() == 2);
-  CHECK(c.units[0] == Unit{4, {0x65, 0x11}, {0, 4}, kNoContainerSample});
-  CHECK(c.units[1] == Unit{kFourGiB + 1, {0x41, 0x22}, {6, kFourGiB + 1 - 6}, kNoContainerSample});
+  CHECK(c.units[0] == Unit{4, {0x65, 0x11}, 0, 4, kNoContainerSample});
+  CHECK(c.units[1] == Unit{kFourGiB + 1, {0x41, 0x22}, 6, kFourGiB + 1 - 6, kNoContainerSample});
   CHECK(c.diags.empty());
 }
 
@@ -290,14 +300,14 @@ TEST_CASE("unit_scan_length_prefixed_sizes", "[syntax][unit_scan][fast]") {
     Collector c;
     const Bytes s{2, 0x41, 0x42, 1, 0x43};
     ovt::syntax::split_length_prefixed(s, 1, 500, 3, c.on_unit(), c.on_diag());
-    CHECK(c.units == std::vector<Unit>{{501, {0x41, 0x42}, {500, 1}, 3}, {504, {0x43}, {503, 1}, 3}});
+    CHECK(c.units == std::vector<Unit>{{501, {0x41, 0x42}, 500, 1, 3}, {504, {0x43}, 503, 1, 3}});
     CHECK(c.diags.empty());
   }
   SECTION("N = 2") {
     Collector c;
     const Bytes s{0, 1, 0x41, 0, 0, 0, 2, 0x42, 0x43};  // the zero length is skipped
     ovt::syntax::split_length_prefixed(s, 2, 0, 0, c.on_unit(), c.on_diag());
-    CHECK(c.units == std::vector<Unit>{{2, {0x41}, {0, 2}, 0}, {7, {0x42, 0x43}, {5, 2}, 0}});
+    CHECK(c.units == std::vector<Unit>{{2, {0x41}, 0, 2, 0}, {7, {0x42, 0x43}, 5, 2, 0}});
     CHECK(c.diags.empty());
   }
   SECTION("N = 4") {
@@ -320,7 +330,7 @@ TEST_CASE("unit_scan_length_prefixed_overrun", "[syntax][unit_scan][fast]") {
   SECTION("length overruns the sample: unit truncated, SYN-GEN-0105") {
     Collector c;
     ovt::syntax::split_length_prefixed(Bytes{1, 0x41, 9, 0x42, 0x43}, 1, 10, 0, c.on_unit(), c.on_diag());
-    CHECK(c.units == std::vector<Unit>{{11, {0x41}, {10, 1}, 0}, {13, {0x42, 0x43}, {12, 1}, 0}});
+    CHECK(c.units == std::vector<Unit>{{11, {0x41}, 10, 1, 0}, {13, {0x42, 0x43}, 12, 1, 0}});
     REQUIRE(c.diags.size() == 1);
     CHECK(c.diags[0].code == "SYN-GEN-0105");
     CHECK(c.diags[0].message == "length-prefixed unit overruns its sample");
@@ -444,10 +454,10 @@ TEST_CASE("unit_scan_obu_annexb_nested", "[syntax][unit_scan][fast]") {
   ovt::syntax::scan_obu_annexb(data, 100, kNoContainerSample, c.on_unit(), c.on_diag());
   CHECK(c.diags.empty());
   const std::vector<Unit> expected{
-      {103, {obu_header(2, false, false)}, {100, 3}, kNoContainerSample},  // tu + fu + obu_length
-      {105, {obu_header(1, false, false), 1, 2}, {104, 1}, kNoContainerSample},
-      {110, {obu_header(6, false, false), 7, 8}, {108, 2}, kNoContainerSample},  // fu + obu_length
-      {116, {obu_header(2, false, false)}, {113, 3}, kNoContainerSample},
+      {103, {obu_header(2, false, false)}, 100, 3, kNoContainerSample},  // tu + fu + obu_length
+      {105, {obu_header(1, false, false), 1, 2}, 104, 1, kNoContainerSample},
+      {110, {obu_header(6, false, false), 7, 8}, 108, 2, kNoContainerSample},  // fu + obu_length
+      {116, {obu_header(2, false, false)}, 113, 3, kNoContainerSample},
   };
   CHECK(c.units == expected);
 }

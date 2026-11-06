@@ -43,7 +43,7 @@ constexpr std::string_view kMsgObuNoSize = "obu_has_size_field = 0 in a position
 
 void report(const DiagnosticCallback& diag, std::string_view code, std::string message, uint64_t file_offset) {
   if (diag) {
-    diag(ScanDiagnostic{std::string(code), std::move(message), file_offset});
+    diag(ScanDiagnostic{.code = std::string(code), .message = std::move(message), .file_offset = file_offset});
   }
 }
 
@@ -139,7 +139,7 @@ class AnnexBScanner {
     if (have_unit_) {
       emit(unit_start_, zero_start);
     }
-    prefix_ = ByteRange{zero_start, one_pos + 1 - zero_start};
+    prefix_ = ByteRange{.offset = zero_start, .length = one_pos + 1 - zero_start};
     unit_start_ = one_pos + 1;
     have_unit_ = true;
   }
@@ -163,7 +163,10 @@ class AnnexBScanner {
       report(diag_, kCodeForbidden, fmt::format("forbidden byte pattern 00 00 {:02X} inside NAL unit", bytes[f + 2]),
              base_ + start + f);
     }
-    cb_(ScannedUnit{base_ + start, bytes, ByteRange{base_ + prefix_.offset, prefix_.length}, sample_});
+    cb_(ScannedUnit{.file_offset = base_ + start,
+                    .bytes = bytes,
+                    .prefix_span = ByteRange{.offset = base_ + prefix_.offset, .length = prefix_.length},
+                    .container_sample_index = sample_});
   }
 
   uint64_t base_;
@@ -185,7 +188,7 @@ class ReaderWarnings final : public BitReader::DiagnosticSink {
   ReaderWarnings(const DiagnosticCallback& diag, uint64_t reader_file_offset)
       : diag_(diag), base_(reader_file_offset) {}
   void reader_warning(std::string_view code, std::string_view message, uint64_t bit_offset) override {
-    report(diag_, code, std::string(message), base_ + bit_offset / 8);
+    report(diag_, code, std::string(message), base_ + (bit_offset / 8));
   }
 
  private:
@@ -194,7 +197,7 @@ class ReaderWarnings final : public BitReader::DiagnosticSink {
 };
 
 void report_parse_error(const DiagnosticCallback& diag, const ParseError& e, uint64_t reader_file_offset) {
-  report(diag, e.code, e.what(), reader_file_offset + e.bit_offset / 8);
+  report(diag, e.code, e.what(), reader_file_offset + (e.bit_offset / 8));
 }
 
 }  // namespace
@@ -268,8 +271,10 @@ void split_length_prefixed(std::span<const uint8_t> sample, unsigned nal_length_
       end = pos + length;
     }
     if (end > pos) {
-      cb(ScannedUnit{sample_file_offset + pos, sample.subspan(pos, end - pos), ByteRange{field_offset, nal_length_size},
-                     container_sample_index});
+      cb(ScannedUnit{.file_offset = sample_file_offset + pos,
+                     .bytes = sample.subspan(pos, end - pos),
+                     .prefix_span = ByteRange{.offset = field_offset, .length = nal_length_size},
+                     .container_sample_index = container_sample_index});
     }
     pos = end;
   }
@@ -311,7 +316,10 @@ void scan_obu_low_overhead(std::span<const uint8_t> data, uint64_t data_file_off
       report_parse_error(diag, e, obu_offset);
       return;
     }
-    cb(ScannedUnit{obu_offset, data.subspan(pos, end - pos), ByteRange{obu_offset, 0}, container_sample_index});
+    cb(ScannedUnit{.file_offset = obu_offset,
+                   .bytes = data.subspan(pos, end - pos),
+                   .prefix_span = ByteRange{.offset = obu_offset, .length = 0},
+                   .container_sample_index = container_sample_index});
     pos = end;
   }
 }
@@ -362,8 +370,11 @@ void scan_obu_annexb(std::span<const uint8_t> data, uint64_t data_file_offset, i
           return;
         }
         if (obu_end > pos) {
-          cb(ScannedUnit{data_file_offset + pos, data.subspan(pos, obu_end - pos),
-                         ByteRange{data_file_offset + prefix_start, pos - prefix_start}, container_sample_index});
+          cb(ScannedUnit{
+              .file_offset = data_file_offset + pos,
+              .bytes = data.subspan(pos, obu_end - pos),
+              .prefix_span = ByteRange{.offset = data_file_offset + prefix_start, .length = pos - prefix_start},
+              .container_sample_index = container_sample_index});
           prefix_start = obu_end;
         }
         pos = obu_end;
