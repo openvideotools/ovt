@@ -48,7 +48,7 @@ RUN apt-get update \
 FROM toolchain AS codecs
 COPY lib.sh build_libaom_inspect.sh /src/
 RUN bash /src/build_libaom_inspect.sh && ldconfig
-COPY build_ffmpeg_oracle.sh /src/
+COPY build_ffmpeg_oracle.sh ffmpeg_mvs.c /src/
 RUN bash /src/build_ffmpeg_oracle.sh && ldconfig
 
 # --- libplacebo + mpv (links the FFmpeg above) -----------------------------------------------------------
@@ -74,7 +74,7 @@ COPY lib.sh build_jm.sh /src/
 RUN bash /src/build_jm.sh
 
 FROM toolchain AS hm
-COPY lib.sh build_hm.sh /src/
+COPY lib.sh build_hm.sh hm_cu_dump.cpp /src/
 RUN bash /src/build_hm.sh
 
 FROM toolchain AS mp4ff
