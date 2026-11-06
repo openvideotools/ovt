@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc5 — 2026-11-06
+
+MINOR-level amendment (CI job behaviour) from the pre-public audit requested by the owner; no WI is re-opened.
+
+- 13 §13.7.1 — `build-linux-x64` and `build-macos-arm64` upload their build artefacts only while the repository is private, because a public Actions artefact is a binary distribution and the CI bundles carry no third-party notices — WI-0.030
+
 ## 1.0.0-rc4 — 2026-11-06
 
 MINOR-level amendment (new optional manifest fields) made by the implementation of WI-0.552; no WI is re-opened.
