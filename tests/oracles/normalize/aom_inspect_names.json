@@ -1,0 +1,42 @@
+{
+ "_comment": "libaom v3.12.1 examples/inspect.c JSON keys (inspect -A -a; chapter 6 §6.8.3) -> canonical block-grid names. layers: per-MI 2-D arrays, each element split into the listed fields (Av1Block / CellGrid names); scale multiplies a layer (motionVectors 1/8 -> 1/16 pel). maps: legend objects. frame_keys go to the frame's header. A frame object with a key outside this file is refused (the key set is pinned with the libaom version).",
+ "accounting_keys": ["symbols", "symbolsMap"],
+ "frame_keys": {
+  "baseQIndex": "base_q_idx",
+  "deltaQPresentFlag": "delta_q_present",
+  "deltaQRes": "delta_q_res",
+  "frame": "frame_number",
+  "frameType": "frame_type",
+  "showFrame": "show_frame",
+  "tileCols": "tile_mi_cols",
+  "tileRows": "tile_mi_rows"
+ },
+ "ignored_keys": ["config", "configString"],
+ "layers": {
+  "blockSize": ["bsize"],
+  "cdef_level": ["cdef_y_pri_strength"],
+  "cdef_strength": ["cdef_y_sec_strength"],
+  "cfl_alpha_idx": ["cfl_alpha_idx"],
+  "cfl_alpha_sign": ["cfl_alpha_signs"],
+  "compound_type": ["compound_type"],
+  "delta_q": ["qp"],
+  "dualFilterType": ["dual_filter_type"],
+  "filter": ["interp_filter_0", "interp_filter_1"],
+  "intrabc": ["use_intrabc"],
+  "mode": ["YMode"],
+  "motionVectors": ["mv0_x", "mv0_y", "mv1_x", "mv1_y"],
+  "motion_mode": ["motion_mode"],
+  "palette": ["PaletteSizeY"],
+  "referenceFrame": ["RefFrame0", "RefFrame1"],
+  "seg_id": ["segment_id"],
+  "skip": ["skip"],
+  "transformSize": ["TxSize"],
+  "transformType": ["TxType"],
+  "uv_mode": ["UVMode"],
+  "uv_palette": ["PaletteSizeUV"]
+ },
+ "maps": ["blockSizeMap", "compound_typeMap", "dualFilterTypeMap", "intrabcMap", "modeMap", "motion_modeMap",
+          "paletteMap", "referenceFrameMap", "skipMap", "transformSizeMap", "transformTypeMap", "uv_modeMap",
+          "uv_paletteMap"],
+ "scale": {"motionVectors": 2}
+}

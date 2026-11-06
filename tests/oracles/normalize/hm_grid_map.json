@@ -1,0 +1,10 @@
+{
+ "_comment": "hm_cu_dump (WI-0.563) cell keys -> CellGrid fields (chapter 0 §0.5.4). copy: same value; mv_quarter: HM 1/4-pel MV -> OVT 1/16-pel (x4), 0 where the reference index is -1. pred, intra_mode_*, cbf and tx_log2_* are derived in hm_grid.py from the keys under derived_from.",
+ "copy": {"getQP": "qp", "getRefIdx_L0": "ref0", "getRefIdx_L1": "ref1"},
+ "derived_from": ["getCUTransquantBypass", "getCbf_Cb", "getCbf_Cr", "getCbf_Y", "getDepth", "getIPCMFlag",
+                  "getIntraDir_chroma", "getIntraDir_luma", "getPredictionMode", "getSkipFlag", "getTransformIdx"],
+ "mv_quarter": {"getMv_L0_x": ["mv0_x", "getRefIdx_L0"], "getMv_L0_y": ["mv0_y", "getRefIdx_L0"],
+                "getMv_L1_x": ["mv1_x", "getRefIdx_L1"], "getMv_L1_y": ["mv1_y", "getRefIdx_L1"]},
+ "ignored": ["getInterDir", "getMVPIdx_L0", "getMVPIdx_L1", "getMergeFlag", "getMergeIndex", "getMvd_L0_x",
+             "getMvd_L0_y", "getMvd_L1_x", "getMvd_L1_y", "getPartitionSize", "getTransformSkip_Y"]
+}

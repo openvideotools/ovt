@@ -31,6 +31,8 @@ SinkSlot& slot() {
   return *s;
 }
 
+// A throwing sink terminates by design (noexcept), so the escape is the intended behaviour.
+// NOLINTNEXTLINE(bugprone-exception-escape)
 void call_sink(const Sink& sink, Level l, std::string_view module, std::string_view code,
                std::string_view message) noexcept {
   sink(l, module, code, message);  // a throwing sink terminates (chapter 12 §12.3.1 rule 8)
@@ -99,7 +101,7 @@ std::string format_line(Level l, std::string_view module, std::string_view code,
   const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(since_epoch - secs).count();
   const std::time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::time_point(secs));
   std::tm utc{};
-  gmtime_r(&t, &utc);
+  static_cast<void>(gmtime_r(&t, &utc));  // on failure utc stays zeroed: a 1900-01-00 stamp, never garbage
   std::array<char, 32> stamp{};
   const size_t n = std::strftime(stamp.data(), stamp.size(), "%Y-%m-%dT%H:%M:%S", &utc);
   if (code.empty()) {
