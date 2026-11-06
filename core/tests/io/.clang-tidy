@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# io unit tests (WI-1.100, WI-1.101). Catch2's CHECK/REQUIRE macros expand to branches, so a test
+# case trips readability-function-cognitive-complexity on code that has almost no control flow of its own.
+# Count only the test's own branches.
+InheritParentConfig: true
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true

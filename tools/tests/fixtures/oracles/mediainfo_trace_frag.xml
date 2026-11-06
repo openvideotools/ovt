@@ -1,0 +1,646 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MediaTrace
+    xmlns="https://mediaarea.net/mediatrace"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="https://mediaarea.net/mediatrace https://mediaarea.net/mediatrace/mediatrace_0_2.xsd"
+    version="0.2">
+<creatingLibrary version="24.01" url="https://mediaarea.net/MediaInfo">MediaInfoLib</creatingLibrary>
+<media ref="frag.mp4" parser="MPEG-4">
+<block offset="0" name="File Type" size="28">
+    <block offset="0" name="Header" size="8">
+        <data offset="0" name="Size">28</data>
+        <data offset="4" name="Name">ftyp</data>
+    </block>
+    <data offset="8" name="MajorBrand">iso5</data>
+    <data offset="12" name="MajorBrandVersion">512</data>
+    <data offset="16" name="CompatibleBrand">iso5</data>
+    <data offset="20" name="CompatibleBrand">iso6</data>
+    <data offset="24" name="CompatibleBrand">mp41</data>
+</block>
+<block offset="28" name="File header" size="769">
+    <block offset="28" name="Header" size="8">
+        <data offset="28" name="Size">769</data>
+        <data offset="32" name="Name">moov</data>
+    </block>
+    <block offset="36" name="Movie header" size="108">
+        <block offset="36" name="Header" size="8">
+            <data offset="36" name="Size">108</data>
+            <data offset="40" name="Name">mvhd</data>
+        </block>
+        <data offset="44" name="Version">0</data>
+        <data offset="45" name="Flags">0</data>
+        <data offset="48" name="Creation time" info="">0</data>
+        <data offset="52" name="Modification time" info="">0</data>
+        <data offset="56" name="Time scale" info="1000 Hz">1000</data>
+        <data offset="60" name="Duration" info="0 ms">0</data>
+        <data offset="64" name="Preferred rate" info="1.000">65536</data>
+        <data offset="68" name="Preferred volume" info="1.000">256</data>
+        <data offset="70" name="Reserved">(10 bytes)</data>
+        <block offset="80" name="Matrix structure" size="36">
+            <data offset="80" name="a (width scale)">1.000</data>
+            <data offset="84" name="b (width rotate)">0.000</data>
+            <data offset="88" name="u (width angle)">0.000</data>
+            <data offset="92" name="c (height rotate)">0.000</data>
+            <data offset="96" name="d (height scale)">1.000</data>
+            <data offset="100" name="v (height angle)">0.000</data>
+            <data offset="104" name="x (position left)">0.000</data>
+            <data offset="108" name="y (position top)">0.000</data>
+            <data offset="112" name="w (divider)">1.000</data>
+        </block>
+        <data offset="116" name="Preview time">0</data>
+        <data offset="120" name="Preview duration">0</data>
+        <data offset="124" name="Poster time">0</data>
+        <data offset="128" name="Selection time">0</data>
+        <data offset="132" name="Selection duration">0</data>
+        <data offset="136" name="Current time">0</data>
+        <data offset="140" name="Next track ID">2</data>
+    </block>
+    <block offset="144" name="Track" size="515">
+        <block offset="144" name="Header" size="8">
+            <data offset="144" name="Size">515</data>
+            <data offset="148" name="Name">trak</data>
+        </block>
+        <block offset="152" name="Track Header" info="1" info2="0 ms" size="92">
+            <block offset="152" name="Header" size="8">
+                <data offset="152" name="Size">92</data>
+                <data offset="156" name="Name">tkhd</data>
+            </block>
+            <data offset="160" name="Version">0</data>
+            <data offset="161" name="Flags">3</data>
+            <data offset="164" name="Creation time" info="">0</data>
+            <data offset="168" name="Modification time" info="">0</data>
+            <data offset="172" name="Track ID">1</data>
+            <data offset="176" name="Reserved">0</data>
+            <data offset="180" name="Duration" info="0 ms">0</data>
+            <data offset="184" name="Reserved">0</data>
+            <data offset="188" name="Reserved">0</data>
+            <data offset="192" name="Layer">0</data>
+            <data offset="194" name="Alternate group">0</data>
+            <data offset="196" name="Volume" info="0.000">0</data>
+            <data offset="198" name="Reserved">0</data>
+            <block offset="200" name="Matrix structure" size="36">
+                <data offset="200" name="a (width scale)">1.000</data>
+                <data offset="204" name="b (width rotate)">0.000</data>
+                <data offset="208" name="u (width angle)">0.000</data>
+                <data offset="212" name="c (height rotate)">0.000</data>
+                <data offset="216" name="d (height scale)">1.000</data>
+                <data offset="220" name="v (height angle)">0.000</data>
+                <data offset="224" name="x (position left)">0.000</data>
+                <data offset="228" name="y (position top)">0.000</data>
+                <data offset="232" name="w (divider)">1.000</data>
+            </block>
+            <data offset="236" name="Track width">64.000</data>
+            <data offset="240" name="Track height">64.000</data>
+        </block>
+        <block offset="244" name="Media" size="415">
+            <block offset="244" name="Header" size="8">
+                <data offset="244" name="Size">415</data>
+                <data offset="248" name="Name">mdia</data>
+            </block>
+            <block offset="252" name="Media Header" size="32">
+                <block offset="252" name="Header" size="8">
+                    <data offset="252" name="Size">32</data>
+                    <data offset="256" name="Name">mdhd</data>
+                </block>
+                <data offset="260" name="Version">0</data>
+                <data offset="261" name="Flags">0</data>
+                <data offset="264" name="Creation time" info="">0</data>
+                <data offset="268" name="Modification time" info="">0</data>
+                <data offset="272" name="Time scale">12800</data>
+                <data offset="276" name="Duration" info="0 ms">0</data>
+                <data offset="280" name="Language" info="und">21956</data>
+                <data offset="282" name="Quality">0</data>
+            </block>
+            <block offset="284" name="Handler Reference" size="45">
+                <block offset="284" name="Header" size="8">
+                    <data offset="284" name="Size">45</data>
+                    <data offset="288" name="Name">hdlr</data>
+                </block>
+                <data offset="292" name="Version">0</data>
+                <data offset="293" name="Flags">0</data>
+                <data offset="296" name="Component type"></data>
+                <data offset="300" name="Component subtype">vide</data>
+                <data offset="304" name="Component manufacturer"></data>
+                <data offset="308" name="Component flags">0</data>
+                <data offset="312" name="Component flags mask">0</data>
+                <data offset="316" name="Component name">VideoHandler</data>
+            </block>
+            <block offset="329" name="Media Information" size="330">
+                <block offset="329" name="Header" size="8">
+                    <data offset="329" name="Size">330</data>
+                    <data offset="333" name="Name">minf</data>
+                </block>
+                <block offset="337" name="Video Media Header" size="20">
+                    <block offset="337" name="Header" size="8">
+                        <data offset="337" name="Size">20</data>
+                        <data offset="341" name="Name">vmhd</data>
+                    </block>
+                    <data offset="345" name="Version">0</data>
+                    <data offset="346" name="Flags">1</data>
+                    <data offset="349" name="Graphic mode">0</data>
+                    <data offset="351" name="Graphic mode color R">0</data>
+                    <data offset="353" name="Graphic mode color G">0</data>
+                    <data offset="355" name="Graphic mode color B">0</data>
+                </block>
+                <block offset="357" name="Data Information" size="36">
+                    <block offset="357" name="Header" size="8">
+                        <data offset="357" name="Size">36</data>
+                        <data offset="361" name="Name">dinf</data>
+                    </block>
+                    <block offset="365" name="Data Reference" size="28">
+                        <block offset="365" name="Header" size="8">
+                            <data offset="365" name="Size">28</data>
+                            <data offset="369" name="Name">dref</data>
+                        </block>
+                        <data offset="373" name="Version">0</data>
+                        <data offset="374" name="Flags">0</data>
+                        <data offset="377" name="entry_count">1</data>
+                        <block offset="381" name="Data Location" size="12">
+                            <block offset="381" name="Header" size="8">
+                                <data offset="381" name="Size">12</data>
+                                <data offset="385" name="Name">url </data>
+                            </block>
+                            <data offset="389" name="Version">0</data>
+                            <data offset="390" name="Flags">1</data>
+                        </block>
+                    </block>
+                </block>
+                <block offset="393" name="Sample Table" size="266">
+                    <block offset="393" name="Header" size="8">
+                        <data offset="393" name="Size">266</data>
+                        <data offset="397" name="Name">stbl</data>
+                    </block>
+                    <block offset="401" name="Sample Description" size="190">
+                        <block offset="401" name="Header" size="8">
+                            <data offset="401" name="Size">190</data>
+                            <data offset="405" name="Name">stsd</data>
+                        </block>
+                        <data offset="409" name="Version">0</data>
+                        <data offset="410" name="Flags">0</data>
+                        <data offset="413" name="Count">1</data>
+                        <block offset="417" name="Video" size="174">
+                            <block offset="417" name="Header" size="8">
+                                <data offset="417" name="Size">174</data>
+                                <data offset="421" name="Name">avc1</data>
+                            </block>
+                            <data offset="425" name="Reserved">0</data>
+                            <data offset="431" name="Data reference index">1</data>
+                            <data offset="433" name="Version">0</data>
+                            <data offset="435" name="Revision level">0</data>
+                            <data offset="437" name="Vendor"></data>
+                            <data offset="441" name="Temporal quality">0</data>
+                            <data offset="445" name="Spatial quality">0</data>
+                            <data offset="449" name="Width">64</data>
+                            <data offset="451" name="Height">64</data>
+                            <data offset="453" name="Horizontal resolution">4718592</data>
+                            <data offset="457" name="Vertical resolution">4718592</data>
+                            <data offset="461" name="Data size">0</data>
+                            <data offset="465" name="Frame count">1</data>
+                            <data offset="467" name="Compressor name size">21</data>
+                            <data offset="468" name="Compressor name">Lavc60.31.102 libx264</data>
+                            <data offset="489" name="Padding">(10 bytes)</data>
+                            <data offset="499" name="Depth">24</data>
+                            <data offset="501" name="Color table ID">65535</data>
+                            <block offset="503" name="AVC decode" size="52">
+                                <block offset="503" name="Header" size="8">
+                                    <data offset="503" name="Size">52</data>
+                                    <data offset="507" name="Name">avcC</data>
+                                </block>
+                                <data offset="511" name="Version">1</data>
+                                <block offset="512" name="Specific" size="43">
+                                    <data offset="512" name="AVCProfileIndication">244</data>
+                                    <data offset="513" name="profile_compatibility">0</data>
+                                    <data offset="514" name="AVCLevelIndication">10</data>
+                                    <data offset="515" name="reserved" info="(6 bits)">63</data>
+                                    <data offset="515" name="lengthSizeMinusOne" info="(2 bits)">3</data>
+                                    <data offset="516" name="reserved" info="(3 bits)">7</data>
+                                    <data offset="516" name="numOfSequenceParameterSets" info="(5 bits)">1</data>
+                                    <block offset="517" name="seq_parameter_set" size="26">
+                                        <data offset="517" name="sequenceParameterSetLength">24</data>
+                                        <data offset="519" name="nal_ref_idc" info="(2 bits)">3</data>
+                                        <data offset="519" name="nal_unit_type" info="(5 bits)">7</data>
+                                        <data offset="520" name="profile_idc">244</data>
+                                        <data offset="521" name="constraint_sett_flags">0</data>
+                                        <data offset="522" name="level_idc">10</data>
+                                        <data offset="523" name="seq_parameter_set_id">0</data>
+                                        <block offset="523" name="high profile specific" size="1">
+                                            <data offset="523" name="chroma_format_idc">3</data>
+                                            <data offset="523" name="separate_colour_plane_flag">No</data>
+                                            <data offset="524" name="bit_depth_luma_minus8">0</data>
+                                            <data offset="524" name="bit_depth_chroma_minus8">0</data>
+                                            <data offset="524" name="qpprime_y_zero_transform_bypass_flag">No</data>
+                                            <data offset="524" name="seq_scaling_matrix_present_flag">No</data>
+                                        </block>
+                                        <data offset="524" name="log2_max_frame_num_minus4">0</data>
+                                        <data offset="524" name="pic_order_cnt_type">0</data>
+                                        <data offset="524" name="log2_max_pic_order_cnt_lsb_minus4">0</data>
+                                        <data offset="524" name="max_num_ref_frames">2</data>
+                                        <data offset="525" name="gaps_in_frame_num_value_allowed_flag">No</data>
+                                        <data offset="525" name="pic_width_in_mbs_minus1">3</data>
+                                        <data offset="526" name="pic_height_in_map_units_minus1">3</data>
+                                        <data offset="526" name="frame_mbs_only_flag">Yes</data>
+                                        <data offset="526" name="direct_8x8_inference_flag">Yes</data>
+                                        <data offset="526" name="frame_cropping_flag">No</data>
+                                        <block offset="526" name="vui_parameters_present_flag" size="14">
+                                            <data offset="526" name="vui_parameters_present_flag">Yes</data>
+                                            <block offset="527" name="aspect_ratio_info_present_flag" size="1">
+                                                <data offset="527" name="aspect_ratio_info_present_flag">Yes</data>
+                                                <data offset="527" name="aspect_ratio_idc" info="(8 bits)" info2="1.000">1</data>
+                                            </block>
+                                            <data offset="528" name="overscan_info_present_flag">No</data>
+                                            <data offset="528" name="video_signal_type_present_flag">No</data>
+                                            <data offset="528" name="chroma_loc_info_present_flag">No</data>
+                                            <block offset="528" name="timing_info_present_flag" size="8">
+                                                <data offset="528" name="timing_info_present_flag">Yes</data>
+                                                <data offset="528" name="num_units_in_tick" info="(32 bits)">1</data>
+                                                <data offset="532" name="time_scale" info="(32 bits)">50</data>
+                                                <data offset="536" name="fixed_frame_rate_flag">No</data>
+                                            </block>
+                                            <data offset="536" name="nal_hrd_parameters_present_flag">No</data>
+                                            <data offset="536" name="vcl_hrd_parameters_present_flag">No</data>
+                                            <data offset="537" name="pic_struct_present_flag">No</data>
+                                            <block offset="537" name="bitstream_restriction_flag" size="3">
+                                                <data offset="537" name="bitstream_restriction_flag">Yes</data>
+                                                <data offset="537" name="motion_vectors_over_pic_boundaries_flag">Yes</data>
+                                                <data offset="537" name="max_bytes_per_pic_denom">0</data>
+                                                <data offset="537" name="max_bits_per_mb_denom">0</data>
+                                                <data offset="537" name="log2_max_mv_length_horizontal">8</data>
+                                                <data offset="538" name="log2_max_mv_length_vertical">8</data>
+                                                <data offset="539" name="max_num_reorder_frames">1</data>
+                                                <data offset="539" name="max_dec_frame_buffering">2</data>
+                                            </block>
+                                        </block>
+                                    </block>
+                                    <data offset="543" name="numOfPictureParameterSets">1</data>
+                                    <block offset="544" name="pic_parameter_set" size="7">
+                                        <data offset="544" name="pictureParameterSetLength">5</data>
+                                        <data offset="546" name="nal_ref_idc" info="(2 bits)">3</data>
+                                        <data offset="546" name="nal_unit_type" info="(5 bits)">8</data>
+                                        <data offset="547" name="pic_parameter_set_id">0</data>
+                                        <data offset="547" name="seq_parameter_set_id">0</data>
+                                        <data offset="547" name="entropy_coding_mode_flag">No</data>
+                                        <data offset="547" name="bottom_field_pic_order_in_frame_present_flag">No</data>
+                                        <data offset="547" name="num_slice_groups_minus1">0</data>
+                                        <data offset="547" name="num_ref_idx_l0_default_active_minus1">0</data>
+                                        <data offset="547" name="num_ref_idx_l1_default_active_minus1">0</data>
+                                        <data offset="547" name="weighted_pred_flag">No</data>
+                                        <data offset="548" name="weighted_bipred_idc" info="(2 bits)">0</data>
+                                        <data offset="548" name="pic_init_qp_minus26">-3</data>
+                                        <data offset="549" name="pic_init_qs_minus26">0</data>
+                                        <data offset="549" name="chroma_qp_index_offset">6</data>
+                                        <data offset="549" name="deblocking_filter_control_present_flag">Yes</data>
+                                        <data offset="550" name="constrained_intra_pred_flag">No</data>
+                                        <data offset="550" name="redundant_pic_cnt_present_flag">No</data>
+                                    </block>
+                                    <data offset="551" name="Padding?">(4 bytes)</data>
+                                </block>
+                            </block>
+                            <block offset="555" name="Pixel Aspect Ratio" size="16">
+                                <block offset="555" name="Header" size="8">
+                                    <data offset="555" name="Size">16</data>
+                                    <data offset="559" name="Name">pasp</data>
+                                </block>
+                                <data offset="563" name="hSpacing">1</data>
+                                <data offset="567" name="vSpacing">1</data>
+                            </block>
+                            <block offset="571" name="BitRate" size="20">
+                                <block offset="571" name="Header" size="8">
+                                    <data offset="571" name="Size">20</data>
+                                    <data offset="575" name="Name">btrt</data>
+                                </block>
+                                <data offset="579" name="bufferSizeDB">0</data>
+                                <data offset="583" name="maxBitrate">379333</data>
+                                <data offset="587" name="avgBitrate">379333</data>
+                            </block>
+                        </block>
+                    </block>
+                    <block offset="591" name="Time to Sample" size="16">
+                        <block offset="591" name="Header" size="8">
+                            <data offset="591" name="Size">16</data>
+                            <data offset="595" name="Name">stts</data>
+                        </block>
+                        <data offset="599" name="Version">0</data>
+                        <data offset="600" name="Flags">0</data>
+                        <data offset="603" name="Number of entries">0</data>
+                    </block>
+                    <block offset="607" name="Sample To Chunk" size="16">
+                        <block offset="607" name="Header" size="8">
+                            <data offset="607" name="Size">16</data>
+                            <data offset="611" name="Name">stsc</data>
+                        </block>
+                        <data offset="615" name="Version">0</data>
+                        <data offset="616" name="Flags">0</data>
+                        <data offset="619" name="Number of entries">0</data>
+                    </block>
+                    <block offset="623" name="Sample Size" size="20">
+                        <block offset="623" name="Header" size="8">
+                            <data offset="623" name="Size">20</data>
+                            <data offset="627" name="Name">stsz</data>
+                        </block>
+                        <data offset="631" name="Version">0</data>
+                        <data offset="632" name="Flags">0</data>
+                        <data offset="635" name="Sample Size">0</data>
+                        <data offset="639" name="Number of entries">0</data>
+                    </block>
+                    <block offset="643" name="Chunk offset" size="16">
+                        <block offset="643" name="Header" size="8">
+                            <data offset="643" name="Size">16</data>
+                            <data offset="647" name="Name">stco</data>
+                        </block>
+                        <data offset="651" name="Version">0</data>
+                        <data offset="652" name="Flags">0</data>
+                        <data offset="655" name="Number of entries">0</data>
+                    </block>
+                </block>
+            </block>
+        </block>
+    </block>
+    <block offset="659" name="Movie Extends" size="40">
+        <block offset="659" name="Header" size="8">
+            <data offset="659" name="Size">40</data>
+            <data offset="663" name="Name">mvex</data>
+        </block>
+        <block offset="667" name="Movie Extends Defaults" size="32">
+            <block offset="667" name="Header" size="8">
+                <data offset="667" name="Size">32</data>
+                <data offset="671" name="Name">trex</data>
+            </block>
+            <data offset="675" name="Version">0</data>
+            <data offset="676" name="Flags">0</data>
+            <data offset="679" name="track_ID">1</data>
+            <data offset="683" name="default_sample_description_index">1</data>
+            <data offset="687" name="default_sample_duration">0</data>
+            <data offset="691" name="default_sample_size">0</data>
+            <block offset="695" name="default_sample_flags" size="4">
+                <data offset="695" name="reserved" info="(6 bits)">0</data>
+                <data offset="695" name="sample_depends_on" info="(2 bits)">0</data>
+                <data offset="696" name="sample_is_depended_on" info="(2 bits)">0</data>
+                <data offset="696" name="sample_has_redundancy" info="(2 bits)">0</data>
+                <data offset="696" name="sample_padding_value" info="(3 bits)">0</data>
+                <data offset="696" name="sample_is_difference_sample">No</data>
+                <data offset="697" name="sample_degradation_priority">0</data>
+            </block>
+        </block>
+    </block>
+    <block offset="699" name="User Data" size="98">
+        <block offset="699" name="Header" size="8">
+            <data offset="699" name="Size">98</data>
+            <data offset="703" name="Name">udta</data>
+        </block>
+        <block offset="707" name="Metadata" size="90">
+            <block offset="707" name="Header" size="8">
+                <data offset="707" name="Size">90</data>
+                <data offset="711" name="Name">meta</data>
+            </block>
+            <data offset="715" name="Version">0</data>
+            <data offset="716" name="Flags">0</data>
+            <block offset="719" name="Metadata Header" size="33">
+                <block offset="719" name="Header" size="8">
+                    <data offset="719" name="Size">33</data>
+                    <data offset="723" name="Name">hdlr</data>
+                </block>
+                <data offset="727" name="Version">0</data>
+                <data offset="728" name="Flags">0</data>
+                <data offset="731" name="Type (Quicktime)"></data>
+                <data offset="735" name="Metadata type">mdir</data>
+                <data offset="739" name="Manufacturer">appl</data>
+                <data offset="743" name="Component reserved flags">0</data>
+                <data offset="747" name="Component reserved flags mask">0</data>
+                <data offset="751" name="Component type name"></data>
+            </block>
+            <block offset="752" name="List" size="45">
+                <block offset="752" name="Header" size="8">
+                    <data offset="752" name="Size">45</data>
+                    <data offset="756" name="Name">ilst</data>
+                </block>
+                <block offset="760" name="Element" size="37">
+                    <block offset="760" name="Header" size="8">
+                        <data offset="760" name="Size">37</data>
+                        <data offset="764" name="Name">?too</data>
+                    </block>
+                    <block offset="768" name="Data" info="Encoded_Application" size="29">
+                        <block offset="768" name="Header" size="8">
+                            <data offset="768" name="Size">29</data>
+                            <data offset="772" name="Name">data</data>
+                        </block>
+                        <data offset="776" name="Kind" info="UTF8">1</data>
+                        <data offset="780" name="Language">0</data>
+                        <data offset="784" name="Value">Lavf60.16.100</data>
+                    </block>
+                </block>
+            </block>
+        </block>
+    </block>
+</block>
+<block offset="797" name="Movie Fragment" size="120">
+    <block offset="797" name="Header" size="8">
+        <data offset="797" name="Size">120</data>
+        <data offset="801" name="Name">moof</data>
+    </block>
+    <block offset="805" name="Movie Fragment Header" size="16">
+        <block offset="805" name="Header" size="8">
+            <data offset="805" name="Size">16</data>
+            <data offset="809" name="Name">mfhd</data>
+        </block>
+        <data offset="813" name="Version">0</data>
+        <data offset="814" name="Flags">0</data>
+        <data offset="817" name="sequence_number">1</data>
+    </block>
+    <block offset="821" name="Track Fragment" size="96">
+        <block offset="821" name="Header" size="8">
+            <data offset="821" name="Size">96</data>
+            <data offset="825" name="Name">traf</data>
+        </block>
+        <block offset="829" name="Track Fragment Header" size="28">
+            <block offset="829" name="Header" size="8">
+                <data offset="829" name="Size">28</data>
+                <data offset="833" name="Name">tfhd</data>
+            </block>
+            <data offset="837" name="Version">0</data>
+            <data offset="838" name="Flags">131128</data>
+            <data offset="841" name="track_ID">1</data>
+            <data offset="845" name="default_sample_duration">512</data>
+            <data offset="849" name="default_sample_size">2314</data>
+            <block offset="853" name="default_sample_flags" size="4">
+                <data offset="853" name="reserved" info="(4 bits)">0</data>
+                <data offset="853" name="is_leading" info="(2 bits)">0</data>
+                <data offset="853" name="sample_depends_on" info="(2 bits)">1</data>
+                <data offset="854" name="sample_is_depended_on" info="(2 bits)">0</data>
+                <data offset="854" name="sample_has_redundancy" info="(2 bits)">0</data>
+                <data offset="854" name="sample_padding_value" info="(3 bits)">0</data>
+                <data offset="854" name="sample_is_non_sync_sample">Yes</data>
+                <data offset="855" name="sample_degradation_priority">0</data>
+            </block>
+        </block>
+        <block offset="857" name="Track Fragment Base Media Decode Time" size="20">
+            <block offset="857" name="Header" size="8">
+                <data offset="857" name="Size">20</data>
+                <data offset="861" name="Name">tfdt</data>
+            </block>
+            <data offset="865" name="Version">1</data>
+            <data offset="866" name="Flags">0</data>
+            <data offset="869" name="baseMediaDecodeTime">0</data>
+        </block>
+        <block offset="877" name="Track Fragment Run" size="40">
+            <block offset="877" name="Header" size="8">
+                <data offset="877" name="Size">40</data>
+                <data offset="881" name="Name">trun</data>
+            </block>
+            <data offset="885" name="Version">0</data>
+            <data offset="886" name="Flags">2565</data>
+            <data offset="889" name="sample_count">2</data>
+            <data offset="893" name="data_offset">128</data>
+            <block offset="897" name="first_sample_flags" size="4">
+                <data offset="897" name="reserved" info="(4 bits)">0</data>
+                <data offset="897" name="is_leading" info="(2 bits)">0</data>
+                <data offset="897" name="sample_depends_on" info="(2 bits)">2</data>
+                <data offset="898" name="sample_is_depended_on" info="(2 bits)">0</data>
+                <data offset="898" name="sample_has_redundancy" info="(2 bits)">0</data>
+                <data offset="898" name="sample_padding_value" info="(3 bits)">0</data>
+                <data offset="898" name="sample_is_non_sync_sample">No</data>
+                <data offset="899" name="sample_degradation_priority">0</data>
+            </block>
+            <block offset="901" name="sample" info="0" size="8">
+                <data offset="901" name="sample_size">2314</data>
+                <data offset="905" name="sample_composition_time_offset" info="512">512</data>
+            </block>
+            <block offset="909" name="sample" info="1" size="8">
+                <data offset="909" name="sample_size">972</data>
+                <data offset="913" name="sample_composition_time_offset" info="512">512</data>
+            </block>
+        </block>
+    </block>
+</block>
+<block offset="917" name="Data" size="3294">
+    <block offset="917" name="Header" size="8">
+        <data offset="917" name="Size">3294</data>
+        <data offset="921" name="Name">mdat</data>
+    </block>
+    <data offset="925" name="Data">(3286 bytes)</data>
+</block>
+<block offset="4211" name="Movie Fragment" size="108">
+    <block offset="4211" name="Header" size="8">
+        <data offset="4211" name="Size">108</data>
+        <data offset="4215" name="Name">moof</data>
+    </block>
+    <block offset="4219" name="Movie Fragment Header" size="16">
+        <block offset="4219" name="Header" size="8">
+            <data offset="4219" name="Size">16</data>
+            <data offset="4223" name="Name">mfhd</data>
+        </block>
+        <data offset="4227" name="Version">0</data>
+        <data offset="4228" name="Flags">0</data>
+        <data offset="4231" name="sequence_number">2</data>
+    </block>
+    <block offset="4235" name="Track Fragment" size="84">
+        <block offset="4235" name="Header" size="8">
+            <data offset="4235" name="Size">84</data>
+            <data offset="4239" name="Name">traf</data>
+        </block>
+        <block offset="4243" name="Track Fragment Header" size="28">
+            <block offset="4243" name="Header" size="8">
+                <data offset="4243" name="Size">28</data>
+                <data offset="4247" name="Name">tfhd</data>
+            </block>
+            <data offset="4251" name="Version">0</data>
+            <data offset="4252" name="Flags">131128</data>
+            <data offset="4255" name="track_ID">1</data>
+            <data offset="4259" name="default_sample_duration">512</data>
+            <data offset="4263" name="default_sample_size">2404</data>
+            <block offset="4267" name="default_sample_flags" size="4">
+                <data offset="4267" name="reserved" info="(4 bits)">0</data>
+                <data offset="4267" name="is_leading" info="(2 bits)">0</data>
+                <data offset="4267" name="sample_depends_on" info="(2 bits)">1</data>
+                <data offset="4268" name="sample_is_depended_on" info="(2 bits)">0</data>
+                <data offset="4268" name="sample_has_redundancy" info="(2 bits)">0</data>
+                <data offset="4268" name="sample_padding_value" info="(3 bits)">0</data>
+                <data offset="4268" name="sample_is_non_sync_sample">Yes</data>
+                <data offset="4269" name="sample_degradation_priority">0</data>
+            </block>
+        </block>
+        <block offset="4271" name="Track Fragment Base Media Decode Time" size="20">
+            <block offset="4271" name="Header" size="8">
+                <data offset="4271" name="Size">20</data>
+                <data offset="4275" name="Name">tfdt</data>
+            </block>
+            <data offset="4279" name="Version">1</data>
+            <data offset="4280" name="Flags">0</data>
+            <data offset="4283" name="baseMediaDecodeTime">1024</data>
+        </block>
+        <block offset="4291" name="Track Fragment Run" size="28">
+            <block offset="4291" name="Header" size="8">
+                <data offset="4291" name="Size">28</data>
+                <data offset="4295" name="Name">trun</data>
+            </block>
+            <data offset="4299" name="Version">0</data>
+            <data offset="4300" name="Flags">2053</data>
+            <data offset="4303" name="sample_count">1</data>
+            <data offset="4307" name="data_offset">116</data>
+            <block offset="4311" name="first_sample_flags" size="4">
+                <data offset="4311" name="reserved" info="(4 bits)">0</data>
+                <data offset="4311" name="is_leading" info="(2 bits)">0</data>
+                <data offset="4311" name="sample_depends_on" info="(2 bits)">2</data>
+                <data offset="4312" name="sample_is_depended_on" info="(2 bits)">0</data>
+                <data offset="4312" name="sample_has_redundancy" info="(2 bits)">0</data>
+                <data offset="4312" name="sample_padding_value" info="(3 bits)">0</data>
+                <data offset="4312" name="sample_is_non_sync_sample">No</data>
+                <data offset="4313" name="sample_degradation_priority">0</data>
+            </block>
+            <block offset="4315" name="sample" info="2" size="4">
+                <data offset="4315" name="sample_composition_time_offset" info="512">512</data>
+            </block>
+        </block>
+    </block>
+</block>
+<block offset="4319" name="Data" size="2412">
+    <block offset="4319" name="Header" size="8">
+        <data offset="4319" name="Size">2412</data>
+        <data offset="4323" name="Name">mdat</data>
+    </block>
+    <data offset="4327" name="Data">(2404 bytes)</data>
+</block>
+<block offset="6731" name="Movie Fragment Random Access" size="86">
+    <block offset="6731" name="Header" size="8">
+        <data offset="6731" name="Size">86</data>
+        <data offset="6735" name="Name">mfra</data>
+    </block>
+    <block offset="6739" name="Track Fragment Random Access" size="62">
+        <block offset="6739" name="Header" size="8">
+            <data offset="6739" name="Size">62</data>
+            <data offset="6743" name="Name">tfra</data>
+        </block>
+        <data offset="6747" name="Version">1</data>
+        <data offset="6748" name="Flags">0</data>
+        <data offset="6751" name="track_ID">1</data>
+        <data offset="6758" name="reserved" info="(26 bits)">0</data>
+        <data offset="6758" name="length_size_of_traf_num" info="(2 bits)">0</data>
+        <data offset="6758" name="length_size_of_trun_num" info="(2 bits)">0</data>
+        <data offset="6758" name="length_size_of_sample_num" info="(2 bits)">0</data>
+        <data offset="6759" name="number_of_entry">2</data>
+        <block offset="6763" name="entry" size="19">
+            <data offset="6763" name="time">512</data>
+            <data offset="6771" name="moof_offset">797</data>
+            <data offset="6779" name="traf_number">1</data>
+            <data offset="6780" name="trun_num">1</data>
+            <data offset="6781" name="sample_num">1</data>
+        </block>
+        <block offset="6782" name="entry" size="19">
+            <data offset="6782" name="time">1536</data>
+            <data offset="6790" name="moof_offset">4211</data>
+            <data offset="6798" name="traf_number">1</data>
+            <data offset="6799" name="trun_num">1</data>
+            <data offset="6800" name="sample_num">1</data>
+        </block>
+    </block>
+    <block offset="6801" name="Movie Fragment Random Access Offset" size="16">
+        <block offset="6801" name="Header" size="8">
+            <data offset="6801" name="Size">16</data>
+            <data offset="6805" name="Name">mfro</data>
+        </block>
+        <data offset="6809" name="Version">0</data>
+        <data offset="6810" name="Flags">0</data>
+        <data offset="6813" name="size">86</data>
+    </block>
+</block>
+</media>
+</MediaTrace>

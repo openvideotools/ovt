@@ -72,6 +72,9 @@ check tsanalyze - tsanalyze syn_h265.ts
 check tstables - tstables syn_h265.ts
 check tsp tsp.stderr tsp -I file syn_h265.ts -P count -O drop # count reports on stderr
 check gst_codecparsers - pkg-config --cflags --libs gstreamer-codecparsers-1.0
+check gst_parse_h264 - gst_parse_oracle --codec h264 syn_h264.264
+check gst_parse_h265 - gst_parse_oracle --codec h265 syn_h265_amp_sao_on.265
+check gst_parse_av1 - gst_parse_oracle --codec av1 --ivf syn_av1.ivf
 
 # --- §14.4.3-14.4.5 block-level oracles --------------------------------------------------------------------
 check ldecod trace_dec.txt ldecod -p InputFile=syn_h264.264 -p OutputFile=ldecod.yuv -p RefOffset=0 -p POCScale=2 \
@@ -79,6 +82,14 @@ check ldecod trace_dec.txt ldecod -p InputFile=syn_h264.264 -p OutputFile=ldecod
 check TAppDecoder hm.yuv TAppDecoder -b syn_h265_amp_sao_on.265 -o hm.yuv
 check TAppDecoder_trace TraceDec.txt TAppDecoder_trace -b syn_h265_amp_sao_on.265 -o /dev/null \
   --SEIDecodedPictureHash=1
+# WI-0.563 acceptance 2: an MBAFF stream (x264 --interlaced) decoded by the TRACE build names mb_field_decoding_flag.
+check x264_mbaff syn_h264_mbaff.264 x264 --preset fast --interlaced --frames 5 --output syn_h264_mbaff.264 \
+  src_720p_8bit.y4m
+check ldecod_mbaff - sh -c 'ldecod -p InputFile=syn_h264_mbaff.264 -p OutputFile=ldecod_mbaff.yuv -p RefOffset=0 \
+  -p POCScale=2 -p WriteUV=1 -p SilentDecode=1 && grep -m1 mb_field_decoding_flag trace_dec.txt'
+check ffmpeg_mvs - ffmpeg_mvs syn_h264.264
+check ffmpeg_mvs_qp ffmpeg_qp.csv ffmpeg_mvs --qp ffmpeg_qp.csv syn_h264.264
+check hm_cu_dump - hm_cu_dump -b syn_h265_amp_sao_on.265
 check inspect - inspect -A -a syn_av1.ivf
 check dav1d dav1d.y4m dav1d -q -i syn_av1.ivf -o dav1d.y4m
 
@@ -97,12 +108,12 @@ check dump_psnrhvs - dump_psnrhvs -y src_720p_8bit.y4m dist.y4m
 check dump_ciede2000 - dump_ciede2000 src_720p_8bit.y4m dist.y4m
 check bjontegaard - python3 -c 'import bjontegaard as bd
 print(bd.bd_rate([100, 200, 400, 800], [30, 33, 36, 39], [90, 180, 360, 720], [30, 33, 36, 39], method="pchip"))'
-run_uvq() {
-  (cd "${OVT_ORACLES_PREFIX}/uvq" && TF_DETERMINISTIC_OPS=1 python3 uvq_main.py \
-    --input_files="syn_h265,2,${out}/syn_h265.mp4" --output_dir="${out}/uvq_out" --model_dir=models \
-    --transcode=yes) && cat "${out}"/uvq_out/*/*.csv
+run_uvq() {  # run_uvq <model_version>: the reference CLI on CPU, one thread, all statistics as JSON
+  OMP_NUM_THREADS=1 python3 "${OVT_ORACLES_PREFIX}/uvq/uvq_inference.py" "${out}/syn_h265.mp4" \
+    --model_version "$1" --device cpu --threads 1 --output_all_stats
 }
-check uvq - run_uvq
+check uvq_1p5 - run_uvq 1.5
+check uvq_1p0 - run_uvq 1.0
 check mpv - mpv --no-config --vo=null --ao=null --frames=5 --msg-level=all=v syn_h265.mp4
 check oracle_versions - oracle-versions
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/canonical/box-tree.schema.json",
+  "title": "box-tree (chapter 14 §14.4.0)",
+  "description": "One entry per box in file order. path is slash-separated fourccs with a 1-based [n] index on repeated siblings (moov/trak[1]/mdia/minf/stbl/stsz). offset and header_length are present only when the oracle reports them.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["path", "size"],
+    "additionalProperties": false,
+    "properties": {
+      "path": {"type": "string"},
+      "offset": {"type": "integer", "minimum": 0},
+      "size": {"type": "integer", "minimum": 0},
+      "header_length": {"type": "integer", "minimum": 0},
+      "fields": {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}}
+    }
+  },
+  "$defs": {
+    "value": {"anyOf": [
+      {"type": ["integer", "number", "string", "boolean"]},
+      {"type": "array", "items": {"$ref": "#/$defs/value"}},
+      {"type": "object", "additionalProperties": {"$ref": "#/$defs/value"}}
+    ]}
+  }
+}

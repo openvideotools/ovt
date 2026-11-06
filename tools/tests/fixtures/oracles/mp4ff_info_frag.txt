@@ -1,0 +1,116 @@
+[ftyp] size=28
+ - majorBrand: iso5
+ - minorVersion: 512
+ - compatibleBrand: iso5
+ - compatibleBrand: iso6
+ - compatibleBrand: mp41
+[moov] size=769
+  [mvhd] size=108 version=0 flags=000000
+   - timeScale: 1000
+   - duration: 0
+   - creation time: 0
+   - modification time: 0
+  [trak] size=515
+    [tkhd] size=92 version=0 flags=000003
+     - trackID: 1
+     - duration: 0
+     - creation time: 0
+     - modification time: 0
+     - Width: 64.0, Height: 64.0
+    [mdia] size=415
+      [mdhd] size=32 version=0 flags=000000
+       - timeScale: 12800
+       - creation time: 0
+       - modification time: 0
+       - language: und
+      [hdlr] size=45 version=0 flags=000000
+       - handlerType: vide
+       - handlerName: "VideoHandler"
+      [minf] size=330
+        [vmhd] size=20 version=0 flags=000001
+        [dinf] size=36
+          [dref] size=28 version=0 flags=000000
+            [url ] size=12 version=0 flags=000001
+        [stbl] size=266
+          [stsd] size=190 version=0 flags=000000
+            [avc1] size=174
+             - width: 64
+             - height: 64
+             - compressorName: "Lavc60.31.102 libx264"
+              [avcC] size=52
+               - AVCProfileIndication: 244
+               - profileCompatibility: 00
+               - AVCLevelIndication: 10
+               - SPS: 67f4000a919d884d808800000300080000030190789129c0
+               - PPS: 68ce0f1920
+              [pasp] size=16
+               - hSpacing:vSpacing: 1:1
+              [btrt] size=20
+               - bufferSizeDB: 0
+               - maxBitrate: 379333
+               - AvgBitrate: 379333
+          [stts] size=16 version=0 flags=000000
+          [stsc] size=16 version=0 flags=000000
+          [stsz] size=20 version=0 flags=000000
+          [stco] size=16 version=0 flags=000000
+  [mvex] size=40
+    [trex] size=32 version=0 flags=000000
+     - trackID: 1
+     - defaultSampleDescriptionIndex: 1
+     - defaultSampleDuration: 0
+     - defaultSampleSize: 0
+     - defaultSampleFlags: 00000000 (isLeading=0 dependsOn=0 isDependedOn=0 hasRedundancy=0 padding=0 isNonSync=false degradationPriority=0)
+  [udta] size=98
+    [meta] size=90 version=0 flags=000000
+      [hdlr] size=33 version=0 flags=000000
+       - handlerType: mdir
+       - handlerName: ""
+      [ilst] size=45
+        [©too] size=37
+          [data] size=29
+           - data: Lavf60.16.100
+[moof] size=120
+  [mfhd] size=16 version=0 flags=000000
+   - sequenceNumber: 1
+  [traf] size=96
+    [tfhd] size=28 version=0 flags=020038
+     - trackID: 1
+     - defaultBaseIsMoof: true
+     - defaultSampleDuration: 512
+     - defaultSampleSize: 2314
+     - defaultSampleFlags: 01010000 (isLeading=0 dependsOn=1 isDependedOn=0 hasRedundancy=0 padding=0 isNonSync=true degradationPriority=0)
+    [tfdt] size=20 version=1 flags=000000
+     - baseMediaDecodeTime: 0
+    [trun] size=40 version=0 flags=000a05
+     - sampleCount: 2
+     - DataOffset: 128
+     - firstSampleFlags: 02000000 (isLeading=0 dependsOn=2 isDependedOn=0 hasRedundancy=0 padding=0 isNonSync=false degradationPriority=0)
+     - sample[1]: size=2314 compositionTimeOffset=512
+     - sample[2]: size=972 compositionTimeOffset=512
+[mdat] size=3294
+[moof] size=108
+  [mfhd] size=16 version=0 flags=000000
+   - sequenceNumber: 2
+  [traf] size=84
+    [tfhd] size=28 version=0 flags=020038
+     - trackID: 1
+     - defaultBaseIsMoof: true
+     - defaultSampleDuration: 512
+     - defaultSampleSize: 2404
+     - defaultSampleFlags: 01010000 (isLeading=0 dependsOn=1 isDependedOn=0 hasRedundancy=0 padding=0 isNonSync=true degradationPriority=0)
+    [tfdt] size=20 version=1 flags=000000
+     - baseMediaDecodeTime: 1024
+    [trun] size=28 version=0 flags=000805
+     - sampleCount: 1
+     - DataOffset: 116
+     - firstSampleFlags: 02000000 (isLeading=0 dependsOn=2 isDependedOn=0 hasRedundancy=0 padding=0 isNonSync=false degradationPriority=0)
+     - sample[1]: compositionTimeOffset=512
+[mdat] size=2412
+[mfra] size=86
+  [tfra] size=62 version=1 flags=000000
+   - trackID: 1
+   - nrEntries: 2
+   - 1: time=512 moofOffset=797 trafNr=1 trunNr=1 sampleDelta=1
+   - 2: time=1536 moofOffset=4211 trafNr=1 trunNr=1 sampleDelta=1
+  [mfro] size=16 version=0 flags=000000
+   - parentSize: 86

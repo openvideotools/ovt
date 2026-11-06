@@ -93,6 +93,47 @@ else()
   include("${CMAKE_CURRENT_LIST_DIR}/../third_party/ffmpeg.cmake")
 endif()
 
+# ---- libde265 (WI-0.014) ----------------------------------------------------------------------------
+# tp::de265, the patched static libde265 of third_party/libde265.cmake (§13.3.6), for the HEVC analysis
+# plugin only (LGPL-3.0-or-later, chapter 15 §15.2). OVT_SYSTEM_DE265=ON (the distro preset) takes the
+# system library instead, which carries none of the OVT patches.
+# SPEC-ASSUMPTION(#114): the system bypass is kept for distro builds, reported unpatched; the plugin
+# work of chapter 07 decides whether it may build without the internals API.
+if(OVT_BUILD_PLUGIN_DE265)
+  if(OVT_SYSTEM_DE265)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_de265 REQUIRED IMPORTED_TARGET libde265)
+    add_library(tp::de265 INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::de265 INTERFACE PkgConfig::ovt_system_de265)
+    ovt_set_dependency_license(
+      tp::de265
+      SOURCE
+      system
+      SPDX
+      "LGPL-3.0-or-later"
+      VERSION
+      "${ovt_system_de265_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libde265.cmake")
+  endif()
+endif()
+
+# ---- MoltenVK (WI-0.017) ------------------------------------------------------------------------------
+# tp::moltenvk from third_party/moltenvk.cmake: the prebuilt libMoltenVK.dylib (single-architecture slice) that
+# ovt_render links directly on macOS (§13.5.6). Only fetched when the renderer is built.
+if(APPLE AND OVT_BUILD_RENDER)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/moltenvk.cmake")
+endif()
+
+# ---- ONNX Runtime prebuilt (WI-0.017) -----------------------------------------------------------------
+# tp::onnxruntime from third_party/onnxruntime.cmake when OVT_ONNXRUNTIME_PREBUILT=ON; otherwise the UVQ host
+# takes the vcpkg `onnxruntime` port (§13.3.1).
+if(OVT_ONNXRUNTIME_PREBUILT)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/onnxruntime.cmake")
+endif()
+
 # ovt_find_package(<Package> SPDX <expr> TARGETS <target>... [NAMES <config-name>...] [PKG_CONFIG <module>]
 #                  [HEADER_ONLY] [OPTIONAL])
 #

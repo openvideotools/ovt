@@ -21,6 +21,28 @@ inventory as a Markdown table, and `--report <json>` overrides the report path (
 Exit codes: 0 pass, 1 at least one finding, 2 usage error (bad flags, unreadable policy, missing required
 input). Warnings (`W-*`) never change the exit code.
 
+## Corpora mode
+
+`--corpora` (WI-0.561) checks the test-media registry instead of the dependencies (chapter 14 §14.3.4). It is
+a separate invocation: `--manifest` then names `tests/corpora/manifest.json`, not a `license_manifest.json`.
+
+```sh
+python -I tools/license_gate.py --policy tools/license_policy.toml --corpora           # CI
+python -I tools/license_gate.py --policy tools/license_policy.toml --corpora --write-licenses-md
+```
+
+Exit codes: 0 clean, 1 violation, 4 manifest unreadable or an entry lacks `id`, `licence`, `licence_spdx` or a
+boolean `redistributable` (rule 1). Rules and findings:
+
+| Code | Rule | Meaning | Resolve |
+|---|---|---|---|
+| `E-DENY` | 4 | `licence_spdx` matches `[deny]` (`AGPL`, `SSPL`, `BUSL`, `NonCommercial`, `CC-BY-NC`, ...). `where` is `corpora:<id>`. | Drop the entry; such media is never in the manifest. |
+| `E-CORPUS` | 2 | `redistributable: true` with an id outside `[corpora] redistributable_spdx`. | Set `redistributable: false`, or, if the licence really is permissive, add it to the list in a reviewed PR. |
+| `E-STALE` | 5 | `tests/corpora/LICENSES.md` is missing or differs from the generated text. | Run with `--write-licenses-md` and commit the file. |
+
+Rule 3 (non-redistributable media stay out of release artefacts and public caches) is a packaging rule that no
+gate input describes yet; this mode does not check it.
+
 ## Finding codes and how to resolve them
 
 Every finding has a `code`, a `where`, the offending `license` and a message. Fix by one of three routes, in this
