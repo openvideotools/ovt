@@ -19,9 +19,10 @@
 #     (§13.3.1: direct link, no loader); on Android it names the NDK's system libvulkan.so.
 # The generator scripts of libplacebo need python3 Mako and Jinja2 (tools/requirements.txt, `pip install`).
 #
-# Patch: third_party/patches/libplacebo/0001 (Python 3.13 in utils_gen.py). The archive is GitLab's
+# Patches: third_party/patches/libplacebo/0001 (Python 3.13 in utils_gen.py) and 0002 (meson's find_library()
+# searches the directories in OVT_TP_LIB_DIRS, the vcpkg tree, for the glslang libraries). The archive is GitLab's
 # `-/archive/` tarball, which has no git submodules: Vulkan-Headers (replaced by vulkan-headers above),
-# fast_float (optional), jinja and markupsafe (the pip packages), and glad (OpenGL loader, Android only; the pip
+# fast_float (the vcpkg port `fast-float`), jinja and markupsafe (the pip packages), and glad (OpenGL loader, Android only; the pip
 # package `glad2` provides the same module).
 
 include_guard(GLOBAL)
@@ -187,9 +188,6 @@ unset(_ovt_pl_extra_link)
 unset(_ovt_pl_pkg_path)
 unset(_ovt_pl_hints)
 unset(_ovt_pl_root)
-unset(_ovt_pl_libdirs_env)
-unset(_ovt_pl_libdirs)
-unset(_ovt_pl_libdir)
 unset(_ovt_pl_libs)
 unset(_ovt_pl_vulkan_link)
 unset(_ovt_pl_vulkan_libs)
