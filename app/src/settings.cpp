@@ -71,7 +71,7 @@ bool check(const QJsonValue& value, const QJsonObject& schema, const QString& wh
     const QJsonValue type = schema.value(QStringLiteral("type"));
     bool ok = false;
     if (type.isArray()) {
-      for (const QJsonValue& t : type.toArray()) ok = ok || matches_type(value, t.toString());
+      for (const QJsonValue t : type.toArray()) ok = ok || matches_type(value, t.toString());
     } else {
       ok = matches_type(value, type.toString());
     }
@@ -89,7 +89,7 @@ bool check(const QJsonValue& value, const QJsonObject& schema, const QString& wh
   }
   if (value.isObject()) {
     const QJsonObject object = value.toObject();
-    for (const QJsonValue& name : schema.value(QStringLiteral("required")).toArray()) {
+    for (const QJsonValue name : schema.value(QStringLiteral("required")).toArray()) {
       if (!object.contains(name.toString())) return fail(QStringLiteral("missing \"%1\"").arg(name.toString()));
     }
     const QJsonObject properties = schema.value(QStringLiteral("properties")).toObject();
