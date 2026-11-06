@@ -14,11 +14,8 @@
 
 #include <nlohmann/json.hpp>
 
-#include "test_support/fb_normalize.h"
-
 #include <filesystem>
 #include <map>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -46,11 +43,6 @@ std::vector<Difference> compare_canonical(const nlohmann::json& golden, const nl
 /// Reads a tolerance map: a JSON object {"<pattern>": <tolerance>, ...}; the key "default" sets default_tolerance.
 /// Throws std::invalid_argument on a malformed file.
 CompareOptions load_compare_options(const std::filesystem::path& file);
-
-/// Checks the top-level shape of a canonical document of @p family (§14.4.0: box-tree is an array of
-/// {path,offset,size,fields}, block-grid has w4/h4/fields, ...). Returns the problem, or std::nullopt when the shape
-/// is right. Run on both the golden and the OVT output so a malformed golden cannot pass silently.
-std::optional<std::string> check_family_shape(Family family, const nlohmann::json& document);
 
 /// Unified diff (3 lines of context) of two texts, "" when they are equal.
 std::string unified_diff(std::string_view expected, std::string_view actual, std::string_view expected_label = "golden",

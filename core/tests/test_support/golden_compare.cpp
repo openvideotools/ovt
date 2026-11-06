@@ -10,7 +10,6 @@
 #include <cmath>
 #include <cstdint>
 #include <fstream>
-#include <initializer_list>
 #include <sstream>
 #include <stdexcept>
 
@@ -258,45 +257,6 @@ CompareOptions load_compare_options(const std::filesystem::path& file) {
     }
   }
   return options;
-}
-
-std::optional<std::string> check_family_shape(Family family, const json& document) {
-  const auto rows_have = [&](std::initializer_list<const char*> keys) -> std::optional<std::string> {
-    if (!document.is_array()) {
-      return std::string(family_name(family)) + " must be a JSON array";
-    }
-    for (std::size_t i = 0; i < document.size(); ++i) {
-      for (const char* key : keys) {
-        if (!document[i].is_object() || !document[i].contains(key)) {
-          return fmt::format("{}[{}] has no \"{}\"", family_name(family), i, key);
-        }
-      }
-    }
-    return std::nullopt;
-  };
-  switch (family) {
-    case Family::kSyntaxElements:
-      return rows_have({"unit", "name", "bit_offset", "bit_length", "value"});
-    case Family::kBoxTree:
-      return rows_have({"path", "offset", "size", "fields"});
-    case Family::kSampleTable:
-      return rows_have({"i", "dts", "cts", "size", "offset", "sync"});
-    case Family::kHeaderStruct:
-      return document.is_object() ? std::nullopt : std::optional<std::string>("header-struct must be a JSON object");
-    case Family::kBlockGrid:
-      if (!document.is_object() || !document.contains("w4") || !document.contains("h4") ||
-          !document.contains("fields") || !document["fields"].is_object()) {
-        return "block-grid must be an object with w4, h4 and fields";
-      }
-      return std::nullopt;
-    case Family::kScores:
-      if (!document.is_object() || !document.contains("frames") || !document["frames"].is_array() ||
-          !document.contains("pooled") || !document["pooled"].is_object()) {
-        return "scores must be an object with frames (array) and pooled (object)";
-      }
-      return std::nullopt;
-  }
-  return std::nullopt;
 }
 
 std::string unified_diff(std::string_view expected, std::string_view actual, std::string_view expected_label,
