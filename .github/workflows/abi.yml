@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# abi-check (chapter 13 §13.7.1, WI-0.031): abidiff of libovt_core.so between the last release tag and the pull
+# request, for pull requests that touch core/include/. Both sides are RelWithDebInfo with unstripped symbols,
+# because abidiff without DWARF reports nothing useful.
+#
+# Linux only (libabigail and the ELF .so): skips when the repository variable OVT_HOSTED_RUNNERS is `off`
+# (see ci.yml). Third-party actions are pinned by commit SHA, never by tag.
+#
+# Escape hatch: the pull request label `abi-break` allows a break, but only together with a bump of
+# OVT_API_VERSION_MAJOR in core/include/ovt/version.h; the job checks both.
+name: abi
+
+on:
+  pull_request:
+    paths:
+      - "core/include/**"
+      - ".github/workflows/abi.yml"
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  abi-check:
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    env:
+      BREAK_ALLOWED: ${{ contains(github.event.pull_request.labels.*.name, 'abi-break') }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0 # the release tags
+
+      - name: Last release tag
+        id: tag
+        run: |
+          tag="$(git describe --tags --abbrev=0 --match 'v*' origin/${{ github.base_ref }} 2>/dev/null || true)"
+          if [ -z "$tag" ]; then
+            echo "::notice::no release tag (v*) yet: there is no ABI baseline, abi-check passes"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install abidiff
+        if: steps.tag.outputs.tag != ''
+        run: sudo apt-get install -y -q --no-install-recommends abigail-tools
+
+      - uses: ./.github/actions/setup-ovt
+        if: steps.tag.outputs.tag != ''
+        with:
+          preset: linux-x64-release
+          triplet: x64-linux-ovt
+
+      # The release workflow (WI-0.036) does not exist yet, so the baseline is rebuilt from the tag instead of
+      # downloaded as an artefact: same preset, same compiler, so the comparison is like for like.
+      - name: Build libovt_core.so, RelWithDebInfo (pull request and tag)
+        if: steps.tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          build() { # <source dir> <absolute build dir>; presets are read from the source dir
+            (cd "$1" && cmake --preset linux-x64-release -B "$2" -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+              -DOVT_BUILD_GUI=OFF -DOVT_BUILD_CLI=OFF -DOVT_BUILD_RENDER=OFF)
+            cmake --build "$2" --target ovt_core
+          }
+          git worktree add "$RUNNER_TEMP/baseline" "$TAG"
+          git -C "$RUNNER_TEMP/baseline" submodule update --init --depth 1 third_party/vcpkg
+          build "$PWD" "$PWD/build/abi-head"
+          build "$RUNNER_TEMP/baseline" "$RUNNER_TEMP/baseline/build/abi"
+
+      - name: Compare
+        if: steps.tag.outputs.tag != ''
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          old="$(find "$RUNNER_TEMP/baseline/build/abi" -name 'libovt_core.so.*.*' -type f | head -n 1)"
+          new="$(find build/abi-head -name 'libovt_core.so.*.*' -type f | head -n 1)"
+          mkdir -p build/abi-report
+          rc=0
+          abidiff --harmless --no-added-syms "$old" "$new" > build/abi-report/abidiff.txt || rc=$?
+          cat build/abi-report/abidiff.txt
+          # abidiff exit bits: 1 error, 2 usage, 4 ABI change, 8 incompatible change.
+          if [ $((rc & 3)) -ne 0 ]; then
+            echo "::error::abidiff failed to run (exit $rc)"
+            exit 1
+          fi
+          if [ "$rc" -eq 0 ]; then echo "no ABI change since $TAG"; exit 0; fi
+          if [ "$BREAK_ALLOWED" != true ]; then
+            echo "::error::ABI changed since $TAG (report attached) and the PR lacks the abi-break label"
+            exit 1
+          fi
+          major() { sed -n 's/^#define OVT_API_VERSION_MAJOR \([0-9]*\).*/\1/p' "$1"; }
+          if [ "$(major core/include/ovt/version.h)" = "$(major "$RUNNER_TEMP/baseline/core/include/ovt/version.h")" ]; then
+            echo "::error::abi-break label set but OVT_API_VERSION_MAJOR was not bumped since $TAG"
+            exit 1
+          fi
+          echo "ABI break accepted: abi-break label and OVT_API_VERSION_MAJOR bumped"
+
+      - name: Upload abidiff report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: abidiff-report
+          path: build/abi-report/abidiff.txt
+          if-no-files-found: ignore

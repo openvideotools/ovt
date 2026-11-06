@@ -227,3 +227,115 @@ jobs:
           name: ovt-macos-arm64
           path: dist/ovt-macos-arm64.zip
           retention-days: 30
+
+  asan-ubsan:
+    # chapter 13 §13.7.1 (WI-0.031): Clang 16 and the Linux sanitizer runtimes, so Linux-only; skipped when the
+    # owner has switched hosted runners off. asan-ubsan-macos below covers the gap on the Mini meanwhile.
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-asan-ubsan
+          triplet: x64-linux-ovt
+
+      - name: Clang 16
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm.sh -o "$RUNNER_TEMP/llvm.sh"
+          sudo bash "$RUNNER_TEMP/llvm.sh" 16
+
+      # configure + build with OVT_BUILD_GUI=OFF, then `ctest --preset sanitizers` (fast|golden under ASan+UBSan;
+      # the deliberate canary test is excluded by the preset).
+      - name: Configure, build, test (sanitizers)
+        run: cmake --workflow --preset ci-linux-asan-ubsan
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-asan-ubsan
+          path: build/sanitizers/junit.xml
+          if-no-files-found: warn
+
+  asan-ubsan-macos:
+    # The sanitizer gate while hosted Linux runners are off: the nightly macos-asan workflow preset (ASan+UBSan on
+    # Apple clang) run on every pull request, on the Mini. Not a §13.7.1 job; it disappears from the picture when
+    # the owner removes OVT_HOSTED_RUNNERS=off, and asan-ubsan above takes over.
+    if: >-
+      vars.OVT_HOSTED_RUNNERS == 'off' &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: macos-arm64-asan
+          triplet: arm64-osx-ovt
+
+      - name: Configure, build, test (sanitizers)
+        run: cmake --workflow --preset ci-macos-asan # ctest --preset sanitizers-macos
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-asan-ubsan-macos
+          path: build/sanitizers-macos/junit.xml
+          if-no-files-found: warn
+
+  coverage:
+    # Clang source-based coverage (OVT_COVERAGE, chapter 13 §13.2.2) of the unit tests, gated by
+    # tools/coverage_gate.py (chapter 04 NFR-028). The spec names Clang 16 on ubuntu-22.04; the Mini's Apple clang
+    # supports the same flags and is where CI runs while hosted runners are unavailable, so one job serves both.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macos-arm64]
+    timeout-minutes: 60
+    env:
+      PRESET: macos-arm64-debug
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: macos-arm64-debug
+          triplet: arm64-osx-ovt
+
+      - name: Configure and build with coverage
+        run: |
+          cmake --preset "$PRESET" -DOVT_COVERAGE=ON -DOVT_BUILD_GUI=OFF
+          cmake --build --preset "$PRESET"
+
+      - name: Run the fast tests
+        run: |
+          rm -rf build/coverage && mkdir -p build/coverage
+          # %p-%m: one profile per process and binary; the tests start child processes.
+          export LLVM_PROFILE_FILE="$PWD/build/coverage/%p-%m.profraw"
+          ctest --preset "$PRESET" -L fast -LE "needs_display|needs_android|canary"
+
+      - name: Gate on core/src/
+        run: |
+          xcrun llvm-profdata merge -sparse build/coverage/*.profraw -o build/coverage/merged.profdata
+          objects="$(python -I tools/coverage_gate.py objects --test-dir "build/$PRESET")"
+          args=()
+          while IFS= read -r obj; do args+=("-object=$obj"); done <<< "$objects"
+          # The first binary is positional for llvm-cov; -object adds the rest.
+          xcrun llvm-cov export -summary-only -instr-profile=build/coverage/merged.profdata \
+            "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/export.json
+          xcrun llvm-cov report -instr-profile=build/coverage/merged.profdata \
+            "${objects%%$'\n'*}" "${args[@]:1}" > build/coverage/report.txt || true
+          python -I tools/coverage_gate.py check --summary build/coverage/export.json --root .
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage
+          path: |
+            build/coverage/export.json
+            build/coverage/report.txt
+          if-no-files-found: warn
