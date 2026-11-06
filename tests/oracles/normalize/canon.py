@@ -220,6 +220,94 @@ def to_int(text: str, what: str) -> int:
     return int(text)
 
 
+# --------------------------------------------------------------------------------------------------------
+# box-tree helpers shared by the ISOBMFF normalisers (§14.4.6-§14.4.9)
+
+HEX_RE = re.compile(r"^(?:0x)?([0-9a-fA-F]+)$")
+FIXED_RE = re.compile(r"^-?\d+(?:\.\d+)?$")
+
+
+def box_paths(boxes: Iterable[tuple[int, str, dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Give every box its ``box-tree`` path. Input: ``(depth, fourcc, record)`` in file order (pre-order,
+    depth 0 = top level). A 1-based ``[n]`` follows a fourcc only when its parent has several such boxes."""
+    nodes: list[tuple[int, str, dict[str, Any]]] = []  # (parent index or -1, fourcc, record)
+    stack: list[int] = []
+    for depth, fourcc, record in boxes:
+        if depth > len(stack):
+            raise NormalizeError(f"box {fourcc!r} at depth {depth} without a parent")
+        del stack[depth:]
+        nodes.append((stack[-1] if stack else -1, fourcc, record))
+        stack.append(len(nodes) - 1)
+    count: dict[tuple[int, str], int] = {}
+    for parent, fourcc, _ in nodes:
+        count[parent, fourcc] = count.get((parent, fourcc), 0) + 1
+    seen: dict[tuple[int, str], int] = {}
+    paths: list[str] = []
+    out = []
+    for parent, fourcc, record in nodes:
+        seen[parent, fourcc] = seen.get((parent, fourcc), 0) + 1
+        part = fourcc + (f"[{seen[parent, fourcc]}]" if count[parent, fourcc] > 1 else "")
+        paths.append(part if parent < 0 else f"{paths[parent]}/{part}")
+        out.append({"path": paths[-1], **record})
+    return out
+
+
+def field_value(text: str, conv: str = "auto") -> Any:
+    """One oracle field value in the §8.9.2 rule-3 form: integers as integers, fixed point as the raw integer
+    (``fixed16`` = 16.16, ``fixed8`` = 8.8), hex as integers (``hex``), byte blobs as lowercase hex
+    (``blob``; GPAC writes ``data:application/octet-string,<HEX>``), booleans 0/1, the rest as strings."""
+    text = text.strip()
+    if conv in ("fixed16", "fixed8"):
+        if not FIXED_RE.match(text):
+            raise NormalizeError(f"{text!r} is not a fixed-point number")
+        return round(float(text) * (65536 if conv == "fixed16" else 256))
+    if conv == "hex":
+        m = HEX_RE.match(text.split(" ", 1)[0])
+        if not m:
+            raise NormalizeError(f"{text!r} is not a hex number")
+        return int(m.group(1), 16)
+    if conv == "blob":
+        return text.rsplit(",", 1)[-1].lower()
+    if conv == "minus1":
+        return to_int(text, "value") - 1
+    if conv == "str":
+        return text
+    if INT_RE.match(text):
+        return int(text)
+    if text.startswith("0x") and HEX_RE.match(text):
+        return int(text, 16)
+    if text.startswith("data:application/octet-string,"):
+        return text.rsplit(",", 1)[-1].lower()
+    if text in ("true", "false"):
+        return int(text == "true")
+    return text
+
+
+def map_fields(raw: Iterable[tuple[str, str]], spec: dict[str, Any], keep_unmapped: bool = False) -> dict[str, Any]:
+    """Map ``(oracle name, text)`` pairs through ``spec`` = ``{oracle name: spec name | [spec name, conv]}``.
+    A spec name ending in ``[]`` collects repeated values into a list. Unmapped names are dropped unless
+    ``keep_unmapped`` (used while extending a map: they come out under ``?<oracle name>``)."""
+    out: dict[str, Any] = {}
+    for name, text in raw:
+        target = spec.get(name)
+        if target is None:
+            if keep_unmapped:
+                out[f"?{name}"] = field_value(text)
+            continue
+        key, conv = (target, "auto") if isinstance(target, str) else target
+        value = field_value(text, conv)
+        if key.endswith("[]"):
+            out.setdefault(key[:-2], []).append(value)
+        else:
+            out[key] = value
+    return out
+
+
+def box_map(maps: dict[str, Any], fourcc: str) -> dict[str, Any]:
+    """The field map of one box: the ``"*"`` entries overlaid with the box's own."""
+    return {**maps.get("*", {}), **maps.get(fourcc, {})}
+
+
 def run(
     family: str,
     description: str,
