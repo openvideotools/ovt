@@ -5,6 +5,8 @@
 # WI-0.006 acceptance tests 1 and 2). bootstrap.sh never runs sudo; it prints the install commands, which
 # this job runs (`--print-install | sudo bash`) before running bootstrap.sh for real.
 # Third-party actions are pinned by commit SHA.
+# Both jobs need a fresh GitHub-hosted machine, so they skip when the repository variable OVT_HOSTED_RUNNERS
+# is `off` (ci.yml).
 name: bootstrap-check
 
 on:
@@ -28,6 +30,7 @@ permissions:
 jobs:
   ubuntu-22-04:
     name: bootstrap-check (ubuntu-22.04)
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-22.04
     container: ubuntu:22.04            # a fresh image: only git and sudo are added below
     timeout-minutes: 120
@@ -60,6 +63,7 @@ jobs:
 
   macos-15:
     name: bootstrap-check (macos-15)
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: macos-15
     timeout-minutes: 120
     steps:
