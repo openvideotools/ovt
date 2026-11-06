@@ -79,6 +79,10 @@ file(MAKE_DIRECTORY "${_ovt_ort_prefix}/include")
 add_library(tp::onnxruntime SHARED IMPORTED GLOBAL)
 set_target_properties(tp::onnxruntime PROPERTIES IMPORTED_LOCATION "${_ovt_ort_lib}" INTERFACE_INCLUDE_DIRECTORIES
                                                                                      "${_ovt_ort_prefix}/include")
+if(APPLE)
+  # The dylib's install name is @rpath/...; CMake cannot read it before the archive is extracted (see moltenvk.cmake).
+  set_property(TARGET tp::onnxruntime PROPERTY INTERFACE_LINK_OPTIONS "LINKER:-rpath,${_ovt_ort_prefix}/lib")
+endif()
 add_dependencies(tp::onnxruntime tp_onnxruntime)
 ovt_set_dependency_license(
   tp::onnxruntime

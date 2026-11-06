@@ -62,6 +62,9 @@ file(MAKE_DIRECTORY "${_ovt_mvk_prefix}/include")
 add_library(tp::moltenvk SHARED IMPORTED GLOBAL)
 set_target_properties(tp::moltenvk PROPERTIES IMPORTED_LOCATION "${_ovt_mvk_dylib}" INTERFACE_INCLUDE_DIRECTORIES
                                                                                     "${_ovt_mvk_prefix}/include")
+# The dylib's install name is @rpath/libMoltenVK.dylib and CMake cannot read it while the file is not yet downloaded,
+# so it adds no build-tree rpath by itself: give every consumer one.
+set_property(TARGET tp::moltenvk PROPERTY INTERFACE_LINK_OPTIONS "LINKER:-rpath,${_ovt_mvk_prefix}/lib")
 add_dependencies(tp::moltenvk tp_moltenvk)
 ovt_set_dependency_license(
   tp::moltenvk
