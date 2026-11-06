@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "ovt_container_generated.h"
+#include "ovt_metrics_generated.h"
 #include "ovt_model_generated.h"
 #include "test_support/fb_normalize.h"
 
@@ -192,4 +193,77 @@ TEST_CASE("to_canonical: box-tree paths, offsets, sizes and fields", "[test_supp
     {"path":"moov/trak[2]","offset":140,"size":40,"fields":{}},
     {"path":"moov/udta","offset":180,"size":8,"fields":{}}])"));
   CHECK_THROWS_AS(ovt::test::to_canonical(*t, Family::kScores), std::invalid_argument);
+}
+
+TEST_CASE("to_canonical: sample-table rows from the structure-of-arrays table", "[test_support][golden][fast]") {
+  flatbuffers::FlatBufferBuilder b;
+  const auto dts = b.CreateVector(std::vector<int64_t>{0, 3000, 6000});
+  const auto cts = b.CreateVector(std::vector<int32_t>{3000, 6000, 0});
+  const auto offset = b.CreateVector(std::vector<uint64_t>{48, 1048, 1348});
+  const auto size = b.CreateVector(std::vector<uint32_t>{1000, 300, 200});
+  const auto sync = b.CreateVector(std::vector<uint8_t>{1, 0, 0});
+  fb::SampleTableBuilder table(b);
+  table.add_count(3);
+  table.add_dts(dts);
+  table.add_cts_offset(cts);
+  table.add_offset(offset);
+  table.add_size(size);
+  table.add_is_sync(sync);
+  b.Finish(table.Finish());
+  const auto* t = flatbuffers::GetRoot<fb::SampleTable>(b.GetBufferPointer());
+  CHECK(ovt::test::to_canonical(*t) == json::parse(R"([
+    {"i":0,"dts":0,"cts":3000,"size":1000,"offset":48,"sync":1},
+    {"i":1,"dts":3000,"cts":9000,"size":300,"offset":1048,"sync":0},
+    {"i":2,"dts":6000,"cts":6000,"size":200,"offset":1348,"sync":0}])"));
+}
+
+TEST_CASE("to_canonical: block-grid selects CellGrid fields", "[test_support][golden][fast]") {
+  flatbuffers::FlatBufferBuilder b;
+  const auto qp = b.CreateVector(std::vector<int16_t>{26, 26, 30, 31});
+  const auto pred = b.CreateVector(std::vector<uint8_t>{1, 1, 2, 2});
+  const auto block_id = b.CreateVector(std::vector<uint32_t>{0, 0, 1, 1});
+  fb::CellGridBuilder grid(b);
+  grid.add_cells_w(2);
+  grid.add_cells_h(2);
+  grid.add_qp(qp);
+  grid.add_pred(pred);
+  grid.add_block_id(block_id);
+  const auto grid_off = grid.Finish();
+  fb::FrameAnalysisBuilder analysis(b);
+  analysis.add_grid(grid_off);
+  b.Finish(analysis.Finish());
+  const auto* a = flatbuffers::GetRoot<fb::FrameAnalysis>(b.GetBufferPointer());
+
+  CHECK(ovt::test::to_canonical(*a, Family::kBlockGrid, {"qp"}) ==
+        json::parse(R"({"w4":2,"h4":2,"fields":{"qp":[26,26,30,31]}})"));
+  // Default: every vector the grid carries, except the plugin-internal block_id.
+  CHECK(ovt::test::to_canonical(*a) ==
+        json::parse(R"({"w4":2,"h4":2,"fields":{"qp":[26,26,30,31],"pred":[1,1,2,2]}})"));
+  CHECK_THROWS_AS(ovt::test::to_canonical(*a, Family::kBlockGrid, {"nope"}), std::invalid_argument);
+}
+
+TEST_CASE("to_canonical: scores per frame and pooled", "[test_support][golden][fast]") {
+  flatbuffers::FlatBufferBuilder b;
+  const auto id = b.CreateString("psnr");
+  const auto descriptor = fb::CreateMetricDescriptor(b, id);
+  const fb::FrameId f0(0, 0);
+  const fb::FrameId f1(2, 1);
+  const auto v0 = b.CreateVector(std::vector<double>{38.25, 41.5, 42.0});
+  const auto v1 = b.CreateVector(std::vector<double>{36.125, 40.0, 40.75});
+  const auto frames = b.CreateVector(std::vector<flatbuffers::Offset<fb::FrameScore>>{
+      fb::CreateFrameScore(b, &f0, v0), fb::CreateFrameScore(b, &f1, v1)});
+  const auto mean = b.CreateVector(std::vector<double>{37.1875, 40.75, 41.375});
+  const auto min = b.CreateVector(std::vector<double>{36.125, 40.0, 40.75});
+  fb::MetricsResultBuilder result(b);
+  result.add_descriptor(descriptor);
+  result.add_frames(frames);
+  result.add_pooled_mean(mean);
+  result.add_pooled_min(min);
+  b.Finish(result.Finish());
+  const auto* r = flatbuffers::GetRoot<fb::MetricsResult>(b.GetBufferPointer());
+  const json scores = ovt::test::to_canonical(*r);
+  CHECK(scores["frames"][0] == json::parse(R"({"i":0,"psnr_y":38.25,"psnr_u":41.5,"psnr_v":42.0})"));
+  CHECK(scores["frames"][1]["i"] == 1);  // display_index
+  CHECK(scores["pooled"]["psnr_y"] == json::parse(R"({"mean":37.1875,"min":36.125})"));
+  CHECK(scores["pooled"]["psnr_v"]["mean"] == 41.375);
 }
