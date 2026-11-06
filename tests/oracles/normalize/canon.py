@@ -194,10 +194,14 @@ def read_text(path: str) -> str:
 
 
 def read_json(path: str) -> Any:
+    return parse_json(read_text(path), path)
+
+
+def parse_json(text: str, what: str) -> Any:
     try:
-        return json.loads(read_text(path))
+        return json.loads(text)
     except json.JSONDecodeError as exc:
-        raise NormalizeError(f"{path}: not JSON: {exc}") from exc
+        raise NormalizeError(f"{what}: not JSON: {exc}") from exc
 
 
 def load_map(name: str) -> Any:
@@ -218,6 +222,24 @@ def to_int(text: str, what: str) -> int:
     if not INT_RE.match(text.strip()):
         raise NormalizeError(f"{what}: {text!r} is not an integer")
     return int(text)
+
+
+def to_score(text: str, what: str) -> float:
+    """A metric value as an oracle prints it: a decimal or %G number, or inf/-inf (any case). NaN is refused."""
+    try:
+        value = float(text)
+    except ValueError as exc:
+        raise NormalizeError(f"{what}: {text!r} is not a number") from exc
+    if math.isnan(value):
+        raise NormalizeError(f"{what}: NaN")
+    return value
+
+
+def numbered_frames(numbers: list[int], what: str) -> None:
+    """Oracles that print their own frame counter (0- or 1-based) must count up by one without gaps."""
+    for prev, cur in zip(numbers, numbers[1:]):
+        if cur != prev + 1:
+            raise NormalizeError(f"{what}: frame number {cur} follows {prev}")
 
 
 # --------------------------------------------------------------------------------------------------------
