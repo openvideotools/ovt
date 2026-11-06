@@ -116,6 +116,16 @@ TEST_CASE("AT5: ovt completion zsh begins with compdef", "[fast][cli]") {
   CHECK(contains(invoke({"completion", "fish"}).out, "complete -c ovt"));
 }
 
+TEST_CASE("completion on a terminal ignores OVT_FORMAT=fb", "[fast][cli]") {
+  const Result env = invoke({"completion", "zsh"}, {{"OVT_FORMAT", "fb"}}, true);
+  CHECK(env.code == 0);
+  CHECK(env.out.starts_with("#compdef ovt\n"));
+  CHECK(env.err.empty());
+  const Result flag = invoke({"--format", "fb", "completion", "zsh"}, {}, true);
+  CHECK(flag.code == 2);
+  CHECK(contains(flag.err, "CLI-0010"));
+}
+
 TEST_CASE("Completion scripts list subcommands and IsMember choices", "[fast][cli]") {
   const std::string bash = invoke({"completion", "bash"}).out;
   CHECK(contains(bash, "completion"));
@@ -315,5 +325,5 @@ TEST_CASE("Progress on a TTY rewrites one line with an ETA", "[fast][cli]") {
   p.finish();
   const std::string s = slurp(err);
   static_cast<void>(std::fclose(err));
-  CHECK(s == "\r[####      ] 42% frames 1200/2850 ETA 00:12\n");
+  CHECK(s == "\r[####      ] 42% frames 1200/2850 ETA 00:12\x1b[K\n");
 }

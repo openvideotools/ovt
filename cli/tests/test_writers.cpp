@@ -150,6 +150,8 @@ TEST_CASE("SI sizes and HH:MM:SS.mmm times", "[fast][cli]") {
   CHECK(ovt::cli::si(999, "B") == "999 B");
   CHECK(ovt::cli::si(12345678, "B") == "12.3 MB");
   CHECK(ovt::cli::si(1500, "b/s") == "1.5 kb/s");
+  CHECK(ovt::cli::si(999.95, "B") == "1.0 kB");
+  CHECK(ovt::cli::si(999950, "B") == "1.0 MB");
   CHECK(ovt::cli::hms(3723.5) == "01:02:03.500");
   CHECK(ovt::cli::hms(0.0004) == "00:00:00.000");
   CHECK(ovt::cli::hms(-1.25) == "-00:00:01.250");

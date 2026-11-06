@@ -68,7 +68,9 @@ std::string si(double value, std::string_view unit) {
   static constexpr std::array<std::string_view, 7> kPrefixes = {"", "k", "M", "G", "T", "P", "E"};
   std::size_t i = 0;
   double v = value;
-  while (std::fabs(v) >= 1000.0 && i + 1 < kPrefixes.size()) {
+  // Round to the printed precision before choosing the prefix, so 999.95 prints as "1.0 k", not "1000.0".
+  const auto shown = [&](double x) { return i == 0 && x == std::floor(x) ? x : std::round(x * 10.0) / 10.0; };
+  while (std::fabs(shown(v)) >= 1000.0 && i + 1 < kPrefixes.size()) {
     v /= 1000.0;
     ++i;
   }

@@ -239,7 +239,10 @@ Resolved resolve(const Cli& cli, const Context& ctx) {
     return {std::nullopt, std::move(err)};
   }
   g.output = r.output;
-  if (g.format == Format::Fb && g.output == "-" && ctx.stdout_tty) {
+  // #101 (accepted): `completion` ignores OVT_FORMAT and the TTY default, so only a --format flag can make it
+  // refuse binary output here.
+  const bool format_used = g.format_from_flag || !cli.completion()->parsed();
+  if (format_used && g.format == Format::Fb && g.output == "-" && ctx.stdout_tty) {
     return {std::nullopt, UsageError{"CLI-0010", std::string(kRefuseBinaryOnTty), std::string(kName)}};
   }
   resolve_paths(cli, ctx, g);
@@ -699,7 +702,7 @@ void ProgressReporter::update(double fraction, std::uint64_t done, std::uint64_t
       eta = left >= 3600 ? fmt::format("{:02}:{:02}:{:02}", left / 3600, left / 60 % 60, left % 60)
                          : fmt::format("{:02}:{:02}", left / 60, left % 60);
     }
-    line = fmt::format("\r[{}{}] {}% {} {}/{} ETA {}", std::string(static_cast<std::size_t>(filled), '#'),
+    line = fmt::format("\r[{}{}] {}% {} {}/{} ETA {}\x1b[K", std::string(static_cast<std::size_t>(filled), '#'),
                        std::string(static_cast<std::size_t>(kBar - filled), ' '), percent, unit_, done, total, eta);
   } else {
     line = fmt::format("{{\"progress\":{},\"done\":{},\"total\":{},\"stage\":{}}}\n", percent / 100.0, done, total,
