@@ -92,7 +92,7 @@ Cancel& Cancel::never() noexcept {
 
 // ---- JobHandle -----------------------------------------------------------------------------------
 
-void JobHandle::wait() {
+void JobHandle::wait() const {
   detail::JobState& s = *state;
   std::unique_lock<std::mutex> lock(s.m);
   while (s.phase.load(std::memory_order_acquire) != detail::kDone) {

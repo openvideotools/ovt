@@ -80,7 +80,7 @@ struct JobHandle {
   uint64_t id;
   Cancel& cancel;                      // request() cancels the job
   std::function<Progress()> progress;  // snapshot, callable from any thread
-  void wait();                         // blocks until finished, or until cancelled before it started
+  void wait() const;                   // blocks until finished, or until cancelled before it started
   [[nodiscard]] bool done() const noexcept;
   // The job's result once done(): OVT_E_CANCELLED for ovt::Cancelled or a job cancelled before it started,
   // OVT_E_NOMEM for std::bad_alloc, OVT_E_INTERNAL for any other exception; OVT_E_INTERNAL while running.

@@ -41,7 +41,7 @@ struct ovt_Job {
   ovt_progress_fn callback = nullptr;
   void* callback_user = nullptr;
   bool callback_called = false;
-  std::chrono::steady_clock::time_point last_callback{};
+  std::chrono::steady_clock::time_point last_callback;
 };
 
 namespace ovt::jobs {
