@@ -8,9 +8,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
-#include <iterator>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -18,7 +16,6 @@
 #include <vector>
 
 #include "ovt_container_generated.h"
-#include "ovt_metrics_generated.h"
 #include "ovt_model_generated.h"
 
 namespace ovt::test {
@@ -342,73 +339,6 @@ void collect_boxes(const flatbuffers::Vector<flatbuffers::Offset<fb::BoxNode>>* 
   }
 }
 
-// ---- block-grid ---------------------------------------------------------------------------------
-
-template <typename T>
-json cell_array(const flatbuffers::Vector<T>* values) {
-  json array = json::array();
-  if (values != nullptr) {
-    for (const T v : *values) {
-      array.push_back(v);
-    }
-  }
-  return array;
-}
-
-using GridGetter = json (*)(const fb::CellGrid&);
-
-const std::map<std::string, GridGetter>& grid_getters() {
-  static const std::map<std::string, GridGetter> getters = {
-      {"block_id", [](const fb::CellGrid& g) { return cell_array(g.block_id()); }},
-      {"partition_id", [](const fb::CellGrid& g) { return cell_array(g.partition_id()); }},
-      {"pred", [](const fb::CellGrid& g) { return cell_array(g.pred()); }},
-      {"qp", [](const fb::CellGrid& g) { return cell_array(g.qp()); }},
-      {"intra_mode_y", [](const fb::CellGrid& g) { return cell_array(g.intra_mode_y()); }},
-      {"intra_mode_c", [](const fb::CellGrid& g) { return cell_array(g.intra_mode_c()); }},
-      {"mv0_x", [](const fb::CellGrid& g) { return cell_array(g.mv0_x()); }},
-      {"mv0_y", [](const fb::CellGrid& g) { return cell_array(g.mv0_y()); }},
-      {"mv1_x", [](const fb::CellGrid& g) { return cell_array(g.mv1_x()); }},
-      {"mv1_y", [](const fb::CellGrid& g) { return cell_array(g.mv1_y()); }},
-      {"ref0", [](const fb::CellGrid& g) { return cell_array(g.ref0()); }},
-      {"ref1", [](const fb::CellGrid& g) { return cell_array(g.ref1()); }},
-      {"tx_log2_w", [](const fb::CellGrid& g) { return cell_array(g.tx_log2_w()); }},
-      {"tx_log2_h", [](const fb::CellGrid& g) { return cell_array(g.tx_log2_h()); }},
-      {"tx_type", [](const fb::CellGrid& g) { return cell_array(g.tx_type()); }},
-      {"cbf", [](const fb::CellGrid& g) { return cell_array(g.cbf()); }},
-      {"bits_x8", [](const fb::CellGrid& g) { return cell_array(g.bits_x8()); }},
-      {"deblock_bs_v", [](const fb::CellGrid& g) { return cell_array(g.deblock_bs_v()); }},
-      {"deblock_bs_h", [](const fb::CellGrid& g) { return cell_array(g.deblock_bs_h()); }},
-      {"filter_idx", [](const fb::CellGrid& g) { return cell_array(g.filter_idx()); }},
-  };
-  return getters;
-}
-
-// ---- scores -------------------------------------------------------------------------------------
-
-std::string score_key(const std::string& metric, std::size_t plane, std::size_t count) {
-  if (count <= 1) {
-    return metric;
-  }
-  static constexpr std::array<std::string_view, 3> kPlanes = {"_y", "_u", "_v"};
-  std::string key = metric;
-  if (plane < kPlanes.size()) {
-    key += kPlanes[plane];
-  } else {
-    key += '_';
-    key += std::to_string(plane);
-  }
-  return key;
-}
-
-void add_pooled(json& pooled, const std::string& metric, const char* stat, const flatbuffers::Vector<double>* values) {
-  if (values == nullptr) {
-    return;
-  }
-  for (std::size_t i = 0; i < values->size(); ++i) {
-    pooled[score_key(metric, i, values->size())][stat] = (*values)[static_cast<flatbuffers::uoffset_t>(i)];
-  }
-}
-
 void require_family(Family actual, Family expected, const char* what) {
   if (actual != expected) {
     throw std::invalid_argument(std::string("to_canonical: ") + what + " cannot produce family " +
@@ -489,80 +419,6 @@ json to_canonical(const fb::ContainerTree& tree, Family family) {
   json boxes = json::array();
   collect_boxes(tree.root(), std::string(), boxes);
   return boxes;
-}
-
-json to_canonical(const fb::SampleTable& table, Family family) {
-  require_family(family, Family::kSampleTable, "a SampleTable");
-  json rows = json::array();
-  const flatbuffers::uoffset_t count = table.dts() != nullptr ? table.dts()->size() : 0U;
-  const auto at_u32 = [&](const flatbuffers::Vector<uint32_t>* v, flatbuffers::uoffset_t i) -> uint64_t {
-    return v != nullptr && i < v->size() ? (*v)[i] : 0U;
-  };
-  for (flatbuffers::uoffset_t i = 0; i < count; ++i) {
-    const int64_t dts = (*table.dts())[i];
-    const int64_t cts_offset =
-        table.cts_offset() != nullptr && i < table.cts_offset()->size() ? (*table.cts_offset())[i] : 0;
-    const uint64_t offset = table.offset() != nullptr && i < table.offset()->size() ? (*table.offset())[i] : 0U;
-    const bool sync = table.is_sync() != nullptr && i < table.is_sync()->size() && (*table.is_sync())[i] != 0;
-    rows.push_back({{"i", i},
-                    {"dts", dts},
-                    {"cts", dts + cts_offset},
-                    {"size", at_u32(table.size(), i)},
-                    {"offset", offset},
-                    {"sync", sync ? 1 : 0}});
-  }
-  return rows;
-}
-
-json to_canonical(const fb::FrameAnalysis& analysis, Family family, const std::vector<std::string>& fields) {
-  require_family(family, Family::kBlockGrid, "a FrameAnalysis");
-  const fb::CellGrid* grid = analysis.grid();
-  json out = {{"w4", grid != nullptr ? grid->cells_w() : 0U},
-              {"h4", grid != nullptr ? grid->cells_h() : 0U},
-              {"fields", json::object()}};
-  if (grid == nullptr) {
-    return out;
-  }
-  if (fields.empty()) {
-    for (const auto& [name, getter] : grid_getters()) {
-      json values = getter(*grid);
-      if (name != "block_id" && !values.empty()) {
-        out["fields"][name] = std::move(values);
-      }
-    }
-    return out;
-  }
-  for (const std::string& name : fields) {
-    const auto it = grid_getters().find(name);
-    if (it == grid_getters().end()) {
-      throw std::invalid_argument("to_canonical: unknown CellGrid field '" + name + "'");
-    }
-    out["fields"][name] = it->second(*grid);
-  }
-  return out;
-}
-
-json to_canonical(const fb::MetricsResult& result, Family family) {
-  require_family(family, Family::kScores, "a MetricsResult");
-  const std::string metric = result.descriptor() != nullptr ? str_of(result.descriptor()->id()) : std::string();
-  json frames = json::array();
-  if (result.frames() != nullptr) {
-    for (const fb::FrameScore* score : *result.frames()) {
-      json row = {{"i", score->frame() != nullptr ? score->frame()->display_index() : 0}};
-      if (score->values() != nullptr) {
-        for (std::size_t p = 0; p < score->values()->size(); ++p) {
-          row[score_key(metric, p, score->values()->size())] =
-              (*score->values())[static_cast<flatbuffers::uoffset_t>(p)];
-        }
-      }
-      frames.push_back(std::move(row));
-    }
-  }
-  json pooled = json::object();
-  add_pooled(pooled, metric, "mean", result.pooled_mean());
-  add_pooled(pooled, metric, "harmonic_mean", result.pooled_harmonic());
-  add_pooled(pooled, metric, "min", result.pooled_min());
-  return {{"frames", std::move(frames)}, {"pooled", std::move(pooled)}};
 }
 
 }  // namespace ovt::test
