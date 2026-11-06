@@ -3,3 +3,7 @@
 # Fuzz seeds and crash regressions are binary inputs (WI-0.557).
 core/tests/fuzz/corpus/** binary
 core/tests/fuzz/regressions/** binary
+
+# WI-0.093 golden fixtures: raw FlatBuffers and YUV bytes must never be line-ending normalised.
+core/tests/golden/*.fa binary
+core/tests/golden/*.yuv binary
