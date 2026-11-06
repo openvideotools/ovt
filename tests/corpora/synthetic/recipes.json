@@ -138,8 +138,8 @@
     {"recipe": "40", "id": "syn_h265_pq_colr_only", "features": ["10bit", "pq", "colr_only"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_h265_pq_colr_only.mp4"], "steps": [
       {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "src_1080p_10bit.y4m", "--input-depth", "10", "--output-depth", "10", "--profile", "main10", "--preset", "fast", "--keyint", "30", "--output", "pq_novui.265"]},
       {"cmd": ["MP4Box", "-for-test", "-add", "pq_novui.265:colr=nclx,9,16,9,0", "-new", "syn_h265_pq_colr_only.mp4"]}]},
-    {"recipe": "41", "id": "syn_h265_pq_4000nit", "features": ["10bit", "pq", "mdcv_sei", "clli_sei"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_h265_pq_4000nit.mp4", "syn_h265_pq_4000nit.265"], "steps": [
-      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-vf", "lutyuv=y='if(lt(Y,800),Y,Y+60)'", "-pix_fmt", "yuv420p10le", "-strict", "-1", "-f", "yuv4mpegpipe", "src_1080p_10bit_4000nit.y4m"]},
+    {"recipe": "41", "id": "syn_h265_pq_4000nit", "features": ["10bit", "pq", "mdcv_sei", "clli_sei"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_h265_pq_4000nit.mp4", "syn_h265_pq_4000nit.265"], "note": "lutyuv names the sample value val, not Y; the result is clipped at maxval", "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-vf", "lutyuv=y='if(lt(val,800),val,min(val+60,maxval))'", "-pix_fmt", "yuv420p10le", "-strict", "-1", "-f", "yuv4mpegpipe", "src_1080p_10bit_4000nit.y4m"]},
       {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "src_1080p_10bit_4000nit.y4m", "--input-depth", "10", "--output-depth", "10", "--profile", "main10", "--preset", "medium", "--colorprim", "bt2020", "--transfer", "smpte2084", "--colormatrix", "bt2020nc", "--master-display", "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(40000000,50)", "--max-cll", "4000,1000", "--hdr10", "--hdr10-opt", "--repeat-headers", "--keyint", "30", "--output", "syn_h265_pq_4000nit.265"]},
       {"cmd": ["ffmpeg", "-i", "syn_h265_pq_4000nit.265", "-c", "copy", "-tag:v", "hvc1", "syn_h265_pq_4000nit.mp4"]}]},
     {"recipe": "42", "id": "syn_h265_vui_unspecified", "features": ["no_vui", "bt709_content"], "needs": ["src_720p_8bit.yuv"], "files": ["syn_h265_vui_unspecified.265"], "steps": [
@@ -184,8 +184,8 @@
     {"recipe": "55", "id": "syn_metrics_fps_mismatch_pair", "features": ["metrics_pair", "fps_mismatch"], "files": ["syn_metrics_fps_mismatch_ref60.y4m", "syn_metrics_fps_mismatch_dist30.y4m"], "steps": [
       {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "testsrc2=size=1280x720:rate=60,format=yuv420p", "-frames:v", "600", "syn_metrics_fps_mismatch_ref60.y4m"]},
       {"cmd": ["ffmpeg", "-i", "syn_metrics_fps_mismatch_ref60.y4m", "-vf", "fps=30", "syn_metrics_fps_mismatch_dist30.y4m"]}]},
-    {"recipe": "56", "id": "syn_metrics_scale_range_pair", "features": ["metrics_pair", "scale", "range"], "needs": ["src_1080p_8bit.y4m"], "files": ["syn_metrics_scale_range_ref.y4m", "syn_metrics_scale_range_dist.y4m"], "steps": [
-      {"cmd": ["ffmpeg", "-i", "src_1080p_8bit.y4m", "-vf", "scale=1280:720:flags=bicubic:out_range=full", "-c:v", "libx264", "-threads", "1", "-x264-params", "range=pc", "-crf", "20", "-f", "h264", "syn_metrics_scale_range_dist.264"]},
+    {"recipe": "56", "id": "syn_metrics_scale_range_pair", "features": ["metrics_pair", "scale", "range"], "needs": ["src_1080p_8bit.y4m"], "files": ["syn_metrics_scale_range_ref.y4m", "syn_metrics_scale_range_dist.y4m"], "note": "-color_range pc instead of -x264-params range=pc, which libx264 rejects ('Error parsing option')", "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_8bit.y4m", "-vf", "scale=1280:720:flags=bicubic:out_range=full", "-c:v", "libx264", "-threads", "1", "-color_range", "pc", "-crf", "20", "-f", "h264", "syn_metrics_scale_range_dist.264"]},
       {"cmd": ["ffmpeg", "-i", "syn_metrics_scale_range_dist.264", "-f", "yuv4mpegpipe", "syn_metrics_scale_range_dist.y4m"]},
       {"cmd": ["cp", "src_1080p_8bit.y4m", "syn_metrics_scale_range_ref.y4m"]}]},
     {"recipe": "57", "id": "syn_metrics_ladder_ref", "features": ["ladder", "bdrate"], "needs": ["src_1080p_8bit.y4m"], "files": ["syn_metrics_ladder_ref.y4m"], "steps": [

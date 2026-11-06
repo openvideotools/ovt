@@ -6,7 +6,7 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 Accepted answer of `spec-question` #119 (coordinator, under the owner's level-3 autonomy). MINOR-level change (recipe commands of WI-0.553); no WI is re-opened.
 
-- 14 §14.3.3 — reproducibility adjustments of the synthetic recipes: pinned encoder thread counts, `MP4Box -for-test`, `mkvmerge --no-date --deterministic`, seeded lavfi sources, fixed Bento4 IV, `-strict -1` for 10-bit Y4M, `-framerate 30` for raw Annex B, tool paths and arguments of recipes 2, 16, 22, 27, 28, 31 and 68; `check_fast_subset.py` greps `docs/spec/` (#119) — WI-0.553
+- 14 §14.3.3 — reproducibility adjustments of the synthetic recipes: pinned encoder thread counts, `MP4Box -for-test`, `mkvmerge --no-date --deterministic`, seeded lavfi sources, fixed Bento4 IV, `-strict -1` for 10-bit Y4M, `-framerate 30` for raw Annex B, tool paths and arguments of recipes 2, 16, 22, 27, 28, 31, 41, 56 and 68; `check_fast_subset.py` greps `docs/spec/` (#119) — WI-0.553
 
 ## 1.0.0-rc2 — 2026-11-04
 
