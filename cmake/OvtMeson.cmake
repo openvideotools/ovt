@@ -4,16 +4,25 @@
 # Meson wrapper for third_party/*.cmake (chapter 13 §13.3.5, WI-0.011). Include it through
 # OvtThirdPartyCommon or OvtThirdParty; third_party/dav1d.cmake is the first consumer.
 #
-#   ovt_tp_meson(<dep> (URL <url> URL_HASH SHA256=<hex> | SOURCE_DIR <dir>) [OPTIONS <-Dopt=value>...]
-#                OUTPUT_LIBS <tp::target=lib/libx.a>... [PATCH_COMMAND <cmd>...] [DEPENDS <target>...])
+#   ovt_tp_meson(<dep> (URL <url> URL_HASH SHA256=<hex> | SOURCE_DIR <dir>) [SOURCE_SUBDIR <dir>]
+#                [OPTIONS <-Dopt=value>...] OUTPUT_LIBS <tp::target=lib/libx.a>... [PATCH_COMMAND <cmd>...]
+#                [DEPENDS <target>...] [EXTRA_C_ARGS <flag>...] [EXTRA_LINK_ARGS <flag>...]
+#                [PKG_CONFIG_PATH <dir>...])
 #       Builds the Meson project <dep> as ExternalProject `tp_<dep>`, installed into
 #       ${OVT_THIRD_PARTY_PREFIX}/<dep> (libdir `lib`, static, release, no LTO, position-independent).
 #       URL and URL_HASH are the VERSIONS.md row (OVT_TP_<dep>_URL / _SHA256); the archive is already in
 #       OVT_TP_DOWNLOADS from ovt_tp_declare(), so ExternalProject does not fetch it again. SOURCE_DIR is an
 #       existing tree instead.
+#       SOURCE_SUBDIR names the directory of the archive that holds the top-level meson.build (libvmaf keeps
+#       its Meson project in `libvmaf/`); patches and licence files still refer to the archive root.
 #       OPTIONS are passed to `meson setup` verbatim. Each OUTPUT_LIBS entry `tp::name=relative/lib.a`
 #       becomes a STATIC IMPORTED GLOBAL target (ovt_tp_import_static: include dir `include`, licence record
 #       from the ovt_tp_declare() of <dep>, so call that first).
+#
+#       EXTRA_C_ARGS / EXTRA_LINK_ARGS add compiler (C and C++) and linker flags, PKG_CONFIG_PATH directories to
+#       the pkg-config search path, for dependencies Meson finds outside the system paths (the vcpkg tree of
+#       libplacebo's glslang and lcms2). They go into the cross file, or into CFLAGS/CXXFLAGS/LDFLAGS and
+#       PKG_CONFIG_PATH of a native Linux build.
 #
 #   Cross file: <binary>/third_party/<dep>-cross.ini is written from third_party/meson/cross_template.ini.in
 #   with the compilers, archiver, strip tool, flags and system of the active CMake toolchain. It is passed
@@ -129,6 +138,7 @@ endfunction()
 
 # Writes the cross file of <dep> and sets <out_file>. Called by ovt_tp_meson().
 function(_ovt_meson_write_cross_file dep out_file)
+  cmake_parse_arguments(PARSE_ARGV 2 extra "" "" "C_ARGS;LINK_ARGS;PKG_CONFIG_PATH")
   _ovt_meson_machine(m)
 
   # Compiler command lines: the Android NDK toolchain file names a plain clang and a separate target triple.
@@ -163,6 +173,7 @@ function(_ovt_meson_write_cross_file dep out_file)
   if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
     set(pkg_path "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib/pkgconfig")
   endif()
+  list(APPEND pkg_path ${extra_PKG_CONFIG_PATH})
   _ovt_meson_pkg_config(pkg_config)
 
   set(ar "${CMAKE_AR}")
@@ -177,9 +188,9 @@ function(_ovt_meson_write_cross_file dep out_file)
   _ovt_meson_quote(OVT_MESON_AR ${ar})
   _ovt_meson_quote(OVT_MESON_STRIP ${strip})
   _ovt_meson_quote(OVT_MESON_PKG_CONFIG ${pkg_config})
-  _ovt_meson_quote(OVT_MESON_C_ARGS ${common_args} ${c_flags})
-  _ovt_meson_quote(OVT_MESON_CXX_ARGS ${common_args} ${cxx_flags})
-  _ovt_meson_quote(OVT_MESON_LINK_ARGS ${common_args} ${link_flags})
+  _ovt_meson_quote(OVT_MESON_C_ARGS ${common_args} ${c_flags} ${extra_C_ARGS})
+  _ovt_meson_quote(OVT_MESON_CXX_ARGS ${common_args} ${cxx_flags} ${extra_C_ARGS})
+  _ovt_meson_quote(OVT_MESON_LINK_ARGS ${common_args} ${link_flags} ${extra_LINK_ARGS})
   _ovt_meson_quote(OVT_MESON_PKG_CONFIG_PATH ${pkg_path})
   set(OVT_MESON_SYSTEM "${m_SYSTEM}")
   set(OVT_MESON_CPU_FAMILY "${m_CPU_FAMILY}")
@@ -197,7 +208,8 @@ function(_ovt_meson_write_cross_file dep out_file)
 endfunction()
 
 function(ovt_tp_meson dep)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "" "URL;URL_HASH;SOURCE_DIR" "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS")
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "URL;URL_HASH;SOURCE_DIR;SOURCE_SUBDIR"
+                      "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS;EXTRA_C_ARGS;EXTRA_LINK_ARGS;PKG_CONFIG_PATH")
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_meson(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -216,10 +228,26 @@ function(ovt_tp_meson dep)
   set(cross_args "")
   set(env_args "")
   if(ANDROID_ABI OR APPLE OR OVT_MESON_FORCE_CROSS_FILE)
-    _ovt_meson_write_cross_file(${dep} cross_file)
+    _ovt_meson_write_cross_file(
+      ${dep} cross_file
+      C_ARGS ${arg_EXTRA_C_ARGS}
+      LINK_ARGS ${arg_EXTRA_LINK_ARGS}
+      PKG_CONFIG_PATH ${arg_PKG_CONFIG_PATH})
     set(cross_args --cross-file "${cross_file}")
   else()
     set(env_args "CC=${CMAKE_C_COMPILER}" "CXX=${CMAKE_CXX_COMPILER}")
+    if(arg_EXTRA_C_ARGS)
+      list(JOIN arg_EXTRA_C_ARGS " " joined)
+      list(APPEND env_args "CFLAGS=${joined}" "CXXFLAGS=${joined}")
+    endif()
+    if(arg_EXTRA_LINK_ARGS)
+      list(JOIN arg_EXTRA_LINK_ARGS " " joined)
+      list(APPEND env_args "LDFLAGS=${joined}")
+    endif()
+    if(arg_PKG_CONFIG_PATH)
+      list(JOIN arg_PKG_CONFIG_PATH ":" joined)
+      list(APPEND env_args "PKG_CONFIG_PATH=${joined}")
+    endif()
   endif()
 
   set(prefix "${OVT_THIRD_PARTY_PREFIX}/${dep}")
@@ -228,6 +256,10 @@ function(ovt_tp_meson dep)
     set(source_args URL "${arg_URL}" URL_HASH "${arg_URL_HASH}" DOWNLOAD_DIR "${OVT_TP_DOWNLOADS}")
   else()
     set(source_args SOURCE_DIR "${arg_SOURCE_DIR}" DOWNLOAD_COMMAND "")
+  endif()
+  set(source_subdir "<SOURCE_DIR>")
+  if(arg_SOURCE_SUBDIR)
+    set(source_subdir "<SOURCE_DIR>/${arg_SOURCE_SUBDIR}")
   endif()
   set(patch_args "")
   if(arg_PATCH_COMMAND)
@@ -252,7 +284,7 @@ function(ovt_tp_meson dep)
     INSTALL_DIR "${prefix}"
     BINARY_DIR "${prefix}/build"
     CONFIGURE_COMMAND
-      ${CMAKE_COMMAND} -E env ${env_args} "${OVT_MESON}" setup --wipe "<BINARY_DIR>" "<SOURCE_DIR>" --prefix
+      ${CMAKE_COMMAND} -E env ${env_args} "${OVT_MESON}" setup --wipe "<BINARY_DIR>" "${source_subdir}" --prefix
       "<INSTALL_DIR>" --libdir lib --buildtype release --default-library static -Db_lto=false -Db_staticpic=true
       ${cross_args} ${arg_OPTIONS}
     BUILD_COMMAND "${OVT_MESON}" compile -C "<BINARY_DIR>"

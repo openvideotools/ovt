@@ -5,7 +5,9 @@
   "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
   "dependencies": [
     "fmt", "spdlog", { "name": "flatbuffers", "host": true }, "flatbuffers", "zstd", "nlohmann-json", "highway", "cli11", "xxhash",
-    { "name": "catch2", "platform": "!android" }
+    { "name": "catch2", "platform": "!android" },
+    "vulkan-headers", "glslang", "lcms",
+    { "name": "vulkan-loader", "platform": "linux" }
   ],
   "features": {
     "tests": { "description": "unit tests and the bench_* perf harness (chapter 14 §14.9)", "dependencies": [ "catch2", "benchmark" ] },

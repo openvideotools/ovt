@@ -64,6 +64,28 @@ if(OVT_BUILD_PLUGIN_DE265)
   endif()
 endif()
 
+# ---- libvmaf (WI-0.015) -------------------------------------------------------------------------------
+# tp::vmaf from third_party/libvmaf.cmake, or from the system library with OVT_SYSTEM_LIBVMAF=ON (the distro
+# preset). The system library must have been built with its built-in models.
+if(OVT_SYSTEM_LIBVMAF)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(ovt_system_vmaf REQUIRED IMPORTED_TARGET libvmaf)
+  add_library(tp::vmaf INTERFACE IMPORTED GLOBAL)
+  target_link_libraries(tp::vmaf INTERFACE PkgConfig::ovt_system_vmaf)
+  ovt_set_dependency_license(
+    tp::vmaf
+    SOURCE
+    system
+    SPDX
+    "BSD-2-Clause-Patent"
+    VERSION
+    "${ovt_system_vmaf_VERSION}"
+    LINKAGE
+    shared)
+else()
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libvmaf.cmake")
+endif()
+
 # ---- MoltenVK (WI-0.017) ------------------------------------------------------------------------------
 # tp::moltenvk from third_party/moltenvk.cmake: the prebuilt libMoltenVK.dylib (single-architecture slice) that
 # ovt_render links directly on macOS (§13.5.6). Only fetched when the renderer is built.
@@ -218,3 +240,27 @@ function(_ovt_describe_package_closure target source spdx version)
     endforeach()
   endwhile()
 endfunction()
+
+# ---- libplacebo (WI-0.015) ----------------------------------------------------------------------------
+# tp::placebo from third_party/libplacebo.cmake (after MoltenVK: on macOS it is the Vulkan implementation), or
+# from the system library with OVT_SYSTEM_LIBPLACEBO=ON. Only built with the renderer.
+if(OVT_BUILD_RENDER)
+  if(OVT_SYSTEM_LIBPLACEBO)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_placebo REQUIRED IMPORTED_TARGET libplacebo)
+    add_library(tp::placebo INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::placebo INTERFACE PkgConfig::ovt_system_placebo)
+    ovt_set_dependency_license(
+      tp::placebo
+      SOURCE
+      system
+      SPDX
+      "LGPL-2.1-or-later"
+      VERSION
+      "${ovt_system_placebo_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libplacebo.cmake")
+  endif()
+endif()
