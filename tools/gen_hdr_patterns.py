@@ -468,6 +468,12 @@ def encode_mp4(y4m: Path, mp4: Path, tags: Tags) -> str:
         "1",
         "-i",
         str(y4m),
+        # The Y4M carries no colour tags. FFmpeg 7.1 negotiates colour space and range with the encoder and,
+        # for an untagged input, auto-inserts a scale filter that converts the matrix (unspecified -> -colorspace),
+        # which changes every non-neutral chroma sample. setparams declares the input's real properties, so no
+        # conversion is inserted and the round trip stays lossless.
+        "-vf",
+        f"setparams=range=tv:colorspace={tags.matrix}:color_primaries={tags.primaries}:color_trc={tags.trc}",
         "-c:v",
         "libx265",
         "-pix_fmt",

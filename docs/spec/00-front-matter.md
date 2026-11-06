@@ -64,4 +64,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc7 (2026-11-06) | WI-0.012 FFmpeg core flavour also disables the VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1 decoders (owner decision on PR #132; see `CHANGELOG.md`). |
 | 1.0-rc8 (2026-11-06) | Chapter 14 §14.3.3 recipe 12 uses HM 18.0's `SliceSegmentMode`/`SliceSegmentArgument` and 100-CTU slices with a segment every 40 CTUs, so 720p pictures carry several slices and dependent segments (see `CHANGELOG.md`). |
 | 1.0-rc9 (2026-11-06) | Chapter 14 §14.3.3 recipes 19 and 62 spell the aomenc option `--superres-denominator` (see `CHANGELOG.md`). |
-| 1.0-rc10 (2026-11-06) | Chapter 14 §14.3.3 recipe 19 uses `--resize-denominator=9` so resize × superres stays within AV1's 2x reference scaling (see `CHANGELOG.md`). |
+| 1.0-rc10 (2026-11-06) | Chapter 14 §14.3.3 recipe 19 uses `--resize-denominator=9` so resize × superres stays within AV1's 2x reference scaling, recipe 68 writes the `--pssh` system ID without dashes, and rule 6 skips recipes whose `manual_download` input is absent (see `CHANGELOG.md`). |

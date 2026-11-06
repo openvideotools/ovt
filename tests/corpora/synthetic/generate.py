@@ -25,7 +25,8 @@ Before anything is written, the version probe of every tool the selected recipes
 or on an entry whose hash is not recorded yet; ``--update-manifest`` writes the produced hashes into the
 manifest instead (the maintainer's regeneration mode). ``--sync-manifest`` rewrites the ``syn`` stream entries
 of the manifest from ``recipes.json`` (ids, features, tags, aliases), keeping recorded hashes. ``local_only`` recipes (the perf files) run only with
-``--local-only`` or when named by ``--only``. ``--fixtures`` runs the non-stream fixture generators instead of
+``--local-only`` or when named by ``--only``. A recipe whose ``{corpus:ID}`` input is a ``manual_download``
+corpus missing from the cache is skipped, with the reason logged, unless ``--only`` names it. ``--fixtures`` runs the non-stream fixture generators instead of
 the stream recipes.
 
 Exit codes: 0 success; 1 a step failed; 2 usage; 4 invalid recipes, unknown id, missing tool or helper;
@@ -399,6 +400,33 @@ def corpus_file(out: Path, cid: str) -> Path:
     raise GenError(EXIT_STEP, f"corpus {cid} is not available (fetch it with tools/fetch_corpora.py --ids {cid})")
 
 
+def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path, wanted: list[str]) -> dict[str, str]:
+    """Recipes among ``wanted`` whose ``{corpus:ID}`` input is a ``manual_download`` corpus not in the cache.
+
+    Such a corpus has no URL for the fetcher (chapter 14 §14.3.1): a maintainer places it by hand. Until then the
+    recipe cannot run, so the default selection skips it with this reason and its manifest entry stays unverified.
+    Returns {recipe id: reason}.
+    """
+    manual = {e["id"] for e in manifest["entries"] if e.get("manual_download")}
+    gaps = {}
+    for rid in wanted:
+        rec = doc["_ids"][rid]
+        for step in rec["steps"]:
+            for argv in step_argvs(step):
+                for arg in argv:
+                    for cid in re.findall(r"\{corpus:([A-Za-z0-9_]+)\}", arg):
+                        if cid not in manual or rid in gaps:
+                            continue
+                        try:
+                            corpus_file(out, cid)
+                        except GenError:
+                            gaps[rid] = (
+                                f"needs {cid}, a manual_download corpus that is not in the cache "
+                                f"(no URL or hash to fetch it; place it by hand, then run --only {rid})"
+                            )
+    return gaps
+
+
 def missing_helpers(items: list[dict[str, Any]]) -> list[str]:
     missing = set()
     for item in items:
@@ -524,7 +552,14 @@ def main(argv: list[str] | None = None) -> int:
         out = (args.out or default_out()).resolve()
         if args.fixtures:
             return run_fixtures(doc, out)
-        wanted = select(doc, [i for i in args.only.split(",") if i], args.local_only)
+        only = [i for i in args.only.split(",") if i]
+        wanted = select(doc, only, args.local_only)
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        if not only:  # an id named by --only runs, and fails if its corpus is missing
+            gaps = manual_corpus_gaps(doc, manifest, out, wanted)
+            for rid, reason in gaps.items():
+                log(f"skip {rid}: {reason}")
+            wanted = [rid for rid in wanted if rid not in gaps]
         items = closure(doc, wanted)
         if args.list:
             print("\n".join(r["id"] for r in items if "id" in r))
@@ -532,7 +567,6 @@ def main(argv: list[str] | None = None) -> int:
         if missing := missing_helpers(items):
             raise GenError(EXIT_INVALID, "missing helper script(s): " + ", ".join(missing))
         versions = check_pins(doc, tools_of(items))  # before anything is written
-        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         work = out / ".work"
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir(parents=True)
