@@ -53,6 +53,7 @@ endif()
 # glslang and lcms2 libraries, in link order. The optional SPIRV-Tools pair exists when glslang was built with
 # the optimiser (the vcpkg port does).
 set(_ovt_pl_libs "")
+set(_ovt_pl_libdirs "")
 foreach(
   _name
   glslang-default-resource-limits
@@ -68,11 +69,17 @@ foreach(
   find_library(OVT_PLACEBO_LIB_${_id} NAMES ${_name} ${_ovt_pl_hints} PATH_SUFFIXES lib)
   if(OVT_PLACEBO_LIB_${_id})
     list(APPEND _ovt_pl_libs "${OVT_PLACEBO_LIB_${_id}}")
+    get_filename_component(_ovt_pl_libdir "${OVT_PLACEBO_LIB_${_id}}" DIRECTORY)
+    list(APPEND _ovt_pl_libdirs "${_ovt_pl_libdir}")
   elseif(_name MATCHES "^(SPIRV|glslang|lcms2)$")
     message(FATAL_ERROR "libplacebo: library '${_name}' not found (vcpkg ports glslang and lcms; "
                         "OVT_USE_VCPKG=OFF: the system packages).")
   endif()
 endforeach()
+
+# meson's find_library() does not search the vcpkg tree; patch 0002 reads these directories from the environment.
+list(REMOVE_DUPLICATES _ovt_pl_libdirs)
+list(JOIN _ovt_pl_libdirs ":" _ovt_pl_libdirs_env)
 
 # ---- Vulkan: the `vulkan` pkg-config module and the target's link dependency --------------------------
 set(_ovt_pl_vulkan_link "")
@@ -152,7 +159,9 @@ ovt_tp_meson(
   EXTRA_LINK_ARGS
   ${_ovt_pl_extra_link}
   PKG_CONFIG_PATH
-  ${_ovt_pl_pkg_path})
+  ${_ovt_pl_pkg_path}
+  ENV
+  "OVT_TP_LIB_DIRS=${_ovt_pl_libdirs_env}")
 
 # A changed patch re-extracts the pristine archive (as for libde265), so the patch step never meets a tree
 # patched with another set.
@@ -169,11 +178,17 @@ set_property(TARGET tp::placebo PROPERTY INTERFACE_LINK_LIBRARIES "${_ovt_pl_int
 set_property(TARGET tp::placebo PROPERTY INTERFACE_COMPILE_DEFINITIONS PL_STATIC)
 set_property(TARGET tp::placebo PROPERTY IMPORTED_LINK_INTERFACE_LANGUAGES CXX)
 
+unset(_ovt_pl_libdirs_env)
+unset(_ovt_pl_libdirs)
+unset(_ovt_pl_libdir)
 unset(_ovt_pl_extra_c)
 unset(_ovt_pl_extra_link)
 unset(_ovt_pl_pkg_path)
 unset(_ovt_pl_hints)
 unset(_ovt_pl_root)
+unset(_ovt_pl_libdirs_env)
+unset(_ovt_pl_libdirs)
+unset(_ovt_pl_libdir)
 unset(_ovt_pl_libs)
 unset(_ovt_pl_vulkan_link)
 unset(_ovt_pl_vulkan_libs)

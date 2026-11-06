@@ -7,7 +7,7 @@
 #   ovt_tp_meson(<dep> (URL <url> URL_HASH SHA256=<hex> | SOURCE_DIR <dir>) [SOURCE_SUBDIR <dir>]
 #                [OPTIONS <-Dopt=value>...] OUTPUT_LIBS <tp::target=lib/libx.a>... [PATCH_COMMAND <cmd>...]
 #                [DEPENDS <target>...] [EXTRA_C_ARGS <flag>...] [EXTRA_LINK_ARGS <flag>...]
-#                [PKG_CONFIG_PATH <dir>...])
+#                [PKG_CONFIG_PATH <dir>...] [ENV <NAME=value>...])
 #       Builds the Meson project <dep> as ExternalProject `tp_<dep>`, installed into
 #       ${OVT_THIRD_PARTY_PREFIX}/<dep> (libdir `lib`, static, release, no LTO, position-independent).
 #       URL and URL_HASH are the VERSIONS.md row (OVT_TP_<dep>_URL / _SHA256); the archive is already in
@@ -209,7 +209,7 @@ endfunction()
 
 function(ovt_tp_meson dep)
   cmake_parse_arguments(PARSE_ARGV 1 arg "" "URL;URL_HASH;SOURCE_DIR;SOURCE_SUBDIR"
-                        "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS;EXTRA_C_ARGS;EXTRA_LINK_ARGS;PKG_CONFIG_PATH")
+                        "OPTIONS;OUTPUT_LIBS;PATCH_COMMAND;DEPENDS;EXTRA_C_ARGS;EXTRA_LINK_ARGS;PKG_CONFIG_PATH;ENV")
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_meson(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -246,6 +246,8 @@ function(ovt_tp_meson dep)
       list(APPEND env_args "PKG_CONFIG_PATH=${joined}")
     endif()
   endif()
+
+  list(APPEND env_args ${arg_ENV})
 
   set(prefix "${OVT_THIRD_PARTY_PREFIX}/${dep}")
   set(source_args "")

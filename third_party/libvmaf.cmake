@@ -34,6 +34,7 @@ ovt_tp_meson(
   SOURCE_SUBDIR
   libvmaf
   OPTIONS
+  -Db_ndebug=true
   -Denable_float=true
   -Denable_avx512=true
   -Dbuilt_in_models=true
