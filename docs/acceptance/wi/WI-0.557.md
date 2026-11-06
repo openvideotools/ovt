@@ -51,8 +51,8 @@ the failure is the target's `abort()`, reported as a deadly signal.
 $ git checkout core/src/bitreader/bitreader.cpp   # rebuild, rerun the same script
 $ echo $?
 0
-#9	INITED cov: 696 ft: 1696 corp: 8/1283b exec/s: 0 rss: 36Mb
-#31828	DONE   cov: 796 ft: 5661 corp: 429/44Kb lim: 192 exec/s: 521 rss: 464Mb
+#9 INITED cov: 696 ft: 1696 corp: 8/1283b exec/s: 0 rss: 36Mb
+#31828 DONE   cov: 796 ft: 5661 corp: 429/44Kb lim: 192 exec/s: 521 rss: 464Mb
 stat::new_units_added:          986
 ```
 
