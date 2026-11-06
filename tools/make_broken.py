@@ -82,7 +82,7 @@ def trak(track_id: int, stbl: list[bytes], hevc: bool = False, strip_ps: bool = 
         b"tkhd",
         0,
         3,
-        struct.pack(">IIIII", 0, 0, track_id, 0, SAMPLES * 1000),
+        struct.pack(">IIIII", 0, 0, track_id, 0, SAMPLES * 1000 // 30),  # movie timescale 1000: 1 s
         bytes(8),
         struct.pack(">hhhH", 0, 0, 0, 0),
         struct.pack(">9I", 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000),
@@ -116,7 +116,8 @@ def progressive(mode: str) -> bytes:
     stts = full(b"stts", 0, 0, struct.pack(">III", 1, SAMPLES, 1000))
     stsz = full(b"stsz", 0, 0, struct.pack(">II", SAMPLE_SIZE, SAMPLES))
     if mode == "stsc-descending":
-        stsc = full(b"stsc", 0, 0, struct.pack(">I", 2), struct.pack(">III", 2, 10, 1), struct.pack(">III", 1, 10, 1))
+        entries = [struct.pack(">III", c, 10, 1) for c in (1, 3, 2)]  # first_chunk 1, then 3 > 2: not increasing
+        stsc = full(b"stsc", 0, 0, struct.pack(">I", 3), *entries)
     else:
         stsc = full(b"stsc", 0, 0, struct.pack(">I", 1), struct.pack(">III", 1, 10, 1))
     extra = []

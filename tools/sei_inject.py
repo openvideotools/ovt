@@ -54,6 +54,7 @@ def is_vcl(codec: str, nal: Nal) -> bool:
 
 
 def insert(data: bytes, codec: str, ptype: int, payload: bytes) -> bytes:
+    """One SEI NAL unit before the first VCL unit of the stream (recipe 47); later access units are unchanged."""
     nals = split_annexb(data)
     first = next((i for i, n in enumerate(nals) if is_vcl(codec, n)), None)
     if first is None:

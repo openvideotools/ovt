@@ -209,10 +209,23 @@ def test_make_broken_sample_table_modes(tmp_path: Path) -> None:
     assert struct.unpack_from(">I", data, a + 16)[0] > len(data)
     data = broken(tmp_path, "--stsc-descending")
     a, b = find(data, [*STBL, b"stsc"])
-    assert struct.unpack_from(">I", data, a + 8)[0] > struct.unpack_from(">I", data, a + 20)[0]
+    firsts = [struct.unpack_from(">I", data, a + 8 + 12 * i)[0] for i in range(3)]
+    assert firsts[0] == 1 and firsts[1] > firsts[2]  # only the "not increasing" defect
     data = broken(tmp_path, "--ctts-v0-negative")
     a, b = find(data, [*STBL, b"ctts"])
     assert data[a] == 0 and struct.unpack_from(">i", data, a + 12)[0] < 0
+
+
+def test_make_broken_base_durations_agree() -> None:
+    """mvhd, tkhd (movie timescale) and mdhd (media timescale) all say 1 s, so no extra CNT-1033."""
+    for data in (make_broken.progressive("none"), make_broken.fragmented(b"msix", 1)):
+        a, _ = find(data, [b"moov", b"mvhd"])
+        timescale, mvhd = struct.unpack_from(">II", data, a + 12)
+        a, _ = find(data, [b"moov", b"trak", b"tkhd"])
+        tkhd = struct.unpack_from(">I", data, a + 20)[0]  # after flags, two times, track_ID, reserved
+        a, _ = find(data, [b"moov", b"trak", b"mdia", b"mdhd"])
+        media_scale, mdhd = struct.unpack_from(">II", data, a + 12)
+        assert mvhd / timescale == tkhd / timescale == mdhd / media_scale == 1
 
 
 def test_make_broken_structure_modes(tmp_path: Path) -> None:
