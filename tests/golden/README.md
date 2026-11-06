@@ -11,10 +11,10 @@ field in the golden must be present and equal in OVT's output; fields only OVT r
 |---|---|---|
 | `syntax-elements` | `[{unit, name, bit_offset, bit_length, value}]` sorted by `(unit, bit_offset)` | `StreamIndex` or one `SyntaxNode` |
 | `header-struct` | `{"sps": {...}, "pps": {...}, "slice_header": {...}}` | `StreamIndex` or one `SyntaxNode` |
-| `block-grid` | `{w4, h4, fields: {name: [int per 4×4 cell]}}` | `FrameAnalysis` (writer: WI-0.556c) |
+| `block-grid` | `{w4, h4, fields: {name: [int per 4×4 cell]}}` | `FrameAnalysis` |
 | `box-tree` | `[{path, offset, size, fields}]` | `ContainerTree` |
-| `sample-table` | `[{i, dts, cts, size, offset, sync}]` | `SampleTable` (writer: WI-0.556c) |
-| `scores` | `{frames: [{i, <metric>}], pooled: {<metric>: {mean, harmonic_mean, min}}}` | `MetricsResult` (writer: WI-0.556c) |
+| `sample-table` | `[{i, dts, cts, size, offset, sync}]` | `SampleTable` |
+| `scores` | `{frames: [{i, <metric>}], pooled: {<metric>: {mean, harmonic_mean, min}}}` | `MetricsResult` |
 
 The Python twins are in `tests/oracles/normalize/`; both sides print non-integers with `%.6f`.
 

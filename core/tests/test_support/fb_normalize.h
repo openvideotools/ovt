@@ -29,6 +29,9 @@ namespace ovt::fb {
 struct StreamIndex;
 struct SyntaxNode;
 struct ContainerTree;
+struct SampleTable;
+struct FrameAnalysis;
+struct MetricsResult;
 }  // namespace ovt::fb
 
 namespace ovt::test {
@@ -75,7 +78,18 @@ nlohmann::json to_canonical(const fb::SyntaxNode& header, Family family, uint32_
 /// children) or an array (unnamed children).
 nlohmann::json to_canonical(const fb::ContainerTree& tree, Family family = Family::kBoxTree);
 
-// The sample-table, block-grid and scores writers (SampleTable, FrameAnalysis, MetricsResult) arrive with
-// WI-0.556c.
+/// sample-table: `[{"i","dts","cts","size","offset","sync"}]`; cts = dts + cts_offset; sync = 0|1.
+nlohmann::json to_canonical(const fb::SampleTable& table, Family family = Family::kSampleTable);
+
+/// block-grid: `{"w4","h4","fields":{name:[int per cell]}}` from FrameAnalysis.grid. @p fields selects CellGrid
+/// vectors by name (empty = all vectors the grid carries, except block_id/partition_id). Unknown name:
+/// std::invalid_argument.
+nlohmann::json to_canonical(const fb::FrameAnalysis& analysis, Family family = Family::kBlockGrid,
+                            const std::vector<std::string>& fields = {});
+
+/// scores: `{"frames":[{"i":n,"<metric>":v}],"pooled":{"<metric>":{"mean","harmonic_mean","min"}}}`. A result
+/// with one value per frame is keyed by the metric id; with several, by "<id>_y", "<id>_u", "<id>_v"
+/// (more than three: "<id>_<n>").
+nlohmann::json to_canonical(const fb::MetricsResult& result, Family family = Family::kScores);
 
 }  // namespace ovt::test
