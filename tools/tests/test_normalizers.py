@@ -492,6 +492,36 @@ def test_nits_reference(tmp_path: Path) -> None:
     assert full["max_cll_nits"] < frame["max_cll_nits"]  # code/1023 < (code-64)/876 for this code
 
 
+@pytest.mark.parametrize(
+    ("header", "ok"),
+    [
+        (b"C420", True),
+        (b"C420jpeg", True),
+        (b"C420mpeg2", True),
+        (b"C420paldv", True),
+        (b"C422", True),
+        (b"C444", True),
+        (b"C420p10", True),
+        (b"C444p12", True),
+        (b"", True),  # no C tag: Y4M default is 420jpeg
+        (b"Cmono", False),
+        (b"C420foo", False),
+    ],
+)
+def test_nits_reference_y4m_colour_tags(tmp_path: Path, header: bytes, ok: bool) -> None:
+    tag = header.decode()
+    depth = int(tag.rsplit("p", 1)[1]) if tag[-2:].isdigit() and "p" in tag[-4:] else 8
+    size = 2 if depth > 8 else 1
+    chroma = {"C422": 4, "C444": 8}.get(tag[:4], 2)
+    path = tmp_path / "t.y4m"
+    path.write_bytes(b"YUV4MPEG2 W4 H2 F25:1 " + header + b"\nFRAME\n" + bytes(size * (8 + 2 * chroma)))
+    if ok:
+        assert len(normalise("nits_reference", str(path))["frames"]) == 1
+    else:
+        proc = run("nits_reference", str(path))
+        assert proc.returncode != 0 and "unsupported Y4M colour space" in proc.stderr
+
+
 # -- canon (§14.4.0) ---------------------------------------------------------------------------------------
 
 

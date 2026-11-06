@@ -4,7 +4,7 @@
 """Per-frame MaxCLL / FALL of a PQ Y4M in float64 -> ``scores`` (chapter 14 §14.4.15, WI-0.555).
 
 Input: a Y4M file of the decoded frames (``ffmpeg -i <in> -pix_fmt yuv420p10le -f yuv4mpegpipe out.y4m``;
-``C420p10``, ``C420p12``, ``C422p10``, ``C444p10``, ... or 8-bit ``C420``). For each frame (or only ``--frame
+``C420p10``, ``C420p12``, ``C422p10``, ``C444p10``, ... 8-bit ``C420``/``C420jpeg``/``C420mpeg2``/``C420paldv``, or no ``C`` tag, which Y4M defines as 420jpeg). For each frame (or only ``--frame
 n``, 0-based):
 
 1. Y'CbCr to normalised values: limited range ``Y' = (Y − 16·2^(b−8)) / (219·2^(b−8))``,
@@ -24,6 +24,7 @@ a family (acceptance test 3). Needs numpy (oracle image and ``tools/requirements
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -37,6 +38,8 @@ KR, KB = 0.2627, 0.0593
 KG = 1 - KR - KB
 M1, M2 = 2610 / 16384, 2523 / 4096 * 128
 C1, C2, C3 = 3424 / 4096, 2413 / 4096 * 32, 2392 / 4096 * 32
+# Every 4:2:0 / 4:2:2 / 4:4:4 Y4M C tag: an optional siting suffix (8-bit only), then an optional "p<depth>".
+COLOURSPACE = re.compile(r"(420|422|444)(?:jpeg|mpeg2|paldv)?(?:p(\d+))?")
 SUBSAMPLING = {"420": (2, 2), "422": (2, 1), "444": (1, 1)}
 
 
@@ -89,11 +92,10 @@ def convert(args: argparse.Namespace) -> dict[str, Any]:
     except (KeyError, ValueError) as exc:
         raise canon.NormalizeError("Y4M header without W/H") from exc
     cs = params.get("C", "420jpeg")
-    fmt, _, bits = cs.partition("p")
-    fmt = fmt[:3]
-    if fmt not in SUBSAMPLING or (bits and not bits.isdigit()):
+    match = COLOURSPACE.fullmatch(cs)
+    if match is None or not 8 <= int(match.group(2) or 8) <= 16:
         raise canon.NormalizeError(f"unsupported Y4M colour space C{cs}")
-    depth = int(bits) if bits else 8
+    fmt, depth = match.group(1), int(match.group(2) or 8)
     sub = SUBSAMPLING[fmt]
     full = args.full_range or params.get("COLORRANGE") == "FULL"
     cw, ch = -(-width // sub[0]), -(-height // sub[1])
