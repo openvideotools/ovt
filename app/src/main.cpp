@@ -71,7 +71,7 @@ int print_version() {
 // Exported: on Android this binary is libovt_studio_<ABI>.so and Qt finds main() with dlsym(), but
 // ovt::flags compiles with -fvisibility=hidden (chapter 13 §13.2.5).
 Q_DECL_EXPORT int main(int argc, char* argv[]) {
-  QElapsedTimer startup_clock; // covers QGuiApplication construction and engine.load(), where startup is slow
+  QElapsedTimer startup_clock;  // covers QGuiApplication construction and engine.load(), where startup is slow
   startup_clock.start();
   if (wants_version(std::span<char*>(argv, static_cast<std::size_t>(argc)))) {
     return print_version();
