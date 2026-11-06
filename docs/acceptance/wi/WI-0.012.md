@@ -54,9 +54,9 @@ Automated: `ffmpeg_plugin_symbol_leak` (`plugins/ovt-plugin-ffmpeg/tests/test_sy
 Machine: the Mac Mini build host (macOS, Apple silicon), 2026-11-06, head `10d32c2`, the pinned ffmpeg.org n7.1.1
 tarball. The run was relayed from the Mac Mini thread; this record gives its results, not a verbatim log.
 
-```console
-$ cmake --preset macos-arm64-debug && cmake --build --preset macos-arm64-debug
-$ ctest --test-dir build/macos-arm64-debug -R ffmpeg -V
+```sh
+cmake --preset macos-arm64-debug && cmake --build --preset macos-arm64-debug
+ctest --test-dir build/macos-arm64-debug -R ffmpeg -V
 ```
 
 `pr-macos` is the test preset of `macos-arm64-release` (CMakePresets.json, chapter 13 §13.2.4), so a debug build is
