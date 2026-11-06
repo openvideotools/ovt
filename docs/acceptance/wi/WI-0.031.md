@@ -26,8 +26,28 @@ branch and confirm the job fails with the abidiff report attached.
 
 ## Test 3: deleting the `bitreader/` tests fails `coverage`
 
-- Gate logic: `tools/tests/test_coverage_gate.py::test_low_bitreader_names_directory_and_percentage` and
-  `test_flags_prefix_map_names_are_remapped` (export names as the Mini produces them, `/ovt/core/src/...`).
-- Job: `coverage` runs on pushes to `main` and nightly only (the Mini is CPU-bound); a `workflow_dispatch` trigger is in
-  `ci.yml`, but GitHub offers it only once the file is on `main`. The first green run, and a red run with the
-  bitreader tests removed, are to be recorded after the merge.
+Both runs are the `coverage` job on the Mac Mini (Apple clang, `macos-arm64-debug` with `OVT_COVERAGE=ON`).
+
+- Green, `main` at `e65e490` (the merge of #112):
+  <https://github.com/openvideotools/ovt/actions/runs/42186898783/job/127790104784>
+
+  ```console
+  core/src/: 93.4 % of 2421 lines (minimum 80 %)
+  bitreader/: 100.0 % of 434 lines (minimum 90 %)
+  syntax/: 94.0 % of 596 lines (minimum 90 %)
+  container/: no source files yet; skipped
+  ```
+
+- Red, `workflow_dispatch` of `ci.yml` on a throwaway commit that comments out `add_subdirectory(bitreader)` in
+  `core/tests/CMakeLists.txt` (reverted in the same pull request):
+  <https://github.com/openvideotools/ovt/actions/runs/42189693372/job/127798386673>
+
+  ```console
+  core/src/: 90.4 % of 2421 lines (minimum 80 %)
+  bitreader/: 83.2 % of 434 lines (minimum 90 %)
+  ##[error]coverage below threshold: bitreader/: 83.2 % < 90 %
+  ```
+
+  The percentage does not drop to 0 %, because other test executables still call `BitReader`.
+
+Unit tests of the gate logic: `tools/tests/test_coverage_gate.py`.
