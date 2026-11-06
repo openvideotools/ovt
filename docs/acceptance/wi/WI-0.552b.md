@@ -4,7 +4,8 @@ Second half of WI-0.552 (§16.2.6; WI-0.552a landed the tooling). This PR record
 fast-lane entries on the Mac Mini, regenerates `tests/corpora/LICENSES.md`, and records the fast-subset fetch.
 
 Machine: Mac Mini (Apple silicon, macOS 15), Python 3.15.2. Date: 2026-11-06. Spec version: 1.0-rc4.
-The fetch and the tools tests used `.venv/bin/python` (it provides `jsonschema`; the system `python3` does not). Nothing was installed.
+The fetch and the tools tests used `.venv/bin/python` (it provides `jsonschema`; the system `python3` does not).
+Nothing was installed.
 
 ## Step 1: `python3 tools/manifest_add.py fill --jobs 4`
 
