@@ -7,7 +7,7 @@
 
 ``--cc-errors N`` drops N packets of the first video PID of the first PMT, spread evenly over the stream and
 never adjacent, so each drop is exactly one ``continuity_count_error``; packets that carry a PCR or start a PES
-are never dropped. ``--pcr-gap S`` removes every PCR of that window of S seconds that starts one second after
+are never dropped, nor are those whose PCR ``--pcr-gap`` removes. ``--pcr-gap S`` removes every PCR of that window of S seconds that starts one second after
 the first PCR, turning its 6 bytes into adaptation-field stuffing (packet length and payload unchanged), so the
 PCR interval there exceeds S. The packet indices touched are printed as JSON on stdout. Exit 0 ok, 2 bad input.
 """
@@ -49,7 +49,9 @@ def video_pid(pkts: list[bytearray]) -> int:
     for p in pkts:
         sec = section(p)
         if pmt is None and pid(p) == 0 and sec[:1] == b"\x00":
-            pmt = (sec[10] & 0x1F) << 8 | sec[11]  # first program after the 8-byte header
+            end = 3 + ((sec[1] & 0x0F) << 8 | sec[2]) - 4  # before the CRC
+            programs = [(sec[i] << 8 | sec[i + 1], (sec[i + 2] & 0x1F) << 8 | sec[i + 3]) for i in range(8, end, 4)]
+            pmt = next((pmt_pid for number, pmt_pid in programs if number != 0), None)  # 0 is the NIT
         elif pmt is not None and pid(p) == pmt and sec[:1] == b"\x02":
             length = (sec[1] & 0x0F) << 8 | sec[2]
             pos = 12 + ((sec[10] & 0x0F) << 8 | sec[11])
@@ -90,7 +92,10 @@ def inject(data: bytes, cc_errors: int, pcr_gap: float) -> tuple[bytes, dict]:
         for i in report["pcr_removed"]:
             strip_pcr(pkts[i])
     if cc_errors:
-        candidates = [i for i, p in enumerate(pkts) if pid(p) == vpid and not p[1] & 0x40 and pcr(p) is None]
+        stripped = set(report["pcr_removed"])
+        candidates = [
+            i for i, p in enumerate(pkts) if pid(p) == vpid and not p[1] & 0x40 and pcr(p) is None and i not in stripped
+        ]
         if len(candidates) < 3 * cc_errors:
             raise ValueError(f"too few video packets for {cc_errors} separate drops")
         step = len(candidates) / (cc_errors + 1)

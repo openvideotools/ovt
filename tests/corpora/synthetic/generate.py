@@ -58,7 +58,7 @@ SYN_LICENCE = {
 }
 
 EXIT_OK, EXIT_STEP, EXIT_INVALID, EXIT_MISMATCH = 0, 1, 4, 5
-UNSEEDED_LAVFI = re.compile(r"\b(life|cellauto)=([^,;\[\]]*)")
+UNSEEDED_LAVFI = re.compile(r"(?:^|[,;\]])\s*(life|cellauto)(?:=([^,;\[\]]*))?\s*(?=$|[,;\[])")
 
 
 class GenError(Exception):

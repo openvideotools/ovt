@@ -821,6 +821,16 @@ the licence gate fails when this file is stale.
 | syn_raw_1080p_p010 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_raw_yuv420p10le_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_scenes_5cuts | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_content_light_level_info | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_ga94_cc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_mastering_display_colour_volume | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_recovery_point | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_user_data_unregistered | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_alternative_transfer | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_content_light_level_info | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_mastering_display_colour_volume | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_recovery_point | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_user_data_unregistered | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_ts_cc_errors | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_webm_lacing_xiph | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | ts_h264_dvb | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
