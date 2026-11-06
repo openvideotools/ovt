@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc9 — 2026-11-06
+
+PATCH-level: an aomenc option name in two recipe commands, found by the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 recipes 19 `syn_av1_superres_scaled_refs` and 62 (`syn_av1_tools_all` …) — aomenc 3.12.1 has no `--superres-denom`; the option is `--superres-denominator=12` (same value) — WI-0.553
+
 ## 1.0.0-rc8 — 2026-11-06
 
 PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image (an option name HM 18.0 does not know, and slice sizes that produced one slice per picture). No requirement sentence, acceptance line or WI scope changes.
