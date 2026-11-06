@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import time
 import subprocess
 import sys
 import tarfile
@@ -179,7 +181,12 @@ def test_changed_series_re_extracts_and_applies_the_new_one(tmp_path: Path) -> N
     build = Build(tmp_path, series)
     assert build.run().returncode == 0
     renamed = patch("0001-other.patch", "// line one", "// line one, patched again")
-    write_series(tmp_path, renamed)
+    changed = write_series(tmp_path, renamed)
+    # The download step reruns when the series or a patch is newer than its stamp. Both were written within the
+    # filesystem's timestamp granularity of the stamp, so make the order certain instead of waiting for it.
+    later = time.time() + 60
+    for f in changed.parent.iterdir():
+        os.utime(f, (later, later))
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
     assert "apply_patches: applied 0001-other.patch" in result.stdout
