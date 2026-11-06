@@ -3,7 +3,7 @@
 WI-0.552 is delivered in two pull requests (§16.2.6, letter suffixes; the §16.4 row stays WI-0.552 until
 WI-0.552b merges). WI-0.552a: tooling, schema fields, fetcher `vcs` support, the named-stream check and every
 entry whose origin is reachable from the cloud container. WI-0.552b: `manifest_add.py fill` and
-`list-dir` on a machine that can reach www.itu.int, dash.akamaized.net, testassets.dashif.org, Apple and the
+`list-dir` on a machine that can reach `www.itu.int`, `dash.akamaized.net`, `testassets.dashif.org`, Apple and the
 CTA WAVE host, the `LICENSES.md` regeneration, and the AT1 run below.
 
 Machine: cloud container, Ubuntu 24.04 x86_64, Python 3.13. Date: 2026-11-06. Spec version: 1.0-rc4.
