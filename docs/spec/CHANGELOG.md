@@ -2,6 +2,18 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc6 — 2026-11-06
+
+PATCH-level (editorial) amendment from the pre-public audit, owner-approved wording change; no requirement sentence, acceptance line, interface or WI scope changes, and no WI is re-opened.
+
+- 00 §0.0 — the one-sentence goal names the feature areas OVT covers instead of saying it "reproduces the functionality of" two named commercial products — none
+- 01 §1.2, §1.4 — commercial analyzers named only as examples of the tool class; per-product price figures and sub-product lists removed; trademark and non-affiliation note added; the live-monitoring non-goal no longer names a product — none
+- 90 Appendix A — reduced to factual feature comparison with links to public pages: quoted vendor text, descriptions of vendors' panels, menus, key bindings and CLI flags, the UI-lineage claim and reseller price tables removed; trademark, non-affiliation and sourcing rules added; A.5 replaced by product-neutral usability lessons — none
+- 11 design principles, §11 panel purposes — references to competitors' UI elements removed; no behaviour changes — none
+- 03 — trademark and independence note; §3.1 and §3.2 describe feature areas only (UI skeleton, mode list, CLI flag and price rows removed; "reproduces both idioms" and the UI-lineage claim removed); §3.5 conventions stated as OVT's own with no competitor provenance, UX-2 justified on its own terms (one key per overlay mode, default order from §11.4.2, all rebindable). Coordinator ruling: no binding is tied to a competitor; the F-key assignments, FR-GUI-008 and its acceptance lines are unchanged — none
+- 02 — "Binding mode" entry removed; "Primary benchmark" reworded — none
+- 04 GUI rationale — no longer cites competitor users' expectations — none
+
 ## 1.0.0-rc5 — 2026-11-06
 
 MINOR-level amendment (CI job behaviour) from the pre-public audit requested by the owner; no WI is re-opened.

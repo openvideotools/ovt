@@ -8,7 +8,7 @@
 
 ## 11.1 Principles and requirements realised by this chapter
 
-**Design principles (informative).** (1) Three-pane skeleton shared by VQ Analyzer, StreamEye, Parabola and VEGA (Appendix A.5). (2) The GUI shows only what `libovt-core`/`libovt-render` produce; it never parses or computes codec data itself. (3) Keyboard-first; every action has a shortcut in the single keyboard map of §11.4.3. (4) Desktop idioms behave identically on macOS, Linux and Android/ChromeOS with a keyboard and mouse. (5) Spec terminology in labels, explanations in tooltips. (6) One `SelectionModel` for cursor synchronisation. (7) Nothing blocks the GUI thread.
+**Design principles (informative).** (1) Three-pane skeleton: timeline, picture canvas with overlays, and syntax/statistics of the selection visible together (usability lesson 1, Appendix A.5). (2) The GUI shows only what `libovt-core`/`libovt-render` produce; it never parses or computes codec data itself. (3) Keyboard-first; every action has a shortcut in the single keyboard map of §11.4.3. (4) Desktop idioms behave identically on macOS, Linux and Android/ChromeOS with a keyboard and mouse. (5) Spec terminology in labels, explanations in tooltips. (6) One `SelectionModel` for cursor synchronisation. (7) Nothing blocks the GUI thread.
 
 ### 11.1.1 Requirements realised by this chapter
 
@@ -159,7 +159,7 @@ Common rules for every panel: (a) title bar with name, context menu (Detach / Cl
 
 ### 11.3.1 Timeline
 
-**Purpose.** Primary navigation (bar-chart-as-timeline, Appendix A.2): one bar per frame; filmstrip; range → bitrate.
+**Purpose.** Primary navigation (per-frame bar chart as the timeline): one bar per frame; filmstrip; range → bitrate.
 **Data source.** `StreamIndex.frames[]` (`type`, `size_bytes`, `qp_base`, `temporal_id`, `is_rap`, `pts`, `declared_refs`), `StreamIndex.display_order[]`; metric series from `MetricsResult.frames[]` (Chapter 9) when present; thumbnails from the playback decoder (`ovt_decoder_*`) rendered at 96 px height into a `QImage` cache (`app/src/models/thumbnail_cache.cpp`, LRU 2000, disk-backed in the cache dir).
 **Layout.**
 
@@ -207,7 +207,7 @@ Common rules for every panel: (a) title bar with name, context menu (Detach / Cl
 **Dual view (FR-GUI-021, phase 2).** View ▸ Dual view (`Ctrl+D`; arrangement Horizontal/Vertical) replaces the single Picture with two `VideoSurface` instances hosted by two `PictureHost` items in one panel: A left/top, B right/bottom, each with its own `ViewState` and `OverlayConfig` and its own `FrameAnalysis` overlays (B's analysis is requested from B's stream). A **sync set** {frame, zoom, pan, plane mode, overlay mode} is synchronised by default; each item is unlockable from a padlock row in the panel header (`Platform`-independent; persisted in `panel_state.dual.locks`). While locked, input on either surface writes `ViewState`/`SelectionModel` for both; unlocked properties diverge and the status strip shows both values. B's frame follows `SelectionB` (§11.4.1). The compare modes below remain available in single-surface mode only (Compare and Dual view are mutually exclusive; switching to Dual view sets `CompareMode::Single`). NATIVE HDR mode uses the first surface only; the second surface stays EMBEDDED (SDR badge). Delivered by WI-2.489.
 **Overlay toggles.** `P` picture on/off (overlays over a flat `#202020`), `I` labels, `G` grid, `M` motion vectors, `T` heatmap, `L` legend; the Mode combo selects the F1–F12 preset (§11.4.2). Each toggle maps to `OverlayLayer` bits (§11.4.2 table).
 **HDR toggle.** `Ctrl+H`/toolbar: requests NATIVE mode (Chapter 10 R-ARCH-2). Disabled with tooltip = `DisplayCaps.reason` when not capable. The tone-map/gamut/clip controls live in the HDR panel (§11.3.14).
-**Pixel probe.** Hover shows the read-out in the status bar; `Ctrl+click` (or long-press on touch) **pins** the probe (crosshair at the pixel; `OverlayConfig.probe_x/y`; the Selection Info panel shows the full `Pick` incl. nits/xy; `Esc` unpins). Pinned probes survive panning ("lock pixel selection while panning", Appendix A.1).
+**Pixel probe.** Hover shows the read-out in the status bar; `Ctrl+click` (or long-press on touch) **pins** the probe (crosshair at the pixel; `OverlayConfig.probe_x/y`; the Selection Info panel shows the full `Pick` incl. nits/xy; `Esc` unpins). Pinned probes survive panning.
 **Selection rectangle.** `Shift+drag` draws a rect (luma samples, snapped to cells); the Statistics panel scopes to it when "Scope: selection" is chosen; `Esc` clears; context menu {Statistics for selection, Metrics for region, Export region as PNG/PGM, Copy rect}.
 **Block selection.** Left click → `Selection.block_id` at the cycle level (§11.3.9); repeated click on the same point cycles levels; `Tab`/`Shift+Tab` cycle too; right-click → Details context menu (Open in Block Presenter, Show in Syntax, Show in Hex, Copy block JSON, Follow MV to reference frame (seeks to `refs[ref].frame` and pins the probe at the displaced position)); hover → hover outline + tooltip (`CU 32×32 · Inter L0 (−12,+3) · QP 27 · 2,913 b`).
 **States.** Empty (drop zone hint); loading (first frame decoding: dimmed previous frame + spinner); **analysis pending** (overlays requested but `FrameAnalysis` missing: picture shown, a hatched placeholder band at the top "Block data not analysed — press A", and a progress ring while the job runs); partial (plugin lacks some fields → affected overlays shown disabled in the Mode combo with "n/a (plugin)"); error (decode error → red badge, last decoded frame kept, message).
@@ -341,7 +341,7 @@ Derived tabs: **Tracks** (id, handler, codec fourcc + profile string, dimensions
 
 ### 11.3.10 Block Presenter
 
-**Purpose.** Numeric sample grids of the selected block per pipeline stage (StreamEye "Block Presenter", Appendix A.2).
+**Purpose.** Numeric sample grids of the selected block per pipeline stage.
 **Data source.** `FrameAnalysis.planes[]` (`PlaneRef` per stage/plane) read via `ovt_analysis_plane(blob_id)`; the selected `Block.rect`; chroma rect = luma rect scaled by the chroma format.
 **Layout.** Tabs per stage available (`Prediction`, `Residual`, `Reconstruction`, `PreDeblock`, `PreSaoOrCdef`, `PreLoopRestoration`, `Coefficients`); inside, plane tabs Y/U/V; a grid of cells (`TableView`, monospace) with row/column headers (sample coordinates), values ⓗ; cell background: grey ramp for samples, diverging blue–white–red for signed stages (Residual, Coefficients) centred at 0; header row shows `mean`, `min`, `max`, `energy (Σx²)`. Buttons: Dec/Hex, "Compare with B" (adds a second grid and a diff grid when a B frame with planes exists), Export CSV, Copy TSV.
 **Interactions.** Hover a cell → Picture probe moves to that sample; click → pins probe; wheel scrolls; `Ctrl+wheel` adjusts font size.
@@ -433,7 +433,7 @@ Row modes: temporal layers (default), decode-vs-display (two rows with crossing 
 
 ### 11.3.17 Bookmarks & Comments
 
-**Purpose.** Named frame bookmarks and anchored comments (StreamEye "comments", Appendix A.2), stored in the project.
+**Purpose.** Named frame bookmarks and anchored comments, stored in the project.
 **Data source.** `.ovtproj` `bookmarks[]`, `comments[]` (§11.2.6).
 **Layout.** Two lists: Bookmarks (colour dot, name, `disp#/dec#`, type, time; shown as markers on the Timeline) and Comments (anchor kind icon, excerpt, author, date). Buttons Add bookmark (`B`), Add comment (`Shift+B` → inline editor anchored to the current selection: frame, block, byte range, field or box), Export JSON/CSV, Import.
 **Interactions.** Click → navigate to anchor (frame/block/bytes/field/box via `SelectionModel`); `N`/`Shift+N` next/previous bookmark; rename inline; drag to reorder; right-click → Delete, Change colour.

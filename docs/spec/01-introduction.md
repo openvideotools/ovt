@@ -14,7 +14,9 @@ If you are an implementer: read chapters 1, 2 and 5 first, then the chapter for 
 
 ## 1.2 Why OVT exists
 
-Codec engineers, video quality teams and video platform teams rely on two families of commercial analyzers: ViCueSoft VQ Analyzer (the successor of Intel Video Pro Analyzer) and the Elecard StreamEye Studio suite (StreamEye, Stream Analyzer, Video Quality Estimator, YUV Viewer). These tools show, for every frame of an encoded stream, the syntax elements the encoder wrote, the block partitioning and prediction decisions, motion vectors, quantisation, bit allocation, in-loop filter decisions, the decoded planes at each processing stage, container structure, and quality metrics against a reference. They cost between roughly five and thirty thousand US dollars per seat per year, none of them runs on Android or ChromeOS, and none exposes a documented scripting API beyond command-line flags.
+Codec engineers, video quality teams and video platform teams rely on commercial stream analyzers, for example ViCueSoft VQ Analyzer and the Elecard StreamEye Studio suite. Tools of this class show, for every frame of an encoded stream, the syntax elements the encoder wrote, the block partitioning and prediction decisions, motion vectors, quantisation, bit allocation, in-loop filter decisions, the decoded planes at each processing stage, container structure, and quality metrics against a reference. They are licensed per seat at commercial prices, and from their public product information we know of none that runs on Android or ChromeOS or that exposes a documented scripting API beyond command-line flags.
+
+Product names in this specification are trademarks of their respective owners and are used only to identify the class of tool and for factual feature comparison (chapter 3). OVT is an independent project: it is not affiliated with, endorsed by or compatible with any of these products, and it does not copy their code, user interfaces, artwork or documentation.
 
 The free and open-source world has pieces but no suite: YUView (GPL-3) is an excellent raw viewer with statistics overlays but has no syntax tree, no hex view, no AV1 block data and no mobile build; aomanalyzer (MIT) shows AV1 blocks and bit accounting but is dormant and AV1-only; hevcesbrowser shows an HEVC syntax tree with hex but does not decode; FFmpeg exports coarse motion vectors and per-block QP for H.264 only; libvmaf computes metrics but has no viewer. Chapter 3 documents the commercial feature set in detail and chapter 15 the licensing landscape.
 
@@ -36,7 +38,7 @@ OVT closes that gap with one architecture: a core library that produces every pi
 
 - Windows and iOS builds, and web browser builds. The architecture does not preclude them; no work item targets them.
 - Encoding, transcoding or editing of video (except re-muxing/extraction helpers in chapter 12).
-- Real-time monitoring of live network streams (Elecard Stream Inspector class). File-based analysis only.
+- Real-time monitoring of live network streams (live stream monitoring tools). File-based analysis only.
 - Audio analysis beyond listing audio tracks and their container metadata.
 - Dolby Vision display-side mapping ("true DV" rendering). OVT parses and shows RPU metadata and converts profile 5/8 to PQ via libplacebo, and labels it as such.
 - Reimplementing decoders. OVT instruments existing decoders; it never writes a pixel-reconstructing decoder.
