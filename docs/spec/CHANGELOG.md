@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc11 — 2026-11-06
+
+PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 recipe 33 `syn_ts_cc_errors` — the clean TS loops the 60-frame source once (`-stream_loop 1`, 120 frames, 4 s). At 2 s, `ts_inject_errors.py --pcr-gap 1` (gap from first PCR + 1 s to + 2 s) found no PCR after the gap and stopped with "the stream is too short"; the 1 s gap and the 7 CC errors are unchanged — WI-0.553
+
 ## 1.0.0-rc10 — 2026-11-06
 
 PATCH-level: recipe commands fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.

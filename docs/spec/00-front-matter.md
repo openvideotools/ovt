@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc10 (2026-11-06) |
+| **Version** | 1.0-rc11 (2026-11-06) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -65,3 +65,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc8 (2026-11-06) | Chapter 14 §14.3.3 recipe 12 uses HM 18.0's `SliceSegmentMode`/`SliceSegmentArgument` and 100-CTU slices with a segment every 40 CTUs, so 720p pictures carry several slices and dependent segments (see `CHANGELOG.md`). |
 | 1.0-rc9 (2026-11-06) | Chapter 14 §14.3.3 recipes 19 and 62 spell the aomenc option `--superres-denominator` (see `CHANGELOG.md`). |
 | 1.0-rc10 (2026-11-06) | Chapter 14 §14.3.3 recipe 19 uses `--resize-denominator=9` so resize × superres stays within AV1's 2x reference scaling, recipe 68 writes the `--pssh` system ID without dashes, and rule 6 skips recipes whose `manual_download` input is absent (see `CHANGELOG.md`). |
+| 1.0-rc11 (2026-11-06) | Chapter 14 §14.3.3 recipe 33 loops its source once so the clean TS lasts 4 s and the 1 s PCR gap fits (see `CHANGELOG.md`). |
