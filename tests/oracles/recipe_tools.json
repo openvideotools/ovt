@@ -123,6 +123,9 @@
       "rawvideo",
       "webm",
       "yuv4mpegpipe"
+    ],
+    "devices": [
+      "lavfi"
     ]
   },
   "python_modules": [
