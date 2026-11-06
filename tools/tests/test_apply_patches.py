@@ -13,10 +13,10 @@ import hashlib
 import json
 import os
 import shutil
-import time
 import subprocess
 import sys
 import tarfile
+import time
 from pathlib import Path
 
 import pytest
@@ -182,11 +182,14 @@ def test_changed_series_re_extracts_and_applies_the_new_one(tmp_path: Path) -> N
     assert build.run().returncode == 0
     renamed = patch("0001-other.patch", "// line one", "// line one, patched again")
     changed = write_series(tmp_path, renamed)
-    # The download step reruns when the series or a patch is newer than its stamp. Both were written within the
-    # filesystem's timestamp granularity of the stamp, so make the order certain instead of waiting for it.
-    later = time.time() + 60
+    # ExternalProject reruns a step when its inputs are newer than its stamp, and the build tree compares mtimes
+    # at the filesystem's granularity. The first build, the rewrite and the second build all fall within it, so
+    # make the order certain: the new series is in the future, the first build's stamps are in the past.
+    now = time.time()
     for f in changed.parent.iterdir():
-        os.utime(f, (later, later))
+        os.utime(f, (now + 60, now + 60))
+    for stamp in (tmp_path / "prefix").rglob("*-stamp/*"):
+        os.utime(stamp, (now - 60, now - 60))
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
     assert "apply_patches: applied 0001-other.patch" in result.stdout
