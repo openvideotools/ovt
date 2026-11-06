@@ -262,15 +262,15 @@
     {"recipe": "72", "id": "syn_mp4_broken_size7_in_moov", "features": ["broken"], "tags": ["fast"], "files": ["size7_in_moov.mp4"], "aliases": ["size7_in_moov.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--box-size", "7", "--in", "moov", "-o", "size7_in_moov.mp4"]}]},
     {"recipe": "73", "id": "syn_pat_pq_patches_1000", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["pq_patches_1000.mp4", "pq_patches_1000.expected.json"], "aliases": ["pq_patches_1000.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
-      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "pq_patches_1000", "--out", "."]}]},
+      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "pq_patches_1000", "--out", ".", "--no-manifest"]}]},
     {"recipe": "73", "id": "syn_pat_hlg_patches", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["hlg_patches.mp4", "hlg_patches.expected.json"], "aliases": ["hlg_patches.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
-      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "hlg_patches", "--out", "."]}]},
+      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "hlg_patches", "--out", ".", "--no-manifest"]}]},
     {"recipe": "73", "id": "syn_pat_sdr709_ramp", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["sdr709_ramp.mp4", "sdr709_ramp.expected.json"], "aliases": ["sdr709_ramp.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
-      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "sdr709_ramp", "--out", "."]}]},
+      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "sdr709_ramp", "--out", ".", "--no-manifest"]}]},
     {"recipe": "73", "id": "syn_pat_p3_saturation", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["p3_saturation.mp4", "p3_saturation.expected.json"], "aliases": ["p3_saturation.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
-      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "p3_saturation", "--out", "."]}]},
+      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "p3_saturation", "--out", ".", "--no-manifest"]}]},
     {"recipe": "73", "id": "syn_pat_siting_checker", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["siting_checker.mp4", "siting_checker.expected.json"], "aliases": ["siting_checker.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
-      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "siting_checker", "--out", "."]}]},
+      {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "siting_checker", "--out", ".", "--no-manifest"]}]},
     {"recipe": "74", "id": "syn_av1_globalmotion", "features": ["global_motion", "av1"], "tags": ["fast"], "needs": ["src_1080p_8bit.y4m"], "files": ["syn_av1_globalmotion.ivf"], "steps": [
       {"cmd": ["ffmpeg", "-i", "src_1080p_8bit.y4m", "-vf", "crop=1280:720:'t*64':0", "-frames:v", "30", "-pix_fmt", "yuv420p", "syn_av1_globalmotion_src.y4m"]},
       {"cmd": ["aomenc", "--threads=1", "--codec=av1", "--cpu-used=4", "--enable-global-motion=1", "--end-usage=q", "--cq-level=30", "--kf-max-dist=30", "--lag-in-frames=0", "--ivf", "-o", "syn_av1_globalmotion.ivf", "syn_av1_globalmotion_src.y4m"]}]},

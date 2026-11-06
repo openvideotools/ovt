@@ -58,6 +58,7 @@ SYN_LICENCE = {
 }
 
 EXIT_OK, EXIT_STEP, EXIT_INVALID, EXIT_MISMATCH = 0, 1, 4, 5
+UNSEEDED_LAVFI = re.compile(r"\b(life|cellauto)=([^,;\[\]]*)")
 
 
 class GenError(Exception):
@@ -102,9 +103,16 @@ def determinism_problem(argv: list[str]) -> str | None:
     """Why ``argv`` would give different bytes on another machine or run, or None.
 
     The x264/x265/libaom output depends on the thread count, which defaults to the CPU count; MP4Box and
-    mkvmerge stamp the wall-clock time and random UIDs unless told not to (#119).
+    mkvmerge stamp the wall-clock time and random UIDs unless told not to; lavfi ``life``/``cellauto`` start
+    from a random grid and ``mp4encrypt --key …:random`` draws a random IV (#119, §14.3.3 rules 1-2).
     """
     tool, args = argv[0], argv[1:]
+    for arg in args:  # lavfi sources whose first frame is random unless seeded
+        for name, opts in UNSEEDED_LAVFI.findall(arg):
+            if not re.search(r"(^|:)seed=", opts):
+                return f"lavfi {name} needs seed=N"
+    if tool == "mp4encrypt" and any(a.endswith(":random") for a in args):
+        return "mp4encrypt needs a fixed IV, not :random"
     if tool == "x264" and "--threads" not in args:
         return "x264 needs --threads N"
     if tool == "x265" and not {"--frame-threads", "--pools"} <= set(args):
@@ -117,8 +125,9 @@ def determinism_problem(argv: list[str]) -> str | None:
         return "mkvmerge needs --no-date --deterministic SEED"
     if tool == "ffmpeg" and "-c:v" in args:
         codec = args[args.index("-c:v") + 1]
-        if codec in ("libx264", "libaom-av1") and "-threads" not in args:
-            return f"ffmpeg {codec} needs -threads N"
+        after = args[args.index("-c:v") :]  # before -i, -threads sets only the decoder threads
+        if codec in ("libx264", "libaom-av1") and "-threads" not in after:
+            return f"ffmpeg {codec} needs -threads N after -c:v"
         if codec == "libx265":
             params = args[args.index("-x265-params") + 1] if "-x265-params" in args else ""
             if "frame-threads=" not in params or "pools=" not in params:
