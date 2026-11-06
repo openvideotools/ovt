@@ -22,8 +22,11 @@
 #include <QVariantMap>
 #include <QtGlobal>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdio>
-#include <cstring>
+#include <span>
+#include <string_view>
 
 #include "ovt/ovt.h"
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
@@ -45,13 +48,10 @@ void report(const QString& message) {
 }
 
 // `--version` runs before the QGuiApplication exists, so it works without a display.
-bool wants_version(int argc, char* argv[]) {
-  for (int i = 1; i < argc; ++i) {
-    if (std::strcmp(argv[i], "--version") == 0 || std::strcmp(argv[i], "-v") == 0) {
-      return true;
-    }
-  }
-  return false;
+bool wants_version(std::span<char*> args) {
+  return std::ranges::any_of(args.subspan(1), [](const char* arg) {
+    return std::string_view(arg) == "--version" || std::string_view(arg) == "-v";
+  });
 }
 
 int print_version() {
@@ -65,7 +65,7 @@ int print_version() {
 // Exported: on Android this binary is libovt_studio_<ABI>.so and Qt finds main() with dlsym(), but
 // ovt::flags compiles with -fvisibility=hidden (chapter 13 §13.2.5).
 Q_DECL_EXPORT int main(int argc, char* argv[]) {
-  if (wants_version(argc, argv)) {
+  if (wants_version(std::span<char*>(argv, static_cast<std::size_t>(argc)))) {
     return print_version();
   }
   // Before the application object (WI-1.450): the scale factor is passed through unrounded, so 125 % stays 125 %.

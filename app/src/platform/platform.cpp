@@ -10,7 +10,10 @@
 #include <QStandardPaths>
 #include <QtGlobal>
 
+#include <algorithm>
+#include <array>
 #include <cstdio>
+#include <string_view>
 
 namespace ovt::app {
 
@@ -90,24 +93,27 @@ QSGRendererInterface::GraphicsApi Platform::defaultGraphicsApi() {
 bool Platform::parseGraphicsApi(const QString& name, QSGRendererInterface::GraphicsApi* api) {
   const QString key = name.trimmed().toLower();
   struct Entry {
-    const char* name;
+    std::string_view name;
     QSGRendererInterface::GraphicsApi api;
   };
-  static const Entry kEntries[] = {
-      {"metal", QSGRendererInterface::Metal},      {"vulkan", QSGRendererInterface::Vulkan},
-      {"opengl", QSGRendererInterface::OpenGL},    {"gles", QSGRendererInterface::OpenGL},
-      {"d3d11", QSGRendererInterface::Direct3D11}, {"software", QSGRendererInterface::Software},
-      {"null", QSGRendererInterface::NullRhi},
-  };
-  for (const Entry& entry : kEntries) {
-    if (key == QLatin1String(entry.name)) {
-      if (api != nullptr) {
-        *api = entry.api;
-      }
-      return true;
-    }
+  static constexpr std::array<Entry, 7> kEntries{{
+      {.name = "metal", .api = QSGRendererInterface::Metal},
+      {.name = "vulkan", .api = QSGRendererInterface::Vulkan},
+      {.name = "opengl", .api = QSGRendererInterface::OpenGL},
+      {.name = "gles", .api = QSGRendererInterface::OpenGL},
+      {.name = "d3d11", .api = QSGRendererInterface::Direct3D11},
+      {.name = "software", .api = QSGRendererInterface::Software},
+      {.name = "null", .api = QSGRendererInterface::NullRhi},
+  }};
+  const auto* const found =
+      std::ranges::find_if(kEntries, [&key](const Entry& entry) { return key == QLatin1StringView(entry.name); });
+  if (found == kEntries.end()) {
+    return false;
   }
-  return false;
+  if (api != nullptr) {
+    *api = found->api;
+  }
+  return true;
 }
 
 QString Platform::graphicsApiName(QSGRendererInterface::GraphicsApi api) {

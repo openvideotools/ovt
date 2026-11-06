@@ -40,7 +40,7 @@ void write_file(const QString& path, const QByteArray& bytes) {
 }  // namespace
 
 TEST_CASE("Settings: an empty directory gives the defaults without a diagnostic", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   const Settings settings(dir.path());
   CHECK(settings.theme() == QStringLiteral("system"));
@@ -51,7 +51,7 @@ TEST_CASE("Settings: an empty directory gives the defaults without a diagnostic"
 }
 
 TEST_CASE("Settings: the theme change survives a restart and the file validates", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   {
     Settings first(dir.path());
@@ -71,7 +71,7 @@ TEST_CASE("Settings: the theme change survives a restart and the file validates"
 }
 
 TEST_CASE("Settings: a corrupt file loads the defaults and raises GUI-SET-0001", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   write_file(dir.path() + QStringLiteral("/settings.json"), "{ not json");
   const Settings settings(dir.path());
@@ -81,7 +81,7 @@ TEST_CASE("Settings: a corrupt file loads the defaults and raises GUI-SET-0001",
 }
 
 TEST_CASE("Settings: a file that parses but violates the schema is rejected", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   write_file(dir.path() + QStringLiteral("/settings.json"),
              R"({"settings_version": 1, "general": {"theme": "purple"}})");
@@ -92,7 +92,7 @@ TEST_CASE("Settings: a file that parses but violates the schema is rejected", "[
 }
 
 TEST_CASE("Settings: unknown keys are preserved on save", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   write_file(dir.path() + QStringLiteral("/settings.json"),
              R"({"settings_version": 1, "future": {"x": [1, 2]}, "general": {"theme": "light", "extra": true}})");
@@ -107,7 +107,7 @@ TEST_CASE("Settings: unknown keys are preserved on save", "[fast][gui][settings]
 }
 
 TEST_CASE("Settings: an invalid theme is refused", "[fast][gui][settings]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   Settings settings(dir.path());
   settings.setTheme(QStringLiteral("purple"));
@@ -129,7 +129,7 @@ TEST_CASE("Settings::validate: type, range and required keys", "[fast][gui][sett
 }
 
 TEST_CASE("Platform: OVT_CONFIG_DIR overrides the configuration directory", "[fast][gui][platform]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   REQUIRE(dir.isValid());
   qputenv("OVT_CONFIG_DIR", dir.path().toLocal8Bit());
   CHECK(Platform::configDir() == QDir::cleanPath(dir.path()));

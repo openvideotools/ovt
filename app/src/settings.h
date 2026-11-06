@@ -30,14 +30,14 @@ class Settings : public QObject {
   Settings();
   explicit Settings(const QString& config_dir, QObject* parent = nullptr);
 
-  QString theme() const;
+  [[nodiscard]] QString theme() const;
   void setTheme(const QString& theme);
-  QString path() const { return path_; }
-  QString diagnosticCode() const { return diagnostic_code_; }
-  QString diagnosticMessage() const { return diagnostic_message_; }
+  [[nodiscard]] QString path() const { return path_; }
+  [[nodiscard]] QString diagnosticCode() const { return diagnostic_code_; }
+  [[nodiscard]] QString diagnosticMessage() const { return diagnostic_message_; }
 
   // The document as it will be written: the defaults with the loaded values and unknown keys merged in.
-  const QJsonObject& document() const { return document_; }
+  [[nodiscard]] const QJsonObject& document() const { return document_; }
   static QJsonObject defaults();
 
   // Validates `document` against the bundled settings.schema.json (a subset of JSON Schema 2020-12: type, enum,

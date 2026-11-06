@@ -13,6 +13,7 @@
 #include <QSaveFile>
 #include <QStringList>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -23,10 +24,9 @@ namespace ovt::app {
 namespace {
 
 constexpr int kSettingsVersion = 1;
-constexpr char kSchemaResource[] = ":/qt/qml/OvtStudio/settings.schema.json";
 
 QJsonObject load_schema(QString* error) {
-  QFile file(QString::fromLatin1(kSchemaResource));
+  QFile file(QStringLiteral(":/qt/qml/OvtStudio/settings.schema.json"));
   if (!file.open(QIODevice::ReadOnly)) {
     *error = QStringLiteral("the bundled settings schema is missing");
     return {};
@@ -41,79 +41,113 @@ QJsonObject load_schema(QString* error) {
 }
 
 bool matches_type(const QJsonValue& value, const QString& type) {
-  if (type == QLatin1String("object")) return value.isObject();
-  if (type == QLatin1String("array")) return value.isArray();
-  if (type == QLatin1String("string")) return value.isString();
-  if (type == QLatin1String("boolean")) return value.isBool();
-  if (type == QLatin1String("null")) return value.isNull();
-  if (type == QLatin1String("number")) return value.isDouble();
+  if (type == QLatin1String("object")) {
+    return value.isObject();
+  }
+  if (type == QLatin1String("array")) {
+    return value.isArray();
+  }
+  if (type == QLatin1String("string")) {
+    return value.isString();
+  }
+  if (type == QLatin1String("boolean")) {
+    return value.isBool();
+  }
+  if (type == QLatin1String("null")) {
+    return value.isNull();
+  }
+  if (type == QLatin1String("number")) {
+    return value.isDouble();
+  }
   if (type == QLatin1String("integer")) {
     return value.isDouble() && std::floor(value.toDouble()) == value.toDouble();
   }
   return true;  // an unknown type name constrains nothing here
 }
 
-// Validates the subset of JSON Schema 2020-12 that settings.schema.json uses. Returns false and sets `reason`
-// ("/general/theme: not one of the allowed values") at the first violation.
-bool check(const QJsonValue& value, const QJsonObject& schema, const QString& where, QString* reason) {
-  const auto fail = [&](const QString& what) {
-    *reason = (where.isEmpty() ? QStringLiteral("/") : where) + QStringLiteral(": ") + what;
-    return false;
-  };
+bool check(const QJsonValue& value, const QJsonObject& schema, const QString& where, QString* reason);
+
+// The violation text of const, enum, type, minimum and maximum, or an empty string when the value passes.
+QString scalar_violation(const QJsonValue& value, const QJsonObject& schema) {
   if (schema.contains(QStringLiteral("const")) && schema.value(QStringLiteral("const")) != value) {
-    return fail(QStringLiteral("unexpected value"));
+    return QStringLiteral("unexpected value");
   }
-  if (schema.contains(QStringLiteral("enum"))) {
-    const QJsonArray allowed = schema.value(QStringLiteral("enum")).toArray();
-    if (!allowed.contains(value)) return fail(QStringLiteral("not one of the allowed values"));
+  if (schema.contains(QStringLiteral("enum")) && !schema.value(QStringLiteral("enum")).toArray().contains(value)) {
+    return QStringLiteral("not one of the allowed values");
   }
   if (schema.contains(QStringLiteral("type"))) {
     const QJsonValue type = schema.value(QStringLiteral("type"));
-    bool ok = false;
-    if (type.isArray()) {
-      for (const QJsonValue t : type.toArray()) ok = ok || matches_type(value, t.toString());
-    } else {
-      ok = matches_type(value, type.toString());
+    const QJsonArray types = type.isArray() ? type.toArray() : QJsonArray{type};
+    const bool ok =
+        std::ranges::any_of(types, [&value](const QJsonValue& t) { return matches_type(value, t.toString()); });
+    if (!ok) {
+      return QStringLiteral("wrong type");
     }
-    if (!ok) return fail(QStringLiteral("wrong type"));
   }
   if (value.isDouble()) {
     if (schema.contains(QStringLiteral("minimum")) &&
         value.toDouble() < schema.value(QStringLiteral("minimum")).toDouble()) {
-      return fail(QStringLiteral("below the minimum"));
+      return QStringLiteral("below the minimum");
     }
     if (schema.contains(QStringLiteral("maximum")) &&
         value.toDouble() > schema.value(QStringLiteral("maximum")).toDouble()) {
-      return fail(QStringLiteral("above the maximum"));
+      return QStringLiteral("above the maximum");
     }
   }
-  if (value.isObject()) {
-    const QJsonObject object = value.toObject();
-    for (const QJsonValue name : schema.value(QStringLiteral("required")).toArray()) {
-      if (!object.contains(name.toString())) return fail(QStringLiteral("missing \"%1\"").arg(name.toString()));
-    }
-    const QJsonObject properties = schema.value(QStringLiteral("properties")).toObject();
-    for (auto it = properties.begin(); it != properties.end(); ++it) {
-      if (object.contains(it.key()) &&
-          !check(object.value(it.key()), it.value().toObject(), where + QLatin1Char('/') + it.key(), reason)) {
-        return false;
-      }
+  return {};
+}
+
+// required and properties of an object value.
+bool check_object(const QJsonObject& object, const QJsonObject& schema,
+                  const QString& where,  // NOLINT(misc-no-recursion)
+                  QString* reason) {
+  for (const QJsonValue name : schema.value(QStringLiteral("required")).toArray()) {
+    if (!object.contains(name.toString())) {
+      *reason = where + QStringLiteral(": missing \"%1\"").arg(name.toString());
+      return false;
     }
   }
-  if (value.isArray() && schema.contains(QStringLiteral("items"))) {
-    const QJsonArray array = value.toArray();
-    for (int i = 0; i < array.size(); ++i) {
-      if (!check(array.at(i), schema.value(QStringLiteral("items")).toObject(),
-                 where + QLatin1Char('/') + QString::number(i), reason)) {
-        return false;
-      }
+  const QJsonObject properties = schema.value(QStringLiteral("properties")).toObject();
+  for (auto it = properties.begin(); it != properties.end(); ++it) {
+    if (object.contains(it.key()) &&
+        !check(object.value(it.key()), it.value().toObject(), where + QLatin1Char('/') + it.key(), reason)) {
+      return false;
     }
   }
   return true;
 }
 
+bool check_items(const QJsonArray& array, const QJsonObject& items, const QString& where,  // NOLINT(misc-no-recursion)
+                 QString* reason) {
+  for (int i = 0; i < array.size(); ++i) {
+    if (!check(array.at(i), items, where + QLatin1Char('/') + QString::number(i), reason)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Validates the subset of JSON Schema 2020-12 that settings.schema.json uses. Returns false and sets `reason`
+// ("/general/theme: not one of the allowed values") at the first violation. The schema is a tree, so the
+// recursion is as deep as the document.
+bool check(const QJsonValue& value, const QJsonObject& schema, const QString& where,
+           QString* reason) {  // NOLINT(misc-no-recursion)
+  const QString violation = scalar_violation(value, schema);
+  if (!violation.isEmpty()) {
+    *reason = (where.isEmpty() ? QStringLiteral("/") : where) + QStringLiteral(": ") + violation;
+    return false;
+  }
+  if (value.isObject() && !check_object(value.toObject(), schema, where, reason)) {
+    return false;
+  }
+  if (value.isArray() && schema.contains(QStringLiteral("items"))) {
+    return check_items(value.toArray(), schema.value(QStringLiteral("items")).toObject(), where, reason);
+  }
+  return true;
+}
+
 // Recursively overlays `over` onto `base`; objects merge, everything else is replaced. Unknown keys survive.
-QJsonObject merge(QJsonObject base, const QJsonObject& over) {
+QJsonObject merge(QJsonObject base, const QJsonObject& over) {  // NOLINT(misc-no-recursion): as deep as the document
   for (auto it = over.begin(); it != over.end(); ++it) {
     if (it.value().isObject() && base.value(it.key()).isObject()) {
       base.insert(it.key(), merge(base.value(it.key()).toObject(), it.value().toObject()));
