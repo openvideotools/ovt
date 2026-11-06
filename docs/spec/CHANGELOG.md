@@ -2,11 +2,17 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc5 — 2026-11-06
+## 1.0.0-rc7 — 2026-11-06
 
 Owner decision on PR #132 (WI-0.012): the core FFmpeg flavour leaves out every pool-covered decoder, not only AVC/HEVC. MINOR-level change (configure flag list); no WI is re-opened.
 
 - 13 §13.3.3, 15 §15.5.2 POL-PAT-2, 02 glossary "VP9 / VVC / MPEG-2" — core flavour adds `vvc`, `aac`, `aac_fixed`, `aac_latm`, `aac_at`, `aac_mediacodec`, `mpeg4`, `mpeg4_mediacodec`, `vc1`, `vc1image`, `wmv3`, `wmv3image` to `--disable-decoder=` and `mpeg4_videotoolbox`, `mpeg4_vaapi`, `vc1_vaapi`, `wmv3_vaapi` to `--disable-hwaccel=`; `OVT_PATENT_CODECS_IN_CORE=ON` keeps them; POL-PAT-2 no longer says parsers and bitstream filters are disabled (§13.3.3 keeps them on) — WI-0.012
+
+## 1.0.0-rc5 — 2026-11-06
+
+MINOR-level amendment (CI job behaviour) from the pre-public audit requested by the owner; no WI is re-opened.
+
+- 13 §13.7.1 — `build-linux-x64` and `build-macos-arm64` upload their build artefacts only while the repository is private, because a public Actions artefact is a binary distribution and the CI bundles carry no third-party notices — WI-0.030
 
 ## 1.0.0-rc4 — 2026-11-06
 

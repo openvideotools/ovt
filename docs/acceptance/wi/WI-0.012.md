@@ -97,7 +97,7 @@ time and found the OVT checkout around the build tree, so the OVT commit leaked 
 
 ## Amendment: other pool-covered decoders left out of the core (owner decision on #132)
 
-Spec 1.0-rc5 (§13.3.3, POL-PAT-2) adds VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1 to the core flavour's
+Spec 1.0-rc7 (§13.3.3, POL-PAT-2) adds VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1 to the core flavour's
 `--disable-decoder=`/`--disable-hwaccel=` lists. The core probe case is renamed "the core flavour has no
 pool-covered decoder unless OVT_PATENT_CODECS_IN_CORE" and checks all of them; `ffmpeg_configure_flags` checks
 the new lists and that the plugin flavour names none of them.

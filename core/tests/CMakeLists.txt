@@ -117,6 +117,14 @@ unset(_ovt_ff_opt)
 unset(_ovt_ff_on)
 unset(_ovt_ff_name)
 
+# WI-0.015: tp::vmaf (Meson wrapper) links into a test that loads the built-in vmaf_v0.6.1 model.
+if(TARGET tp::vmaf)
+  add_executable(ovt_tests_vmaf_probe test_vmaf_probe.cpp)
+  target_link_libraries(ovt_tests_vmaf_probe PRIVATE tp::vmaf ovt::flags ${Catch2_TARGET})
+  ovt_set_license(ovt_tests_vmaf_probe "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(ovt_tests_vmaf_probe)
+endif()
+
 # WI-0.017: tp::onnxruntime (prebuilt fallback, OVT_ONNXRUNTIME_PREBUILT=ON) links into a plain C program that
 # calls OrtGetApiBase(); it exits 0 when the header is found and the library loads.
 if(TARGET tp::onnxruntime)

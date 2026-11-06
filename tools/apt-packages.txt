@@ -13,6 +13,8 @@ ninja-build
 ccache
 pkg-config
 nasm
+# libvmaf generates its built-in models with xxd (WI-0.015)
+xxd
 git
 curl
 ca-certificates
