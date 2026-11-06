@@ -8,6 +8,8 @@
 #ifndef OVT_OVT_H
 #define OVT_OVT_H
 
+#include "ovt/jobs.h"
+#include "ovt/log.h"
 #include "ovt/status.h"
 #include "ovt/version.h"
 

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/ovt-settings-1.json",
+  "title": "OVT Studio settings",
+  "description": "settings.json of chapter 11 section 11.2.5. Unknown keys are allowed and preserved on save.",
+  "type": "object",
+  "required": ["settings_version"],
+  "properties": {
+    "settings_version": { "const": 1 },
+    "general": {
+      "type": "object",
+      "properties": {
+        "theme": { "enum": ["system", "light", "dark"], "default": "system" },
+        "language": { "type": "string", "default": "en" },
+        "recent_files_count": { "type": "integer", "minimum": 0, "maximum": 100, "default": 10 },
+        "confirm_on_close": { "type": "boolean", "default": true }
+      }
+    },
+    "decoding": { "type": "object" },
+    "picture": { "type": "object" },
+    "overlays": { "type": "object" },
+    "hdr": { "type": "object" },
+    "metrics": { "type": "object" },
+    "keyboard": { "type": "object" },
+    "privacy": { "type": "object" }
+  }
+}

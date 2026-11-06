@@ -1,0 +1,108 @@
+# FFmpeg 6.1.1 (Ubuntu 24.04) trace_headers on a 64x64 libx265 stream; excerpt (VPS of the first packet, then the second packet)
+[trace_headers @ 0x55e4f8b8b4c0] Packet: 3023 bytes, key frame, no pts, dts -96000, duration 48000.
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 32(VPS), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 33(SPS), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 34(PPS), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 39(SEI_PREFIX), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 20(IDR_N_LP), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] Video Parameter Set
+[trace_headers @ 0x55e4f8b8b4c0] 0           forbidden_zero_bit                                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 1           nal_unit_type                                          100000 = 32
+[trace_headers @ 0x55e4f8b8b4c0] 7           nuh_layer_id                                           000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 13          nuh_temporal_id_plus1                                     001 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 16          vps_video_parameter_set_id                               0000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 20          vps_base_layer_internal_flag                                1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 21          vps_base_layer_available_flag                               1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 22          vps_max_layers_minus1                                  000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 28          vps_max_sub_layers_minus1                                 000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 31          vps_temporal_id_nesting_flag                                1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 32          vps_reserved_0xffff_16bits                   1111111111111111 = 65535
+[trace_headers @ 0x55e4f8b8b4c0] 48          general_profile_space                                      00 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 50          general_tier_flag                                           0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 51          general_profile_idc                                     00100 = 4
+[trace_headers @ 0x55e4f8b8b4c0] 56          general_profile_compatibility_flag[0]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 57          general_profile_compatibility_flag[1]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 58          general_profile_compatibility_flag[2]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 59          general_profile_compatibility_flag[3]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 60          general_profile_compatibility_flag[4]                       1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 61          general_profile_compatibility_flag[5]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 62          general_profile_compatibility_flag[6]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 63          general_profile_compatibility_flag[7]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 64          general_profile_compatibility_flag[8]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 65          general_profile_compatibility_flag[9]                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 66          general_profile_compatibility_flag[10]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 67          general_profile_compatibility_flag[11]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 68          general_profile_compatibility_flag[12]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 69          general_profile_compatibility_flag[13]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 70          general_profile_compatibility_flag[14]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 71          general_profile_compatibility_flag[15]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 72          general_profile_compatibility_flag[16]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 73          general_profile_compatibility_flag[17]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 74          general_profile_compatibility_flag[18]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 75          general_profile_compatibility_flag[19]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 76          general_profile_compatibility_flag[20]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 77          general_profile_compatibility_flag[21]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 78          general_profile_compatibility_flag[22]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 79          general_profile_compatibility_flag[23]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 80          general_profile_compatibility_flag[24]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 81          general_profile_compatibility_flag[25]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 82          general_profile_compatibility_flag[26]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 83          general_profile_compatibility_flag[27]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 84          general_profile_compatibility_flag[28]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 85          general_profile_compatibility_flag[29]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 86          general_profile_compatibility_flag[30]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 87          general_profile_compatibility_flag[31]                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 88          general_progressive_source_flag                             1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 89          general_interlaced_source_flag                              0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 90          general_non_packed_constraint_flag                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 91          general_frame_only_constraint_flag                          1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 92          general_max_12bit_constraint_flag                           1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 93          general_max_10bit_constraint_flag                           1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 94          general_max_8bit_constraint_flag                            1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 95          general_max_422chroma_constraint_flag                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 96          general_max_420chroma_constraint_flag                       0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 97          general_max_monochrome_constraint_flag                      0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 98          general_intra_constraint_flag                               0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 99          general_one_picture_only_constraint_flag                    0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 100         general_lower_bit_rate_constraint_flag                      1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 101         general_reserved_zero_34bits         000000000000000000000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 125         general_reserved_zero_34bits                       0000000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 135         general_inbld_flag                                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 136         general_level_idc                                    00011110 = 30
+[trace_headers @ 0x55e4f8b8b4c0] 144         vps_sub_layer_ordering_info_present_flag                    1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 145         vps_max_dec_pic_buffering_minus1[0]                     00101 = 4
+[trace_headers @ 0x55e4f8b8b4c0] 150         vps_max_num_reorder_pics[0]                               011 = 2
+[trace_headers @ 0x55e4f8b8b4c0] 153         vps_max_latency_increase_plus1[0]                       00110 = 5
+[trace_headers @ 0x55e4f8b8b4c0] 158         vps_max_layer_id                                       000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 164         vps_num_layer_sets_minus1                                   1 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 165         vps_timing_info_present_flag                                0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 166         vps_extension_flag                                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 167         rbsp_stop_one_bit                                           1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] Slice Segment Header
+[trace_headers @ 0x55e4f8b8b4c0] 0           forbidden_zero_bit                                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 1           nal_unit_type                                          010100 = 20
+[trace_headers @ 0x55e4f8b8b4c0] 7           nuh_layer_id                                           000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 13          nuh_temporal_id_plus1                                     001 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 16          first_slice_segment_in_pic_flag                             1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 17          no_output_of_prior_pics_flag                                0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 18          slice_pic_parameter_set_id                                  1 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 19          slice_type                                                011 = 2
+[trace_headers @ 0x55e4f8b8b4c0] 22          slice_sao_luma_flag                                         1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 23          slice_sao_chroma_flag                                       1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 24          slice_qp_delta                                        0001110 = 7
+[trace_headers @ 0x55e4f8b8b4c0] 31          slice_loop_filter_across_slices_enabled_flag                1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 32          alignment_bit_equal_to_one                                  1 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 33          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 34          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 35          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 36          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 37          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 38          alignment_bit_equal_to_zero                                 0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 39          alignment_bit_equal_to_zero                                 0 = 0
+size=       0kB time=-00:00:00.08 bitrate=  -0.0kbits/s speed=N/A    [trace_headers @ 0x55e4f8b8b4c0] Packet: 38 bytes, no pts, dts -48000, duration 48000.
+[trace_headers @ 0x55e4f8b8b4c0] nal_unit_type: 1(TRAIL_R), nuh_layer_id: 0, temporal_id: 0
+[trace_headers @ 0x55e4f8b8b4c0] Slice Segment Header
+[trace_headers @ 0x55e4f8b8b4c0] 0           forbidden_zero_bit                                          0 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 1           nal_unit_type                                          000001 = 1
+[trace_headers @ 0x55e4f8b8b4c0] 7           nuh_layer_id                                           000000 = 0
+[trace_headers @ 0x55e4f8b8b4c0] 13          nuh_temporal_id_plus1                                     001 = 1
