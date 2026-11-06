@@ -12,7 +12,8 @@ directory and its percentage. A gated directory that has source files but no ins
 counts as 0 %, so deleting its tests cannot hide it; a gated directory without any source file is reported
 and skipped (container/ has no sources yet). Exit 2 means unusable input.
 
-`objects` prints the test executables registered with CTest in BUILD_DIR, one per line, for the
+`objects` prints the test executables registered with CTest in BUILD_DIR plus the built libovt_core shared
+library (the unit tests run core/src/ from it), one per line, for the
 `llvm-cov export -object` arguments.
 """
 
@@ -117,6 +118,10 @@ def cmd_objects(args: argparse.Namespace) -> int:
         command = test.get("command") or []
         if command and Path(command[0]).is_file():
             seen[command[0]] = None
+    # Tests that link the shared ovt::core run its code from the library, which llvm-cov needs as an object too.
+    for lib in sorted(Path(args.test_dir).rglob("libovt_core*")):
+        if lib.suffix in (".dylib", ".so") or ".so." in lib.name:
+            seen[str(lib.resolve())] = None
     print("\n".join(seen))
     return 0
 
