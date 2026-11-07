@@ -1,0 +1,292 @@
+[
+ {
+  "fields": {
+   "major_brand": "isom",
+   "minor_version": 512
+  },
+  "header_length": 8,
+  "offset": 0,
+  "path": "ftyp",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 32,
+  "path": "free",
+  "size": 8
+ },
+ {
+  "header_length": 8,
+  "offset": 40,
+  "path": "mdat",
+  "size": 3148364
+ },
+ {
+  "header_length": 8,
+  "offset": 3148404,
+  "path": "moov",
+  "size": 7885
+ },
+ {
+  "fields": {
+   "creation_time": 0,
+   "duration": 20000,
+   "flags": 0,
+   "modification_time": 0,
+   "next_track_ID": 2,
+   "rate": 65536,
+   "timescale": 1000,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148412,
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "header_length": 8,
+  "offset": 3148520,
+  "path": "moov/trak",
+  "size": 7678
+ },
+ {
+  "fields": {
+   "alternate_group": 0,
+   "creation_time": 0,
+   "duration": 20000,
+   "flags": 3,
+   "height": 23592960,
+   "layer": 0,
+   "modification_time": 0,
+   "track_ID": 1,
+   "version": 0,
+   "width": 41943040
+  },
+  "header_length": 8,
+  "offset": 3148528,
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 3148620,
+  "path": "moov/trak/edts",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148628,
+  "path": "moov/trak/edts/elst",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 3148656,
+  "path": "moov/trak/mdia",
+  "size": 7542
+ },
+ {
+  "fields": {
+   "creation_time": 0,
+   "duration": 307200,
+   "flags": 0,
+   "language": "und",
+   "modification_time": 0,
+   "timescale": 15360,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148664,
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "VideoHandler",
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148696,
+  "path": "moov/trak/mdia/hdlr",
+  "size": 45
+ },
+ {
+  "header_length": 8,
+  "offset": 3148741,
+  "path": "moov/trak/mdia/minf",
+  "size": 7457
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "graphicsmode": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148749,
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 3148769,
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148777,
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148793,
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 3148805,
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 7393
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148813,
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 169
+ },
+ {
+  "header_length": 16,
+  "offset": 3148829,
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1",
+  "size": 153
+ },
+ {
+  "header_length": 8,
+  "offset": 3148915,
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1/avcC",
+  "size": 51
+ },
+ {
+  "header_length": 8,
+  "offset": 3148966,
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1/pasp",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3148982,
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3149006,
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3149034,
+  "path": "moov/trak/mdia/minf/stbl/ctts",
+  "size": 4648
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3153682,
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 64
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sample_count": 600,
+   "sample_size": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3153746,
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 2420
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3156166,
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 3156198,
+  "path": "moov/udta",
+  "size": 91
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3156206,
+  "path": "moov/udta/meta",
+  "size": 83
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "mdir",
+   "name": "",
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 3156218,
+  "path": "moov/udta/meta/hdlr",
+  "size": 33
+ },
+ {
+  "header_length": 8,
+  "offset": 3156251,
+  "path": "moov/udta/meta/ilst",
+  "size": 38
+ }
+]

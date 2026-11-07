@@ -23,7 +23,8 @@ if(NOT OVT_XXD)
                       "library. Install it (macOS ships it; Debian/Ubuntu: apt install xxd; tools/bootstrap.sh).")
 endif()
 
-ovt_tp_declare(libvmaf LICENSE_FILES LICENSE)
+# "./LICENSE", not LICENSE: a bare LICENSE is read as ovt_tp_declare()'s LICENSE keyword and records no file.
+ovt_tp_declare(libvmaf LICENSE_FILES ./LICENSE)
 
 ovt_tp_meson(
   libvmaf
