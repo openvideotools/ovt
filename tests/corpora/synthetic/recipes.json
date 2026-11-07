@@ -180,12 +180,62 @@
     {"recipe": "48", "id": "syn_h265_hdr10plus", "features": ["10bit", "pq", "hdr10plus", "t35"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_h265_hdr10plus.mp4", "syn_h265_hdr10plus.265"], "steps": [
       {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "src_1080p_10bit.y4m", "--input-depth", "10", "--output-depth", "10", "--profile", "main10", "--preset", "medium", "--colorprim", "bt2020", "--transfer", "smpte2084", "--colormatrix", "bt2020nc", "--master-display", "G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1)", "--max-cll", "1000,400", "--hdr10", "--hdr10-opt", "--repeat-headers", "--keyint", "30", "--dhdr10-info", "{repo}/tests/corpora/synthetic/hdr10plus_metadata.json", "--output", "syn_h265_hdr10plus.265"]},
       {"cmd": ["ffmpeg", "-i", "syn_h265_hdr10plus.265", "-c", "copy", "-tag:v", "hvc1", "syn_h265_hdr10plus.mp4"]}]},
-    {"recipe": "49", "id": "syn_broken_h265_truncated_sps", "features": ["broken"], "tags": ["fast"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_h265_truncated_sps.265"], "note": "expected SYN-H265-0003; the syn_broken_syntax_<code> family is added with corrupt_conditions.json (part b)", "steps": [
+    {"recipe": "49", "id": "syn_broken_h265_truncated_sps", "features": ["broken"], "tags": ["fast"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_h265_truncated_sps.265"], "note": "expected SYN-H265-0003", "steps": [
       {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--truncate-nal", "sps", "--keep-bytes", "9", "syn_h265_amp_sao_on.265", "syn_broken_h265_truncated_sps.265"]}]},
     {"recipe": "49", "id": "syn_broken_h265_slice_error_f12", "features": ["broken"], "tags": ["fast"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_h265_slice_error_f12.265"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--flip-slice-data", "--frame", "12", "--byte", "40", "syn_h265_amp_sao_on.265", "syn_broken_h265_slice_error_f12.265"]}]},
     {"recipe": "49", "id": "syn_broken_h264_missing_pps", "features": ["broken"], "tags": ["fast"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_h264_missing_pps.264"], "note": "expected SYN-H264-0010", "steps": [
       {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--drop-nal", "pps", "syn_h264_multislice_cavlc.264", "syn_broken_h264_missing_pps.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_GEN_0001", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_GEN_0001.265"], "note": "vps_reserved_0xffff_16bits (f(16)) reads 0x0000", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-GEN-0001", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_GEN_0001.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_GEN_0002", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_GEN_0002.264"], "note": "an emulation prevention byte followed by 0x04 in the first slice of picture 1", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-GEN-0002", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_GEN_0002.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_GEN_0003", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_GEN_0003.264"], "note": "reserved_zero_2bits = 3", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-GEN-0003", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_GEN_0003.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_GEN_0101", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_GEN_0101.264"], "note": "every NAL unit removed: an empty file", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-GEN-0101", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_GEN_0101.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_GEN_0102", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_GEN_0102.264"], "note": "no SPS or PPS anywhere (SYN-H264-0010 follows)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-GEN-0102", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_GEN_0102.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0001", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_H264_0001.264"], "note": "forbidden_zero_bit = 1 on the first SEI", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0001", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_H264_0001.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0010", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_H264_0010.264"], "note": "the PPS removed (same edit as syn_broken_h264_missing_pps)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0010", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_H264_0010.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0020", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_H264_0020.264"], "note": "the PPS moved before its SPS", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0020", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_H264_0020.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0030", "features": ["broken"], "needs": ["syn_h264_hrd_cbr"], "files": ["syn_broken_syntax_SYN_H264_0030.264"], "note": "the SEIs of the first access unit (buffering_period first) moved before the SPS", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0030", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_hrd_cbr.264", "syn_broken_syntax_SYN_H264_0030.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0060", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_H264_0060.264"], "note": "the first slice repeated: a second first_mb_in_slice 0 in the same picture", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0060", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_H264_0060.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H264_0103", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_H264_0103.264"], "note": "reference picture 1 removed: frame_num jumps by 2, gaps not allowed", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H264-0103", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_H264_0103.264"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0001", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0001.265"], "note": "nuh_temporal_id_plus1 = 0 on the first prefix SEI", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0001", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0001.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0003", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0003.265"], "note": "the SPS cut to 9 bytes (same edit as syn_broken_h265_truncated_sps)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0003", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0003.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0007", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0007.265"], "note": "vps_max_sub_layers_minus1 = 7 (allowed 0..6)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0007", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0007.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0010", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0010.265"], "note": "pps_pic_parameter_set_id = 64", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0010", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0010.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0050", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0050.265"], "note": "the first prefix SEI's payloadType set to 132 (decoded picture hash, suffix only)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0050", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0050.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0060", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0060.265"], "note": "first_slice_segment_in_pic_flag = 0 on the only slice of picture 1", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0060", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0060.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_H265_0102", "features": ["broken"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_broken_syntax_SYN_H265_0102.265"], "note": "picture 1 (a reference of the following pictures) removed", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-H265-0102", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h265_amp_sao_on.265", "syn_broken_syntax_SYN_H265_0102.265"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0001", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0001.obu"], "note": "obu_has_size_field = 0 on the sequence header, which is followed by more OBUs", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0001", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_lowoverhead.obu", "syn_broken_syntax_SYN_AV1_0001.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0003", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0003.obu"], "note": "the KEY frame OBU of the first temporal unit removed after its sequence header", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0003", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_lowoverhead.obu", "syn_broken_syntax_SYN_AV1_0003.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0030", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0030.obu"], "note": "the temporal delimiter of TU 2 removed: TU 1 has two shown frames", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0030", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_lowoverhead.obu", "syn_broken_syntax_SYN_AV1_0030.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0032", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0032.obu"], "note": "TUs 1 and 2 under one temporal_unit_size: two temporal delimiters inside it", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0032", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_annexb.obu", "syn_broken_syntax_SYN_AV1_0032.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0101", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0101.obu"], "note": "the KEY frame OBU of TU 0 keeps half of its tile data (obu_size consistent)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0101", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_lowoverhead.obu", "syn_broken_syntax_SYN_AV1_0101.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_AV1_0102", "features": ["broken"], "needs": ["syn_av1_annexb_obu_split"], "files": ["syn_broken_syntax_SYN_AV1_0102.obu"], "note": "no KEY frame: the inter frame of TU 1 names empty slots (same edit as SYN-AV1-0003)", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-AV1-0102", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_av1_lowoverhead.obu", "syn_broken_syntax_SYN_AV1_0102.obu"]}]},
+    {"recipe": "49", "id": "syn_broken_syntax_SYN_CONF_0001", "features": ["broken"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_broken_syntax_SYN_CONF_0001.264"], "note": "level_idc = 10 (Level 1, MaxFS 99) on a 1280x720 stream", "steps": [
+      {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--condition", "SYN-CONF-0001", "--conditions", "{repo}/tests/corpora/corrupt_conditions.json", "syn_h264_multislice_cavlc.264", "syn_broken_syntax_SYN_CONF_0001.264"]}]},
     {"recipe": "50", "id": "syn_broken_h265_hash_mismatch", "features": ["broken", "hash_sei"], "tags": ["fast"], "needs": ["src_720p_8bit.yuv"], "files": ["syn_broken_h265_hash_mismatch_f17.265"], "steps": [
       {"cmd": ["TAppEncoder", "-c", "{hm_cfg}/encoder_lowdelay_main.cfg", "-i", "src_720p_8bit.yuv", "-wdt", "1280", "-hgt", "720", "-fr", "30", "-f", "30", "--SEIDecodedPictureHash=1", "-b", "clean_md5.265"]},
       {"cmd": ["{python}", "{repo}/tools/corrupt.py", "--flip-hash-sei", "--frame", "17", "clean_md5.265", "syn_broken_h265_hash_mismatch_f17.265"]}]},
@@ -226,8 +276,52 @@
       {"cmd": ["cp", "src_1080p_10bit.y4m", "syn_metrics_pq_1080p_ref.y4m"]}]},
     {"recipe": "59", "id": "syn_scenes_5cuts", "features": ["scenes"], "files": ["syn_scenes_5cuts.mp4"], "note": "life and cellauto get seed=1: without a seed their first frame is random", "steps": [
       {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "testsrc2=s=1280x720:r=30:d=0.667", "-f", "lavfi", "-i", "mandelbrot=s=1280x720:r=30", "-f", "lavfi", "-i", "smptehdbars=s=1280x720:r=30", "-f", "lavfi", "-i", "color=c=0x802020:s=1280x720:r=30", "-f", "lavfi", "-i", "life=s=1280x720:r=30:mold=10:seed=1", "-f", "lavfi", "-i", "cellauto=s=1280x720:r=30:rule=110:seed=1", "-filter_complex", "[0]trim=end_frame=20,format=yuv420p[a];[1]trim=end_frame=20,format=yuv420p[b];[2]trim=end_frame=20,format=yuv420p[c];[3]trim=end_frame=20,format=yuv420p[d];[4]trim=end_frame=20,format=yuv420p[e];[5]trim=end_frame=20,format=yuv420p[f];[a][b][c][d][e][f]concat=n=6:v=1", "-c:v", "libx264", "-threads", "1", "-crf", "20", "-g", "300", "syn_scenes_5cuts.mp4"]}]},
-    {"recipe": "60", "id": "syn_raw_1080p_p010", "features": ["raw"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_1080p_p010.yuv"], "note": "the syn_raw_<ctag> family is added with raw_formats.json (part b)", "steps": [
+    {"recipe": "60", "id": "syn_raw_1080p_p010", "features": ["raw"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_1080p_p010.yuv"], "steps": [
       {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "p010le", "-f", "rawvideo", "syn_raw_1080p_p010.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_420", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_420_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv420p", "-f", "rawvideo", "syn_raw_420_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_422", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_422_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv422p", "-f", "rawvideo", "syn_raw_422_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_444_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv444p", "-f", "rawvideo", "syn_raw_444_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444alpha", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_444alpha_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "yuva444p", "-f", "rawvideo", "syn_raw_444alpha_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_mono", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_mono_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "gray", "-f", "rawvideo", "syn_raw_mono_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_411", "features": ["raw"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_raw_411_1280x720.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_720p_8bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv411p", "-f", "rawvideo", "syn_raw_411_1280x720.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_420p10", "features": ["raw", "10bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_420p10_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv420p10le", "-f", "rawvideo", "syn_raw_420p10_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_422p10", "features": ["raw", "10bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_422p10_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv422p10le", "-f", "rawvideo", "syn_raw_422p10_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444p10", "features": ["raw", "10bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_444p10_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv444p10le", "-f", "rawvideo", "syn_raw_444p10_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_420p12", "features": ["raw", "12bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_420p12_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv420p12le", "-f", "rawvideo", "syn_raw_420p12_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_422p12", "features": ["raw", "12bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_422p12_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv422p12le", "-f", "rawvideo", "syn_raw_422p12_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444p12", "features": ["raw", "12bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_444p12_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv444p12le", "-f", "rawvideo", "syn_raw_444p12_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_420p14", "features": ["raw", "14bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_420p14_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv420p14le", "-f", "rawvideo", "syn_raw_420p14_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_422p14", "features": ["raw", "14bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_422p14_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv422p14le", "-f", "rawvideo", "syn_raw_422p14_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444p14", "features": ["raw", "14bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_444p14_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv444p14le", "-f", "rawvideo", "syn_raw_444p14_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_420p16", "features": ["raw", "16bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_420p16_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv420p16le", "-f", "rawvideo", "syn_raw_420p16_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_422p16", "features": ["raw", "16bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_422p16_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv422p16le", "-f", "rawvideo", "syn_raw_422p16_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_444p16", "features": ["raw", "16bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_444p16_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "yuv444p16le", "-f", "rawvideo", "syn_raw_444p16_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_mono10", "features": ["raw", "10bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_mono10_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "gray10le", "-f", "rawvideo", "syn_raw_mono10_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_mono12", "features": ["raw", "12bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_mono12_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "gray12le", "-f", "rawvideo", "syn_raw_mono12_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_mono14", "features": ["raw", "14bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_mono14_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "gray14le", "-f", "rawvideo", "syn_raw_mono14_1920x1080.yuv"]}]},
+    {"recipe": "60", "id": "syn_raw_mono16", "features": ["raw", "16bit"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_raw_mono16_1920x1080.yuv"], "steps": [
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "10", "-pix_fmt", "gray16le", "-f", "rawvideo", "syn_raw_mono16_1920x1080.yuv"]}]},
     {"recipe": "61", "id": "syn_h265_4k_main10", "features": ["4k", "10bit", "perf"], "local_only": true, "files": ["syn_h265_4k_main10.mp4"], "steps": [
       {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "testsrc2=size=3840x2160:rate=30,format=yuv420p10le", "-frames:v", "600", "-c:v", "libx265", "-x265-params", "profile=main10:keyint=60:crf=26:frame-threads=4:pools=8", "-tag:v", "hvc1", "syn_h265_4k_main10.mp4"]}]},
     {"recipe": "62", "id": "syn_av1_tools_all", "features": ["palette", "obmc", "superres"], "tags": ["fast"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_av1_tools_all.ivf"], "steps": [
@@ -306,12 +400,13 @@
       {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "30", "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "foo_1920x1080_yuv420p10le.yuv"]}]}
   ],
   "fixtures": [
-    {"path": "tests/perf/data/fa_4k_dense.bin", "cmd": ["{python}", "{repo}/tools/gen_dense_fa.py", "--out", "{out}"], "local_only": true},
-    {"path": "render/tests/fixtures/synthetic_4k_grid.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "grid", "--size", "4k", "--out", "{out}"]},
-    {"path": "render/tests/fixtures/synthetic_4k_mv.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "mv", "--size", "4k", "--out", "{out}"]},
-    {"path": "render/tests/fixtures/synthetic_8k_mv.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "mv", "--size", "8k", "--out", "{out}"]},
-    {"path": "render/tests/fixtures/real_1080p_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_h265_gop60_1080p}", "--frame", "59", "--plugin", "de265", "--format", "fb", "-o", "{out}"]},
-    {"path": "render/tests/fixtures/real_4k_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_av1_4k_2min}", "--frame", "59", "--plugin", "aom", "--format", "fb", "-o", "{out}"]},
-    {"path": "tests/corpora/hdr10plus/f000.bin", "cmd": ["{python}", "{repo}/tools/sei_inject.py", "--extract", "t35", "--frames", "0,30,59", "--out-dir", "{repo}/tests/corpora/hdr10plus", "{corpus:syn_h265_hdr10plus}"], "outputs": ["tests/corpora/hdr10plus/f030.bin", "tests/corpora/hdr10plus/f059.bin"]}
+    {"id": "fixture_fa_4k_dense", "path": "tests/perf/data/fa_4k_dense.bin", "cmd": ["{python}", "{repo}/tools/gen_dense_fa.py", "--size", "4k", "--out", "{out}"], "local_only": true},
+    {"id": "fixture_fa_1080p_dense", "path": "tests/perf/data/fa_1080p_dense.bin", "cmd": ["{python}", "{repo}/tools/gen_dense_fa.py", "--size", "1080p", "--out", "{out}"], "local_only": true},
+    {"id": "fixture_synthetic_4k_grid", "path": "render/tests/fixtures/synthetic_4k_grid.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "grid", "--size", "4k", "--out", "{out}"]},
+    {"id": "fixture_synthetic_4k_mv", "path": "render/tests/fixtures/synthetic_4k_mv.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "mv", "--size", "4k", "--out", "{out}"]},
+    {"id": "fixture_synthetic_8k_mv", "path": "render/tests/fixtures/synthetic_8k_mv.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "mv", "--size", "8k", "--out", "{out}"]},
+    {"id": "fixture_real_1080p_hevc_frame", "path": "render/tests/fixtures/real_1080p_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_h265_gop60_1080p}", "--frame", "59", "--plugin", "de265", "--format", "fb", "-o", "{out}"]},
+    {"id": "fixture_real_4k_hevc_frame", "path": "render/tests/fixtures/real_4k_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_av1_4k_2min}", "--frame", "59", "--plugin", "aom", "--format", "fb", "-o", "{out}"]},
+    {"id": "fixture_hdr10plus_t35", "path": "tests/corpora/hdr10plus/f000.bin", "cmd": ["{python}", "{repo}/tools/sei_inject.py", "--extract", "t35", "--frames", "0,30,59", "--out-dir", "{repo}/tests/corpora/hdr10plus", "{corpus:syn_h265_hdr10plus}"], "outputs": ["tests/corpora/hdr10plus/f030.bin", "tests/corpora/hdr10plus/f059.bin"]}
   ]
 }

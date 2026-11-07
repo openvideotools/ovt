@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Chapter 14 recipe 60 (WI-0.553): one raw file per Y4M C tag of chapter 8 section 8.6.5, written as",
+    "ffmpeg -i <source> -frames:v 10 -pix_fmt <pix_fmt> -f rawvideo syn_raw_<ctag>_<w>x<h>.yuv; 8-bit tags from",
+    "Source A (src_720p_8bit.y4m), deeper ones from Source B (src_1080p_10bit.y4m). The C tags 420jpeg, 420mpeg2",
+    "and 420paldv differ from 420 only in chroma siting, which a raw file does not carry: they share the 420 file.",
+    "SPEC-ASSUMPTION(#174): the family is the C tags of chapter 8 section 8.6.5 (FR-CNT-013), not FR-PLN-001/002."
+  ],
+  "same_as": {"420jpeg": "420", "420mpeg2": "420", "420paldv": "420"},
+  "formats": [
+    {"ctag": "420", "pix_fmt": "yuv420p", "chroma_format": "420", "bit_depth": 8},
+    {"ctag": "422", "pix_fmt": "yuv422p", "chroma_format": "422", "bit_depth": 8},
+    {"ctag": "444", "pix_fmt": "yuv444p", "chroma_format": "444", "bit_depth": 8},
+    {"ctag": "444alpha", "pix_fmt": "yuva444p", "chroma_format": "444", "bit_depth": 8},
+    {"ctag": "mono", "pix_fmt": "gray", "chroma_format": "400", "bit_depth": 8},
+    {"ctag": "411", "pix_fmt": "yuv411p", "chroma_format": "411", "bit_depth": 8},
+    {"ctag": "420p10", "pix_fmt": "yuv420p10le", "chroma_format": "420", "bit_depth": 10},
+    {"ctag": "422p10", "pix_fmt": "yuv422p10le", "chroma_format": "422", "bit_depth": 10},
+    {"ctag": "444p10", "pix_fmt": "yuv444p10le", "chroma_format": "444", "bit_depth": 10},
+    {"ctag": "420p12", "pix_fmt": "yuv420p12le", "chroma_format": "420", "bit_depth": 12},
+    {"ctag": "422p12", "pix_fmt": "yuv422p12le", "chroma_format": "422", "bit_depth": 12},
+    {"ctag": "444p12", "pix_fmt": "yuv444p12le", "chroma_format": "444", "bit_depth": 12},
+    {"ctag": "420p14", "pix_fmt": "yuv420p14le", "chroma_format": "420", "bit_depth": 14},
+    {"ctag": "422p14", "pix_fmt": "yuv422p14le", "chroma_format": "422", "bit_depth": 14},
+    {"ctag": "444p14", "pix_fmt": "yuv444p14le", "chroma_format": "444", "bit_depth": 14},
+    {"ctag": "420p16", "pix_fmt": "yuv420p16le", "chroma_format": "420", "bit_depth": 16},
+    {"ctag": "422p16", "pix_fmt": "yuv422p16le", "chroma_format": "422", "bit_depth": 16},
+    {"ctag": "444p16", "pix_fmt": "yuv444p16le", "chroma_format": "444", "bit_depth": 16},
+    {"ctag": "mono10", "pix_fmt": "gray10le", "chroma_format": "400", "bit_depth": 10},
+    {"ctag": "mono12", "pix_fmt": "gray12le", "chroma_format": "400", "bit_depth": 12},
+    {"ctag": "mono14", "pix_fmt": "gray14le", "chroma_format": "400", "bit_depth": 14},
+    {"ctag": "mono16", "pix_fmt": "gray16le", "chroma_format": "400", "bit_depth": 16}
+  ]
+}

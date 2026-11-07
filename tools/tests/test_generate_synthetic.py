@@ -330,3 +330,39 @@ def test_check_fast_subset_flags_unknown_names(tmp_path, capsys):
     found = sorted(re.findall(r"unknown (?:corpus id|fixture file|fixture) (\S+)", out))
     assert found == ["bogus_grid.fb", "corpus/jvt_NOT_A_STREAM", "mystery_clip.mp4", "syn_h264_nonexistent"]
     assert all(line.startswith("99-test.md:2:") for line in out.splitlines())
+
+
+def test_fixtures_run_hash_and_register(env, tmp_path, monkeypatch):
+    """--fixtures writes each fixture to its path, skips ovt-made and local_only ones, and records hashes."""
+    manifest = env()
+    monkeypatch.setattr(generate, "REPO", tmp_path)
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "gen.py").write_text("import sys; open(sys.argv[1], 'wb').write(b'fx')\n")
+    fixtures = [
+        {"id": "fixture_t_a", "path": "fx/a.bin", "cmd": ["{python}", "{repo}/tools/gen.py", "{out}"]},
+        {
+            "id": "fixture_t_perf",
+            "path": "fx/p.bin",
+            "cmd": ["{python}", "{repo}/tools/gen.py", "{out}"],
+            "local_only": True,
+        },
+        {"id": "fixture_t_ovt", "path": "fx/o.fb", "cmd": ["ovt", "analyze", "x", "-o", "{out}"]},
+    ]
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text()) | {"fixtures": fixtures}
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    monkeypatch.setattr(generate.shutil, "which", lambda name: None)
+    assert generate.main(["--recipes", str(path), "--manifest", str(manifest), "--sync-manifest"]) == 0
+    entry = {e["id"]: e for e in json.loads(manifest.read_text())["entries"]}["fixture_t_a"]
+    assert entry["kind"] == "fixture" and entry["path"] == "fx/a.bin" and entry["unverified"]
+    base = ["--recipes", str(path), "--manifest", str(manifest), "--out", str(tmp_path / "out"), "--fixtures"]
+    assert generate.main([*base, "--check"]) == 5  # hash not recorded yet
+    assert generate.main([*base, "--update-manifest"]) == 0
+    assert (tmp_path / "fx" / "a.bin").read_bytes() == b"fx"
+    assert not (tmp_path / "fx" / "p.bin").exists() and not (tmp_path / "fx" / "o.fb").exists()
+    entry = {e["id"]: e for e in json.loads(manifest.read_text())["entries"]}["fixture_t_a"]
+    assert entry["sha256"] == generate.sha256_file(tmp_path / "fx" / "a.bin") and "unverified" not in entry
+    assert generate.main([*base, "--check"]) == 0
+    doc["fixtures"].append(dict(fixtures[0]))
+    path.write_text(json.dumps(doc))
+    assert generate.main(["--recipes", str(path), "--list"]) == 4  # duplicate fixture id
