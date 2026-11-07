@@ -10,6 +10,7 @@ import stat
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -84,7 +85,7 @@ def test_sniff() -> None:
 
 # ---- selection --------------------------------------------------------------------------------------------------
 
-MANIFEST = {
+MANIFEST: dict[str, Any] = {
     "entries": [
         {
             "id": "jvt_A",
