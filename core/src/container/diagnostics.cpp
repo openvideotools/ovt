@@ -22,7 +22,7 @@ std::span<const DiagInfo> all_diagnostics() noexcept {
 }
 
 const DiagInfo& diag(DiagCode code) noexcept {
-  return kRegistry.at(static_cast<size_t>(code));
+  return kRegistry[static_cast<size_t>(code)];  // DiagCode values are indices into kRegistry
 }
 
 const DiagInfo* diag(std::string_view code) noexcept {
