@@ -484,6 +484,8 @@ def manifest_entry(rec: dict[str, Any]) -> dict[str, Any]:
     for key in ("features", "tags", "aliases"):
         if rec.get(key):
             entry[key] = list(rec[key])
+    if rec.get("expected"):
+        entry["expected"] = dict(rec["expected"])  # container tests (WI-1.237)
     if rec.get("local_only"):
         entry["local_only"] = True
     return entry
