@@ -7,9 +7,10 @@
 schema_version = 1
 
 [deny]                      # regex on SPDX ids (case-insensitive); any match anywhere fails
+# `NC` is the only LicenseRef token that collides with ordinary words ("Conformance"), so it must be a whole word.
 patterns = [
   "^AGPL", "^SSPL", "^BUSL", "^Elastic-2", "Commons-Clause", "^CC-BY-NC", "NonCommercial",
-  "LicenseRef-.*(NC|Proprietary|Evaluation)", "^JSON$", "^Hippocratic",
+  "LicenseRef-.*(Proprietary|Evaluation)", "LicenseRef-(\\S*[-.])?NC(?![A-Za-z])", "^JSON$", "^Hippocratic",
 ]
 
 [allow]
@@ -56,8 +57,15 @@ ovt_studio = "GPL-3.0-or-later"
 ovt_py = "GPL-3.0-or-later"
 ovt_plugin_aom = "BSD-2-Clause"
 ovt_plugin_de265 = "LGPL-3.0-or-later"
+# Probe test of the patched libde265 build (WI-0.014); the ovt_plugin_ prefix gives it the plugin rules, which allow
+# the LGPL-3.0-or-later link.
+ovt_plugin_de265_probe_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
 ovt_plugin_hm = "BSD-3-Clause"
+# Test targets of the FFmpeg flavours (WI-0.012): the two probe executables and the plugin symbol-leak fixture.
+ovt_tests_ffmpeg_probe = "LGPL-2.1-or-later"
+ovt_tests_ffmpeg_plugin_probe = "LGPL-2.1-or-later"
+ovt_ffmpeg_symbol_leak_fixture = "LGPL-2.1-or-later"
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
@@ -83,6 +91,11 @@ ovt_plugin_hm = "BSD-3-Clause"
 "plugins" = "LGPL-2.1-or-later"
 "" = "LGPL-2.1-or-later"
 
+[corpora]                   # chapter 14 §14.3.4 rule 2, read by `license_gate.py --corpora` (WI-0.561)
+# `redistributable = true` needs one of these ids. Extend by PR, never by CI override. Rule 4 (AGPL, SSPL, BUSL,
+# NonCommercial) uses [deny] above.
+redistributable_spdx = ["CC0-1.0", "CC-BY-4.0", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent", "MIT", "Apache-2.0"]
+
 [distribution]              # artefact rules (ADR-015); artefact ids are those of tools/release/manifest.toml (chapter 13 §13.8.1)
 default_download_forbidden_plugins = ["ovt_plugin_ffmpeg", "ovt_plugin_de265", "ovt_plugin_hm"]
 codec_pack_plugins = ["ovt_plugin_ffmpeg", "ovt_plugin_de265"]
@@ -90,6 +103,14 @@ required_notices = ["LICENSES/LicenseRef-AOM-Patent-License-1.0.txt", "THIRD_PAR
 
 [vcpkg_overrides]           # ports whose vcpkg.spdx.json says NOASSERTION; reviewed by a licence reviewer
 # zimg = "WTFPL"
+# glslang 16.4.0: vcpkg has its licence as null (vcpkg.spdx.json: LicenseRef-vcpkg-null). Its share/glslang/copyright file
+# carries BSD-3-Clause, BSD-2-Clause, MIT and Apache-2.0 sections and a "GPL 3 with special bison exception" section for
+# the Bison-generated glslang_tab.cpp (the file is in the upstream 16.4.0 tag, checked by cloning it; the copyright file itself
+# calls the Bison use "long removed"). The Bison exception (Bison-exception-2.2) lets that
+# output be distributed under other terms, so the concluded expression leaves it out; the owner confirms this (WI-0.015, #176).
+glslang = "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0"
+# vulkan-loader (Linux only): the port manifest has "license": null; upstream Vulkan-Loader is Apache-2.0.
+vulkan-loader = "Apache-2.0"
 
 [gradle_license_names]      # free-text licence names of the Gradle report -> SPDX id
 "The Apache Software License, Version 2.0" = "Apache-2.0"

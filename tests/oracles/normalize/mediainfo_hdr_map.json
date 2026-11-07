@@ -1,0 +1,18 @@
+{
+  "primaries": {"BT.709": 1, "BT.470 System M": 4, "BT.601 PAL": 5, "BT.601 NTSC": 6, "SMPTE 240M": 7,
+                "Generic film": 8, "BT.2020": 9, "XYZ": 10, "DCI P3": 11, "Display P3": 12, "EBU Tech 3213": 22},
+  "transfer": {"BT.709": 1, "BT.470 System M": 4, "BT.470 System B/G": 5, "BT.601": 6, "SMPTE 240M": 7,
+               "Linear": 8, "Logarithmic (100:1)": 9, "Logarithmic (316.22777:1)": 10, "xvYCC": 11,
+               "BT.1361": 12, "sRGB/sYCC": 13, "BT.2020 (10-bit)": 14, "BT.2020 (12-bit)": 15, "PQ": 16,
+               "SMPTE 428M": 17, "HLG": 18},
+  "matrix": {"Identity": 0, "BT.709": 1, "FCC 73.682": 4, "BT.470 System B/G": 5, "BT.601": 6,
+             "SMPTE 240M": 7, "YCgCo": 8, "BT.2020 non-constant": 9, "BT.2020 constant": 10, "Y'D'zD'x": 11,
+             "Chromaticity-derived non-constant": 12, "Chromaticity-derived constant": 13, "ICtCp": 14},
+  "full_range": {"Limited": 0, "Full": 1},
+  "mdcv_named": {
+    "BT.709": [[32000, 16500], [15000, 30000], [7500, 3000], [15635, 16450]],
+    "BT.2020": [[35400, 14600], [8500, 39850], [6550, 2300], [15635, 16450]],
+    "Display P3": [[34000, 16000], [13250, 34500], [7500, 3000], [15635, 16450]],
+    "DCI P3": [[34000, 16000], [13250, 34500], [7500, 3000], [15700, 17550]]
+  }
+}

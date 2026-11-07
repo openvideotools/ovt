@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Members that GStreamer derives (or keeps for its own bookkeeping) instead of parsing; the gstparse normaliser
+# drops them before comparison (chapter 14 §14.4.2). Format: <codec>.<structure>.<member path>, one per line.
+# tools/gen_gst_fields.py fails when a line names no member of tests/oracles/gst_fields.h.
+h264.sps.chroma_array_type
+h264.sps.max_frame_num
+h264.sps.width
+h264.sps.height
+h264.sps.crop_rect_width
+h264.sps.crop_rect_height
+h264.sps.crop_rect_x
+h264.sps.crop_rect_y
+h264.sps.fps_num_removed
+h264.sps.fps_den_removed
+h264.sps.valid
+h264.sps.vui_parameters.par_n
+h264.sps.vui_parameters.par_d
+h264.pps.valid
+h264.slice_header.max_pic_num
+h264.slice_header.valid
+h264.slice_header.header_size
+h264.slice_header.n_emulation_prevention_bytes
+h264.slice_header.pic_order_cnt_bit_size
+h264.slice_header.dec_ref_pic_marking.bit_size
+h265.sps.chroma_array_type
+h265.sps.width
+h265.sps.height
+h265.sps.crop_rect_width
+h265.sps.crop_rect_height
+h265.sps.crop_rect_x
+h265.sps.crop_rect_y
+h265.sps.fps_num
+h265.sps.fps_den
+h265.sps.valid
+h265.pps.PicWidthInCtbsY
+h265.pps.PicHeightInCtbsY
+h265.pps.valid
+h265.vps.valid
+h265.slice_header.NumPocTotalCurr
+h265.slice_header.header_size
+h265.slice_header.n_emulation_prevention_bytes
+h265.slice_header.short_term_ref_pic_set_size
+h265.slice_header.long_term_ref_pic_set_size
+av1.sequence_header.order_hint_bits
+av1.sequence_header.bit_depth
+av1.sequence_header.num_planes
+av1.frame_header.superres_denom
+av1.frame_header.frame_is_intra
+av1.frame_header.order_hints
+av1.frame_header.ref_frame_sign_bias
+av1.frame_header.coded_lossless
+av1.frame_header.all_lossless
+av1.frame_header.lossless_array
+av1.frame_header.seg_qm_Level
+av1.frame_header.tx_mode
+av1.frame_header.skip_mode_frame
+av1.frame_header.expected_frame_id

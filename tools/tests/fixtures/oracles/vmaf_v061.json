@@ -1,0 +1,52 @@
+{
+  "version": "3.0.0",
+  "fps": 312.50,
+  "frames": [
+    {
+      "frameNum": 0,
+      "metrics": {
+        "integer_motion2": 0.000000,
+        "integer_motion": 0.000000,
+        "integer_adm2": 0.981262,
+        "integer_adm_scale0": 0.977465,
+        "integer_vif_scale0": 0.802518,
+        "psnr_y": 40.910000,
+        "psnr_cb": 40.360000,
+        "psnr_cr": 40.490000,
+        "float_ssim": 0.986532,
+        "vmaf": 91.264871
+      }
+    },
+    {
+      "frameNum": 1,
+      "metrics": {
+        "integer_motion2": 1.284430,
+        "integer_motion": 1.284430,
+        "integer_adm2": 0.979054,
+        "integer_adm_scale0": 0.975110,
+        "integer_vif_scale0": 0.798871,
+        "psnr_y": 40.880000,
+        "psnr_cb": null,
+        "psnr_cr": 40.470000,
+        "float_ssim": 0.986011,
+        "vmaf": 90.877402
+      }
+    }
+  ],
+  "pooled_metrics": {
+    "integer_motion2": {
+      "min": 0.000000,
+      "max": 1.284430,
+      "mean": 0.642215,
+      "harmonic_mean": 0.000000
+    },
+    "vmaf": {
+      "min": 90.877402,
+      "max": 91.264871,
+      "mean": 91.071137,
+      "harmonic_mean": 91.070722
+    }
+  },
+  "aggregate_metrics": {
+  }
+}
