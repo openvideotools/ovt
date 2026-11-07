@@ -90,27 +90,10 @@ ApplicationWindow {
         }
     }
 
-    // Window-level shortcuts of the Keymap (§11.4.3, WI-1.466) and the dialogs they open (Go to, Preferences, Keyboard
-    // map). Ctrl+J (action "view.jobs") opens the Jobs popover (§11.3.18).
-    ShortcutLayer {
-        actions: actions
-        blocked: dialogs.anyOpen
-    }
-
-    Dialogs {
-        id: dialogs
-
-        actions: actions
-        overlayParent: Overlay.overlay
-    }
-
-    Connections {
-        target: actions
-
-        function onActivated(id) {
-            if (id === "view.jobs")
-                jobsPopover.opened ? jobsPopover.close() : jobsPopover.open()
-        }
+    // Ctrl+J opens the Jobs popover (§11.3.18).
+    Shortcut {
+        sequence: "Ctrl+J"
+        onActivated: jobsPopover.opened ? jobsPopover.close() : jobsPopover.open()
     }
 
     JobsPopover {
