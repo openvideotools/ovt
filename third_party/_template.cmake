@@ -23,14 +23,15 @@ include(OvtThirdPartyCommon)
 # 1. Declare the VERSIONS.md row: fails when the row is missing or has no hash, downloads the archive into
 #    OVT_TP_DOWNLOADS and verifies it, so ExternalProject finds the file there and does not fetch it again.
 #    LICENSE defaults to the row's Licence column.
-ovt_tp_declare(mydep
-  LICENSE_FILES LICENSE)
+ovt_tp_declare(mydep LICENSE_FILES ./LICENSE) # "./": a bare LICENSE would be read as the LICENSE keyword
 
 # 2. Patch step: every third_party/patches/mydep/*.patch, `git apply --check` first, applied once.
 #    For a series file and a patches.json record use instead:
 #      ovt_tp_apply_patches(mydep_patch SERIES <series> INSTALL_DIR <INSTALL_DIR>) ...  PATCH_COMMAND ${mydep_patch}
-ExternalProject_Add(tp_mydep
-  URL ${OVT_TP_mydep_URL} URL_HASH SHA256=${OVT_TP_mydep_SHA256}
+externalproject_add(
+  tp_mydep
+  URL ${OVT_TP_mydep_URL}
+  URL_HASH SHA256=${OVT_TP_mydep_SHA256}
   DOWNLOAD_DIR ${OVT_TP_DOWNLOADS}
   PREFIX ${OVT_THIRD_PARTY_PREFIX}/mydep
   INSTALL_DIR ${OVT_THIRD_PARTY_PREFIX}/mydep
