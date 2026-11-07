@@ -9,11 +9,13 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include <libplacebo/colorspace.h>
 #include <libplacebo/gpu.h>
 #include <libplacebo/renderer.h>
 
+#include "color/h273_map.h"
 #include "ovt/render/picture.h"
 
 namespace ovt::render::detail {
@@ -36,14 +38,12 @@ std::string validate_picture(const Picture& pic);
 // §10.3.1 chroma siting table: ovt_ColorDescription.chroma_siting -> pl_chroma_location.
 enum pl_chroma_location chroma_location(uint8_t chroma_siting);
 
-// Fills slot.frame.repr and slot.frame.color from the picture's colour description.
-// The H.273 tables of §10.3.3 belong to WI-1.402 (render/src/color/h273_map.cpp); until it lands this applies the
-// common codes and libplacebo's guesses for the rest.
-void fill_color(const Picture& pic, struct pl_frame& frame);
-
 // Uploads `pic` into `slot` (validate first). Skips the upload when the slot already holds a picture with the same
 // generation (§10.2.1). Returns "" on success, otherwise an RND-0001 message; on failure the slot is left invalid.
-std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot);
+// The colour description is mapped by the §10.3.3 tables (color/h273_map.h); the RND-0020/RND-0021 lines that
+// `notice_log` has not yet seen for this description are appended to `notices`.
+std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot, H273NoticeLog& notice_log,
+                           std::vector<std::string>& notices);
 
 // Source rectangle of the slot for the current view: the conformance window when show_cropped and the window is
 // non-empty, otherwise the full coded picture (§10.3.1 "Crop").

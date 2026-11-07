@@ -9,6 +9,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace ovt::render::detail {
 namespace {
@@ -111,68 +113,6 @@ enum pl_chroma_location chroma_location(uint8_t chroma_siting) {
   }
 }
 
-void fill_color(const Picture& pic, struct pl_frame& frame) {
-  // TODO(WI-1.402): replace with the §10.3.3 tables of render/src/color/h273_map.cpp.
-  const ovt_ColorDescription& c = pic.color;
-  const auto w = static_cast<int>(pic.coded_width);
-  const auto h = static_cast<int>(pic.coded_height);
-  frame.repr = pl_color_repr_unknown;
-  frame.repr.levels = c.full_range != 0 ? PL_COLOR_LEVELS_FULL : PL_COLOR_LEVELS_LIMITED;
-  switch (c.matrix) {
-    case 0:
-      frame.repr.sys = PL_COLOR_SYSTEM_RGB;
-      break;
-    case 1:
-      frame.repr.sys = PL_COLOR_SYSTEM_BT_709;
-      break;
-    case 5:
-    case 6:
-      frame.repr.sys = PL_COLOR_SYSTEM_BT_601;
-      break;
-    case 9:
-      frame.repr.sys = PL_COLOR_SYSTEM_BT_2020_NC;
-      break;
-    case 10:
-      frame.repr.sys = PL_COLOR_SYSTEM_BT_2020_C;
-      break;
-    default:
-      frame.repr.sys = pl_color_system_guess_ycbcr(w, h);
-      break;
-  }
-  frame.color = pl_color_space_unknown;
-  switch (c.primaries) {
-    case 1:
-      frame.color.primaries = PL_COLOR_PRIM_BT_709;
-      break;
-    case 9:
-      frame.color.primaries = PL_COLOR_PRIM_BT_2020;
-      break;
-    case 12:
-      frame.color.primaries = PL_COLOR_PRIM_DISPLAY_P3;
-      break;
-    default:
-      frame.color.primaries = pl_color_primaries_guess(w, h);
-      break;
-  }
-  switch (c.transfer) {
-    case 8:
-      frame.color.transfer = PL_COLOR_TRC_LINEAR;
-      break;
-    case 13:
-      frame.color.transfer = PL_COLOR_TRC_SRGB;
-      break;
-    case 16:
-      frame.color.transfer = PL_COLOR_TRC_PQ;
-      break;
-    case 18:
-      frame.color.transfer = PL_COLOR_TRC_HLG;
-      break;
-    default:
-      frame.color.transfer = PL_COLOR_TRC_BT_1886;
-      break;
-  }
-}
-
 namespace {
 
 // Creates (or reuses) the plane texture of slot.tex[i], fills it from the caller's buffer and describes it in
@@ -221,7 +161,8 @@ int upload_plane(pl_gpu gpu, const Picture& pic, uint8_t i, FrameSlot& slot, str
 
 }  // namespace
 
-std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot) {
+std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot, H273NoticeLog& notice_log,
+                           std::vector<std::string>& notices) {
   if (slot.valid && slot.generation == pic.generation) {
     return "";  // §10.2.1: same generation for the same slot -> no re-upload
   }
@@ -248,7 +189,14 @@ std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot) {
     pl_tex_destroy(gpu, &slot.tex[i]);
   }
 
-  fill_color(pic, frame);
+  // §10.3.3 tables (WI-1.402). The mapping leaves repr.bits zero; it is filled from the picture below.
+  const H273Mapping mapping =
+      map_color_description(pic.color, static_cast<int>(pic.coded_width), static_cast<int>(pic.coded_height));
+  frame.repr = mapping.repr;
+  frame.color = mapping.space;
+  for (std::string& line : notice_log.first_seen(pic.color, mapping)) {
+    notices.push_back(std::move(line));
+  }
   // Bit depth is declared on the frame (§10.3.1); samples are LSB-aligned and never pre-shifted.
   frame.repr.bits.sample_depth = depth;
   frame.repr.bits.color_depth = pic.color.bit_depth;

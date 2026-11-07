@@ -4,9 +4,9 @@
 // The one concrete VideoSurface (chapter 10 §10.1.3, §10.2.7). WI-1.400 is the skeleton: an OffscreenTexture target
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
-// pl_render_image pass. Colour mapping (WI-1.402), the full render parameters, target frames and dithering (WI-1.403),
-// interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements and export arrive
-// with their own work items; until then those entry points are inert.
+// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
+// dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
+// and export arrive with their own work items; until then those entry points are inert.
 
 #include <cstdio>
 #include <cstdlib>
@@ -171,7 +171,12 @@ class VideoSurfaceImpl final : public VideoSurface {
       error_ = "RND-0001 picture rejected: surface is not initialised";
       return;
     }
-    std::string err = detail::upload_picture(vk_->gpu, a, slot_a_);
+    std::vector<std::string> notices;
+    std::string err = detail::upload_picture(vk_->gpu, a, slot_a_, notice_log_, notices);
+    for (const std::string& line : notices) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), line.c_str());
+    }
     if (!err.empty()) {
       error_ = std::move(err);
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
@@ -363,6 +368,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   pl_tex tex_ = nullptr;
   pl_renderer renderer_ = nullptr;
   detail::FrameSlot slot_a_;
+  detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
 };
