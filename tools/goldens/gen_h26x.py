@@ -49,14 +49,19 @@ import h26x_selfcheck  # noqa: E402
 ALL_ORACLES = ("trace_headers", "gstparse", "jm", "hm", "mvs")
 HEADER_PICTURES = 6
 BLOCK_PICTURES = 2
-MAX_BYTES = 900_000  # per golden; CLAUDE.md forbids goldens over 2 MB, and a PR carries 100+ of them
+MAX_BYTES = 900_000  # header goldens; CLAUDE.md forbids goldens over 2 MB, and a PR carries 100+ of them
+MAX_BLOCK_BYTES = 1_900_000  # block goldens (JM, HM, MVs): one 1080p picture of JM output is 1.2 MB
 CONTAINER_PACKETS = 16  # packets copied out of a container: enough for HEADER_PICTURES whatever the GOP
 EPB_ID = "syn_h264_epb_dense"
 SKIP_CONTAINERS = {
     "heif": "an image item, not a video track",
     "hls": "a playlist, not a stream",
 }
-SKIP_IDS = {r"cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones"}
+SKIP_IDS = {
+    r"cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+    r"hev1_clg1_(header|segment)$": "an initialisation or media segment on its own: no sample description or no samples",
+}
+PROBE = ["-probesize", "50M", "-analyzeduration", "50M"]  # TS and Matroska need more than the default to know the size
 EXIT_OK, EXIT_STEP, EXIT_USAGE, EXIT_MISSING = 0, 1, 2, 4
 
 CODEC_INFO = {
@@ -97,6 +102,8 @@ def select(manifest: dict[str, Any], only: list[str] | None) -> tuple[list[dict[
         if entry_codec(entry) is None:
             continue
         reason = next((r for pat, r in SKIP_IDS.items() if re.search(pat, entry["id"])), None)
+        if entry.get("unverified") and entry.get("source") != "syn":
+            reason = reason or "no recorded hash: tools/fetch_corpora.py cannot fetch it"
         for container in entry.get("containers") or []:
             reason = reason or SKIP_CONTAINERS.get(container)
         if reason and only is None:
@@ -159,7 +166,9 @@ def run(
     )
     if res.returncode != 0:
         tail = (res.stderr or "").strip().splitlines()[-3:] if isinstance(res.stderr, str) else []
-        raise StepError(f"{what} exited {res.returncode}: {' | '.join(tail)}")
+        # addresses in the messages differ from run to run; the index must not
+        message = re.sub(r"0x[0-9a-f]{6,}", "0x…", " | ".join(tail))
+        raise StepError(f"{what} exited {res.returncode}: {message}")
     return res.stderr if isinstance(res.stderr, str) else ""
 
 
@@ -186,17 +195,33 @@ def sniff(head: bytes) -> str:
     raise StepError("unrecognised container (not Annex B, ISOBMFF, Matroska or MPEG-TS)")
 
 
-def to_annexb(src: Path, codec: str, work: Path, ffmpeg: str) -> Path:
-    """The Annex B elementary stream of ``src``: itself, or the first video track copied out of the container."""
+def video_stream(src: Path, codec: str, work: Path) -> int:
+    """Index of the first stream of ``src`` that is ``codec`` (Matroska and MP4 test files carry other codecs too)."""
+    name = {"h264": "h264", "h265": "hevc"}[codec]
+    out = subprocess.run(  # noqa: S603
+        [tool("ffprobe"), "-v", "error", *PROBE, "-select_streams", "v", "-show_entries", "stream=index,codec_name",
+         "-of", "csv=p=0", str(src)],
+        cwd=work, capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL,
+    )  # fmt: skip
+    for line in out.stdout.splitlines():
+        index, _, codec_name = line.partition(",")
+        if codec_name.strip() == name and index.strip().isdigit():
+            return int(index)
+    raise StepError(f"no {name} video stream in {src.name}")
+
+
+def to_annexb(src: Path, codec: str, work: Path) -> Path:
+    """The Annex B elementary stream of ``src``: itself, or its H.26x video track copied out of the container."""
     with src.open("rb") as f:
         kind = sniff(f.read(512))
     if kind == "annexb":
         return src
     info = CODEC_INFO[codec]
     es = work / f"es.{info['ext']}"
+    index = video_stream(src, codec, work)
     run(
-        [ffmpeg, "-hide_banner", "-v", "error", "-y", "-i", str(src), "-map", "0:v:0", "-c:v", "copy",
-         "-frames:v", str(CONTAINER_PACKETS), "-bsf:v", info["bsf"], "-f", info["fmt"], str(es)],
+        [tool("ffmpeg"), "-hide_banner", "-v", "error", "-y", *PROBE, "-i", str(src), "-map", f"0:{index}",
+         "-c:v", "copy", "-frames:v", str(CONTAINER_PACKETS), "-bsf:v", info["bsf"], "-f", info["fmt"], str(es)],
         work, "ffmpeg (container to Annex B)",
     )  # fmt: skip
     return es
@@ -274,7 +299,7 @@ class Entry:
         info = CODEC_INFO[self.codec]
         log = run(
             [tool("ffmpeg"), "-hide_banner", "-loglevel", "trace", "-f", info["fmt"], "-i", str(es), "-map", "0:v:0",
-             "-c:v", "copy", "-bsf:v", "trace_headers", "-f", "null", "-"],
+             "-c:v", "copy", "-bsf:v", "trace_headers", "-f", info["fmt"], "-y", os.devnull],
             self.work, "ffmpeg trace_headers",
         )  # fmt: skip
         path = self.work / "trace_headers.txt"
@@ -329,16 +354,22 @@ PICTURE_BUDGET = {"trace_headers": HEADER_PICTURES, "gstparse": HEADER_PICTURES,
                   "mvs": BLOCK_PICTURES, "hm": BLOCK_PICTURES}  # fmt: skip
 
 
+class TooLarge(StepError):
+    """Even one picture's golden exceeds the size limit: not a failure, the golden is left out."""
+
+
 def produce(state: Entry, oracle: str, max_bytes: int) -> tuple[str, int]:
     """Run one oracle on the longest stream prefix whose golden fits ``max_bytes``; returns (text, pictures)."""
     pictures = PICTURE_BUDGET[oracle]
+    if oracle in ("jm", "mvs", "hm"):
+        max_bytes = max(max_bytes, MAX_BLOCK_BYTES)
     while True:
         es, kept = state.stream(pictures)
         text = state.trace_headers(es, []) if oracle == "trace_headers" else getattr(state, oracle)(es)
         if len(text.encode()) <= max_bytes:
             return text, kept
         if pictures == 1:
-            raise StepError(f"{oracle}: the golden of one picture is {len(text)} bytes (limit {max_bytes})")
+            raise TooLarge(f"the golden of one picture is {len(text)} bytes (limit {max_bytes})")
         pictures = max(1, pictures // 2)
 
 
@@ -361,7 +392,7 @@ def process(
     }
     src = corpus_file(corpora, cid)
     record["input_sha256"] = sha256_file(src)
-    state = Entry(entry, codec, to_annexb(src, codec, work, tool("ffmpeg")), work)
+    state = Entry(entry, codec, to_annexb(src, codec, work), work)
     area = args.out / CODEC_INFO[codec]["area"]
     area.mkdir(parents=True, exist_ok=True)
     texts: dict[str, str] = {}
@@ -369,6 +400,9 @@ def process(
         key = f"{cid}:{oracle}"
         try:
             text, pictures = produce(state, oracle, args.max_bytes)
+        except TooLarge as exc:
+            record["skipped"][oracle] = str(exc)
+            continue
         except StepError as exc:
             if key in skips:
                 record["skipped"][oracle] = skips[key]
@@ -487,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
                 REPO, "generate.py", stdout=sys.stderr)  # fmt: skip
     needed = {"trace_headers": ["ffmpeg"], "gstparse": ["gst_parse_oracle"], "jm": ["ldecod"], "hm": ["hm_cu_dump"],
               "mvs": ["ffmpeg_mvs"]}  # fmt: skip
-    missing = sorted({t for o in args.oracles for t in needed[o] + ["ffmpeg"] if not _have(t)})
+    missing = sorted({t for o in args.oracles for t in needed[o] + ["ffmpeg", "ffprobe"] if not _have(t)})
     if missing:
         print(
             f"error: not on PATH (run this in the oracle image): {', '.join(missing)}",

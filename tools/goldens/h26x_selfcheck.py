@@ -51,6 +51,11 @@ def is_known(known: list[tuple[str, str]], member: str, corpus_id: str) -> bool:
     return any(fnmatch.fnmatchcase(member, pat) and fnmatch.fnmatchcase(corpus_id, ids) for pat, ids in known)
 
 
+# NAL unit types that GStreamer lists but CBS does not decompose (reserved and unspecified types, for example the
+# Dolby Vision RPU of HEVC type 62): such a unit has no trace_headers counterpart and is skipped.
+UNTRACED = {"h264": set(range(24, 32)), "h265": set(range(41, 64))}
+
+
 def cbs_units(elements: list[dict[str, Any]]) -> dict[int, dict[str, list[int | str]]]:
     units: dict[int, dict[str, list[int | str]]] = defaultdict(lambda: defaultdict(list))
     for e in elements:
@@ -100,21 +105,26 @@ def check(
         "problems": [],
     }
     seen: Counter[str] = Counter()
+    order = sorted(cbs)
+    cursor = 0
     for key in sorted(gst):
         unit = gst[key]
         index = int(key)
+        gst_type = unit["unit"]["type"]
+        if cursor >= len(order):
+            if gst_type not in UNTRACED[codec]:
+                report["problems"].append(f"unit {index}: no trace_headers unit left (type {gst_type})")
+            continue
+        elements = cbs[order[cursor]]
+        cbs_type = elements.get("nal_unit_type", [None])[0]
+        if cbs_type != gst_type:
+            if gst_type not in UNTRACED[codec]:
+                report["problems"].append(f"unit {index}: nal_unit_type {cbs_type} (trace_headers) vs {gst_type} (gst)")
+                cursor += 1
+            continue
+        cursor += 1
         if "error" in unit:
             report["problems"].append(f"unit {index}: GStreamer could not parse it ({unit['error']})")
-            continue
-        elements = cbs.get(index)
-        if elements is None:
-            report["problems"].append(f"unit {index}: no trace_headers unit")
-            continue
-        cbs_type = elements.get("nal_unit_type", [None])[0]
-        if cbs_type != unit["unit"]["type"]:
-            report["problems"].append(
-                f"unit {index}: nal_unit_type {cbs_type} (trace_headers) vs {unit['unit']['type']} (gst)"
-            )
             continue
         for structure, body in unit.items():
             if structure == "unit":

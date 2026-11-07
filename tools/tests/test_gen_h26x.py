@@ -139,6 +139,12 @@ def test_select_takes_fast_h26x_entries_and_the_epb_stream() -> None:
     assert set(skipped) == {"heif_C", "mpegff_video_cenc_128iv"}
 
 
+def test_select_skips_entries_without_a_recorded_hash() -> None:
+    manifest = {"entries": [{"id": "cta_x", "source": "cta", "codecs": ["h264"], "tags": ["fast"], "unverified": True}]}
+    chosen, skipped = gen.select(manifest, None)
+    assert chosen == [] and "no recorded hash" in skipped["cta_x"]
+
+
 def test_select_only_names_any_entry() -> None:
     chosen, _ = gen.select(MANIFEST, ["syn_h264_mbaff", "jvt_slow"])
     assert [e["id"] for e in chosen] == ["jvt_slow", "syn_h264_mbaff"]
@@ -279,6 +285,16 @@ def test_selfcheck_known_rows_document_a_disagreement(tmp_path: Path) -> None:
     assert sc.check("h264", trace, GST, "jctvc_B", sc.load_known(known))["problems"]
 
 
+def test_selfcheck_skips_units_cbs_does_not_trace() -> None:
+    gst = {
+        "000000": {"unit": {"index": 0, "offset": 0, "type": 62}},
+        "000001": {"unit": {"index": 1, "offset": 9, "type": 33}, "sps": {"sps_max_sub_layers_minus1": 0}},
+    }
+    trace = cbs([("nal_unit_type", 33), ("sps_max_sub_layers_minus1", 0)])
+    report = sc.check("h265", trace, gst, "x", [])
+    assert report["problems"] == [] and report["compared"] == 1
+
+
 def test_selfcheck_flags_unit_type_mismatch_and_gst_errors() -> None:
     trace = cbs([("nal_unit_type", 8)])
     assert "nal_unit_type" in sc.check("h264", trace, GST, "x", [])["problems"][0]
@@ -325,6 +341,7 @@ def lab(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict:
     monkeypatch.setenv("OVT_ORACLE_FFMPEG", str(fake_tool(tools / "ffmpeg", f'printf "{trace}" >&2\n')))
     gst = '{"unit":{"index":0,"offset":4,"type":0},"slice_header":{"first_mb_in_slice":0}}'
     monkeypatch.setenv("OVT_ORACLE_GST_PARSE_ORACLE", str(fake_tool(tools / "gst", f"echo '{gst}'\n")))
+    monkeypatch.setenv("OVT_ORACLE_FFPROBE", str(fake_tool(tools / "ffprobe", "exit 0\n")))
     monkeypatch.setenv("OVT_ORACLE_LDECOD", str(fake_tool(tools / "ldecod", "exit 3\n")))
     monkeypatch.setenv(
         "OVT_ORACLE_HM_CU_DUMP",
