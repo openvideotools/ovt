@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <utility>
 
 #include "platform/platform.h"
 #include "settings.h"
@@ -159,8 +160,8 @@ RawFormat RawFormat::fromJson(const QJsonObject& object) {
 
 Project::Project() : Project(Platform::configDir()) {}
 
-Project::Project(const QString& config_dir, QObject* parent)
-    : QObject(parent), config_dir_(config_dir), created_(QDateTime::currentDateTimeUtc()) {
+Project::Project(QString config_dir, QObject* parent)
+    : QObject(parent), config_dir_(std::move(config_dir)), created_(QDateTime::currentDateTimeUtc()) {
   autosave_timer_.setInterval(kDefaultAutosaveMs);
   connect(&autosave_timer_, &QTimer::timeout, this, [this] {
     if (dirty_) {
@@ -439,7 +440,7 @@ bool Project::validate(const QJsonObject& document, QString* reason) {
   return Settings::validateAgainst(document, schema, reason);
 }
 
-bool Project::write(const QString& path, const QString& base_dir) {
+bool Project::write(const QString& path, const QString& base_dir) const {
   const QByteArray bytes = QJsonDocument(document(base_dir)).toJson(QJsonDocument::Indented);
   return write_atomic(path, bytes);
 }

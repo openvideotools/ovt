@@ -88,7 +88,7 @@ class Project : public QObject {
 
   // For QML: the directory of Platform::configDir() (autosave of an unsaved project lives there).
   Project();
-  explicit Project(const QString& config_dir, QObject* parent = nullptr);
+  explicit Project(QString config_dir, QObject* parent = nullptr);
 
   [[nodiscard]] QString path() const { return path_; }
   [[nodiscard]] QString name() const;
@@ -120,7 +120,7 @@ class Project : public QObject {
   // Adds a raw YUV file with the format chosen in the Raw format dialog (first file: single; else distorted).
   Q_INVOKABLE void addRaw(const QString& path, int width, int height, const QString& chroma, int bit_depth, double fps);
   // "New window": starts another instance of this program on `path` (desktop only; false elsewhere).
-  Q_INVOKABLE bool launchNewWindow(const QString& path_or_url);
+  Q_INVOKABLE static bool launchNewWindow(const QString& path_or_url);
   Q_INVOKABLE void closeAll();
 
   // The sections the panels own: "layout", "panel_state", "view" (objects), "bookmarks", "comments",
@@ -159,7 +159,7 @@ class Project : public QObject {
   void setDirty(bool dirty);
   void raise(const QString& code, const QString& severity, const QString& message);
   bool readDocument(const QString& path, const QString& base_dir, bool mark_clean);
-  bool write(const QString& path, const QString& base_dir);
+  bool write(const QString& path, const QString& base_dir) const;
   static QString normalise(const QString& path_or_url);
 
   QString config_dir_;
