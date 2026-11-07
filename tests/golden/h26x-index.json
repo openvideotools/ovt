@@ -1,11 +1,11 @@
 {
  "entries": {
   "hdr_hdr10plus_dv81": {
-   "failed": {
-    "entry": "no hevc video stream in regular.mkv"
-   },
+   "failed": {},
    "goldens": {},
-   "skipped": {}
+   "skipped": {
+    "entry": "no hevc video stream in regular.mkv"
+   }
   },
   "jctvc_AMP_A_Samsung_7": {
    "codec": "h265",
@@ -30,7 +30,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 7709477 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 7709477 bytes (limit 1000000)"
    }
   },
   "jctvc_AMP_D_Hisilicon_3": {
@@ -56,7 +56,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3883228 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3883228 bytes (limit 1000000)"
    }
   },
   "jctvc_Bitdepth_A_RExt_Sony_1": {
@@ -70,7 +70,7 @@
    },
    "input_sha256": "0519f266d11fad0a25878f29d5dac153ba00629aacef34ecd78f5f5ad0fb2174",
    "skipped": {
-    "hm": "the golden of one picture is 3913387 bytes (limit 1900000)",
+    "hm": "the golden of one picture is 3913387 bytes (limit 1000000)",
     "trace_headers": "FFmpeg 7.1 cannot open a muxer for this stream's codec parameters (RExt extended precision), so trace_headers never runs"
    }
   },
@@ -84,7 +84,7 @@
     },
     "hm": {
      "file": "h265/jctvc_CAINIT_A_SHARP_4.hm-grid.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/jctvc_CAINIT_A_SHARP_4.trace_headers.json",
@@ -153,7 +153,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3885963 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3885963 bytes (limit 1000000)"
    }
   },
   "jctvc_ENTP_A_QUALCOMM_1": {
@@ -179,7 +179,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3952013 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3952013 bytes (limit 1000000)"
    }
   },
   "jctvc_EXT_A_ericsson_4": {
@@ -401,7 +401,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3834555 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3834555 bytes (limit 1000000)"
    }
   },
   "jctvc_NUT_A_ericsson_5": {
@@ -442,7 +442,7 @@
     },
     "hm": {
      "file": "h265/jctvc_NoOutPrior_A_Qualcomm_1.hm-grid.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/jctvc_NoOutPrior_A_Qualcomm_1.trace_headers.json",
@@ -511,7 +511,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 16920965 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 16920965 bytes (limit 1000000)"
    }
   },
   "jctvc_PMERGE_A_TI_3": {
@@ -580,7 +580,7 @@
     },
     "hm": {
      "file": "h265/jctvc_PPS_A_qualcomm_7.hm-grid.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/jctvc_PPS_A_qualcomm_7.trace_headers.json",
@@ -863,7 +863,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3890180 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3890180 bytes (limit 1000000)"
    }
   },
   "jctvc_SLIST_A_Sony_5": {
@@ -876,7 +876,7 @@
     },
     "hm": {
      "file": "h265/jctvc_SLIST_A_Sony_5.hm-grid.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/jctvc_SLIST_A_Sony_5.trace_headers.json",
@@ -904,7 +904,7 @@
     },
     "hm": {
      "file": "h265/jctvc_STRUCT_B_Samsung_7.hm-grid.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/jctvc_STRUCT_B_Samsung_7.trace_headers.json",
@@ -945,7 +945,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3961801 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3961801 bytes (limit 1000000)"
    }
   },
   "jctvc_TSCL_A_VIDYO_5": {
@@ -984,10 +984,6 @@
      "file": "h265/jctvc_TSKIP_A_MS_3.gstparse.json",
      "pictures": 6
     },
-    "hm": {
-     "file": "h265/jctvc_TSKIP_A_MS_3.hm-grid.json",
-     "pictures": 1
-    },
     "trace_headers": {
      "file": "h265/jctvc_TSKIP_A_MS_3.trace_headers.json",
      "pictures": 6
@@ -1002,7 +998,9 @@
     "problems": [],
     "undocumented": {}
    },
-   "skipped": {}
+   "skipped": {
+    "hm": "the golden of one picture is 1763757 bytes (limit 1000000)"
+   }
   },
   "jctvc_VPSID_A_VIDYO_2": {
    "codec": "h265",
@@ -1689,11 +1687,11 @@
    "skipped": {}
   },
   "mkv_test1": {
-   "failed": {
-    "entry": "no h264 video stream in test1.mkv"
-   },
+   "failed": {},
    "goldens": {},
-   "skipped": {}
+   "skipped": {
+    "entry": "no h264 video stream in test1.mkv"
+   }
   },
   "mkv_test3": {
    "codec": "h264",
@@ -1744,11 +1742,11 @@
    "skipped": {}
   },
   "mpegff_a1_foreman_qcif": {
-   "failed": {
-    "entry": "no h264 video stream in a1-foreman-QCIF.mp4"
-   },
+   "failed": {},
    "goldens": {},
-   "skipped": {}
+   "skipped": {
+    "entry": "no h264 video stream in a1-foreman-QCIF.mp4"
+   }
   },
   "mpegff_hevc_dual_track": {
    "codec": "h265",
@@ -1848,7 +1846,7 @@
     },
     "mvs": {
      "file": "h264/syn_h264_gop60_1080p.ffmpeg-mvs.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h264/syn_h264_gop60_1080p.trace_headers.json",
@@ -1880,7 +1878,7 @@
     },
     "mvs": {
      "file": "h264/syn_h264_hrd_cbr.ffmpeg-mvs.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h264/syn_h264_hrd_cbr.trace_headers.json",
@@ -1912,7 +1910,7 @@
     },
     "mvs": {
      "file": "h264/syn_h264_hrd_vbr.ffmpeg-mvs.json",
-     "pictures": 2
+     "pictures": 1
     },
     "trace_headers": {
      "file": "h264/syn_h264_hrd_vbr.trace_headers.json",
@@ -1970,10 +1968,6 @@
      "file": "h265/syn_h265_amp_sao_on.gstparse.json",
      "pictures": 6
     },
-    "hm": {
-     "file": "h265/syn_h265_amp_sao_on.hm-grid.json",
-     "pictures": 1
-    },
     "trace_headers": {
      "file": "h265/syn_h265_amp_sao_on.trace_headers.json",
      "pictures": 6
@@ -1988,7 +1982,9 @@
     "problems": [],
     "undocumented": {}
    },
-   "skipped": {}
+   "skipped": {
+    "hm": "the golden of one picture is 1771557 bytes (limit 1000000)"
+   }
   },
   "syn_h265_bpyramid": {
    "codec": "h265",
@@ -1997,10 +1993,6 @@
     "gstparse": {
      "file": "h265/syn_h265_bpyramid.gstparse.json",
      "pictures": 6
-    },
-    "hm": {
-     "file": "h265/syn_h265_bpyramid.hm-grid.json",
-     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/syn_h265_bpyramid.trace_headers.json",
@@ -2016,7 +2008,9 @@
     "problems": [],
     "undocumented": {}
    },
-   "skipped": {}
+   "skipped": {
+    "hm": "the golden of one picture is 1771071 bytes (limit 1000000)"
+   }
   },
   "syn_h265_crop_1080_in_1088": {
    "codec": "h265",
@@ -2041,7 +2035,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 4010170 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 4010170 bytes (limit 1000000)"
    }
   },
   "syn_h265_gop60_1080p": {
@@ -2067,7 +2061,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3982066 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3982066 bytes (limit 1000000)"
    }
   },
   "syn_h265_hdr10plus": {
@@ -2093,7 +2087,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3952900 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
    }
   },
   "syn_h265_hrd_cbr": {
@@ -2119,7 +2113,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3981700 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3981700 bytes (limit 1000000)"
    }
   },
   "syn_h265_hrd_vbr": {
@@ -2145,7 +2139,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3982066 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3982066 bytes (limit 1000000)"
    }
   },
   "syn_h265_main10_hev1": {
@@ -2171,7 +2165,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3952900 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
    }
   },
   "syn_h265_main10_pq_hdr": {
@@ -2197,7 +2191,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3952900 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
    }
   },
   "syn_h265_multi_pps": {
@@ -2207,10 +2201,6 @@
     "gstparse": {
      "file": "h265/syn_h265_multi_pps.gstparse.json",
      "pictures": 6
-    },
-    "hm": {
-     "file": "h265/syn_h265_multi_pps.hm-grid.json",
-     "pictures": 1
     },
     "trace_headers": {
      "file": "h265/syn_h265_multi_pps.trace_headers.json",
@@ -2226,7 +2216,9 @@
     "problems": [],
     "undocumented": {}
    },
-   "skipped": {}
+   "skipped": {
+    "hm": "the golden of one picture is 1771557 bytes (limit 1000000)"
+   }
   },
   "syn_h265_pq_colr_only": {
    "codec": "h265",
@@ -2251,7 +2243,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3945213 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3945213 bytes (limit 1000000)"
    }
   },
   "syn_h265_pq_sei_only": {
@@ -2277,7 +2269,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3952900 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
    }
   },
   "syn_h265_sei_unknown_200": {
@@ -2329,7 +2321,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3727310 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3727310 bytes (limit 1000000)"
    }
   },
   "syn_pat_p3_saturation": {
@@ -2355,7 +2347,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3723485 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3723485 bytes (limit 1000000)"
    }
   },
   "syn_pat_pq_patches_1000": {
@@ -2381,7 +2373,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3711433 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3711433 bytes (limit 1000000)"
    }
   },
   "syn_pat_sdr709_ramp": {
@@ -2407,7 +2399,7 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3752333 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3752333 bytes (limit 1000000)"
    }
   },
   "syn_pat_siting_checker": {
@@ -2433,15 +2425,15 @@
     "undocumented": {}
    },
    "skipped": {
-    "hm": "the golden of one picture is 3758725 bytes (limit 1900000)"
+    "hm": "the golden of one picture is 3758725 bytes (limit 1000000)"
    }
   },
   "ts_h264_dvb": {
-   "failed": {
-    "entry": "ffmpeg (container to Annex B) exited 234: [h264 @ 0x\u2026] dimensions not set | [out#0/h264 @ 0x\u2026] Could not write header (incorrect codec parameters ?): Invalid argument"
-   },
+   "failed": {},
    "goldens": {},
-   "skipped": {}
+   "skipped": {
+    "entry": "FFmpeg cannot size the H.264 track of this transport stream while copying it (dimensions not set)"
+   }
   },
   "ytugc_clip01": {
    "codec": "h264",
