@@ -23,10 +23,18 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
-  set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml"
-                "${app_dir}/qml/ShortcutLayer.qml" "${app_dir}/qml/Dialogs.qml" "${app_dir}/qml/dialogs/GotoDialog.qml"
-                "${app_dir}/qml/dialogs/PreferencesDialog.qml" "${app_dir}/qml/dialogs/KeymapDialog.qml")
+  set(qml_files
+      "${app_dir}/qml/Main.qml"
+      "${app_dir}/qml/Actions.qml"
+      "${app_dir}/qml/OvtMenu.qml"
+      "${app_dir}/qml/OvtMenuBar.qml"
+      "${app_dir}/qml/controls/OvtStyle.qml"
+      "${app_dir}/qml/JobsPopover.qml"
+      "${app_dir}/qml/ShortcutLayer.qml"
+      "${app_dir}/qml/Dialogs.qml"
+      "${app_dir}/qml/dialogs/GotoDialog.qml"
+      "${app_dir}/qml/dialogs/PreferencesDialog.qml"
+      "${app_dir}/qml/dialogs/KeymapDialog.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
