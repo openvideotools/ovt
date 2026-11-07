@@ -1,0 +1,549 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["mp42","mp41"],
+   "major_brand": "mp42",
+   "minor_version": 1
+  },
+  "path": "ftyp",
+  "size": 24
+ },
+ {
+  "path": "moov",
+  "size": 6769
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "duration": 6003,
+   "flags": 0,
+   "modification_time": "2006-05-31T22:31:51Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/trak[1]",
+  "size": 3281
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:45Z",
+   "duration": 6003,
+   "flags": 1,
+   "modification_time": "2006-05-31T22:31:51Z",
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moov/trak[1]/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak[1]/mdia",
+  "size": 3181
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "flags": 0,
+   "language": "eng",
+   "modification_time": "2006-05-31T22:31:50Z",
+   "timescale": 48000,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "soun",
+   "name": "Apple Sound Media Handler",
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/hdlr",
+  "size": 58
+ },
+ {
+  "path": "moov/trak[1]/mdia/minf",
+  "size": 3083
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/smhd",
+  "size": 16
+ },
+ {
+  "path": "moov/trak[1]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[1]/mdia/minf/stbl",
+  "size": 3023
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd",
+  "size": 103
+ },
+ {
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd/mp4a",
+  "size": 87
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd/mp4a/esds",
+  "size": 51
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stsc",
+  "size": 736
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stsz",
+  "size": 1896
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[1]/mdia/minf/stbl/stco",
+  "size": 256
+ },
+ {
+  "path": "moov/trak[2]",
+  "size": 2425
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:45Z",
+   "duration": 6000,
+   "flags": 1,
+   "height": 9437184,
+   "modification_time": "2006-05-31T22:31:51Z",
+   "track_ID": 2,
+   "version": 0,
+   "width": 11534336
+  },
+  "path": "moov/trak[2]/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak[2]/mdia",
+  "size": 2325
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "flags": 0,
+   "language": "eng",
+   "modification_time": "2006-05-31T22:31:51Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "Apple Video Media Handler",
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/hdlr",
+  "size": 58
+ },
+ {
+  "path": "moov/trak[2]/mdia/minf",
+  "size": 2227
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak[2]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[2]/mdia/minf/stbl",
+  "size": 2163
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stsd",
+  "size": 183
+ },
+ {
+  "path": "moov/trak[2]/mdia/minf/stbl/stsd/mp4v",
+  "size": 167
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stss",
+  "size": 56
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stsc",
+  "size": 496
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stsz",
+  "size": 1220
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[2]/mdia/minf/stbl/stco",
+  "size": 176
+ },
+ {
+  "path": "moov/trak[3]",
+  "size": 445
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "duration": 6000,
+   "flags": 1,
+   "modification_time": "2006-05-31T22:31:51Z",
+   "track_ID": 3,
+   "version": 0
+  },
+  "path": "moov/trak[3]/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak[3]/mdia",
+  "size": 345
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "flags": 0,
+   "language": "eng",
+   "modification_time": "2006-05-31T22:31:50Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "sdsm",
+   "name": "Apple MPEG-4 Scene Media Handler",
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/hdlr",
+  "size": 65
+ },
+ {
+  "path": "moov/trak[3]/mdia/minf",
+  "size": 240
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/nmhd",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[3]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[3]/mdia/minf/stbl",
+  "size": 184
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/stbl/stsd",
+  "size": 84
+ },
+ {
+  "path": "moov/trak[3]/mdia/minf/stbl/stsd/mp4s",
+  "size": 68
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[3]/mdia/minf/stbl/stco",
+  "size": 20
+ },
+ {
+  "path": "moov/trak[4]",
+  "size": 460
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "duration": 6000,
+   "flags": 1,
+   "modification_time": "2006-05-31T22:31:51Z",
+   "track_ID": 4,
+   "version": 0
+  },
+  "path": "moov/trak[4]/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak[4]/tref",
+  "size": 24
+ },
+ {
+  "path": "moov/trak[4]/tref/mpod",
+  "size": 16
+ },
+ {
+  "path": "moov/trak[4]/mdia",
+  "size": 336
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-31T22:31:50Z",
+   "flags": 0,
+   "language": "eng",
+   "modification_time": "2006-05-31T22:31:50Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "odsm",
+   "name": "Apple MPEG-4 ODSM Media Handler",
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/hdlr",
+  "size": 64
+ },
+ {
+  "path": "moov/trak[4]/mdia/minf",
+  "size": 232
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/nmhd",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[4]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak[4]/mdia/minf/stbl",
+  "size": 176
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/stbl/stsd",
+  "size": 76
+ },
+ {
+  "path": "moov/trak[4]/mdia/minf/stbl/stsd/mp4s",
+  "size": 60
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak[4]/mdia/minf/stbl/stco",
+  "size": 20
+ },
+ {
+  "path": "moov/iods",
+  "size": 42
+ },
+ {
+  "path": "mdat",
+  "size": 469195
+ }
+]

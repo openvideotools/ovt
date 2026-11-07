@@ -1,0 +1,217 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["iso9","avc1","dash","clg1"],
+   "major_brand": "iso9",
+   "minor_version": 0
+  },
+  "path": "ftyp",
+  "size": 32
+ },
+ {
+  "path": "moov",
+  "size": 730
+ },
+ {
+  "fields": {
+   "creation_time": 3582711279,
+   "duration": 0,
+   "flags": 0,
+   "modification_time": 3582711279,
+   "next_track_ID": 2,
+   "timescale": 200,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/mvex",
+  "size": 40
+ },
+ {
+  "fields": {
+   "default_sample_description_index": 1,
+   "default_sample_duration": 0,
+   "default_sample_size": 0,
+   "flags": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moov/mvex/trex",
+  "size": 32
+ },
+ {
+  "path": "moov/trak",
+  "size": 574
+ },
+ {
+  "fields": {
+   "creation_time": 3582711279,
+   "duration": 0,
+   "flags": 7,
+   "height": 141557760,
+   "modification_time": 3582711279,
+   "track_ID": 1,
+   "version": 0,
+   "width": 251658240
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 425
+ },
+ {
+  "fields": {
+   "creation_time": 3582711279,
+   "duration": 0,
+   "flags": 0,
+   "language": "und",
+   "modification_time": 3582711279,
+   "timescale": 200,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "BBC Video",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 42
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 343
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 279
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 187
+ },
+ {
+  "fields": {
+   "compressorname": "HEVC Coding",
+   "data_reference_index": 1,
+   "depth": 24,
+   "height": 2160,
+   "width": 3840
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/hev1",
+  "size": 171
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/hev1/hvcC",
+  "size": 31
+ },
+ {
+  "fields": {
+   "hSpacing": 1,
+   "vSpacing": 1
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/hev1/pasp",
+  "size": 16
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/hev1/colr",
+  "size": 19
+ },
+ {
+  "fields": {
+   "entry_count": 0,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 16
+ },
+ {
+  "fields": {
+   "entry_count": 0,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sample_count": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "fields": {
+   "entry_count": 0,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 16
+ },
+ {
+  "fields": {
+   "entry_count": 0,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "size": 16
+ },
+ {
+  "path": "moov/trak/udta",
+  "size": 49
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/udta/kind",
+  "size": 41
+ }
+]

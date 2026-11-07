@@ -1,0 +1,28 @@
+{
+ "versions": {
+  "MP4Box": "2.2.1-rev2.2.1+dfsg1-3.1build2",
+  "mediainfo": "MediaInfoLib - v24.01",
+  "mp4ff-info": "v0.48.0",
+  "mp4box.js": "1.5.0",
+  "node": "v22.23.4"
+ },
+ "ids": [
+  "gpac_dolby_vision_cenc",
+  "gpac_enc_cenc",
+  "mpegff_10_fragments",
+  "mpegff_a1_foreman_qcif",
+  "mpegff_a4_tone_fragmented",
+  "mpegff_fragment_random_access_2",
+  "mpegff_hev1_clg1_header",
+  "mpegff_hev1_clg1_segment",
+  "mpegff_hevc_dual_track",
+  "mpegff_hvc1_only",
+  "mpegff_video_cenc_128iv",
+  "mpegff_video_cenc_roll_frag1s",
+  "ytugc_clip01"
+ ],
+ "refused": [
+  "mpegff_10_fragments:mp4ff-info",
+  "mpegff_hev1_clg1_segment:mp4box-dts"
+ ]
+}
