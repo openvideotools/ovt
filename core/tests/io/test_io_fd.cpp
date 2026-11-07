@@ -97,7 +97,7 @@ bool fd_is_open(int fd) {
 }
 
 std::vector<uint8_t> read_all(const RandomAccessFile& f) {
-  std::vector<uint8_t> buf(static_cast<size_t>(f.size()));
+  std::vector<uint8_t> buf(f.size());
   REQUIRE(f.read(0, buf.size(), buf.data()) == buf.size());
   return buf;
 }
