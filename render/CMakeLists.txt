@@ -7,6 +7,8 @@
 
 add_library(ovt_render SHARED src/surface/video_surface_impl.cpp)
 add_library(ovt::render ALIAS ovt_render)
+# WI-1.401: Picture -> pl_frame upload (§10.3.1).
+target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

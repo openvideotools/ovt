@@ -3,9 +3,10 @@
 //
 // The one concrete VideoSurface (chapter 10 §10.1.3, §10.2.7). WI-1.400 is the skeleton: an OffscreenTexture target
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
-// ViewState.background_rgba by render(). Picture upload (WI-1.401), colour mapping (WI-1.402), the render pipeline
-// (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), overlays, measurements and export arrive with
-// their own work items; until then those entry points are inert.
+// ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
+// pl_render_image pass. Colour mapping (WI-1.402), the full render parameters, target frames and dithering (WI-1.403),
+// interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements and export arrive
+// with their own work items; until then those entry points are inert.
 
 #include <cstdio>
 #include <cstdlib>
@@ -17,11 +18,13 @@
 
 #include <libplacebo/gpu.h>
 #include <libplacebo/log.h>
+#include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/overlay_set_impl.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
+#include "pipeline/frame_upload.h"
 
 namespace ovt::render {
 namespace {
@@ -52,6 +55,30 @@ const char* offscreen_format_name(DisplayTarget::OffscreenFormat f) {
       return "rgb10a2";
   }
   return "rgba8";
+}
+
+// §10.3.2 target colour per offscreen format (Rgba8Srgb -> Srgb8 row, Rgba16F -> ScRgbLinear16F row,
+// Rgb10A2 -> Pq10 row).
+struct pl_color_space target_color(const DisplayTarget& t) {
+  struct pl_color_space c = pl_color_space_unknown;
+  switch (t.offscreen_format) {
+    case DisplayTarget::OffscreenFormat::Rgba8Srgb:
+      c.primaries = PL_COLOR_PRIM_BT_709;
+      c.transfer = PL_COLOR_TRC_SRGB;
+      c.hdr.max_luma = PL_COLOR_SDR_WHITE;
+      break;
+    case DisplayTarget::OffscreenFormat::Rgba16F:
+      c.primaries = PL_COLOR_PRIM_BT_709;
+      c.transfer = PL_COLOR_TRC_LINEAR;
+      c.hdr.max_luma = t.headroom * t.sdr_white_nits;
+      break;
+    case DisplayTarget::OffscreenFormat::Rgb10A2:
+      c.primaries = PL_COLOR_PRIM_BT_2020;
+      c.transfer = PL_COLOR_TRC_PQ;
+      c.hdr.max_luma = 1000.0F;  // display max from DisplayCaps when known (WI-1.403/1.407)
+      break;
+  }
+  return c;
 }
 
 class VideoSurfaceImpl final : public VideoSurface {
@@ -101,6 +128,11 @@ class VideoSurfaceImpl final : public VideoSurface {
       return fail("pl_gpu", "pl_vulkan_create found no usable Vulkan device");
     }
 
+    renderer_ = pl_renderer_create(log_, vk_->gpu);
+    if (renderer_ == nullptr) {
+      return fail("pl_renderer", "pl_renderer_create failed");
+    }
+
     target_ = target;
     return create_texture(target.width, target.height);
   }
@@ -132,7 +164,22 @@ class VideoSurfaceImpl final : public VideoSurface {
     create_texture(target.width, target.height);
   }
 
-  void set_frame(const Picture& /*a*/) override {}                                 // WI-1.401
+  // SPEC-ASSUMPTION(#209): set_frame() is void (§10.2.7); a rejected picture leaves slot A empty and last_error()
+  // reports RND-0001.
+  void set_frame(const Picture& a) override {
+    if (vk_ == nullptr) {
+      error_ = "RND-0001 picture rejected: surface is not initialised";
+      return;
+    }
+    std::string err = detail::upload_picture(vk_->gpu, a, slot_a_);
+    if (!err.empty()) {
+      error_ = std::move(err);
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+      return;
+    }
+    error_.clear();
+  }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
 
@@ -148,6 +195,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     color.f[2] = static_cast<float>((bg >> 8U) & 0xFFU) / 255.0F;
     color.f[3] = static_cast<float>(bg & 0xFFU) / 255.0F;
     pl_tex_clear_ex(vk_->gpu, tex_, color);
+    if (slot_a_.valid) {
+      draw_slot_a(view);
+    }
     pl_gpu_flush(vk_->gpu);
   }
 
@@ -176,6 +226,15 @@ class VideoSurfaceImpl final : public VideoSurface {
   [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override { return target_.encoding; }
   [[nodiscard]] const char* last_error() const override { return error_.c_str(); }
 
+  bool chroma_shift(float& sx, float& sy) const {
+    if (!slot_a_.valid || slot_a_.frame.num_planes < 3) {
+      return false;
+    }
+    sx = slot_a_.frame.planes[1].shift_x;
+    sy = slot_a_.frame.planes[1].shift_y;
+    return true;
+  }
+
   bool download(detail::OutputPixels& out) const {
     out = detail::OutputPixels{};
     if (tex_ == nullptr) {
@@ -201,6 +260,58 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
  private:
+  // Draws slot A over the cleared target with a basic parameter set: nearest upscaling at zoom >= 1, the ViewState
+  // chroma upscaler and downscaler, no dithering, no anti-ringing (§10.3.1 "Scaling filters"). WI-1.403 replaces this
+  // with the full pl_render_params of §10.3.4/§10.3.5 and the target frames of every encoding.
+  void draw_slot_a(const ViewState& view) {
+    struct pl_frame image = slot_a_.frame;
+    image.crop = detail::source_rect(slot_a_, view.show_cropped);
+
+    struct pl_frame target = {};
+    target.num_planes = 1;
+    target.planes[0].texture = tex_;
+    target.planes[0].components = 4;
+    for (int c = 0; c < 4; ++c) {
+      target.planes[0].component_mapping[c] = c;
+    }
+    target.repr = pl_color_repr_rgb;
+    target.color = target_color(target_);
+    // §10.2.3 viewport mapping: device = (image - pan) * zoom + viewport / 2.
+    const double zoom = view.zoom > 0.0 ? view.zoom : 1.0;
+    const double half_w = target_.width / 2.0;
+    const double half_h = target_.height / 2.0;
+    target.crop.x0 = static_cast<float>(((static_cast<double>(image.crop.x0) - view.pan_x) * zoom) + half_w);
+    target.crop.y0 = static_cast<float>(((static_cast<double>(image.crop.y0) - view.pan_y) * zoom) + half_h);
+    target.crop.x1 = static_cast<float>(((static_cast<double>(image.crop.x1) - view.pan_x) * zoom) + half_w);
+    target.crop.y1 = static_cast<float>(((static_cast<double>(image.crop.y1) - view.pan_y) * zoom) + half_h);
+
+    struct pl_render_params params = {};
+    params.upscaler = zoom >= 1.0 ? &pl_filter_nearest : nullptr;
+    switch (view.downscale) {
+      case Downscale::Box:
+        params.downscaler = &pl_filter_box;
+        break;
+      case Downscale::Lanczos:
+        params.downscaler = &pl_filter_lanczos;
+        break;
+      case Downscale::Bilinear:
+        params.downscaler = &pl_filter_bilinear;
+        break;
+    }
+    params.plane_upscaler = view.chroma_upscale == ChromaUpscale::Nearest ? &pl_filter_nearest : &pl_filter_bilinear;
+    params.skip_anti_aliasing = zoom >= 1.0;
+    params.antiringing_strength = 0.0F;
+    // The target was cleared to background_rgba above; keep libplacebo from clearing the border again.
+#if PL_API_VER >= 346
+    params.border = PL_CLEAR_NONE;
+#else
+    params.skip_target_clearing = true;
+#endif
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
+      error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
+    }
+  }
+
   bool create_texture(int width, int height) {
     pl_gpu gpu = vk_->gpu;
     const char* name = offscreen_format_name(target_.offscreen_format);
@@ -235,8 +346,10 @@ class VideoSurfaceImpl final : public VideoSurface {
   void destroy() {
     overlays_.reset();
     if (vk_ != nullptr) {
+      detail::destroy_slot(vk_->gpu, slot_a_);
       pl_tex_destroy(vk_->gpu, &tex_);
     }
+    pl_renderer_destroy(&renderer_);
     pl_vulkan_destroy(&vk_);
     pl_vk_inst_destroy(&inst_);
     pl_log_destroy(&log_);
@@ -248,6 +361,8 @@ class VideoSurfaceImpl final : public VideoSurface {
   pl_vk_inst inst_ = nullptr;
   pl_vulkan vk_ = nullptr;
   pl_tex tex_ = nullptr;
+  pl_renderer renderer_ = nullptr;
+  detail::FrameSlot slot_a_;
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
 };
@@ -267,6 +382,11 @@ bool download_output(const VideoSurface& surface, OutputPixels& out) {
     return false;
   }
   return impl->download(out);
+}
+
+bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {
+  const auto* impl = dynamic_cast<const VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->chroma_shift(shift_x, shift_y);
 }
 
 }  // namespace detail
