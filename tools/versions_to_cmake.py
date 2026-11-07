@@ -37,6 +37,8 @@ import hashlib
 import re
 import sys
 import tarfile
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -231,13 +233,32 @@ def archive_name(row: Row) -> str:
     return row.url.rstrip("/").rsplit("/", 1)[-1]
 
 
-def download(url: str, dest: Path) -> None:
+def _transient(e: OSError) -> bool:
+    """True for failures worth retrying: timeouts, resets, TLS handshakes, HTTP 5xx/408/429. A 4xx is final."""
+    if isinstance(e, urllib.error.HTTPError):
+        return e.code >= 500 or e.code in (408, 429)
+    return True
+
+
+def download(url: str, dest: Path, attempts: int = 5, backoff: float = 5.0) -> None:
+    """Fetches url to dest through a .part file, retrying transient errors with exponential backoff (5 s, 10 s,
+    20 s, ...). The caller still verifies the SHA-256; retrying never weakens that check."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + ".part")
-    with urllib.request.urlopen(url, timeout=120) as resp, tmp.open("wb") as f:  # noqa: S310 (https pins)
-        while chunk := resp.read(1 << 20):
-            f.write(chunk)
-    tmp.replace(dest)
+    for attempt in range(1, attempts + 1):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as resp, tmp.open("wb") as f:  # noqa: S310 (https pins)
+                while chunk := resp.read(1 << 20):
+                    f.write(chunk)
+            tmp.replace(dest)
+            return
+        except OSError as e:
+            tmp.unlink(missing_ok=True)
+            if attempt == attempts or not _transient(e):
+                raise
+            delay = backoff * 2 ** (attempt - 1)
+            print(f"retry     {url}: {e} (attempt {attempt} of {attempts}, waiting {delay:g} s)", file=sys.stderr)
+            time.sleep(delay)
 
 
 def member_sha256(archive: Path, member_name: str) -> str | None:
