@@ -146,6 +146,14 @@ the licence gate fails when this file is stale.
 | dashif_bbb_30fps | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
 | dashif_sidx_m4s | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
 | dashif_testcase_1a | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
+| fixture_fa_1080p_dense | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_fa_4k_dense | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_hdr10plus_t35 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_real_1080p_hevc_frame | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_real_4k_hevc_frame | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_synthetic_4k_grid | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_synthetic_4k_mv | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| fixture_synthetic_8k_mv | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | gpac_chroma_pulse | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | gpac_dolby_vision_cenc | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | gpac_eac3_atmos | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
@@ -739,6 +747,31 @@ the licence gate fails when this file is stale.
 | syn_broken_h265_hash_mismatch | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_broken_h265_slice_error_f12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_broken_h265_truncated_sps | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0001 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0003 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0030 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0032 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0101 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_AV1_0102 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_CONF_0001 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_GEN_0001 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_GEN_0002 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_GEN_0003 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_GEN_0101 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_GEN_0102 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0001 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0010 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0020 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0030 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0060 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H264_0103 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0001 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0003 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0007 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0010 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0050 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0060 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_syntax_SYN_H265_0102 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h264_1h_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h264_444_intra | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h264_crop_8x8dct_10bit | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
@@ -819,6 +852,28 @@ the licence gate fails when this file is stale.
 | syn_pat_sdr709_ramp | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_siting_checker | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_raw_1080p_p010 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_411 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_420 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_420p10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_420p12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_420p14 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_420p16 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_422 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_422p10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_422p12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_422p14 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_422p16 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444alpha | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444p10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444p12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444p14 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_444p16 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_mono | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_mono10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_mono12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_mono14 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_mono16 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_raw_yuv420p10le_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_scenes_5cuts | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_sei_h264_content_light_level_info | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |

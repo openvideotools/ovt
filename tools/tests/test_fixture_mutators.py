@@ -9,6 +9,7 @@ with FFmpeg, ``trace_headers`` of the rewritten fields); these tests pin the byt
 from __future__ import annotations
 
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -293,6 +294,89 @@ def test_corrupt_flip_slice_and_hash(tmp_path: Path) -> None:
     assert run_corrupt(tmp_path, data, "--flip-hash-sei", "--frame", "9")[0] == 2
     rc, out = run_corrupt(tmp_path, data, "--byte-xor", "5")
     assert rc == 0 and out[5] == data[5] ^ 0xFF and out[:5] == data[:5]
+
+
+def test_corrupt_header_edits(tmp_path: Path) -> None:
+    data = h265_stream(4)
+    types = lambda d: [bs.h265_type(n.data) for n in bs.split_annexb(d)]  # noqa: E731
+    rc, out = run_corrupt(tmp_path, data, "--set-bits", "vps", "--bit", "13", "--width", "3", "--value", "0")
+    assert rc == 0 and bs.split_annexb(out)[0].data[1] & 7 == 0  # nuh_temporal_id_plus1
+    rc, out = run_corrupt(tmp_path, data, "--set-ue", "pps", "--bit", "16", "--value", "64")
+    rbsp = bs.unescape(bs.split_annexb(out)[2].data)
+    r = bs.BitReader(rbsp, 16)
+    assert rc == 0 and r.ue() == 64 and bs.payload_bits(rbsp) == bs.payload_bits(bs.unescape(pps().data)) + 12
+    rc, out = run_corrupt(tmp_path, data, "--duplicate-nal", "slice", "--nth", "1")
+    assert rc == 0 and types(out) == [32, 33, 34, 19, 40, 1, 1, 40, 1, 40, 1, 40]
+    rc, out = run_corrupt(tmp_path, data, "--move-nal", "pps", "--before", "vps")
+    assert rc == 0 and types(out)[:3] == [34, 32, 33]
+    rc, out = run_corrupt(tmp_path, data, "--drop-picture", "2")
+    assert rc == 0 and types(out) == [32, 33, 34, 19, 40, 1, 40, 40, 1, 40]
+    rc, out = run_corrupt(tmp_path, data, "--drop-nal", "vps,sps")
+    assert rc == 0 and types(out)[:2] == [34, 19] and run_corrupt(tmp_path, data, "--drop-nal", "all")[1] == b""
+    rc, out = run_corrupt(tmp_path, data, "--poke", "slice", "--nth", "1", "--byte", "4", "--hex", "00000304")
+    assert rc == 0 and b"\x00\x00\x03\x04" in bs.split_annexb(out)[5].data
+    assert run_corrupt(tmp_path, data, "--set-bits", "sps", "--bit", "4000", "--width", "1", "--value", "1")[0] == 2
+
+
+def av1_stream(tus: int = 3) -> bytes:
+    """Low-overhead OBUs: TD, sequence header, frame per temporal unit (payloads are stand-ins)."""
+    out = b""
+    for i in range(tus):
+        out += bs.Obu(b"\x12\x00"[:1], b"").encode()
+        if i == 0:
+            out += bs.Obu(b"\x0a", b"\x00" * 10).encode()
+        out += bs.Obu(b"\x32", bytes(range(i, i + 20))).encode()
+    return out
+
+
+def test_corrupt_av1_edits(tmp_path: Path) -> None:
+    data = av1_stream()
+    tus = lambda d, annexb=False: [[o.type for fu in tu for o in fu] for tu in corrupt.av1_units(d, annexb)]  # noqa
+    assert tus(data) == [[2, 1, 6], [2, 6], [2, 6]]
+    rc, out = run_corrupt(tmp_path, data, "--strip-obu-size", "--tu", "0", "--nth", "1", suffix=".obu")
+    obus = bs.split_obus(out)
+    assert rc == 0 and len(obus) == 2 and obus[1].type == 1 and not obus[1].header[0] & 2  # swallows the rest
+    rc, out = run_corrupt(tmp_path, data, "--drop-obu", "6", "--tu", "0", suffix=".obu")
+    assert rc == 0 and tus(out) == [[2, 1], [2, 6], [2, 6]]
+    rc, out = run_corrupt(tmp_path, data, "--truncate-obu", "6", "--tu", "1", suffix=".obu")
+    assert rc == 0 and bs.split_obus(out)[4].payload == bytes(range(1, 11))
+    rc, out = run_corrupt(tmp_path, data, "--merge-tu", "--tu", "1", suffix=".obu")
+    assert rc == 0 and tus(out) == [[2, 1, 6], [2, 6, 6]]
+    annexb = corrupt.av1_join(
+        [
+            [[bs.Obu(bytes([o.header[0] & ~2]), o.payload) for o in fu] for fu in tu]
+            for tu in corrupt.av1_units(data, False)
+        ],
+        True,
+    )
+    rc, out = run_corrupt(tmp_path, annexb, "--codec", "av1-annexb", "--merge-tu", "--tu", "1", suffix=".obu")
+    assert rc == 0 and tus(out, True) == [[2, 1, 6], [2, 6, 2, 6]]  # two temporal delimiters in one TU
+    ivf = bs.write_ivf(
+        b"DKIF" + struct.pack("<HH", 0, 32) + bytes(24),
+        [(i, b"".join(o.encode() for fu in tu for o in fu)) for i, tu in enumerate(corrupt.av1_units(data, False))],
+    )
+    rc, out = run_corrupt(tmp_path, ivf, "--merge-tu", "--tu", "0", suffix=".ivf")
+    assert rc == 0 and len(bs.read_ivf(out)[1]) == 2
+
+
+def test_corrupt_conditions_cover_the_registry(tmp_path: Path) -> None:
+    """Every SYN code of chapter 7 §7.9.3 has a condition or a reason; every condition's edit parses."""
+    spec = (REPO / "docs" / "spec" / "07-bitstream-and-decoders.md").read_text(encoding="utf-8")
+    section = spec[spec.index("### 7.9.3") : spec.index("### 7.9.4")]
+    codes = set(re.findall(r"^\| `(SYN-[A-Z0-9]+-\d{4})`", section, re.M))
+    table = json.loads(corrupt.CONDITIONS.read_text(encoding="utf-8"))
+    listed = [c["code"] for c in table["conditions"]]
+    assert len(listed) == len(set(listed)) and not set(listed) & set(table["not_in_table"])
+    assert set(listed) | set(table["not_in_table"]) == codes
+    for entry in table["conditions"]:
+        args = corrupt.parser().parse_args([*entry["edit"], "in", "out"])
+        assert not args.all_codes and not args.condition, entry["code"]
+    data = h265_stream(4)
+    (tmp_path / "in.265").write_bytes(data)
+    out = tmp_path / "o.265"
+    assert corrupt.main(["--condition", "SYN-H265-0102", str(tmp_path / "in.265"), str(out)]) == 0
+    assert len(bs.split_annexb(out.read_bytes())) == len(bs.split_annexb(data)) - 1  # picture 1's slice
+    assert corrupt.main(["--condition", "SYN-NOPE-0001", str(tmp_path / "in.265"), str(out)]) == 2
 
 
 def test_make_multi_pps_keeps_alignment_and_data() -> None:
