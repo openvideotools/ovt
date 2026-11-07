@@ -407,6 +407,6 @@
     {"id": "fixture_synthetic_8k_mv", "path": "render/tests/fixtures/synthetic_8k_mv.fb", "cmd": ["{python}", "{repo}/tools/gen_fixture_fb.py", "--kind", "mv", "--size", "8k", "--out", "{out}"]},
     {"id": "fixture_real_1080p_hevc_frame", "path": "render/tests/fixtures/real_1080p_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_h265_gop60_1080p}", "--frame", "59", "--plugin", "de265", "--format", "fb", "-o", "{out}"]},
     {"id": "fixture_real_4k_hevc_frame", "path": "render/tests/fixtures/real_4k_hevc_frame.fb", "cmd": ["ovt", "analyze", "{corpus:syn_av1_4k_2min}", "--frame", "59", "--plugin", "aom", "--format", "fb", "-o", "{out}"]},
-    {"id": "fixture_hdr10plus_t35", "path": "tests/corpora/hdr10plus/f000.bin", "cmd": ["{python}", "{repo}/tools/sei_inject.py", "--extract", "t35", "--frames", "0,30,59", "--out-dir", "{repo}/tests/corpora/hdr10plus", "{corpus:syn_h265_hdr10plus}"], "outputs": ["tests/corpora/hdr10plus/f030.bin", "tests/corpora/hdr10plus/f059.bin"]}
+    {"id": "fixture_hdr10plus_t35", "path": "tests/corpora/hdr10plus/f000.bin", "cmd": ["{python}", "{repo}/tools/sei_inject.py", "--extract", "t35", "--frames", "0,30,59", "--out-dir", "{repo}/tests/corpora/hdr10plus", "{corpus:syn_h265_hdr10plus:syn_h265_hdr10plus.265}"], "outputs": ["tests/corpora/hdr10plus/f030.bin", "tests/corpora/hdr10plus/f059.bin"]}
   ]
 }
