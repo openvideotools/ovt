@@ -33,7 +33,7 @@ function(ovt_set_license target spdx)
   endif()
   set_property(TARGET ${target} PROPERTY OVT_LICENSE "${spdx}")
   get_property(known GLOBAL PROPERTY OVT_LICENSED_TARGETS)
-  if(NOT target IN_LIST known)
+  if(NOT "${target}" IN_LIST known)
     set_property(GLOBAL APPEND PROPERTY OVT_LICENSED_TARGETS ${target})
     # DEFER evaluates its arguments when the call runs, so bake the target name in now.
     cmake_language(EVAL CODE "cmake_language(DEFER CALL _ovt_license_target_entry [[${target}]])")
@@ -70,11 +70,29 @@ function(ovt_describe_vcpkg_library path port)
     return()
   endif()
   file(READ "${spdx_file}" doc)
-  string(JSON spdx ERROR_VARIABLE err GET "${doc}" "packages" 0 "licenseConcluded")
+  string(
+    JSON
+    spdx
+    ERROR_VARIABLE
+    err
+    GET
+    "${doc}"
+    "packages"
+    0
+    "licenseConcluded")
   if(err OR spdx STREQUAL "" OR spdx STREQUAL "NOASSERTION")
     return()
   endif()
-  string(JSON version ERROR_VARIABLE err GET "${doc}" "packages" 0 "versionInfo")
+  string(
+    JSON
+    version
+    ERROR_VARIABLE
+    err
+    GET
+    "${doc}"
+    "packages"
+    0
+    "versionInfo")
   if(err)
     set(version "")
   endif()
@@ -152,18 +170,18 @@ function(_ovt_license_collect target out_var deps_var)
       continue()
     endif()
     get_target_property(type ${current} TYPE)
-    set(items "")
+    set(link_list "")
     if(NOT type STREQUAL "INTERFACE_LIBRARY")
       get_target_property(direct ${current} LINK_LIBRARIES)
       if(direct)
-        list(APPEND items ${direct})
+        list(APPEND link_list ${direct})
       endif()
     endif()
     get_target_property(iface ${current} INTERFACE_LINK_LIBRARIES)
     if(iface)
-      list(APPEND items ${iface})
+      list(APPEND link_list ${iface})
     endif()
-    foreach(raw IN LISTS items)
+    foreach(raw IN LISTS link_list)
       _ovt_license_normalise_item("${raw}" item)
       if(item STREQUAL "")
         continue()
