@@ -104,6 +104,14 @@ ApplicationWindow {
         y: root.header.height + OvtStyle.spacing
     }
 
+    // GUI-JOB-0001 (§11.7): a job that did not stop in time is detached and reported.
+    Connections {
+        target: JobsModel
+        function onJobDetached(name) {
+            DiagnosticsModel.addGui(1, "GUI-JOB-0001", "job " + name + " did not stop within 2 s; detached")
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         color: OvtStyle.window
@@ -113,6 +121,17 @@ ApplicationWindow {
             text: "No file open"
             color: OvtStyle.textMuted
             Accessible.name: "No file open"
+        }
+
+        // Until the dock manager (WI-1.451) exists the Diagnostics / Log panel sits at the bottom, opened from the
+        // status bar badge.
+        DiagnosticsPanel {
+            id: diagnosticsPanel
+
+            visible: false
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
         }
     }
 
@@ -149,6 +168,14 @@ ApplicationWindow {
                 value: Math.max(0, JobsModel.foregroundProgress)
                 indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
                 Accessible.name: "Job progress"
+            }
+            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click shows or hides the panel.
+            ToolButton {
+                objectName: "statusDiagnostics"
+                text: DiagnosticsModel.errorCount > 0 ? DiagnosticsModel.errorCount + " errors" : "Diagnostics"
+                onClicked: diagnosticsPanel.visible = !diagnosticsPanel.visible
+                Accessible.name: "Diagnostics"
+                palette.buttonText: DiagnosticsModel.errorCount > 0 ? "#ff6b6b" : OvtStyle.text
             }
         }
     }
