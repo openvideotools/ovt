@@ -304,7 +304,12 @@ def check_expression(
         if code == "E-LINK" and known:
             rep.add("E-LINK", f"{where} {link}" if link else where, expr, f"{expr} is not allowed here")
         else:
-            rep.add("E-UNKNOWN", where, expr if known else msg, f"licence not in any allow list: {msg}")
+            rep.add(
+                "E-UNKNOWN",
+                f"{where} {link}" if link else where,
+                expr if known else msg,
+                f"licence not in any allow list: {msg}",
+            )
         return None
 
 
