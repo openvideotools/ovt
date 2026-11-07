@@ -40,7 +40,8 @@ file(GLOB _ovt_de265_patch_files CONFIGURE_DEPENDS "${_ovt_de265_patch_dir}/*.pa
 # defines it as the arithmetic shift every supported compiler emits). Suppression files cannot silence it under
 # -fno-sanitize-recover=all, so this one check is turned off for libde265 only; every other check stays on and OVT's
 # own code keeps shift-base. The flags repeat OVT_TP_SANITIZER_C_FLAGS, because this later -D replaces the one in
-# OVT_TP_CMAKE_TOOLCHAIN_ARGS.
+# OVT_TP_CMAKE_TOOLCHAIN_ARGS. Tracked in https://github.com/openvideotools/ovt/issues/236; remove when the pin
+# includes an upstream fix.
 set(_ovt_de265_flag_args "")
 if(OVT_TP_SANITIZER_C_FLAGS MATCHES "-fsanitize=[^ ]*undefined")
   set(_ovt_de265_cflags "${OVT_TP_SANITIZER_C_FLAGS} -fno-sanitize=shift-base")
