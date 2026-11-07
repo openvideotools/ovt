@@ -1,0 +1,245 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["isom","iso2","avc1","mp41"],
+   "major_brand": "isom",
+   "minor_version": 512
+  },
+  "path": "ftyp",
+  "size": 32
+ },
+ {
+  "path": "free",
+  "size": 8
+ },
+ {
+  "path": "mdat",
+  "size": 3148364
+ },
+ {
+  "path": "moov",
+  "size": 7885
+ },
+ {
+  "fields": {
+   "creation_time": 0,
+   "duration": 20000,
+   "flags": 0,
+   "modification_time": 0,
+   "timescale": 1000,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/trak",
+  "size": 7678
+ },
+ {
+  "fields": {
+   "creation_time": 0,
+   "duration": 20000,
+   "flags": 3,
+   "height": 23592960,
+   "modification_time": 0,
+   "track_ID": 1,
+   "version": 0,
+   "width": 41943040
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/edts",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/edts/elst",
+  "size": 28
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 7542
+ },
+ {
+  "fields": {
+   "creation_time": 0,
+   "flags": 0,
+   "language": "und",
+   "modification_time": 0,
+   "timescale": 15360,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "VideoHandler",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 45
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 7457
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 7393
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 169
+ },
+ {
+  "fields": {
+   "compressorname": "",
+   "height": 360,
+   "width": 640
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1",
+  "size": 153
+ },
+ {
+  "fields": {
+   "AVCLevelIndication": 30,
+   "AVCProfileIndication": 100,
+   "pictureParameterSetNALUnit": ["68ebe0432c8b"],
+   "profile_compatibility": 0,
+   "sequenceParameterSetNALUnit": ["6764001eacd940a02ff970110000030001000003003c0f162d96"]
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1/avcC",
+  "size": 51
+ },
+ {
+  "fields": {
+   "hSpacing": 1,
+   "vSpacing": 1
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/avc1/pasp",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/ctts",
+  "size": 4648
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 64
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 2420
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 32
+ },
+ {
+  "path": "moov/udta",
+  "size": 91
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/udta/meta",
+  "size": 83
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "mdir",
+   "name": "",
+   "version": 0
+  },
+  "path": "moov/udta/meta/hdlr",
+  "size": 33
+ },
+ {
+  "path": "moov/udta/meta/ilst",
+  "size": 38
+ },
+ {
+  "path": "moov/udta/meta/ilst/©too",
+  "size": 30
+ },
+ {
+  "path": "moov/udta/meta/ilst/©too/data",
+  "size": 22
+ }
+]

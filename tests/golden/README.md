@@ -68,3 +68,12 @@ A tolerance applies only when one number is a double (integers are exact). Witho
 `isobmff/ovt_min_structural.mp4` (2 KiB) is walked into a `ContainerTree` by `isobmff/box_tree_main.cpp`, converted by
 `to_canonical` and compared with `isobmff/ovt_min_structural.pybox.json`, written by the independent walker
 `isobmff/gen_min_mp4.py` (`--check` verifies both files). It moves to `ovt probe` when the container parser exists.
+
+## H.264/HEVC oracle goldens (WI-0.567)
+
+`h264/`, `h265/` and `epb/` are written by `tools/goldens/gen_h26x.py` in the oracle image (workflow `goldens-h26x`), never
+by hand. They are stored **gzip-compressed** (`<id>.<tool>.json.gz`, no name or time in the gzip header, so the bytes are
+reproducible): the repository keeps every version for ever, and the plain JSON of 250 goldens is about 38 MB. A test
+reads them with `gzip.open` / zlib; the canonical JSON inside is exactly what §14.4.0 describes. Each golden covers the first
+pictures of its stream (`h26x-index.json` records how many, the SHA-256 of the corpus file used, and every skipped oracle
+with the reason). `KNOWN_DIFFS.md` lists documented disagreements between `trace_headers` and `gstparse`.

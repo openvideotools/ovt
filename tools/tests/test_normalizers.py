@@ -337,6 +337,26 @@ def test_mp4ff_agrees_with_gpac_on_tree_and_shared_fields() -> None:
     assert mp4ff["mfra/tfra"]["fields"]["entries"] == gpac["mfra/tfra"]["fields"]["entries"]
 
 
+def test_mp4ff_skips_descriptor_hex_and_bare_pair_lines(tmp_path: Path) -> None:
+    """Lines mp4ff-info v0.48.0 prints for esds descriptors, parameter-set hex dumps and sgpd (WI-0.564)."""
+    text = (
+        "[moov] size=100\n"
+        "  [trak] size=90\n"
+        "    [esds] size=61 version=0 flags=000000\n"
+        '      Descriptor "tag=3 ES" size=2+44\n'
+        "       - EsID: 0\n"
+        "    [sgpd] size=44 version=1 flags=000000\n"
+        "       groupingType: seig\n"
+        "       - defaultLength: 20\n"
+        "     - SPS_33 complete: 1\n"
+        "      4201010160000003\n"
+    )
+    path = tmp_path / "x.txt"
+    path.write_text(text, encoding="utf-8")
+    boxes = by_path(normalise("mp4ff_info", str(path)))
+    assert {"moov", "moov/trak", "moov/trak/esds", "moov/trak/sgpd"} <= set(boxes)
+
+
 def test_mediainfo_offsets_and_header_length() -> None:
     boxes = by_path(normalise("mediainfo_trace", "mediainfo_trace_frag.xml"))
     gpac = by_path(normalise("mp4box_diso", "mp4box_diso_frag.xml"))

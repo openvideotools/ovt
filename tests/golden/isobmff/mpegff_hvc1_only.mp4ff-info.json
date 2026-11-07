@@ -1,0 +1,205 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["iso4","hvc1"],
+   "major_brand": "iso4",
+   "minor_version": 1
+  },
+  "path": "ftyp",
+  "size": 24
+ },
+ {
+  "path": "moov",
+  "size": 4094
+ },
+ {
+  "fields": {
+   "creation_time": "2016-10-12T19:06:38Z",
+   "duration": 6168,
+   "flags": 0,
+   "modification_time": "2016-10-12T19:06:38Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/trak",
+  "size": 3978
+ },
+ {
+  "fields": {
+   "creation_time": "2016-10-12T19:06:38Z",
+   "duration": 6168,
+   "flags": 1,
+   "height": 35389440,
+   "modification_time": "2016-10-12T19:06:38Z",
+   "track_ID": 1,
+   "version": 0,
+   "width": 62914560
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/edts",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/edts/elst",
+  "size": 28
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 3842
+ },
+ {
+  "fields": {
+   "creation_time": "2016-10-12T19:06:38Z",
+   "flags": 0,
+   "language": "und",
+   "modification_time": "2016-10-12T19:06:38Z",
+   "timescale": 25000,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "hvc:nosvc@GPAC0.6.2-DEV-rev1025-g47a7127-master",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 80
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 3722
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 3658
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 290
+ },
+ {
+  "fields": {
+   "compressorname": "",
+   "height": 540,
+   "width": 960
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/hvc1",
+  "size": 274
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/hvc1/hvcC",
+  "size": 168
+ },
+ {
+  "fields": {
+   "avgBitrate": 239832,
+   "bufferSizeDB": 13941,
+   "maxBitrate": 372144
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/hvc1/btrt",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/ctts",
+  "size": 2072
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "size": 60
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 52
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 1048
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 104
+ },
+ {
+  "path": "mdat",
+  "size": 308198
+ },
+ {
+  "path": "free",
+  "size": 75
+ }
+]

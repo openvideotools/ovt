@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 /** Marks a function exported from libovt_core (chapter 12 §12.3.2: nothing else is exported). */
+/* clang-format off */
 #ifndef OVT_API
 #  if defined(__GNUC__) || defined(__clang__)
 #    define OVT_API __attribute__((visibility("default")))
@@ -21,11 +22,16 @@
 #    define OVT_API
 #  endif
 #endif
+/* clang-format on */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/* ovt/abi/analysis_decoder_v1.h repeats these two types under the same guard. SPEC-ASSUMPTION(#211). */
+#ifndef OVT_STATUS_TYPES_DEFINED
+#define OVT_STATUS_TYPES_DEFINED
+/* NOLINTBEGIN(modernize-use-using): a C11 header */
 /** Result of every fallible C API call. Values are never renumbered; new values are appended. */
 typedef enum ovt_status {
   OVT_OK = 0,
@@ -39,18 +45,20 @@ typedef enum ovt_status {
   OVT_E_INTERNAL
 } ovt_status;
 
+/** A byte span. Exempt from the struct_size rule (chapter 12 §12.3.1 rule 7); never extended. */
+typedef struct ovt_Buffer {
+  const uint8_t* data;
+  size_t size;
+} ovt_Buffer;
+/* NOLINTEND(modernize-use-using) */
+#endif /* OVT_STATUS_TYPES_DEFINED */
+
 /**
  * Returns the enumerator name of @p status, for example "OVT_E_CORRUPT"; "OVT_E_UNKNOWN" for a value
  * outside the enum. Never fails. The returned string is a static constant owned by the library and
  * MUST NOT be freed.
  */
 OVT_API const char* ovt_status_string(ovt_status status);
-
-/** A byte span. Exempt from the struct_size rule (chapter 12 §12.3.1 rule 7); never extended. */
-typedef struct ovt_Buffer {
-  const uint8_t* data;
-  size_t size;
-} ovt_Buffer;
 
 /**
  * Releases a caller-owned buffer (one returned through an out-parameter, rule 12.3.1.3a) and zeroes
