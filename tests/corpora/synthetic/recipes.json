@@ -83,8 +83,9 @@
       {"cmd": ["MP4Box", "-for-test", "-add", "syn_h264_multislice_cavlc.264:fps=30:delay=500", "-new", "syn_mp4_elst.mp4"]},
       {"cmd": ["MP4Box", "-for-test", "-dash", "1000", "-frag", "500", "-rap", "-segment-name", "seg_", "-out", "syn_mp4_frag.mpd", "syn_mp4_elst.mp4"]},
       {"cmd": ["MP4Box", "-for-test", "-crypt", "{repo}/tests/corpora/synthetic/drm_cbcs.xml", "syn_mp4_elst.mp4", "-out", "syn_mp4_cenc_cbcs.mp4"]}]},
-    {"recipe": "21", "id": "syn_mp4_frag_cmaf", "features": ["fragmented", "cmaf", "cmfc", "styp", "tfdt", "trun"], "needs": ["syn_h265_amp_sao_on"], "files": ["syn_mp4_frag_cmaf.mp4"], "steps": [
-      {"cmd": ["MP4Box", "-for-test", "-dash", "2000", "-frag", "2000", "-rap", "-profile", "live", "-segment-name", "cmaf_$Number$", "-brand", "cmfc", "-out", "syn_mp4_frag_cmaf.mpd", "syn_h265_amp_sao_on.265:fps=30"]},
+    {"recipe": "21", "id": "syn_mp4_frag_cmaf", "features": ["fragmented", "cmaf", "cmfc", "styp", "tfdt", "trun"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_mp4_frag_cmaf.mp4"], "note": "own encode with an IDR every 20 frames: the 60-frame source holds only two 30-frame GOPs, too few for three RAP-aligned segments", "steps": [
+      {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "src_720p_8bit.y4m", "--preset", "medium", "--keyint", "20", "--min-keyint", "20", "--no-scenecut", "--no-open-gop", "--output", "cmaf_src.265"]},
+      {"cmd": ["MP4Box", "-for-test", "-dash", "600", "-frag", "600", "-rap", "-profile", "live", "-segment-name", "cmaf_$Number$", "-brand", "cmfc", "-out", "syn_mp4_frag_cmaf.mpd", "cmaf_src.265:fps=30"]},
       {"cmd": ["cat", "cmaf_init.mp4", "cmaf_1.m4s", "cmaf_2.m4s", "cmaf_3.m4s"], "stdout": "syn_mp4_frag_cmaf.mp4"}]},
     {"recipe": "22", "id": "syn_h264_epb_dense", "features": ["epb_dense", "cabac", "high"], "needs": ["src_epb.y4m"], "files": ["syn_h264_epb_dense.264"], "note": "--qp 1: x264 refuses --qp 0 (lossless) with --profile high; part b checks the >= 20 EPB count", "steps": [
       {"cmd": ["x264", "--threads", "1", "--preset", "medium", "--profile", "high", "--qp", "1", "--keyint", "30", "--no-scenecut", "--output", "syn_h264_epb_dense.264", "src_epb.y4m"]}]},

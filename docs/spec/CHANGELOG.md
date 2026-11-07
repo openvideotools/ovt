@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc12 — 2026-11-06
+
+PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 recipe 21 `syn_mp4_frag_cmaf` — `MP4Box -dash 2000 -rap` on the 2 s `syn_h265_amp_sao_on` (IDRs at frames 0 and 30) wrote only `cmaf_1.m4s`, and the `cat` of three segments failed. The recipe now encodes its own HEVC from `src_720p_8bit.y4m` with an IDR every 20 frames and segments at 600 ms, which gives three 667 ms segments; the `cmfc`/`styp`/`moof` intent is unchanged — WI-0.553
+
 ## 1.0.0-rc11 — 2026-11-06
 
 PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
