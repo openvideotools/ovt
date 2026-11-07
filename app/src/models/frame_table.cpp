@@ -20,6 +20,7 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
   qp_.reserve(n);
   tid_.reserve(n);
   pts_.reserve(n);
+  poc_.reserve(n);
   type_.reserve(n);
   rap_.reserve(n);
   shown_.reserve(n);
@@ -28,6 +29,7 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
     qp_.push_back(f->qp_base());
     tid_.push_back(f->temporal_id());
     pts_.push_back(f->pts());
+    poc_.push_back(f->poc());
     type_.push_back(f->type());
     rap_.push_back(f->is_rap() ? 1 : 0);
     shown_.push_back(f->shown() ? 1 : 0);
@@ -59,7 +61,18 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
       return pts_[static_cast<std::size_t>(a)] < pts_[static_cast<std::size_t>(b)];
     });
   }
+  display_of_.assign(n, -1);
+  for (std::size_t slot = 0; slot < display_order_.size(); ++slot) {
+    display_of_[static_cast<std::size_t>(display_order_[slot])] = static_cast<int>(slot);
+  }
   rebuild_order();
+}
+
+int FrameTable::display_index_of(int decode_index) const {
+  if (decode_index < 0 || static_cast<std::size_t>(decode_index) >= display_of_.size()) {
+    return -1;
+  }
+  return display_of_[static_cast<std::size_t>(decode_index)];
 }
 
 void FrameTable::rebuild_order() {

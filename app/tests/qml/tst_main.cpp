@@ -4,13 +4,21 @@
 // Qt Quick Test runner of app/tests/qml (WI-1.450). The tests use the same QML module as ovt-studio, with the
 // settings directory redirected to a temporary one so they never touch the user's settings.json.
 
+#include <QtQml/qqml.h>
 #include <QtQuickTest/quicktest.h>
 #include <QObject>
+#include <QQmlContext>
+#include <QQmlEngine>
 #include <QQuickStyle>
 #include <QTemporaryDir>
 #include <QtGlobal>
 
+#include <memory>
+
+#include "models/selection_model.h"
+#include "models/stream_index_model.h"
 #include "platform/platform.h"
+#include "synthetic_index.h"
 
 class Setup : public QObject {
   Q_OBJECT
@@ -25,8 +33,29 @@ class Setup : public QObject {
     QQuickStyle::setStyle(QStringLiteral("Fusion"));
   }
 
+  // The Timeline tests (tst_timeline.qml) need an index: 300 frames, 60 fps in a 90 kHz time base, a GOP of 60.
+  void qmlEngineAvailable(QQmlEngine* engine) {
+    using namespace ovt::app;
+    using namespace ovt::app::testing;
+    index_model_.setIndex(StreamIndexHandle::adopt(build_index(gop60(300, 1500), 1, 90000)));
+    engine_ = engine;
+    engine->rootContext()->setContextProperty(QStringLiteral("testIndex"), &index_model_);
+    engine->rootContext()->setContextProperty(QStringLiteral("testSetup"), this);
+  }
+
+  // Called by tst_timeline.qml once the module is loaded: the Selection singleton derives unit and sample from the
+  // same index.
+  void attachSelection() {
+    const int type_id = qmlTypeId("OvtStudio", 1, 0, "Selection");
+    if (auto* selection = engine_->singletonInstance<ovt::app::SelectionModel*>(type_id)) {
+      selection->setIndex(index_model_.selectionIndex());
+    }
+  }
+
  private:
   QTemporaryDir config_dir_;
+  QQmlEngine* engine_ = nullptr;
+  ovt::app::StreamIndexModel index_model_;
 };
 
 QUICK_TEST_MAIN_WITH_SETUP(tst_main, Setup)

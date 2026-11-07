@@ -23,8 +23,10 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
-  set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml")
+  set(qml_files
+      "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
+      "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml"
+      "${app_dir}/qml/panels/TimelinePanel.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -64,11 +66,18 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/stream_index_adapter.cpp"
     "${app_dir}/src/models/stream_index_model.h"
     "${app_dir}/src/models/stream_index_model.cpp"
+    "${app_dir}/src/models/timeline_viewport.h"
+    "${app_dir}/src/models/timeline_viewport.cpp"
+    "${app_dir}/src/models/timeline_geometry.h"
+    "${app_dir}/src/models/timeline_geometry.cpp"
+    "${app_dir}/src/items/timeline_chart.h"
+    "${app_dir}/src/items/timeline_chart.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
     "${schema}")
   # src/platform too: the generated type registration includes the headers by file name.
-  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
+                                               "${app_dir}/src/items")
   # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).
