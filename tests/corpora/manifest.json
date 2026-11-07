@@ -1151,13 +1151,18 @@
       "tags": [
         "fast",
         "h264-ps-golden",
-        "h264-slice-golden"
+        "h264-slice-golden",
+        "container-smoke"
       ],
       "sha256": "70b26364f98a21fddfe1daca09549985e3309d3c2146c3d75575587e9e60582d",
       "size_bytes": 887025,
       "extract": {
         "archive": "zip",
         "member": "HCAFF1_HHI.264"
+      },
+      "expected": {
+        "format": "annexb",
+        "codec": "H264"
       }
     },
     {
@@ -2467,13 +2472,18 @@
       ],
       "tags": [
         "fast",
-        "h265-cu-golden"
+        "h265-cu-golden",
+        "container-smoke"
       ],
       "sha256": "89a71f4b9b7e22c481378f83bacc5aac6c8f204999691d3fa21f2804337e84c9",
       "size_bytes": 6037,
       "extract": {
         "archive": "zip",
         "member": "ipcm_A_NEC_3/ipcm_A_NEC_3.bit"
+      },
+      "expected": {
+        "format": "annexb",
+        "codec": "H265"
       }
     },
     {
@@ -2685,10 +2695,15 @@
         "md5"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "sha256": "8bb6d2c4bfdddca26815e4545c829c8d25ed11341a8d2858ada792e50e4f1ee9",
-      "size_bytes": 318
+      "size_bytes": 318,
+      "expected": {
+        "format": "ivf",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b8_01_size_16x18",
@@ -2845,10 +2860,15 @@
         "md5"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "size_bytes": 35794,
-      "sha256": "919bc6e93d1127a6bd98d413dd6c3a227bd2f4f6149ea32a2b455eec380b2b9f"
+      "sha256": "919bc6e93d1127a6bd98d413dd6c3a227bd2f4f6149ea32a2b455eec380b2b9f",
+      "expected": {
+        "format": "matroska",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b8_03_sizedown",
@@ -2927,10 +2947,15 @@
       ],
       "tags": [
         "fast",
-        "av1-grid-golden"
+        "av1-grid-golden",
+        "container-smoke"
       ],
       "size_bytes": 55223,
-      "sha256": "222a9050059b254dab17cfb802ff829c778e3f93af18961a622c8268576c1395"
+      "sha256": "222a9050059b254dab17cfb802ff829c778e3f93af18961a622c8268576c1395",
+      "expected": {
+        "format": "ivf",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b8_06_mfmv",
@@ -3012,10 +3037,15 @@
         "md5"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "size_bytes": 159037,
-      "sha256": "d65824e8e7c19bc958db810d728b2132b513b5a93cb5f99ca3d7995e19a226e1"
+      "sha256": "d65824e8e7c19bc958db810d728b2132b513b5a93cb5f99ca3d7995e19a226e1",
+      "expected": {
+        "format": "ivf",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b8_22_svc_L2T2",
@@ -3066,10 +3096,15 @@
       ],
       "tags": [
         "fast",
-        "av1-grid-golden"
+        "av1-grid-golden",
+        "container-smoke"
       ],
       "size_bytes": 28634,
-      "sha256": "ba3edd82a58414f009e1c821b947ec8de4e0420f33803ca7bfea39af6aeea155"
+      "sha256": "ba3edd82a58414f009e1c821b947ec8de4e0420f33803ca7bfea39af6aeea155",
+      "expected": {
+        "format": "ivf",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b10_23_film_grain_50",
@@ -3199,10 +3234,15 @@
       ],
       "tags": [
         "fast",
-        "av1-grid-golden"
+        "av1-grid-golden",
+        "container-smoke"
       ],
       "size_bytes": 16109,
-      "sha256": "73892f9d9251eae73c226faea7ca1911d5c51a7fc8e8bcdadf4a87b497d5f279"
+      "sha256": "73892f9d9251eae73c226faea7ca1911d5c51a7fc8e8bcdadf4a87b497d5f279",
+      "expected": {
+        "format": "ivf",
+        "codec": "AV1"
+      }
     },
     {
       "id": "aom_av1_1_b10_00_quantizer_63",
@@ -5954,8 +5994,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_female_amr67_hinted",
@@ -5975,8 +6019,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_male_amr122",
@@ -5996,8 +6044,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_male_amr122DTX",
@@ -6017,8 +6069,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_pdin_example",
@@ -6038,8 +6094,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_rs_example_r1",
@@ -6059,8 +6119,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_meta_2500000bps_0",
@@ -6080,8 +6144,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_2500000bps_0",
@@ -6101,8 +6169,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_C001",
@@ -7274,8 +7346,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_02_dref_edts_img",
@@ -7295,8 +7371,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_03_hinted",
@@ -7316,8 +7396,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_04_bifs_video",
@@ -7337,8 +7421,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_05_bifs_video_protected_v2",
@@ -7358,8 +7446,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_06_bifs",
@@ -7379,8 +7471,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_07_bifs_sprite",
@@ -7400,8 +7496,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_08_bifs_carousel_v2",
@@ -7421,8 +7521,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_09_text",
@@ -7442,8 +7546,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_10_fragments",
@@ -7463,8 +7571,12 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
-      ]
+        "fast",
+        "container-smoke"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_12_metas_v2",
@@ -7484,8 +7596,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_13_long",
@@ -7505,8 +7621,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_16_vtt",
@@ -7526,8 +7646,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_17_negative_ctso",
@@ -7547,8 +7671,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_18_pssh_v2",
@@ -7568,8 +7696,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_19_ttml",
@@ -7589,8 +7721,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_20_stxt",
@@ -7610,8 +7746,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_21_segment",
@@ -7631,8 +7771,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_22_tx3g",
@@ -7652,8 +7796,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_FX_VY_9436R_3_qhd_variant",
@@ -7673,8 +7821,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_FX_VY_9436R_3_qhd",
@@ -7694,8 +7846,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a1_foreman_qcif",
@@ -7715,11 +7871,16 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "codecs": [
         "h264"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "mpegff_a10_foreman_QCIF_raw",
@@ -7739,8 +7900,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a2_foreman_QCIF_hinted",
@@ -7760,8 +7925,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a3_tone_protected",
@@ -7781,8 +7950,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a3b_tone_deprot",
@@ -7802,8 +7975,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a4_tone_fragmented",
@@ -7823,8 +8000,12 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
-      ]
+        "fast",
+        "container-smoke"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a5_foreman_AVC",
@@ -7844,8 +8025,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a6_tone_multifile",
@@ -7865,8 +8050,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a7_tone_oddities",
@@ -7886,8 +8075,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a8_foreman_QCIF_edit",
@@ -7907,8 +8100,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_a9_aac_samplegroups_edit",
@@ -7928,8 +8125,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_compact_no_code_fec_1",
@@ -7949,8 +8150,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_compact_no_code_fec_2",
@@ -7970,8 +8175,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_f1",
@@ -7991,8 +8200,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_f2",
@@ -8012,8 +8225,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_fragment_random_access_1_AF8_rev1",
@@ -8033,8 +8250,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_fragment_random_access_2",
@@ -8054,8 +8275,12 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
-      ]
+        "fast",
+        "container-smoke"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mbms_fec",
@@ -8075,8 +8300,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_restricted",
@@ -8096,8 +8325,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_rtp_rtcp_reception_hint_tracks_v2",
@@ -8117,8 +8350,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sg_tl_st",
@@ -8138,8 +8375,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_timed_metadata",
@@ -8159,8 +8400,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_1",
@@ -8180,8 +8425,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_ac01",
@@ -8201,8 +8450,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sls2100_aot02_048_16",
@@ -8222,8 +8475,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_aggr_hvc1",
@@ -8243,11 +8500,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_alst_hvc1",
@@ -8267,11 +8529,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hev1_clg1_header",
@@ -8291,11 +8558,16 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hev1_clg1_segment",
@@ -8315,11 +8587,16 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hev1_only",
@@ -8339,11 +8616,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_hev1_hev2_extractors",
@@ -8363,11 +8645,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_hev1_hev2_implicit",
@@ -8387,11 +8674,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_hvc1_hvc2_extractors",
@@ -8411,11 +8703,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_hvc1_hvc2_implicit",
@@ -8435,11 +8732,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_multiple_tracks",
@@ -8459,11 +8761,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_multiple_tracks_empty_base",
@@ -8483,11 +8790,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_single_track_nalm",
@@ -8507,11 +8819,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_single_track_nalm_all_intra",
@@ -8531,11 +8848,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_single_track_nalm_rle",
@@ -8555,11 +8877,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_single_track_trif_full_picture",
@@ -8579,11 +8906,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hvc1_only",
@@ -8603,11 +8935,16 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_hvc2_extractors",
@@ -8627,11 +8964,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_subs_slice_hvc1",
@@ -8651,11 +8993,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_subs_tile_hvc1",
@@ -8675,11 +9022,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_trgr_hvc1",
@@ -8699,11 +9051,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_lhevc_avc1_lhe1",
@@ -8723,11 +9080,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_lhevc_avc1_lhv1",
@@ -8747,11 +9109,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_lhevc_avc3_lhe1",
@@ -8771,11 +9138,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_lhevc_avc3_lhv1",
@@ -8795,11 +9167,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hev1_hev2_multiple_tracks_extractors",
@@ -8819,11 +9196,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hev1_lhe1_multiple_tracks_implicit",
@@ -8843,11 +9225,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hev1_single_track",
@@ -8867,11 +9254,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hev2_single_track",
@@ -8891,11 +9283,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hvc1_hvc2_multiple_tracks_extractors",
@@ -8915,11 +9312,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hvc1_lhv1_multiple_tracks_implicit",
@@ -8939,11 +9341,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hvc1_single_track",
@@ -8963,11 +9370,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_mhvc_hvc2_single_track",
@@ -8987,11 +9399,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hev1_hev2_multiple_tracks_extractors",
@@ -9011,11 +9428,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hev1_lhe1_multiple_tracks_implicit",
@@ -9035,11 +9457,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hev1_single_track",
@@ -9059,11 +9486,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hev2_single_track",
@@ -9083,11 +9515,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hvc1_hvc2_multiple_tracks_extractors",
@@ -9107,11 +9544,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hvc1_lhv1_multiple_tracks_implicit",
@@ -9131,11 +9573,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hvc1_single_track",
@@ -9155,11 +9602,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_shvc_hvc2_single_track",
@@ -9179,11 +9631,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mpegff_DDF_10s_25fps_dynamic",
@@ -9203,8 +9660,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_DDF_10s_25fps_dynamic_rep_R1_seg_0005",
@@ -9224,8 +9685,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_DDF_10s_25fps_dynamic_rep_R2_seg_0005",
@@ -9245,8 +9710,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_DDF_10s_25fps",
@@ -9266,8 +9735,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R1_0001",
@@ -9287,8 +9760,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R1_0002",
@@ -9308,8 +9785,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R1_0003",
@@ -9329,8 +9810,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R2_0001",
@@ -9350,8 +9835,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R2_0002",
@@ -9371,8 +9860,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R2_0003",
@@ -9392,8 +9885,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R3_0001",
@@ -9413,8 +9910,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R3_0002",
@@ -9434,8 +9935,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep_R3_0003",
@@ -9455,8 +9960,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_mp4_live_LastTime_depRep",
@@ -9476,8 +9985,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_Solekai002_1280_23_1x1_v7clear",
@@ -9497,8 +10010,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_audio_cbcs",
@@ -9518,11 +10035,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_audio_cbcs_const_iv",
@@ -9542,11 +10063,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_audio_cenc_128iv",
@@ -9566,11 +10091,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_image_cbc1",
@@ -9902,11 +10431,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cbcs",
@@ -9926,11 +10459,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cbcs_const_iv",
@@ -9950,11 +10487,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cbcs_const_iv_roll",
@@ -9974,11 +10515,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cbcs_const_iv_roll_frag1s",
@@ -9998,11 +10543,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cbcs_mkey_const_iv_subs",
@@ -10022,11 +10571,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_128iv",
@@ -10046,14 +10599,19 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "features": [
         "cenc"
       ],
       "codecs": [
         "h264"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "mpegff_video_cenc_64iv",
@@ -10073,11 +10631,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_mkey_base",
@@ -10097,11 +10659,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_mkey_roll",
@@ -10121,11 +10687,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_mkey_subs",
@@ -10145,11 +10715,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_roll",
@@ -10169,11 +10743,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cenc_roll_frag1s",
@@ -10193,14 +10771,19 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "features": [
         "cenc"
       ],
       "codecs": [
         "h264"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "mpegff_video_cens_128iv",
@@ -10220,11 +10803,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_video_cens_64iv",
@@ -10244,11 +10831,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "features": [
         "cenc"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_all_otyp",
@@ -10268,8 +10859,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moof_nobrand",
@@ -10289,8 +10884,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moof_otyp",
@@ -10310,8 +10909,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moof_sidx_otyp",
@@ -10331,8 +10934,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moof_sidx_ssix_otyp",
@@ -10352,8 +10959,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moov_isoc",
@@ -10373,8 +10984,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_comp_moov_otyp",
@@ -10394,8 +11009,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_data_2_Data3_3",
@@ -10415,8 +11034,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_out_avail_track",
@@ -10436,8 +11059,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_out_overlap",
@@ -10457,8 +11084,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sample_group_default_desc",
@@ -10478,8 +11109,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sample_group_default_desc_frag",
@@ -10499,8 +11134,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sample_group_static_group",
@@ -10520,8 +11159,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sample_group_static_group_frag",
@@ -10541,8 +11184,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_sample_group_static_mapping",
@@ -10562,8 +11209,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_hev1_hev2_extractors_v2",
@@ -10583,8 +11234,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_hev1_hev2_implicit_v2",
@@ -10604,8 +11259,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_hvc1_hvc2_extractors_v2",
@@ -10625,8 +11284,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_hvc1_hvc2_implicit_v2",
@@ -10646,8 +11309,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_multiple_tracks_empty_base_v2",
@@ -10667,8 +11334,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_multiple_tracks_v2",
@@ -10688,8 +11359,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_tiles_single_track_trif_full_picture_v2",
@@ -10709,8 +11384,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_test_mebx_me4c",
@@ -10730,8 +11409,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_dcfi_1920x1080_qp37",
@@ -10751,8 +11434,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_inband_ps_1280x720_qp37",
@@ -10772,8 +11459,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_mixed_res_qp37",
@@ -10793,8 +11484,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_outband_ps_1920x1080_qp37",
@@ -10814,8 +11509,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_pase_unused_1280x720_qp37",
@@ -10835,8 +11534,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_RA_BodeMuseum_pase_used_1920x1080_and_1280x720_qp37",
@@ -10856,8 +11559,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_basic_track",
@@ -10877,8 +11584,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_mixed_nal_subpicture_tracks",
@@ -10898,8 +11609,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_subpicture_tracks",
@@ -10919,8 +11634,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_subpicture_tracks_spor_ordered",
@@ -10940,8 +11659,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_substitute_subpicture_single_sample_track",
@@ -10961,8 +11684,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_substitute_subpictures_all_frames",
@@ -10982,8 +11709,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_substitute_subpictures_single_sample_track",
@@ -11003,8 +11734,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_vvc_substitute_subpictures_track",
@@ -11024,8 +11759,12 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
-      ]
+        "slow",
+        "container-full"
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "mpegff_hevc_dual_track",
@@ -11045,12 +11784,17 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-full"
       ],
       "codecs": [
         "h265"
       ],
-      "note": "SPEC-ASSUMPTION(#160): no file of this name exists upstream; stands in with hvc1_only.mp4 until the MP4Box mux post step exists"
+      "note": "SPEC-ASSUMPTION(#160): no file of this name exists upstream; stands in with hvc1_only.mp4 until the MP4Box mux post step exists",
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "mkv_test1",
@@ -11250,11 +11994,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "aac"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "bento4_audio_aac_002",
@@ -11270,11 +12018,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "aac"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "bento4_audio_aac_003",
@@ -11290,11 +12042,15 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "aac"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff"
+      }
     },
     {
       "id": "bento4_video_h264_001",
@@ -11310,11 +12066,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h264"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "bento4_video_h264_002",
@@ -11330,11 +12091,16 @@
         "isobmff"
       ],
       "tags": [
-        "slow"
+        "slow",
+        "container-full"
       ],
       "codecs": [
         "h264"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "gpac_chroma_pulse",
@@ -11367,14 +12133,19 @@
       "size_bytes": 18631,
       "upstream_path": "media/dolby_vision/dolby_vision_cenc.ismv",
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
       "containers": [
         "isobmff"
       ],
       "codecs": [
         "h265"
-      ]
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "gpac_enc_cenc",
@@ -11387,7 +12158,8 @@
       "size_bytes": 18631,
       "upstream_path": "media/dolby_vision/dolby_vision_cenc.ismv",
       "tags": [
-        "fast"
+        "fast",
+        "container-full"
       ],
       "containers": [
         "isobmff"
@@ -11398,7 +12170,11 @@
       "features": [
         "cenc"
       ],
-      "note": "SPEC-ASSUMPTION(#160): media/encryption/enc_cenc.mp4 does not exist upstream (the folder holds only GPAC config files); stands in with the CENC-protected dolby_vision_cenc.ismv"
+      "note": "SPEC-ASSUMPTION(#160): media/encryption/enc_cenc.mp4 does not exist upstream (the folder holds only GPAC config files); stands in with the CENC-protected dolby_vision_cenc.ismv",
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "heif_C001",
@@ -11417,8 +12193,13 @@
         "heif"
       ],
       "tags": [
-        "fast"
-      ]
+        "fast",
+        "container-smoke"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "codec": "H265"
+      }
     },
     {
       "id": "heif_C002",
@@ -16433,9 +17214,14 @@
         "uvq"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "container-smoke"
       ],
-      "note": "SPEC-ASSUMPTION(#161): the 20 s H.264 re-encode of the clip (original_videos_h264/), not the 150 MiB+ raw MKV, so the fast subset stays under 300 MiB"
+      "note": "SPEC-ASSUMPTION(#161): the 20 s H.264 re-encode of the clip (original_videos_h264/), not the 150 MiB+ raw MKV, so the fast subset stays under 300 MiB",
+      "expected": {
+        "format": "isobmff",
+        "codec": "H264"
+      }
     },
     {
       "id": "ytugc_clip02",
@@ -18190,6 +18976,15 @@
         "broken",
         "stco"
       ],
+      "tags": [
+        "isobmff-broken"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-2007"
+        ]
+      },
       "sha256": "e753223342d2854964bdf098e011728cda54896cfca05182f2aedc42bc7700c8",
       "size_bytes": 19865,
       "files": {
@@ -18208,6 +19003,15 @@
         "broken",
         "cmaf"
       ],
+      "tags": [
+        "isobmff-broken"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-7010"
+        ]
+      },
       "sha256": "0faccda984efbff2f25fbe36b1a2337dbdf2bb439d76fbc2dc28ea177c05faf3",
       "size_bytes": 20766,
       "files": {
@@ -18226,6 +19030,15 @@
         "broken",
         "cmaf"
       ],
+      "tags": [
+        "isobmff-broken"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-7031"
+        ]
+      },
       "sha256": "081b40c1c70241e3ad64a1dfa87b4c563116954e9807c01953d8ffe319f2f65b",
       "size_bytes": 20193,
       "files": {
@@ -18244,6 +19057,15 @@
         "broken",
         "hvc1"
       ],
+      "tags": [
+        "isobmff-broken"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-7005"
+        ]
+      },
       "sha256": "c6e3e2eaee3e89d1a9da74a119ce816b4dad936b9d258587b5021cd12afcf071",
       "size_bytes": 19846,
       "files": {
@@ -20404,11 +21226,18 @@
         "broken"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "isobmff-broken"
       ],
       "aliases": [
         "stsc_descending.mp4"
       ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-2003"
+        ]
+      },
       "sha256": "0fce592ca27489592de20955d3d6de0958c3d61f1f79f51fc6728b69f81acd6d",
       "size_bytes": 19889,
       "files": {
@@ -20427,11 +21256,18 @@
         "broken"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "isobmff-broken"
       ],
       "aliases": [
         "ctts_v0_negative.mp4"
       ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-2002"
+        ]
+      },
       "sha256": "f1b31074e664b733b168a54ec2881af8f198c40734589cc988359aeadb9f275a",
       "size_bytes": 20121,
       "files": {
@@ -20450,11 +21286,18 @@
         "broken"
       ],
       "tags": [
-        "fast"
+        "fast",
+        "isobmff-broken"
       ],
       "aliases": [
         "size7_in_moov.mp4"
       ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-0106"
+        ]
+      },
       "sha256": "16a16e916bd423dcdb63258a8f69f62f429e1d8624300d0955dfc5a322ec1f08",
       "size_bytes": 19873,
       "files": {

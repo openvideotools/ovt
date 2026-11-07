@@ -81,6 +81,17 @@
         "features": { "type": "array", "items": { "type": "string" } },
         "tests": { "type": "array", "items": { "type": "string" } },
         "tags": { "type": "array", "items": { "type": "string" } },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "container tests (docs/spec 08-container.md section 8.9.3, WI-1.237): what the reader must report for this file",
+          "properties": {
+            "format": { "enum": ["isobmff", "ivf", "annexb", "obu", "y4m", "matroska", "mpegts"] },
+            "codec": { "type": "string" },
+            "hdr_kind": { "enum": ["Unknown", "SDR", "HDR10", "HDR10Plus", "HLG", "DolbyVision", "PQ_NoStatic"] },
+            "diagnostics": { "type": "array", "items": { "type": "string", "pattern": "^CNT-[0-9]{4}$" } }
+          }
+        },
         "upstream_path": { "type": "string", "description": "path of the file inside the origin repository or bucket (informational)" },
         "note": { "type": "string", "description": "free text: pending steps and SPEC-ASSUMPTION remarks (WI-0.552)" },
         "aliases": { "type": "array", "items": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$" } },

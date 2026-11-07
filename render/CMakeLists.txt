@@ -5,7 +5,7 @@
 # WI-1.400 creates the library: the public headers of §10.2 and the OffscreenTexture skeleton of VideoSurface on
 # libplacebo's Vulkan backend. Later chapter 10 work items add their sources to ovt_render.
 
-add_library(ovt_render SHARED src/surface/video_surface_impl.cpp)
+add_library(ovt_render SHARED src/color/h273_map.cpp src/surface/video_surface_impl.cpp)
 add_library(ovt::render ALIAS ovt_render)
 
 target_include_directories(
