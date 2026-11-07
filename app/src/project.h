@@ -159,7 +159,7 @@ class Project : public QObject {
   void setDirty(bool dirty);
   void raise(const QString& code, const QString& severity, const QString& message);
   bool readDocument(const QString& path, const QString& base_dir, bool mark_clean);
-  bool write(const QString& path, const QString& base_dir) const;
+  [[nodiscard]] bool write(const QString& path, const QString& base_dir) const;
   static QString normalise(const QString& path_or_url);
 
   QString config_dir_;

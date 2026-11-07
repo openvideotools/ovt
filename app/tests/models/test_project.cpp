@@ -266,14 +266,14 @@ TEST_CASE("RawFormat: frame sizes per chroma format and bit depth", "[fast][gui]
   RawFormat f;
   f.width = 64;
   f.height = 32;
-  CHECK(f.frameSize() == 64U * 32U * 3 / 2);  // 4:2:0, 8-bit
+  CHECK(f.frameSize() == 64ULL * 32ULL * 3 / 2);  // 4:2:0, 8-bit
   f.chroma_format = QStringLiteral("422");
-  CHECK(f.frameSize() == 64U * 32U * 2);
+  CHECK(f.frameSize() == 64ULL * 32ULL * 2);
   f.chroma_format = QStringLiteral("444");
   f.bit_depth = 10;
-  CHECK(f.frameSize() == 64U * 32U * 3 * 2);
+  CHECK(f.frameSize() == 64ULL * 32ULL * 3 * 2);
   f.chroma_format = QStringLiteral("400");
-  CHECK(f.frameSize() == 64U * 32U * 2);
+  CHECK(f.frameSize() == 64ULL * 32ULL * 2);
   f.chroma_format = QStringLiteral("420");
   f.width = 63;  // odd sizes round the chroma up
   f.height = 31;
