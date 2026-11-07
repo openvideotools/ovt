@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc13 — 2026-11-07
+
+Owner decision (follow-up to the PR #132 review, which noted the msmpeg4 decoders still in the core): the core FFmpeg flavour also leaves out the Microsoft pre-standard variants of MPEG-4 Part 2. MINOR-level change (configure flag list); no WI is re-opened.
+
+- 13 §13.3.3, 15 §15.5.2 POL-PAT-2 — core flavour adds `msmpeg4v1`, `msmpeg4v2`, `msmpeg4v3`, `wmv1`, `wmv2` to `--disable-decoder=` (all five share FFmpeg's `msmpeg4dec` component, which then is not built; none has a hwaccel); the `h263` decoder and parser stay; `OVT_PATENT_CODECS_IN_CORE=ON` keeps them — WI-0.012
+
 ## 1.0.0-rc12 — 2026-11-06
 
 PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
