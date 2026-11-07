@@ -56,11 +56,12 @@ yadif CUDA filter (`shaders/dithering.c`, `deinterlacing.c`) is LGPL-2.1-or-late
   (the AOM PATENTS grant covers libaom's own code). A new licence id is a Karl decision (project rules), so #154 or a
   follow-up should raise it, or build with `-DCONFIG_SVT_AV1=0` (decoder performance cost only).
 - **dav1d 1.5.1**: `COPYING` is BSD-2-Clause only, but `src/ext/x86/x86inc.asm` is ISC (x264), `src/loongarch/
-  loongson_asm.S` is ISC and `src/arm/64/mc16_sve.S` is BSD-2-Clause (Arm). `dav1d.cmake` stages `COPYING` only, so the
-  ISC text is missing.
+  loongson_asm.S` is ISC and `src/arm/64/mc16_sve.S` is BSD-2-Clause (Arm). `dav1d.cmake` staged `COPYING` only. **Fixed in this PR**: both ISC texts are staged
+  (`third_party/licenses/dav1d/`; the Loongson file is read from the GitHub mirror tag 1.5.1, not the pinned tarball).
 - **libde265 1.0.15**: `libde265/md5.cc` is public domain (Alexander Peslyak) with a fallback permissive grant, and
-  `libde265/arm/*` is LGPL-2.1-or-later (from FFmpeg). Both are compatible with LGPL-3.0-or-later; the md5 grant is
-  not in `COPYING`.
+  `libde265/arm/*` is LGPL-2.1-or-later (from FFmpeg). Both are compatible with LGPL-3.0-or-later; the md5 grant was
+  not in `COPYING`. **Fixed in this PR**: staged as `LicenseRef-Peslyak-md5-public-domain` (also in `LICENSES/`; a new
+  LicenseRef id for the REUSE check only, not a policy entry).
 - **FFmpeg n7.1.1**: `LICENSE.md` is staged and lists the bundled components. No gap found.
 - **HM, MoltenVK, ONNX Runtime**: not examined (MoltenVK and ONNX Runtime stage their own notice files).
 
