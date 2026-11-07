@@ -11,6 +11,8 @@ namespace ovt::app {
 namespace {
 
 constexpr qint64 kMicrosPerSecond = 1'000'000;
+// The leading hours or minutes field: far beyond any video, and keeps the microsecond sum inside qint64.
+constexpr qint64 kMaxLeadingField = 99'999;
 
 std::optional<GotoTarget> fail(QString* error, const QString& message) {
   if (error != nullptr) {
@@ -59,7 +61,7 @@ std::optional<qint64> parse_clock(const QString& text) {
   for (qsizetype i = parts.size() - 2; i >= 0; --i) {
     const std::optional<qint64> value = parse_digits(parts.at(i));
     // Only the leading field may exceed 59.
-    if (!value || (i > 0 && *value >= 60)) {
+    if (!value || (i > 0 && *value >= 60) || *value > kMaxLeadingField) {
       return std::nullopt;
     }
     total += *value * unit * kMicrosPerSecond;

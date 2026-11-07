@@ -51,9 +51,29 @@ TEST_CASE("Go to: times", "[fast][gui][goto]") {
 }
 
 TEST_CASE("Go to: text that is not the grammar is refused with a reason", "[fast][gui][goto]") {
-  for (const char* text :
-       {"",      "   ",     "abc",  "d",    "p",      "dx1",     "poc", "poc4.5", "@",   "@0x",        "@0xZZ",
-        "unit:", "unit:-1", "12.5", "1:75", "1:2:75", "0:61:00", "-3",  "1e3s",   ".5s", "12.1234567s"}) {
+  for (const char* text : {"",
+                           "   ",
+                           "abc",
+                           "d",
+                           "p",
+                           "dx1",
+                           "poc",
+                           "poc4.5",
+                           "@",
+                           "@0x",
+                           "@0xZZ",
+                           "unit:",
+                           "unit:-1",
+                           "12.5",
+                           "1:75",
+                           "1:2:75",
+                           "0:61:00",
+                           "-3",
+                           "1e3s",
+                           ".5s",
+                           "12.1234567s",
+                           "999999999999999:00:00",
+                           "100000:00"}) {
     QString error;
     CHECK_FALSE(parseGoto(QString::fromLatin1(text), &error).has_value());
     CHECK_FALSE(error.isEmpty());
