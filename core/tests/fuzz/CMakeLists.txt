@@ -16,8 +16,8 @@
 # SPEC-ASSUMPTION(#90): the replay directory is regressions/<name>/ (name without the fuzz_ prefix), as in §14.7.1.
 #
 # The targets link the module objects (ovt_core_objects), not ovt::core: ovt_core exports only the C API (#62).
-# Splitter and parser targets (fuzz_container_*, fuzz_syntax_*) are added by the work items that own those
-# parsers (WI-1.238 and the syntax WIs).
+# fuzz_container_sniff is WI-1.200; the other splitter and parser targets (fuzz_container_*, fuzz_syntax_*) are
+# added by the work items that own those parsers (WI-1.238 and the syntax WIs).
 
 function(ovt_add_fuzz_target name source)
   set(regress_dir "${CMAKE_CURRENT_SOURCE_DIR}/regressions/${name}")
@@ -40,6 +40,7 @@ function(ovt_add_fuzz_target name source)
 endfunction()
 
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
+ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
