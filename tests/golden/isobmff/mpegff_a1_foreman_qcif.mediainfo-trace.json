@@ -1,0 +1,482 @@
+[
+ {
+  "header_length": 8,
+  "offset": 0,
+  "path": "ftyp",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 24,
+  "path": "moov",
+  "size": 6769
+ },
+ {
+  "header_length": 8,
+  "offset": 32,
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "header_length": 8,
+  "offset": 140,
+  "path": "moov/trak[1]",
+  "size": 3281
+ },
+ {
+  "header_length": 8,
+  "offset": 148,
+  "path": "moov/trak[1]/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 240,
+  "path": "moov/trak[1]/mdia",
+  "size": 3181
+ },
+ {
+  "header_length": 8,
+  "offset": 248,
+  "path": "moov/trak[1]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 280,
+  "path": "moov/trak[1]/mdia/hdlr",
+  "size": 58
+ },
+ {
+  "header_length": 8,
+  "offset": 338,
+  "path": "moov/trak[1]/mdia/minf",
+  "size": 3083
+ },
+ {
+  "header_length": 8,
+  "offset": 346,
+  "path": "moov/trak[1]/mdia/minf/smhd",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 362,
+  "path": "moov/trak[1]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "header_length": 8,
+  "offset": 370,
+  "path": "moov/trak[1]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 386,
+  "path": "moov/trak[1]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 398,
+  "path": "moov/trak[1]/mdia/minf/stbl",
+  "size": 3023
+ },
+ {
+  "header_length": 8,
+  "offset": 406,
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd",
+  "size": 103
+ },
+ {
+  "header_length": 8,
+  "offset": 422,
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd/mp4a",
+  "size": 87
+ },
+ {
+  "header_length": 8,
+  "offset": 458,
+  "path": "moov/trak[1]/mdia/minf/stbl/stsd/mp4a/esds",
+  "size": 51
+ },
+ {
+  "header_length": 8,
+  "offset": 509,
+  "path": "moov/trak[1]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 533,
+  "path": "moov/trak[1]/mdia/minf/stbl/stsc",
+  "size": 736
+ },
+ {
+  "header_length": 8,
+  "offset": 1269,
+  "path": "moov/trak[1]/mdia/minf/stbl/stsz",
+  "size": 1896
+ },
+ {
+  "header_length": 8,
+  "offset": 3165,
+  "path": "moov/trak[1]/mdia/minf/stbl/stco",
+  "size": 256
+ },
+ {
+  "header_length": 8,
+  "offset": 3421,
+  "path": "moov/trak[2]",
+  "size": 2425
+ },
+ {
+  "header_length": 8,
+  "offset": 3429,
+  "path": "moov/trak[2]/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 3521,
+  "path": "moov/trak[2]/mdia",
+  "size": 2325
+ },
+ {
+  "header_length": 8,
+  "offset": 3529,
+  "path": "moov/trak[2]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 3561,
+  "path": "moov/trak[2]/mdia/hdlr",
+  "size": 58
+ },
+ {
+  "header_length": 8,
+  "offset": 3619,
+  "path": "moov/trak[2]/mdia/minf",
+  "size": 2227
+ },
+ {
+  "header_length": 8,
+  "offset": 3627,
+  "path": "moov/trak[2]/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 3647,
+  "path": "moov/trak[2]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "header_length": 8,
+  "offset": 3655,
+  "path": "moov/trak[2]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 3671,
+  "path": "moov/trak[2]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 3683,
+  "path": "moov/trak[2]/mdia/minf/stbl",
+  "size": 2163
+ },
+ {
+  "header_length": 8,
+  "offset": 3691,
+  "path": "moov/trak[2]/mdia/minf/stbl/stsd",
+  "size": 183
+ },
+ {
+  "header_length": 8,
+  "offset": 3707,
+  "path": "moov/trak[2]/mdia/minf/stbl/stsd/mp4v",
+  "size": 167
+ },
+ {
+  "header_length": 8,
+  "offset": 3793,
+  "path": "moov/trak[2]/mdia/minf/stbl/stsd/mp4v/esds",
+  "size": 81
+ },
+ {
+  "header_length": 8,
+  "offset": 3874,
+  "path": "moov/trak[2]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 3898,
+  "path": "moov/trak[2]/mdia/minf/stbl/stss",
+  "size": 56
+ },
+ {
+  "header_length": 8,
+  "offset": 3954,
+  "path": "moov/trak[2]/mdia/minf/stbl/stsc",
+  "size": 496
+ },
+ {
+  "header_length": 8,
+  "offset": 4450,
+  "path": "moov/trak[2]/mdia/minf/stbl/stsz",
+  "size": 1220
+ },
+ {
+  "header_length": 8,
+  "offset": 5670,
+  "path": "moov/trak[2]/mdia/minf/stbl/stco",
+  "size": 176
+ },
+ {
+  "header_length": 8,
+  "offset": 5846,
+  "path": "moov/trak[3]",
+  "size": 445
+ },
+ {
+  "header_length": 8,
+  "offset": 5854,
+  "path": "moov/trak[3]/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 5946,
+  "path": "moov/trak[3]/mdia",
+  "size": 345
+ },
+ {
+  "header_length": 8,
+  "offset": 5954,
+  "path": "moov/trak[3]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 5986,
+  "path": "moov/trak[3]/mdia/hdlr",
+  "size": 65
+ },
+ {
+  "header_length": 8,
+  "offset": 6051,
+  "path": "moov/trak[3]/mdia/minf",
+  "size": 240
+ },
+ {
+  "header_length": 8,
+  "offset": 6059,
+  "path": "moov/trak[3]/mdia/minf/nmhd",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 6071,
+  "path": "moov/trak[3]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "header_length": 8,
+  "offset": 6079,
+  "path": "moov/trak[3]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 6095,
+  "path": "moov/trak[3]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 6107,
+  "path": "moov/trak[3]/mdia/minf/stbl",
+  "size": 184
+ },
+ {
+  "header_length": 8,
+  "offset": 6115,
+  "path": "moov/trak[3]/mdia/minf/stbl/stsd",
+  "size": 84
+ },
+ {
+  "header_length": 8,
+  "offset": 6131,
+  "path": "moov/trak[3]/mdia/minf/stbl/stsd/mp4s",
+  "size": 68
+ },
+ {
+  "header_length": 8,
+  "offset": 6147,
+  "path": "moov/trak[3]/mdia/minf/stbl/stsd/mp4s/esds",
+  "size": 52
+ },
+ {
+  "header_length": 8,
+  "offset": 6199,
+  "path": "moov/trak[3]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 6223,
+  "path": "moov/trak[3]/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 6251,
+  "path": "moov/trak[3]/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 6271,
+  "path": "moov/trak[3]/mdia/minf/stbl/stco",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 6291,
+  "path": "moov/trak[4]",
+  "size": 460
+ },
+ {
+  "header_length": 8,
+  "offset": 6299,
+  "path": "moov/trak[4]/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 6391,
+  "path": "moov/trak[4]/tref",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 6399,
+  "path": "moov/trak[4]/tref/mpod",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 6415,
+  "path": "moov/trak[4]/mdia",
+  "size": 336
+ },
+ {
+  "header_length": 8,
+  "offset": 6423,
+  "path": "moov/trak[4]/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 6455,
+  "path": "moov/trak[4]/mdia/hdlr",
+  "size": 64
+ },
+ {
+  "header_length": 8,
+  "offset": 6519,
+  "path": "moov/trak[4]/mdia/minf",
+  "size": 232
+ },
+ {
+  "header_length": 8,
+  "offset": 6527,
+  "path": "moov/trak[4]/mdia/minf/nmhd",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 6539,
+  "path": "moov/trak[4]/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "header_length": 8,
+  "offset": 6547,
+  "path": "moov/trak[4]/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 6563,
+  "path": "moov/trak[4]/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 6575,
+  "path": "moov/trak[4]/mdia/minf/stbl",
+  "size": 176
+ },
+ {
+  "header_length": 8,
+  "offset": 6583,
+  "path": "moov/trak[4]/mdia/minf/stbl/stsd",
+  "size": 76
+ },
+ {
+  "header_length": 8,
+  "offset": 6599,
+  "path": "moov/trak[4]/mdia/minf/stbl/stsd/mp4s",
+  "size": 60
+ },
+ {
+  "header_length": 8,
+  "offset": 6615,
+  "path": "moov/trak[4]/mdia/minf/stbl/stsd/mp4s/esds",
+  "size": 44
+ },
+ {
+  "header_length": 8,
+  "offset": 6659,
+  "path": "moov/trak[4]/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 6683,
+  "path": "moov/trak[4]/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "header_length": 8,
+  "offset": 6711,
+  "path": "moov/trak[4]/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 6731,
+  "path": "moov/trak[4]/mdia/minf/stbl/stco",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 6751,
+  "path": "moov/iods",
+  "size": 42
+ },
+ {
+  "header_length": 8,
+  "offset": 6793,
+  "path": "mdat",
+  "size": 469195
+ }
+]

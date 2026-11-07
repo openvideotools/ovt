@@ -19,7 +19,8 @@ if(NOT APPLE)
   message(FATAL_ERROR "third_party/moltenvk.cmake: MoltenVK is macOS only.")
 endif()
 
-ovt_tp_declare(moltenvk LICENSE_FILES LICENSE)
+ovt_tp_declare(moltenvk LICENSE_FILES ./LICENSE
+)# not a bare LICENSE: ovt_tp_declare() would read it as its LICENSE keyword
 
 if(CMAKE_OSX_ARCHITECTURES)
   set(_ovt_mvk_archs "${CMAKE_OSX_ARCHITECTURES}")

@@ -51,10 +51,18 @@ file that mixes them with `leak` makes both runtimes abort with `failed to parse
 names, not `-fsanitize` group names, so `shift` and `implicit-conversion` are rejected. `check_suppressions.py`
 enforces both.
 
-Append the option from the table to the options of the preset. The preset environments do not set the
-suppression options yet (they live in
-`CMakePresets.json`, which needs the owner's approval, and in the CI jobs of WI-0.031); until then, with the
-files empty, nothing is suppressed.
+The `asan-env` test preset sets `LSAN_OPTIONS=suppressions=${sourceDir}/tests/asan.supp`, so `ctest --preset
+sanitizers` and the `asan-ubsan` CI job read `tests/asan.supp`. The UBSan and TSan files are not wired into a preset
+yet. LeakSanitizer prints `Suppressions used:` with a count per entry at exit, so a suppressed leak stays visible in
+the log.
+
+LSan matches an entry against the function, file and module of each frame of the allocation stack. ASan records
+that stack with the fast frame-pointer unwinder, which stops at the first library built without frame pointers
+(a distribution driver, for example), and a library that was `dlclose`d before exit shows as `<unknown module>`
+and has no name to match. When the only named frame is deep in the stack, give that one test binary the slow
+unwinder rather than the whole lane: `ovt_catch_discover_tests(<target> ENVIRONMENT_MODIFICATION
+"LSAN_OPTIONS=string_append::fast_unwind_on_malloc=0")`, as `render/tests/CMakeLists.txt` does for the Vulkan
+probe (#207).
 
 ## Adding a suppression
 
