@@ -290,6 +290,16 @@ jobs:
       - name: Configure, build, test (sanitizers)
         run: cmake --workflow --preset ci-linux-asan-ubsan
 
+      - name: DIAGNOSTIC Vulkan ICD (temporary, reverted before merge)
+        if: always()
+        continue-on-error: true
+        run: |
+          ls -l /usr/share/vulkan/icd.d /etc/vulkan/icd.d 2>&1 || true
+          dpkg -l | grep -E 'mesa-vulkan|libvulkan' || true
+          bin=build/linux-x64-asan-ubsan/render/tests/ovt_tests_placebo_probe
+          VK_LOADER_DEBUG=error,warn,driver "$bin" "libplacebo creates a Vulkan device" 2>&1 | head -80 || true
+          ASAN_OPTIONS=fast_unwind_on_malloc=0 "$bin" "libplacebo creates a Vulkan device" 2>&1 | grep -A25 'Direct leak' | head -60 || true
+
       - name: Upload JUnit
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
