@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc4 (2026-11-06) |
+| **Version** | 1.0-rc12 (2026-11-06) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -59,3 +59,11 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc2 (2026-11-04) | Accepted answers of the M0.1 `spec-question` issues #2, #3, #4, #6, #8, #11, #13, #15, #17, #20, #22, #25 and #27 folded into chapters 12–16 (see `CHANGELOG.md`). |
 | 1.0-rc3 (2026-11-06) | Accepted answers of `spec-question` #119 (synthetic generator reproducibility, chapter 14 §14.3.3) and #123 (licence gate `--corpora` mode, chapter 14 §14.3.4) folded in (see `CHANGELOG.md`). |
 | 1.0-rc4 (2026-11-06) | WI-0.552 corpora manifest: `vcs.rev`, `upstream_path`, `note` fields; url-less `unverified` entries for names absent at their origin (see `CHANGELOG.md`). |
+| 1.0-rc5 (2026-11-06) | CI build artefacts are uploaded only while the repository is private (chapter 13 §13.7.1; see `CHANGELOG.md`). |
+| 1.0-rc6 (2026-11-06) | Editorial: goal sentence (chapter 0 §0.0) and chapter 1 §1.2 reworded as a factual feature-area comparison, with a trademark and non-affiliation note; chapter 3 and Appendix A trimmed to factual feature comparison; UX conventions stated as OVT's own; goal G1 reworded; "Block Presenter" panel renamed "Block Samples"; compare modes use OVT's own names only (see `CHANGELOG.md`). |
+| 1.0-rc7 (2026-11-06) | WI-0.012 FFmpeg core flavour also disables the VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1 decoders (owner decision on PR #132; see `CHANGELOG.md`). |
+| 1.0-rc8 (2026-11-06) | Chapter 14 §14.3.3 recipe 12 uses HM 18.0's `SliceSegmentMode`/`SliceSegmentArgument` and 100-CTU slices with a segment every 40 CTUs, so 720p pictures carry several slices and dependent segments (see `CHANGELOG.md`). |
+| 1.0-rc9 (2026-11-06) | Chapter 14 §14.3.3 recipes 19 and 62 spell the aomenc option `--superres-denominator` (see `CHANGELOG.md`). |
+| 1.0-rc10 (2026-11-06) | Chapter 14 §14.3.3 recipe 19 uses `--resize-denominator=9` so resize × superres stays within AV1's 2x reference scaling, recipe 68 writes the `--pssh` system ID without dashes, and rule 6 skips recipes whose `manual_download` input is absent (see `CHANGELOG.md`). |
+| 1.0-rc11 (2026-11-06) | Chapter 14 §14.3.3 recipe 33 loops its source once so the clean TS lasts 4 s and the 1 s PCR gap fits (see `CHANGELOG.md`). |
+| 1.0-rc12 (2026-11-06) | Chapter 14 §14.3.3 recipe 21 encodes its own HEVC with an IDR every 20 frames and 600 ms segments, so the CMAF file has its three segments (see `CHANGELOG.md`). |

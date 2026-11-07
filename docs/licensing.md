@@ -91,8 +91,8 @@ is ✘ or the licence is not in the table, stop and open an issue labelled `lice
 
 - OVT is free of charge (POL-PAT-1).
 - The official downloads contain **no AVC or HEVC decoder** (POL-PAT-2). They contain OVT's own parsers, the
-  LGPL FFmpeg build with the `h264`/`hevc` decoders disabled, libaom with its `PATENTS` text, dav1d and
-  libvmaf.
+  LGPL FFmpeg build with the `h264`/`hevc` decoders disabled (and those of the other pool-covered codecs:
+  VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1), libaom with its `PATENTS` text, dav1d and libvmaf.
 - AVC and HEVC decoding comes from **runtime-loaded plugins** distributed as a separate codec pack, with its
   own licence files and a patent notice (POL-PAT-3). Distributors may build a single package with
   `OVT_PATENT_CODECS_IN_CORE=ON`; the project's own releases never do.

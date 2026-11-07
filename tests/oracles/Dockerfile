@@ -33,7 +33,7 @@ RUN apt-get update \
       build-essential pkg-config git curl unzip xz-utils xxd cmake ninja-build meson nasm \
       autoconf automake libtool python3 python3-dev python3-venv \
       golang-go \
-      libnuma-dev zlib1g-dev libssl-dev libogg-dev libpng-dev libjpeg-dev \
+      libnuma-dev zlib1g-dev libssl-dev libogg-dev libopus-dev libpng-dev libjpeg-dev \
       libvulkan-dev libshaderc-dev liblcms2-dev libass-dev \
       libx11-dev libxext-dev libxrandr-dev libxpresent-dev libxss-dev libxinerama-dev libxkbcommon-dev \
       mesa-vulkan-drivers xvfb \
@@ -48,7 +48,7 @@ RUN apt-get update \
 FROM toolchain AS codecs
 COPY lib.sh build_libaom_inspect.sh /src/
 RUN bash /src/build_libaom_inspect.sh && ldconfig
-COPY build_ffmpeg_oracle.sh /src/
+COPY build_ffmpeg_oracle.sh ffmpeg_mvs.c /src/
 RUN bash /src/build_ffmpeg_oracle.sh && ldconfig
 
 # --- libplacebo + mpv (links the FFmpeg above) -----------------------------------------------------------
@@ -74,7 +74,7 @@ COPY lib.sh build_jm.sh /src/
 RUN bash /src/build_jm.sh
 
 FROM toolchain AS hm
-COPY lib.sh build_hm.sh /src/
+COPY lib.sh build_hm.sh hm_cu_dump.cpp /src/
 RUN bash /src/build_hm.sh
 
 FROM toolchain AS mp4ff
@@ -128,9 +128,11 @@ RUN bash -c 'source /src/lib.sh \
  && ovt_git_fetch https://github.com/google/uvq.git "${UVQ_COMMIT}" "${UVQ_COMMIT}" /opt/ovt-oracles/uvq \
  && rm -rf /opt/ovt-oracles/uvq/.git /opt/ovt-oracles/uvq/models && ovt_stamp uvq "google/uvq ${UVQ_COMMIT}"'
 
-COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh /opt/ovt-oracles/share/ovt-oracles/
+COPY ORACLE_VERSIONS.md oracle_versions.py smoke_test.sh recipe_tools.py recipe_tools.json \
+     /opt/ovt-oracles/share/ovt-oracles/
 RUN ln -s ../share/ovt-oracles/oracle_versions.py /opt/ovt-oracles/bin/oracle-versions \
  && ln -s ../share/ovt-oracles/smoke_test.sh /opt/ovt-oracles/bin/oracle-smoke-test \
+ && ln -s ../share/ovt-oracles/recipe_tools.py /opt/ovt-oracles/bin/oracle-recipe-tools \
  && chmod 0755 /opt/ovt-oracles/share/ovt-oracles/*.py /opt/ovt-oracles/share/ovt-oracles/*.sh
 
 WORKDIR /work

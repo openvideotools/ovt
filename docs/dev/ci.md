@@ -15,7 +15,8 @@ skips (#27).
 ## Getting a macOS build
 
 Every push to `main` uploads `ovt-macos-arm64`: a zip with the `ovt` CLI and, once the GUI exists,
-`OVT Studio.app`, both ad-hoc signed. Artefacts are kept for 30 days. To download the latest:
+`OVT Studio.app`, both ad-hoc signed. Artefacts are kept for 30 days, and only while the repository is
+private: a public artefact would be a binary distribution without third-party notices. To download the latest:
 
 ```sh
 gh run download --repo openvideotools/ovt -n ovt-macos-arm64 \

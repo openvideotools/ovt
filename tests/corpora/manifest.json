@@ -26,7 +26,11 @@
         "h264-slice-golden"
       ],
       "sha256": "399eae2eb03f82fc291bdc4fe9cedd110b40a96368ffe1e1bcf9ff6436fa9df7",
-      "size_bytes": 1766668
+      "size_bytes": 1766668,
+      "extract": {
+        "archive": "zip",
+        "member": "BA1_Sony_D.jsv"
+      }
     },
     {
       "id": "jvt_BA_MW_D",
@@ -35,7 +39,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/BA_MW_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -52,7 +55,13 @@
         "h264-ps-golden",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "f85d0c1e6a8317ecff19bf11d1496b327ee11e391de27453031062ea62241843",
+      "size_bytes": 3167217,
+      "extract": {
+        "archive": "zip",
+        "member": "BA_MW_D.264"
+      }
     },
     {
       "id": "jvt_BAMQ1_JVC_C",
@@ -61,7 +70,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/BAMQ1_JVC_C.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -74,10 +82,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "4d37b02cd96ce57f91db306bcd29976ac26b88efbc1c8b3322101f7914378303",
+      "size_bytes": 9719423,
+      "extract": {
+        "archive": "zip",
+        "member": "BAMQ1_JVC_C.264"
+      }
     },
     {
       "id": "jvt_CABA1_SVA_B",
@@ -103,7 +117,11 @@
         "h264-slice-golden"
       ],
       "sha256": "d0cf94006df2319a6c98683a6013f85ea5a1c0d382c796523b751c263e8c8989",
-      "size_bytes": 960760
+      "size_bytes": 960760,
+      "extract": {
+        "archive": "zip",
+        "member": "CABA1_SVA_B.264"
+      }
     },
     {
       "id": "jvt_CABA3_TOSHIBA_E",
@@ -112,7 +130,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CABA3_TOSHIBA_E.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -125,10 +142,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "7ed0d82ebd6fc96fe3b1b2daf0969360140833e180c8fb217e8c8ad817d40178",
+      "size_bytes": 9429579,
+      "extract": {
+        "archive": "zip",
+        "member": "CABA3_TOSHIBA_E.264"
+      }
     },
     {
       "id": "jvt_CAMA1_Sony_C",
@@ -137,7 +160,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CAMA1_Sony_C.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -153,10 +175,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "e2aaf99d934f60a5410d400696290fcc894fcb916c268703d61adade1ca854eb",
+      "size_bytes": 14517408,
+      "extract": {
+        "archive": "zip",
+        "member": "CAMA1_Sony_C.jsv"
+      }
     },
     {
       "id": "jvt_CAPAMA3_Sand_F",
@@ -165,7 +193,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CAPAMA3_Sand_F.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -181,10 +208,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "964118db0951061cb766b3df0e5518ff95f7f027adc78a447c760cc5bc91085c",
+      "size_bytes": 10058520,
+      "extract": {
+        "archive": "zip",
+        "member": "CAPAMA3_Sand_F.264"
+      }
     },
     {
       "id": "jvt_CVWP1_TOSHIBA_E",
@@ -193,7 +226,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVWP1_TOSHIBA_E.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -212,7 +244,13 @@
         "h264-ps-golden",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "4402349be955730a67401e218c6fd20874e1bba4f33ea5c5123e25a80682c6ba",
+      "size_bytes": 18679933,
+      "extract": {
+        "archive": "zip",
+        "member": "CVWP1_TOSHIBA_E/CVWP1_TOSHIBA_E.264"
+      }
     },
     {
       "id": "jvt_MR1_BT_A",
@@ -221,7 +259,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/MR1_BT_A.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -241,7 +278,13 @@
         "h264-ps-golden",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "a76d4e199e6ffb27292d1a07c516e5adea251e63e3f756de490c153b23d4684d",
+      "size_bytes": 1714616,
+      "extract": {
+        "archive": "zip",
+        "member": "MR1_BT_A.h264"
+      }
     },
     {
       "id": "jvt_CAPM3_Sony_D",
@@ -250,7 +293,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CAPM3_Sony_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -266,10 +308,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "61dbb73d5acc16a10f5f75dfa8a368a71f87d119d802f7c2bbebb5abcd32f075",
+      "size_bytes": 22917826,
+      "extract": {
+        "archive": "zip",
+        "member": "CAPM3_Sony_D.jsv"
+      }
     },
     {
       "id": "jvt_HPCV_BRCM_A",
@@ -278,7 +326,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/HPCV_BRCM_A.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -294,10 +341,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "2d68dde9e6a533a77d1db84bdf75948eed99712e435857317952b3cf33c8e447",
+      "size_bytes": 49036847,
+      "extract": {
+        "archive": "zip",
+        "member": "HPCV_BRCM_A.264"
+      }
     },
     {
       "id": "jvt_Hi422FR1_SONY_A",
@@ -306,7 +359,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/Hi422FR1_SONY_A.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -324,7 +376,13 @@
         "fast",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "00160408cfcb21e3636d47d1f17833cf1ebe7a4b8dc2c8fadef897f509fc1d81",
+      "size_bytes": 4362608,
+      "extract": {
+        "archive": "zip",
+        "member": "Hi422FR1_SONY_A.jsv"
+      }
     },
     {
       "id": "jvt_ALPHACONFORMANCEG",
@@ -360,7 +418,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/sp1_bt_a.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -375,10 +432,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "aa9a1fa4fedad3d0437b8d77caefbf1b3cfb60add57b231dc67ebbded60d9d8a",
+      "size_bytes": 16046980,
+      "extract": {
+        "archive": "zip",
+        "member": "sp1_bt_a.h264"
+      }
     },
     {
       "id": "jvt_CI1_FT_B",
@@ -387,7 +450,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CI1_FT_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -407,7 +469,13 @@
         "h264-ps-golden",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "b44b82586b4be8232d77e7d0971691004f7aed5ef7d8730b20f81405fbc77d1a",
+      "size_bytes": 24960033,
+      "extract": {
+        "archive": "zip",
+        "member": "CI1_FT_B.264"
+      }
     },
     {
       "id": "jvt_cvmp_mot_frm_L31_B",
@@ -416,7 +484,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/cvmp_mot_frm_L31_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -431,9 +498,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "3901a1df74ab2a10c2b184b78ada16d2207bb193035c3898f2493c170227875f",
+      "size_bytes": 11544425,
+      "extract": {
+        "archive": "zip",
+        "member": "CVMP_MOT_FRM_L31_B.26l"
+      }
     },
     {
       "id": "jvt_src19td_IBP_264",
@@ -466,7 +539,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/NRF_MW_E.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -484,7 +556,13 @@
         "fast",
         "h264-analysis-smoke",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "c48f067fe8ac1309b99292d024324a0a7561bf28312a133995a42d7a98ae9835",
+      "size_bytes": 3103398,
+      "extract": {
+        "archive": "zip",
+        "member": "NRF_MW_E.264"
+      }
     },
     {
       "id": "jvt_Sharp_MP_Field_1_B",
@@ -493,7 +571,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/Sharp_MP_Field_1_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -506,9 +583,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "8beb25c4b8c93a0ad711a88f05688d530f7a4d43f37f2f7ad56e2b1bb652e4e0",
+      "size_bytes": 8973251,
+      "extract": {
+        "archive": "zip",
+        "member": "Sharp_MP_Field_1_B.jvt"
+      }
     },
     {
       "id": "jvt_CVSE2_Sony_B",
@@ -517,7 +600,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVSE2_Sony_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -535,7 +617,13 @@
         "fast",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "0d19398d5a8bc02d5df0906bd3d7c52e6341e992037eb67c73fc782852fbe17d",
+      "size_bytes": 18798970,
+      "extract": {
+        "archive": "zip",
+        "member": "CVSE2_Sony_B.jsv"
+      }
     },
     {
       "id": "jvt_CVFC1_Sony_C",
@@ -544,7 +632,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVFC1_Sony_C.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -559,9 +646,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "99aa2f1501cd1ca8af1a292bb1f1f1cb49e6189a3131bc5bc8168b3dd322905a",
+      "size_bytes": 14606675,
+      "extract": {
+        "archive": "zip",
+        "member": "CVFC1_Sony_C.jsv"
+      }
     },
     {
       "id": "jvt_FM1_BT_B",
@@ -570,7 +663,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/FM1_BT_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -585,10 +677,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "9e8de6bc7e87eef28f603a089438eb50c7af542d3958253cbf2c1f1ef05e816f",
+      "size_bytes": 10828694,
+      "extract": {
+        "archive": "zip",
+        "member": "FM1_BT_B.h264"
+      }
     },
     {
       "id": "jvt_aud_mw_e",
@@ -597,7 +695,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/aud_mw_e.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -614,7 +711,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "ecaed4a05d02c8ffc0ec7dd02a640f87ba9d9f8c2dab3273ef1d6da3d7f8568e",
+      "size_bytes": 3151402,
+      "extract": {
+        "archive": "zip",
+        "member": "AUD_MW_E.264"
+      }
     },
     {
       "id": "jvt_MIDR_MW_D",
@@ -623,7 +726,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/MIDR_MW_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -638,7 +740,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "69e7d04bd4b782f93401b12b79d58a96b39319d932743af8bc7134c752d6b577",
+      "size_bytes": 3174584,
+      "extract": {
+        "archive": "zip",
+        "member": "MIDR_MW_D.264"
+      }
     },
     {
       "id": "jvt_LS_SVA_D",
@@ -647,7 +755,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/LS_SVA_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -660,9 +767,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "b34a28852630abe770b680dbd7e0c619a01eacfffd2d928ab4aff3bc76746796",
+      "size_bytes": 58030932,
+      "extract": {
+        "archive": "zip",
+        "member": "LS_SVA_D.264"
+      }
     },
     {
       "id": "jvt_CVSE3_Sony_H",
@@ -671,7 +784,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVSE3_Sony_H.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -689,7 +801,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "8866d96f4531296bdf45f2f1ba30b54f8635255625fc42069fa5dd87f5e152d7",
+      "size_bytes": 18639074,
+      "extract": {
+        "archive": "zip",
+        "member": "CVSE3_Sony_H.jsv"
+      }
     },
     {
       "id": "jvt_CVSEFDFT3_Sony_E",
@@ -698,7 +816,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVSEFDFT3_Sony_E.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -714,9 +831,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "b98a88904113f1ed59271168fbcdd54fec7bde63eaf869bdcada9fe4752be4b5",
+      "size_bytes": 18805508,
+      "extract": {
+        "archive": "zip",
+        "member": "CVSEFDFT3_Sony_E.jsv"
+      }
     },
     {
       "id": "jvt_MR6_BT_B",
@@ -725,7 +848,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/MR6_BT_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -745,7 +867,13 @@
         "fast",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "6d854331b7fefdc3c644bab4378a738bc0af6e981623e5a5b65b6401692f3310",
+      "size_bytes": 4695432,
+      "extract": {
+        "archive": "zip",
+        "member": "MR6_BT_B.h264"
+      }
     },
     {
       "id": "jvt_MR9_BT_B",
@@ -754,7 +882,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/MR9_BT_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -773,7 +900,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "fd10a0be32f6fbe5d35e4a4b73707af97b3d8c1999bc5680c53d7068c20bf72e",
+      "size_bytes": 2509338,
+      "extract": {
+        "archive": "zip",
+        "member": "MR9_BT_B.h264"
+      }
     },
     {
       "id": "jvt_CVPCMNL1_SVA_C",
@@ -782,7 +915,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVPCMNL1_SVA_C.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -799,7 +931,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "4d7d78a590acaf36f197d746c122281f3c0629abcb964471215b17e8c39f41d8",
+      "size_bytes": 14837110,
+      "extract": {
+        "archive": "zip",
+        "member": "CVPCMNL1_SVA_C.264"
+      }
     },
     {
       "id": "jvt_CVPA1_TOSHIBA_B",
@@ -808,7 +946,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVPA1_TOSHIBA_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -823,9 +960,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "6f349eb8fae64ed2c8e00ba8b8e194ef32b1ebc498f47c348687b6ac7da3c9b3",
+      "size_bytes": 15371660,
+      "extract": {
+        "archive": "zip",
+        "member": "CVPA1_TOSHIBA_B.264"
+      }
     },
     {
       "id": "jvt_CVFI1_Sony_D",
@@ -834,7 +977,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVFI1_Sony_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -849,9 +991,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "880545a19b8a9c002c26dabccfd679ebbea624bc7d1104d6a8aa653d96913f7b",
+      "size_bytes": 18175515,
+      "extract": {
+        "archive": "zip",
+        "member": "CVFI1_Sony_D.jsv"
+      }
     },
     {
       "id": "jvt_CAQP1_Sony_B",
@@ -860,7 +1008,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CAQP1_Sony_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -875,10 +1022,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "1b2055d67af3861da9fdb05ce140d79645b454f369fc62a41f64a9ce2b21e8a7",
+      "size_bytes": 9999745,
+      "extract": {
+        "archive": "zip",
+        "member": "CAQP1_Sony_B.jsv"
+      }
     },
     {
       "id": "jvt_CABAST3_Sony_E",
@@ -887,7 +1040,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CABAST3_Sony_E.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -903,10 +1055,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "8271a1756ccfd7b434f189e1aaa8144d3ca026531f4d2b58759ae7300c1c9d68",
+      "size_bytes": 20390390,
+      "extract": {
+        "archive": "zip",
+        "member": "CABAST3_Sony_E.jsv"
+      }
     },
     {
       "id": "jvt_CVFC1_SVA_C",
@@ -942,7 +1100,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/FRExt1_Panasonic_D.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -961,7 +1118,13 @@
         "fast",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "832ea7fae6fe6296c3f0377585a24cb3bf73fbfb51a3adbd852cf571a95ae16d",
+      "size_bytes": 1324147,
+      "extract": {
+        "archive": "zip",
+        "member": "FRExt1_Panasonic.avc"
+      }
     },
     {
       "id": "jvt_HCAFF1_HHI_B",
@@ -970,7 +1133,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/HCAFF1_HHI_B.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -990,7 +1152,13 @@
         "fast",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "70b26364f98a21fddfe1daca09549985e3309d3c2146c3d75575587e9e60582d",
+      "size_bytes": 887025,
+      "extract": {
+        "archive": "zip",
+        "member": "HCAFF1_HHI.264"
+      }
     },
     {
       "id": "jvt_HPCAFL_BRCM_C",
@@ -999,7 +1167,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/HPCAFL_BRCM_C.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -1016,10 +1183,16 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-ps-golden",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "f72207c406ec4461fe3197b5928f8095e8da1db1dd97bc8733f4faf82069abe5",
+      "size_bytes": 54372573,
+      "extract": {
+        "archive": "zip",
+        "member": "HPCAFL_BRCM_C.264"
+      }
     },
     {
       "id": "jvt_MVCNV_1",
@@ -1055,7 +1228,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/SVC/SVCBST-1.zip",
-      "unverified": true,
       "codecs": [
         "h264"
       ],
@@ -1074,7 +1246,13 @@
         "h264-ps-golden",
         "h264-slice-golden",
         "svc"
-      ]
+      ],
+      "sha256": "ef90c1017be4f10e31ae1b34467cc635c631d09c034adda37bcdad4cfacbcdc4",
+      "size_bytes": 36906064,
+      "extract": {
+        "archive": "zip",
+        "member": "SVCBST-1/SVCBST-1.264"
+      }
     },
     {
       "id": "jctvc_AMP_A_Samsung_7",
@@ -1116,7 +1294,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/AMP_D_Hisilicon_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1133,7 +1310,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "0ceb48fd2593f3d298adfb845c09a6aaee377f243583ad980921f48eea97dc92",
+      "size_bytes": 716532,
+      "extract": {
+        "archive": "zip",
+        "member": "AMP_D_Hisilicon.bit"
+      }
     },
     {
       "id": "jctvc_CAINIT_A_SHARP_4",
@@ -1142,7 +1325,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/CAINIT_A_SHARP_4.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1158,7 +1340,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "58d66213064bac9444cf13cc2f62d6f044bdb4d8ec9488640fb86090de976b43",
+      "size_bytes": 1898631,
+      "extract": {
+        "archive": "zip",
+        "member": "CAINIT_A_SHARP_4.bit"
+      }
     },
     {
       "id": "jctvc_CONFWIN_A_Sony_1",
@@ -1167,7 +1355,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/CONFWIN_A_Sony_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1184,7 +1371,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c3c823ffb9e526f5d9506ba2f1239b1f0323572850789230d762f4e4678fc298",
+      "size_bytes": 284207,
+      "extract": {
+        "archive": "zip",
+        "member": "CONFWIN_A_Sony_1/CONFWIN_A_Sony_1.bit"
+      }
     },
     {
       "id": "jctvc_DBLK_A_SONY_4",
@@ -1218,7 +1411,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/DSLICE_A_HHI_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1236,7 +1428,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c41c1a1e1e700af201eaf4cb0d11d4361b41ba0828e80c78d1835d1de187f80c",
+      "size_bytes": 371423,
+      "extract": {
+        "archive": "zip",
+        "member": "DSLICE_A_HHI_5/DSLICE_A_HHI_5.bin"
+      }
     },
     {
       "id": "jctvc_ENTP_A_QUALCOMM_1",
@@ -1245,7 +1443,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/ENTP_A_QUALCOMM_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1262,7 +1459,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "66abdf60455ece468acf160274316c51dca3858d93a8ffce93646cbb5568fe43",
+      "size_bytes": 2624919,
+      "extract": {
+        "archive": "zip",
+        "member": "ENTP_A_Qualcomm_1.bit"
+      }
     },
     {
       "id": "jctvc_EXT_A_ericsson_4",
@@ -1271,7 +1474,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/EXT_A_ericsson_4.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1288,7 +1490,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "a70af63f710753f4157bc5de33e29c1a6622e823f50549c83a62a605fb2d7f66",
+      "size_bytes": 27780,
+      "extract": {
+        "archive": "zip",
+        "member": "EXT_A_ericsson_4.bit"
+      }
     },
     {
       "id": "jctvc_FILLER_A_Sony_1",
@@ -1297,7 +1505,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/FILLER_A_Sony_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1312,7 +1519,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "abf6cd7525378d2e1c8f32b67af01c594553c342c21dcd36ab677c3c77b528db",
+      "size_bytes": 284359,
+      "extract": {
+        "archive": "zip",
+        "member": "FILLER_A_Sony_1/FILLER_A_Sony_1.bit"
+      }
     },
     {
       "id": "jctvc_HRD_A_Fujitsu_3",
@@ -1321,7 +1534,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/HRD_A_Fujitsu_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1339,7 +1551,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "7241c304d8326ae182ae245b83eb4f95e299d0f4fe254e0e8844c56ee5d37aee",
+      "size_bytes": 147331,
+      "extract": {
+        "archive": "zip",
+        "member": "HRD_A_Fujitsu_3.bin"
+      }
     },
     {
       "id": "jctvc_INITQP_B_Sony_1",
@@ -1398,7 +1616,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/MAXBINS_A_TI_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1413,7 +1630,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "a6d1ed217b232aec8faff836c180a3368e5dd8ed3f8bf912c3527297ee89d498",
+      "size_bytes": 302251,
+      "extract": {
+        "archive": "zip",
+        "member": "MAXBINS_A_TI_5/MAXBINS_A_TI_5.bit",
+        "md5_member": "MAXBINS_A_TI_5/MAXBINS_A_TI_5_yuv.md5"
+      }
     },
     {
       "id": "jctvc_MERGE_B_TI_3",
@@ -1422,7 +1646,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/MERGE_B_TI_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1438,7 +1661,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "3caadff6efe206a4916fc77b00dee960a4abf7c0c318bc74567e978990ad6f4a",
+      "size_bytes": 16676,
+      "extract": {
+        "archive": "zip",
+        "member": "MERGE_B_TI_3/MERGE_B_TI_3.bit"
+      }
     },
     {
       "id": "jctvc_NUT_A_ericsson_5",
@@ -1447,7 +1676,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/NUT_A_ericsson_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1464,7 +1692,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "caabf3005c37b5ad7497b110f30f04ffb603fc154250058edc23da95b7c73d88",
+      "size_bytes": 302365,
+      "extract": {
+        "archive": "zip",
+        "member": "NUT_A_ericsson_5.bit"
+      }
     },
     {
       "id": "jctvc_OPFLAG_A_Qualcomm_1",
@@ -1473,7 +1707,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/OPFLAG_A_Qualcomm_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1488,7 +1721,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c48c1f9d0553a26d06d9c3090cc61e7e0f14c48c0d718d3b30eaab8872f6b8af",
+      "size_bytes": 501886,
+      "extract": {
+        "archive": "zip",
+        "member": "OPFLAG_A_Qualcomm_1.bit"
+      }
     },
     {
       "id": "jctvc_PICSIZE_A_Bossen_1",
@@ -1497,7 +1736,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/PICSIZE_A_Bossen_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1512,7 +1750,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "ffdffecff6ba03ce0220eb89e83bc3043af5953ab6864ad6acefee382e49ee7c",
+      "size_bytes": 420346,
+      "extract": {
+        "archive": "zip",
+        "member": "PICSIZE_A_Bossen_1/PICSIZE_A_Bossen_1.bin"
+      }
     },
     {
       "id": "jctvc_PMERGE_A_TI_3",
@@ -1521,7 +1765,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/PMERGE_A_TI_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1537,7 +1780,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "7d3c8f4c07c56b2f3ac943f8d93b4f68f6ef8f6f4b5ce9df6967f1162c596dfe",
+      "size_bytes": 16580,
+      "extract": {
+        "archive": "zip",
+        "member": "PMERGE_A_TI_3/PMERGE_A_TI_3.bit"
+      }
     },
     {
       "id": "jctvc_POC_A_Bossen_3",
@@ -1546,7 +1795,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/POC_A_Bossen_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1561,7 +1809,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "aec93a088b81d68d87eda99e4a0e64bed7012b571158c8a2242223d1f9db8ccd",
+      "size_bytes": 86243,
+      "extract": {
+        "archive": "zip",
+        "member": "POC_A_Bossen_3/POC_A_Bossen_3.bin"
+      }
     },
     {
       "id": "jctvc_PPS_A_qualcomm_7",
@@ -1570,7 +1824,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/PPS_A_qualcomm_7.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1585,7 +1838,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "39058b857df8d60c92135e1ae32a5e09b1ee76be6ed06e19014d2dc18c6df778",
+      "size_bytes": 407388,
+      "extract": {
+        "archive": "zip",
+        "member": "PPS_A_qualcomm_7/PPS_A_qualcomm_7.bit"
+      }
     },
     {
       "id": "jctvc_RAP_A_docomo_6",
@@ -1594,7 +1853,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RAP_A_docomo_6.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1612,7 +1870,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "5031bac0b1520ed826bf3112d000e59c76677c01dee706738af0d206cde031be",
+      "size_bytes": 111169,
+      "extract": {
+        "archive": "zip",
+        "member": "RAP_A_docomo_6.bit"
+      }
     },
     {
       "id": "jctvc_RPS_A_docomo_5",
@@ -1621,7 +1885,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_A_docomo_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1638,7 +1901,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "45427f66400a033e7a47cc6ca9b21d456e9e06450db6ca8d8fa92c438125324b",
+      "size_bytes": 66960,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_A_docomo_5.bit"
+      }
     },
     {
       "id": "jctvc_SAO_A_MediaTek_4",
@@ -1647,7 +1916,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/SAO_A_MediaTek_4.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1665,7 +1933,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "e0b5c8f4ab4fb592971f06469db630d9e7ef72b4d37d729604e2fdaa9df706c9",
+      "size_bytes": 52930,
+      "extract": {
+        "archive": "zip",
+        "member": "SAO_A_MediaTek_4.bit"
+      }
     },
     {
       "id": "jctvc_SDH_A_Orange_4",
@@ -1674,7 +1948,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/SDH_A_Orange_4.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1689,7 +1962,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "ddf41877f10b47bad946712954e4a4b35cae435bac187d8c404c6bcfcb4acad0",
+      "size_bytes": 1099127,
+      "extract": {
+        "archive": "zip",
+        "member": "SDH_A_Orange_4/SDH_A_Orange_4.bit",
+        "md5_member": "SDH_A_Orange_4/SDH_A_Orange_4_yuv.md5"
+      }
     },
     {
       "id": "jctvc_SLIST_A_Sony_5",
@@ -1698,7 +1978,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/SLIST_A_Sony_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1715,7 +1994,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c51997394e58293b6bedbc5493056fee1b0e7fd41e266468d6a4664b1699b568",
+      "size_bytes": 338351,
+      "extract": {
+        "archive": "zip",
+        "member": "SLIST_A_Sony_5/SLIST_A_Sony_5.bin",
+        "md5_member": "SLIST_A_Sony_5/SLIST_A_Sony_5_yuv.md5"
+      }
     },
     {
       "id": "jctvc_STRUCT_B_Samsung_7",
@@ -1724,7 +2010,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/STRUCT_B_Samsung_7.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1739,7 +2024,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "d2ddaebfefdd2e6189030f75d88b351c027aaabed3cd71ce6752b44f120f2078",
+      "size_bytes": 325036,
+      "extract": {
+        "archive": "zip",
+        "member": "STRUCT_B_Samsung_7.bin"
+      }
     },
     {
       "id": "jctvc_TILES_B_Cisco_1",
@@ -1748,7 +2039,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/TILES_B_Cisco_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1766,7 +2056,14 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "75b3c9b2981cda59d497750322cde7ca23d6cef39fa9a8e11f36926758b7f83b",
+      "size_bytes": 529009,
+      "extract": {
+        "archive": "zip",
+        "member": "TILES_B_Cisco_1/TILES_B_Cisco_1.bin",
+        "md5_member": "TILES_B_Cisco_1/TILES_B_Cisco_1_yuv.md5"
+      }
     },
     {
       "id": "jctvc_TSCL_A_VIDYO_5",
@@ -1775,7 +2072,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/TSCL_A_VIDYO_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1792,7 +2088,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "987ff999aac9b3c9828763b9aeb67a393ef32dede683356f2702f2686c905313",
+      "size_bytes": 48346,
+      "extract": {
+        "archive": "zip",
+        "member": "TSCL_A_VIDYO_5/TSCL_A_VIDYO_5.bit",
+        "md5_member": "TSCL_A_VIDYO_5/TSCL_A_VIDYO_5_yuv.md5"
+      }
     },
     {
       "id": "jctvc_WP_A_Toshiba_3",
@@ -1801,7 +2104,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/WP_A_Toshiba_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1818,7 +2120,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "1eb0245131b15b10e671eff84e9c04e1f7413136908cf2120a8eac4ae2e2a1a2",
+      "size_bytes": 739017,
+      "extract": {
+        "archive": "zip",
+        "member": "WP_A_Toshiba_3.bit",
+        "md5_member": "WP_A_Toshiba_3_yuv.md5"
+      }
     },
     {
       "id": "jctvc_WPP_A_ericsson_MAIN10_2",
@@ -1827,7 +2136,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/WPP_A_ericsson_MAIN10_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1845,7 +2153,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "1827b7111a9ce76f6c04332b61cd24d9daf818fd203aa1d0b7d1087b9b83a6aa",
+      "size_bytes": 6838327,
+      "extract": {
+        "archive": "zip",
+        "member": "WPP_A_ericsson_MAIN10_2.bit",
+        "md5_member": "WPP_A_ericsson_MAIN10_yuv.md5"
+      }
     },
     {
       "id": "jctvc_VPSID_A_VIDYO_2",
@@ -1854,7 +2169,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/VPSID_A_VIDYO_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1869,7 +2183,14 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c7fe4e7c81b22146930b3840cf11eef02d8da4328ea2428d9107d8dd53dd75aa",
+      "size_bytes": 25106,
+      "extract": {
+        "archive": "zip",
+        "member": "VPSID_A_VIDYO_2/VPSID_A_VIDYO_2.bit",
+        "md5_member": "VPSID_A_VIDYO_2/VPSID_A_VIDYO_2_yuv.md5"
+      }
     },
     {
       "id": "jctvc_Main_422_10_A_RExt_Sony_2",
@@ -1878,7 +2199,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/Main_422_10_A_RExt_Sony_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1897,7 +2217,13 @@
       "tags": [
         "fast",
         "rext"
-      ]
+      ],
+      "sha256": "7618ccc9c836eec9a981910f4e0e46dc36936d620755857005cf6f85bbd5cc84",
+      "size_bytes": 1944916,
+      "extract": {
+        "archive": "zip",
+        "member": "Main_422_10_A_RExt_Sony_2/Main_422_10_A_RExt_Sony_2.bin"
+      }
     },
     {
       "id": "jctvc_GENERAL_444_8bit_RExt_Sony_2",
@@ -1934,7 +2260,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/WPP_A_ericsson_MAIN_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1952,7 +2277,14 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "81c601e9301ba5f562ebf9918e73d1c7153e0a6fe8fa4509f61035a212188216",
+      "size_bytes": 4110130,
+      "extract": {
+        "archive": "zip",
+        "member": "WPP_A_ericsson_MAIN_2.bit",
+        "md5_member": "WPP_A_ericsson_MAIN_2_yuv.md5"
+      }
     },
     {
       "id": "jctvc_RAP_B_Bossen_2",
@@ -1961,7 +2293,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RAP_B_Bossen_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -1980,7 +2311,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "162e16fa34535085f58a3128782a820ae41430281508ab0a7ef036a0d7cf4707",
+      "size_bytes": 120428,
+      "extract": {
+        "archive": "zip",
+        "member": "RAP_B_Bossen_2.bit"
+      }
     },
     {
       "id": "jctvc_TSKIP_A_MS_3",
@@ -1989,7 +2326,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/TSKIP_A_MS_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2007,7 +2343,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "7f09bd323228975260b14c1b8e92cb15341771b29addd71cc0c2471d5e070a80",
+      "size_bytes": 6969739,
+      "extract": {
+        "archive": "zip",
+        "member": "TSKIP_A_MS_3.bit"
+      }
     },
     {
       "id": "jctvc_MVCLIP_A_qualcomm_3",
@@ -2016,7 +2358,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/MVCLIP_A_qualcomm_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2033,7 +2374,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "59362bb9db5ead0245ec7ff1e40d2ddd80eb81d03bb5cceb6d4a971210888221",
+      "size_bytes": 100255,
+      "extract": {
+        "archive": "zip",
+        "member": "MVCLIP_A_qualcomm_3/MVCLIP_A_qualcomm_3.bit"
+      }
     },
     {
       "id": "jctvc_MVEDGE_A_qualcomm_3",
@@ -2042,7 +2389,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/MVEDGE_A_qualcomm_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2059,7 +2405,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "077887906b30e89aec88d09ff99e549fa1c99067a4f66a264a0ef03fd5f57f5e",
+      "size_bytes": 52420,
+      "extract": {
+        "archive": "zip",
+        "member": "MVEDGE_A_qualcomm_3/MVEDGE_A_qualcomm_3.bit"
+      }
     },
     {
       "id": "jctvc_NoOutPrior_A_Qualcomm_1",
@@ -2068,7 +2420,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/NoOutPrior_A_Qualcomm_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2085,7 +2436,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "f1d17de98fc0d69bc28793f74d5b31c5c113ba2c72983bfad03413459b95a07f",
+      "size_bytes": 140200,
+      "extract": {
+        "archive": "zip",
+        "member": "NoOutPrior_A_Qualcomm_1.bit"
+      }
     },
     {
       "id": "jctvc_ipcm_A_NEC_3",
@@ -2094,7 +2451,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/ipcm_A_NEC_3.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2112,7 +2468,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "89a71f4b9b7e22c481378f83bacc5aac6c8f204999691d3fa21f2804337e84c9",
+      "size_bytes": 6037,
+      "extract": {
+        "archive": "zip",
+        "member": "ipcm_A_NEC_3/ipcm_A_NEC_3.bit"
+      }
     },
     {
       "id": "jctvc_RPS_B_qualcomm_5",
@@ -2121,7 +2483,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_B_qualcomm_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2138,7 +2499,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "1925e1a9867b5380395af9b2b52a4b1f2c0ccfa5c62abb330c481fa26aca5307",
+      "size_bytes": 220876,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_B_qualcomm_5/RPS_B_qualcomm_5.bit"
+      }
     },
     {
       "id": "jctvc_RPS_C_ericsson_5",
@@ -2147,7 +2514,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_C_ericsson_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2164,7 +2530,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "72eaf0e85d1f5809a1b1ebe2051a171c4361ae39fa206e198b69eb9972795459",
+      "size_bytes": 354979,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_C_ericsson_5.bit"
+      }
     },
     {
       "id": "jctvc_RPS_D_ericsson_6",
@@ -2173,7 +2545,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_D_ericsson_6.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2190,7 +2561,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "ad3a34befc07b88538442859c2c7a4faa96ad8e48875f0189b93875bb7fef302",
+      "size_bytes": 561804,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_D_ericsson_6.bit"
+      }
     },
     {
       "id": "jctvc_RPS_E_qualcomm_5",
@@ -2199,7 +2576,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_E_qualcomm_5.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2216,7 +2592,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "74f59448bb458875bc8081bd724de999902e7422fd77b74a7ca1c48381d9e96a",
+      "size_bytes": 436970,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_E_qualcomm_5/RPS_E_qualcomm_5.bit"
+      }
     },
     {
       "id": "jctvc_RPS_F_docomo_2",
@@ -2225,7 +2607,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/RPS_F_docomo_2.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2242,7 +2623,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "db62853318f3a7bc5af8b3fb193fbc1f7e2384353dfe184c75dd678e7543b2f1",
+      "size_bytes": 80776,
+      "extract": {
+        "archive": "zip",
+        "member": "RPS_F_docomo_2.bit"
+      }
     },
     {
       "id": "jctvc_Bitdepth_A_RExt_Sony_1",
@@ -2251,7 +2638,6 @@
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
       "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/Bitdepth_A_RExt_Sony_1.zip",
-      "unverified": true,
       "codecs": [
         "h265"
       ],
@@ -2270,7 +2656,13 @@
       "tags": [
         "fast",
         "rext"
-      ]
+      ],
+      "sha256": "34967e2047d59b0f3e96e7501712a056c01f369501d812b170c717ce1d417368",
+      "size_bytes": 35522,
+      "extract": {
+        "archive": "zip",
+        "member": "Bitdepth_A_RExt_Sony_1/Bitdepth_A_RExt_Sony_1.bin"
+      }
     },
     {
       "id": "aom_av1_1_b8_01_size_16x16",
@@ -16069,7 +16461,7 @@
         "uvq"
       ],
       "tags": [
-        "fast"
+        "slow"
       ]
     },
     {
@@ -16640,7 +17032,6 @@
       "licence": "DASH-IF test assets: free for conformance/interop testing; not redistributable",
       "licence_spdx": "LicenseRef-DASHIF-Test-Assets",
       "redistributable": false,
-      "unverified": true,
       "url": "https://dash.akamaized.net/akamai/bbb_30fps/bbb_30fps.mpd",
       "containers": [
         "mpd"
@@ -16648,7 +17039,9 @@
       "tags": [
         "slow"
       ],
-      "note": "needs the mpd_localize post step (not implemented, #161)"
+      "note": "needs the mpd_localize post step (not implemented, #161)",
+      "sha256": "aec9278b5494bc2a91a3659aa680e33f0c42111d179845baa92eadb562cf1e86",
+      "size_bytes": 3060
     },
     {
       "id": "apple_bipbop_adv_hevc",
@@ -16656,7 +17049,6 @@
       "licence": "Apple HLS sample content, for testing; not redistributable",
       "licence_spdx": "LicenseRef-Apple-HLS-Examples",
       "redistributable": false,
-      "unverified": true,
       "url": "https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_fmp4/master.m3u8",
       "containers": [
         "hls"
@@ -16664,7 +17056,9 @@
       "tags": [
         "fast"
       ],
-      "note": "needs the hls_localize post step (not implemented, #161)"
+      "note": "needs the hls_localize post step (not implemented, #161)",
+      "sha256": "0bea46a8a069e3b9de0e34a58b027e3432d58eacc6cd9619a68c17563372b8f9",
+      "size_bytes": 6291
     },
     {
       "id": "apple_bipbop_adv_avc",

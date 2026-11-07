@@ -82,8 +82,23 @@ check ldecod trace_dec.txt ldecod -p InputFile=syn_h264.264 -p OutputFile=ldecod
 check TAppDecoder hm.yuv TAppDecoder -b syn_h265_amp_sao_on.265 -o hm.yuv
 check TAppDecoder_trace TraceDec.txt TAppDecoder_trace -b syn_h265_amp_sao_on.265 -o /dev/null \
   --SEIDecodedPictureHash=1
+# WI-0.563 acceptance 2: an MBAFF stream (x264 --interlaced) decoded by the TRACE build names mb_field_decoding_flag.
+check x264_mbaff syn_h264_mbaff.264 x264 --preset fast --interlaced --frames 5 --output syn_h264_mbaff.264 \
+  src_720p_8bit.y4m
+check ldecod_mbaff - sh -c 'ldecod -p InputFile=syn_h264_mbaff.264 -p OutputFile=ldecod_mbaff.yuv -p RefOffset=0 \
+  -p POCScale=2 -p WriteUV=1 -p SilentDecode=1 && grep -m1 mb_field_decoding_flag trace_dec.txt'
+check ffmpeg_mvs - ffmpeg_mvs syn_h264.264
+check ffmpeg_mvs_qp ffmpeg_qp.csv ffmpeg_mvs --qp ffmpeg_qp.csv syn_h264.264
+check hm_cu_dump - hm_cu_dump -b syn_h265_amp_sao_on.265
+# The encoder configs of the {jm_cfg} and {hm_cfg} recipes (tests/corpora/synthetic/generate.py).
+check jm_cfg - ls "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/jm/cfg/encoder_main.cfg"
+check hm_cfg - ls "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/hm/cfg/encoder_randomaccess_main.cfg" \
+  "${OVT_ORACLES_PREFIX:-/opt/ovt-oracles}/share/hm/cfg/encoder_lowdelay_main.cfg"
 check inspect - inspect -A -a syn_av1.ivf
 check dav1d dav1d.y4m dav1d -q -i syn_av1.ivf -o dav1d.y4m
+
+# --- every tool, pin and FFmpeg component the synthetic corpus recipes use (recipe_tools.json, WI-0.553) --------
+check recipe_tools - oracle-recipe-tools --check
 
 # --- §14.4.10-14.4.15 metric and render oracles ------------------------------------------------------------
 check ffpsnr ffpsnr.txt ff -i dist.y4m -i src_720p_8bit.y4m -lavfi "[0:v][1:v]psnr=stats_file=ffpsnr.txt" -f null -
