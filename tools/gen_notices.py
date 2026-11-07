@@ -72,7 +72,17 @@ class UsageError(Exception):
 
 # CMake target or library names of the manifest -> the port / dependency they come from, where stripping the
 # namespace and `lib` prefix is not enough.
-ALIASES = {"hwy": "highway", "libzstd_static": "zstd", "libzstd_shared": "zstd"}
+ALIASES = {
+    "hwy": "highway",
+    "libzstd_static": "zstd",
+    "libzstd_shared": "zstd",
+    # The prebuilt ONNX Runtime has one VERSIONS.md row per archive (third_party/onnxruntime.cmake) but is one component,
+    # named after its CMake target tp::onnxruntime.
+    "onnx_runtime": "onnxruntime",
+    "onnx_runtime_linux_aarch64": "onnxruntime",
+    "onnx_runtime_osx_arm64": "onnxruntime",
+    "onnx_runtime_osx_x86_64": "onnxruntime",
+}
 
 
 def key_of(name: str) -> str:
@@ -133,7 +143,7 @@ def read_pins(path: Path, root: Path) -> dict[str, dict]:
         patches = []
         for p in re.findall(r"[^\s,`]+\.patch", cells[i_patch]):
             patches.append((Path(p).name, upstream_status(root / p)))
-        pins[key_of(cells[i_name])] = {"url": m.group(0) if m else "", "patches": patches}
+        pins.setdefault(key_of(cells[i_name]), {"url": m.group(0) if m else "", "patches": patches})
     return pins
 
 

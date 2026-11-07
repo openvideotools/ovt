@@ -79,6 +79,7 @@ the `v3.0.0` tag, so it reports the pinned commit's short hash.
 | siti-tools | 0.6.0 | [`requirements.txt`](requirements.txt) | MIT | `python-package:siti-tools` | `0.6.0` |
 | scikit-image | 0.26.0 | [`requirements.txt`](requirements.txt) (for `dump_ciede2000`) | BSD-3-Clause | `python-package:scikit-image` | `0.26.0` |
 | y4m | 1.1.1 | [`requirements.txt`](requirements.txt) (for `dump_ciede2000`) | Apache-2.0 | `python-package:y4m` | `1.1.1` |
+| flatbuffers | 25.12.19 | [`requirements.txt`](requirements.txt) (for `tools/gen_fixture_fb.py`) | Apache-2.0 | `python-package:flatbuffers` | `25.12.19` |
 <!-- oracle-versions:end -->
 
 `gst_parse_oracle` (WI-0.562), `hm_cu_dump` and `ffmpeg_mvs` (WI-0.563) are built from the sources in this directory.

@@ -107,11 +107,62 @@ def convert(args: argparse.Namespace) -> list[dict[str, Any]]:
     if unknown:
         raise canon.NormalizeError(f"CBS names not in cbs_name_map.json ({codec}): {', '.join(sorted(unknown))}")
     out.sort(key=lambda e: (e["unit"], e["bit_offset"]))
+    if args.epb_offsets:
+        if codec == "av1":
+            raise canon.NormalizeError("--epb-offsets is for H.26x streams")
+        add_file_offsets(out, Path(args.epb_offsets).read_bytes())
     return out
+
+
+def annexb_units(data: bytes) -> list[tuple[int, list[int]]]:
+    """Annex B byte stream -> per NAL unit ``(file offset of the NAL header byte, raw indices of its EPBs)``.
+
+    A NAL unit ends at the next ``00 00 01`` (the zero bytes before a start code belong to the start code or are
+    trailing_zero_8bits). An emulation-prevention byte is a ``03`` that follows two zero bytes inside the unit.
+    """
+    starts = [m.end() for m in re.finditer(rb"\x00\x00\x01", data)]
+    units = []
+    for n, begin in enumerate(starts):
+        end = starts[n + 1] - 3 if n + 1 < len(starts) else len(data)
+        while end > begin and data[end - 1] == 0:
+            end -= 1
+        epbs, zeros = [], 0
+        for i in range(begin, end):
+            if zeros >= 2 and data[i] == 3:
+                epbs.append(i - begin)
+                zeros = 0
+                continue
+            zeros = zeros + 1 if data[i] == 0 else 0
+        units.append((begin, epbs))
+    return units
+
+
+# SPEC-ASSUMPTION(#94): --epb-offsets adds file_byte / file_bit to every element; the unit index is the index of
+# the NAL unit in the Annex B stream (the ES the elements were traced from).
+def add_file_offsets(elements: list[dict[str, Any]], stream: bytes) -> None:
+    units = annexb_units(stream)
+    for e in elements:
+        if e["unit"] >= len(units):
+            raise canon.NormalizeError(f"unit {e['unit']} is not in the Annex B stream ({len(units)} units)")
+        begin, epbs = units[e["unit"]]
+        raw = e["bit_offset"] // 8
+        for epb in epbs:
+            if epb <= raw:
+                raw += 1
+            else:
+                break
+        e["file_byte"] = begin + raw
+        e["file_bit"] = e["bit_offset"] % 8
 
 
 def add_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--codec", required=True, choices=sorted(UNIT_START) + sorted(CODEC_ALIASES))
+    parser.add_argument(
+        "--epb-offsets",
+        metavar="ES",
+        help="H.26x Annex B stream the log was traced from: add file_byte / file_bit (the position of each element's "
+        "first bit in the file, emulation-prevention bytes included)",
+    )
     parser.add_argument(
         "--include-extradata", action="store_true", help="also emit the units of the Extradata / Side data blocks"
     )

@@ -1,0 +1,231 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["mp42","isom"],
+   "major_brand": "mp42",
+   "minor_version": 0
+  },
+  "path": "ftyp",
+  "size": 24
+ },
+ {
+  "path": "moov",
+  "size": 835
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-30T23:11:12Z",
+   "duration": 614,
+   "flags": 0,
+   "modification_time": "2006-05-30T23:11:12Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/iods",
+  "size": 33
+ },
+ {
+  "path": "moov/trak",
+  "size": 646
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-30T23:11:12Z",
+   "duration": 614,
+   "flags": 7,
+   "modification_time": "2006-05-30T23:11:12Z",
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 546
+ },
+ {
+  "fields": {
+   "creation_time": "2006-05-30T23:11:12Z",
+   "flags": 0,
+   "language": "und",
+   "modification_time": "2006-05-30T23:11:12Z",
+   "timescale": 48000,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "soun",
+   "name": "soun",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 37
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 469
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/smhd",
+  "size": 16
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 409
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 113
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/mp4a",
+  "size": 97
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/mp4a/esds",
+  "size": 61
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 212
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 24
+ },
+ {
+  "path": "moov/mvex",
+  "size": 40
+ },
+ {
+  "fields": {
+   "default_sample_description_index": 1,
+   "default_sample_duration": 1024,
+   "default_sample_flags": 0,
+   "default_sample_size": 25,
+   "flags": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moov/mvex/trex",
+  "size": 32
+ },
+ {
+  "path": "mdat[1]",
+  "size": 1208
+ },
+ {
+  "path": "moof",
+  "size": 92
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 1,
+   "version": 0
+  },
+  "path": "moof/mfhd",
+  "size": 16
+ },
+ {
+  "path": "moof/traf",
+  "size": 68
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moof/traf/tfhd",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sample_count": 24,
+   "version": 0
+  },
+  "path": "moof/traf/trun[1]",
+  "size": 16
+ },
+ {
+  "fields": {
+   "data_offset": 600,
+   "flags": 1,
+   "sample_count": 24,
+   "version": 0
+  },
+  "path": "moof/traf/trun[2]",
+  "size": 20
+ },
+ {
+  "path": "mdat[2]",
+  "size": 1208
+ }
+]

@@ -23,6 +23,13 @@ target_include_directories(
   ovt_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE "${OVT_GENERATED_DIR}")
 target_link_libraries(ovt_core PRIVATE ovt::flags)
+# A sanitized libovt_core calls into the sanitizer runtime, which Clang on Linux links only into executables, not
+# into shared libraries. An installed consumer must therefore link with the same -fsanitize flags, so the exported
+# target carries them as a usage requirement (OVT_INSTALL_SANITIZER_LINK_FLAGS, cmake/OvtTesting.cmake). In-tree
+# targets get the plain flags from ovt::flags already.
+if(OVT_INSTALL_SANITIZER_LINK_FLAGS)
+  target_link_options(ovt_core INTERFACE "$<INSTALL_INTERFACE:${OVT_INSTALL_SANITIZER_LINK_FLAGS}>")
+endif()
 add_dependencies(ovt_core ovt_version_header)
 
 # Platform id in the preset spelling (linux-x64, macos-arm64, macos-x86_64, android-arm64, ...).
