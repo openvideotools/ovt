@@ -1,9 +1,9 @@
-# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
-# SPDX-License-Identifier: LGPL-2.1-or-later
-#
-# cppcheck suppressions (chapter 14 §14.8.4, WI-0.559). One line per suppression, each with a comment
-# naming why. Prefer an inline `// cppcheck-suppress <id>` next to the code (--inline-suppr is on).
-# Format: <id>[:<file glob>[:<line>]]
-#
-# Third-party code is never analysed: the nightly job only passes OVT translation units.
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// cppcheck suppressions (chapter 14 §14.8.4, WI-0.559). One line per suppression, each with a comment
+// naming why. Prefer an inline `// cppcheck-suppress <id>` next to the code (--inline-suppr is on).
+// Format: <id>[:<file glob>[:<line>]]
+//
+// Third-party code is never analysed: the nightly job only passes OVT translation units.
 missingIncludeSystem

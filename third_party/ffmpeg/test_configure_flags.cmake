@@ -52,7 +52,7 @@ foreach(platform linux macos android)
     expect_has("${f}" --disable-gpl "${ctx}")
     expect_has(
       "${f}"
-      --disable-decoder=h264,hevc,h264_mediacodec,hevc_mediacodec,vvc,aac,aac_fixed,aac_latm,aac_at,aac_mediacodec,mpeg4,mpeg4_mediacodec,vc1,vc1image,wmv3,wmv3image
+      --disable-decoder=h264,hevc,h264_mediacodec,hevc_mediacodec,vvc,aac,aac_fixed,aac_latm,aac_at,aac_mediacodec,mpeg4,mpeg4_mediacodec,msmpeg4v1,msmpeg4v2,msmpeg4v3,wmv1,wmv2,vc1,vc1image,wmv3,wmv3image
       "${ctx}")
     expect_has(
       "${f}"
@@ -87,7 +87,7 @@ foreach(platform linux macos android)
     expect_not("${f}" "^--build-suffix" "${ctx}")
     expect_not("${f}" "^--enable-encoder" "${ctx}")
     expect_not("${f}" "^--enable-libdav1d" "${ctx}")
-    expect_not("${f}" "vvc|aac|mpeg4|vc1|wmv3" "${ctx}")
+    expect_not("${f}" "vvc|aac|mpeg4|vc1|wmv" "${ctx}")
     if(platform STREQUAL "android" AND hw)
       expect_has("${f}" --enable-decoder=h264,hevc,h264_mediacodec,hevc_mediacodec "${ctx}")
     else()

@@ -27,7 +27,11 @@ TEST_CASE("libplacebo creates a Vulkan device", "[fast][third_party][vulkan]") {
   pl_log log = pl_log_create(PL_API_VER, &params);
   REQUIRE(log != nullptr);
 
-  pl_vulkan vk = pl_vulkan_create(log, nullptr);
+  // libplacebo rejects software rasterizers (lavapipe) unless allow_software is set, so the defaults find no device
+  // on a GPU-less Linux CI host even though the ICD is registered.
+  struct pl_vulkan_params vk_params = pl_vulkan_default_params;
+  vk_params.allow_software = true;
+  pl_vulkan vk = pl_vulkan_create(log, &vk_params);
   if (vk == nullptr) {
     pl_log_destroy(&log);
     SKIP("no Vulkan device available on this host");
