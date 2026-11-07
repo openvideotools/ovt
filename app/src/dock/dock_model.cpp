@@ -367,7 +367,9 @@ std::optional<Layout> fromJsonObject(const QJsonObject& object, QString* error) 
     fail(error, QStringLiteral("'groups' must be an array"));
     return std::nullopt;
   }
-  for (const auto& value : groups.toArray()) {
+  // By value: QJsonArray's iterators yield temporaries (-Wrange-loop-bind-reference on Apple clang).
+  const QJsonArray groupArray = groups.toArray();
+  for (const QJsonValue value : groupArray) {
     const QJsonObject g = value.toObject();
     const std::optional<DockArea> area = parseArea(g.value(QLatin1StringView("area")).toString());
     const QJsonValue ids = g.value(QLatin1StringView("panelIds"));
@@ -379,9 +381,11 @@ std::optional<Layout> fromJsonObject(const QJsonObject& object, QString* error) 
                     .panelIds = {},
                     .currentIndex = g.value(QLatin1StringView("currentIndex")).toInt(0),
                     .sizeFraction = g.value(QLatin1StringView("sizeFraction")).toDouble(1.0)};
-    for (const auto& id : ids.toArray()) {
-      if (findPanel(id.toString()) != nullptr) {  // unknown ids (a newer version's panels) are dropped
-        group.panelIds.append(id.toString());
+    const QJsonArray idArray = ids.toArray();
+    for (const QJsonValue idValue : idArray) {
+      const QString id = idValue.toString();
+      if (findPanel(id) != nullptr) {  // unknown ids (a newer version's panels) are dropped
+        group.panelIds.append(id);
       }
     }
     layout.groups.append(group);
