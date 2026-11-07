@@ -13,6 +13,7 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <libplacebo/gpu.h>
 #include <libplacebo/log.h>
