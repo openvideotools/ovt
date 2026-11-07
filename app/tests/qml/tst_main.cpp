@@ -6,22 +6,16 @@
 
 #include <QtQuickTest/quicktest.h>
 #include <QObject>
-#include <QQmlEngine>
 #include <QQuickStyle>
 #include <QTemporaryDir>
 #include <QtGlobal>
 
 #include "platform/platform.h"
-#include "project.h"
 
 class Setup : public QObject {
   Q_OBJECT
 
  public Q_SLOTS:
-  void qmlEngineAvailable(QQmlEngine* engine) {
-    engine->addImageProvider(QStringLiteral("rawpreview"), new ovt::app::RawPreviewProvider);
-  }
-
   void applicationAvailable() {
     if (config_dir_.isValid()) {
       qputenv("OVT_CONFIG_DIR", config_dir_.path().toLocal8Bit());

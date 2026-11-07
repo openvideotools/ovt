@@ -4,14 +4,13 @@
 // Tests of Project, RecentFiles and RawFormatModel (WI-1.454; chapter 11 §11.2.6, §11.8).
 //   AT1: a saved project with two files and bookmarks restores files, roles, layout, view and bookmarks.
 //   AT2: a project whose file no longer exists opens with the file in error state (GUI-PROJ-0003).
-//   AT3: changing the raw width/height/bit depth updates the preview within 200 ms; a size mismatch gives GUI-RAW-0001.
+//   AT3 (the RawFormatModel and the dialogs) is part b of this work item.
 //   AT4 (the model part): the second file opened while one is open asks for the Open-as choice.
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <QByteArray>
 #include <QDir>
-#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -27,7 +26,6 @@ namespace {
 using ovt::app::FileRole;
 using ovt::app::Project;
 using ovt::app::RawFormat;
-using ovt::app::RawFormatModel;
 using ovt::app::RecentFiles;
 
 void touch(const QString& path, const QByteArray& bytes = QByteArray(16, 'x')) {
@@ -287,49 +285,4 @@ TEST_CASE("RawFormat: frame sizes per chroma format and bit depth", "[fast][gui]
   small.width = 8;
   small.height = 4;
   CHECK(RawFormat::fromJson(small.toJson()) == small);
-}
-
-TEST_CASE("RawFormatModel: AT3 the preview follows the format within 200 ms; a mismatch gives GUI-RAW-0001",
-          "[fast][gui][project]") {
-  const QTemporaryDir dir;
-  REQUIRE(dir.isValid());
-  // Two 64x32 4:2:0 8-bit frames: luma ramps with x, chroma 128.
-  QByteArray bytes;
-  for (int frame = 0; frame < 2; ++frame) {
-    for (int y = 0; y < 32; ++y) {
-      for (int x = 0; x < 64; ++x) {
-        bytes.append(static_cast<char>(x * 4));
-      }
-    }
-    bytes.append(QByteArray(64 * 32 / 2, static_cast<char>(128)));
-  }
-  const QString path = dir.filePath(QStringLiteral("clip.yuv"));
-  touch(path, bytes);
-
-  RawFormatModel model;
-  model.setPath(path);  // default 1920x1080: far too big for the file
-  CHECK(model.diagnosticCode() == QStringLiteral("GUI-RAW-0001"));
-  CHECK(model.diagnosticMessage().contains(QStringLiteral("does not match the file size")));
-  CHECK(model.preview().isNull());
-
-  QElapsedTimer clock;
-  clock.start();
-  model.setWidth(64);
-  model.setHeight(32);
-  CHECK(clock.elapsed() < 200);
-  CHECK(model.diagnosticCode().isEmpty());
-  CHECK(model.frameCount() == 2);
-  REQUIRE_FALSE(model.preview().isNull());
-  CHECK(model.preview().size() == QSize(64, 32));
-  CHECK(qGray(model.preview().pixel(10, 5)) == 40);
-
-  const QString first_source = model.previewSource();
-  model.setBitDepth(10);  // 2 bytes per sample: one 6144-byte frame fits the 6144-byte file exactly
-  CHECK(model.previewSource() != first_source);
-  CHECK(model.diagnosticCode().isEmpty());
-  CHECK(model.frameCount() == 1);
-  model.setBitDepth(8);
-  model.setHeight(31);  // 64x31 frames are 2976 bytes: the file has 6144
-  CHECK(model.diagnosticCode() == QStringLiteral("GUI-RAW-0001"));
-  CHECK(model.diagnosticMessage().contains(QStringLiteral("6144")));
 }

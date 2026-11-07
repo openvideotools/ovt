@@ -9,8 +9,6 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonParseError>
-#include <QMutex>
-#include <QMutexLocker>
 #include <QProcess>
 #include <QSaveFile>
 #include <QUrl>
@@ -27,7 +25,6 @@ namespace ovt::app {
 namespace {
 
 constexpr int kProjectVersion = 1;
-constexpr std::uint64_t kMaxPreviewPixels = 64ULL * 1024 * 1024;
 
 QString key(const char* name) {
   return QString::fromLatin1(name);
@@ -88,9 +85,6 @@ int chroma_halves(const QString& chroma) {
   }
   return -1;
 }
-
-QMutex g_preview_mutex;
-QImage g_preview_image;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): guarded by g_preview_mutex
 
 }  // namespace
 
@@ -676,134 +670,6 @@ void RecentFiles::save() const {
   if (!write_atomic(file_, bytes)) {
     to_stderr(QStringLiteral("recent files: could not write %1").arg(file_));
   }
-}
-
-// ---- RawFormatModel
-// ----------------------------------------------------------------------------------------------------
-
-RawFormatModel::RawFormatModel(QObject* parent) : QObject(parent) {
-  format_.width = 1920;
-  format_.height = 1080;
-}
-
-void RawFormatModel::setPath(const QString& path) {
-  path_ = path;
-  update();
-}
-
-void RawFormatModel::setWidth(int width) {
-  format_.width = width;
-  update();
-}
-
-void RawFormatModel::setHeight(int height) {
-  format_.height = height;
-  update();
-}
-
-void RawFormatModel::setChromaFormat(const QString& chroma) {
-  format_.chroma_format = chroma;
-  update();
-}
-
-void RawFormatModel::setBitDepth(int bit_depth) {
-  format_.bit_depth = bit_depth;
-  update();
-}
-
-void RawFormatModel::setFps(double fps) {
-  format_.fps = fps;
-  update();
-}
-
-QString RawFormatModel::previewSource() const {
-  return QStringLiteral("image://rawpreview/%1").arg(serial_);
-}
-
-// SPEC-ASSUMPTION(#243): "expected" in GUI-RAW-0001 is the size of the whole frames that fit the file (at least one
-// frame); "actual" is the file size. A file whose size is not a multiple of the frame size raises the diagnostic.
-QString RawFormatModel::checkSize(const RawFormat& format, std::uint64_t file_size, std::uint64_t* expected) {
-  const std::uint64_t frame = format.frameSize();
-  if (frame == 0) {
-    *expected = 0;
-    return QStringLiteral("GUI-RAW-0001");
-  }
-  const std::uint64_t whole = std::max<std::uint64_t>(1, file_size / frame);
-  *expected = whole * frame;
-  return file_size % frame == 0 && file_size > 0 ? QString() : QStringLiteral("GUI-RAW-0001");
-}
-
-QImage RawFormatModel::renderPreview(const QString& path, const RawFormat& format) {
-  const std::uint64_t frame = format.frameSize();
-  const auto pixels =
-      static_cast<std::uint64_t>(std::max(0, format.width)) * static_cast<std::uint64_t>(std::max(0, format.height));
-  if (frame == 0 || pixels == 0 || pixels > kMaxPreviewPixels) {
-    return {};
-  }
-  QFile file(path);
-  if (!file.open(QIODevice::ReadOnly)) {
-    return {};
-  }
-  const bool wide = format.bit_depth > 8;
-  const QByteArray luma = file.read(static_cast<qint64>(pixels * (wide ? 2 : 1)));
-  if (static_cast<std::uint64_t>(luma.size()) < pixels * (wide ? 2 : 1)) {
-    return {};  // shorter than one luma plane
-  }
-  QImage image(format.width, format.height, QImage::Format_Grayscale8);
-  const auto* src = reinterpret_cast<const unsigned char*>(luma.constData());
-  const int shift = format.bit_depth - 8;
-  for (int y = 0; y < format.height; ++y) {
-    uchar* dst = image.scanLine(y);
-    for (int x = 0; x < format.width; ++x) {
-      const std::size_t i =
-          static_cast<std::size_t>(y) * static_cast<std::size_t>(format.width) + static_cast<std::size_t>(x);
-      dst[x] = wide ? static_cast<uchar>(std::min(255, (src[2 * i] | (src[2 * i + 1] << 8)) >> shift)) : src[i];
-    }
-  }
-  return image;
-}
-
-void RawFormatModel::update() {
-  diagnostic_code_.clear();
-  diagnostic_message_.clear();
-  frame_count_ = 0;
-  preview_ = {};
-  if (!path_.isEmpty() && QFileInfo::exists(path_)) {
-    const auto size = static_cast<std::uint64_t>(QFileInfo(path_).size());
-    std::uint64_t expected = 0;
-    diagnostic_code_ = checkSize(format_, size, &expected);
-    if (!diagnostic_code_.isEmpty()) {
-      diagnostic_message_ = QStringLiteral("raw format does not match the file size (%1 ≠ %2)").arg(expected).arg(size);
-    }
-    if (format_.frameSize() != 0) {
-      frame_count_ = static_cast<int>(size / format_.frameSize());
-    }
-    preview_ = renderPreview(path_, format_);
-  }
-  ++serial_;
-  RawPreviewProvider::publish(preview_);
-  Q_EMIT changed();
-}
-
-QImage RawPreviewProvider::requestImage(const QString& /*id*/, QSize* size, const QSize& requested_size) {
-  const QMutexLocker lock(&g_preview_mutex);
-  QImage image = g_preview_image;
-  if (image.isNull()) {
-    image = QImage(1, 1, QImage::Format_Grayscale8);
-    image.fill(0);
-  }
-  if (requested_size.isValid() && !requested_size.isEmpty()) {
-    image = image.scaled(requested_size, Qt::KeepAspectRatio, Qt::FastTransformation);
-  }
-  if (size != nullptr) {
-    *size = image.size();
-  }
-  return image;
-}
-
-void RawPreviewProvider::publish(const QImage& image) {
-  const QMutexLocker lock(&g_preview_mutex);
-  g_preview_image = image;
 }
 
 }  // namespace ovt::app
