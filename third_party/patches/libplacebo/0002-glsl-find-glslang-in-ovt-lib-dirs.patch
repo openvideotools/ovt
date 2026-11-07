@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-06
+Subject: [PATCH] glsl: search the directories in OVT_TP_LIB_DIRS for the glslang libraries
+
+meson's find_library() looks for static libraries only in the compiler's own search directories, and clang
+does not take the -L flags of a cross file into account. The glslang libraries installed in the vcpkg tree are
+therefore not found ("C++ shared library 'SPIRV' not found"). This adds a `dirs:` argument to each glslang
+find_library() call, taken from the colon-separated environment variable OVT_TP_LIB_DIRS. With the variable
+unset the behaviour is unchanged.
+
+Upstream-Status: Inappropriate [build-host specific]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: the libraries live in a dependency prefix that only our build knows; upstream expects system paths
+  or pkg-config.
+---
+ src/glsl/meson.build | 22 ++++++++++++++--------
+
+--- a/src/glsl/meson.build
++++ b/src/glsl/meson.build
+@@ -16,8 +16,15 @@
+ 
+ elif not glslang_req.disabled()
+ 
++  # OVT: the build host's search directories for the glslang libraries (the vcpkg tree), from the environment
++  ovt_lib_dirs = run_command(python, '-c',
++    'import os; print(os.environ.get("OVT_TP_LIB_DIRS", ""))', check: true).stdout().strip().split(':')
++  if ovt_lib_dirs == ['']
++    ovt_lib_dirs = []
++  endif
++
+   glslang_deps = [
+-    cxx.find_library('glslang-default-resource-limits', required: false)
++    cxx.find_library('glslang-default-resource-limits', required: false, dirs: ovt_lib_dirs)
+   ]
+ 
+   # meson doesn't respect generator expressions in INTERFACE_LINK_LIBRARIES
+@@ -31,7 +38,7 @@
+     static   = arg[0]
+     required = arg[1]
+ 
+-    spirv = cxx.find_library('SPIRV', required: required, static: static)
++    spirv = cxx.find_library('SPIRV', required: required, static: static, dirs: ovt_lib_dirs)
+ 
+     if not spirv.found()
+       continue
+@@ -42,13 +49,13 @@
+     if static
+       glslang_deps += [
+         # Always required for static linking
+-        cxx.find_library('MachineIndependent', required: false, static: true),
+-        cxx.find_library('OSDependent',        required: false, static: true),
+-        cxx.find_library('OGLCompiler',        required: false, static: true),
+-        cxx.find_library('GenericCodeGen',     required: false, static: true),
++        cxx.find_library('MachineIndependent', required: false, static: true, dirs: ovt_lib_dirs),
++        cxx.find_library('OSDependent',        required: false, static: true, dirs: ovt_lib_dirs),
++        cxx.find_library('OGLCompiler',        required: false, static: true, dirs: ovt_lib_dirs),
++        cxx.find_library('GenericCodeGen',     required: false, static: true, dirs: ovt_lib_dirs),
+         # SPIRV-Tools are required only if optimizer is enabled in glslang build
+-        cxx.find_library('SPIRV-Tools',        required: false, static: true),
+-        cxx.find_library('SPIRV-Tools-opt',    required: false, static: true),
++        cxx.find_library('SPIRV-Tools',        required: false, static: true, dirs: ovt_lib_dirs),
++        cxx.find_library('SPIRV-Tools-opt',    required: false, static: true, dirs: ovt_lib_dirs),
+       ]
+     endif
+ 

@@ -5,24 +5,862 @@ the licence gate fails when this file is stale.
 
 | Id | Source | Licence | SPDX | Redistributable |
 |---|---|---|---|---|
+| aom_av1_1_b10_00_quantizer_00 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b10_00_quantizer_10 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b10_00_quantizer_30 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b10_00_quantizer_63 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b10_23_film_grain_50 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_00_quantizer_00 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_00_quantizer_10 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_00_quantizer_30 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_00_quantizer_63 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_16x16_annexb | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_16x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_16x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_16x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_16x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_18x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_196x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_196x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_198x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_200x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_202x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_208x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_210x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_224x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x196 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x198 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x200 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x202 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x208 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x210 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_226x224 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_226x226 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_32x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_34x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_64x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_66x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_66x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_66x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_66x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_01_size_66x64 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_66x66 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_02_allintra | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_03_sizedown | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_03_sizeup | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_04_cdfupdate | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_05_mv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_06_mfmv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_16_intra_only | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_16_intra_only_intrabc_extreme_dv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_22_svc_L1T2 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_22_svc_L2T1 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_22_svc_L2T2 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1_1_b8_23_film_grain_50 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1c_vs_00 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1c_vs_01 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1c_vs_02 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| aom_av1c_vs_03 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
+| apple_bipbop_adv_avc | apple | Apple HLS sample content, for testing; not redistributable | LicenseRef-Apple-HLS-Examples | no |
+| apple_bipbop_adv_hevc | apple | Apple HLS sample content, for testing; not redistributable | LicenseRef-Apple-HLS-Examples | no |
+| bento4_audio_aac_001 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_audio_aac_002 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_audio_aac_003 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_cenc_subsample | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | bento4_frag_cenc | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_playready | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_video_h264_001 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| bento4_video_h264_002 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
+| cta_cmaf_video_cmfv | cta | CTA WAVE test content for conformance; free use; not redistributable | LicenseRef-CTA-WAVE-Test-Content | no |
+| cta_hdr10_hevc | cta | CTA WAVE test content for conformance; free use; not redistributable | LicenseRef-CTA-WAVE-Test-Content | no |
+| dashif_bbb_30fps | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
+| dashif_sidx_m4s | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
+| dashif_testcase_1a | dashif | DASH-IF test assets: free for conformance/interop testing; not redistributable | LicenseRef-DASHIF-Test-Assets | no |
+| gpac_chroma_pulse | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
+| gpac_dolby_vision_cenc | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
+| gpac_eac3_atmos | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | gpac_enc_cenc | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
+| hdr_dovi_p5 | hdr | Per-clip demo-content terms; download for testing; not redistributable | LicenseRef-HDR-Demo-Content | no |
+| hdr_hdr10plus_dv81 | hdr | dovi_tool test assets: MIT repository; treated as not redistributable (third-party picture data) | LicenseRef-DoviTool-Assets | no |
+| hdr_hlg_bt2020 | hdr | Per-clip demo-content terms; download for testing; not redistributable | LicenseRef-HDR-Demo-Content | no |
+| hdr_lg_chess_hdr10 | hdr | Per-clip demo-content terms; download for testing; not redistributable | LicenseRef-HDR-Demo-Content | no |
+| hdr_sony_camp_hdr10 | hdr | Per-clip demo-content terms; download for testing; not redistributable | LicenseRef-HDR-Demo-Content | no |
+| heif_C001 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C002 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C003 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C004 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C005 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C006 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C007 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C008 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C009 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C010 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C011 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C012 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C013 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C014 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C015 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C016 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C017 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C018 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C019 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C020 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C021 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C022 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C023 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C024 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C025 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C026 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C027 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C028 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C029 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C030 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C031 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C032 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C034 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C036 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C037 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C038 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C039 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C040 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C041 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C042 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C043 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C044 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C045 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C046 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C047 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C048 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C049 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C050 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C051 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C052 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_C053 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF001 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF002 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF003 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF004 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF005 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF006 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_MIAF007 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_avif_Apple_edge_case_testing_non_compliant_truncated_elemen | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_edge_case_testing_unknown_properties_free_proper | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_edge_case_testing_unknown_properties_unknown_non | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_a1lx | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_a1op | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_a1op_l | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_grid_a | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_grid_l | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_multilayer_lsel | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Apple_multilayer_examples_animals_00_singlelayer | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_monochrome_odd_width_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_10bpc_yuv420_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_monochrome_odd_width_o | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile0_8bpc_yuv420_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_10bpc_yuv444 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_10bpc_yuv444_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_10bpc_yuv444_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_10bpc_yuv444_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_8bpc_yuv444 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_8bpc_yuv444_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_8bpc_yuv444_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile1_8bpc_yuv444_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_monochrome_odd_width_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_10bpc_yuv422_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_monochrome_odd_width_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv420_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_monochrome_odd_width_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv422_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_monochrome_odd_width_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_12bpc_yuv444_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_monochrome_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_monochrome_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_monochrome_odd_width_o | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_odd_width | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_fox_profile2_8bpc_yuv422_odd_width_odd_height | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile0_10bpc_yuv420_monochrome_no_cdef_n | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile0_10bpc_yuv420_no_cdef_no_restorati | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile0_8bpc_yuv420_monochrome_no_cdef | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile0_8bpc_yuv420_no_cdef | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_10bpc_yuv422_monochrome_no_cdef_n | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_10bpc_yuv422_no_cdef_no_restorati | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_12bpc_yuv422_monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_12bpc_yuv422_monochrome_no_cdef_n | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_12bpc_yuv422_no_cdef_no_restorati | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_8bpc_yuv422_monochrome_no_cdef | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_hato_profile2_8bpc_yuv422_no_cdef | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_crop | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_mirror_horizontal | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_mirror_vertical | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_mirror_vertical_rotate270 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_mirror_vertical_rotate270_crop | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_rotate270 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Link_U_kimono_rotate90 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Chimera_10bit_cropped_to_1920x1008 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Chimera_10bit_cropped_to_1920x1008_with_HDR_ | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Chimera_8bit_cropped_480x256 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Irvine_CA | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Mexico | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Mexico_YUV444 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Monochrome | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Ronda_rotate90 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Summer_Nature_4k | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Summer_in_Tomsk_720p_5x4_grid | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_Tomsk_with_thumbnails | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_bbb_4k | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_bbb_alpha_inverted | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_kids_720p | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_reduced_still_picture_header | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Microsoft_still_picture | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01000_cicp9_16_9_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos01650_cicp9_16_9_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos07296_cicp9_16_9_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_hdr_cosmos12920_cicp9_16_9_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01000_cicp1_13_6_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos01650_cicp1_13_6_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos07296_cicp1_13_6_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_0_lossless | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv420_li_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv420_li_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv420_limited | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv444_fu_2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv444_fu_3 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avif_sdr_cosmos12920_cicp1_13_6_yuv444_full_qp | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avis_Chimera_AV1_10bit_480x270 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Netflix_avis_alpha_video | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Xiph_abandoned_filmgrain | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Xiph_fruits_2layer_thumbsize | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Xiph_quebec_3layer_op2 | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Xiph_tiger_3layer_1res | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_avif_Xiph_tiger_3layer_3res | heif | av1-avif test files: BSD-2-Clause (AOMedia) | BSD-2-Clause | yes |
+| heif_heic_grid | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_multilayer001 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_multilayer002 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_multilayer003 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_multilayer004 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
+| heif_multilayer005 | heif | Nokia HEIF conformance files: free for testing, not redistributable | LicenseRef-Nokia-HEIF-Conformance | no |
 | jctvc_AMP_A_Samsung_7 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_AMP_D_Hisilicon_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_Bitdepth_A_RExt_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_CAINIT_A_SHARP_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_CONFWIN_A_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_DBLK_A_SONY_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_DSLICE_A_HHI_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_ENTP_A_QUALCOMM_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_EXT_A_ericsson_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_FILLER_A_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_GENERAL_444_8bit_RExt_Sony_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_HRD_A_Fujitsu_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_INITQP_B_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_LTRPSPS_A_FJ_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_MAXBINS_A_TI_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_MERGE_B_TI_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_MVCLIP_A_qualcomm_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_MVEDGE_A_qualcomm_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_Main_422_10_A_RExt_Sony_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_NUT_A_ericsson_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_NoOutPrior_A_Qualcomm_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_OPFLAG_A_Qualcomm_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_PICSIZE_A_Bossen_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_PMERGE_A_TI_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_POC_A_Bossen_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_PPS_A_qualcomm_7 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RAP_A_docomo_6 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RAP_B_Bossen_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_A_docomo_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_B_qualcomm_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_C_ericsson_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_D_ericsson_6 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_E_qualcomm_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_RPS_F_docomo_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_SAO_A_MediaTek_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_SDH_A_Orange_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_SLIST_A_Sony_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_STRUCT_B_Samsung_7 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_TILES_B_Cisco_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_TSCL_A_VIDYO_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_TSKIP_A_MS_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_VPSID_A_VIDYO_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_WPP_A_ericsson_MAIN10_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_WPP_A_ericsson_MAIN_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_WP_A_Toshiba_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_ipcm_A_NEC_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_ALPHACONFORMANCEG | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_BA1_Sony_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_BAMQ1_JVC_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_BA_MW_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CABA1_SVA_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CABA3_TOSHIBA_E | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CABAST3_Sony_E | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CAMA1_Sony_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CAPAMA3_Sand_F | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CAPM3_Sony_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CAQP1_Sony_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CI1_FT_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVFC1_SVA_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVFC1_Sony_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVFI1_Sony_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVPA1_TOSHIBA_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVPCMNL1_SVA_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVSE2_Sony_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVSE3_Sony_H | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVSEFDFT3_Sony_E | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_CVWP1_TOSHIBA_E | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_FM1_BT_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_FRExt1_Panasonic_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_HCAFF1_HHI_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_HPCAFL_BRCM_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_HPCV_BRCM_A | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_Hi422FR1_SONY_A | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_LS_SVA_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_MIDR_MW_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_MR1_BT_A | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_MR6_BT_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_MR9_BT_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_MVCNV_1 | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_NRF_MW_E | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_SVCBST_1 | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_Sharp_MP_Field_1_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_aud_mw_e | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_cvmp_mot_frm_L31_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_sp1_bt_a | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jvt_src19td_IBP_264 | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| misc_iphone_hevc_mov | misc | OVT-owned capture, CC0 | CC0-1.0 | yes |
+| misc_pixel_motion_photo | misc | OVT-owned capture, CC0 | CC0-1.0 | yes |
+| mkv_test1 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test2 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test3 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test4 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test5 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test6 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test7 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mkv_test8 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
+| mpegff_01_simple | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_02_dref_edts_img | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_03_hinted | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_04_bifs_video | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_05_bifs_video_protected_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_06_bifs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_07_bifs_sprite | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_08_bifs_carousel_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_09_text | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_10_fragments | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_12_metas_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_13_long | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_16_vtt | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_17_negative_ctso | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_18_pssh_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_19_ttml | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_20_stxt | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_21_segment | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_22_tx3g | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C001 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C002 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C003 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C004 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C005 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C006 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C007 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C008 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C009 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C010 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C011 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C012 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C013 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C014 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C015 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C016 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C017 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C018 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C019 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C020 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C021 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C022 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C023 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C024 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C025 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C026 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C027 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C028 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C029 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C030 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C031 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C032 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C034 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C036 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C037 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C038 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C039 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C040 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C041 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_C042 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_DDF_10s_25fps | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_DDF_10s_25fps_dynamic | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_DDF_10s_25fps_dynamic_rep_R1_seg_0005 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_DDF_10s_25fps_dynamic_rep_R2_seg_0005 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_FX_VY_9436R_3_qhd | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_FX_VY_9436R_3_qhd_variant | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_dcfi_1920x1080_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_inband_ps_1280x720_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_mixed_res_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_outband_ps_1920x1080_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_pase_unused_1280x720_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_RA_BodeMuseum_pase_used_1920x1080_and_1280x720_qp37 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_Solekai002_1280_23_1x1_v7clear | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a10_foreman_QCIF_raw | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
 | mpegff_a1_foreman_qcif | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a2_foreman_QCIF_hinted | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a3_tone_protected | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a3b_tone_deprot | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a4_tone_fragmented | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a5_foreman_AVC | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a6_tone_multifile | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a7_tone_oddities | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a8_foreman_QCIF_edit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_a9_aac_samplegroups_edit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_ac01 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_aggr_hvc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_alst_hvc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_audio_cbcs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_audio_cbcs_const_iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_audio_cenc_128iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_all_otyp | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moof_nobrand | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moof_otyp | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moof_sidx_otyp | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moof_sidx_ssix_otyp | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moov_isoc | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_comp_moov_otyp | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_compact_no_code_fec_1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_compact_no_code_fec_2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_data_2_Data3_3 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_f1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_f2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_female_amr67DTX_hinted | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_female_amr67_hinted | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_fragment_random_access_1_AF8_rev1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_fragment_random_access_2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hev1_clg1_header | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hev1_clg1_segment | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hev1_only | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_dual_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hev1_hev2_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hev1_hev2_extractors_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hev1_hev2_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hev1_hev2_implicit_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hvc1_hvc2_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hvc1_hvc2_extractors_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hvc1_hvc2_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_hvc1_hvc2_implicit_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_multiple_tracks | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_multiple_tracks_empty_base | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_multiple_tracks_empty_base_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_multiple_tracks_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_single_track_nalm | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_single_track_nalm_all_intra | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_single_track_nalm_rle | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_single_track_trif_full_picture | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hevc_tiles_single_track_trif_full_picture_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hvc1_only | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_hvc2_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_iff_hevc_single_item | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_iff_hevc_single_item_main10 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_iff_hevc_tile_multiple_items_tbas | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cbc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cbcs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cbcs_const_iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cbcs_const_iv_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cbcs_mkey_const_iv_subs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_128iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_64iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_mkey_base | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_mkey_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_mkey_subs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cenc_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cens_128iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_image_cens_64iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_lhevc_avc1_lhe1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_lhevc_avc1_lhv1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_lhevc_avc3_lhe1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_lhevc_avc3_lhv1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_male_amr122 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_male_amr122DTX | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mbms_fec | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_meta_2500000bps_0 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hev1_hev2_multiple_tracks_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hev1_lhe1_multiple_tracks_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hev1_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hev2_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hvc1_hvc2_multiple_tracks_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hvc1_lhv1_multiple_tracks_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hvc1_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mhvc_hvc2_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R1_0001 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R1_0002 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R1_0003 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R2_0001 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R2_0002 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R2_0003 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R3_0001 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R3_0002 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_mp4_live_LastTime_depRep_R3_0003 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_multilayer001 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_multilayer002 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_multilayer003 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_multilayer004 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_multilayer005 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_out_avail_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_out_overlap | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_pdin_example | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_restricted | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_rs_example_r1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_rtp_rtcp_reception_hint_tracks_v2 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sample_group_default_desc | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sample_group_default_desc_frag | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sample_group_static_group | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sample_group_static_group_frag | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sample_group_static_mapping | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sg_tl_st | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hev1_hev2_multiple_tracks_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hev1_lhe1_multiple_tracks_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hev1_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hev2_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hvc1_hvc2_multiple_tracks_extractors | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hvc1_lhv1_multiple_tracks_implicit | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hvc1_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_shvc_hvc2_single_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_sls2100_aot02_048_16 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_subs_slice_hvc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_subs_tile_hvc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_test_mebx_me4c | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_timed_metadata | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_trgr_hvc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_2500000bps_0 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbc1 | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbcs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbcs_const_iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbcs_const_iv_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbcs_const_iv_roll_frag1s | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cbcs_mkey_const_iv_subs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
 | mpegff_video_cenc_128iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cenc_64iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cenc_mkey_base | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cenc_mkey_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cenc_mkey_subs | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cenc_roll | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
 | mpegff_video_cenc_roll_frag1s | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cens_128iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_video_cens_64iv | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_basic_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_mixed_nal_subpicture_tracks | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_subpicture_tracks | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_subpicture_tracks_spor_ordered | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_substitute_subpicture_single_sample_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_substitute_subpictures_all_frames | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_substitute_subpictures_single_sample_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
+| mpegff_vvc_substitute_subpictures_track | mpegff | BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo | LicenseRef-MPEG-Conformance | no |
 | netflix_src01_hrc00_576x324 | netflix | BSD-2-Clause-Patent (vmaf repository) | BSD-2-Clause-Patent | yes |
 | netflix_src01_hrc01_576x324 | netflix | BSD-2-Clause-Patent (vmaf repository) | BSD-2-Clause-Patent | yes |
+| syn_align_drop7 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_10min_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_444_422_profile2 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_4k_2min | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_annexb | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_annexb_obu_split | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_deltaq | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_filmgrain_10bit | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_globalmotion | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_gop60_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_hidden_altref_showexisting | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_hlg_metadata | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_intra_only_sframe_svc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_lowoverhead | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_palette | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_pq_hdr_obu | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_superres_scaled_refs | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_tiles_cdef_lr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_av1_tools_all | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_avif_10bit | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_h264_missing_pps | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_h265_hash_mismatch | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_h265_slice_error_f12 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_broken_h265_truncated_sps | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_1h_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_444_intra | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_crop_8x8dct_10bit | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_epb_dense | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_gop60_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_hrd_cbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_hrd_vbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_mbaff | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_multislice_cavlc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_multislice_cavlc_mp4 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_paff | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h264_weightedpred_ltr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_10min_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_422_444_rext | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_4k_main10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_amp_sao_on | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_bpyramid | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_crop_1080_in_1088 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_gop60_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_hdr10plus | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_hrd_cbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_hrd_vbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_main10_hev1 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_main10_pq_hdr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_main10_pq_hdr_mismatch | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_multi_pps | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_multislice_wp | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_pq_4000nit | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_pq_colr_only | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_pq_sei_only | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_sao_off_deblock_off_pcm | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_sei_unknown_200 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_tiles_4x2 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_tiles_wpp | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_vui_unspecified | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_heif_1000items | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_hlg_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_level_violation_av1 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_level_violation_h264 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_level_violation_h265 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_m4a_aac_lc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_m4a_itunes | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_1080p_bitflip_f37 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_1080p_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_10bit_8bit_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_444_420_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_fps_mismatch_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_ladder_q22 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_ladder_q27 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_ladder_q32 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_ladder_q37 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_ladder_ref | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_pq_1080p_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_metrics_scale_range_pair | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mkv_dv_p5 | syn | Remux of the hdr_dovi_p5 corpus entry; same terms as hdr_dovi_p5 | LicenseRef-hdr-dovi-p5-terms | no |
+| syn_mkv_h264 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mkv_hdr10 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_cmfc_two_tracks | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_ctts_v0_negative | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_hvc1_no_ps | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_msix_without_sidx | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_size7_in_moov | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_stco_beyond_eof | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_broken_stsc_descending | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_cbcs_keyrot | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_cenc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_cenc_widevine | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_edit_list_frag_cenc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_frag | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_frag_3600 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_frag_cbcs | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_frag_cmaf | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_nero_chapters | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mp4_piff | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_pat_hlg_patches | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_p3_saturation | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_pq_patches_1000 | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_sdr709_ramp | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_siting_checker | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
+| syn_raw_1080p_p010 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_raw_yuv420p10le_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_scenes_5cuts | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_content_light_level_info | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_ga94_cc | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_mastering_display_colour_volume | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_recovery_point | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h264_user_data_unregistered | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_alternative_transfer | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_content_light_level_info | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_mastering_display_colour_volume | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_recovery_point | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_sei_h265_user_data_unregistered | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_ts_cc_errors | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_webm_lacing_xiph | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| ts_h264_dvb | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_025 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_026 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_052 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_064 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_072 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_097 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_100_1 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_125 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_137 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ts_test_139 | ts | tsduck-test input files: BSD-2-Clause | BSD-2-Clause | yes |
+| ytugc_clip01 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip02 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip03 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip04 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip05 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip06 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip07 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip08 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip09 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip10 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip11 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip12 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip13 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip14 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip15 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip16 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip17 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip18 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip19 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |
+| ytugc_clip20 | ytugc | YouTube-UGC dataset, CC BY 4.0 (attribution in the dataset's ATTRIBUTION file) | CC-BY-4.0 | yes |

@@ -64,6 +64,62 @@ if(OVT_BUILD_PLUGIN_AOM)
   endif()
 endif()
 
+# ---- FFmpeg (WI-0.012) ------------------------------------------------------------------------------
+# tp::ffmpeg_core and tp::ffmpeg_plugin from third_party/ffmpeg.cmake (two flavours, §13.3.3), or both from the
+# system FFmpeg, dynamically linked, with OVT_SYSTEM_FFMPEG=ON (distro preset; ovt_plugin_ffmpeg is then a thin
+# wrapper and its symbol-leak test does not apply). Built when the core needs it (always, for the demuxer of
+# WI-1.230); the plugin flavour only with OVT_BUILD_PLUGIN_FFMPEG=ON.
+#
+# ovt_ffmpeg_hide_symbols(<target>)
+#   For the shared object that links tp::ffmpeg_plugin (ovt_plugin_ffmpeg, WI-2.169, and the symbol-leak fixture of
+#   plugins/ovt-plugin-ffmpeg/tests): hidden visibility for its own code, and the linker options of §13.3.3 that keep
+#   every symbol of the static FFmpeg archives inside it. Linux/Android: --exclude-libs,ALL, plus -Bsymbolic so
+#   FFmpeg's references bind inside the plugin. macOS: an exported-symbol list naming only the two plugin entry points
+#   (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
+#   the plugin links the system FFmpeg dynamically.
+function(ovt_ffmpeg_hide_symbols target)
+  set_target_properties(${target} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden
+                                             VISIBILITY_INLINES_HIDDEN ON)
+  if(OVT_SYSTEM_FFMPEG)
+    return()
+  endif()
+  if(APPLE)
+    target_link_options(${target} PRIVATE "LINKER:-exported_symbol,_ovt_analysis_decoder_v1"
+                        "LINKER:-exported_symbol,_ovt_plugin_describe")
+  else()
+    target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL" "LINKER:-Bsymbolic")
+  endif()
+endfunction()
+
+if(OVT_SYSTEM_FFMPEG)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(ovt_system_ffmpeg REQUIRED IMPORTED_TARGET libavformat libavcodec libswscale libswresample
+                    libavutil)
+  foreach(_ovt_ff_flavour core plugin)
+    add_library(tp::ffmpeg_${_ovt_ff_flavour} INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::ffmpeg_${_ovt_ff_flavour} INTERFACE PkgConfig::ovt_system_ffmpeg)
+    # The distro's FFmpeg may be GPL (Debian's is); the expression lets the gate pick what the target allows.
+    ovt_set_dependency_license(
+      tp::ffmpeg_${_ovt_ff_flavour}
+      SOURCE
+      system
+      SPDX
+      "LGPL-2.1-or-later OR GPL-2.0-or-later"
+      VERSION
+      "${ovt_system_ffmpeg_libavcodec_VERSION}"
+      LINKAGE
+      shared)
+  endforeach()
+  unset(_ovt_ff_flavour)
+  foreach(_ovt_ff_item PkgConfig::ovt_system_ffmpeg ${ovt_system_ffmpeg_LINK_LIBRARIES})
+    ovt_set_dependency_license(${_ovt_ff_item} SOURCE system SPDX "LGPL-2.1-or-later OR GPL-2.0-or-later" LINKAGE
+                               shared)
+  endforeach()
+  unset(_ovt_ff_item)
+else()
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/ffmpeg.cmake")
+endif()
+
 # ---- libde265 (WI-0.014) ----------------------------------------------------------------------------
 # tp::de265, the patched static libde265 of third_party/libde265.cmake (§13.3.6), for the HEVC analysis
 # plugin only (LGPL-3.0-or-later, chapter 15 §15.2). OVT_SYSTEM_DE265=ON (the distro preset) takes the
@@ -89,6 +145,42 @@ if(OVT_BUILD_PLUGIN_DE265)
   else()
     include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libde265.cmake")
   endif()
+endif()
+
+# ---- libvmaf (WI-0.015) -------------------------------------------------------------------------------
+# tp::vmaf from third_party/libvmaf.cmake, or from the system library with OVT_SYSTEM_LIBVMAF=ON (the distro
+# preset). The system library must have been built with its built-in models.
+if(OVT_SYSTEM_LIBVMAF)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(ovt_system_vmaf REQUIRED IMPORTED_TARGET libvmaf)
+  add_library(tp::vmaf INTERFACE IMPORTED GLOBAL)
+  target_link_libraries(tp::vmaf INTERFACE PkgConfig::ovt_system_vmaf)
+  ovt_set_dependency_license(
+    tp::vmaf
+    SOURCE
+    system
+    SPDX
+    "BSD-2-Clause-Patent"
+    VERSION
+    "${ovt_system_vmaf_VERSION}"
+    LINKAGE
+    shared)
+else()
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libvmaf.cmake")
+endif()
+
+# ---- MoltenVK (WI-0.017) ------------------------------------------------------------------------------
+# tp::moltenvk from third_party/moltenvk.cmake: the prebuilt libMoltenVK.dylib (single-architecture slice) that
+# ovt_render links directly on macOS (§13.5.6). Only fetched when the renderer is built.
+if(APPLE AND OVT_BUILD_RENDER)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/moltenvk.cmake")
+endif()
+
+# ---- ONNX Runtime prebuilt (WI-0.017) -----------------------------------------------------------------
+# tp::onnxruntime from third_party/onnxruntime.cmake when OVT_ONNXRUNTIME_PREBUILT=ON; otherwise the UVQ host
+# takes the vcpkg `onnxruntime` port (§13.3.1).
+if(OVT_ONNXRUNTIME_PREBUILT)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/onnxruntime.cmake")
 endif()
 
 # ovt_find_package(<Package> SPDX <expr> TARGETS <target>... [NAMES <config-name>...] [PKG_CONFIG <module>]
@@ -231,3 +323,27 @@ function(_ovt_describe_package_closure target source spdx version)
     endforeach()
   endwhile()
 endfunction()
+
+# ---- libplacebo (WI-0.015) ----------------------------------------------------------------------------
+# tp::placebo from third_party/libplacebo.cmake (after MoltenVK: on macOS it is the Vulkan implementation), or
+# from the system library with OVT_SYSTEM_LIBPLACEBO=ON. Only built with the renderer.
+if(OVT_BUILD_RENDER)
+  if(OVT_SYSTEM_LIBPLACEBO)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_placebo REQUIRED IMPORTED_TARGET libplacebo)
+    add_library(tp::placebo INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::placebo INTERFACE PkgConfig::ovt_system_placebo)
+    ovt_set_dependency_license(
+      tp::placebo
+      SOURCE
+      system
+      SPDX
+      "LGPL-2.1-or-later"
+      VERSION
+      "${ovt_system_placebo_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libplacebo.cmake")
+  endif()
+endif()

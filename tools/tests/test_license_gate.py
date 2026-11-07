@@ -447,6 +447,21 @@ def test_vcpkg_gpl3_text_is_not_denied_but_agpl_title_is(tmp_path: Path) -> None
     assert run("--vcpkg", str(vc), report=tmp_path / "r2.json")[0] == 0
 
 
+def test_vcpkg_null_licence_falls_back_to_the_override(tmp_path: Path) -> None:
+    # vcpkg writes LicenseRef-vcpkg-null for `"license": null`; it is not a licence, so [vcpkg_overrides] applies.
+    vc = tmp_path / "vcpkg_installed"
+    for name in ("glslang", "nulled"):
+        d = vc / "share" / name
+        d.mkdir(parents=True)
+        (d / "copyright").write_text("BSD-3-Clause text\n")
+        (d / "vcpkg.spdx.json").write_text(
+            json.dumps({"packages": [{"licenseConcluded": "LicenseRef-vcpkg-null", "licenseDeclared": "NOASSERTION"}]})
+        )
+    code, data, _ = run("--vcpkg", str(vc), report=tmp_path / "r.json")
+    assert code == 1
+    assert [(f["code"], f["where"]) for f in data["findings"]] == [("E-UNKNOWN", "vcpkg:nulled")]
+
+
 def test_versions_override_wins_over_parseable_cell(tmp_path: Path) -> None:
     versions = tmp_path / "v.md"
     versions.write_text(

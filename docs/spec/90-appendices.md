@@ -10,149 +10,78 @@
 
 # Appendix A — Commercial feature inventory
 
-This appendix records what the commercial tools OVT is measured against actually do. Chapter 3 (Competitive reference) derives must/should/nice priorities from it; this appendix keeps the raw inventory. Two products define the "full bitstream analyzer" category: **ViCueSoft VQ Analyzer** (descendant of Intel Video Pro Analyzer) and **Elecard StreamEye Studio**. No commercial analyzer runs on Android; only MediaInfo does.
+This appendix records, as factual feature comparison, which feature areas commercial video analyzers offer according to their public product pages, release notes and published reviews. Chapter 3 (Competitive reference) derives must/should/nice priorities from it. Two products are commonly treated as the "full bitstream analyzer" category: **ViCueSoft VQ Analyzer** and **Elecard StreamEye Studio**. Of the tools surveyed, only MediaInfo has an Android app.
+
+**Rules for this appendix.** Product names are trademarks of their respective owners and are used only to identify the products compared; OVT is not affiliated with, endorsed by or compatible with any of them. Entries state *what* a product does (codecs, containers, platforms, feature areas, metrics), each with a link to the public page it comes from. They do not quote vendor documentation, and they do not describe vendors' menus, panel layouts, key bindings, command-line flags or visual styles: OVT's own user interface is specified independently in chapter 11 and its CLI in chapter 12. No facts here come from installing, running or examining a commercial product.
 
 ## A.1 ViCueSoft VQ Analyzer (and VQ Probe, VQ DVK)
 
 | Item | Facts | Source |
 |---|---|---|
-| Lineage | Intel Video Pro Analyzer (VPA) was discontinued; "development and new sales moved to ViCue Soft". The VQ Analyzer user guide's menu structure, Mode list (F1–F12), YUVDiff menu and CLI flags are essentially identical to the Intel VPA 2.3 user guide. | https://www.intel.com/content/www/us/en/developer/articles/tool/video-pro-analyzer.html · https://www.intel.cn/content/dam/develop/external/us/en/documents/intelvideoproanalyzeruserguide-560483.pdf · https://vicuesoft.com/analyzer/userguide |
-| Platforms | Windows 7+ (32/64-bit), macOS 10.12+, Ubuntu 16.04+, SLES 12+, CentOS 7.4+; 1 GB RAM minimum, 4 GB recommended for 4K; 8K VVC decodable on 32 GB after v6.4 memory optimisation. No Android/iOS. | https://vicuesoft.com/vq-analyzer · https://vicuesoft.com/analyzer/releasenotes |
-| GUI/CLI | "GUI and console mode": the same binary accepts all CLI options. | https://vicuesoft.com/vq-analyzer |
-| Codecs | VVC/H.266 (tracks VTM; VTM 19.0 in v7.2, multilayer OLS selection in v7.3), AV1 (av1-normative branch), AVM (AV2 development codec), AVS3 (HPM 15.1), HEVC v1 8/10-bit, HEVC RExt 8/10/12-bit 4:0:0–4:4:4, HEVC SCC (SCM 8.6), SHVC/MV-HEVC (SHM 12.1), AVC High profile 8/10-bit (no SVC/MVC), VP9 profiles 0–3 8/10/12-bit, MPEG-2 4:2:0/4:2:2, JPEG XS, VC-3, APV. | https://vicuesoft.com/vq-analyzer · https://vicuesoft.com/analyzer/releasenotes |
-| Containers | MKV, WebM, MP4/MOV (incl. `lhvC`), MMT (ARIB STD-B60), MPEG-2 TS/PS, AVI, ASF, FLV, IVF, PCAP (v7.4, AVC), HEIF/HEIC/AVIF (v7.3). Annex B / raw OBU elementary streams open directly. | https://vicuesoft.com/analyzer/releasenotes |
-| Colour | BT.601/709/2020 conversion; "YUV as RGB/BGR" for 4:4:4. Debug YUV inputs: planar/interleaved/NV12, P016, A2RGB10, 8–16-bit, display or decode order, start offset. | https://vicuesoft.com/analyzer/userguide |
-| HDR | "HDR and VBV buffer visualization"; SEI identification tab (v6.5). An Intel VPA community thread reports an HDR rendering bug, indicating VPA/VQA renders PQ/HLG content. | https://vicuesoft.com/vq-analyzer · https://community.intel.com/t5/Media-Intel-oneAPI-Video/Intel-Video-Analyzer-Pro-BUG-report-regarding-High-Dynamic-Range/m-p/1090691/highlight/true |
+| Lineage | Successor product to Intel Video Pro Analyzer (VPA), which Intel discontinued. | https://www.intel.com/content/www/us/en/developer/articles/tool/video-pro-analyzer.html |
+| Platforms | Windows, macOS and Linux desktop; no Android/iOS. | https://vicuesoft.com/vq-analyzer |
+| GUI/CLI | Graphical and console modes. | https://vicuesoft.com/vq-analyzer |
+| Codecs | VVC/H.266, AV1, AVM (AV2 development codec), AVS3, HEVC (incl. RExt, SCC, SHVC/MV-HEVC), AVC, VP9, MPEG-2, JPEG XS, VC-3, APV. | https://vicuesoft.com/vq-analyzer · https://vicuesoft.com/analyzer/releasenotes |
+| Containers | MKV/WebM, MP4/MOV, MMT, MPEG-2 TS/PS, AVI, ASF, FLV, IVF, PCAP, HEIF/AVIF; raw elementary streams. | https://vicuesoft.com/analyzer/releasenotes |
+| HDR | HDR and VBV buffer visualisation; SEI identification. | https://vicuesoft.com/vq-analyzer · https://vicuesoft.com/analyzer/releasenotes |
+| Pricing | Commercial per-seat subscriptions and perpetual licences in several codec editions; an academic edition exists. | https://shop.xlsoft.com/en/vicue-price/ |
 
-**Pricing and editions** (xlsoft reseller list, https://shop.xlsoft.com/en/vicue-price/). All editions include AVC, MPEG-2, VP9, HEVC; higher tiers add codecs.
+**Feature areas** (from the product page and release notes): syntax element tree per codec with links to the raw bytes and hex view; per-frame type, size and QP charts; HRD/VBV buffer analysis; reference and DPB structure; block partitioning, prediction mode and motion-vector visualisation; per-stage pictures (prediction, residual, reconstruction, in-loop filters) with block-level detail of intermediate values; QP, bit-cost and per-block PSNR/SSIM maps; memory-bandwidth analysis; stream statistics; comparison against a decoder-output YUV with first-difference search; two-stream comparison; conformance and error reporting; extraction of NAL units, sub-streams and decoded data to files; batch analysis from the console.
 
-| Edition | Added codecs | Floating subscription (1 yr) | Perpetual floating (incl. 1 yr support) | Annual support renewal |
-|---|---|---|---|---|
-| Crux4 | — | $5,159 | n/a | n/a |
-| Cassi5-AV1 / -AVS3 / -VVC | one of AV1, AVS3, VVC | $6,239 / $6,719 / $6,719 | — / $18,599 / $18,599 | — / $3,839 / $3,839 |
-| Pleia6-AVS3 / -VVC | AV1 + (AVS3 or VVC) | $7,799 | $20,999 | $4,439 |
-| Ursa7-JXS-APV | AV1 + JPEG XS/APV | $8,639 | $22,199 | $4,799 |
-| Ursa7-AVS3-VVC | AV1 + AVS3 + VVC | $9,359 | $23,999 | $5,159 |
-| Crown8-AV2 | AV1, AVS3, VVC, AV2 | $10,799 | $25,199 | $5,519 |
-| Orion10-AV2 | all of the above + JXS/APV | $13,199 | $28,799 | $6,359 |
-| Academic (Ursa7-AVS3-VVC) | — | $1,199 subscription, no support | | |
+**VQ Probe (free metrics tool)** — https://vicuesoft.com/vq-probe/. Windows/macOS/Linux; compressed and raw inputs in common containers. Metrics: PSNR variants, XPSNR, PSNR-HVS, SSIM, MS-SSIM, VMAF, VMAF-NEG, CAMBI, CIEDE2000. Feature areas: side-by-side and difference comparison, per-frame metric curves with export, RD curves and BD-rate against an anchor, convex hull and encoding-ladder tables, regions of interest, SI/TI, scene-change detection, frame-size view; console tool.
 
-**Panels** (the fixed UI skeleton; source: user guide and Intel VPA guide).
-
-| Panel | Description | Underlying data |
-|---|---|---|
-| Main Panel | Zoom/pan picture canvas on which the current Mode draws overlays; buttons FS, +/−, R (fit), YUV/Y/U/V plane select, Pic (toggle picture underneath), Info (toggle annotations), Details, H/D (hex/decimal), Delta. | Decoded planes at each stage, block tree |
-| Stream View – Thumbnails | Filmstrip with frame numbers in decode and display order, picture type colouring (red I, blue P, green B), reference arrows (green = long-term), red "used as ref" dots, CVS markers, layerId/POC labels, super-frame bands. | Per-frame type, POC, RPS/ref lists, size |
-| Stream View – Bars: Buffer | Zoomable bar chart of frame sizes with average slice-QP and block-QP plots. | Per-frame bits, per-slice QP, per-CU QP |
-| Stream View – HRD | HRD/VBV buffer fullness curve, optional arrival-time mode (CPB from SEI/VUI). | HRD params, frame sizes, timing |
-| Stream View – Hierarchy | B-pyramid / temporal-layer graph. | Temporal ID, ref structure |
-| Stream View – Metric | Per-frame PSNR/SSIM Y/U/V timeline (needs debug YUV and full analysis). | Per-frame metrics |
-| Stream View – Active/DPB refs | Reference dependency / DPB contents for the current frame. | DPB state |
-| Syntax Info | Tabbed syntax element tree per codec with SE name/value toggles, filter box, Expand/Collapse, hex toggle, spec quotations/tooltips. VVC tabs NAL/SPS/PPS/OPI/VPS/PH/APS/DCI/Slice/CU/Ref Lists/Stats; HEVC NAL/VPS-SPS-PPS-Slice-SEI/CU-TU (CABAC range & value columns)/QM/Ref Lists/Stats; AV1 IVF-MKV/OBU/Sequence/Frame/Block/Refs/Stats; VP9 adds Probabilities/Counts; JPEG XS NAL/Picture/Markers/Slice/Precinct. | Parsed syntax, CABAC state |
-| Stats tab | Picture/Syntax/Stream statistics as pie or bar, raw / area-normalised / bits-normalised, %, MV scatter plots; CU size, CU mode, intra luma/chroma modes, QpY, TU size/type per component, list0/list1 utilisation, affine/SBTMVP/inter-refinement counts. | Aggregated block data |
-| Selection Info | Per-codec read-out of the clicked block: picture size, bit depth, tile/slice/CTB/CU/PU/TU position & size, pred mode, MVs (incl. affine), QP, tree type, subpicture ID, MaxCTB, cursor position. | Block tree |
-| Unit Info / HEX View | Up to 500 raw bytes of the selected NAL/OBU; middle-double-click opens full HEX View; B toggles binary/hex; selected unit's bit range highlighted; hex search for byte sub-sequences (v5.0). | Raw bitstream, bit offsets |
-| Status / Errors | Decode log, digest (MD5/CRC/checksum) mismatch warnings, Errors tab turns red; double-click an error jumps to block + NAL; memory bar. | Conformance checks |
-| Details popup | Right-click a block in any dense mode opens a stage-specific detail dialog. | Per-stage intermediate arrays |
-
-**Modes (F1–F12) and Detail views.**
-
-- *Coding Flow*: CTB grid in decode order with tile/slice/subpicture boundaries, CABAC resets/flushes, CTB info; virtual boundaries drawn (v6.2).
-- *Prediction*: intra CUs green with angular arrows + chroma mode label; inter CUs cyan with L0 MVs orange / L1 purple; skip texture; GPM/GEO splits, affine, SbTMVP sub-blocks, IBC/ISC string vectors, weighted-prediction and CIIP/MIP/ISP/MRL/BDPCM labels; "group of equal MVs" for sub-blocks. *Prediction Detail*: PU samples, intra reference arrays with neighbour availability, MPM list, MIP/CCLM matrices, interpolation visualisation and per-sample formulas for all inter modes, candidate lists (merge/AMVP/affine/IBC) in a Candidates tab, MV differences, DMVR/BDOF details, Motion Buffer (4×4 MV field), IBC buffer, palette details, candidate map.
-- *Transform (Residuals)*: CU/TU boundaries, QP, coefficient counts, transform type, LFNST/BDPCM/ISP labels, optional raw residual image. *Transform Detail*: three-stage tabs — quantised coefficients → dequantised/LFNST → residual samples — plus QP derivation formula (delta-QP, no-transform blocks), LMCS chroma scaling, scan order, coefficient-level flags.
-- *Reconstruction* (+ Detail), *Inverse Map* (LMCS) (+ Detail).
-- *Loop Filter / Deblocking*: edges colour-coded by filter result and block type; legend (L key); Detail shows modified samples, filter inputs, Bs, reason an edge was not filtered.
-- *SAO* (+ Detail: per-CTB params, edge/band formulas), *Adaptive Filter / ALF* (+ Detail: 4×4 classification & transpose indices, CC-ALF), AVS3 ESAO/CCSAO equivalents.
-- *YUV*: final decoded samples without overlays; YUVDiff compare against debug YUV with mismatches as red dots; Delta compares main vs dependent stream.
-- *Info Overlays*: Heat Map (bits per block), QP Map, PU Type, PU Reference Indices, PSNR/SSIM per block (needs reference YUV), Efficiency map, Inter Memory Reads / memory-bandwidth map ("data hog" blocks for decoder prefetch design, v5.0), Simple Motion (MV field), separate chroma tree overlays; AVS3 adds CoeffsY density (https://vicuesoft.com/blog/titles/V5.0_Launch).
-- *Statistics map*: several graphs combined into one map (v5.0).
-
-**Debug/compare workflows.** Dual View ("Open dependent bitstream": second in-sync analyzer; Delta shows pixel differences). Debug YUV / Find First Difference (runs in parallel with UI work, v6.5). Extraction: NAL units, sub-streams, "minimum CVS to picture", key-frame/IDR extraction, CTB syntax export, YUV planes to three CSVs, MV vectors to CSV, intermediate pictures to file. Conformance: level/profile/tile-limit checks, DiffPicOrderCnt warnings, syntax errors shown red in NAL tab.
-
-**CLI (console mode; identical options accepted by the GUI).** Codec forcing `-hevc -vp9 -av1 -avc -mpeg2`; `-n` start frame, `-dependent`, `-debug_yuv`; `-regress`, `-frames`, `-fast 0|1|2`; output `-o`, `-dump`, `-y4m`, `-md5`, `-display_order`, `-nocrop`, `-dump_bitdepth 8..16`, `-film_grain`, `-errors`, `-stats`, `-stream_stats` (HEVC), `-streamstatslevel 1–3`, `-norm_pix`, `-norm_bits`, `-percent`, `-psnr`; `-cpumaxfeature`, `-disablehevcext`, `-vp9hwemul`; licensing `-activate -deactivate -license_server host:port`. Export artefacts: YUV/Y4M, per-frame MD5, error & statistics text, HRD timings CSV, extracted bitstreams, `.idx` HEVC index.
-
-**UX conventions.** Mouse-drag pan, wheel zoom about cursor, right-click = Details, repeated click cycles CU→PU→TU, `R` fit, `F` fullscreen, `P` picture on/off, `I` annotations on/off, `H`/`D` hex/decimal, F1–F12 modes, double-click an error or VCL NAL to navigate, playback follows filmstrip order, lock pixel selection while panning, hotkeys for plane switching.
-
-**VQ Probe (free metrics tool)** — https://vicuesoft.com/vq-probe/ · https://vicuesoft.com/probe/userguide. Windows/macOS/Linux; inputs AVC/HEVC/VVC/AV1/AV2/AVS3/MJPEG/MPEG-2/VP9 + YUV/Y4M/RGB + BMP/JPG/PNG; containers MP4/TS/MKV/MOV/AVI/IVF/WEBM/PCAP; 4:0:0–4:4:4, 8–16 bit. Metrics: PSNR (per-channel, YUV weighted), APSNR, XPSNR, PSNR-HVS, SSIM, MS-SSIM, VMAF, VMAF-NEG, CAMBI, CIEDE2000; Intel CM / OpenCL acceleration. Panels: Project (files with Left/Right/Reference roles, RD curves, anchor, ROIs), Log, Playback (L|R split, overlay, pixel-difference heat map, planes, grid, 32× zoom pixel values, Lanczos/bicubic scaling), Metrics (per-frame curves, cumulative average, click-to-seek sync, JSON/CSV log, percentiles). RD curves, BD-rate vs anchor, convex hull, optimal encoding ladder table, COCO-JSON ROIs, ML object detection → ROIs, ITU-T P.910 SI/TI, FFmpeg-based scene change detection, Buffer View (per-frame size bars coloured by type with moving average), "Open in VQ Analyzer" hand-off. `VQProbeConsole` CLI with `--reference/--distorted`, `--enable-<metric>`, `--siti`, `--buffer-info`, ladders, ROIs, cache.
-
-**VQ DVK (Decoder Validation Kit)** — https://vicuesoft.com/blog/titles/dvk_advantages/ · https://vicuesoft.com/vq-dvk/vq-dvk-av1. Conformance/stress stream sets (VVC, AV1, HEVC, VP9, AVS3) generated by a reference-based encoder with switchable syntax elements; code/syntax/cross-coverage HTML reports, GitLab-CI integration. Relevant to OVT only as a consumer: OVT must ingest such stress streams gracefully (NFR robustness, B.7 rule 1).
+**VQ DVK (Decoder Validation Kit)** — https://vicuesoft.com/vq-dvk/vq-dvk-av1. Conformance and stress stream sets for VVC, AV1, HEVC, VP9 and AVS3 with coverage reports. Relevant to OVT only as a consumer: OVT must ingest such stress streams gracefully (NFR robustness, B.7 rule 1).
 
 ## A.2 Elecard StreamEye Studio
 
 | Item | Facts | Source |
 |---|---|---|
-| Composition | Four GUI apps + four consoles: StreamEye, Stream Analyzer, Video Quality Estimator (UI name "VideoQuest"), YUV Viewer; StreamEye Console, Stream Analyzer Console, Video Quality Estimator Console, YUV Viewer Console. Older bundles listed a separate Buffer Analyzer, now folded into StreamEye's Buffer tool. Stream Inspector is a separate real-time monitoring product (network/DVB-ASI/file input, TR 101 290, E-PSNR no-reference metric for AVC/MPEG-2, bitrate-per-PID pie chart). "Quality Gates" (multi-stream synchronised analysis, AV1/AVS3/VVC decoders) appears in release notes. | https://www.elecard.com/products/video-analysis/streameye-studio · https://www.softpedia.com/get/Multimedia/Video/Other-VIDEO-Tools/Elecard-StreamEye-Studio.shtml · https://elecard.com/question/elecard-streameye-and-elecard-streameye-basic-comparison · https://elecard.com/products/monitoring/stream-inspector · https://www.elecard.com/docs/en/ReleaseNotes/index.html |
-| Platforms | Windows 10/11 x64, macOS 10.13 → macOS 26 Tahoe, Ubuntu 18.04 → 26.04 LTS x64, 16 GB RAM. 2026 release moved the UI to Qt 6 and added Mandarin localisation. No Android. | https://www.elecard.com/products/video-analysis/streameye · release notes |
-| Pricing | Quote-only on Elecard and SoftwareOne pages. A 2019 Streaming Media review quoted Video Quality Estimator GUI $850, console +$400. StreamEye Basic sells VP9/VVC/AV1/AVS3 as paid plugins. | https://platform.softwareone.com/product/elecard-streameye-studio/PCP-9579-1164 · https://platform.softwareone.com/product/elecard-streameye-basic/PCP-3082-7951 · https://www.streamingmedia.com/Articles/Editorial/Featured-Articles/Elecard-Video-Quality-Estimator-Review-129136.aspx |
-| StreamEye codecs | MPEG-1/2, AVC, HEVC, MV-HEVC, VP9, AV1 (libaom 3.7), VVC (VTM 18.2, 12-bit), AVS3 (HPM 15.4), APV. | https://www.elecard.com/products/video-analysis/streameye |
-| StreamEye containers | MPEG-1 SS, MPEG-2 TS/PS, MP4/MOV, MKV/WebM, AVI, MXF, FLV, IVF, HEIC, MPEG-DASH MPD and HLS master playlist (pick a rendition). | same + release notes |
-| Raw formats | I444, I422, IYUV, NV12, NV21, P420, P444, RGB24/32, UYVY, V210, V400, V444, Y42B, YUY2, YV12, YV16, YVYU. | same |
+| Composition | Suite of four applications, each with a console version: StreamEye, Stream Analyzer, Video Quality Estimator and YUV Viewer. Stream Inspector is a separate real-time monitoring product. | https://www.elecard.com/products/video-analysis/streameye-studio · https://elecard.com/products/monitoring/stream-inspector |
+| Platforms | Windows, macOS and Linux desktop; no Android. | https://www.elecard.com/products/video-analysis/streameye |
+| Pricing | Quote-based; a "Basic" edition sells some codecs as paid plugins. | https://elecard.com/question/elecard-streameye-and-elecard-streameye-basic-comparison |
+| StreamEye codecs | MPEG-1/2, AVC, HEVC, MV-HEVC, VP9, AV1, VVC, AVS3, APV. | https://www.elecard.com/products/video-analysis/streameye |
+| StreamEye containers | MPEG-1 SS, MPEG-2 TS/PS, MP4/MOV, MKV/WebM, AVI, MXF, FLV, IVF, HEIC; DASH and HLS manifests (one rendition). | https://www.elecard.com/products/video-analysis/streameye · https://www.elecard.com/docs/en/ReleaseNotes/index.html |
+| Raw formats | Common planar, semi-planar and packed YUV and RGB formats. | https://www.elecard.com/products/video-analysis/streameye |
 
-**StreamEye views** (full edition unless stated; sources: StreamEye page, Full vs Basic comparison, release notes).
+**StreamEye feature areas** (from the product page, edition comparison and release notes): per-frame size/type/QP chart used for navigation, with bitrate over a selected range; bit distribution across coded elements; frame thumbnails; stream, picture and block information; parameter-set and slice headers; DPB contents; per-stage block data (prediction, residual, coefficients, unfiltered and decoded pixels); statistics; hex view; pixel values; standards-compliance messages; HRD/VBV buffer analysis; picture comparison against a reference with PSNR/SSIM/VMAF; overlays for slices, tiles, partitions, motion vectors and in-loop filters; colour-matrix selection; HDR format and metadata identification; frame search by order, time or byte offset; synchronisation and shared comments between the suite's applications; CSV export and decoded-YUV export; console.
 
-| View / panel | Description | Data |
-|---|---|---|
-| BarChart | Per-frame bar chart (size, type colour, selectable element: bits, QP, PSNR/EPSNR, Temporal ID) used as the primary navigation; set a time window and recalc bitrate instantly. Basic: yes except EPSNR. | Per-frame bits/type/QP/metrics |
-| Area Chart | Stacked area chart of bit distribution across coded elements over time. Full only. | Bits per syntax element per frame |
-| Thumbnails | GOP view with thumbnails; jump to any frame. Full only. | Decoded frames |
-| Info panel: Stream / Picture | Stream summary and picture info incl. bit distribution in coded elements (Basic lacks the latter). | Aggregates |
-| Info panel: Block info | Selected MB/CU/SB data: slice/tile, partition, pred type, bit size, quantiser, filters. | Block tree |
-| Info panel: Headers | Parameter-set/slice header text. | Syntax |
-| Info panel: DPB info | Reference frames and DPB contents (AVC, HEVC). | DPB |
-| Info panel: Block Presenter | Decoded / predicted / unfiltered pixels, residual, transform, dequantised coefficients for the selected block. | Per-stage block arrays |
-| Info panel: Statistics | Visualised statistics (modes, sizes etc.). | Aggregates |
-| Stream Viewer | Header-level text presentation of the stream structure. | Syntax |
-| HEX Viewer | Byte view of the stream. | Raw bytes |
-| Pixels Viewer | Numeric pixel values under the cursor. | Planes |
-| Message Viewer | Standards-compliance messages (AVC, HEVC). | Conformance |
-| Buffer Analyzer / Buffer tool | Decoder buffer (HRD/VBV) parameters and fullness graph for MPEG-2, AVC, HEVC, VVC, AV1; cursor synced with BarChart & Stream Viewer; fullness at cursor; entries in one table. | HRD params, frame sizes, timing |
-| Picture difference / Memory | Save frames to memory and compare; modes Compare, PSNR, PSNR Clip, Temperature, Subtraction, H/V split; add reference YUV for PSNR/SSIM/VMAF. | Decoded + reference planes |
-| Overlays (Overlay Config) | Slice & tile boundaries, partitions, motion vectors, sizes, "Extended" (SAO/ALF filter overlays), customizable. | Block tree, MVs, filter params |
-| Applied filters | Interlace mode, contrast/colour; BT.601/709/2020 switch; new upsamplers and split view (4.10). | Planes |
-| HDR | HDR format identification incl. HDR Vivid, metadata display. | SEI/VUI |
-| Navigation / search | Play/stop/jump/step; I/P/B/IP/Key-frame stepping modes; search by stream or display order, time, byte offset. | Index |
-| Binding mode / comments | Sync frame/cursor across StreamEye Studio apps; share comments between instances. Full only. | — |
-| Export | CSV analytical data, save decoded YUV in selectable format, stream summaries; CLI StreamEye Console. Full only. | — |
+Quality metrics listed for StreamEye with a reference: PSNR, SSIM, DELTA, MSE, MSAD, VQM, NQI, EPSNR, VMAF.
 
-Quality metrics available inside StreamEye when a reference is added: PSNR, SSIM, DELTA, MSE, MSAD, VQM, NQI, EPSNR, VMAF.
+**Stream Analyzer** (https://elecard.com/products/video-analysis/stream-analyzer): container structure and hex view for TS/PS, MP4/MOV, MKV/WebM, AVI, FLV, IVF, HEIC, DASH and HLS; video and audio syntax for the common codecs; ETSI TR 101 290 checks; PSI/SI, SCTE-35 and other broadcast tables; PCR/PTS/DTS analysis; bitrate graphs with short windows; HDR metadata checks; CSV export; console.
 
-**Stream Analyzer** (https://elecard.com/products/video-analysis/stream-analyzer): configurable GUI with hex viewer synchronised with the selected element; structure trees for TS/PS/MPEG-1 SS, MP4/MOV, MKV/WebM, AVI, FLV, IVF, HEIC, DASH MPD and HLS (select a profile, analyse its segments); video syntax for MPEG-1/2/4, VC-1, AVC, HEVC, MV-HEVC, VP9, AV1, VVC, AVS3, APV; audio MPEG-1/2 L1-3, AC-3, AAC; ETSI TR 101 290 P1–P3 error list filterable by service/PID/table, TS packet numbering with PID; PSI/SI, EPG, SCTE-35, DVB subtitles, HbbTV tables; PCR/PTS/DTS analysis with PCR accuracy graph; bitrate graph with 10/100/250/500 ms windows for micro-burst detection; overhead calculation; HDR10/HDR Vivid metadata checks; CSV export of stream info and selected packets; save data portion; Binding mode; console. Platforms Windows 10/11, macOS 10.13–26, Ubuntu 18.04–26.04 x64. Pricing on request.
+**Video Quality Estimator** (https://www.elecard.com/products/video-analysis/video-quality-estimator · https://www.elecard.com/question/what-metrics-video-quality-estimator-4.x-can-calculate): full-reference metrics PSNR, APSNR, SSIM, DELTA, MSE, MSAD, VQM, NQI, VIF, VMAF, VMAF-phone; several distorted files against one reference; regions of interest; automatic start-frame alignment; per-frame metric plots and difference views; CSV/JSON export; console.
 
-**Video Quality Estimator (VideoQuest)** (https://www.elecard.com/products/video-analysis/video-quality-estimator · https://www.elecard.com/question/what-metrics-video-quality-estimator-4.x-can-calculate): metrics PSNR, APSNR, SSIM, DELTA, MSE, MSAD, VQM, NQI, VIF, VMAF, VMAF-phone; up to 5 files simultaneously (v5.0); ROI selection; automatic start-frame matching; three-panel UI (Stream list, Graphics with bitrate/frame/metric plots and magnification, Display side-by-side or layered with zoom, grid, synchronised panning); Diff panel modes PSNR/PSNR Clip/Subtraction/Temperature/H-V split; Y/U/V/YUV per metric; export CSV/JSON, stream info, frame grabs; console. Reviewer cons (Streaming Media): source must be raw with no preview, same-resolution requirement, tiny bitrate graph, Euro-style CSV defaults.
-
-**YUV Viewer** (https://www.elecard.com/en/products/video-analysis/yuv-viewer): raw-only display/compare; metrics PSNR, APSNR, MSE, MSAD, DELTA, SSIM, NQI, VQM, VMAF; compare modes PSNR/PSNR Clip/Subtraction/H-V split; BT.601/709/2020; endian/upsampler selection; frame rotation (4.5); monochrome (4.3); console for batch; Binding mode; macOS 11+.
-
-**Elecard UX conventions.** Bar-chart-as-timeline is the primary navigation idiom; Buffer graph cursor, Stream Viewer and thumbnails follow the selected frame; cross-process Binding mode sync + shared comments; search by display/decode order, time or byte offset; frame-type stepping filters.
+**YUV Viewer** (https://www.elecard.com/en/products/video-analysis/yuv-viewer): raw video display and comparison with full-reference metrics; colour-matrix selection; console for batch use.
 
 ## A.3 Other tools
 
-**Intel Video Pro Analyzer (discontinued → VQ Analyzer).** Codecs HEVC (8–14-bit, SHVC/SCC/MV-HEVC), VP9, AVC, MPEG-2; containers MKV/MP4/TS/PS/AVI/MMT; file-only, no TS-packet view, no DASH/HLS packet stats, no audio. VP9 Efficiency Map and Probabilities/Counts tabs were VPA-unique. Evaluation limited to 10 frames. https://www.intel.com/content/www/us/en/developer/articles/tool/video-pro-analyzer.html · https://www.intel.com/content/www/us/en/developer/articles/troubleshooting/find-quality-issues-vpa.html
+**Intel Video Pro Analyzer (discontinued).** HEVC, VP9, AVC, MPEG-2; common containers; file-based analysis. https://www.intel.com/content/www/us/en/developer/articles/tool/video-pro-analyzer.html
 
-**Solveig Zond 265.** https://www.solveigmm.com/en/products/zond/ · https://www.solveigmm.com/en/products/zond/history/linux/. Codecs HEVC, AVC, MPEG-2, AV1, EVC (ES only), VVC (ES/MP4, 2026); containers VES, TS, MP4, fMP4, MXF/MKV/PS/FLV/AVI/ASF, YUV/Y4M; Windows/macOS/Linux (.deb). Views: frame-size bars coloured I/P/B with reference marking and frame-duration tooltips; translucent overlays CU/PU/TU/QP/Bits/RefIdx/PSNR; CU/PU/TU bit-table; bitrate histogram with per-second peaks; HRD/CPB from SEI; HDR/SEI parse per frame; encoding-toolset summary; AV1 Q-index per block, AV1 HEX, AV1 level validation; no-reference PSNR (6.0); VMAF/PSNR/MSSIM; GUI + CLI conformance validation; CLI reports CSV & JSON with CU data, intra-mode stats, HRD occupancy, decoding-stage YUV dumps (final/after-deblock/before-deblock/residual/predicted). Pricing: Free tier; Home $174/yr or $27.30/mo; Business $834/yr (CLI); Business Teams $1,794/yr floating. NW.js-based UI.
+**Solveig Zond 265.** https://www.solveigmm.com/en/products/zond/. HEVC, AVC, MPEG-2, AV1, EVC, VVC; common containers and raw YUV; Windows/macOS/Linux. Feature areas: frame-size chart with reference marking; block-level overlays (partitions, QP, bits, reference index, PSNR); bitrate histogram; HRD/CPB analysis; HDR/SEI parsing; AV1 level validation; no-reference and full-reference metrics; conformance validation; CSV/JSON reports and per-stage YUV output from the CLI. Free and paid tiers.
 
-**Codecian CodecVisa.** https://codecian.com/ · https://codecian.com/codecvisa.html. HEVC (+MV-HEVC), AVC/MVC, VP9/VP8, MPEG-2, YUV; MP4/3GP, TS/PS, FLV, MKV/WebM; Windows/Linux/macOS; last release 4.38 (2017), effectively dormant; no VVC/AV1. Views: Thumbnail View, Video View (final / pre-SAO / pre-loop-filter / predicted / residual pictures, top/bottom field), Pixel Dialog (per-stage pixel values incl. IDCT coefficients, dec/hex), Header View, MB Info (ref list, MB strength), Summary (encoding rate, avg QP, bits per MB type), Binary View per MB/CU, CTB Structure View with MVs/PU/TU, Compare Streams, Dump Information (YUV, MB info, headers). Unique: "Decode Stage Display" of whole pictures at each stage.
+**Codecian CodecVisa.** https://codecian.com/codecvisa.html. HEVC, AVC/MVC, VP9/VP8, MPEG-2; common containers; Windows/Linux/macOS; no release since 2017; no VVC/AV1. Feature areas: per-stage whole-picture display, per-stage pixel values, headers, block information, summary statistics, partition and motion-vector display, stream comparison, data dumps.
 
-**Interra VEGA Media Analyzer.** https://interrasystems.com/press-kit/IBC2023/Product-Datasheets/VEGA/Vega_Datasheet.pdf · https://www.interrasystems.com/video-codec-analyzer.php · https://interrasystems.com/Vega-cli.php · https://www.interrasystems.com/av1-analyzer.php. Codecs AV1, VVC, HEVC (SCC, FRExt), AVC, VP8/9, MPEG-2, JPEG 2000, ProRes, AVS/AVS+, Dolby Vision; containers TS/PS, MP4, MXF, MKV/WebM, MMT/TLV, PCAP, HEIF; ABR DASH/HLS/ISM with manifest validation, CMAF, ATSC 3.0, chunk alignment checks; audio incl. Dolby AC-4/Atmos/E. Views: Quad-tree view, slice/tile/block overlays with bits/MV/QP/interpolation/ref idx, residue view, in-loop filter & intra visualisation, pixel at each stage, Trace Viewer linking syntax to hex, Buffer Analyzer (CPB & T-STD), YUV Quality Viewer (PSNR/RMSE/SSIM), Comparison Viewer, Error Log Viewer export XML/PDF, closed-caption visualisation, GUI batch mode; VEGA CLI is Linux/Docker, XML reports, 5× real-time 4K.
+**Interra VEGA Media Analyzer.** https://www.interrasystems.com/video-codec-analyzer.php · https://interrasystems.com/Vega-cli.php. AV1, VVC, HEVC, AVC, VP8/9, MPEG-2, JPEG 2000, ProRes, AVS/AVS+, Dolby Vision; broadcast and ABR containers with manifest validation; audio. Feature areas: block overlays (bits, MV, QP, reference index), residual and in-loop filter views, per-stage pixels, syntax-to-hex linkage, buffer analysis, quality metrics, stream comparison, error reporting; Linux/Docker CLI with XML reports.
 
-**Tektronix/Telestream MTS4EA (MTS4EAV7).** https://manualmachine.com/tektronix/mts4ea/10503446-datasheet · https://www.electronicspecifier.com/products/design-automation/new-mts4eav7-adds-hevc-h-265-standard-support-to-elementary-stream-analyzer. AVC/MPEG-2/VC-1/MPEG-4 Part 2/H.263 (+HEVC via MTS4EAV7), audio add-on; buffer analysis plots, spatial bits-per-MB, MV histogram, quantisation, DCT frequency, MB-coded and intra frequency plots; bitstream/interpret/alert/frame/MB/transform/pixel/fidelity/syntax traces; bitstream editor (edit, re-analyse, save); batch regression with logs; Excel export; YUV output; ARIB TR-B14 compliance; Windows PC / MTS400 hardware.
+**Tektronix/Telestream MTS4EA.** https://manualmachine.com/tektronix/mts4ea/10503446-datasheet. AVC, MPEG-2, VC-1, MPEG-4 Part 2, H.263 and HEVC; buffer analysis, spatial bit and quantisation plots, MV histograms, syntax traces, bitstream editing, batch regression, YUV output; Windows.
 
-**Sencore CMA 1820.** https://www.tvtechnology.com/opinions/sencore-delivers-hevc-analysis-capabilities-with-cma-1820 · https://prnewswire.com/news-releases/sencore-debuts-new-hevc-analysis-product-at-cable-tec-expo-2013-225790251.html. HEVC/AVC/MPEG-2/VC-1 + AC-3/AAC/MPEG audio, frame-by-frame breakout, coding tree block structure, full header syntax, PTS/DTS and A/V sync, optional CC, SCTE-35 DPI analysis.
+**Sencore CMA 1820.** https://www.tvtechnology.com/opinions/sencore-delivers-hevc-analysis-capabilities-with-cma-1820. HEVC, AVC, MPEG-2, VC-1 and audio; frame-by-frame analysis, coding-tree structure, header syntax, PTS/DTS and A/V sync, SCTE-35.
 
-**Parabola Explorer (HEVC only).** https://parabolaresearch.com/explorer-hevc-analyzer.html · https://parabolaresearch.com/downloads/Parabola-Explorer-Datasheet.pdf · https://parabolaresearch.com/blog/2012-11-16-introducing-parabola-explorer.html. HEVC Main/Main10; Windows XP–8.1; Essential $800, Pro quote. Syntax tree down to CABAC bins and individual bits with fractional-bit size, CABAC state/contexts in stream view, display-order output view with thumbnails, interactive GOP display, per-picture QP/size chart, interactive DPB/RPL view, active VPS/SPS/PPS/SSH display, overlays (tiles/slices/CTU/CU grid, bit usage, QP, SAO, PU prediction, residual with scan pattern & coefficient values), predicted/reconstructed/output/YUV-diff stages; Pro adds full feature-usage statistics, printable reports, conformance with spec paragraph numbers, profile/level validation, multi-process decoding and image caching.
+**Parabola Explorer (HEVC only).** https://parabolaresearch.com/explorer-hevc-analyzer.html. HEVC Main/Main10; Windows. Feature areas: syntax tree down to CABAC bins with bit sizes, GOP and DPB/reference-list views, per-picture QP/size chart, block overlays, per-stage pictures, feature-usage statistics, conformance checks with spec paragraph references, profile/level validation.
 
-**Telestream Switch and Aurora.** Switch 5 (https://redsharknews.com/telestream-switch-5-pro-review-comprehensive-qc-software · https://www.streamingmedia.com/PressRelease/Telestream-Brings-New-Professional-Visual-Inspection-and-QC-Capabilities-to-Switch_38804.aspx): Player (free) / Plus ($699) / Pro ($999) on macOS & Windows; frame-accurate QC playback of MXF/IMF/GXF/TS/PS/MOV/MP4/WMV/HEVC/DNx/ProRes RAW/DCP/J2K; timeline showing GOP structure, datarate and flags; on-frame metadata overlays; container/codec property inspector; split/alternating multi-file compare; captions CEA-608/708/SCC/DVB/TTML/WebVTT/SRT/STL; loudness BS.1770 up to 64 tracks; AJA/Blackmagic SDI/HDMI preview; AS-11/AS-03 metadata; export with colour-space controls. Not a bitstream analyzer. Aurora (https://www.trustradius.com/products/telestream-aurora/details): automated file QC with TekMOS no-reference ML picture-quality score, delivery-spec templates (Netflix, iTunes, AS-11 DPP, ARD-ZDF), OTT profile/packaging checks, on-prem/cloud API, graphical reports.
+**Telestream Switch and Aurora.** https://redsharknews.com/telestream-switch-5-pro-review-comprehensive-qc-software · https://www.trustradius.com/products/telestream-aurora/details. Switch: QC playback and container/codec property inspection on macOS and Windows, captions, loudness, multi-file comparison; not a bitstream analyzer. Aurora: automated file QC with a no-reference picture-quality score and delivery-spec templates.
 
-**VideoQ VQV (Windows, dongle).** https://videoq.com/Downloads/VideoQ_VQV_Viewer-Analyzer_Datasheet.pdf. FFmpeg-decoded or raw YUV/Y4M/RGB/BMP up to 8K; YUV/RGB waveform, vectorscope, ChromaScope gamut check, FrameScope line profile, RGB & light-level histograms, L-Bar light-level stats (nits, % range) with LL heat-map & highlighter, active-frame (letterbox) meter, noise/activity meter, C-Bar bitrate/GOP, PQ/HLG/LOG/SDR transfer functions with HDR→SDR previews, BT.601/709/2020 matrices, DCI-P3/2020 primaries, narrow/full range, MSB/LSB view, temporal/spatial HP/LP filters, gain ×16, AB loop, 9 bookmarks, sync server to VQMP player. Unique: broadcast scopes and HDR light-level metrology (input to Chapter 10 HDR measurements).
+**VideoQ VQV.** https://videoq.com/Downloads/VideoQ_VQV_Viewer-Analyzer_Datasheet.pdf. Windows raw/decoded viewer with broadcast scopes (waveform, vectorscope, gamut, histograms), HDR light-level measurement, PQ/HLG/SDR transfer functions and colour-matrix selection. Relevant as a reference point for chapter 10 HDR measurements.
 
-**vooya (raw viewer, shareware).** https://www.offminor.de/vooya-usage.html · https://www.offminor.de/vooya-command-line.html · https://offminor.de/. Planar/interleaved YUV, UYVY/YUY2, v210/v410, NV12, P010/P016, r210, grey, float; YUV/RGB/HSV/XYZ/YIQ; up to 16-bit, signed/endian/header-skip/interlaced/flip; two-file diff (normalised, binary, side-by-side), PSNR/MSE/SSIM per channel + first differing pixel, magnifier with per-channel values, histogram, brightness/contrast/gamma/exposure, plugins; CLI flags `-w -h --packing --color --bits --diff --metrics stdout --go --loop`, stdin pipe input (`cat f.yuv | vooya -w ... --packing p420`), playlists; macOS/Windows/Linux; closed source, free on Linux, paid on macOS/Windows. Unique: pipe-friendly CLI, float formats, macroblock overlays for AVC/HEVC/AV1.
+**vooya (raw viewer, shareware).** https://www.offminor.de/. Raw video viewer for many planar/packed formats up to 16-bit and float; two-file difference with per-channel metrics; histograms; command-line and pipe input; macOS/Windows/Linux.
 
-**MediaInfo (open source, BSD-2).** https://www.mankier.com/1/mediainfo-gui · https://mediaarea.net/en/MediaInfo. CLI/GUI/library; outputs Text, HTML, XML, OLDXML, JSON, EBUCore XML/JSON, PBCore/PBCore2, custom `--Inform` templates, CSV/sheet/tree views; very wide container/codec metadata coverage; official Android app. Reference for metadata schema and template-based reporting; its `--Details=1` trace is a container oracle (B.2).
+**MediaInfo (open source, BSD-2).** https://mediaarea.net/en/MediaInfo. CLI/GUI/library with Text, HTML, XML, JSON, EBUCore and PBCore output and template-based reports; very wide container/codec metadata coverage; official Android app. Its detailed trace output is a container oracle (B.2).
 
-**MulticoreWare.** No commercial bitstream analyzer product could be located (only x265 and third-party analyzers; https://en.wikipedia.org/wiki/X265). Not applicable.
+**MulticoreWare.** No commercial bitstream analyzer product could be located (https://en.wikipedia.org/wiki/X265). Not applicable.
 
 ## A.4 Consolidated feature matrix
 
-Legend: ● = yes/full, ◐ = partial or edition-gated, ○ = no/unknown. Abbreviations: VQA = VQ Analyzer, SE/SES = StreamEye (full) / Studio companion apps, Z = Zond 265, PE = Parabola Explorer, CV = CodecVisa, VEGA = Interra VEGA, MTS = Tektronix MTS4EA, VPA = Intel VPA (legacy), Sw = Switch, VQV = VideoQ, vo = vooya, MI = MediaInfo.
+Legend: ● = yes/full, ◐ = partial or edition-gated, ○ = no/unknown, per the public sources above. Abbreviations: VQA = VQ Analyzer, SE/SES = StreamEye (full) / Studio companion apps, Z = Zond 265, PE = Parabola Explorer, CV = CodecVisa, VEGA = Interra VEGA, MTS = Tektronix MTS4EA, VPA = Intel VPA (legacy), Sw = Switch, VQV = VideoQ, vo = vooya, MI = MediaInfo.
 
 | Feature | VQA | SE/SES | Z | PE | CV | VEGA | MTS | VPA | Sw | VQV | vo | MI |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -201,20 +130,18 @@ Legend: ● = yes/full, ◐ = partial or edition-gated, ○ = no/unknown. Abbrev
 | Android | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ○ | ● |
 | Free tier | trial | demo | ● | trial | trial | trial | ○ | 10 frames | Player | ○ | shareware | ● OSS |
 
-## A.5 Cross-tool UX consensus (recorded for Chapter 11)
+## A.5 Usability lessons (recorded for Chapter 11)
 
-1. Three-pane skeleton: filmstrip/bar-chart timeline, picture canvas with overlays, tabbed syntax/statistics tree + selection info (VQA/VPA, SE, PE, CodecVisa, VEGA).
-2. Mode switching by function keys (F1–F12) and overlay toggles by single letters (P picture, I info, H/D hex/dec, L legend, R fit, F fullscreen).
-3. Right-click = drill-down Details; repeated left-click cycles CU→PU→TU; wheel-zoom about cursor; drag-pan.
-4. Selection → syntax linkage: clicking a block selects its CU entry in the syntax tree and highlights its bit range in hex; double-clicking a VCL NAL or an error row navigates to that picture/block.
-5. Frame-type colour language: red I, blue P, green B; long-term refs green arrows.
-6. Cursor sync everywhere (buffer graph, bar chart, stream viewer, thumbnails); cross-process Binding mode (Elecard).
-7. Decode vs display order toggle throughout; search by either order, time or byte offset.
-8. Legends and formula popups rather than bare numbers.
-9. Same binary for GUI and CLI; every GUI analysis exportable from the console.
-10. Spec terminology in all labels.
+This section used to record the user-interface conventions of the surveyed products. It now keeps only generic, product-neutral usability lessons; OVT's layout, panels and key bindings are designed independently in chapter 11.
 
-Pain points recorded from reviews (to avoid): raw-source format guessing without preview, same-resolution constraints, non-resizable charts, locale-dependent CSV defaults.
+1. Users expect a timeline of per-frame data, a picture canvas with switchable overlays, and a syntax/statistics view of the current selection to be visible together.
+2. Selecting a block, a syntax element or a byte range should select the same item in every other view, and navigation from an error to the picture and block it concerns should take one action.
+3. Decode order and display order both matter to codec engineers; every view that lists frames should say which order it uses and allow switching.
+4. Numbers are easier to use with legends and derivations shown beside them.
+5. Every analysis available in the GUI should also be available from the command line for batch use.
+6. Labels should use the terminology of the codec specifications.
+
+Pain points reported in published reviews (to avoid): guessing raw-source formats without a preview, requiring equal resolutions for comparison, charts that cannot be resized, and locale-dependent CSV defaults.
 
 ---
 

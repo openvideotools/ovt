@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # libaom for the oracle image (chapter 14 §14.4.5, WI-0.554). Two builds from one verified archive:
-#   1. stock shared libaom + aomenc/aomdec, installed into the prefix (FFmpeg's --enable-libaom links it);
+#   1. stock shared libaom + aomenc/aomdec, installed into the prefix (FFmpeg's --enable-libaom links it), plus the
+#      scalable_encoder example (recipe 16 of §14.3.3);
 #   2. the inspection build: `inspect` exists only with CONFIG_INSPECTION=1 AND ENABLE_EXAMPLES=1.
 # The archive is the one third_party/VERSIONS.md pins (same SHA-256), so oracle and product agree.
 
@@ -23,16 +24,25 @@ src="${work}/libaom-${LIBAOM_VERSION}"
 
 common=(-G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTS=0 -DENABLE_DOCS=0 -DENABLE_TOOLS=0)
 
+# CMAKE_BUILD_WITH_INSTALL_RPATH: the examples are installed from the build tree (below), so they need the install
+# RPATH too; the build tree is deleted at the end.
 cmake -S "${src}" -B stock "${common[@]}" -DBUILD_SHARED_LIBS=1 -DENABLE_EXAMPLES=1 \
-  -DCMAKE_INSTALL_PREFIX="${OVT_ORACLES_PREFIX}" -DCMAKE_INSTALL_RPATH="${OVT_ORACLES_PREFIX}/lib"
+  -DCMAKE_INSTALL_PREFIX="${OVT_ORACLES_PREFIX}" -DCMAKE_INSTALL_RPATH="${OVT_ORACLES_PREFIX}/lib" \
+  -DCMAKE_BUILD_WITH_INSTALL_RPATH=1
 cmake --build stock -j "${OVT_ORACLES_JOBS}"
 cmake --install stock
+# libaom's install step does not install the examples. scalable_encoder is the §14.3.3 recipe 16 producer
+# (syn_av1_scalability, tests/corpora/synthetic/recipes.json).
+scalable_bin="$(find stock -type f -name scalable_encoder -perm -u+x -print -quit)"
+[[ -n "${scalable_bin}" ]] || ovt_die "scalable_encoder was not built"
+install -m 0755 "${scalable_bin}" "${OVT_ORACLES_PREFIX}/bin/scalable_encoder"
 
 cmake -S "${src}" -B inspection "${common[@]}" -DENABLE_EXAMPLES=1 -DCONFIG_INSPECTION=1 -DCONFIG_ACCOUNTING=1
 cmake --build inspection -j "${OVT_ORACLES_JOBS}" --target inspect
-inspect_bin="$(find inspection -type f -name inspect -perm -u+x | head -n 1)"
+inspect_bin="$(find inspection -type f -name inspect -perm -u+x -print -quit)"
 [[ -n "${inspect_bin}" ]] || ovt_die "inspect was not built"
 install -m 0755 "${inspect_bin}" "${OVT_ORACLES_PREFIX}/bin/inspect"
 
+ovt_stamp scalable_encoder "libaom v${LIBAOM_VERSION} (${LIBAOM_COMMIT}) examples/scalable_encoder"
 ovt_stamp inspect "libaom v${LIBAOM_VERSION} (${LIBAOM_COMMIT}) CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1"
 rm -rf "${work}"

@@ -5,7 +5,7 @@ OVT gets its libraries from three places (chapter 13 §13.3.1):
 | Source | What | Pinned by |
 |---|---|---|
 | vcpkg manifest (`vcpkg.json`) | fmt, spdlog, flatbuffers (library and the `flatc` host tool), zstd, nlohmann-json, highway, cli11, xxhash, catch2; later zimg, Vulkan, glslang, lcms, libpng, pybind11, benchmark, onnxruntime | `builtin-baseline` in `vcpkg.json` and the `third_party/vcpkg` submodule commit |
-| `third_party/*.cmake` ExternalProject scripts | FFmpeg, libaom, dav1d, libde265, HM, libvmaf, libplacebo, MoltenVK | `third_party/VERSIONS.md` |
+| `third_party/*.cmake` ExternalProject scripts | FFmpeg, libaom, dav1d, libde265, HM, libvmaf, libplacebo, MoltenVK, ONNX Runtime (prebuilt fallback, `OVT_ONNXRUNTIME_PREBUILT=ON`) | `third_party/VERSIONS.md` |
 | Prebuilt | Qt 6.8.3 (aqtinstall), Android SDK/NDK | `tools/install_qt.py`, `tools/bootstrap_android.sh` |
 
 This page covers the vcpkg part first, then the `third_party/` script machinery (see "Own builds" below).

@@ -13,7 +13,7 @@
 | Item | Value |
 |---|---|
 | Project name | **Open Video Tools** (short: **OVT**). Component names below use the `ovt` prefix. The owner may rename later; names are placeholders but MUST be used consistently in the spec. |
-| One-sentence goal | A free and open-source, cross-platform video analysis suite that reproduces the functionality of ViCueSoft VQ Analyzer and the Elecard StreamEye Studio suite for H.264/AVC, H.265/HEVC and AV1, with correct HDR (PQ and HLG) display, usable by codec researchers, video quality teams and video platform teams. |
+| One-sentence goal | A free and open-source, cross-platform video analysis suite for H.264/AVC, H.265/HEVC and AV1 that covers the feature areas of commercial stream analyzers (bitstream syntax, block partitioning and motion vectors, decoded planes, container structure and quality metrics), with correct HDR (PQ and HLG) display, usable by codec researchers, video quality teams and video platform teams. OVT is an independent implementation (chapter 1 §1.2). |
 | Primary platforms | **macOS (arm64 and x86_64)** — first development platform. **Android tablets and Chromebooks (Android app; arm64-v8a and x86_64 ABIs)** — developed concurrently from the start. **Linux desktop (x86_64, arm64; Wayland and X11)**. |
 | Explicit non-targets | Windows, iOS, web browser builds. The design must not *preclude* them, but no work item may target them. |
 | Initial codecs | H.264/AVC (ITU-T H.264 08/2021), H.265/HEVC (ITU-T H.265 09/2023, Main/Main10 required; RExt/SCC via oracle decoder), AV1 (AOM AV1 Bitstream & Decoding Process Specification v1.0.0 with Errata 1). VP9, VVC, MPEG-2 are **future** codecs; the data model and plugin ABI must not hard-code the initial three. |

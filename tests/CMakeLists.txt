@@ -27,9 +27,16 @@ if(Python3_Interpreter_FOUND)
 endif()
 
 # Golden glue (WI-0.556) and the perf harness (WI-0.560) add their directories when they land.
-foreach(_dir golden perf downstream)
+foreach(_dir golden oracles perf downstream)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/CMakeLists.txt")
     add_subdirectory(${_dir})
   endif()
 endforeach()
 unset(_dir)
+
+# WI-0.012: the FFmpeg flag lists of third_party/ffmpeg/configure_flags.cmake and the Android toolchain wrapper,
+# checked without building FFmpeg.
+add_test(NAME ffmpeg_configure_flags
+         COMMAND "${CMAKE_COMMAND}" "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/ffmpeg_configure_flags" -P
+                 "${PROJECT_SOURCE_DIR}/third_party/ffmpeg/test_configure_flags.cmake")
+set_tests_properties(ffmpeg_configure_flags PROPERTIES LABELS "fast;unit;third_party")

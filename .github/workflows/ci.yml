@@ -131,6 +131,9 @@ jobs:
       - name: Schema text equals the spec (WI-0.080, WI-0.081)
         run: python -I tools/check_schema_in_spec.py docs/spec/06-data-model.md core/schema
 
+      - name: Tests that cite slow streams carry [slow] (WI-0.552c)
+        run: python -I tools/check_slow_labels.py
+
       - name: Tool tests
         run: python -m pytest -q tools/tests
 
@@ -167,6 +170,7 @@ jobs:
         with:
           preset: linux-x64-release
           triplet: x64-linux-ovt
+          corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
           qt: "true" # ovt_studio and its --self-test CTest test (WI-0.019)
 
       # configure, build and the linux-x64-release test preset; JUnit at build/linux-x64-release/junit.xml.
@@ -189,7 +193,11 @@ jobs:
           path: build/linux-x64-release/junit.xml
           if-no-files-found: warn
 
+      # Build artefacts only while the repository is private: on a public repository anyone signed in to GitHub can
+      # download them, which is binary distribution, and they carry no THIRD_PARTY_NOTICES yet (chapter 15 §15.6;
+      # the release work items ship them with notices).
       - name: Upload build
+        if: github.event.repository.private
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ovt-linux-x64
@@ -212,6 +220,7 @@ jobs:
         with:
           preset: macos-arm64-release
           triplet: arm64-osx-ovt
+          corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
           qt: "true" # ovt_studio and its --self-test CTest test (WI-0.019)
 
       - name: Configure, build, test
@@ -246,9 +255,10 @@ jobs:
             build/pr-macos/junit.xml
           if-no-files-found: warn
 
-      # Karl downloads main builds to his MacBook with `gh run download -n ovt-macos-arm64`.
+      # Karl downloads main builds to his MacBook with `gh run download -n ovt-macos-arm64`. Private repository only,
+      # like ovt-linux-x64 above: a public artefact is a binary distribution without notices.
       - name: Upload build
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event.repository.private && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ovt-macos-arm64
@@ -268,6 +278,7 @@ jobs:
         with:
           preset: linux-x64-asan-ubsan
           triplet: x64-linux-ovt
+          corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
 
       - name: Clang 16
         run: |
@@ -307,6 +318,7 @@ jobs:
         with:
           preset: macos-arm64-asan
           triplet: arm64-osx-ovt
+          corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
 
       - name: Configure, build, test (sanitizers)
         run: cmake --workflow --preset ci-macos-asan # ctest --preset sanitizers-macos
