@@ -102,7 +102,7 @@ std::optional<SelectionUnit> StreamIndexAdapter::unit(int unit_index) const {
   if (u.file_span() != nullptr) {
     out.file_span = ByteSpan{u.file_span()->offset(), u.file_span()->length()};
   }
-  if (const auto* epb = u.epb_positions(); epb != nullptr && epb->size() != 0) {
+  if (const auto* epb = u.epb_positions(); epb != nullptr) {
     // FlatBuffers stores scalars little-endian and this is a little-endian-only build (Qt 6 targets), so the vector
     // is a plain uint32 array in place.
     out.epb_positions = std::span<const std::uint32_t>(epb->data(), epb->size());
@@ -120,22 +120,24 @@ int StreamIndexAdapter::decode_index_of(FrameId frame) const {
   if (frames == nullptr) {
     return -1;
   }
-  const auto frame_count = static_cast<std::int64_t>(frames->size());
-  if (frame.decode_index >= 0) {
-    if (frames_dense_) {
-      return frame.decode_index < frame_count ? frame.decode_index : -1;
+  std::int32_t decode = frame.decode_index;
+  if (decode < 0 && frame.display_index >= 0) {
+    // The display slot names the decode index.
+    const auto* order = index.display_order();
+    if (order == nullptr || static_cast<flatbuffers::uoffset_t>(frame.display_index) >= order->size()) {
+      return -1;
     }
-    for (flatbuffers::uoffset_t i = 0; i < frames->size(); ++i) {
-      if (frames->Get(i)->id() != nullptr && frames->Get(i)->id()->decode_index() == frame.decode_index) {
-        return static_cast<int>(i);
-      }
-    }
+    decode = order->Get(static_cast<flatbuffers::uoffset_t>(frame.display_index));
+  }
+  if (decode < 0) {
     return -1;
   }
-  if (frame.display_index >= 0) {
-    const auto* order = index.display_order();
-    if (order != nullptr && static_cast<flatbuffers::uoffset_t>(frame.display_index) < order->size()) {
-      return decode_index_of(FrameId{order->Get(static_cast<flatbuffers::uoffset_t>(frame.display_index)), -1});
+  if (frames_dense_) {
+    return static_cast<std::size_t>(decode) < frames->size() ? decode : -1;
+  }
+  for (flatbuffers::uoffset_t i = 0; i < frames->size(); ++i) {
+    if (frames->Get(i)->id() != nullptr && frames->Get(i)->id()->decode_index() == decode) {
+      return static_cast<int>(i);
     }
   }
   return -1;
