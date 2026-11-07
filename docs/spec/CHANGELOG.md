@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc13 — 2026-11-07
+
+PATCH-level: two recipe commands made reproducible after the WI-0.553 c2 `--check` on the oracle image. No requirement sentence, acceptance line or WI scope changes.
+
+- 14 §14.3.3 reproducibility rule 2 and recipes 68 `syn_mp4_cenc_widevine`, 69 `syn_mp4_piff` — Bento4 `mp4fragment`/`mp4encrypt` write the wall-clock time into `mvhd` (two runs differed in bytes 64 and 68), so both recipes end with the new `tools/mp4_pin_times.py`, which zeroes the `mvhd`/`tkhd`/`mdhd` creation and modification times; `generate.py` rejects (exit 4) a recipe whose last Bento4 step is not followed by it — WI-0.553
+
 ## 1.0.0-rc12 — 2026-11-06
 
 PATCH-level: a recipe command fixed after the WI-0.553 c2 run on the oracle image. No requirement sentence, acceptance line or WI scope changes.
