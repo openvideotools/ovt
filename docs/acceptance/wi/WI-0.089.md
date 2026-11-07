@@ -35,8 +35,8 @@ Pending: WI-0.089b.
 AT3 (YUView 2.14 loads `tiny16.yuv` plus `tiny16_hevc.csv` and exits 0 with no "error" line) and the step 5
 screenshot need a YUView binary. This container can't download one. To run them on a desktop with YUView 2.14:
 
-```console
-$ YUView --loadfile core/tests/golden/tiny16.yuv --loadfile core/tests/golden/tiny16_hevc.csv --quit-after-load
+```sh
+YUView --loadfile core/tests/golden/tiny16.yuv --loadfile core/tests/golden/tiny16_hevc.csv --quit-after-load
 ```
 
 Set the YUV item to 16×16 YUV 4:2:0 8-bit. The statistics item should list 23 OVT types (PredMode … BlockGrid_TU)
