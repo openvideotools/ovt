@@ -15,9 +15,14 @@ downloads and hash-verifies files into a cache. `LICENSES.md` is generated from 
 | `isobmff-broken` | seven generated broken MP4 files (recipes 34 to 37 and 72, `tests/corpora/synthetic/recipes.json`); each names the codes the reader must emit | tiny, generated | `tests/corpora/synthetic/generate.py` |
 
 Every entry of these tags has an `expected` object read by the container tests:
-`{ "format": "isobmff|ivf|annexb|matroska|mpegts", "codec": "H264|H265|AV1", "hdr_kind": "<HdrKind>", "diagnostics": ["CNT-nnnn"] }`;
+
+```json
+{ "format": "isobmff|ivf|annexb|matroska|mpegts", "codec": "H264|H265|AV1",
+  "hdr_kind": "<HdrKind>", "diagnostics": ["CNT-nnnn"] }
+```
+
 `codec`, `hdr_kind` and `diagnostics` appear only where known. HEIF files report `format: isobmff`.
 
 Redistribution: most container media is licensed for testing only (`redistributable: false`, see `LICENSES.md`). Never
-commit it, mirror it or attach it to a release. Dolby and CTA WAVE clips that need a login or are large are not tagged yet;
-their entries stay `unverified` until a mirror is pinned.
+commit it, mirror it or attach it to a release. Dolby and CTA WAVE clips that need a login or are large are
+not tagged yet; their entries stay `unverified` until a mirror is pinned.
