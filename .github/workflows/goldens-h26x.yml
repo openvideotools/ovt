@@ -50,6 +50,9 @@ jobs:
           key: goldens-h26x-corpora-${{ hashFiles('tests/corpora/manifest.json') }}
           restore-keys: goldens-h26x-corpora-
 
+      - name: fetcher dependencies
+        run: python3 -m pip install -r tools/requirements.txt
+
       - name: fetch the fast H.264/HEVC corpora (verified against the manifest hashes)
         run: |
           python3 -I tools/fetch_corpora.py --tags fast --cache-dir "${RUNNER_TEMP}/corpora" --retries 4 \
