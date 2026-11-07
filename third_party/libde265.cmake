@@ -15,6 +15,8 @@
 # kept out of the default downloads (tools/license_policy.toml [distribution]). The archive's COPYING is
 # kept with the build. ENABLE_ENCODER=OFF drops the enc265 tool; ENABLE_DECODER=OFF drops the dec265 tool;
 # these and ENABLE_SDL/BUILD_SHARED_LIBS are the only options of the pinned libde265 (chapter 07 §7.6.2).
+# DE265_INTERNALS is added by patch 0001 (WI-2.162): ON builds and installs the read-only internals API
+# libde265/de265_internals.h that the plugin reads per-block data through; OFF would build exactly upstream.
 
 include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
@@ -52,6 +54,7 @@ externalproject_add(
              -DENABLE_SDL=OFF
              -DENABLE_DECODER=OFF
              -DENABLE_ENCODER=OFF
+             -DDE265_INTERNALS=ON
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libde265.a)
 externalproject_add_stepdependencies(tp_libde265 download "${OVT_DE265_PATCH_SERIES}" ${_ovt_de265_patch_files})
 
