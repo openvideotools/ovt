@@ -207,3 +207,6 @@ _ovt_gate_test(fails_when_required "${_gate_dir}/empty" 1)
 set_tests_properties(corpus_gate_fails_when_required PROPERTIES WILL_FAIL TRUE)
 _ovt_gate_test(runs_command_when_complete "${_gate_dir}/complete" 1 ${CMAKE_COMMAND} -E echo gate-ran-the-command)
 set_tests_properties(corpus_gate_runs_command_when_complete PROPERTIES PASS_REGULAR_EXPRESSION "gate-ran-the-command")
+# A failing wrapped command must fail the gate (a gate that never runs its command would pass vacuously).
+_ovt_gate_test(propagates_command_failure "${_gate_dir}/complete" 1 ${CMAKE_COMMAND} -E cat "${_gate_dir}/no_such_file")
+set_tests_properties(corpus_gate_propagates_command_failure PROPERTIES WILL_FAIL TRUE)
