@@ -56,7 +56,7 @@ jobs:
             if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
               "$py" -m venv "$RUNNER_TEMP/lint-venv"
               echo "$RUNNER_TEMP/lint-venv/bin" >> "$GITHUB_PATH"
-              "$RUNNER_TEMP/lint-venv/bin/python" -m pip install --quiet -r tools/requirements.txt pytest==8.3.4 numpy==2.2.1
+              "$RUNNER_TEMP/lint-venv/bin/python" -m pip install --quiet -r tools/requirements.txt pytest==8.3.4 numpy==2.2.1 flatbuffers==25.12.19
               exit 0
             fi
           done
