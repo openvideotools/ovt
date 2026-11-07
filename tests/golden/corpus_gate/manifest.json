@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "entries": [
+    {"id": "gate_a", "tags": ["fast"], "url": "https://example.invalid/a.bin"},
+    {"id": "gate_b", "tags": ["fast", "slow"], "vcs": {"git": "https://github.com/example/x", "rev": "0", "lfs_path": "b.bin"}},
+    {"id": "gate_pending", "tags": ["fast"], "url": "https://example.invalid/c.bin", "unverified": true},
+    {"id": "gate_manual", "tags": ["fast"], "manual_download": true, "unverified": true},
+    {"id": "gate_slow_only", "tags": ["slow"], "url": "https://example.invalid/d.bin"}
+  ]
+}

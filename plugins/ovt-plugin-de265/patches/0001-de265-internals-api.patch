@@ -1,31 +1,707 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: The Open Video Tools contributors <noreply@ovt.dev>
-Date: 2026-11-06
-Subject: [PATCH] placeholder: comment-only change proving the OVT patch step
+Date: 2026-11-07
+Subject: [PATCH] Add a read-only internals API (de265_internals.h)
 
-Placeholder for the internals API patch of chapter 07 (WI-2.162). It adds one comment to
-libde265/de265.cc and changes no code, so the patched library is identical to upstream 1.0.15.
-WI-2.162 replaces this file's content with the real patch under the same name.
+Adds the CMake option DE265_INTERNALS (default OFF). With it ON, libde265 builds and installs
+libde265/de265_internals.h and libde265/de265_internals.cc: C functions that read the
+per-picture metadata the decoder already keeps (CTB slice and SAO info, CB size, partition
+and prediction mode, PB motion, intra modes, TU split flags, deblocking edge flags, slice
+headers) of a picture returned by de265_get_next_picture(). Coordinates are always units of
+the layout the matching *_layout() function returns. Consumers: analysis tools such as Open
+Video Tools, sherlock265 and YUView.
 
-Upstream-Status: Inappropriate [OVT build placeholder, comment only; never submitted]
+libde265 keeps one boundary strength per 4x4 block and the horizontal-edge pass overwrites
+the vertical-edge value, so the patch adds de265_image::deblk_bS_v and one store in
+derive_boundaryStrength() for vertical edges. That is the only change to decoding code, and
+like the friend declaration that lets the accessors read the metadata arrays it is compiled
+only when DE265_INTERNALS is defined. With DE265_INTERNALS=OFF the library is identical to
+upstream (same symbols, same object code).
+
+Every modified upstream file carries a dated modification notice (GPL-3.0 section 5(a),
+through LGPL-3.0); the two new files are LGPL-3.0-or-later like libde265.
+
+Upstream-Status: Pending [to be submitted to strukturag/libde265 by WI-2.167]
 SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 SPDX-License-Identifier: LGPL-3.0-or-later
-Rationale: exercises tools/apply_patches.py, the .ovt-patched marker and patches.json (WI-0.014)
-  before the internals API patch exists.
+Rationale: libde265's public API exposes decoded pictures only; per-block coding data (CB tree,
+  motion, intra modes, transform tree, deblocking bS, SAO) lives in private de265_image members
+  with no accessor in de265.h (chapter 07 section 7.6.2).
 ---
- libde265/de265.cc | 3 +++
- 1 file changed, 3 insertions(+)
+ CMakeLists.txt              |   3 +
+ libde265/CMakeLists.txt     |   9 +
+ libde265/de265_internals.cc | 345 ++++++++++++++++++++++++++++++++++++
+ libde265/de265_internals.h  | 174 ++++++++++++++++++
+ libde265/deblock.cc         |   9 +
+ libde265/image.cc           |  10 ++
+ libde265/image.h            |  16 ++
+ 7 files changed, 566 insertions(+)
 
-diff --git a/libde265/de265.cc b/libde265/de265.cc
---- a/libde265/de265.cc
-+++ b/libde265/de265.cc
-@@ -20,6 +20,9 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6066e9f..78bd4bc 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -65,6 +65,9 @@ if(MSVC)
+ endif()
  
- #define DEBUG_INSERT_STREAM_ERRORS 0
+ option(ENABLE_DECODER "Enable Decoder" ON)
++# Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001, internals API):
++# the DE265_INTERNALS option. OFF builds exactly the upstream library.
++option(DE265_INTERNALS "Build the read-only internals API (de265_internals.h)" OFF)
+ option(ENABLE_ENCODER "Enable Encoder" OFF)
  
-+// Open Video Tools: placeholder patch (comment only). It proves the patch step of the OVT build and is
-+// replaced by the internals API patch; the code compiles exactly as upstream.
+ add_subdirectory (libde265)
+diff --git a/libde265/CMakeLists.txt b/libde265/CMakeLists.txt
+index 79fc81f..7b80a2e 100644
+--- a/libde265/CMakeLists.txt
++++ b/libde265/CMakeLists.txt
+@@ -92,6 +92,15 @@ endif()
+ 
+ add_definitions(-DLIBDE265_EXPORTS)
+ 
++# Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001, internals API):
++# DE265_INTERNALS=ON adds the read-only internals API; OFF builds exactly the upstream library.
++if(DE265_INTERNALS)
++  add_definitions(-DDE265_INTERNALS)
++  list(APPEND libde265_sources de265_internals.cc)
++  list(APPEND libde265_headers de265_internals.h)
++  list(APPEND libde265_public_headers de265_internals.h)
++endif()
 +
+ add_subdirectory (encoder)
  
- #include "de265.h"
- #include "decctx.h"
+ check_c_source_compiles(
+diff --git a/libde265/de265_internals.cc b/libde265/de265_internals.cc
+new file mode 100644
+index 0000000..0ce19fa
+--- /dev/null
++++ b/libde265/de265_internals.cc
+@@ -0,0 +1,345 @@
++/*
++ * H.265 video codec.
++ * Copyright (c) 2026 The Open Video Tools contributors
++ *
++ * This file is part of libde265.
++ *
++ * libde265 is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, either version 3 of
++ * the License, or (at your option) any later version.
++ *
++ * libde265 is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* Read-only internals API (OVT patch 0001). Reads the metadata arrays of a decoded
++   de265_image; changes nothing. The public functions take unit coordinates; the
++   de265_image accessors take luma sample coordinates, so every function converts. */
++
++#include "de265_internals.h"
++#include "image.h"
++#include "slice.h"
++#include "sps.h"
++
++#include <string.h>
++
++
++struct de265_internals_access
++{
++  static const MetaDataArray<CTB_info>&    ctb(const de265_image* img) { return img->ctb_info; }
++  static const MetaDataArray<CB_ref_info>& cb (const de265_image* img) { return img->cb_info; }
++  static const MetaDataArray<PBMotion>&    pb (const de265_image* img) { return img->pb_info; }
++  static const MetaDataArray<uint8_t>&     ipm(const de265_image* img) { return img->intraPredMode; }
++  static const MetaDataArray<uint8_t>&     tu (const de265_image* img) { return img->tu_info; }
++  static const MetaDataArray<uint8_t>&     deblk(const de265_image* img) { return img->deblk_info; }
++};
++
++typedef de265_internals_access ia;
++
++
++namespace {
++
++template <class T>
++de265_internals_layout layout_of(const MetaDataArray<T>& a)
++{
++  de265_internals_layout l;
++  l.log2_unit_size  = a.log2unitSize;
++  l.width_in_units  = a.width_in_units;
++  l.height_in_units = a.height_in_units;
++  return l;
++}
++
++/* The 4x4 view of an array whose units are 4x4 or larger. */
++template <class T>
++de265_internals_layout layout_4x4(const MetaDataArray<T>& a)
++{
++  de265_internals_layout l;
++  l.log2_unit_size  = 2;
++  l.width_in_units  = a.width_in_units  << (a.log2unitSize - 2);
++  l.height_in_units = a.height_in_units << (a.log2unitSize - 2);
++  return l;
++}
++
++de265_internals_layout empty_layout()
++{
++  de265_internals_layout l;
++  l.log2_unit_size = l.width_in_units = l.height_in_units = 0;
++  return l;
++}
++
++bool inside(const de265_internals_layout& l, int x, int y)
++{
++  return x >= 0 && y >= 0 && x < l.width_in_units && y < l.height_in_units;
++}
++
++bool has_metadata(const de265_image* img)
++{
++  return img != NULL && img->has_sps() && ia::cb(img).data != NULL;
++}
++
++/* The slice header of the CTB containing luma sample (x,y), or NULL. */
++const slice_segment_header* slice_at(const de265_image* img, int x, int y)
++{
++  const MetaDataArray<CTB_info>& ctb = ia::ctb(img);
++  return img->get_SliceHeaderCtb(x >> ctb.log2unitSize, y >> ctb.log2unitSize);
++}
++
++}  // namespace
++
++
++/* --- CTB --- */
++
++de265_internals_layout de265_internals_get_CTB_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_of(ia::ctb(img)) : empty_layout();
++}
++
++uint16_t de265_internals_get_CTB_slice_header_index(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  if (!inside(de265_internals_get_CTB_info_layout(img), ctb_x, ctb_y)) return 0;
++  return (uint16_t)img->get_SliceHeaderIndexCtb(ctb_x, ctb_y);
++}
++
++int de265_internals_get_CTB_slice_addr_rs(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  if (!inside(de265_internals_get_CTB_info_layout(img), ctb_x, ctb_y)) return 0;
++  return img->get_SliceAddrRS(ctb_x, ctb_y);
++}
++
++void de265_internals_get_CTB_sao(const struct de265_image* img, int ctb_x, int ctb_y, de265_internals_sao* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  if (!inside(de265_internals_get_CTB_info_layout(img), ctb_x, ctb_y)) return;
++
++  const sao_info* sao = img->get_sao_info(ctb_x, ctb_y);
++  for (int c = 0; c < 3; c++) {
++    out->SaoTypeIdx[c]      = (sao->SaoTypeIdx >> (2*c)) & 0x3;
++    out->SaoEoClass[c]      = (sao->SaoEoClass >> (2*c)) & 0x3;
++    out->SaoBandPosition[c] = sao->sao_band_position[c];
++    for (int i = 0; i < 4; i++) {
++      out->SaoOffsetVal[c][i] = sao->saoOffsetVal[c][i];
++    }
++  }
++}
++
++uint8_t de265_internals_get_CTB_flags(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  if (!inside(de265_internals_get_CTB_info_layout(img), ctb_x, ctb_y)) return 0;
++
++  uint8_t flags = 0;
++  if (img->get_CTB_has_pcm_or_cu_transquant_bypass(ctb_x, ctb_y)) {
++    flags |= DE265_INTERNALS_CTB_FLAG_PCM_OR_TRANSQUANT_BYPASS;
++  }
++  const slice_segment_header* shdr = img->get_SliceHeaderCtb(ctb_x, ctb_y);
++  if (shdr != NULL && shdr->slice_deblocking_filter_disabled_flag) {
++    flags |= DE265_INTERNALS_CTB_FLAG_DEBLOCKING_DISABLED;
++  }
++  return flags;
++}
++
++
++/* --- CB --- */
++
++de265_internals_layout de265_internals_get_CB_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_of(ia::cb(img)) : empty_layout();
++}
++
++void de265_internals_get_CB_info(const struct de265_image* img, int unit_x, int unit_y, de265_internals_cb* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  const de265_internals_layout l = de265_internals_get_CB_info_layout(img);
++  if (!inside(l, unit_x, unit_y)) return;
++
++  const int log2MinCb = l.log2_unit_size;
++  const int x = unit_x << log2MinCb;
++  const int y = unit_y << log2MinCb;
++
++  // libde265 stores log2CbSize and PartMode only at the CB's top-left unit (zero elsewhere).
++  // CBs are aligned to their size, so the CB covering (x,y) is the smallest aligned square
++  // whose top-left unit records exactly that size.
++  const int log2Ctb = img->get_sps().Log2CtbSizeY;
++  for (int log2Size = log2MinCb; log2Size <= log2Ctb; log2Size++) {
++    const int x0 = (x >> log2Size) << log2Size;
++    const int y0 = (y >> log2Size) << log2Size;
++    if (img->get_log2CbSize(x0, y0) == log2Size) {
++      out->log2CbSize = (uint8_t)log2Size;
++      out->PartMode   = (uint8_t)img->get_PartMode(x0, y0);
++      break;
++    }
++  }
++
++  // These are written to every unit of the CB.
++  out->ctDepth              = (uint8_t)img->get_ctDepth(x, y);
++  out->PredMode             = (uint8_t)img->get_pred_mode(x, y);
++  out->pcm_flag             = (uint8_t)img->get_pcm_flag(x, y);
++  out->cu_transquant_bypass = (uint8_t)img->get_cu_transquant_bypass(x, y);
++  out->QP_Y                 = (int8_t)img->get_QPY(x, y);
++}
++
++
++/* --- PB --- */
++
++de265_internals_layout de265_internals_get_PB_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_of(ia::pb(img)) : empty_layout();
++}
++
++void de265_internals_get_PB_info(const struct de265_image* img, int x4, int y4, de265_internals_pb* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  out->refIdx[0] = out->refIdx[1] = -1;
++  if (!inside(de265_internals_get_PB_info_layout(img), x4, y4)) return;
++
++  const int x = x4 << 2;
++  const int y = y4 << 2;
++  if (!inside(de265_internals_get_CB_info_layout(img),
++              x >> ia::cb(img).log2unitSize, y >> ia::cb(img).log2unitSize)) return;
++  // The motion array is not cleared per picture: intra blocks keep stale vectors.
++  if (img->get_pred_mode(x, y) == MODE_INTRA) return;
++
++  const PBMotion& mv = img->get_mv_info(x, y);
++  const slice_segment_header* shdr = slice_at(img, x, y);
++  for (int l = 0; l < 2; l++) {
++    if (!mv.predFlag[l]) continue;
++    out->predFlag[l] = 1;
++    out->refIdx[l]   = mv.refIdx[l];
++    out->mv_x[l]     = mv.mv[l].x;
++    out->mv_y[l]     = mv.mv[l].y;
++    if (shdr != NULL && mv.refIdx[l] >= 0 && mv.refIdx[l] < MAX_NUM_REF_PICS) {
++      out->refPOC[l]        = shdr->RefPicList_POC[l][mv.refIdx[l]];
++      out->refIsLongTerm[l] = shdr->LongTermRefPic[l][mv.refIdx[l]] ? 1 : 0;
++    }
++  }
++}
++
++
++/* --- intra --- */
++
++de265_internals_layout de265_internals_get_intra_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_4x4(ia::ipm(img)) : empty_layout();
++}
++
++void de265_internals_get_intra_modes(const struct de265_image* img, int x4, int y4,
++                                     uint8_t* intraPredModeY, uint8_t* intraPredModeC)
++{
++  uint8_t modeY = 255, modeC = 255;
++
++  if (inside(de265_internals_get_intra_info_layout(img), x4, y4)) {
++    const int x = x4 << 2;
++    const int y = y4 << 2;
++    // The mode arrays are not cleared per picture: only intra blocks hold valid modes.
++    if (inside(de265_internals_get_CB_info_layout(img),
++               x >> ia::cb(img).log2unitSize, y >> ia::cb(img).log2unitSize) &&
++        img->get_pred_mode(x, y) == MODE_INTRA) {
++      modeY = (uint8_t)img->get_IntraPredMode(x, y);
++      modeC = (uint8_t)img->get_IntraPredModeC(x, y);
++    }
++  }
++
++  if (intraPredModeY) *intraPredModeY = modeY;
++  if (intraPredModeC) *intraPredModeC = modeC;
++}
++
++
++/* --- TU --- */
++
++de265_internals_layout de265_internals_get_TU_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_4x4(ia::tu(img)) : empty_layout();
++}
++
++uint8_t de265_internals_get_TU_info(const struct de265_image* img, int x4, int y4)
++{
++  if (!inside(de265_internals_get_TU_info_layout(img), x4, y4)) return 0;
++  return ia::tu(img).get(x4 << 2, y4 << 2);
++}
++
++
++/* --- deblocking --- */
++
++de265_internals_layout de265_internals_get_deblk_info_layout(const struct de265_image* img)
++{
++  return has_metadata(img) ? layout_of(ia::deblk(img)) : empty_layout();
++}
++
++uint8_t de265_internals_get_deblk_flags(const struct de265_image* img, int x4, int y4)
++{
++  if (!inside(de265_internals_get_deblk_info_layout(img), x4, y4)) return 0;
++  return img->get_deblk_flags(x4 << 2, y4 << 2);
++}
++
++uint8_t de265_internals_get_deblk_bS_v(const struct de265_image* img, int x4, int y4)
++{
++  if (!inside(de265_internals_get_deblk_info_layout(img), x4, y4)) return 0;
++  const MetaDataArray<uint8_t>& bS = img->deblk_bS_v;
++  if (bS.data == NULL || x4 >= bS.width_in_units || y4 >= bS.height_in_units) return 0;
++  return bS[x4 + y4*bS.width_in_units];
++}
++
++
++/* --- slice headers and picture --- */
++
++int de265_internals_get_num_slice_headers(const struct de265_image* img)
++{
++  return img != NULL ? (int)img->slices.size() : 0;
++}
++
++void de265_internals_get_slice_header(const struct de265_image* img, int index, de265_internals_slice_header* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  if (index < 0 || index >= de265_internals_get_num_slice_headers(img)) return;
++
++  const slice_segment_header* s = img->slices[index];
++  out->slice_type            = s->slice_type;
++  out->SliceAddrRs           = s->SliceAddrRS;
++  out->slice_qp_delta        = s->slice_qp_delta;
++  out->SliceQPY              = s->SliceQPY;
++  out->num_ref_idx_l0_active = s->num_ref_idx_l0_active;
++  out->num_ref_idx_l1_active = s->num_ref_idx_l1_active;
++  for (int l = 0; l < 2; l++) {
++    for (int i = 0; i < 16 && i < MAX_NUM_REF_PICS; i++) {
++      out->RefPicList_POC[l][i]      = s->RefPicList_POC[l][i];
++      out->RefPicList_LongTerm[l][i] = s->LongTermRefPic[l][i] ? 1 : 0;
++    }
++  }
++  out->MaxNumMergeCand                       = s->MaxNumMergeCand;
++  out->slice_deblocking_filter_disabled_flag = s->slice_deblocking_filter_disabled_flag;
++  out->slice_beta_offset_div2                = s->slice_beta_offset / 2;  // libde265 stores the doubled value
++  out->slice_tc_offset_div2                  = s->slice_tc_offset / 2;
++  out->slice_sao_luma_flag                   = s->slice_sao_luma_flag;
++  out->slice_sao_chroma_flag                 = s->slice_sao_chroma_flag;
++  out->slice_cb_qp_offset                    = s->slice_cb_qp_offset;
++  out->slice_cr_qp_offset                    = s->slice_cr_qp_offset;
++  out->collocated_from_l0_flag               = s->collocated_from_l0_flag;
++  out->collocated_ref_idx                    = s->collocated_ref_idx;
++  out->slice_temporal_mvp_enabled_flag       = s->slice_temporal_mvp_enabled_flag;
++}
++
++int de265_internals_get_picture_poc(const struct de265_image* img)
++{
++  return img != NULL ? img->PicOrderCntVal : 0;
++}
++
++void de265_internals_get_sps_sizes(const struct de265_image* img, int* CtbLog2SizeY, int* MinCbLog2SizeY,
++                                   int* MinTbLog2SizeY, int* PicWidthInCtbsY, int* PicHeightInCtbsY)
++{
++  const bool ok = img != NULL && img->has_sps();
++  const seq_parameter_set* sps = ok ? &img->get_sps() : NULL;
++  if (CtbLog2SizeY)     *CtbLog2SizeY     = ok ? sps->Log2CtbSizeY     : 0;
++  if (MinCbLog2SizeY)   *MinCbLog2SizeY   = ok ? sps->Log2MinCbSizeY   : 0;
++  if (MinTbLog2SizeY)   *MinTbLog2SizeY   = ok ? sps->Log2MinTrafoSize : 0;
++  if (PicWidthInCtbsY)  *PicWidthInCtbsY  = ok ? sps->PicWidthInCtbsY  : 0;
++  if (PicHeightInCtbsY) *PicHeightInCtbsY = ok ? sps->PicHeightInCtbsY : 0;
++}
+diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
+new file mode 100644
+index 0000000..a38fd8a
+--- /dev/null
++++ b/libde265/de265_internals.h
+@@ -0,0 +1,174 @@
++/*
++ * H.265 video codec.
++ * Copyright (c) 2026 The Open Video Tools contributors
++ *
++ * This file is part of libde265.
++ *
++ * libde265 is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, either version 3 of
++ * the License, or (at your option) any later version.
++ *
++ * libde265 is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* de265_internals.h -- read-only access to per-picture metadata (OVT patch 0001).
++ *
++ * Built only with the CMake option DE265_INTERNALS=ON. Every function reads the metadata
++ * that the decoder already keeps for a decoded picture (the image returned by
++ * de265_get_next_picture()) and is valid until de265_release_next_picture().
++ *
++ * Coordinates are always in units of the layout returned by the matching *_layout()
++ * function, never in luma samples: (unit_x, unit_y) for MinCb units, (x4, y4) for 4x4
++ * units, (ctb_x, ctb_y) for CTBs. A coordinate outside the layout, or a NULL image,
++ * yields zero (structures are zero-filled).
++ */
++
++#ifndef DE265_INTERNALS_H
++#define DE265_INTERNALS_H
++
++#include <libde265/de265.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++typedef struct de265_internals_layout {
++  int log2_unit_size;
++  int width_in_units;
++  int height_in_units;
++} de265_internals_layout;
++
++/* --- CTB (coding tree block) info: unit = CTB --- */
++
++LIBDE265_API de265_internals_layout de265_internals_get_CTB_info_layout(const struct de265_image*);
++/* index into the slice header table (de265_internals_get_slice_header) */
++LIBDE265_API uint16_t de265_internals_get_CTB_slice_header_index(const struct de265_image*, int ctb_x, int ctb_y);
++/* SliceAddrRs: address of the first CTB of the independent slice */
++LIBDE265_API int      de265_internals_get_CTB_slice_addr_rs(const struct de265_image*, int ctb_x, int ctb_y);
++
++typedef struct de265_internals_sao {
++  uint8_t SaoTypeIdx[3];        /* per component: 0 not applied, 1 band offset, 2 edge offset */
++  int8_t  SaoOffsetVal[3][4];   /* SaoOffsetVal[cIdx][i+1] of H.265 7.4.9.3.2 (SaoOffsetVal[cIdx][0] is always 0) */
++  uint8_t SaoBandPosition[3];
++  uint8_t SaoEoClass[3];
++} de265_internals_sao;
++
++LIBDE265_API void     de265_internals_get_CTB_sao(const struct de265_image*, int ctb_x, int ctb_y, de265_internals_sao* out);
++
++#define DE265_INTERNALS_CTB_FLAG_PCM_OR_TRANSQUANT_BYPASS (1<<0)
++#define DE265_INTERNALS_CTB_FLAG_DEBLOCKING_DISABLED      (1<<1)
++/* bit0 has_pcm_or_cu_transquant_bypass, bit1 deblocking disabled for this CTB's slice */
++LIBDE265_API uint8_t  de265_internals_get_CTB_flags(const struct de265_image*, int ctb_x, int ctb_y);
++
++/* --- CB (coding block) info: unit = MinCb (log2 = MinCbLog2SizeY) ---
++   Values are valid at every unit covered by the CB, not only at its top-left unit. */
++
++LIBDE265_API de265_internals_layout de265_internals_get_CB_info_layout(const struct de265_image*);
++
++typedef struct de265_internals_cb {
++  uint8_t log2CbSize;            /* 3..6; 0 when the unit was not decoded */
++  uint8_t PartMode;              /* enum PartMode: 0 2Nx2N 1 2NxN 2 Nx2N 3 NxN 4 2NxnU 5 2NxnD 6 nLx2N 7 nRx2N */
++  uint8_t ctDepth;
++  uint8_t PredMode;              /* 0 MODE_INTRA, 1 MODE_INTER, 2 MODE_SKIP (cu_skip_flag set) */
++  uint8_t pcm_flag;
++  uint8_t cu_transquant_bypass;
++  int8_t  QP_Y;
++} de265_internals_cb;
++
++LIBDE265_API void     de265_internals_get_CB_info(const struct de265_image*, int unit_x, int unit_y, de265_internals_cb* out);
++
++/* --- PB (prediction block) motion: unit = 4x4 --- */
++
++LIBDE265_API de265_internals_layout de265_internals_get_PB_info_layout(const struct de265_image*);
++
++typedef struct de265_internals_pb {
++  uint8_t predFlag[2];
++  int8_t  refIdx[2];             /* -1 when predFlag[list] is 0 */
++  int16_t mv_x[2];               /* quarter-sample; 0 when predFlag[list] is 0 */
++  int16_t mv_y[2];
++  int32_t refPOC[2];             /* RefPicList_POC[list][refIdx] of the PB's slice; 0 when unused */
++  int8_t  refIsLongTerm[2];
++} de265_internals_pb;
++
++/* All fields are zero (refIdx -1) for intra-coded blocks. */
++LIBDE265_API void     de265_internals_get_PB_info(const struct de265_image*, int x4, int y4, de265_internals_pb* out);
++
++/* --- Intra prediction modes: unit = 4x4 --- */
++
++LIBDE265_API de265_internals_layout de265_internals_get_intra_info_layout(const struct de265_image*);
++/* intraPredModeY 0..34; intraPredModeC is the derived chroma mode. Both 255 for blocks that are
++   not intra-coded. Either pointer may be NULL. */
++LIBDE265_API void     de265_internals_get_intra_modes(const struct de265_image*, int x4, int y4,
++                                                      uint8_t* intraPredModeY, uint8_t* intraPredModeC);
++
++/* --- TU (transform unit) info: unit = 4x4 --- */
++
++LIBDE265_API de265_internals_layout de265_internals_get_TU_info_layout(const struct de265_image*);
++#define DE265_INTERNALS_TU_FLAG_SPLIT_TRANSFORM_MASK 0x1F    /* bit d = split_transform_flag at depth d (0..4) */
++#define DE265_INTERNALS_TU_FLAG_NONZERO_COEFF        (1<<7)
++/* raw tu_info byte */
++LIBDE265_API uint8_t  de265_internals_get_TU_info(const struct de265_image*, int x4, int y4);
++
++/* --- Deblocking: unit = 4x4 --- */
++
++LIBDE265_API de265_internals_layout de265_internals_get_deblk_info_layout(const struct de265_image*);
++#define DE265_INTERNALS_DEBLOCK_BS_MASK       0x03    /* bS of the edge derived last for this 4x4 */
++#define DE265_INTERNALS_DEBLOCK_FLAG_VERTI    (1<<4)  /* transform or CB edge on the left */
++#define DE265_INTERNALS_DEBLOCK_FLAG_HORIZ    (1<<5)  /* transform or CB edge on the top */
++#define DE265_INTERNALS_DEBLOCK_PB_EDGE_VERTI (1<<6)  /* prediction-block edge on the left */
++#define DE265_INTERNALS_DEBLOCK_PB_EDGE_HORIZ (1<<7)  /* prediction-block edge on the top */
++/* raw deblk_info byte. libde265 keeps one bS per 4x4 and the horizontal-edge pass overwrites
++   the vertical-edge value, so on the rows that pass visits (every 8th luma row) the bS bits
++   hold the HORIZONTAL edge's bS. Use de265_internals_get_deblk_bS_v() for vertical edges. */
++LIBDE265_API uint8_t  de265_internals_get_deblk_flags(const struct de265_image*, int x4, int y4);
++/* bS 0..2 of the vertical edge on the left of the 4x4 at (x4, y4), as derived by the
++   deblocking filter (H.265 8.7.2.4). 0 when that edge is neither a transform nor a
++   prediction-block edge, when it is not on the 8x8 deblocking grid, and when deblocking
++   is disabled for the picture. */
++LIBDE265_API uint8_t  de265_internals_get_deblk_bS_v(const struct de265_image*, int x4, int y4);
++
++/* --- Slice headers and picture-level data --- */
++
++LIBDE265_API int      de265_internals_get_num_slice_headers(const struct de265_image*);
++
++typedef struct de265_internals_slice_header {
++  int slice_type;                /* 0 B, 1 P, 2 I */
++  int SliceAddrRs;
++  int slice_qp_delta;
++  int SliceQPY;
++  int num_ref_idx_l0_active;
++  int num_ref_idx_l1_active;
++  int32_t RefPicList_POC[2][16];
++  int8_t  RefPicList_LongTerm[2][16];
++  int MaxNumMergeCand;
++  int slice_deblocking_filter_disabled_flag;
++  int slice_beta_offset_div2;
++  int slice_tc_offset_div2;
++  int slice_sao_luma_flag;
++  int slice_sao_chroma_flag;
++  int slice_cb_qp_offset;
++  int slice_cr_qp_offset;
++  int collocated_from_l0_flag;
++  int collocated_ref_idx;
++  int slice_temporal_mvp_enabled_flag;
++} de265_internals_slice_header;
++
++LIBDE265_API void     de265_internals_get_slice_header(const struct de265_image*, int index, de265_internals_slice_header* out);
++/* PicOrderCntVal */
++LIBDE265_API int      de265_internals_get_picture_poc(const struct de265_image*);
++/* Any pointer may be NULL. */
++LIBDE265_API void     de265_internals_get_sps_sizes(const struct de265_image*, int* CtbLog2SizeY, int* MinCbLog2SizeY,
++                                                    int* MinTbLog2SizeY, int* PicWidthInCtbsY, int* PicHeightInCtbsY);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/libde265/deblock.cc b/libde265/deblock.cc
+index d19d450..a26c85b 100644
+--- a/libde265/deblock.cc
++++ b/libde265/deblock.cc
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
++ * internals API): stores the vertical-edge boundary strength in deblk_bS_v
++ * when DE265_INTERNALS is defined.
+  */
+ 
+ #include "deblock.h"
+@@ -381,6 +385,11 @@ void derive_boundaryStrength(de265_image* img, bool vertical, int yStart,int yEn
+           }
+         }
+ 
++#ifdef DE265_INTERNALS
++        if (vertical) {
++          img->deblk_bS_v[x + y*img->deblk_bS_v.width_in_units] = bS;
++        }
++#endif
+         img->set_deblk_bS(xDi,yDi, bS);
+       }
+       else {
+diff --git a/libde265/image.cc b/libde265/image.cc
+index 0ae7751..fe45010 100644
+--- a/libde265/image.cc
++++ b/libde265/image.cc
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
++ * internals API): allocates and clears deblk_bS_v when DE265_INTERNALS is
++ * defined.
+  */
+ 
+ #include "image.h"
+@@ -450,6 +454,9 @@ de265_error de265_image::alloc_image(int w,int h, enum de265_chroma c,
+     int deblk_h = (sps->pic_height_in_luma_samples+3)/4;
+ 
+     mem_alloc_success &= deblk_info.alloc(deblk_w, deblk_h, 2);
++#ifdef DE265_INTERNALS
++    mem_alloc_success &= deblk_bS_v.alloc(deblk_w, deblk_h, 2);
++#endif
+ 
+     // CTB info
+ 
+@@ -738,6 +745,9 @@ void de265_image::clear_metadata()
+   //tu_info.clear();  // done on the fly
+   ctb_info.clear();
+   deblk_info.clear();
++#ifdef DE265_INTERNALS
++  deblk_bS_v.clear();
++#endif
+ 
+   // --- reset CTB progresses ---
+ 
+diff --git a/libde265/image.h b/libde265/image.h
+index 0a0c0e3..de401ae 100644
+--- a/libde265/image.h
++++ b/libde265/image.h
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
++ * internals API): adds the deblk_bS_v array and the de265_internals_access
++ * friend, both only when DE265_INTERNALS is defined.
+  */
+ 
+ #ifndef DE265_IMAGE_H
+@@ -79,6 +83,9 @@ enum PictureState {
+ #define CTB_PROGRESS_SAO       4
+ 
+ class decoder_context;
++#ifdef DE265_INTERNALS
++struct de265_internals_access;  // de265_internals.cc reads the metadata arrays
++#endif
+ 
+ template <class DataUnit> class MetaDataArray
+ {
+@@ -414,6 +421,15 @@ private:
+   MetaDataArray<uint8_t>     tu_info;
+   MetaDataArray<uint8_t>     deblk_info;
+ 
++#ifdef DE265_INTERNALS
++  friend struct de265_internals_access;
++
++public:
++  // Boundary strength of the vertical edge left of each 4x4 block. deblk_info keeps only one bS,
++  // which the horizontal-edge pass overwrites; deblock.cc copies the vertical value here.
++  MetaDataArray<uint8_t>     deblk_bS_v;
++#endif
++
+ public:
+   // --- meta information ---
+ 

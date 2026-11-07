@@ -125,13 +125,13 @@
     {"recipe": "33", "id": "syn_ts_cc_errors", "features": ["ts", "cc_errors"], "needs": ["src_720p_8bit.y4m"], "files": ["syn_ts_cc_errors.ts", "syn_ts_clean.ts"], "steps": [
       {"cmd": ["ffmpeg", "-stream_loop", "1", "-i", "src_720p_8bit.y4m", "-c:v", "libx264", "-threads", "1", "-g", "30", "-f", "mpegts", "syn_ts_clean.ts"]},
       {"cmd": ["{python}", "{repo}/tools/ts_inject_errors.py", "--cc-errors", "7", "--pcr-gap", "1", "syn_ts_clean.ts", "syn_ts_cc_errors.ts"]}]},
-    {"recipe": "34", "id": "syn_mp4_broken_stco_beyond_eof", "features": ["broken", "stco"], "files": ["syn_mp4_broken_stco_beyond_eof.mp4"], "steps": [
+    {"recipe": "34", "id": "syn_mp4_broken_stco_beyond_eof", "features": ["broken", "stco"], "tags": ["isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-2007"]}, "files": ["syn_mp4_broken_stco_beyond_eof.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--stco-beyond-eof", "-o", "syn_mp4_broken_stco_beyond_eof.mp4"]}]},
-    {"recipe": "35", "id": "syn_mp4_broken_cmfc_two_tracks", "features": ["broken", "cmaf"], "files": ["syn_mp4_broken_cmfc_two_tracks.mp4"], "note": "expected CNT-7010", "steps": [
+    {"recipe": "35", "id": "syn_mp4_broken_cmfc_two_tracks", "features": ["broken", "cmaf"], "tags": ["isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-7010"]}, "files": ["syn_mp4_broken_cmfc_two_tracks.mp4"], "note": "expected CNT-7010", "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--cmfc-two-tracks", "-o", "syn_mp4_broken_cmfc_two_tracks.mp4"]}]},
-    {"recipe": "36", "id": "syn_mp4_broken_msix_without_sidx", "features": ["broken", "cmaf"], "files": ["syn_mp4_broken_msix_without_sidx.mp4"], "note": "expected CNT-7031", "steps": [
+    {"recipe": "36", "id": "syn_mp4_broken_msix_without_sidx", "features": ["broken", "cmaf"], "tags": ["isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-7031"]}, "files": ["syn_mp4_broken_msix_without_sidx.mp4"], "note": "expected CNT-7031", "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--msix-no-sidx", "-o", "syn_mp4_broken_msix_without_sidx.mp4"]}]},
-    {"recipe": "37", "id": "syn_mp4_broken_hvc1_no_ps", "features": ["broken", "hvc1"], "files": ["syn_mp4_broken_hvc1_no_ps.mp4"], "note": "expected CNT-7005", "steps": [
+    {"recipe": "37", "id": "syn_mp4_broken_hvc1_no_ps", "features": ["broken", "hvc1"], "tags": ["isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-7005"]}, "files": ["syn_mp4_broken_hvc1_no_ps.mp4"], "note": "expected CNT-7005", "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--hvc1-strip-ps", "-o", "syn_mp4_broken_hvc1_no_ps.mp4"]}]},
     {"recipe": "38", "id": "syn_hlg_1080p", "features": ["10bit", "hlg", "main10", "bt2020"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["syn_hlg_1080p.mp4", "syn_hlg_1080p.265"], "steps": [
       {"cmd": ["x265", "--frame-threads", "1", "--pools", "1", "--input", "src_1080p_10bit.y4m", "--input-depth", "10", "--output-depth", "10", "--profile", "main10", "--preset", "medium", "--colorprim", "bt2020", "--transfer", "arib-std-b67", "--colormatrix", "bt2020nc", "--repeat-headers", "--keyint", "30", "--output", "syn_hlg_1080p.265"]},
@@ -375,11 +375,11 @@
     {"recipe": "71", "id": "syn_webm_lacing_xiph", "features": ["webm", "lacing"], "tags": ["fast"], "files": ["syn_webm_lacing_xiph.webm"], "aliases": ["lacing_xiph.webm"], "steps": [
       {"cmd": ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=f=440:d=3", "-c:a", "libopus", "-b:a", "64k", "-f", "webm", "sine_opus.webm"]},
       {"cmd": ["{python}", "{repo}/tools/make_mkv_lacing.py", "--lacing", "xiph", "--frames-per-block", "4", "--input", "sine_opus.webm", "syn_webm_lacing_xiph.webm"]}]},
-    {"recipe": "72", "id": "syn_mp4_broken_stsc_descending", "features": ["broken"], "tags": ["fast"], "files": ["stsc_descending.mp4"], "aliases": ["stsc_descending.mp4"], "steps": [
+    {"recipe": "72", "id": "syn_mp4_broken_stsc_descending", "features": ["broken"], "tags": ["fast", "isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-2003"]}, "files": ["stsc_descending.mp4"], "aliases": ["stsc_descending.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--stsc-descending", "-o", "stsc_descending.mp4"]}]},
-    {"recipe": "72", "id": "syn_mp4_broken_ctts_v0_negative", "features": ["broken"], "tags": ["fast"], "files": ["ctts_v0_negative.mp4"], "aliases": ["ctts_v0_negative.mp4"], "steps": [
+    {"recipe": "72", "id": "syn_mp4_broken_ctts_v0_negative", "features": ["broken"], "tags": ["fast", "isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-2002"]}, "files": ["ctts_v0_negative.mp4"], "aliases": ["ctts_v0_negative.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--ctts-v0-negative", "-o", "ctts_v0_negative.mp4"]}]},
-    {"recipe": "72", "id": "syn_mp4_broken_size7_in_moov", "features": ["broken"], "tags": ["fast"], "files": ["size7_in_moov.mp4"], "aliases": ["size7_in_moov.mp4"], "steps": [
+    {"recipe": "72", "id": "syn_mp4_broken_size7_in_moov", "features": ["broken"], "tags": ["fast", "isobmff-broken"], "expected": {"format": "isobmff", "diagnostics": ["CNT-0106"]}, "files": ["size7_in_moov.mp4"], "aliases": ["size7_in_moov.mp4"], "steps": [
       {"cmd": ["{python}", "{repo}/tools/make_broken.py", "--box-size", "7", "--in", "moov", "-o", "size7_in_moov.mp4"]}]},
     {"recipe": "73", "id": "syn_pat_pq_patches_1000", "features": ["patterns"], "tags": ["fast", "patterns"], "files": ["pq_patches_1000.mp4", "pq_patches_1000.expected.json"], "aliases": ["pq_patches_1000.mp4"], "note": "generator delivered by chapter 10 WI-1.413", "steps": [
       {"cmd": ["{python}", "{repo}/tools/gen_hdr_patterns.py", "--only", "pq_patches_1000", "--out", ".", "--no-manifest"]}]},
