@@ -109,10 +109,15 @@ jobs:
           retention-days: 14
 
       - name: commit the goldens to the PR branch ([commit-goldens] in the title)
-        if: always() && github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[commit-goldens]')
+        if: success() && github.event_name == 'pull_request' && contains(github.event.pull_request.title, '[commit-goldens]')
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
+          # Never replace the goldens with an incomplete run: both runs finished (this step needs success()), and the
+          # output must hold the index and a plausible number of goldens.
+          n="$(find "${RUNNER_TEMP}/out1/h264" "${RUNNER_TEMP}/out1/h265" -name '*.json.gz' | wc -l)"
+          test -s "${RUNNER_TEMP}/out1/h26x-index.json" && test "${n}" -ge 100 || { echo "::error::only ${n} goldens generated"; exit 1; }
+          if find "${RUNNER_TEMP}/out1" -type f -size +2M | grep -q .; then echo "::error::a golden exceeds 2 MB"; exit 1; fi
           git fetch origin "${BRANCH}"
           git checkout -f -B goldens "origin/${BRANCH}"
           rm -rf tests/golden/h264 tests/golden/h265 tests/golden/epb tests/golden/h26x-index.json
