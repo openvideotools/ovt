@@ -17283,7 +17283,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "87ec595a7b25b9a42da6f6412c66901a61b0a47bcd1095e01531181fc53524e5",
+      "sha256": "643f43daee0d52a789771a1c7c1251447c8f29411e5dbecad020ba86e0a4d6d9",
       "size_bytes": 31123,
       "codecs": [
         "h265"
@@ -17301,11 +17301,7 @@
       ],
       "aliases": [
         "pq_patches_1000.mp4"
-      ],
-      "files": {
-        "pq_patches_1000.expected.json": "1b75cc6634e60d596ae5110a45aad8f45c312d2fe0556c24585962c02d3682fd",
-        "pq_patches_1000.mp4": "87ec595a7b25b9a42da6f6412c66901a61b0a47bcd1095e01531181fc53524e5"
-      }
+      ]
     },
     {
       "id": "syn_pat_hlg_patches",
@@ -17313,7 +17309,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "f5805d12ba9d7bdf8919ba557205e206bbc9d5bfd0f537cbd997657227521586",
+      "sha256": "fd4b89443d17f59e75f841662a52a13813d7785ec497e9b4f9693afd50114e83",
       "size_bytes": 19947,
       "codecs": [
         "h265"
@@ -17331,11 +17327,7 @@
       ],
       "aliases": [
         "hlg_patches.mp4"
-      ],
-      "files": {
-        "hlg_patches.expected.json": "064440add3e9a33838704c4017108800977c401132edd723a776f60a13b2c65f",
-        "hlg_patches.mp4": "f5805d12ba9d7bdf8919ba557205e206bbc9d5bfd0f537cbd997657227521586"
-      }
+      ]
     },
     {
       "id": "syn_pat_sdr709_ramp",
@@ -17343,7 +17335,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "8e5bff6b76d7656cc0eccc24aa0ea57b3efccc7b2b8ff400772f98074fdfde6f",
+      "sha256": "5097e4b82e3504aecbcd45d87f51ab748b0aed0f70a764e8708f0651c1b0dad7",
       "size_bytes": 29151,
       "codecs": [
         "h265"
@@ -17361,11 +17353,7 @@
       ],
       "aliases": [
         "sdr709_ramp.mp4"
-      ],
-      "files": {
-        "sdr709_ramp.expected.json": "67b244ee6d40038392e11a4b345647dc0c4dca6ce7138d00da8b58a1df6a7143",
-        "sdr709_ramp.mp4": "8e5bff6b76d7656cc0eccc24aa0ea57b3efccc7b2b8ff400772f98074fdfde6f"
-      }
+      ]
     },
     {
       "id": "syn_pat_p3_saturation",
@@ -17373,7 +17361,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "880c4b78e13f444af12caff39185d8ca350be0235d74819535ba39839b5c8a30",
+      "sha256": "733d0f2f45de8cdd4151e556d0fd8b90dabb9fdd3dba32aea12217e3aea6ed25",
       "size_bytes": 60147,
       "codecs": [
         "h265"
@@ -17391,11 +17379,7 @@
       ],
       "aliases": [
         "p3_saturation.mp4"
-      ],
-      "files": {
-        "p3_saturation.expected.json": "825c6ccb8d797f044285a6df2d0da709faade0cc185a3bf0b3c92538565c3f69",
-        "p3_saturation.mp4": "880c4b78e13f444af12caff39185d8ca350be0235d74819535ba39839b5c8a30"
-      }
+      ]
     },
     {
       "id": "syn_pat_siting_checker",
@@ -17403,7 +17387,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "888a306b6ada738a1c069bf809715f7659aa1fab79bce56cc701111c7264eb59",
+      "sha256": "3da1c685209c677df12c4561d8a20aceefdc4c3e848f216888471f62633e2340",
       "size_bytes": 87964,
       "codecs": [
         "h265"
@@ -17421,11 +17405,7 @@
       ],
       "aliases": [
         "siting_checker.mp4"
-      ],
-      "files": {
-        "siting_checker.expected.json": "85ab6ddc7c49cce7eb450b2d7941d043e1c44fd5c7eb29a236856400d5617030",
-        "siting_checker.mp4": "888a306b6ada738a1c069bf809715f7659aa1fab79bce56cc701111c7264eb59"
-      }
+      ]
     },
     {
       "id": "syn_h264_mbaff",

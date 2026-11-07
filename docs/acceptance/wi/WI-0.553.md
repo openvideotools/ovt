@@ -13,7 +13,7 @@ This file records where each acceptance test stands. Automated tests are named b
 
 | AT | Status | Where |
 |---|---|---|
-| 1. `generate.py --check` in the oracle image, every `syn_*` hash equals the manifest | **pass** | part c2 run record below (exit 0, 158 hashes) |
+| 1. `generate.py --check` in the oracle image, every `syn_*` hash equals the manifest | **partial** | part c2 run record below: exit 0 against the image-produced hashes; the five `syn_pat_*` entries keep their committed-file hashes (follow-up) |
 | 2. encoder version differs from the pin, exit 5, no file written | pass | `tools/tests/test_generate_synthetic.py` (#121, extended in #162) |
 | 3. `syn_av1_hidden_altref_showexisting.ivf`: `inspect -A` has `showFrame: 0`, and `aomdec` outputs more frames than `inspect` shows | **pass** | part c2 run record below |
 | 4. `ovt syntax --hex` reports ≥ 20 `epb_positions` on `syn_h264_epb_dense.264`; `ovt metrics --align auto` reports `offset_frames == +7` on `syn_align_drop7` | **deferred** | see below |
@@ -60,7 +60,7 @@ itself reports are checked by the syntax WIs that consume the family.
 
 Machine: Mac Mini (Apple silicon, macOS 15) running Docker Desktop, image `ovt-oracles:latest` built as
 `linux/amd64` (Rosetta emulation) from `tests/oracles` on `main` at 4618e2c (#190, which adds `scalable_encoder`
-and `libopus`). Generator tree: `main` at bca3c0c (includes #178, #194 and #201). Date: 2026-11-08.
+and `libopus`). Generator tree: `main` at bca3c0c (includes #178, #194 and #201). Date: 2026-11-07.
 `oracle-smoke-test` 51/51 and `oracle-recipe-tools --check` 57 ok, 0 missing on this image.
 
 ```console
@@ -72,10 +72,20 @@ The 49 recipes were the 47 new `syn_raw_*` and `syn_broken_syntax_*` ids from #1
 `syn_mp4_piff` (whose Bento4 `mvhd`/`tkhd`/`mdhd` times were made deterministic by #201; two consecutive runs
 produce identical bytes). The other 109 `syn_*` hashes were produced in earlier runs of the same image on
 the Mini and carried over from their `.ok` records; the `--check` run regenerated all 158 and found every hash equal to
-the manifest, so this also repeats their determinism. 158 of the 165 `syn_*` manifest entries are now hashed.
+the image's hashes, so this also repeats their determinism. 158 of the 165 `syn_*` manifest entries are now hashed.
 Still `unverified`, as designed: `syn_h265_10min_1080p`, `syn_av1_10min_1080p`, `syn_h264_1h_1080p`,
 `syn_av1_4k_2min`, `syn_mp4_frag_3600`, `syn_h265_4k_main10` (`local_only`, hashed on the perf runner) and
 `syn_mkv_dv_p5` (needs the `manual_download` corpus `hdr_dovi_p5`).
+
+### The five `syn_pat_*` entries keep their committed hashes
+
+The pattern streams `syn_pat_pq_patches_1000`, `syn_pat_hlg_patches`, `syn_pat_sdr709_ramp`, `syn_pat_p3_saturation`
+and `syn_pat_siting_checker` are committed as `tests/corpora/patterns/*.mp4`. The image produced different bytes for
+all five (`--check` passed against those image hashes), but the committed files still match the older hashes and
+`test_manifest_has_every_pattern_entry` checks them. This PR therefore leaves those five entries at their values on
+`main`, so `generate.py --check` against this manifest would report exactly these five as differing. Follow-up:
+decide whether the committed `.mp4` files or the image output is canonical (the difference is probably the x264 or
+x265 build inside the encoder step of `tools/gen_hdr_patterns.py`), then regenerate the files or the hashes.
 
 ### AT 3
 
