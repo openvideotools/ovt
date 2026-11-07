@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc15 — 2026-11-07
+
+PATCH-level: WI-0.605 records how branch protection is implemented now that the repository is public. No requirement sentence changes.
+
+- 13 §13.7.3, 15 WI-0.605 — protection of `main` is a repository ruleset managed by `tools/github/apply_protection.sh`; required checks, code-owner review and signed tags follow in later PRs (accepted `asan-ubsan` failures and missing teams block them today); AT1 is pending until the teams exist — WI-0.605
+
 ## 1.0.0-rc14 — 2026-11-07
 
 PATCH-level: two recipe commands made reproducible after the WI-0.553 c2 `--check` on the oracle image. No requirement sentence, acceptance line or WI scope changes.
