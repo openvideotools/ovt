@@ -63,6 +63,12 @@ std::string dl_error() {
   return e != nullptr ? std::string(e) : std::string("unknown dlerror");
 }
 
+bool is_valid_plugin_id(std::string_view id) noexcept {
+  return !id.empty() && id.size() <= kMaxIdLength && std::all_of(id.begin(), id.end(), [](char c) {
+    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
+  });
+}
+
 bool is_valid_codec(uint8_t codec) noexcept {
   return codec > static_cast<uint8_t>(ovt::fb::Codec::Unknown) && codec <= static_cast<uint8_t>(ovt::fb::Codec::MAX);
 }
@@ -175,12 +181,6 @@ const ovt_AnalysisCaps* validate_plugin(const ovt_AnalysisDecoderApi* api, const
 }
 
 }  // namespace
-
-bool is_valid_plugin_id(std::string_view id) noexcept {
-  return !id.empty() && id.size() <= kMaxIdLength && std::all_of(id.begin(), id.end(), [](char c) {
-    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
-  });
-}
 
 std::optional<std::string> plugin_id_from_file_name(std::string_view file_name) {
   if (file_name.size() <= kPrefix.size() + kSuffix.size() || file_name.substr(0, kPrefix.size()) != kPrefix ||

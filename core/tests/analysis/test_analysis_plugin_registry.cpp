@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <mutex>
+#include <numeric>
 #include <string>
 #include <thread>
 #include <utility>
@@ -257,11 +258,7 @@ TEST_CASE("the mock plugin turns units into synthetic FrameAnalysis buffers", "[
   CHECK(g->cells_w() == 2);  // 1 + 17 % 16
   CHECK(g->cells_h() == 2);  // two units
   REQUIRE(g->qp()->size() == 4);
-  uint64_t bits = 0;
-  for (const uint32_t x : *g->bits_x8()) {
-    bits += x;
-  }
-  CHECK(bits == uint64_t{17} * 8);
+  CHECK(std::accumulate(g->bits_x8()->begin(), g->bits_x8()->end(), uint64_t{0}) == uint64_t{17} * 8);
   CHECK(g->mv0_x() == nullptr);  // not announced in grid_fields, so empty
   api->release(dec, fb);
 

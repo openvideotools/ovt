@@ -65,9 +65,6 @@ void set_android_plugin_dirs(std::string native_library_dir, std::string files_p
 // platform's extension (.dylib on macOS, .so elsewhere); std::nullopt otherwise.
 [[nodiscard]] std::optional<std::string> plugin_id_from_file_name(std::string_view file_name);
 
-// Whether `id` is a valid plugin id, `[a-z0-9_]{1,32}`.
-[[nodiscard]] bool is_valid_plugin_id(std::string_view id) noexcept;
-
 class PluginRegistry {
  public:
   // The process singleton (§7.5.1), built lazily; it scans on the first call to plugins()/find()/default_for().

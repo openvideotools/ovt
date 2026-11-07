@@ -28,19 +28,15 @@ function(ovt_add_mock_plugin target)
   set_property(GLOBAL APPEND PROPERTY OVT_MOCK_PLUGIN_TARGETS ${target})
 endfunction()
 
-# The plugin of acceptance test 1 and of the GUI tests.
+# Acceptance tests 1, 3 (same id, another version) and 2 (abi_version 2); also the GUI tests.
 ovt_add_mock_plugin(ovt_plugin_mock DIR mock ID mock)
-# Acceptance test 3: the same id in a second directory, told apart by its version string.
 ovt_add_mock_plugin(ovt_plugin_mock_dup DIR mock_dup ID mock DEFINES "OVT_MOCK_VERSION=\"2.0.0-duplicate\"")
-# Acceptance test 2: abi_version = 2.
 ovt_add_mock_plugin(ovt_plugin_mock_abi2 DIR bad_abi ID abi2 DEFINES "OVT_MOCK_ID=\"abi2\"" OVT_MOCK_ABI_VERSION=2)
-# Step 5 and validation: caps->id differs from the file name; caps->codec outside ovt.fb.Codec.
+# Rejected: wrong caps->id, bad codec, struct_size < v1, NULL entry. mock_hevc: an H265 id for default_for().
 ovt_add_mock_plugin(ovt_plugin_mock_wrong_id DIR bad_id ID wrongid DEFINES "OVT_MOCK_ID=\"other\"")
 ovt_add_mock_plugin(ovt_plugin_mock_bad_codec DIR bad_codec ID badcodec DEFINES "OVT_MOCK_ID=\"badcodec\""
                     OVT_MOCK_CODEC=200)
-# A second id for default_for(): reports H265.
 ovt_add_mock_plugin(ovt_plugin_mock_hevc DIR hevc ID mockhevc DEFINES "OVT_MOCK_ID=\"mockhevc\"" OVT_MOCK_CODEC=2)
-# D4: a function table smaller than the v1 struct, and one with a NULL entry.
 ovt_add_mock_plugin(ovt_plugin_mock_small DIR bad_size ID small DEFINES "OVT_MOCK_ID=\"small\"" OVT_MOCK_API_SIZE=16)
 ovt_add_mock_plugin(ovt_plugin_mock_null DIR bad_null ID nullentry DEFINES "OVT_MOCK_ID=\"nullentry\""
                     OVT_MOCK_NULL_FLUSH)
