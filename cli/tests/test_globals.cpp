@@ -135,6 +135,18 @@ TEST_CASE("Completion scripts list subcommands and IsMember choices", "[fast][cl
   CHECK(contains(invoke({"completion", "zsh"}).out, "--flatbuffers"));
 }
 
+TEST_CASE("Completion offers file names only for path options", "[fast][cli]") {
+  const std::string bash = invoke({"completion", "bash"}).out;
+  CHECK(contains(bash, "--threads) COMPREPLY=(); return ;;"));
+  CHECK(contains(bash, "-o|--output) COMPREPLY=($(compgen -f"));
+  const std::string zsh = invoke({"completion", "zsh"}).out;
+  CHECK(contains(zsh, "(env OVT_THREADS)]:value: '"));
+  CHECK(contains(zsh, "instead of stdout]:value:_files'"));
+  const std::string fish = invoke({"completion", "fish"}).out;
+  CHECK(contains(fish, "-l threads -x"));
+  CHECK(contains(fish, "-l output -r -F"));
+}
+
 TEST_CASE("Version text on a terminal names core and api", "[fast][cli]") {
   const Result r = invoke({"-V"}, {}, true);
   CHECK(r.code == 0);
