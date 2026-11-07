@@ -67,7 +67,11 @@ void spy_destroy(ovt_AnalysisDecoder* dec) noexcept {
   g_spy.real->destroy(dec);
 }
 ovt_status spy_push(ovt_AnalysisDecoder* dec, const uint8_t* unit, size_t len, int32_t hint, int64_t pts) noexcept {
-  g_spy.pushes.push_back({hint, std::vector<uint8_t>(unit, unit + len)});
+  try {
+    g_spy.pushes.push_back({hint, std::vector<uint8_t>(unit, unit + len)});
+  } catch (...) {
+    return OVT_E_NOMEM;
+  }
   if (g_spy.cancel_on != nullptr && hint == g_spy.cancel_at) {
     g_spy.cancel_on->request();
   }

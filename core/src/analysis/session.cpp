@@ -12,9 +12,9 @@
 #include <array>
 #include <cstddef>
 #include <exception>
-#include <functional>
 #include <map>
 #include <new>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -98,6 +98,24 @@ void pack(const ovt::fb::FrameAnalysisT& fa, std::vector<uint8_t>& out) {
   ovt::fb::FinishFrameAnalysisBuffer(fbb, ovt::fb::FrameAnalysis::Pack(fbb, &fa));
   const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
   out.assign(bytes.begin(), bytes.end());
+}
+
+// (type, id) of a parameter set; without a parsed header (type, its bytes), so only identical copies merge.
+// AV1 keeps one sequence header.
+using ParameterSetKey = std::tuple<uint8_t, std::optional<uint64_t>, std::string>;
+ParameterSetKey parameter_set_key(const ovt::fb::Unit& unit, bool av1, const ovt::io::RandomAccessFile& file) {
+  if (av1) {
+    return {unit.type(), 0, {}};
+  }
+  if (auto id = header_ps_id(unit.header())) {
+    return {unit.type(), id, {}};
+  }
+  const auto* span = unit.file_span();
+  std::string bytes(span != nullptr ? span->length() : 0U, '\0');
+  if (!bytes.empty()) {
+    bytes.resize(file.read(span->offset(), bytes.size(), reinterpret_cast<uint8_t*>(bytes.data())));  // NOLINT
+  }
+  return {unit.type(), std::nullopt, std::move(bytes)};
 }
 
 }  // namespace
@@ -362,33 +380,22 @@ ovt_status Session::create_decoder(int rap) {
 ovt_status Session::feed_parameter_sets(int rap) {
   const auto* f = index().frames()->Get(static_cast<uint32_t>(rap));
   const auto* sets = index().parameter_sets();
-  if (sets == nullptr || f->units() == nullptr || f->units()->size() == 0) {
+  if (sets == nullptr || f->units() == nullptr) {
     return OVT_OK;
   }
-  const uint32_t first = *std::min_element(f->units()->begin(), f->units()->end());
+  const auto first_it = std::min_element(f->units()->begin(), f->units()->end());
+  if (first_it == f->units()->end()) {
+    return OVT_OK;
+  }
+  const uint32_t first = *first_it;
   const bool av1 = index().codec() == Codec::AV1;
   // key → unit index of the last occurrence; the value pushed in stream order.
-  std::map<std::tuple<uint8_t, bool, uint64_t>, uint32_t> last;
+  std::map<ParameterSetKey, uint32_t> last;
   for (const auto* unit : *sets) {
     if (unit->index() >= first || (av1 && unit->type() != kAv1SequenceHeader)) {
       continue;
     }
-    std::tuple<uint8_t, bool, uint64_t> key{unit->type(), true, 0};
-    if (!av1) {
-      if (auto id = header_ps_id(unit->header())) {
-        std::get<2>(key) = *id;
-      } else {
-        // No parsed header: deduplicate identical bytes only.
-        const auto* span = unit->file_span();
-        std::vector<uint8_t> bytes(span != nullptr ? span->length() : 0U);
-        if (!bytes.empty()) {
-          bytes.resize(file_.read(span->offset(), bytes.size(), bytes.data()));
-        }
-        key = {unit->type(), false,
-               std::hash<std::string_view>{}(
-                   std::string_view(reinterpret_cast<const char*>(bytes.data()), bytes.size()))};  // NOLINT
-      }
-    }
+    const auto key = parameter_set_key(*unit, av1, file_);
     last[key] = unit->index();
   }
   std::vector<uint32_t> order;
