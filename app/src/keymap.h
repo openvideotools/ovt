@@ -55,7 +55,7 @@ class Keymap : public QObject {
 
  public:
   Keymap();  // keymap.json of Platform::configDir()
-  explicit Keymap(const QString& path, QObject* parent = nullptr);
+  explicit Keymap(QString path, QObject* parent = nullptr);
 
   [[nodiscard]] QStringList actionIds() const;
   [[nodiscard]] QStringList windowActionIds() const;
@@ -64,12 +64,12 @@ class Keymap : public QObject {
   [[nodiscard]] QStringList diagnostics() const { return diagnostics_; }
   [[nodiscard]] QString path() const { return path_; }
 
-  Q_INVOKABLE [[nodiscard]] bool has(const QString& id) const;
-  Q_INVOKABLE [[nodiscard]] QString text(const QString& id) const;
-  Q_INVOKABLE [[nodiscard]] QString scope(const QString& id) const;
+  Q_INVOKABLE [[nodiscard]] static bool has(const QString& id);
+  Q_INVOKABLE [[nodiscard]] static QString text(const QString& id);
+  Q_INVOKABLE [[nodiscard]] static QString scope(const QString& id);
   // The current bindings of an action ("" is never in the list); empty for an unknown id.
   Q_INVOKABLE [[nodiscard]] QStringList keys(const QString& id) const;
-  Q_INVOKABLE [[nodiscard]] QStringList defaultKeys(const QString& id) const;
+  Q_INVOKABLE [[nodiscard]] static QStringList defaultKeys(const QString& id);
   // "Ctrl+O" or "Right / L", for menus and the Keyboard map dialog.
   Q_INVOKABLE [[nodiscard]] QString display(const QString& id) const;
   // The id of the action that already uses `key` in the scope of `id` (other than `id` itself), or "".
@@ -81,14 +81,16 @@ class Keymap : public QObject {
   Q_INVOKABLE void resetAll();
 
   // Portable text of a key press (`Qt::Key` and `Qt::KeyboardModifiers` as integers), "" for a modifier alone.
-  Q_INVOKABLE [[nodiscard]] QString keyText(int key, int modifiers) const;
+  Q_INVOKABLE [[nodiscard]] static QString keyText(int key, int modifiers);
   // The reverse for tests: [key, modifiers] of a portable single-key text.
-  Q_INVOKABLE [[nodiscard]] QVariantList decompose(const QString& key) const;
+  Q_INVOKABLE [[nodiscard]] static QVariantList decompose(const QString& key);
   // True when a key press is bound to `id`, for panel-scope actions that handle Keys.onPressed themselves.
   Q_INVOKABLE [[nodiscard]] bool matches(const QString& id, int key, int modifiers) const;
 
   // Normalised portable text of a key ("ctrl+o" -> "Ctrl+O"), "" when it is not a single valid key sequence.
   static QString normalise(const QString& key);
+  // The registry entry of an id, nullptr when unknown.
+  static const ActionDef* find(const QString& id);
 
  Q_SIGNALS:
   void changed();
@@ -96,7 +98,6 @@ class Keymap : public QObject {
  private:
   void load();
   bool save();
-  [[nodiscard]] const ActionDef* find(const QString& id) const;
 
   QString path_;
   QString code_;

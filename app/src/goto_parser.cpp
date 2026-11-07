@@ -137,7 +137,7 @@ std::optional<GotoTarget> parseGoto(const QString& text, QString* error) {
   return target;
 }
 
-QVariantMap GotoParser::parse(const QString& text) const {
+QVariantMap GotoParser::parse(const QString& text) {
   QString error;
   const std::optional<GotoTarget> target = parseGoto(text, &error);
   QVariantMap result;

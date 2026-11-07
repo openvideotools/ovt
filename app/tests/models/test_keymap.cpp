@@ -128,8 +128,8 @@ TEST_CASE("Keymap: a damaged file gives the default map and GUI-KEY-0001", "[fas
 TEST_CASE("Keymap: key presses to portable text and back", "[fast][gui][keymap]") {
   const QTemporaryDir dir;
   const Keymap keymap(keymap_path(dir));
-  CHECK(keymap.keyText(Qt::Key_O, Qt::ControlModifier) == QStringLiteral("Ctrl+O"));
-  CHECK(keymap.keyText(Qt::Key_Right, Qt::ShiftModifier) == QStringLiteral("Shift+Right"));
-  CHECK(keymap.keyText(Qt::Key_Shift, Qt::ShiftModifier).isEmpty());
-  CHECK(keymap.decompose(QStringLiteral("Ctrl+Shift+O")).at(0).toInt() == Qt::Key_O);
+  CHECK(Keymap::keyText(Qt::Key_O, Qt::ControlModifier) == QStringLiteral("Ctrl+O"));
+  CHECK(Keymap::keyText(Qt::Key_Right, Qt::ShiftModifier) == QStringLiteral("Shift+Right"));
+  CHECK(Keymap::keyText(Qt::Key_Shift, Qt::ShiftModifier).isEmpty());
+  CHECK(Keymap::decompose(QStringLiteral("Ctrl+Shift+O")).at(0).toInt() == Qt::Key_O);
 }
