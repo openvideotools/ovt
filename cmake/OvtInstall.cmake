@@ -29,6 +29,12 @@ if(TARGET ovt_cli)
   install(TARGETS ovt_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT cli)
 endif()
 
+# UVQ model manifest and YouTube-8M label names (chapter 9 §9.6.3 and §9.6.5; WI-3.314). The .onnx files are
+# not installed: the UVQ host downloads them into the cache on first use and checks them against the manifest.
+install(FILES "${CMAKE_SOURCE_DIR}/core/share/models/uvq/manifest.json"
+              "${CMAKE_SOURCE_DIR}/core/share/models/uvq/labels_yt8m.txt"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/ovt/models/uvq" COMPONENT core)
+
 set(_ovt_plugin_targets "")
 foreach(_t ovt_plugin_aom ovt_plugin_ffmpeg ovt_plugin_de265)
   if(TARGET ${_t})
