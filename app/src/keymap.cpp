@@ -13,7 +13,9 @@
 #include <QSaveFile>
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
+#include <utility>
 
 #include "platform/platform.h"
 
@@ -69,18 +71,18 @@ std::vector<ActionDef> build_registry() {
       win("view.area.right", "Toggle right area", {"Ctrl+Shift+R"}),
       win("view.area.bottom", "Toggle bottom area", {"Ctrl+Shift+B"}),
   };
-  static const char* const kFocusText[] = {"Focus panel 1", "Focus panel 2", "Focus panel 3",
-                                           "Focus panel 4", "Focus panel 5", "Focus panel 6",
-                                           "Focus panel 7", "Focus panel 8", "Focus panel 9"};
+  static const std::array<const char*, 9> kFocusText = {"Focus panel 1", "Focus panel 2", "Focus panel 3",
+                                                        "Focus panel 4", "Focus panel 5", "Focus panel 6",
+                                                        "Focus panel 7", "Focus panel 8", "Focus panel 9"};
   for (int i = 1; i <= 9; ++i) {
     ActionDef a;
     a.id = QStringLiteral("action.view.focusPanel%1").arg(i);
-    a.text = qs(kFocusText[i - 1]);
+    a.text = qs(kFocusText.at(static_cast<std::size_t>(i - 1)));
     a.scope = qs(kWindow);
     a.keys = {QStringLiteral("Ctrl+Shift+%1").arg(i)};
     r.push_back(a);
   }
-  static const char* const kModeText[] = {
+  static const std::array<const char*, 12> kModeText = {
       "Coding flow / partitions", "Prediction",    "Motion vectors",
       "Transform / residual",     "QP map",        "Bits heatmap",
       "Reference indices",        "Loop filter",   "In-loop filter params (SAO / CDEF / LR)",
@@ -88,7 +90,7 @@ std::vector<ActionDef> build_registry() {
   for (int i = 1; i <= 12; ++i) {
     ActionDef a;
     a.id = QStringLiteral("action.overlays.mode.f%1").arg(i);
-    a.text = QStringLiteral("Overlay mode F%1: ").arg(i) + qs(kModeText[i - 1]);
+    a.text = QStringLiteral("Overlay mode F%1: ").arg(i) + qs(kModeText.at(static_cast<std::size_t>(i - 1)));
     a.scope = qs(kWindow);
     a.keys = {QStringLiteral("F%1").arg(i)};
     r.push_back(a);
@@ -196,6 +198,28 @@ QStringList keys_of(const QJsonValue& value, bool* ok) {
   return keys;
 }
 
+// The first overriding entry in `applied` that shares a key with another action of its scope: its defaults are put
+// back, it leaves `applied`, GUI-KEY-0001 is appended to `diagnostics`. False when no entry conflicts.
+bool reject_one_conflict(QMap<QString, QStringList>* proposed, QStringList* applied, QStringList* diagnostics) {
+  for (const QString& id : std::as_const(*applied)) {
+    const ActionDef* self = Keymap::find(id);
+    for (const QString& key : proposed->value(id)) {
+      for (const ActionDef& other : actionRegistry()) {
+        if (other.id == id || other.scope != self->scope || !proposed->value(other.id).contains(key)) {
+          continue;
+        }
+        diagnostics->append(QStringLiteral("GUI-KEY-0001: shortcut %1 is bound to %2 and %3, entry %3 rejected")
+                                .arg(key, other.id, id));
+        static_cast<void>(std::fprintf(stderr, "%s\n", diagnostics->back().toLocal8Bit().constData()));
+        proposed->insert(id, self->keys);
+        applied->removeAll(id);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 }  // namespace
 
 const std::vector<ActionDef>& actionRegistry() {
@@ -213,20 +237,21 @@ QString Keymap::normalise(const QString& key) {
 
 Keymap::Keymap() : Keymap(Platform::keymapPath()) {}
 
-Keymap::Keymap(const QString& path, QObject* parent)
-    : QObject(parent), path_(path), code_(QStringLiteral("GUI-KEY-0001")) {
+Keymap::Keymap(QString path, QObject* parent)
+    : QObject(parent), path_(std::move(path)), code_(QStringLiteral("GUI-KEY-0001")) {
   for (const ActionDef& action : actionRegistry()) {
     bindings_.insert(action.id, action.keys);
   }
   load();
 }
 
-const ActionDef* Keymap::find(const QString& id) const {
+const ActionDef* Keymap::find(const QString& id) {
   const auto& registry = actionRegistry();
   const auto it = std::ranges::find(registry, id, &ActionDef::id);
   return it == registry.end() ? nullptr : &*it;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): a Q_PROPERTY getter
 QStringList Keymap::actionIds() const {
   QStringList ids;
   for (const ActionDef& action : actionRegistry()) {
@@ -235,6 +260,7 @@ QStringList Keymap::actionIds() const {
   return ids;
 }
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): a Q_PROPERTY getter
 QStringList Keymap::windowActionIds() const {
   QStringList ids;
   for (const ActionDef& action : actionRegistry()) {
@@ -245,16 +271,16 @@ QStringList Keymap::windowActionIds() const {
   return ids;
 }
 
-bool Keymap::has(const QString& id) const {
+bool Keymap::has(const QString& id) {
   return find(id) != nullptr;
 }
 
-QString Keymap::text(const QString& id) const {
+QString Keymap::text(const QString& id) {
   const ActionDef* action = find(id);
   return action != nullptr ? action->text : QString();
 }
 
-QString Keymap::scope(const QString& id) const {
+QString Keymap::scope(const QString& id) {
   const ActionDef* action = find(id);
   return action != nullptr ? action->scope : QString();
 }
@@ -263,7 +289,7 @@ QStringList Keymap::keys(const QString& id) const {
   return bindings_.value(id);
 }
 
-QStringList Keymap::defaultKeys(const QString& id) const {
+QStringList Keymap::defaultKeys(const QString& id) {
   const ActionDef* action = find(id);
   return action != nullptr ? action->keys : QStringList();
 }
@@ -294,7 +320,8 @@ void Keymap::load() {
   const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parse_error);
   if (parse_error.error != QJsonParseError::NoError || !doc.isObject()) {
     diagnostics_.append(QStringLiteral("GUI-KEY-0001: keymap.json is not a JSON object, the default map is used"));
-    std::fprintf(stderr, "%s: %s\n", diagnostics_.back().toLocal8Bit().constData(), path_.toLocal8Bit().constData());
+    static_cast<void>(std::fprintf(stderr, "%s: %s\n", diagnostics_.back().toLocal8Bit().constData(),
+                                   path_.toLocal8Bit().constData()));
     return;
   }
   // Phase 1: the proposed map, every well-formed override applied to the defaults.
@@ -317,34 +344,7 @@ void Keymap::load() {
   }
   // Phase 2: a key shared by two actions of one scope rejects every overriding entry that holds it; the defaults of
   // the other action stay. Repeat because rejecting an entry restores its defaults, which may conflict in turn.
-  bool again = true;
-  while (again) {
-    again = false;
-    for (const QString& id : std::as_const(applied)) {
-      const ActionDef* self = find(id);
-      for (const QString& key : proposed.value(id)) {
-        QString other_id;
-        for (const ActionDef& other : actionRegistry()) {
-          if (other.id != id && other.scope == self->scope && proposed.value(other.id).contains(key)) {
-            other_id = other.id;
-            break;
-          }
-        }
-        if (other_id.isEmpty()) {
-          continue;
-        }
-        diagnostics_.append(QStringLiteral("GUI-KEY-0001: shortcut %1 is bound to %2 and %3, entry %3 rejected")
-                                .arg(key, other_id, id));
-        std::fprintf(stderr, "%s\n", diagnostics_.back().toLocal8Bit().constData());
-        proposed.insert(id, self->keys);
-        applied.removeAll(id);
-        again = true;
-        break;
-      }
-      if (again) {
-        break;
-      }
-    }
+  while (reject_one_conflict(&proposed, &applied, &diagnostics_)) {
   }
   bindings_ = proposed;
   for (const QString& id : std::as_const(applied)) {
@@ -398,7 +398,7 @@ QString Keymap::setKeys(const QString& id, const QStringList& keys) {
   }
   ++revision_;
   if (!save()) {
-    std::fprintf(stderr, "keymap: could not write %s\n", path_.toLocal8Bit().constData());
+    static_cast<void>(std::fprintf(stderr, "keymap: could not write %s\n", path_.toLocal8Bit().constData()));
   }
   Q_EMIT changed();
   return {};
@@ -436,7 +436,7 @@ void Keymap::resetAll() {
   Q_EMIT changed();
 }
 
-QString Keymap::keyText(int key, int modifiers) const {
+QString Keymap::keyText(int key, int modifiers) {
   if (key == Qt::Key_Control || key == Qt::Key_Shift || key == Qt::Key_Alt || key == Qt::Key_Meta ||
       key == Qt::Key_AltGr || key == Qt::Key_unknown || key == 0) {
     return {};
@@ -447,7 +447,7 @@ QString Keymap::keyText(int key, int modifiers) const {
   return sequence.toString(QKeySequence::PortableText);
 }
 
-QVariantList Keymap::decompose(const QString& key) const {
+QVariantList Keymap::decompose(const QString& key) {
   const QKeySequence sequence(key, QKeySequence::PortableText);
   if (sequence.count() != 1) {
     return {};

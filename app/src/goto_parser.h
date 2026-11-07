@@ -40,7 +40,7 @@ class GotoParser : public QObject {
   QML_SINGLETON
 
  public:
-  Q_INVOKABLE [[nodiscard]] QVariantMap parse(const QString& text) const;
+  Q_INVOKABLE [[nodiscard]] static QVariantMap parse(const QString& text);
 };
 
 }  // namespace ovt::app

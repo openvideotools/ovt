@@ -22,7 +22,7 @@ GotoTarget parsed(const char* text) {
   const auto target = parseGoto(QString::fromLatin1(text), &error);
   INFO(text << ": " << error.toStdString());
   REQUIRE(target.has_value());
-  return *target;
+  return target.value_or(GotoTarget{});
 }
 
 }  // namespace
@@ -61,17 +61,16 @@ TEST_CASE("Go to: text that is not the grammar is refused with a reason", "[fast
 }
 
 TEST_CASE("Go to: the QML view", "[fast][gui][goto]") {
-  const GotoParser parser;
-  QVariantMap result = parser.parse(QStringLiteral("@0x1A3F40"));
+  QVariantMap result = GotoParser::parse(QStringLiteral("@0x1A3F40"));
   CHECK(result.value(QStringLiteral("ok")).toBool());
   CHECK(result.value(QStringLiteral("kind")).toString() == QStringLiteral("byte"));
   CHECK(result.value(QStringLiteral("value")).toLongLong() == 0x1A3F40);
-  result = parser.parse(QStringLiteral("00:01:30.250"));
+  result = GotoParser::parse(QStringLiteral("00:01:30.250"));
   CHECK(result.value(QStringLiteral("kind")).toString() == QStringLiteral("time"));
   CHECK(result.value(QStringLiteral("value")).toDouble() == 90.25);
-  result = parser.parse(QStringLiteral("poc9999"));
+  result = GotoParser::parse(QStringLiteral("poc9999"));
   CHECK(result.value(QStringLiteral("kind")).toString() == QStringLiteral("poc"));
-  result = parser.parse(QStringLiteral("nonsense"));
+  result = GotoParser::parse(QStringLiteral("nonsense"));
   CHECK_FALSE(result.value(QStringLiteral("ok")).toBool());
   CHECK_FALSE(result.value(QStringLiteral("error")).toString().isEmpty());
 }
