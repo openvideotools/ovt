@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Tests of libovt-render. Today only the third-party probe of WI-0.017; the render tests arrive with chapter 10.
+# Tests of libovt-render: the third-party probes of WI-0.015/WI-0.017 and the render tests of chapter 10
+# ("render tests" = ctest -R render_, §10.11; every chapter 10 work item adds its tests here).
 
 # WI-0.017: tp::moltenvk (macOS prebuilt) links directly, as ovt_render will (§13.5.6).
 if(TARGET tp::moltenvk)
@@ -21,3 +22,13 @@ if(TARGET tp::placebo)
   ovt_set_license(ovt_tests_placebo_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_placebo_probe)
 endif()
+
+# WI-1.400: VideoSurface on an OffscreenTexture target (acceptance tests 1 and 2: lavapipe on Linux, MoltenVK on
+# macOS). Links the shared libovt_render; the download helper is an exported internal symbol (src/surface/), so the
+# test also sees render/src.
+ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
+add_executable(ovt_tests_render test_init.cpp)
+target_link_libraries(ovt_tests_render PRIVATE ovt::render ovt::flags ${Catch2_TARGET})
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
+ovt_set_license(ovt_tests_render "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_render)
