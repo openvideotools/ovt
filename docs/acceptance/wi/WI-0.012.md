@@ -132,3 +132,41 @@ vc1 and wmv3, and found the vp9, mpeg2video, av1, mp3 and opus decoders. The bod
 compiled against the same build with `-Wall -Wextra -Werror`, passed. The full probe runs in the Mac CI job.
 
 Result: pass.
+
+## Amendment: Microsoft MPEG-4 Part 2 variants left out of the core (owner decision, spec 1.0-rc13)
+
+Spec 1.0-rc13 (§13.3.3, POL-PAT-2) adds `msmpeg4v1`, `msmpeg4v2`, `msmpeg4v3`, `wmv1` and `wmv2` to the core
+flavour's `--disable-decoder=` list. In n7.1.1 `configure` all five select only the `msmpeg4dec` component
+(`wmv2` also selects shared DSP code), so the change is a flag-list change with no patch; none of them has a
+hwaccel. The `h263` decoder (and `flv`) stays. The core probe case and `ffmpeg_configure_flags` check the new names.
+
+Configure and build check, 2026-11-07, Linux x86-64 cloud container (Ubuntu 24.04, gcc 13), FFmpeg n7.1.1 from the
+GitHub mirror, core/linux flag list from `ovt_ffmpeg_configure_flags()` (HW off, no dav1d, plus `--disable-x86asm`):
+
+```console
+$ grep -E "CONFIG_(MSMPEG4V1|MSMPEG4V2|MSMPEG4V3|WMV1|WMV2|MPEG4|VC1|WMV3|H263|H264|VP9|MPEG2VIDEO)_DECODER |CONFIG_MSMPEG4DEC |CONFIG_(MPEG4VIDEO|VC1|H263)_PARSER " config_components.h config.h
+config_components.h:#define CONFIG_H263_DECODER 1
+config_components.h:#define CONFIG_H264_DECODER 0
+config_components.h:#define CONFIG_MPEG2VIDEO_DECODER 1
+config_components.h:#define CONFIG_MPEG4_DECODER 0
+config_components.h:#define CONFIG_MSMPEG4V1_DECODER 0
+config_components.h:#define CONFIG_MSMPEG4V2_DECODER 0
+config_components.h:#define CONFIG_MSMPEG4V3_DECODER 0
+config_components.h:#define CONFIG_VC1_DECODER 0
+config_components.h:#define CONFIG_VP9_DECODER 1
+config_components.h:#define CONFIG_WMV1_DECODER 0
+config_components.h:#define CONFIG_WMV2_DECODER 0
+config_components.h:#define CONFIG_WMV3_DECODER 0
+config_components.h:#define CONFIG_H263_PARSER 1
+config_components.h:#define CONFIG_MPEG4VIDEO_PARSER 1
+config_components.h:#define CONFIG_VC1_PARSER 1
+config.h:#define CONFIG_MSMPEG4DEC 0
+$ nm libavcodec_ovt.so | grep -E "ff_(h263|msmpeg4v[123]|wmv[12])_decoder$"
+0000000000929c40 d ff_h263_decoder
+```
+
+`libavcodec_ovt.so` and `libavformat_ovt.so` built cleanly. A program built with `-Wall -Wextra -Werror` against
+that `libavcodec_ovt.so` found no decoder for msmpeg4v1, msmpeg4v2, msmpeg4v3, wmv1, wmv2, mpeg4 and wmv3, and
+found the h263, flv1, vp9 and mpeg2video decoders. `cmake -P third_party/ffmpeg/test_configure_flags.cmake` passes.
+
+Result: pass.

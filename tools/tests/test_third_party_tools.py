@@ -352,3 +352,41 @@ def test_third_party_builds_get_the_tsan_flags(tmp_path: Path) -> None:
 def test_third_party_builds_get_no_flags_without_sanitizers(tmp_path: Path) -> None:
     args = toolchain_args(tmp_path)
     assert not [a for a in args if a.startswith(("-DCMAKE_C_FLAGS", "-DCMAKE_EXE_LINKER_FLAGS"))]
+
+
+# ---- download retries -------------------------------------------------------------------------------------
+
+
+def test_download_retries_transient_errors_and_not_4xx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import io
+    import urllib.error
+
+    calls: list[str] = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self) -> "Resp":
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            self.close()
+
+    def flaky(url: str, timeout: float) -> Resp:
+        calls.append(url)
+        if len(calls) < 3:
+            raise TimeoutError("Timeout was reached")
+        return Resp(b"payload")
+
+    monkeypatch.setattr(vtc.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(vtc.time, "sleep", lambda s: None)
+    vtc.download("https://example.org/a.tar", tmp_path / "a.tar")
+    assert len(calls) == 3 and (tmp_path / "a.tar").read_bytes() == b"payload"
+
+    def gone(url: str, timeout: float) -> Resp:
+        calls.append(url)
+        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)  # type: ignore[arg-type]
+
+    calls.clear()
+    monkeypatch.setattr(vtc.urllib.request, "urlopen", gone)
+    with pytest.raises(urllib.error.HTTPError):
+        vtc.download("https://example.org/b.tar", tmp_path / "b.tar")
+    assert len(calls) == 1 and not (tmp_path / "b.tar.part").exists()
