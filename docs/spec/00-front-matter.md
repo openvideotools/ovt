@@ -68,4 +68,5 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc11 (2026-11-06) | Chapter 14 §14.3.3 recipe 33 loops its source once so the clean TS lasts 4 s and the 1 s PCR gap fits (see `CHANGELOG.md`). |
 | 1.0-rc12 (2026-11-06) | Chapter 14 §14.3.3 recipe 21 encodes its own HEVC with an IDR every 20 frames and 600 ms segments, so the CMAF file has its three segments (see `CHANGELOG.md`). |
 | 1.0-rc13 (2026-11-07) | WI-0.012 FFmpeg core flavour also disables the MS-MPEG4 v1–v3 and WMV7/WMV8 decoders, the Microsoft variants of MPEG-4 Part 2 (owner decision; see `CHANGELOG.md`). |
-| 1.0-rc15 (2026-11-07) | Chapter 14 §14.3.3 rule 2 and recipes 68, 69: Bento4 outputs get their `mvhd`/`tkhd`/`mdhd` times pinned to 0 by `tools/mp4_pin_times.py` (see `CHANGELOG.md`). |
+| 1.0-rc14 (2026-11-07) | Chapter 14 §14.3.3 rule 2 and recipes 68, 69: Bento4 outputs get their `mvhd`/`tkhd`/`mdhd` times pinned to 0 by `tools/mp4_pin_times.py` (see `CHANGELOG.md`). |
+| 1.0-rc15 (2026-11-07) | WI-0.605: protection of `main` is a repository ruleset managed by `tools/github/apply_protection.sh`; required checks, code-owner review and signed tags follow in later PRs; acceptance test 1 is pending until the CODEOWNERS teams exist (see `CHANGELOG.md`). |
