@@ -5,7 +5,8 @@
 # (cmake/OvtTesting.cmake). Lists the Catch2 test cases of TEST_EXECUTABLE with their tags and writes
 # CTEST_FILE: one add_test() per test case and its LABELS (tags mapped to label names, chapter 14 §14.2.5).
 #
-# Inputs (-D): TEST_EXECUTABLE, TEST_WORKING_DIR, TEST_EXTRA_LABELS (;-list), CTEST_FILE.
+# Inputs (-D): TEST_EXECUTABLE, TEST_WORKING_DIR, TEST_EXTRA_LABELS (;-list),
+# TEST_ENVIRONMENT_MODIFICATION (;-list of CTest ENVIRONMENT_MODIFICATION entries, may be empty), CTEST_FILE.
 
 foreach(var TEST_EXECUTABLE TEST_WORKING_DIR CTEST_FILE)
   if(NOT DEFINED ${var})
@@ -85,6 +86,10 @@ foreach(case IN LISTS cases)
   string(APPEND content
     "add_test(${qname} ${qexe} ${qspec} --reporter console)\n"
     "set_tests_properties(${qname} PROPERTIES WORKING_DIRECTORY ${qwd} LABELS ${qlabels} SKIP_RETURN_CODE 4)\n")
+  if(NOT "${TEST_ENVIRONMENT_MODIFICATION}" STREQUAL "")
+    _ovt_bracket("${TEST_ENVIRONMENT_MODIFICATION}" qenv)
+    string(APPEND content "set_tests_properties(${qname} PROPERTIES ENVIRONMENT_MODIFICATION ${qenv})\n")
+  endif()
 endforeach()
 
 file(WRITE "${CTEST_FILE}" "${content}")
