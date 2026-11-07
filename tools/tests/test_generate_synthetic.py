@@ -140,6 +140,15 @@ def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
     assert err.value.code == 4
 
 
+def test_missing_helpers_ignores_out_dir_arguments():
+    out = "{repo}/tests/corpora/not_yet_created_dir"
+    step = {"cmd": ["{python}", "{repo}/tools/sei_inject.py", "--out-dir", out, "in.265"]}
+    assert generate.missing_helpers([{"steps": [step]}]) == []
+    step = {"cmd": ["{python}", "{repo}/tools/no_such_helper.py", "--out-dir", out]}
+    assert generate.missing_helpers([{"steps": [step]}]) == ["tools/no_such_helper.py"]
+    assert generate.missing_helpers([{"steps": [{"cmd": ["x", "{repo}/tests/missing_dir"]}]}]) == ["tests/missing_dir"]
+
+
 def test_bento4_clock_without_pin_step_is_rejected(tmp_path):
     doc = json.loads(generate.DEFAULT_RECIPES.read_text(encoding="utf-8"))
     rec = next(r for r in doc["recipes"] if r["id"] == "syn_mp4_piff")

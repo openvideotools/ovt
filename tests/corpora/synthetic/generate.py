@@ -457,12 +457,13 @@ def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path,
 
 
 def missing_helpers(items: list[dict[str, Any]]) -> list[str]:
+    """Repo files a recipe reads (helper scripts, data files). Output directories (``--out-dir X``) are created, not read."""
     missing = set()
     for item in items:
         for step in item["steps"]:
             for argv in step_argvs(step):
-                for arg in argv:
-                    if arg.startswith("{repo}/"):
+                for prev, arg in zip(["", *argv], argv):
+                    if arg.startswith("{repo}/") and prev != "--out-dir":
                         path = REPO / arg[len("{repo}/") :]
                         if not path.exists():
                             missing.add(arg[len("{repo}/") :])
@@ -484,6 +485,8 @@ def manifest_entry(rec: dict[str, Any]) -> dict[str, Any]:
     for key in ("features", "tags", "aliases"):
         if rec.get(key):
             entry[key] = list(rec[key])
+    if rec.get("expected"):
+        entry["expected"] = dict(rec["expected"])  # container tests (WI-1.237)
     if rec.get("local_only"):
         entry["local_only"] = True
     return entry

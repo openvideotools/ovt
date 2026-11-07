@@ -29,7 +29,8 @@ include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
 include(OvtMeson)
 
-ovt_tp_declare(libplacebo LICENSE_FILES LICENSE)
+# "./LICENSE", not LICENSE: a bare LICENSE is read as ovt_tp_declare()'s LICENSE keyword and records no file.
+ovt_tp_declare(libplacebo LICENSE_FILES ./LICENSE)
 
 # ---- where the vcpkg (or system) dependencies are -----------------------------------------------------
 set(_ovt_pl_extra_c "")

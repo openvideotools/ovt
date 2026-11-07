@@ -138,6 +138,10 @@ function(ovt_tp_declare dep)
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_declare(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
+  if(arg_KEYWORDS_MISSING_VALUES)
+    message(FATAL_ERROR "ovt_tp_declare(${dep}): ${arg_KEYWORDS_MISSING_VALUES} has no value. A licence file named "
+                        "LICENSE must be written ./LICENSE, or it is read as the LICENSE keyword.")
+  endif()
   if(NOT DEFINED OVT_TP_${dep}_ROW)
     message(FATAL_ERROR "ovt_tp_declare(${dep}): third_party/VERSIONS.md has no row with id '${dep}' "
                         "(known: ${OVT_TP_DEPS}).")

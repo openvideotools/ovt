@@ -33,9 +33,12 @@ endif()
 # macOS). Links the shared libovt_render; the download helper is an exported internal symbol (src/surface/), so the
 # test also sees render/src.
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-add_executable(ovt_tests_render test_init.cpp)
+add_executable(ovt_tests_render test_h273_map.cpp test_init.cpp)
 target_link_libraries(ovt_tests_render PRIVATE ovt::render ovt::flags ${Catch2_TARGET})
 target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
+# WI-1.402: the H.273 map (src/color/, exported internal symbols) speaks libplacebo's colour types, so the test also
+# needs libplacebo's headers; it calls only pl_color_*_guess itself, everything else goes through libovt_render.
+target_link_libraries(ovt_tests_render PRIVATE tp::placebo)
 ovt_set_license(ovt_tests_render "LGPL-2.1-or-later")
 # Each VideoSurface creates a Vulkan instance and meets the same lavapipe enumeration leak as the probe (#207), so the
 # same per-binary slow unwinder lets the tests/asan.supp entry match.
