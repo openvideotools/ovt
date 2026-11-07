@@ -8,15 +8,29 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS QuickTest)
 # ovt_find_package targets are directory-scoped (core/tests found Catch2 for itself).
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
 
-# ---- Models: Settings, Platform, JobsModel and SelectionModel, without QML -------------------------------------------------
+# ---- Models: Settings, Platform, JobsModel and SelectionModel, Project, RecentFiles and RawFormatModel, without QML -------------------------------------------------
 add_executable(
   ovt_tests_app_models
-  models/test_settings.cpp models/test_jobs_model.cpp models/test_selection_model.cpp ../src/settings.cpp
-  ../src/platform/platform.cpp ../src/models/jobs_model.cpp ../src/models/selection_model.cpp)
+  models/test_settings.cpp
+  models/test_jobs_model.cpp
+  models/test_selection_model.cpp
+  models/test_project.cpp
+  ../src/project.cpp
+  ../src/settings.cpp
+  ../src/platform/platform.cpp
+  ../src/models/jobs_model.cpp
+  ../src/models/selection_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
 qt_add_resources(
-  ovt_tests_app_models settings_schema PREFIX /qt/qml/OvtStudio BASE "${PROJECT_SOURCE_DIR}/docs/spec/schemas" FILES
-  "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json")
+  ovt_tests_app_models
+  settings_schema
+  PREFIX
+  /qt/qml/OvtStudio
+  BASE
+  "${PROJECT_SOURCE_DIR}/docs/spec/schemas"
+  FILES
+  "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json"
+  "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
 target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models)
 target_link_libraries(ovt_tests_app_models PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick ovt::core ovt::flags
                                                    ${Catch2_TARGET})

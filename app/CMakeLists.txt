@@ -23,8 +23,10 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
-  set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml")
+  set(qml_files
+      "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
+      "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml"
+      "${app_dir}/qml/dialogs/OpenAsDialog.qml" "${app_dir}/qml/dialogs/RawFormatDialog.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -35,6 +37,8 @@ function(ovt_studio_add_qml_module target)
                                                                                      resources/icons/ovt-studio.svg)
   set(schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json")
   set_source_files_properties("${schema}" PROPERTIES QT_RESOURCE_ALIAS settings.schema.json)
+  set(project_schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
+  set_source_files_properties("${project_schema}" PROPERTIES QT_RESOURCE_ALIAS ovtproj.schema.json)
   # qt_add_qml_module generates the QML type registration from moc's metatypes.
   set_target_properties(${target} PROPERTIES AUTOMOC ON)
   qt_add_qml_module(
@@ -52,13 +56,16 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/platform/platform.cpp"
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
+    "${app_dir}/src/project.h"
+    "${app_dir}/src/project.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
     "${app_dir}/src/models/selection_model.h"
     "${app_dir}/src/models/selection_model.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
-    "${schema}")
+    "${schema}"
+    "${project_schema}")
   # src/platform too: the generated type registration includes the headers by file name.
   target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
   # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
