@@ -156,9 +156,22 @@ jobs:
       - name: cppcheck
         run: |
           mkdir -p cppcheck-report
+          # The compilation database also lists generated sources that the configure step does not create (Qt
+          # AUTOMOC/AUTORCC <target>_autogen/mocs_compilation.cpp, qmltyperegistrations.cpp). cppcheck aborts on a
+          # missing file, so keep only entries whose source exists. Every real source exists in the checkout.
+          python3 -I - "build/$PRESET/compile_commands.json" cppcheck-report/compile_commands.json <<'PY'
+          import json, os, sys
+          entries = json.load(open(sys.argv[1]))
+          kept = [e for e in entries if os.path.exists(os.path.join(e["directory"], e["file"]))]
+          for e in entries:
+              if e not in kept:
+                  print("dropped (not generated at analysis time):", e["file"])
+          print(f"compile_commands: kept {len(kept)} of {len(entries)} entries")
+          json.dump(kept, open(sys.argv[2], "w"), indent=1)
+          PY
           # Only OVT translation units: third_party and generated files are filtered out of the project.
           cppcheck --enable=warning,performance,portability --std=c++20 --inline-suppr \
-            --project="build/$PRESET/compile_commands.json" \
+            --project=cppcheck-report/compile_commands.json \
             --suppressions-list=tests/cppcheck.supp \
             -i third_party -i build \
             --xml --xml-version=2 -j "$(nproc)" 2> cppcheck-report/cppcheck.xml
