@@ -77,6 +77,8 @@ LogSink::LogSink(bool install, QObject* parent) : QAbstractListModel(parent), in
 }
 
 LogSink::~LogSink() {
+  // ovt_set_logger (ovt/log.h) does not wait for a line already being delivered on another thread, so the
+  // sink must outlive any thread that can still log: the application owns it for its whole lifetime.
   if (installed_) {
     ovt_set_logger(nullptr, nullptr);
   }
