@@ -24,7 +24,7 @@ include(OvtThirdPartyCommon)
 #    OVT_TP_DOWNLOADS and verifies it, so ExternalProject finds the file there and does not fetch it again.
 #    LICENSE defaults to the row's Licence column.
 ovt_tp_declare(mydep
-  LICENSE_FILES LICENSE)
+  LICENSE_FILES ./LICENSE) # "./": a bare LICENSE would be read as the LICENSE keyword
 
 # 2. Patch step: every third_party/patches/mydep/*.patch, `git apply --check` first, applied once.
 #    For a series file and a patches.json record use instead:
