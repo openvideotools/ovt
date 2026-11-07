@@ -1,0 +1,41 @@
+{
+ "_comment": "JM 19.0 trace strings (TRACE_STRING / trace_info in ldecod/src) -> canonical keys of jm_trace.py. header: slice-header names after the 'SH: ' prefix. mb: macroblock-layer names; mvd0_lN / mvd1_lN are the x / y components of a partition MVD, mvd_lN is printed twice (x, y) per sub-partition. arrays and vectors name the keys collected in read order.",
+ "arrays": [
+  "intra4x4_pred_mode",
+  "ref_idx_l0",
+  "ref_idx_l1",
+  "sub_mb_type"
+ ],
+ "header": {
+  "field_pic_flag": "field_pic_flag",
+  "first_mb_in_slice": "first_mb_in_slice",
+  "num_ref_idx_l0_active_minus1": "num_ref_idx_l0_active_minus1",
+  "num_ref_idx_l1_active_minus1": "num_ref_idx_l1_active_minus1",
+  "pic_parameter_set_id": "pic_parameter_set_id",
+  "slice_qp_delta": "slice_qp_delta",
+  "slice_type": "slice_type"
+ },
+ "mb": {
+  "coded_block_pattern": "cbp",
+  "intra4x4_pred_mode": "intra4x4_pred_mode",
+  "intra_chroma_pred_mode": "intra_chroma_pred_mode",
+  "mb_field_decoding_flag": "mb_field_decoding_flag",
+  "mb_qp_delta": "mb_qp_delta",
+  "mb_skip_flag": "mb_skip_flag",
+  "mb_type": "mb_type",
+  "mvd0_l0": "mvd_l0",
+  "mvd0_l1": "mvd_l1",
+  "mvd1_l0": "mvd_l0",
+  "mvd1_l1": "mvd_l1",
+  "mvd_l0": "mvd_l0",
+  "mvd_l1": "mvd_l1",
+  "ref_idx_l0": "ref_idx_l0",
+  "ref_idx_l1": "ref_idx_l1",
+  "sub_mb_type": "sub_mb_type",
+  "transform_size_8x8_flag": "transform_size_8x8_flag"
+ },
+ "vectors": [
+  "mvd_l0",
+  "mvd_l1"
+ ]
+}

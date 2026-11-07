@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-06
+Subject: [PATCH] vulkan: pass the registry root element to VkXML (Python 3.13)
+
+utils_gen.py builds VkXML (an ElementTree Element subclass) from the ElementTree that ET.parse() returns.
+Python 3.13 rejects that with "TypeError: expected an Element, not ElementTree"; Python up to 3.12 accepted
+it. Hosts whose Python is 3.13 therefore fail to build libplacebo v7.349.0.
+Passing the root element works on every Python version.
+
+Upstream-Status: Pending
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: the generator script has no option to select another input type; the build host's Python is not
+  ours to choose (Homebrew and distributions move to 3.13).
+---
+ src/vulkan/utils_gen.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/vulkan/utils_gen.py b/src/vulkan/utils_gen.py
+index a8652fd..4d55fcd 100644
+--- a/src/vulkan/utils_gen.py
++++ b/src/vulkan/utils_gen.py
+@@ -202,7 +202,7 @@ if __name__ == '__main__':
+     if not xmlfile or xmlfile == '':
+         xmlfile = find_registry_xml(datadir)
+ 
+-    registry = VkXML(ET.parse(xmlfile))
++    registry = VkXML(ET.parse(xmlfile).getroot())
+     with open(outfile, 'w') as f:
+         f.write(TEMPLATE.render(
+             vkresults = get_vkenum(registry, 'VkResult'),

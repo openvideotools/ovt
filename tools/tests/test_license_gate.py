@@ -447,6 +447,21 @@ def test_vcpkg_gpl3_text_is_not_denied_but_agpl_title_is(tmp_path: Path) -> None
     assert run("--vcpkg", str(vc), report=tmp_path / "r2.json")[0] == 0
 
 
+def test_vcpkg_null_licence_falls_back_to_the_override(tmp_path: Path) -> None:
+    # vcpkg writes LicenseRef-vcpkg-null for `"license": null`; it is not a licence, so [vcpkg_overrides] applies.
+    vc = tmp_path / "vcpkg_installed"
+    for name in ("glslang", "nulled"):
+        d = vc / "share" / name
+        d.mkdir(parents=True)
+        (d / "copyright").write_text("BSD-3-Clause text\n")
+        (d / "vcpkg.spdx.json").write_text(
+            json.dumps({"packages": [{"licenseConcluded": "LicenseRef-vcpkg-null", "licenseDeclared": "NOASSERTION"}]})
+        )
+    code, data, _ = run("--vcpkg", str(vc), report=tmp_path / "r.json")
+    assert code == 1
+    assert [(f["code"], f["where"]) for f in data["findings"]] == [("E-UNKNOWN", "vcpkg:nulled")]
+
+
 def test_versions_override_wins_over_parseable_cell(tmp_path: Path) -> None:
     versions = tmp_path / "v.md"
     versions.write_text(
@@ -454,3 +469,142 @@ def test_versions_override_wins_over_parseable_cell(tmp_path: Path) -> None:
     )
     code, data, _ = run("--versions", str(versions), report=tmp_path / "r.json")
     assert code == 0 and data["inventory"][0]["license"] == "LGPL-2.1-or-later OR GPL-2.0-or-later"
+
+
+# --- 7. corpora mode (WI-0.561; chapter 14 §14.3.4) ----------------------------------------------------------------
+
+
+def _corpus(**over: object) -> dict:
+    entry = {
+        "id": "syn_ok",
+        "source": "syn",
+        "licence": "CC0 test fixture",
+        "licence_spdx": "CC0-1.0",
+        "redistributable": True,
+    }
+    return {**entry, **over}
+
+
+def _corpora(tmp_path: Path, entries: list[dict], *, write: bool = True) -> Path:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({"schema_version": 1, "entries": entries}))
+    if write:
+        assert run("--corpora", "--manifest", str(manifest), "--write-licenses-md")[0] in (0, 1)
+    return manifest
+
+
+def test_corpora_1_agpl_entry_names_the_id(tmp_path: Path) -> None:
+    manifest = _corpora(tmp_path, [_corpus(id="bad_agpl", licence_spdx="AGPL-3.0-only")])
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 1
+    assert "E-DENY corpora:bad_agpl AGPL-3.0-only" in err
+
+
+def test_corpora_2_itu_conformance_cannot_be_redistributable(tmp_path: Path) -> None:
+    manifest = _corpora(tmp_path, [_corpus(id="bad_itu", licence_spdx="LicenseRef-ITU-Conformance")])
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 1
+    assert "E-CORPUS corpora:bad_itu LicenseRef-ITU-Conformance" in err
+    # The same licence with redistributable=false is the normal case for conformance streams.
+    manifest = _corpora(
+        tmp_path, [_corpus(id="ok_itu", licence_spdx="LicenseRef-ITU-Conformance", redistributable=False)]
+    )
+    assert run("--corpora", "--manifest", str(manifest))[0] == 0
+
+
+def test_corpora_3_committed_manifest_is_clean_and_licenses_md_unchanged() -> None:
+    manifest = REPO / "tests" / "corpora" / "manifest.json"
+    before = (manifest.parent / "LICENSES.md").read_bytes()
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 0, err
+    assert (manifest.parent / "LICENSES.md").read_bytes() == before
+    assert lg.licenses_md(lg.load_corpora(manifest)).encode() == before
+
+
+def test_corpora_non_commercial_and_other_denied_ids(tmp_path: Path) -> None:
+    for spdx in ("CC-BY-NC-4.0", "SSPL-1.0", "BUSL-1.1", "LicenseRef-Foo-NonCommercial", "LicenseRef-Foo-NC"):
+        manifest = _corpora(tmp_path, [_corpus(licence_spdx=spdx, redistributable=False)])
+        code, _, err = run("--corpora", "--manifest", str(manifest))
+        assert code == 1 and f"E-DENY corpora:syn_ok {spdx}" in err, spdx
+
+
+def test_corpora_stale_or_missing_licenses_md(tmp_path: Path) -> None:
+    manifest = _corpora(tmp_path, [_corpus()])
+    assert run("--corpora", "--manifest", str(manifest))[0] == 0
+    (tmp_path / "LICENSES.md").write_text("old\n")
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 1 and "E-STALE" in err
+    (tmp_path / "LICENSES.md").unlink()
+    assert run("--corpora", "--manifest", str(manifest))[0] == 1
+
+
+def test_corpora_generator_is_deterministic_and_sorted(tmp_path: Path) -> None:
+    entries = [_corpus(id="b", licence="x | y"), _corpus(id="a")]
+    text = lg.licenses_md(entries)
+    assert text == lg.licenses_md(list(reversed(entries)))
+    assert text.index("| a |") < text.index("| b |")
+    assert "x \\| y" in text
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        '{"entries": 3}',
+        '{"entries": [{"id": "x", "licence": "l", "licence_spdx": "MIT"}]}',
+        '{"entries": [{"id": "x", "licence": "l", "licence_spdx": "MIT", "redistributable": "yes"}]}',
+    ],
+)
+def test_corpora_invalid_manifest_exits_4(tmp_path: Path, content: str) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(content)
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 4 and "license_gate:" in err
+
+
+def test_corpora_missing_manifest_exits_4(tmp_path: Path) -> None:
+    assert run("--corpora", "--manifest", str(tmp_path / "nope.json"))[0] == 4
+
+
+def test_write_licenses_md_needs_corpora() -> None:
+    assert run("--write-licenses-md")[0] == 2
+
+
+DENIED_REFS = [
+    "LicenseRef-Foo-NC",
+    "LicenseRef-NC-1.0",
+    "LicenseRef-Acme-NC4",
+    "LicenseRef-Foo-nc",
+    "LicenseRef-AcmeProprietary",
+    "LicenseRef-Proprietary2",
+    "LicenseRef-Acme-EvaluationOnly",
+    "LicenseRef-Foo-NC AND MIT",
+    "(LicenseRef-Foo-NC OR MIT)",
+    "LicenseRef-Foo-NC WITH x",
+]
+PASSING_REFS = [
+    "LicenseRef-ITU-Conformance",
+    "LicenseRef-MPEG-Conformance",
+    "LicenseRef-AOM-Patent-License-1.0",
+    "LicenseRef-GPAC-Testsuite-Media",
+    "LicenseRef-Bento4-Test-Media",
+    "LicenseRef-Foo-NCSA",
+]
+
+
+@pytest.mark.parametrize("ref", DENIED_REFS)
+def test_deny_patterns_catch_licenseref_variants(ref: str, policy: dict) -> None:
+    assert lg.is_denied(ref, policy), ref
+
+
+@pytest.mark.parametrize("ref", PASSING_REFS)
+def test_deny_patterns_pass_ordinary_licenseref(ref: str, policy: dict) -> None:
+    assert not lg.is_denied(ref, policy), ref
+
+
+def test_corpora_denies_compound_expression(tmp_path: Path) -> None:
+    manifest = _corpora(
+        tmp_path, [_corpus(id="bad_nc", licence_spdx="LicenseRef-Foo-NC AND MIT", redistributable=False)]
+    )
+    code, _, err = run("--corpora", "--manifest", str(manifest))
+    assert code == 1 and "E-DENY corpora:bad_nc" in err

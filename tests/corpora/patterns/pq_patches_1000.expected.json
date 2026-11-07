@@ -1,0 +1,99 @@
+{
+  "band_edges_nits": [
+    1.0,
+    100.0,
+    203.0,
+    1000.0,
+    4000.0
+  ],
+  "band_fractions": [
+    0.166666667,
+    0.166666667,
+    0.0,
+    0.166666667,
+    0.166666667,
+    0.333333333
+  ],
+  "band_fractions_nominal": [
+    0.0,
+    0.166666667,
+    0.166666667,
+    0.166666667,
+    0.166666667,
+    0.333333333
+  ],
+  "band_fractions_nominal_basis": "nominal patch nits; three patches sit exactly on a Table 10.7-1 edge, so a renderer measures band_fractions instead",
+  "bit_depth": 10,
+  "codes_full": [
+    153,
+    520,
+    594,
+    769,
+    923,
+    1023
+  ],
+  "codes_limited": [
+    195,
+    509,
+    573,
+    723,
+    855,
+    940
+  ],
+  "corpus_id": "syn_pat_pq_patches_1000",
+  "decoded_nits_from_limited_codes": [
+    0.992131264,
+    99.912798489,
+    203.702957877,
+    1004.19190398,
+    4014.717701831,
+    10000.0
+  ],
+  "fall_definition": "area-weighted mean of max(R,G,B) over the nominal patch nits (equal areas)",
+  "fall_nits": 2550.666666667,
+  "frames": 3,
+  "height": 1080,
+  "max_cll_nits": 10000.0,
+  "nits": [
+    1.0,
+    100.0,
+    203.0,
+    1000.0,
+    4000.0,
+    10000.0
+  ],
+  "out_of_gamut_709_samples": 0,
+  "patch_area_samples": 345600,
+  "patch_columns": [
+    [
+      0,
+      320
+    ],
+    [
+      320,
+      640
+    ],
+    [
+      640,
+      960
+    ],
+    [
+      960,
+      1280
+    ],
+    [
+      1280,
+      1600
+    ],
+    [
+      1600,
+      1920
+    ]
+  ],
+  "pattern": "pq_patches_1000",
+  "primaries": "BT.2020",
+  "range": "limited",
+  "saturated_area_samples": 0,
+  "transfer": "PQ (ST 2084)",
+  "width": 1920
+}

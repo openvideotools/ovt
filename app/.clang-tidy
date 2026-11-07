@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# app/ inherits the root configuration. misc-include-cleaner is off here: Qt provides its macros (Q_OBJECT,
+# Q_SIGNALS, QML_ELEMENT, QStringLiteral, qputenv, ...) through umbrella and forwarding headers that the check
+# cannot map back to the header a file "should" include, so it reports every Qt file whatever it includes.
+InheritParentConfig: true
+Checks: -misc-include-cleaner

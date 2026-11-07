@@ -1,0 +1,17 @@
+{
+  "bit_depth": 10,
+  "corpus_id": "syn_pat_sdr709_ramp",
+  "frames": 3,
+  "height": 1080,
+  "out_of_gamut_709_samples": 0,
+  "pattern": "sdr709_ramp",
+  "primaries": "BT.709",
+  "ramp_codes_sha256": "805f3ee8569fd68b9e45de12364bca800d83cac9460f4ba06aa39099535704cb",
+  "ramp_first_code": 64,
+  "ramp_last_code": 940,
+  "ramp_rule": "code(x) = round(876 * x / 1919 + 64), identical on every row; Cb = Cr = 512",
+  "range": "limited",
+  "saturated_area_samples": 0,
+  "transfer": "BT.709 (SDR, gamma 2.4 display)",
+  "width": 1920
+}

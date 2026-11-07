@@ -195,3 +195,27 @@ TEST_CASE("golden_compare: update mode writes the normalised canonical JSON", "[
   const UpdateModeGuard compare_mode(false);
   CHECK(ovt::test::compare_json_golden(golden, json::parse(R"({"a":[2],"b":1.5,"c":true})")).ok);
 }
+
+TEST_CASE("golden_compare: family shapes", "[test_support][golden][fast]") {
+  using ovt::test::check_family_shape;
+  using ovt::test::Family;
+  CHECK_FALSE(check_family_shape(Family::kBoxTree, json::parse(R"([{"path":"a","offset":0,"size":8,"fields":{}}])")));
+  CHECK(check_family_shape(Family::kBoxTree, json::parse(R"([{"path":"a"}])")));
+  CHECK(check_family_shape(Family::kBoxTree, json::object()));
+  CHECK_FALSE(check_family_shape(Family::kBlockGrid, json::parse(R"({"w4":1,"h4":1,"fields":{}})")));
+  CHECK(check_family_shape(Family::kBlockGrid, json::parse(R"({"w4":1})")));
+  CHECK_FALSE(check_family_shape(Family::kScores, json::parse(R"({"frames":[],"pooled":{}})")));
+  CHECK(check_family_shape(Family::kScores, json::array()));
+  CHECK_FALSE(check_family_shape(Family::kHeaderStruct, json::object()));
+  CHECK_FALSE(check_family_shape(Family::kSyntaxElements, json::array()));
+  CHECK_FALSE(check_family_shape(Family::kSampleTable, json::array()));
+}
+
+TEST_CASE("golden_compare: family names", "[test_support][golden][fast]") {
+  for (const char* name : {"syntax-elements", "header-struct", "block-grid", "box-tree", "sample-table", "scores"}) {
+    const auto family = ovt::test::family_from_name(name);
+    REQUIRE(family);
+    CHECK(ovt::test::family_name(*family) == name);
+  }
+  CHECK_FALSE(ovt::test::family_from_name("nope"));
+}

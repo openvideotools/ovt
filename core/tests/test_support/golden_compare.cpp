@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <ios>
 #include <optional>
 #include <sstream>
@@ -314,7 +315,47 @@ bool read_text(const std::filesystem::path& path, std::string& out) {
   return true;
 }
 
+std::optional<std::string> array_rows_have(Family family, const json& document,
+                                           std::initializer_list<const char*> keys) {
+  if (!document.is_array()) {
+    return std::string(family_name(family)) + " must be a JSON array";
+  }
+  for (std::size_t i = 0; i < document.size(); ++i) {
+    for (const char* key : keys) {
+      if (!document[i].is_object() || !document[i].contains(key)) {
+        return fmt::format("{}[{}] has no \"{}\"", family_name(family), i, key);
+      }
+    }
+  }
+  return std::nullopt;
+}
+
 }  // namespace
+
+std::optional<std::string> check_family_shape(Family family, const json& document) {
+  switch (family) {
+    case Family::kSyntaxElements:
+      return array_rows_have(family, document, {"unit", "name", "bit_offset", "bit_length", "value"});
+    case Family::kBoxTree:
+      return array_rows_have(family, document, {"path", "offset", "size", "fields"});
+    case Family::kSampleTable:
+      return array_rows_have(family, document, {"i", "dts", "cts", "size", "offset", "sync"});
+    case Family::kHeaderStruct:
+      return document.is_object() ? std::nullopt : std::optional<std::string>("header-struct must be a JSON object");
+    case Family::kBlockGrid: {
+      const bool ok = document.is_object() && document.contains("w4") && document.contains("h4") &&
+                      document.contains("fields") && document["fields"].is_object();
+      return ok ? std::nullopt : std::optional<std::string>("block-grid must be an object with w4, h4 and fields");
+    }
+    case Family::kScores: {
+      const bool ok = document.is_object() && document.contains("frames") && document["frames"].is_array() &&
+                      document.contains("pooled") && document["pooled"].is_object();
+      return ok ? std::nullopt
+                : std::optional<std::string>("scores must be an object with frames (array) and pooled (object)");
+    }
+  }
+  return std::nullopt;
+}
 
 std::vector<Difference> compare_canonical(const json& golden, const json& actual, const CompareOptions& options) {
   Comparer comparer(options);
