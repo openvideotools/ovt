@@ -13,7 +13,9 @@
 #include <cstring>
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  if (std::getenv("OVT_FUZZ_CANARY") != nullptr && size >= 4 && std::memcmp(data, "OVT!", 4) == 0) {
+  // The fuzz process is single-threaded and nothing calls setenv, so getenv is safe here.
+  const bool armed = std::getenv("OVT_FUZZ_CANARY") != nullptr;  // NOLINT(concurrency-mt-unsafe)
+  if (armed && size >= 4 && std::memcmp(data, "OVT!", 4) == 0) {
     std::abort();
   }
   return 0;
