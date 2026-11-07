@@ -8,6 +8,7 @@ add_executable(ovt_tests_container sniff_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_container PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET}
                                                   ${nlohmann_json_TARGET})
-target_compile_definitions(ovt_tests_container PRIVATE "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\"" "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+target_compile_definitions(ovt_tests_container PRIVATE "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+                                                       "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 ovt_set_license(ovt_tests_container "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_container)
