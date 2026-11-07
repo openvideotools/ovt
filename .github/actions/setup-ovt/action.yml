@@ -123,11 +123,32 @@ runs:
         key: tp-${{ runner.os }}-${{ runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
 
     - name: third_party downloads cache
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      id: tpdl
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: build/third_party/downloads
         key: tpdl-${{ hashFiles('third_party/VERSIONS.md') }}
         restore-keys: tpdl-
+
+    - name: third_party downloads pre-fetch
+      if: steps.tpdl.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Pre-fetch the small archives every configure needs, with retries and backoff, so that a flaky upstream
+        # (ffmpeg.org timeouts, SSL connect errors) is absorbed here and saved to the cache at once, instead of
+        # failing configure and leaving the cache empty (actions/cache only saves after a green job). Every archive
+        # is verified against its VERSIONS.md SHA-256 (tools/third_party_offline.py). Best effort: if this still
+        # fails, configure downloads (and retries) by itself and gives the authoritative error.
+        python -I tools/third_party_offline.py --out build/third_party/downloads --only ffmpeg libaom dav1d libde265 \
+          || echo "::warning::third_party pre-fetch incomplete; configure will retry the missing archives"
+
+    - name: third_party downloads cache (save)
+      if: steps.tpdl.outputs.cache-hit != 'true'
+      continue-on-error: true
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: build/third_party/downloads
+        key: tpdl-${{ hashFiles('third_party/VERSIONS.md') }}
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # v1.2.18
