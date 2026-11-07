@@ -63,7 +63,8 @@ bool same(double a, double b) {
 
 }  // namespace
 
-TEST_CASE("10^6 frames zoomed to fit: bars equal the per-pixel maxima within 16 ms", "[fast][gui][timeline][aggregator]") {
+TEST_CASE("10^6 frames zoomed to fit: bars equal the per-pixel maxima within 16 ms",
+          "[fast][gui][timeline][aggregator]") {
   constexpr std::size_t kFrames = 1'000'000;
   constexpr std::size_t kWidth = 1920;
   const std::vector<double> values = synthetic(kFrames, 0x9E3779B97F4A7C15ULL);

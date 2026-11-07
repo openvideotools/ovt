@@ -32,7 +32,8 @@ TEST_CASE("viewport starts fitted and fits again", "[fast][gui][timeline][viewpo
   CHECK(v.count() == 1000.0);
 }
 
-TEST_CASE("one wheel notch zooms 1.25x about the cursor and keeps the frame under it", "[fast][gui][timeline][viewport]") {
+TEST_CASE("one wheel notch zooms 1.25x about the cursor and keeps the frame under it",
+          "[fast][gui][timeline][viewport]") {
   TimelineViewport v(1000);
   const double width = 800.0;
   const double x = 200.0;  // a quarter across
