@@ -99,6 +99,12 @@ def test_recipes_load_and_cover_every_numbered_recipe():
         (["ffmpeg", "-i", "s.y4m", "-c:v", "libaom-av1", "a.mp4"], "libaom-av1 needs -threads"),
         (["MP4Box", "-add", "a.264", "-new", "a.mp4"], "MP4Box needs -for-test"),
         (["mkvmerge", "--no-date", "-o", "a.mkv", "a.mp4"], "mkvmerge needs"),
+        (["ffmpeg", "-threads", "1", "-i", "s.y4m", "-c:v", "libx264", "a.264"], "libx264 needs -threads N after"),
+        (["ffmpeg", "-f", "lavfi", "-i", "life=s=64x64:mold=10", "a.y4m"], "lavfi life needs seed"),
+        (["ffmpeg", "-f", "lavfi", "-i", "cellauto=s=64x64:rule=110,format=yuv420p", "a.y4m"], "lavfi cellauto"),
+        (["ffmpeg", "-f", "lavfi", "-i", "life", "a.y4m"], "lavfi life needs seed"),
+        (["ffmpeg", "-f", "lavfi", "-i", "cellauto,format=yuv420p", "a.y4m"], "lavfi cellauto"),
+        (["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233:random", "f.mp4", "o.mp4"], "fixed IV"),
     ],
 )
 def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
@@ -109,6 +115,27 @@ def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
     path = tmp_path / "recipes.json"
     path.write_text(json.dumps(doc))
     with pytest.raises(generate.GenError, match="not reproducible") as err:
+        generate.load_recipes(path)
+    assert err.value.code == 4
+
+
+def test_seeded_lavfi_and_fixed_iv_pass():
+    assert generate.determinism_problem(["ffmpeg", "-f", "lavfi", "-i", "life=s=64x64:seed=1:mold=10", "a.y4m"]) is None
+    assert generate.determinism_problem(["ffmpeg", "-i", "cellauto=rule=110:seed=1", "a.y4m"]) is None
+    assert generate.determinism_problem(["mp4encrypt", "--key", "1:0011:0a610676cb88f302", "f.mp4", "o"]) is None
+
+
+def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
+    """aomenc fails mid-encode when resize x superres exceeds AV1's 2x reference scaling (recipe 19, R=S=12)."""
+    base = ["aomenc", "--threads=1", "--superres-mode=1", "--superres-denominator=12", "--resize-mode=1"]
+    assert "exceeds" in generate.av1_scale_problem([*base, "--resize-denominator=12", "-o", "a.ivf", "s.y4m"])
+    assert generate.av1_scale_problem([*base, "--resize-denominator=9", "-o", "a.ivf", "s.y4m"]) is None
+    assert generate.av1_scale_problem(["aomenc", "--superres-mode=0", "--superres-denominator=16"]) is None
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text())
+    doc["recipes"][0]["steps"] = [{"cmd": [*base, "--resize-denominator=12", "-o", "a.ivf", "s.y4m"]}]
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(generate.GenError, match="reference scaling") as err:
         generate.load_recipes(path)
     assert err.value.code == 4
 
@@ -221,6 +248,26 @@ def test_local_only_selection():
         "syn_h265_4k_main10",
     }
     assert generate.main(["--only", "syn_does_not_exist", "--list"]) == 4
+
+
+def test_missing_manual_download_corpus_skips_its_recipe(env, tmp_path, capsys):
+    """syn_mkv_dv_p5 remuxes hdr_dovi_p5, a manual_download corpus with no URL: skipped with a reason until present."""
+    manifest = env()
+    out = tmp_path / "out"
+    base = ["--out", str(out), "--manifest", str(manifest), "--list"]
+    assert generate.main(base) == 0
+    listed, err = capsys.readouterr()
+    assert "syn_mkv_dv_p5" not in listed.split() and "syn_mkv_h264" in listed.split()
+    assert "skip syn_mkv_dv_p5: needs hdr_dovi_p5, a manual_download corpus" in err
+    assert generate.main([*base, "--only", "syn_mkv_dv_p5"]) == 0  # named explicitly: selected, fails at run time
+    assert capsys.readouterr().out.split() == ["syn_mkv_dv_p5"]
+    placed = tmp_path / "corpora" / "hdr_dovi_p5"  # a maintainer placed the clip in the cache
+    placed.mkdir(parents=True)
+    (placed / "hdr_dovi_p5.mp4").write_bytes(b"x")
+    (placed / ".ok").write_text(json.dumps({"primary": "hdr_dovi_p5.mp4"}))
+    assert generate.main(base) == 0
+    listed, err = capsys.readouterr()
+    assert "syn_mkv_dv_p5" in listed.split() and "skip" not in err
 
 
 def test_missing_helper_is_reported_before_running(env, tmp_path, monkeypatch):

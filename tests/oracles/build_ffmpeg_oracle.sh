@@ -8,10 +8,13 @@
 #   x265  (8-bit main library linking the 10- and 12-bit libraries; -DENABLE_HDR10_PLUS=ON)
 #   dav1d (library and CLI), libvmaf + `vmaf` CLI (-Denable_float=true)
 #   FFmpeg --enable-gpl --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d
-# The binaries are oracles only: GPL, never linked into OVT. WI-0.563 adds `ffmpeg_mvs` to this script.
+#          --enable-libopus (Ubuntu libopus-dev, BSD-3-Clause; the libopus encoder of the WebM-Opus recipe)
+# Then `ffmpeg_mvs` (WI-0.563, ffmpeg_mvs.c): the motion-vector and QP exporter linked against that FFmpeg.
+# The binaries are oracles only: GPL, never linked into OVT.
 
 # shellcheck source-path=SCRIPTDIR source=lib.sh disable=SC1091 # followed only when lib.sh is checked too
 source "$(dirname "$0")/lib.sh"
+here="$(cd "$(dirname "$0")" && pwd)"
 
 X264_REVISION="3191"
 X264_COMMIT="4613ac3c15fd75cebc4b9f65b7fb95e70a3acce1"
@@ -77,10 +80,17 @@ ovt_git_fetch https://github.com/FFmpeg/FFmpeg.git "refs/tags/${FFMPEG_VERSION}"
 (
   cd ffmpeg || exit 1
   ./configure --prefix="${P}" --enable-gpl --enable-shared --disable-static --disable-doc --disable-debug \
-    --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d \
+    --enable-libx264 --enable-libx265 --enable-libaom --enable-libvmaf --enable-libdav1d --enable-libopus \
     --extra-cflags="-I${P}/include" --extra-ldflags="-L${P}/lib ${rpath}"
   make -j "${OVT_ORACLES_JOBS}"
   make install
 )
+
+# --- ffmpeg_mvs (chapter 14 §14.4.3a) ------------------------------------------------------------------
+# shellcheck disable=SC2046 # pkg-config prints separate flags
+gcc -std=c11 -O2 -Wall -Wextra -Werror -o ffmpeg_mvs "${here}/ffmpeg_mvs.c" \
+  $(pkg-config --cflags --libs libavformat libavcodec libavutil) "${rpath}"
+install -D -m 0755 ffmpeg_mvs "${P}/bin/ffmpeg_mvs"
+ovt_stamp ffmpeg_mvs "ffmpeg_mvs (OVT tests/oracles) on FFmpeg ${FFMPEG_VERSION}"
 
 rm -rf "${work}"

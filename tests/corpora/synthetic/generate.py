@@ -25,7 +25,8 @@ Before anything is written, the version probe of every tool the selected recipes
 or on an entry whose hash is not recorded yet; ``--update-manifest`` writes the produced hashes into the
 manifest instead (the maintainer's regeneration mode). ``--sync-manifest`` rewrites the ``syn`` stream entries
 of the manifest from ``recipes.json`` (ids, features, tags, aliases), keeping recorded hashes. ``local_only`` recipes (the perf files) run only with
-``--local-only`` or when named by ``--only``. ``--fixtures`` runs the non-stream fixture generators instead of
+``--local-only`` or when named by ``--only``. A recipe whose ``{corpus:ID}`` input is a ``manual_download``
+corpus missing from the cache is skipped, with the reason logged, unless ``--only`` names it. ``--fixtures`` runs the non-stream fixture generators instead of
 the stream recipes.
 
 Exit codes: 0 success; 1 a step failed; 2 usage; 4 invalid recipes, unknown id, missing tool or helper;
@@ -58,6 +59,7 @@ SYN_LICENCE = {
 }
 
 EXIT_OK, EXIT_STEP, EXIT_INVALID, EXIT_MISMATCH = 0, 1, 4, 5
+UNSEEDED_LAVFI = re.compile(r"(?:^|[,;\]])\s*(life|cellauto)(?:=([^,;\[\]]*))?\s*(?=$|[,;\[])")
 
 
 class GenError(Exception):
@@ -98,13 +100,49 @@ def wrap_step(es_file: str) -> dict[str, Any]:
     return {"cmd": ["ffmpeg", *rate, "-i", es_file, "-c", "copy", "-movflags", "+faststart", out]}
 
 
+def aom_option(args: list[str], name: str, default: int) -> int:
+    for arg in args:
+        if arg.startswith(f"--{name}="):
+            try:
+                return int(arg.split("=", 1)[1])
+            except ValueError:
+                return default
+    return default
+
+
+def av1_scale_problem(argv: list[str]) -> str | None:
+    """Why an aomenc command would fail with "Can't find at least one reference frame with valid size", or None.
+
+    AV1 lets a reference frame be at most 2x the coded width of the frame predicting from it (the reference-scaling limit).
+    aomenc's frame resize (--resize-mode, denominator R/8) and superres (--superres-mode, coded width 8/S of the
+    upscaled width) multiply, while key frames keep the full size, so (R/8) * (S/8) must stay at or under 2
+    (R * S <= 128). Recipe 19 used R=S=12 (2.25x); it now uses R=9, S=12 (1.6875x).
+    """
+    if argv[0] != "aomenc":
+        return None
+    args = argv[1:]
+    resize = aom_option(args, "resize-denominator", 8) if aom_option(args, "resize-mode", 0) else 8
+    superres = aom_option(args, "superres-denominator", 8) if aom_option(args, "superres-mode", 0) else 8
+    if resize * superres > 128:
+        scale = resize * superres / 64
+        return f"resize {resize}/8 x superres {superres}/8 = {scale:g}x exceeds AV1's 2x reference scaling"
+    return None
+
+
 def determinism_problem(argv: list[str]) -> str | None:
     """Why ``argv`` would give different bytes on another machine or run, or None.
 
     The x264/x265/libaom output depends on the thread count, which defaults to the CPU count; MP4Box and
-    mkvmerge stamp the wall-clock time and random UIDs unless told not to (#119).
+    mkvmerge stamp the wall-clock time and random UIDs unless told not to; lavfi ``life``/``cellauto`` start
+    from a random grid and ``mp4encrypt --key …:random`` draws a random IV (#119, §14.3.3 rules 1-2).
     """
     tool, args = argv[0], argv[1:]
+    for arg in args:  # lavfi sources whose first frame is random unless seeded
+        for name, opts in UNSEEDED_LAVFI.findall(arg):
+            if not re.search(r"(^|:)seed=", opts):
+                return f"lavfi {name} needs seed=N"
+    if tool == "mp4encrypt" and any(a.endswith(":random") for a in args):
+        return "mp4encrypt needs a fixed IV, not :random"
     if tool == "x264" and "--threads" not in args:
         return "x264 needs --threads N"
     if tool == "x265" and not {"--frame-threads", "--pools"} <= set(args):
@@ -117,8 +155,9 @@ def determinism_problem(argv: list[str]) -> str | None:
         return "mkvmerge needs --no-date --deterministic SEED"
     if tool == "ffmpeg" and "-c:v" in args:
         codec = args[args.index("-c:v") + 1]
-        if codec in ("libx264", "libaom-av1") and "-threads" not in args:
-            return f"ffmpeg {codec} needs -threads N"
+        after = args[args.index("-c:v") :]  # before -i, -threads sets only the decoder threads
+        if codec in ("libx264", "libaom-av1") and "-threads" not in after:
+            return f"ffmpeg {codec} needs -threads N after -c:v"
         if codec == "libx265":
             params = args[args.index("-x265-params") + 1] if "-x265-params" in args else ""
             if "frame-threads=" not in params or "pools=" not in params:
@@ -155,6 +194,9 @@ def load_recipes(path: Path) -> dict[str, Any]:
                 if problem := determinism_problem(argv):
                     name = item.get("id", item.get("file"))
                     raise GenError(EXIT_INVALID, f"recipes.json: {name}: not reproducible: {problem}")
+                if problem := av1_scale_problem(argv):
+                    name = item.get("id", item.get("file"))
+                    raise GenError(EXIT_INVALID, f"recipes.json: {name}: {problem}")
     doc["_sources"], doc["_ids"] = sources, ids
     return doc
 
@@ -358,6 +400,33 @@ def corpus_file(out: Path, cid: str) -> Path:
     raise GenError(EXIT_STEP, f"corpus {cid} is not available (fetch it with tools/fetch_corpora.py --ids {cid})")
 
 
+def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path, wanted: list[str]) -> dict[str, str]:
+    """Recipes among ``wanted`` whose ``{corpus:ID}`` input is a ``manual_download`` corpus not in the cache.
+
+    Such a corpus has no URL for the fetcher (chapter 14 §14.3.1): a maintainer places it by hand. Until then the
+    recipe cannot run, so the default selection skips it with this reason and its manifest entry stays unverified.
+    Returns {recipe id: reason}.
+    """
+    manual = {e["id"] for e in manifest["entries"] if e.get("manual_download")}
+    gaps = {}
+    for rid in wanted:
+        rec = doc["_ids"][rid]
+        for step in rec["steps"]:
+            for argv in step_argvs(step):
+                for arg in argv:
+                    for cid in re.findall(r"\{corpus:([A-Za-z0-9_]+)\}", arg):
+                        if cid not in manual or rid in gaps:
+                            continue
+                        try:
+                            corpus_file(out, cid)
+                        except GenError:
+                            gaps[rid] = (
+                                f"needs {cid}, a manual_download corpus that is not in the cache "
+                                f"(no URL or hash to fetch it; place it by hand, then run --only {rid})"
+                            )
+    return gaps
+
+
 def missing_helpers(items: list[dict[str, Any]]) -> list[str]:
     missing = set()
     for item in items:
@@ -483,7 +552,14 @@ def main(argv: list[str] | None = None) -> int:
         out = (args.out or default_out()).resolve()
         if args.fixtures:
             return run_fixtures(doc, out)
-        wanted = select(doc, [i for i in args.only.split(",") if i], args.local_only)
+        only = [i for i in args.only.split(",") if i]
+        wanted = select(doc, only, args.local_only)
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        if not only:  # an id named by --only runs, and fails if its corpus is missing
+            gaps = manual_corpus_gaps(doc, manifest, out, wanted)
+            for rid, reason in gaps.items():
+                log(f"skip {rid}: {reason}")
+            wanted = [rid for rid in wanted if rid not in gaps]
         items = closure(doc, wanted)
         if args.list:
             print("\n".join(r["id"] for r in items if "id" in r))
@@ -491,7 +567,6 @@ def main(argv: list[str] | None = None) -> int:
         if missing := missing_helpers(items):
             raise GenError(EXIT_INVALID, "missing helper script(s): " + ", ".join(missing))
         versions = check_pins(doc, tools_of(items))  # before anything is written
-        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
         work = out / ".work"
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir(parents=True)

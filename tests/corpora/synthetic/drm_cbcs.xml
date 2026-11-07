@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+     SPDX-License-Identifier: CC0-1.0
+     PUBLIC TEST VALUES: every key, KID and IV in this file is a published test value used only to
+     build the synthetic corpus (chapter 14 §14.3.3). It protects nothing; never reuse it. -->
+<!-- Recipe 20 (c): scheme cbcs, one key, one Common PSSH (system id 1077efec-c0b2-4d02-ace3-3c1e52e2fb4b). -->
+<GPACDRM type="CENC AES-CBC Pattern">
+  <DRMInfo type="pssh" version="1">
+    <BS ID128="1077efecc0b24d02ace33c1e52e2fb4b"/>
+    <BS bits="32" value="1"/>
+    <BS ID128="0123456789abcdef0123456789abcdef"/>
+  </DRMInfo>
+  <CrypTrack IsEncrypted="1" IV_size="16" first_IV="0x0a610676cb88f3020a610676cb88f302" crypt_byte_block="1" skip_byte_block="9" saiSavedBox="senc">
+    <key KID="0x0123456789abcdef0123456789abcdef" value="0x00112233445566778899aabbccddeeff"/>
+  </CrypTrack>
+</GPACDRM>

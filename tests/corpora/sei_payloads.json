@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "description": "Hand-encoded SEI payloads of the syn_sei_<codec>_<name> family (chapter 14 section 14.3.3 recipe 47; WI-0.553). Each entry is inserted by tools/sei_inject.py --payload <name> before the first slice of syn_h264_multislice_cavlc.264 or syn_h265_amp_sao_on.265.",
+  "payloads": {
+    "h264_ga94_cc": {"codec": "h264", "type": 4, "hex": "b500314741393403c2fffcc849fd8080ff", "note": "ATSC A/53 cc_data: two CEA-608 pairs ('HI' on field 1, null on field 2)"},
+    "h264_mastering_display_colour_volume": {"codec": "h264", "type": 137, "hex": "33c286c41d4c0bb884d03e803d1340420098968000000001", "note": "G,B,R,WP in 0.00002, L max/min in 0.0001 cd/m2"},
+    "h264_content_light_level_info": {"codec": "h264", "type": 144, "hex": "03e80190", "note": "MaxCLL 1000, MaxFALL 400"},
+    "h264_user_data_unregistered": {"codec": "h264", "type": 5, "hex": "0d6f7674000000000000000053594e316f7674", "note": "UUID + 'ovt'"},
+    "h264_recovery_point": {"codec": "h264", "type": 6, "hex": "c4", "note": "recovery_frame_cnt 0, exact_match 1, broken_link 0, changing_slice_group_idc 0"},
+    "h265_mastering_display_colour_volume": {"codec": "h265", "type": 137, "hex": "33c286c41d4c0bb884d03e803d1340420098968000000001", "note": "as the H.264 entry"},
+    "h265_content_light_level_info": {"codec": "h265", "type": 144, "hex": "03e80190", "note": "MaxCLL 1000, MaxFALL 400"},
+    "h265_alternative_transfer": {"codec": "h265", "type": 147, "hex": "12", "note": "preferred_transfer_characteristics 18 (HLG)"},
+    "h265_user_data_unregistered": {"codec": "h265", "type": 5, "hex": "0d6f7674000000000000000053594e316f7674", "note": "UUID + 'ovt'"},
+    "h265_recovery_point": {"codec": "h265", "type": 6, "hex": "d0", "note": "recovery_poc_cnt 0, exact_match 1, broken_link 0"}
+  }
+}

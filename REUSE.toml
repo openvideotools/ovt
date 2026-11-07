@@ -105,6 +105,13 @@ path = ["tests/corpora/patterns/*.mp4", "tests/corpora/patterns/.gitignore"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "CC0-1.0"
 
+# Inputs of the synthetic corpus recipes (WI-0.553; chapter 14 section 14.3.3) whose formats have no comment
+# syntax: the Widevine pssh payload, x265's HDR10+ JSON and MP4Box's chapter list. Generated test inputs are CC0.
+[[annotations]]
+path = ["tests/corpora/synthetic/widevine_pssh.bin", "tests/corpora/synthetic/hdr10plus_metadata.json", "tests/corpora/synthetic/chapters.txt"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "CC0-1.0"
+
 # Oracle output snippets for the normaliser tests (WI-0.555): captured or reconstructed oracle text kept
 # byte-exact, so no header line inside them.
 [[annotations]]
