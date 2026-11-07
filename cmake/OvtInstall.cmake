@@ -61,7 +61,7 @@ if(OVT_INSTALL_DEV)
   install(FILES "${CMAKE_BINARY_DIR}/ovt-config.cmake" "${CMAKE_BINARY_DIR}/ovt-config-version.cmake"
           DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ovt COMPONENT dev)
   # Same usage requirement as the exported target's INTERFACE_LINK_OPTIONS (core/CMakeLists.txt).
-  string(JOIN " " OVT_PC_SANITIZER_LIBS ${OVT_SANITIZER_LINK_FLAGS})
+  string(JOIN " " OVT_PC_SANITIZER_LIBS ${OVT_INSTALL_SANITIZER_LINK_FLAGS})
   configure_file("${CMAKE_SOURCE_DIR}/cmake/ovt-core.pc.in" "${CMAKE_BINARY_DIR}/ovt-core.pc" @ONLY)
   install(FILES "${CMAKE_BINARY_DIR}/ovt-core.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig COMPONENT dev)
 endif()
