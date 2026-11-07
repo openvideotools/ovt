@@ -185,8 +185,13 @@ TEST_CASE("sniff: every container-smoke corpus entry", "[container][sniff][needs
     DYNAMIC_SECTION(id) {
       const auto path = ovt::test::corpus_or_skip(id);
       const auto file = ovt::io::RandomAccessFile::open(path.string());
-      CHECK(std::string(ovt::container::format_name(ovt::container::sniff(*file))) ==
-            entry.at("expected").at("format").get<std::string>());
+      // The manifest spells the EBML family "matroska"; ContainerTree.format says "ebml".
+      // SPEC-ASSUMPTION(#138): the test maps the manifest name to the schema name.
+      auto expected = entry.at("expected").at("format").get<std::string>();
+      if (expected == "matroska") {
+        expected = "ebml";
+      }
+      CHECK(std::string(ovt::container::format_name(ovt::container::sniff(*file))) == expected);
     }
   }
 }
