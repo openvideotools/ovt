@@ -17283,7 +17283,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "643f43daee0d52a789771a1c7c1251447c8f29411e5dbecad020ba86e0a4d6d9",
+      "sha256": "87ec595a7b25b9a42da6f6412c66901a61b0a47bcd1095e01531181fc53524e5",
       "size_bytes": 31123,
       "codecs": [
         "h265"
@@ -17301,7 +17301,11 @@
       ],
       "aliases": [
         "pq_patches_1000.mp4"
-      ]
+      ],
+      "files": {
+        "pq_patches_1000.expected.json": "1b75cc6634e60d596ae5110a45aad8f45c312d2fe0556c24585962c02d3682fd",
+        "pq_patches_1000.mp4": "87ec595a7b25b9a42da6f6412c66901a61b0a47bcd1095e01531181fc53524e5"
+      }
     },
     {
       "id": "syn_pat_hlg_patches",
@@ -17309,7 +17313,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "fd4b89443d17f59e75f841662a52a13813d7785ec497e9b4f9693afd50114e83",
+      "sha256": "f5805d12ba9d7bdf8919ba557205e206bbc9d5bfd0f537cbd997657227521586",
       "size_bytes": 19947,
       "codecs": [
         "h265"
@@ -17327,7 +17331,11 @@
       ],
       "aliases": [
         "hlg_patches.mp4"
-      ]
+      ],
+      "files": {
+        "hlg_patches.expected.json": "064440add3e9a33838704c4017108800977c401132edd723a776f60a13b2c65f",
+        "hlg_patches.mp4": "f5805d12ba9d7bdf8919ba557205e206bbc9d5bfd0f537cbd997657227521586"
+      }
     },
     {
       "id": "syn_pat_sdr709_ramp",
@@ -17335,7 +17343,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "5097e4b82e3504aecbcd45d87f51ab748b0aed0f70a764e8708f0651c1b0dad7",
+      "sha256": "8e5bff6b76d7656cc0eccc24aa0ea57b3efccc7b2b8ff400772f98074fdfde6f",
       "size_bytes": 29151,
       "codecs": [
         "h265"
@@ -17353,7 +17361,11 @@
       ],
       "aliases": [
         "sdr709_ramp.mp4"
-      ]
+      ],
+      "files": {
+        "sdr709_ramp.expected.json": "67b244ee6d40038392e11a4b345647dc0c4dca6ce7138d00da8b58a1df6a7143",
+        "sdr709_ramp.mp4": "8e5bff6b76d7656cc0eccc24aa0ea57b3efccc7b2b8ff400772f98074fdfde6f"
+      }
     },
     {
       "id": "syn_pat_p3_saturation",
@@ -17361,7 +17373,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "733d0f2f45de8cdd4151e556d0fd8b90dabb9fdd3dba32aea12217e3aea6ed25",
+      "sha256": "880c4b78e13f444af12caff39185d8ca350be0235d74819535ba39839b5c8a30",
       "size_bytes": 60147,
       "codecs": [
         "h265"
@@ -17379,7 +17391,11 @@
       ],
       "aliases": [
         "p3_saturation.mp4"
-      ]
+      ],
+      "files": {
+        "p3_saturation.expected.json": "825c6ccb8d797f044285a6df2d0da709faade0cc185a3bf0b3c92538565c3f69",
+        "p3_saturation.mp4": "880c4b78e13f444af12caff39185d8ca350be0235d74819535ba39839b5c8a30"
+      }
     },
     {
       "id": "syn_pat_siting_checker",
@@ -17387,7 +17403,7 @@
       "licence": "OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "sha256": "3da1c685209c677df12c4561d8a20aceefdc4c3e848f216888471f62633e2340",
+      "sha256": "888a306b6ada738a1c069bf809715f7659aa1fab79bce56cc701111c7264eb59",
       "size_bytes": 87964,
       "codecs": [
         "h265"
@@ -17405,7 +17421,11 @@
       ],
       "aliases": [
         "siting_checker.mp4"
-      ]
+      ],
+      "files": {
+        "siting_checker.expected.json": "85ab6ddc7c49cce7eb450b2d7941d043e1c44fd5c7eb29a236856400d5617030",
+        "siting_checker.mp4": "888a306b6ada738a1c069bf809715f7659aa1fab79bce56cc701111c7264eb59"
+      }
     },
     {
       "id": "syn_h264_mbaff",
@@ -17415,12 +17435,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "mbaff",
         "interlaced",
         "cabac"
-      ]
+      ],
+      "sha256": "4430074792e803d67477b3936fcf5b64c51752af351e7fddcdf232a11b42efe0",
+      "size_bytes": 776821,
+      "files": {
+        "syn_h264_mbaff.264": "4430074792e803d67477b3936fcf5b64c51752af351e7fddcdf232a11b42efe0"
+      }
     },
     {
       "id": "syn_h264_paff",
@@ -17430,12 +17454,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "paff",
         "interlaced",
         "field_pictures"
-      ]
+      ],
+      "sha256": "e2a5c671e9bc9f9beea859156957b3445044ac3e8581d3d566fff0120437c905",
+      "size_bytes": 967172,
+      "files": {
+        "syn_h264_paff.264": "e2a5c671e9bc9f9beea859156957b3445044ac3e8581d3d566fff0120437c905"
+      }
     },
     {
       "id": "syn_h264_weightedpred_ltr",
@@ -17445,12 +17473,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "weighted_pred",
         "long_term_refs",
         "multi_ref"
-      ]
+      ],
+      "sha256": "cf45d37f381506a419b1d20eb5c2391f73c7c88685da3e1a0155bd552fac2539",
+      "size_bytes": 720477,
+      "files": {
+        "syn_h264_weightedpred_ltr.264": "cd4ebfb7a155f3c2cdafaee88a50974a4148e8316f3f669892ab45f9dedfa660",
+        "syn_h264_weightedpred_ltr.mp4": "cf45d37f381506a419b1d20eb5c2391f73c7c88685da3e1a0155bd552fac2539"
+      }
     },
     {
       "id": "syn_h264_multislice_cavlc",
@@ -17460,12 +17493,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "multiple_slices",
         "cavlc",
         "baseline"
-      ]
+      ],
+      "sha256": "c6fe0640a2cb7d7561a40671b5e6334a9360602eeb267e86b4437361ca02e21d",
+      "size_bytes": 866598,
+      "files": {
+        "syn_h264_multislice_cavlc.264": "c6fe0640a2cb7d7561a40671b5e6334a9360602eeb267e86b4437361ca02e21d"
+      }
     },
     {
       "id": "syn_h264_crop_8x8dct_10bit",
@@ -17475,13 +17512,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cropping",
         "transform_8x8",
         "high10",
         "10bit"
-      ]
+      ],
+      "sha256": "a3cbe825d74fc87f836c07ff8120e60412f89ce28bb6b7e149ab4f07077e48e8",
+      "size_bytes": 1575034,
+      "files": {
+        "syn_h264_crop_8x8dct_10bit.264": "a3cbe825d74fc87f836c07ff8120e60412f89ce28bb6b7e149ab4f07077e48e8"
+      }
     },
     {
       "id": "syn_h264_444_intra",
@@ -17491,12 +17532,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "444",
         "intra_only",
         "lossless"
-      ]
+      ],
+      "sha256": "788552001c7b88a325df4938ec4517d893bccc15b56297088c83d94c66879480",
+      "size_bytes": 857619,
+      "files": {
+        "syn_h264_444_intra.264": "788552001c7b88a325df4938ec4517d893bccc15b56297088c83d94c66879480"
+      }
     },
     {
       "id": "syn_h265_tiles_wpp",
@@ -17506,12 +17551,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "tiles",
         "wpp",
         "main"
-      ]
+      ],
+      "sha256": "ef69d5a0403c36bdfbc095a6697dfd681cc2651a0fdbcb9bae0c2aaec41e4b72",
+      "size_bytes": 525324,
+      "files": {
+        "syn_h265_tiles_2x2.265": "0e5a1cf58f447b3b45f658572b9013a8bed8094ca084cd027fcacd233bc54317",
+        "syn_h265_wpp.265": "ef69d5a0403c36bdfbc095a6697dfd681cc2651a0fdbcb9bae0c2aaec41e4b72"
+      }
     },
     {
       "id": "syn_h265_amp_sao_on",
@@ -17521,7 +17571,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "amp",
         "sao",
@@ -17529,7 +17578,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "e919c04349de3a31b5c5fd0755d2ce2653f59fa3676bdea4f9e3433cc7541199",
+      "size_bytes": 555649,
+      "files": {
+        "syn_h265_amp_sao_on.265": "e919c04349de3a31b5c5fd0755d2ce2653f59fa3676bdea4f9e3433cc7541199"
+      }
     },
     {
       "id": "syn_h265_sao_off_deblock_off_pcm",
@@ -17539,13 +17593,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "no_sao",
         "no_deblock",
         "pcm",
         "transquant_bypass"
-      ]
+      ],
+      "sha256": "ecc153243c80517727dad0345bbbed72a364fba982148cbacf0056bbb6848a72",
+      "size_bytes": 1314843,
+      "files": {
+        "syn_h265_sao_off_deblock_off_pcm.265": "ecc153243c80517727dad0345bbbed72a364fba982148cbacf0056bbb6848a72"
+      }
     },
     {
       "id": "syn_h265_main10_pq_hdr",
@@ -17555,7 +17613,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
@@ -17565,7 +17622,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "df44b7f63aac0c0f848145d813133f7f866c4055355b88add8a16f6b952f4a16",
+      "size_bytes": 1045965,
+      "files": {
+        "syn_h265_main10_pq_hdr.265": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07",
+        "syn_h265_main10_pq_hdr.mp4": "df44b7f63aac0c0f848145d813133f7f866c4055355b88add8a16f6b952f4a16"
+      }
     },
     {
       "id": "syn_h265_422_444_rext",
@@ -17575,13 +17638,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "422",
         "444",
         "rext",
         "12bit"
-      ]
+      ],
+      "sha256": "f972dd5b52c069dec63eb99c6458fd2cad23d8c7a7e38b70deac563831eb0b40",
+      "size_bytes": 90004,
+      "files": {
+        "syn_h265_422_10bit.265": "0d94155c63f14f9fd6063d9a1593fb54536eb58e80e1bc1297fa22435cfc2bdf",
+        "syn_h265_444_12bit.265": "f972dd5b52c069dec63eb99c6458fd2cad23d8c7a7e38b70deac563831eb0b40"
+      }
     },
     {
       "id": "syn_h265_multislice_wp",
@@ -17591,12 +17659,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "multiple_slices",
         "dependent_slices",
         "weighted_pred"
-      ]
+      ],
+      "sha256": "02ce92c5176c013e3743ac29c3c67ba53ef3a030c854bdea4e091bc1f5478256",
+      "size_bytes": 237407,
+      "files": {
+        "syn_h265_multislice_wp.265": "02ce92c5176c013e3743ac29c3c67ba53ef3a030c854bdea4e091bc1f5478256"
+      }
     },
     {
       "id": "syn_av1_tiles_cdef_lr",
@@ -17606,13 +17678,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "tiles",
         "cdef",
         "loop_restoration",
         "superblock_128"
-      ]
+      ],
+      "sha256": "e4a672f9aea6cad954f358148a705b721714a03fdd3930ad96b63530f34ce49d",
+      "size_bytes": 638469,
+      "files": {
+        "syn_av1_tiles_cdef_lr.ivf": "e4a672f9aea6cad954f358148a705b721714a03fdd3930ad96b63530f34ce49d"
+      }
     },
     {
       "id": "syn_av1_hidden_altref_showexisting",
@@ -17622,13 +17698,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hidden_frames",
         "show_existing_frame",
         "altref",
         "order_hint"
-      ]
+      ],
+      "sha256": "a49b89402254a6a58599375710af910b24596049642352a7a0dbb1b45b573a29",
+      "size_bytes": 452728,
+      "files": {
+        "syn_av1_hidden_altref_showexisting.ivf": "a49b89402254a6a58599375710af910b24596049642352a7a0dbb1b45b573a29"
+      }
     },
     {
       "id": "syn_av1_filmgrain_10bit",
@@ -17638,7 +17718,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "film_grain",
         "10bit",
@@ -17649,7 +17728,13 @@
       ],
       "aliases": [
         "av01_10bit.mp4"
-      ]
+      ],
+      "sha256": "5199f44e2cc5a72056a8ecd6335711526842be30e4796bb7d158995b8728b418",
+      "size_bytes": 1217609,
+      "files": {
+        "syn_av1_filmgrain_10bit.ivf": "7b9eae28a521de513d09ca820b7ab706871b4b97725301dbfd4d3ecedf36f5fd",
+        "syn_av1_filmgrain_10bit.mp4": "5199f44e2cc5a72056a8ecd6335711526842be30e4796bb7d158995b8728b418"
+      }
     },
     {
       "id": "syn_av1_pq_hdr_obu",
@@ -17659,14 +17744,19 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
         "hdr_metadata_obu",
         "mdcv_obu",
         "clli_obu"
-      ]
+      ],
+      "sha256": "582b01fbcdf1d02fcc443e6a3bd53fdadf1817c4d9ae9a15a21fe03b69741b95",
+      "size_bytes": 1217442,
+      "files": {
+        "syn_av1_pq_hdr_obu.ivf": "582b01fbcdf1d02fcc443e6a3bd53fdadf1817c4d9ae9a15a21fe03b69741b95",
+        "syn_av1_pq_hdr_obu.mp4": "1b7dc00ff37e38d86fe48bee79d41ccdff68f79d372ff5c896c23c6180eb8888"
+      }
     },
     {
       "id": "syn_av1_intra_only_sframe_svc",
@@ -17676,13 +17766,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "intra_only_frame",
         "switch_frame",
         "svc",
         "operating_points"
-      ]
+      ],
+      "sha256": "1107fe73652993b5995149a640a841c7b1e48251db2b6a3b48d5f0f5d60f34ad",
+      "size_bytes": 283238,
+      "files": {
+        "syn_av1_sframe.ivf": "1107fe73652993b5995149a640a841c7b1e48251db2b6a3b48d5f0f5d60f34ad",
+        "syn_av1_svc_L2T1.obu": "abafd785d190a5562f80470e2617e45b5cafc621fa8043c069bb5f8a30cb4cdd"
+      }
     },
     {
       "id": "syn_av1_444_422_profile2",
@@ -17692,13 +17787,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "444",
         "422",
         "profile_high",
         "profile_professional"
-      ]
+      ],
+      "sha256": "4e829985a09b466dfde7b0d6f2b2e2707b1030ef80f8c1de4a2043248088d49e",
+      "size_bytes": 167230,
+      "files": {
+        "syn_av1_422_profile2.ivf": "04ef510873e0e1c49cb2282044a58644cbb0bae9dba040b6bddd39aa01650d72",
+        "syn_av1_444_profile1.ivf": "4e829985a09b466dfde7b0d6f2b2e2707b1030ef80f8c1de4a2043248088d49e"
+      }
     },
     {
       "id": "syn_av1_annexb_obu_split",
@@ -17708,12 +17808,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "annexb",
         "temporal_unit",
         "obu_size_field"
-      ]
+      ],
+      "sha256": "2dd3fa7cb9fb332541dd6256056ebba7dcb3a9a79c53d9a6be01aa30b198206b",
+      "size_bytes": 341525,
+      "files": {
+        "syn_av1_annexb.obu": "2dd3fa7cb9fb332541dd6256056ebba7dcb3a9a79c53d9a6be01aa30b198206b",
+        "syn_av1_lowoverhead.obu": "f0d9adfa0a51f07b11a37e1b5bcd426bfaeb6e1c6315bf01a4e93baa5953e73f"
+      }
     },
     {
       "id": "syn_av1_superres_scaled_refs",
@@ -17723,12 +17828,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "superres",
         "reference_scaling",
         "render_size"
-      ]
+      ],
+      "sha256": "ea21d57d67522f44aba6cb59ab2f4e2da5a162fc55aa909dae9a025dab44f40f",
+      "size_bytes": 310706,
+      "files": {
+        "syn_av1_superres.ivf": "ea21d57d67522f44aba6cb59ab2f4e2da5a162fc55aa909dae9a025dab44f40f"
+      }
     },
     {
       "id": "syn_mp4_edit_list_frag_cenc",
@@ -17738,14 +17847,22 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "elst",
         "fragmented",
         "sidx",
         "cenc_cbcs",
         "pssh"
-      ]
+      ],
+      "sha256": "27bba685b80834dc6b5d500af4cdc4dd48dbc207c48e3186efa6c3478283bf43",
+      "size_bytes": 867727,
+      "files": {
+        "seg_1.m4s": "db573900d867c4f64a4702a4d75f386d0113c7a2f7b1f8c22348548335cd5ca9",
+        "seg_2.m4s": "6c76d01ca653aa8841d5f379ff688197278cd6d572a1083607f67ca5edfb9ed9",
+        "syn_mp4_cenc_cbcs.mp4": "6002ee8e057907d859960af3db0f143f7242327fb1bf5dc3c9e7eca9ad849352",
+        "syn_mp4_elst.mp4": "27bba685b80834dc6b5d500af4cdc4dd48dbc207c48e3186efa6c3478283bf43",
+        "syn_mp4_frag.mpd": "4cfd8d0583ed2dfc4294f4192563c82385cf37d546a707eb2d127d3966e367ba"
+      }
     },
     {
       "id": "syn_mp4_frag_cmaf",
@@ -17755,7 +17872,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "fragmented",
         "cmaf",
@@ -17763,7 +17879,12 @@
         "styp",
         "tfdt",
         "trun"
-      ]
+      ],
+      "sha256": "e7382758cf829b62128e61dc732693df3458939cb71d3e9bc31e76ab57e4c8a1",
+      "size_bytes": 537979,
+      "files": {
+        "syn_mp4_frag_cmaf.mp4": "e7382758cf829b62128e61dc732693df3458939cb71d3e9bc31e76ab57e4c8a1"
+      }
     },
     {
       "id": "syn_h264_epb_dense",
@@ -17773,12 +17894,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "epb_dense",
         "cabac",
         "high"
-      ]
+      ],
+      "sha256": "cd07c483e0770487fc8104e52feec84ae8f816430d5190e05cdd81f028976b2a",
+      "size_bytes": 2059,
+      "files": {
+        "syn_h264_epb_dense.264": "cd07c483e0770487fc8104e52feec84ae8f816430d5190e05cdd81f028976b2a"
+      }
     },
     {
       "id": "syn_h265_main10_pq_hdr_mismatch",
@@ -17788,12 +17913,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
         "hdr_conflict"
-      ]
+      ],
+      "sha256": "ce5c95a7f4fe0a6ac75ac74db6241ed23950abe1fa09d805f68584af3e9621f2",
+      "size_bytes": 1045865,
+      "files": {
+        "syn_h265_main10_pq_hdr_mismatch.mp4": "ce5c95a7f4fe0a6ac75ac74db6241ed23950abe1fa09d805f68584af3e9621f2"
+      }
     },
     {
       "id": "syn_align_drop7",
@@ -17803,11 +17932,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "alignment",
         "leading_drop"
-      ]
+      ],
+      "sha256": "1614b3f2654826a455a7df6f49a7eb02f0408f165a4920d7417f1e470df1c709",
+      "size_bytes": 632086,
+      "files": {
+        "syn_align_drop7.264": "1614b3f2654826a455a7df6f49a7eb02f0408f165a4920d7417f1e470df1c709",
+        "syn_align_drop7_ref.y4m": "4acce2037fa770c5d48ea56534284f721341d1756d16d46cd9785b21b37a98ea"
+      }
     },
     {
       "id": "syn_metrics_1080p_pair",
@@ -17817,14 +17951,20 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "1080p"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "46f3fae3644529e434566137feb95b1538bcf1a75c9bff279f403b6ecd8bfabe",
+      "size_bytes": 933121860,
+      "files": {
+        "syn_metrics_1080p_dist.264": "cf0d26877868fc56a6323d88dc2d76071d15eb477b13425878dd7ceb095055da",
+        "syn_metrics_1080p_dist.mp4": "39d7efd8e335bd2464bd6c1fba30c0ed6e0a2c8bbeb4e8581d2cdbd9c9f5c841",
+        "syn_metrics_1080p_ref.y4m": "46f3fae3644529e434566137feb95b1538bcf1a75c9bff279f403b6ecd8bfabe"
+      }
     },
     {
       "id": "syn_h264_gop60_1080p",
@@ -17834,7 +17974,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "gop60",
         "1080p",
@@ -17842,7 +17981,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "7293709ba0101e5e7b05f2bfbc6b8b017de787afe3e017216b87e84abd216bd6",
+      "size_bytes": 6867071,
+      "files": {
+        "syn_h264_gop60_1080p.264": "b8a21f7f4a9ddeeb80644e2352f956f7a74bff07a775f26ba4a6d0f85c04ecdb",
+        "syn_h264_gop60_1080p.mp4": "7293709ba0101e5e7b05f2bfbc6b8b017de787afe3e017216b87e84abd216bd6"
+      }
     },
     {
       "id": "syn_h265_gop60_1080p",
@@ -17852,7 +17997,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "gop60",
         "1080p",
@@ -17860,7 +18004,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "db99c37b75126f6fb4f94c8226076f69be326b93df75a4a5ada4051cd18fd8d3",
+      "size_bytes": 7653371,
+      "files": {
+        "syn_h265_gop60_1080p.265": "a3ed3abf2717f3fe9f3106530a0ed1c85754613287d92983241c178c5f73e05d",
+        "syn_h265_gop60_1080p.mp4": "db99c37b75126f6fb4f94c8226076f69be326b93df75a4a5ada4051cd18fd8d3"
+      }
     },
     {
       "id": "syn_av1_gop60_1080p",
@@ -17870,7 +18020,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "gop60",
         "1080p",
@@ -17878,7 +18027,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c26ba74581903287a53f1df91240bcf7d52118fc6a35f5bad0c8e89d95577543",
+      "size_bytes": 5737028,
+      "files": {
+        "syn_av1_gop60_1080p.ivf": "4987f7d83da0f9286abeb68a02743d863fb1830da2f3333bf8d299777d9f8a8b",
+        "syn_av1_gop60_1080p.mp4": "c26ba74581903287a53f1df91240bcf7d52118fc6a35f5bad0c8e89d95577543"
+      }
     },
     {
       "id": "syn_h265_10min_1080p",
@@ -17951,7 +18106,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "multiple_slices",
         "cavlc",
@@ -17963,7 +18117,12 @@
       ],
       "aliases": [
         "mini.mp4"
-      ]
+      ],
+      "sha256": "670a81ee31d36199d2d994e2d34a32789e71b7ca51330706d1b4ed4a997df72d",
+      "size_bytes": 868270,
+      "files": {
+        "syn_h264_multislice_cavlc.mp4": "670a81ee31d36199d2d994e2d34a32789e71b7ca51330706d1b4ed4a997df72d"
+      }
     },
     {
       "id": "syn_mp4_frag",
@@ -17973,12 +18132,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "fragmented",
         "sidx",
         "dash"
-      ]
+      ],
+      "sha256": "4cfd8d0583ed2dfc4294f4192563c82385cf37d546a707eb2d127d3966e367ba",
+      "size_bytes": 841,
+      "files": {
+        "seg_1.m4s": "db573900d867c4f64a4702a4d75f386d0113c7a2f7b1f8c22348548335cd5ca9",
+        "seg_2.m4s": "6c76d01ca653aa8841d5f379ff688197278cd6d572a1083607f67ca5edfb9ed9",
+        "syn_mp4_frag.mpd": "4cfd8d0583ed2dfc4294f4192563c82385cf37d546a707eb2d127d3966e367ba"
+      }
     },
     {
       "id": "syn_mp4_frag_3600",
@@ -18003,12 +18168,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "heif",
         "items",
         "perf"
-      ]
+      ],
+      "sha256": "fd6c144564be8550319a13a67c113ee52612a5e32150d56f2775c9174ad92bce",
+      "size_bytes": 707384,
+      "files": {
+        "syn_heif_1000items.heic": "fd6c144564be8550319a13a67c113ee52612a5e32150d56f2775c9174ad92bce"
+      }
     },
     {
       "id": "syn_ts_cc_errors",
@@ -18018,11 +18187,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ts",
         "cc_errors"
-      ]
+      ],
+      "sha256": "152b286b1fd4fb7801cccc85894d20aaab125d66fcab082aa93f4eb3888bab5e",
+      "size_bytes": 1619432,
+      "files": {
+        "syn_ts_cc_errors.ts": "152b286b1fd4fb7801cccc85894d20aaab125d66fcab082aa93f4eb3888bab5e",
+        "syn_ts_clean.ts": "e2aa8bc2879b6edf38923363c2f23610ff19c85b0fcd8c7a1b8178a794dcae28"
+      }
     },
     {
       "id": "syn_mp4_broken_stco_beyond_eof",
@@ -18032,11 +18206,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken",
         "stco"
-      ]
+      ],
+      "sha256": "e753223342d2854964bdf098e011728cda54896cfca05182f2aedc42bc7700c8",
+      "size_bytes": 19865,
+      "files": {
+        "syn_mp4_broken_stco_beyond_eof.mp4": "e753223342d2854964bdf098e011728cda54896cfca05182f2aedc42bc7700c8"
+      }
     },
     {
       "id": "syn_mp4_broken_cmfc_two_tracks",
@@ -18046,11 +18224,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken",
         "cmaf"
-      ]
+      ],
+      "sha256": "0faccda984efbff2f25fbe36b1a2337dbdf2bb439d76fbc2dc28ea177c05faf3",
+      "size_bytes": 20766,
+      "files": {
+        "syn_mp4_broken_cmfc_two_tracks.mp4": "0faccda984efbff2f25fbe36b1a2337dbdf2bb439d76fbc2dc28ea177c05faf3"
+      }
     },
     {
       "id": "syn_mp4_broken_msix_without_sidx",
@@ -18060,11 +18242,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken",
         "cmaf"
-      ]
+      ],
+      "sha256": "081b40c1c70241e3ad64a1dfa87b4c563116954e9807c01953d8ffe319f2f65b",
+      "size_bytes": 20193,
+      "files": {
+        "syn_mp4_broken_msix_without_sidx.mp4": "081b40c1c70241e3ad64a1dfa87b4c563116954e9807c01953d8ffe319f2f65b"
+      }
     },
     {
       "id": "syn_mp4_broken_hvc1_no_ps",
@@ -18074,11 +18260,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken",
         "hvc1"
-      ]
+      ],
+      "sha256": "c6e3e2eaee3e89d1a9da74a119ce816b4dad936b9d258587b5021cd12afcf071",
+      "size_bytes": 19846,
+      "files": {
+        "syn_mp4_broken_hvc1_no_ps.mp4": "c6e3e2eaee3e89d1a9da74a119ce816b4dad936b9d258587b5021cd12afcf071"
+      }
     },
     {
       "id": "syn_hlg_1080p",
@@ -18088,7 +18278,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "hlg",
@@ -18097,7 +18286,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "2f0a3c8faa6fe34afa8aa3f333d19f82a4487dc2f3793c579e0a60c820f228f4",
+      "size_bytes": 752541,
+      "files": {
+        "syn_hlg_1080p.265": "2896b7cdecef8c4e6269c1d82b740932539459fc0d356f693381aff9c74ea25c",
+        "syn_hlg_1080p.mp4": "2f0a3c8faa6fe34afa8aa3f333d19f82a4487dc2f3793c579e0a60c820f228f4"
+      }
     },
     {
       "id": "syn_h265_pq_sei_only",
@@ -18107,7 +18302,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
@@ -18116,7 +18310,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07",
+      "size_bytes": 1044386,
+      "files": {
+        "syn_h265_pq_sei_only.265": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07"
+      }
     },
     {
       "id": "syn_h265_pq_colr_only",
@@ -18126,7 +18325,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
@@ -18134,7 +18332,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "e82993c4f5bfed2331c62871e72a7d11b457dbc354088070f6cdb30eeda880d7",
+      "size_bytes": 780650,
+      "files": {
+        "syn_h265_pq_colr_only.mp4": "e82993c4f5bfed2331c62871e72a7d11b457dbc354088070f6cdb30eeda880d7"
+      }
     },
     {
       "id": "syn_h265_pq_4000nit",
@@ -18144,13 +18347,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
         "mdcv_sei",
         "clli_sei"
-      ]
+      ],
+      "sha256": "7e1229fcd688140d7e6c608d6499f5b9daff71fd1f8c1edc029181a2b2611752",
+      "size_bytes": 1079553,
+      "files": {
+        "syn_h265_pq_4000nit.265": "0916dbc9220d4a7f89cfcb0d71dc3628abd16ac9cccc2c7285e212ae29bcf5e2",
+        "syn_h265_pq_4000nit.mp4": "7e1229fcd688140d7e6c608d6499f5b9daff71fd1f8c1edc029181a2b2611752"
+      }
     },
     {
       "id": "syn_h265_vui_unspecified",
@@ -18160,11 +18368,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "no_vui",
         "bt709_content"
-      ]
+      ],
+      "sha256": "1c87855d520b0e7cbafcac432418f96e776dc65ae5f43d8efd36c939b5ff0239",
+      "size_bytes": 128174,
+      "files": {
+        "syn_h265_vui_unspecified.265": "1c87855d520b0e7cbafcac432418f96e776dc65ae5f43d8efd36c939b5ff0239"
+      }
     },
     {
       "id": "syn_h265_bpyramid",
@@ -18174,7 +18386,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hierarchical_b",
         "temporal_layers",
@@ -18182,7 +18393,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "9697816c8bd56c68257259110a3fb1e08b413af99bc0c2b7c20ac633e754e41f",
+      "size_bytes": 138067,
+      "files": {
+        "syn_h265_bpyramid.265": "9697816c8bd56c68257259110a3fb1e08b413af99bc0c2b7c20ac633e754e41f"
+      }
     },
     {
       "id": "syn_h265_tiles_4x2",
@@ -18192,11 +18408,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "tiles",
         "main"
-      ]
+      ],
+      "sha256": "438b39baca0f453ec957069c9776f227cf79abc451f3559cc3b17cacc888c8cc",
+      "size_bytes": 235613,
+      "files": {
+        "syn_h265_tiles_4x2.265": "438b39baca0f453ec957069c9776f227cf79abc451f3559cc3b17cacc888c8cc"
+      }
     },
     {
       "id": "syn_h265_multi_pps",
@@ -18206,14 +18426,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "multi_pps",
         "pps_resend"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "1fae4826938ca43b79a46239b607593d4d80bb48b638767d6bcd941f689d909e",
+      "size_bytes": 555777,
+      "files": {
+        "syn_h265_multi_pps.265": "1fae4826938ca43b79a46239b607593d4d80bb48b638767d6bcd941f689d909e"
+      }
     },
     {
       "id": "syn_h265_crop_1080_in_1088",
@@ -18223,14 +18447,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cropping",
         "conformance_window"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "9f454a5a63aba8c3ee27e91846d2336c72f93bed0901ccbd430aa96cbee85752",
+      "size_bytes": 105282,
+      "files": {
+        "syn_h265_crop_1080_in_1088.265": "9f454a5a63aba8c3ee27e91846d2336c72f93bed0901ccbd430aa96cbee85752"
+      }
     },
     {
       "id": "syn_h265_sei_unknown_200",
@@ -18240,13 +18468,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "7aa3e48937e16c548526ff0d291e80d6be7c2a54b222a952821a4497d9913f4b",
+      "size_bytes": 555675,
+      "files": {
+        "syn_h265_sei_unknown_200.265": "7aa3e48937e16c548526ff0d291e80d6be7c2a54b222a952821a4497d9913f4b"
+      }
     },
     {
       "id": "syn_sei_h264_ga94_cc",
@@ -18256,13 +18488,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "21567dfcac7fc632c66c6315364b7534102e890535a40280fa594c429916b7bb",
+      "size_bytes": 866623,
+      "files": {
+        "syn_sei_h264_ga94_cc.264": "21567dfcac7fc632c66c6315364b7534102e890535a40280fa594c429916b7bb"
+      }
     },
     {
       "id": "syn_sei_h264_mastering_display_colour_volume",
@@ -18272,13 +18508,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "9b70f3345d0319e295bc6e8de1c11617c7b5f0cbeb29951963bb8fdef5d2a7b3",
+      "size_bytes": 866631,
+      "files": {
+        "syn_sei_h264_mastering_display_colour_volume.264": "9b70f3345d0319e295bc6e8de1c11617c7b5f0cbeb29951963bb8fdef5d2a7b3"
+      }
     },
     {
       "id": "syn_sei_h264_content_light_level_info",
@@ -18288,13 +18528,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "5634354f738a109167ff72d28a9699c49b2b5aaa76b4cd464ff159c77ca63f75",
+      "size_bytes": 866610,
+      "files": {
+        "syn_sei_h264_content_light_level_info.264": "5634354f738a109167ff72d28a9699c49b2b5aaa76b4cd464ff159c77ca63f75"
+      }
     },
     {
       "id": "syn_sei_h264_user_data_unregistered",
@@ -18304,10 +18548,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "a4102ec71498b41c0076fc2ab5d42d8f48a91ddb632619f9bdaab4e22cd162a0",
+      "size_bytes": 866628,
+      "files": {
+        "syn_sei_h264_user_data_unregistered.264": "a4102ec71498b41c0076fc2ab5d42d8f48a91ddb632619f9bdaab4e22cd162a0"
+      }
     },
     {
       "id": "syn_sei_h264_recovery_point",
@@ -18317,10 +18565,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "de532a4cea5c845599f380512a5e3dac7f30e16babbf89ea9e262dab80b2ad06",
+      "size_bytes": 866607,
+      "files": {
+        "syn_sei_h264_recovery_point.264": "de532a4cea5c845599f380512a5e3dac7f30e16babbf89ea9e262dab80b2ad06"
+      }
     },
     {
       "id": "syn_sei_h265_mastering_display_colour_volume",
@@ -18330,10 +18582,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "f10e1ba8ffc58189b686bca3c33c0509f74c6026d1b7825fc2afc2a10f477c02",
+      "size_bytes": 555683,
+      "files": {
+        "syn_sei_h265_mastering_display_colour_volume.265": "f10e1ba8ffc58189b686bca3c33c0509f74c6026d1b7825fc2afc2a10f477c02"
+      }
     },
     {
       "id": "syn_sei_h265_content_light_level_info",
@@ -18343,10 +18599,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "b243914c60f5f201e629f259e73e9eb9e4d91f42fd0831ccaa01bed9569a6e55",
+      "size_bytes": 555662,
+      "files": {
+        "syn_sei_h265_content_light_level_info.265": "b243914c60f5f201e629f259e73e9eb9e4d91f42fd0831ccaa01bed9569a6e55"
+      }
     },
     {
       "id": "syn_sei_h265_alternative_transfer",
@@ -18356,10 +18616,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "85041aa38d5514f730c2c474062972159492d861e6bd2b31cd30fe94276bc1b1",
+      "size_bytes": 555659,
+      "files": {
+        "syn_sei_h265_alternative_transfer.265": "85041aa38d5514f730c2c474062972159492d861e6bd2b31cd30fe94276bc1b1"
+      }
     },
     {
       "id": "syn_sei_h265_user_data_unregistered",
@@ -18369,10 +18633,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "8cdfac411a0b7eb78ad1195912dd957ddf65a0fb853b781e980a9e8a85cec8b3",
+      "size_bytes": 555680,
+      "files": {
+        "syn_sei_h265_user_data_unregistered.265": "8cdfac411a0b7eb78ad1195912dd957ddf65a0fb853b781e980a9e8a85cec8b3"
+      }
     },
     {
       "id": "syn_sei_h265_recovery_point",
@@ -18382,10 +18650,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "sei"
-      ]
+      ],
+      "sha256": "c72493a3cbc3d7b0b37ec629f0c1ef835bc4f879f824cac28df85ccc61183b23",
+      "size_bytes": 555659,
+      "files": {
+        "syn_sei_h265_recovery_point.265": "c72493a3cbc3d7b0b37ec629f0c1ef835bc4f879f824cac28df85ccc61183b23"
+      }
     },
     {
       "id": "syn_h265_hdr10plus",
@@ -18395,7 +18667,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "pq",
@@ -18404,7 +18675,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "6688f4fa426422d2dbe9f07964eccc0b6a626c0f579243e1712021061d57bd6f",
+      "size_bytes": 1050361,
+      "files": {
+        "syn_h265_hdr10plus.265": "c9165021e7937dd524a7f95c0b66d3687793d8fe1ed6b0ddb668b99fc87b8c97",
+        "syn_h265_hdr10plus.mp4": "6688f4fa426422d2dbe9f07964eccc0b6a626c0f579243e1712021061d57bd6f"
+      }
     },
     {
       "id": "syn_broken_h265_truncated_sps",
@@ -18414,13 +18691,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7",
+      "size_bytes": 555615,
+      "files": {
+        "syn_broken_h265_truncated_sps.265": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7"
+      }
     },
     {
       "id": "syn_broken_h265_slice_error_f12",
@@ -18430,13 +18711,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "5db5b617721fe410cb0e9304c608f8eca0de23e63f1517e4383aee0249d6d1b1",
+      "size_bytes": 555649,
+      "files": {
+        "syn_broken_h265_slice_error_f12.265": "5db5b617721fe410cb0e9304c608f8eca0de23e63f1517e4383aee0249d6d1b1"
+      }
     },
     {
       "id": "syn_broken_h264_missing_pps",
@@ -18446,13 +18731,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "f219180c345429f9290ddccd894fd4bc1055ae9adc851c8716e128e4584d6575",
+      "size_bytes": 866562,
+      "files": {
+        "syn_broken_h264_missing_pps.264": "f219180c345429f9290ddccd894fd4bc1055ae9adc851c8716e128e4584d6575"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_GEN_0001",
@@ -18462,10 +18751,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "40e8639b0b31876ba8974883036b50abb690fd2ba2e01e5aefdfc20c2abe23be",
+      "size_bytes": 555650,
+      "files": {
+        "syn_broken_syntax_SYN_GEN_0001.265": "40e8639b0b31876ba8974883036b50abb690fd2ba2e01e5aefdfc20c2abe23be"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_GEN_0002",
@@ -18475,10 +18768,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "be7f4b846d1fe9d0b1433e1cdf96576092ff1ba7a65939ecb91d028ca06a34bf",
+      "size_bytes": 866598,
+      "files": {
+        "syn_broken_syntax_SYN_GEN_0002.264": "be7f4b846d1fe9d0b1433e1cdf96576092ff1ba7a65939ecb91d028ca06a34bf"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_GEN_0003",
@@ -18488,10 +18785,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "9c9b346b66a6037393a90b8a89e2f4679fd06595ab4bef1b2bad9307fc3edcbe",
+      "size_bytes": 866598,
+      "files": {
+        "syn_broken_syntax_SYN_GEN_0003.264": "9c9b346b66a6037393a90b8a89e2f4679fd06595ab4bef1b2bad9307fc3edcbe"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_GEN_0101",
@@ -18501,10 +18802,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0,
+      "files": {
+        "syn_broken_syntax_SYN_GEN_0101.264": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_GEN_0102",
@@ -18514,10 +18819,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "567fa03c3c0df01c7efb90430827f2135bb7624d0c79f5a045868cff00ddd1ab",
+      "size_bytes": 866454,
+      "files": {
+        "syn_broken_syntax_SYN_GEN_0102.264": "567fa03c3c0df01c7efb90430827f2135bb7624d0c79f5a045868cff00ddd1ab"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0001",
@@ -18527,10 +18836,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "e3a98d36ed21b1edbeab4f7824264c1114f5d777767d7eb9bdcaa0f276e7eb4c",
+      "size_bytes": 866598,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0001.264": "e3a98d36ed21b1edbeab4f7824264c1114f5d777767d7eb9bdcaa0f276e7eb4c"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0010",
@@ -18540,10 +18853,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "f219180c345429f9290ddccd894fd4bc1055ae9adc851c8716e128e4584d6575",
+      "size_bytes": 866562,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0010.264": "f219180c345429f9290ddccd894fd4bc1055ae9adc851c8716e128e4584d6575"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0020",
@@ -18553,10 +18870,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "5eb50a213c92c454e1f3445c1c5929f5e6eb4cd569349f5fe9fab7170c7b2063",
+      "size_bytes": 866598,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0020.264": "5eb50a213c92c454e1f3445c1c5929f5e6eb4cd569349f5fe9fab7170c7b2063"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0030",
@@ -18566,10 +18887,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "8109afb25b972bfafce39d03b07492975ba841fac05634c50425b268e4213cfc",
+      "size_bytes": 2578787,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0030.264": "8109afb25b972bfafce39d03b07492975ba841fac05634c50425b268e4213cfc"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0060",
@@ -18579,10 +18904,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "cad949474ae13d64b498421655e7ebee2018bc883b2f1d4bf0d19425c2757f7f",
+      "size_bytes": 871748,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0060.264": "cad949474ae13d64b498421655e7ebee2018bc883b2f1d4bf0d19425c2757f7f"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H264_0103",
@@ -18592,10 +18921,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "45e3392096c7b24486f52d462d9e0a63d9cfdc7db105cf997946bca8c9696a81",
+      "size_bytes": 852466,
+      "files": {
+        "syn_broken_syntax_SYN_H264_0103.264": "45e3392096c7b24486f52d462d9e0a63d9cfdc7db105cf997946bca8c9696a81"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0001",
@@ -18605,10 +18938,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "d01637b23153e625daa5b762ae1d0f344113c727b530ad05f376fae6a6376714",
+      "size_bytes": 555649,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0001.265": "d01637b23153e625daa5b762ae1d0f344113c727b530ad05f376fae6a6376714"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0003",
@@ -18618,10 +18955,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7",
+      "size_bytes": 555615,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0003.265": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0007",
@@ -18631,10 +18972,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "5d63db9b7a3ab78c49ef276ba5d46ca0cbbbe72da6ff0fe93d28ebcfb5c4ca5f",
+      "size_bytes": 555649,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0007.265": "5d63db9b7a3ab78c49ef276ba5d46ca0cbbbe72da6ff0fe93d28ebcfb5c4ca5f"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0010",
@@ -18644,10 +18989,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "8a6a3adbe414d956dc5150f8c60480979a46609352745a128edaf9ec0b5fe555",
+      "size_bytes": 555650,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0010.265": "8a6a3adbe414d956dc5150f8c60480979a46609352745a128edaf9ec0b5fe555"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0050",
@@ -18657,10 +19006,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "fd861557a4c652f1f8f28fc86f72f1a813513e97c072173009e45438ecfe373d",
+      "size_bytes": 555649,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0050.265": "fd861557a4c652f1f8f28fc86f72f1a813513e97c072173009e45438ecfe373d"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0060",
@@ -18670,10 +19023,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "61cdfd2d826100faa603997cee69a719f3a988b463696958efad9fcf4a7ba710",
+      "size_bytes": 555649,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0060.265": "61cdfd2d826100faa603997cee69a719f3a988b463696958efad9fcf4a7ba710"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_H265_0102",
@@ -18683,10 +19040,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "132c555118aeff8be146a051e2144a75b1bdd3bbede3b463a98999c29107debe",
+      "size_bytes": 538450,
+      "files": {
+        "syn_broken_syntax_SYN_H265_0102.265": "132c555118aeff8be146a051e2144a75b1bdd3bbede3b463a98999c29107debe"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0001",
@@ -18696,10 +19057,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "2215bbc9f8ed9bb57214b02af1030d097e3071793a9ce10b2f8133723cffcae3",
+      "size_bytes": 341278,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0001.obu": "2215bbc9f8ed9bb57214b02af1030d097e3071793a9ce10b2f8133723cffcae3"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0003",
@@ -18709,10 +19074,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "9a7d96b05e45aec1cbd5622664ac499c146bf68d766b35192010f50672e2f62d",
+      "size_bytes": 329164,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0003.obu": "9a7d96b05e45aec1cbd5622664ac499c146bf68d766b35192010f50672e2f62d"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0030",
@@ -18722,10 +19091,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "321b450a4ce254eb0c70be602d4f5da57a861fb86eb7b7e53cbf1c7c97feaa94",
+      "size_bytes": 341277,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0030.obu": "321b450a4ce254eb0c70be602d4f5da57a861fb86eb7b7e53cbf1c7c97feaa94"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0032",
@@ -18735,10 +19108,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "6cfed52e7068d109b8373cd67f882b08d60014f33e3ea1a3439a76c57d56dfdb",
+      "size_bytes": 341524,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0032.obu": "6cfed52e7068d109b8373cd67f882b08d60014f33e3ea1a3439a76c57d56dfdb"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0101",
@@ -18748,10 +19125,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "c702a6766b922e6072693fed540a8d015ebd5d4e8a03ecf1ee093aa6fb0d2d79",
+      "size_bytes": 335223,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0101.obu": "c702a6766b922e6072693fed540a8d015ebd5d4e8a03ecf1ee093aa6fb0d2d79"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_AV1_0102",
@@ -18761,10 +19142,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "9a7d96b05e45aec1cbd5622664ac499c146bf68d766b35192010f50672e2f62d",
+      "size_bytes": 329164,
+      "files": {
+        "syn_broken_syntax_SYN_AV1_0102.obu": "9a7d96b05e45aec1cbd5622664ac499c146bf68d766b35192010f50672e2f62d"
+      }
     },
     {
       "id": "syn_broken_syntax_SYN_CONF_0001",
@@ -18774,10 +19159,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
-      ]
+      ],
+      "sha256": "60943a4d3b0b30cffe654d25f87e6b50e5e0438aabe45d7cc082c2887d01a203",
+      "size_bytes": 866598,
+      "files": {
+        "syn_broken_syntax_SYN_CONF_0001.264": "60943a4d3b0b30cffe654d25f87e6b50e5e0438aabe45d7cc082c2887d01a203"
+      }
     },
     {
       "id": "syn_broken_h265_hash_mismatch",
@@ -18787,14 +19176,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken",
         "hash_sei"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "83b4dcf7b9083a2df52f70fa75263d673e2e97d281ae8140f7ef08de007b7dc0",
+      "size_bytes": 129884,
+      "files": {
+        "syn_broken_h265_hash_mismatch_f17.265": "83b4dcf7b9083a2df52f70fa75263d673e2e97d281ae8140f7ef08de007b7dc0"
+      }
     },
     {
       "id": "syn_level_violation_h264",
@@ -18804,13 +19197,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "level_violation"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "2a29d10120aca573198654764e25c217b652988c4b1769bc4f11496b6fdbcc23",
+      "size_bytes": 6862993,
+      "files": {
+        "syn_level_violation_h264.264": "2a29d10120aca573198654764e25c217b652988c4b1769bc4f11496b6fdbcc23"
+      }
     },
     {
       "id": "syn_level_violation_h265",
@@ -18820,13 +19217,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "level_violation"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "35c5c8ed9807ce4c5a3f48497dcafd7964b0750e9a9033c0ada05162eccc6124",
+      "size_bytes": 7649233,
+      "files": {
+        "syn_level_violation_h265.265": "35c5c8ed9807ce4c5a3f48497dcafd7964b0750e9a9033c0ada05162eccc6124"
+      }
     },
     {
       "id": "syn_level_violation_av1",
@@ -18836,13 +19237,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "level_violation"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "3db51b961d54023f1119021d20247405f6f2e81e145d194a42edd8eb7eca88b6",
+      "size_bytes": 5739135,
+      "files": {
+        "syn_level_violation_av1.ivf": "3db51b961d54023f1119021d20247405f6f2e81e145d194a42edd8eb7eca88b6"
+      }
     },
     {
       "id": "syn_metrics_1080p_bitflip_f37",
@@ -18852,14 +19257,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "identity"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "def8c786969496761ee0bcc6de4119a650223d20b518f1429c1821db84202c0d",
+      "size_bytes": 933121860,
+      "files": {
+        "syn_metrics_1080p_bitflip_f37.y4m": "def8c786969496761ee0bcc6de4119a650223d20b518f1429c1821db84202c0d"
+      }
     },
     {
       "id": "syn_metrics_10bit_8bit_pair",
@@ -18869,14 +19278,19 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "bitdepth_mismatch"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e",
+      "size_bytes": 373248418,
+      "files": {
+        "syn_metrics_10bit_8bit_dist.y4m": "c79c3d0760ca80cd4d5e77c70018ff469538da0687f9add88f2012d9041f9f31",
+        "syn_metrics_10bit_8bit_ref.y4m": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e"
+      }
     },
     {
       "id": "syn_metrics_444_420_pair",
@@ -18886,14 +19300,19 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "chroma_mismatch"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "07bdb7aa42511e5ac22695745184663ae3bdac2397e2aa3ad59aadc747b9b659",
+      "size_bytes": 20736230,
+      "files": {
+        "syn_metrics_444_420_dist.y4m": "febce4becd7aad8614a7d92ce2df676066895c3ba757a7c5d7d02742b9dc862c",
+        "syn_metrics_444_420_ref.y4m": "07bdb7aa42511e5ac22695745184663ae3bdac2397e2aa3ad59aadc747b9b659"
+      }
     },
     {
       "id": "syn_metrics_fps_mismatch_pair",
@@ -18903,11 +19322,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "fps_mismatch"
-      ]
+      ],
+      "sha256": "58eeccfaade8ca6884d40dc466ab70ffd7ab0cb4af978e30cc5084a659e01d9b",
+      "size_bytes": 829443659,
+      "files": {
+        "syn_metrics_fps_mismatch_dist30.y4m": "7819cd443cdd871838187c866fe86e6b3ea6612de4f7f8e60466a1c1f9ecbc8b",
+        "syn_metrics_fps_mismatch_ref60.y4m": "58eeccfaade8ca6884d40dc466ab70ffd7ab0cb4af978e30cc5084a659e01d9b"
+      }
     },
     {
       "id": "syn_metrics_scale_range_pair",
@@ -18917,12 +19341,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "scale",
         "range"
-      ]
+      ],
+      "sha256": "46f3fae3644529e434566137feb95b1538bcf1a75c9bff279f403b6ecd8bfabe",
+      "size_bytes": 933121860,
+      "files": {
+        "syn_metrics_scale_range_dist.y4m": "0971145f292c5d09dfafe5cb6080c969091b617514e8b083d7a3e0e648df34c8",
+        "syn_metrics_scale_range_ref.y4m": "46f3fae3644529e434566137feb95b1538bcf1a75c9bff279f403b6ecd8bfabe"
+      }
     },
     {
       "id": "syn_metrics_ladder_ref",
@@ -18932,11 +19361,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ladder",
         "bdrate"
-      ]
+      ],
+      "sha256": "25f54a3e51c51682f665b4fbb3ec88e5d2bc8d767c1a506dac18fc6b51ffee59",
+      "size_bytes": 373248780,
+      "files": {
+        "syn_metrics_ladder_ref.y4m": "25f54a3e51c51682f665b4fbb3ec88e5d2bc8d767c1a506dac18fc6b51ffee59"
+      }
     },
     {
       "id": "syn_metrics_ladder_q22",
@@ -18946,11 +19379,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ladder",
         "bdrate"
-      ]
+      ],
+      "sha256": "0fe4471220864932654027ce5305bc52d8de139aad4009dde6273b544d809dd3",
+      "size_bytes": 5859811,
+      "files": {
+        "syn_metrics_ladder_q22.264": "5faaa45ec4dd8b0b686a7f1106841249ae07b9686092a226059f351447f20984",
+        "syn_metrics_ladder_q22.mp4": "0fe4471220864932654027ce5305bc52d8de139aad4009dde6273b544d809dd3"
+      }
     },
     {
       "id": "syn_metrics_ladder_q27",
@@ -18960,11 +19398,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ladder",
         "bdrate"
-      ]
+      ],
+      "sha256": "f7bba4836ca794383fc246d058d10565b5a509535a3f88ba31a32de6ca8431ac",
+      "size_bytes": 4128389,
+      "files": {
+        "syn_metrics_ladder_q27.264": "253ffda8cb3eb77b000709021198e5e40ce67039860de14b647be77b85f4b1e3",
+        "syn_metrics_ladder_q27.mp4": "f7bba4836ca794383fc246d058d10565b5a509535a3f88ba31a32de6ca8431ac"
+      }
     },
     {
       "id": "syn_metrics_ladder_q32",
@@ -18974,11 +19417,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ladder",
         "bdrate"
-      ]
+      ],
+      "sha256": "63314ad2f67cb1f00f1a4753c5d724e9a024ba6bc3c51cc49b3e0bb4fc894358",
+      "size_bytes": 2481830,
+      "files": {
+        "syn_metrics_ladder_q32.264": "577a50ee4e91b7bc0c88956d88471d922bca628b45f8c9cd3d9de7b9bdc09bac",
+        "syn_metrics_ladder_q32.mp4": "63314ad2f67cb1f00f1a4753c5d724e9a024ba6bc3c51cc49b3e0bb4fc894358"
+      }
     },
     {
       "id": "syn_metrics_ladder_q37",
@@ -18988,11 +19436,16 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ladder",
         "bdrate"
-      ]
+      ],
+      "sha256": "474d9da2c3bfe5ad79244abee4735a82d8b895646b688e9529ccdfc43297f042",
+      "size_bytes": 1133103,
+      "files": {
+        "syn_metrics_ladder_q37.264": "0394cd61a8221ed36868e9bc1ea13732d6fdb8339598065d60d8f329b945ff47",
+        "syn_metrics_ladder_q37.mp4": "474d9da2c3bfe5ad79244abee4735a82d8b895646b688e9529ccdfc43297f042"
+      }
     },
     {
       "id": "syn_metrics_pq_1080p_pair",
@@ -19002,12 +19455,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "metrics_pair",
         "pq",
         "10bit"
-      ]
+      ],
+      "sha256": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e",
+      "size_bytes": 373248418,
+      "files": {
+        "syn_metrics_pq_1080p_dist.y4m": "f939be50c02651436f9457ce796e55d178e0ea36824290e835b6d9384a864bab",
+        "syn_metrics_pq_1080p_ref.y4m": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e"
+      }
     },
     {
       "id": "syn_scenes_5cuts",
@@ -19017,10 +19475,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "scenes"
-      ]
+      ],
+      "sha256": "d904cedbb1f1bbae1334738020cd57780e000cf7c5bd922a9b06c08e82d45de1",
+      "size_bytes": 5888714,
+      "files": {
+        "syn_scenes_5cuts.mp4": "d904cedbb1f1bbae1334738020cd57780e000cf7c5bd922a9b06c08e82d45de1"
+      }
     },
     {
       "id": "syn_raw_1080p_p010",
@@ -19030,13 +19492,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "efc8d81eb8c06baad38b17a2ba59b72deb1918d1befd7864ff833f064f56d1f8",
+      "size_bytes": 62208000,
+      "files": {
+        "syn_raw_1080p_p010.yuv": "efc8d81eb8c06baad38b17a2ba59b72deb1918d1befd7864ff833f064f56d1f8"
+      }
     },
     {
       "id": "syn_raw_420",
@@ -19046,10 +19512,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "53a9d397ee7f554e69c15a3ee0be79b2a69906ddf7085f9d6fd9a63e2ab30cae",
+      "size_bytes": 13824000,
+      "files": {
+        "syn_raw_420_1280x720.yuv": "53a9d397ee7f554e69c15a3ee0be79b2a69906ddf7085f9d6fd9a63e2ab30cae"
+      }
     },
     {
       "id": "syn_raw_422",
@@ -19059,10 +19529,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "b2f12cf9a1ffb9fd52233b2e0107690e44c00a8067be973e5b76db126c3b4f06",
+      "size_bytes": 18432000,
+      "files": {
+        "syn_raw_422_1280x720.yuv": "b2f12cf9a1ffb9fd52233b2e0107690e44c00a8067be973e5b76db126c3b4f06"
+      }
     },
     {
       "id": "syn_raw_444",
@@ -19072,10 +19546,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "287ecdc1bc020cfbfaa3b0bdb20ef19c0f171bb923c2800428ba3934213a84ff",
+      "size_bytes": 27648000,
+      "files": {
+        "syn_raw_444_1280x720.yuv": "287ecdc1bc020cfbfaa3b0bdb20ef19c0f171bb923c2800428ba3934213a84ff"
+      }
     },
     {
       "id": "syn_raw_444alpha",
@@ -19085,10 +19563,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "2d51cdd687a2706e4e8664d8a4e38a2ae460dab6e30a9e238c52d825efe3232c",
+      "size_bytes": 36864000,
+      "files": {
+        "syn_raw_444alpha_1280x720.yuv": "2d51cdd687a2706e4e8664d8a4e38a2ae460dab6e30a9e238c52d825efe3232c"
+      }
     },
     {
       "id": "syn_raw_mono",
@@ -19098,10 +19580,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "293a58c852c416ea76273cce4a69339df2cb16be38a42e45d8d457a4c7e100b5",
+      "size_bytes": 9216000,
+      "files": {
+        "syn_raw_mono_1280x720.yuv": "293a58c852c416ea76273cce4a69339df2cb16be38a42e45d8d457a4c7e100b5"
+      }
     },
     {
       "id": "syn_raw_411",
@@ -19111,10 +19597,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw"
-      ]
+      ],
+      "sha256": "bcd898bdf03d522f6d6c0b64ff3e4449494e8fe9fb9e5e8f2411628fbbf91189",
+      "size_bytes": 13824000,
+      "files": {
+        "syn_raw_411_1280x720.yuv": "bcd898bdf03d522f6d6c0b64ff3e4449494e8fe9fb9e5e8f2411628fbbf91189"
+      }
     },
     {
       "id": "syn_raw_420p10",
@@ -19124,11 +19614,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "10bit"
-      ]
+      ],
+      "sha256": "bd89007aed8b8fa310f6f5c18ebaa8def12d652c662d76f935a4ca9285f8edf9",
+      "size_bytes": 62208000,
+      "files": {
+        "syn_raw_420p10_1920x1080.yuv": "bd89007aed8b8fa310f6f5c18ebaa8def12d652c662d76f935a4ca9285f8edf9"
+      }
     },
     {
       "id": "syn_raw_422p10",
@@ -19138,11 +19632,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "10bit"
-      ]
+      ],
+      "sha256": "32753bd37a24d2c57bae650a19f66a2d8ecb630ae67e7da1de61c1e9a0507eba",
+      "size_bytes": 82944000,
+      "files": {
+        "syn_raw_422p10_1920x1080.yuv": "32753bd37a24d2c57bae650a19f66a2d8ecb630ae67e7da1de61c1e9a0507eba"
+      }
     },
     {
       "id": "syn_raw_444p10",
@@ -19152,11 +19650,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "10bit"
-      ]
+      ],
+      "sha256": "dca437b4f534f381a12abece03b4305494c2f224fec7b34f8f0578d351251645",
+      "size_bytes": 124416000,
+      "files": {
+        "syn_raw_444p10_1920x1080.yuv": "dca437b4f534f381a12abece03b4305494c2f224fec7b34f8f0578d351251645"
+      }
     },
     {
       "id": "syn_raw_420p12",
@@ -19166,11 +19668,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "12bit"
-      ]
+      ],
+      "sha256": "9b204ecf6d0a3d01358ef7ebeb62c5b577b6d9c215a393bd2c5a8a003d71ebc7",
+      "size_bytes": 62208000,
+      "files": {
+        "syn_raw_420p12_1920x1080.yuv": "9b204ecf6d0a3d01358ef7ebeb62c5b577b6d9c215a393bd2c5a8a003d71ebc7"
+      }
     },
     {
       "id": "syn_raw_422p12",
@@ -19180,11 +19686,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "12bit"
-      ]
+      ],
+      "sha256": "c353a550117baf67c271098efc9966cc7bd14e25088bf1f1925841947eeb5abc",
+      "size_bytes": 82944000,
+      "files": {
+        "syn_raw_422p12_1920x1080.yuv": "c353a550117baf67c271098efc9966cc7bd14e25088bf1f1925841947eeb5abc"
+      }
     },
     {
       "id": "syn_raw_444p12",
@@ -19194,11 +19704,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "12bit"
-      ]
+      ],
+      "sha256": "93b6ca0cbf1867e2b9b3fcb730f0ba0fefcdbc3991acf6d3d6042aaf18cdd6b6",
+      "size_bytes": 124416000,
+      "files": {
+        "syn_raw_444p12_1920x1080.yuv": "93b6ca0cbf1867e2b9b3fcb730f0ba0fefcdbc3991acf6d3d6042aaf18cdd6b6"
+      }
     },
     {
       "id": "syn_raw_420p14",
@@ -19208,11 +19722,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "14bit"
-      ]
+      ],
+      "sha256": "3977cf40447229cf88d01754f16c94cee9dcd5775dd48f0e9da8b8f249aad263",
+      "size_bytes": 62208000,
+      "files": {
+        "syn_raw_420p14_1920x1080.yuv": "3977cf40447229cf88d01754f16c94cee9dcd5775dd48f0e9da8b8f249aad263"
+      }
     },
     {
       "id": "syn_raw_422p14",
@@ -19222,11 +19740,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "14bit"
-      ]
+      ],
+      "sha256": "81c6aa9048906c0f4e85b84dd85c65e923f9e626860e7f9f22930d126f53948f",
+      "size_bytes": 82944000,
+      "files": {
+        "syn_raw_422p14_1920x1080.yuv": "81c6aa9048906c0f4e85b84dd85c65e923f9e626860e7f9f22930d126f53948f"
+      }
     },
     {
       "id": "syn_raw_444p14",
@@ -19236,11 +19758,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "14bit"
-      ]
+      ],
+      "sha256": "e0aed5c313b87c05ac9359c179130a4ac35d99ad221d445f6fa5705b302b0adf",
+      "size_bytes": 124416000,
+      "files": {
+        "syn_raw_444p14_1920x1080.yuv": "e0aed5c313b87c05ac9359c179130a4ac35d99ad221d445f6fa5705b302b0adf"
+      }
     },
     {
       "id": "syn_raw_420p16",
@@ -19250,11 +19776,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "16bit"
-      ]
+      ],
+      "sha256": "a85d2d3319fe79f5ddbe4db1d7391ed61c09bfd5b0789d395ac64af3a8a258af",
+      "size_bytes": 62208000,
+      "files": {
+        "syn_raw_420p16_1920x1080.yuv": "a85d2d3319fe79f5ddbe4db1d7391ed61c09bfd5b0789d395ac64af3a8a258af"
+      }
     },
     {
       "id": "syn_raw_422p16",
@@ -19264,11 +19794,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "16bit"
-      ]
+      ],
+      "sha256": "62b5c72cd19f569c58d321b3e25fefc55adfe75d7dd3db8bea66f7bd92ed8ff2",
+      "size_bytes": 82944000,
+      "files": {
+        "syn_raw_422p16_1920x1080.yuv": "62b5c72cd19f569c58d321b3e25fefc55adfe75d7dd3db8bea66f7bd92ed8ff2"
+      }
     },
     {
       "id": "syn_raw_444p16",
@@ -19278,11 +19812,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "16bit"
-      ]
+      ],
+      "sha256": "c402f8436ed62c032730d62b0861527ccb3546910f0759bc36e11c5e4f26cae1",
+      "size_bytes": 124416000,
+      "files": {
+        "syn_raw_444p16_1920x1080.yuv": "c402f8436ed62c032730d62b0861527ccb3546910f0759bc36e11c5e4f26cae1"
+      }
     },
     {
       "id": "syn_raw_mono10",
@@ -19292,11 +19830,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "10bit"
-      ]
+      ],
+      "sha256": "869614727214e87a9a0ce5533331df35d142664ed565ed99551fece162d41914",
+      "size_bytes": 41472000,
+      "files": {
+        "syn_raw_mono10_1920x1080.yuv": "869614727214e87a9a0ce5533331df35d142664ed565ed99551fece162d41914"
+      }
     },
     {
       "id": "syn_raw_mono12",
@@ -19306,11 +19848,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "12bit"
-      ]
+      ],
+      "sha256": "a3b92997a520bd159d1e3f79ec335adcf97ebfc6e16a7fb3b488a060ea9732d9",
+      "size_bytes": 41472000,
+      "files": {
+        "syn_raw_mono12_1920x1080.yuv": "a3b92997a520bd159d1e3f79ec335adcf97ebfc6e16a7fb3b488a060ea9732d9"
+      }
     },
     {
       "id": "syn_raw_mono14",
@@ -19320,11 +19866,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "14bit"
-      ]
+      ],
+      "sha256": "2dab626f3bc0af11b7dcf3284d5fc3d73dfffde08a2f60fbd3779eaddaa96870",
+      "size_bytes": 41472000,
+      "files": {
+        "syn_raw_mono14_1920x1080.yuv": "2dab626f3bc0af11b7dcf3284d5fc3d73dfffde08a2f60fbd3779eaddaa96870"
+      }
     },
     {
       "id": "syn_raw_mono16",
@@ -19334,11 +19884,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "16bit"
-      ]
+      ],
+      "sha256": "c1d9b6b5468e9f22f7059309bbff5505587d9bdc02ddfac9638658024b4e387f",
+      "size_bytes": 41472000,
+      "files": {
+        "syn_raw_mono16_1920x1080.yuv": "c1d9b6b5468e9f22f7059309bbff5505587d9bdc02ddfac9638658024b4e387f"
+      }
     },
     {
       "id": "syn_h265_4k_main10",
@@ -19364,7 +19918,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "palette",
         "obmc",
@@ -19372,7 +19925,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "1d2582272c43ed595a31bac1b0b6d3c3140217bc10c95e5c52b3b290315fa085",
+      "size_bytes": 581783,
+      "files": {
+        "syn_av1_tools_all.ivf": "1d2582272c43ed595a31bac1b0b6d3c3140217bc10c95e5c52b3b290315fa085"
+      }
     },
     {
       "id": "syn_av1_palette",
@@ -19382,13 +19940,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "palette"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "8082f45bb0a30887e584de460a3addb15f1b25516ddd3fb22423472636e2a4ef",
+      "size_bytes": 105618,
+      "files": {
+        "syn_av1_palette.ivf": "8082f45bb0a30887e584de460a3addb15f1b25516ddd3fb22423472636e2a4ef"
+      }
     },
     {
       "id": "syn_av1_deltaq",
@@ -19398,13 +19960,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "delta_q"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "2c89d9b8c5f122b5113530a4558a97198073f45acac137049cc511065e07123c",
+      "size_bytes": 300133,
+      "files": {
+        "syn_av1_deltaq.ivf": "2c89d9b8c5f122b5113530a4558a97198073f45acac137049cc511065e07123c"
+      }
     },
     {
       "id": "syn_av1_lowoverhead",
@@ -19414,10 +19980,14 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "obu"
-      ]
+      ],
+      "sha256": "f0d9adfa0a51f07b11a37e1b5bcd426bfaeb6e1c6315bf01a4e93baa5953e73f",
+      "size_bytes": 341279,
+      "files": {
+        "syn_av1_lowoverhead.obu": "f0d9adfa0a51f07b11a37e1b5bcd426bfaeb6e1c6315bf01a4e93baa5953e73f"
+      }
     },
     {
       "id": "syn_av1_annexb",
@@ -19427,11 +19997,15 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "obu",
         "annexb"
-      ]
+      ],
+      "sha256": "2dd3fa7cb9fb332541dd6256056ebba7dcb3a9a79c53d9a6be01aa30b198206b",
+      "size_bytes": 341525,
+      "files": {
+        "syn_av1_annexb.obu": "2dd3fa7cb9fb332541dd6256056ebba7dcb3a9a79c53d9a6be01aa30b198206b"
+      }
     },
     {
       "id": "syn_av1_hlg_metadata",
@@ -19441,7 +20015,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "10bit",
         "hlg",
@@ -19449,7 +20022,12 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "e49ca11034346a120d141b4595b59b0c1a5c63c20c8c8470c79bec0630143217",
+      "size_bytes": 505215,
+      "files": {
+        "syn_av1_hlg_metadata.ivf": "e49ca11034346a120d141b4595b59b0c1a5c63c20c8c8470c79bec0630143217"
+      }
     },
     {
       "id": "syn_h264_hrd_cbr",
@@ -19459,14 +20037,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hrd",
         "nal_hrd"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "3c2e708e491175f0eccb344678bdd4051cfebcf3ad51c60a000487dca936406b",
+      "size_bytes": 2578787,
+      "files": {
+        "syn_h264_hrd_cbr.264": "3c2e708e491175f0eccb344678bdd4051cfebcf3ad51c60a000487dca936406b"
+      }
     },
     {
       "id": "syn_h264_hrd_vbr",
@@ -19476,14 +20058,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hrd",
         "nal_hrd"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "6a379e39083c28c42d642dd594115562cd768ddb6d7de677c6f3589d7953ba05",
+      "size_bytes": 5188196,
+      "files": {
+        "syn_h264_hrd_vbr.264": "6a379e39083c28c42d642dd594115562cd768ddb6d7de677c6f3589d7953ba05"
+      }
     },
     {
       "id": "syn_h265_hrd_cbr",
@@ -19493,13 +20079,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hrd"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "734748076a2674b46d3680414d9ecaf153b0768d220e325e9cde64b0b110712d",
+      "size_bytes": 3738345,
+      "files": {
+        "syn_h265_hrd_cbr.265": "734748076a2674b46d3680414d9ecaf153b0768d220e325e9cde64b0b110712d"
+      }
     },
     {
       "id": "syn_h265_hrd_vbr",
@@ -19509,13 +20099,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hrd"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "af1991063b1fc046df7f7107eed81f16938046ac1dfd806c4f077898fe122960",
+      "size_bytes": 7733570,
+      "files": {
+        "syn_h265_hrd_vbr.265": "af1991063b1fc046df7f7107eed81f16938046ac1dfd806c4f077898fe122960"
+      }
     },
     {
       "id": "syn_h265_main10_hev1",
@@ -19525,7 +20119,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "hev1",
         "10bit"
@@ -19535,7 +20128,12 @@
       ],
       "aliases": [
         "hev1_main10.mp4"
-      ]
+      ],
+      "sha256": "3eec29d0257ae56c101b315279d6c925dced1468d9800348f4edc9184375843b",
+      "size_bytes": 1045965,
+      "files": {
+        "syn_h265_main10_hev1.mp4": "3eec29d0257ae56c101b315279d6c925dced1468d9800348f4edc9184375843b"
+      }
     },
     {
       "id": "syn_mp4_cenc",
@@ -19545,7 +20143,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cenc",
         "pssh"
@@ -19555,7 +20152,12 @@
       ],
       "aliases": [
         "encv_cenc.mp4"
-      ]
+      ],
+      "sha256": "a05a3cceda575c3e57b92d86193033efc4a4de461a3dc490e0d324a0e35e6d75",
+      "size_bytes": 870397,
+      "files": {
+        "syn_mp4_cenc.mp4": "a05a3cceda575c3e57b92d86193033efc4a4de461a3dc490e0d324a0e35e6d75"
+      }
     },
     {
       "id": "syn_mp4_frag_cbcs",
@@ -19565,7 +20167,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cbcs",
         "pssh",
@@ -19576,7 +20177,12 @@
       ],
       "aliases": [
         "gpac_cbcs.mp4"
-      ]
+      ],
+      "sha256": "2d9d720f64cae9efcf4066aa3632d5a0611caa2e08f86ba64c5fc5bd3a772f81",
+      "size_bytes": 869551,
+      "files": {
+        "syn_mp4_frag_cbcs.mp4": "2d9d720f64cae9efcf4066aa3632d5a0611caa2e08f86ba64c5fc5bd3a772f81"
+      }
     },
     {
       "id": "syn_mp4_cbcs_keyrot",
@@ -19586,7 +20192,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cbcs",
         "pssh",
@@ -19597,7 +20202,12 @@
       ],
       "aliases": [
         "cenc_cbcs_keyrotation.mp4"
-      ]
+      ],
+      "sha256": "bfcf88d3575cb688c61aeb5f07bc46ea19527b803e9ef2b43132c3a6e3184750",
+      "size_bytes": 6869667,
+      "files": {
+        "syn_mp4_cbcs_keyrot.mp4": "bfcf88d3575cb688c61aeb5f07bc46ea19527b803e9ef2b43132c3a6e3184750"
+      }
     },
     {
       "id": "syn_mp4_cenc_widevine",
@@ -19607,7 +20217,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "cenc",
         "pssh",
@@ -19618,7 +20227,12 @@
       ],
       "aliases": [
         "bento4_widevine.mp4"
-      ]
+      ],
+      "sha256": "9cf96f8ac42e87ad30ebc235b1e8f0f8fb4334eb715be609a6fd80d1c8ff6b52",
+      "size_bytes": 871330,
+      "files": {
+        "syn_mp4_cenc_widevine.mp4": "9cf96f8ac42e87ad30ebc235b1e8f0f8fb4334eb715be609a6fd80d1c8ff6b52"
+      }
     },
     {
       "id": "syn_mp4_piff",
@@ -19628,14 +20242,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "piff",
         "smooth"
       ],
       "aliases": [
         "smooth_piff.ismv"
-      ]
+      ],
+      "sha256": "7de7797a62464b7914b26f92c46ba476145fab8ca6831fd0518a204e8a17a033",
+      "size_bytes": 870637,
+      "files": {
+        "syn_mp4_piff.ismv": "7de7797a62464b7914b26f92c46ba476145fab8ca6831fd0518a204e8a17a033"
+      }
     },
     {
       "id": "syn_m4a_itunes",
@@ -19645,7 +20263,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "ilst"
       ],
@@ -19654,7 +20271,12 @@
       ],
       "aliases": [
         "itunes_tagged.m4a"
-      ]
+      ],
+      "sha256": "6d2969572447fface970681797301857abf9a6b7fe63d813d2fe6ebf2e048114",
+      "size_bytes": 45322,
+      "files": {
+        "syn_m4a_itunes.m4a": "6d2969572447fface970681797301857abf9a6b7fe63d813d2fe6ebf2e048114"
+      }
     },
     {
       "id": "syn_mp4_nero_chapters",
@@ -19664,7 +20286,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "chpl"
       ],
@@ -19673,7 +20294,12 @@
       ],
       "aliases": [
         "nero_chapters.mp4"
-      ]
+      ],
+      "sha256": "5ab80ab883b7d9d4c697327cb263d2fdec9c353fdd2e2889ca2a22e9acf74a35",
+      "size_bytes": 867750,
+      "files": {
+        "syn_mp4_nero_chapters.mp4": "5ab80ab883b7d9d4c697327cb263d2fdec9c353fdd2e2889ca2a22e9acf74a35"
+      }
     },
     {
       "id": "syn_avif_10bit",
@@ -19683,7 +20309,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "avif"
       ],
@@ -19692,7 +20317,12 @@
       ],
       "aliases": [
         "avif_10bit.avif"
-      ]
+      ],
+      "sha256": "9c0697066e76632e26d856012b44544ea0c6da0dda3ab62f028377aac28f1bc1",
+      "size_bytes": 39817,
+      "files": {
+        "syn_avif_10bit.avif": "9c0697066e76632e26d856012b44544ea0c6da0dda3ab62f028377aac28f1bc1"
+      }
     },
     {
       "id": "syn_mkv_h264",
@@ -19702,13 +20332,17 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "mkv"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "939030c41807c393513974957ea0c92f1578b9d7d3ea8e0f83c4e186467ebca9",
+      "size_bytes": 873156,
+      "files": {
+        "syn_mkv_h264.mkv": "939030c41807c393513974957ea0c92f1578b9d7d3ea8e0f83c4e186467ebca9"
+      }
     },
     {
       "id": "syn_mkv_hdr10",
@@ -19718,7 +20352,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "mkv",
         "hdr10"
@@ -19728,7 +20361,12 @@
       ],
       "aliases": [
         "hdr10.mkv"
-      ]
+      ],
+      "sha256": "cedd839bcc704451b124f224ee39492db07b9e52d374b4981f7093dae4e2e01a",
+      "size_bytes": 1050827,
+      "files": {
+        "syn_mkv_hdr10.mkv": "cedd839bcc704451b124f224ee39492db07b9e52d374b4981f7093dae4e2e01a"
+      }
     },
     {
       "id": "syn_mkv_dv_p5",
@@ -19758,7 +20396,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "webm",
         "lacing"
@@ -19768,7 +20405,12 @@
       ],
       "aliases": [
         "lacing_xiph.webm"
-      ]
+      ],
+      "sha256": "e54ae954ae41e46fd1573220e98e587d5b41d7a1c8748d756855ec33c580a1a3",
+      "size_bytes": 27826,
+      "files": {
+        "syn_webm_lacing_xiph.webm": "e54ae954ae41e46fd1573220e98e587d5b41d7a1c8748d756855ec33c580a1a3"
+      }
     },
     {
       "id": "syn_mp4_broken_stsc_descending",
@@ -19778,7 +20420,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
@@ -19787,7 +20428,12 @@
       ],
       "aliases": [
         "stsc_descending.mp4"
-      ]
+      ],
+      "sha256": "0fce592ca27489592de20955d3d6de0958c3d61f1f79f51fc6728b69f81acd6d",
+      "size_bytes": 19889,
+      "files": {
+        "stsc_descending.mp4": "0fce592ca27489592de20955d3d6de0958c3d61f1f79f51fc6728b69f81acd6d"
+      }
     },
     {
       "id": "syn_mp4_broken_ctts_v0_negative",
@@ -19797,7 +20443,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
@@ -19806,7 +20451,12 @@
       ],
       "aliases": [
         "ctts_v0_negative.mp4"
-      ]
+      ],
+      "sha256": "f1b31074e664b733b168a54ec2881af8f198c40734589cc988359aeadb9f275a",
+      "size_bytes": 20121,
+      "files": {
+        "ctts_v0_negative.mp4": "f1b31074e664b733b168a54ec2881af8f198c40734589cc988359aeadb9f275a"
+      }
     },
     {
       "id": "syn_mp4_broken_size7_in_moov",
@@ -19816,7 +20466,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "broken"
       ],
@@ -19825,7 +20474,12 @@
       ],
       "aliases": [
         "size7_in_moov.mp4"
-      ]
+      ],
+      "sha256": "16a16e916bd423dcdb63258a8f69f62f429e1d8624300d0955dfc5a322ec1f08",
+      "size_bytes": 19873,
+      "files": {
+        "size7_in_moov.mp4": "16a16e916bd423dcdb63258a8f69f62f429e1d8624300d0955dfc5a322ec1f08"
+      }
     },
     {
       "id": "syn_av1_globalmotion",
@@ -19835,14 +20489,18 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "global_motion",
         "av1"
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c92d15f7b1d50b46ee5cdd8e6c147d9c922b609f58704fb44efb09cb303981bf",
+      "size_bytes": 50016,
+      "files": {
+        "syn_av1_globalmotion.ivf": "c92d15f7b1d50b46ee5cdd8e6c147d9c922b609f58704fb44efb09cb303981bf"
+      }
     },
     {
       "id": "syn_m4a_aac_lc",
@@ -19852,7 +20510,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "aac",
         "audio"
@@ -19862,7 +20519,12 @@
       ],
       "aliases": [
         "aac_lc.m4a"
-      ]
+      ],
+      "sha256": "e01a7b8674cc4d357f14808ba74567746fea9af236858b7e8ae45128f0af4143",
+      "size_bytes": 33542,
+      "files": {
+        "syn_m4a_aac_lc.m4a": "e01a7b8674cc4d357f14808ba74567746fea9af236858b7e8ae45128f0af4143"
+      }
     },
     {
       "id": "syn_raw_yuv420p10le_1080p",
@@ -19872,7 +20534,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "raw",
         "10bit"
@@ -19882,7 +20543,12 @@
       ],
       "aliases": [
         "foo_1920x1080_yuv420p10le.yuv"
-      ]
+      ],
+      "sha256": "91325147316dc7d3a2694ad4e4ea9e1bf2741c3f1d0c652d257aa9d6f9024fad",
+      "size_bytes": 186624000,
+      "files": {
+        "foo_1920x1080_yuv420p10le.yuv": "91325147316dc7d3a2694ad4e4ea9e1bf2741c3f1d0c652d257aa9d6f9024fad"
+      }
     },
     {
       "id": "fixture_fa_4k_dense",
