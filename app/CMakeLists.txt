@@ -54,11 +54,14 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/settings.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
+    "${app_dir}/src/dock/dock_model.h"
+    "${app_dir}/src/dock/dock_model.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
     "${schema}")
   # src/platform too: the generated type registration includes the headers by file name.
-  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
+                                               "${app_dir}/src/dock")
   # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
   target_link_libraries(${target} PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 ovt::core
                                           ovt::flags)
