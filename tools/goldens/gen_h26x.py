@@ -79,6 +79,10 @@ class StepError(Exception):
     """One oracle step of one entry failed."""
 
 
+class NoStream(StepError):
+    """The corpus file has no stream of the manifest's codec (the manifest names the file's family, not a track)."""
+
+
 # ------------------------------------------------------------------------------------------------ selection
 
 
@@ -207,7 +211,7 @@ def video_stream(src: Path, codec: str, work: Path) -> int:
         index, _, codec_name = line.partition(",")
         if codec_name.strip() == name and index.strip().isdigit():
             return int(index)
-    raise StepError(f"no {name} video stream in {src.name}")
+    raise NoStream(f"no {name} video stream in {src.name}")
 
 
 def to_annexb(src: Path, codec: str, work: Path) -> Path:

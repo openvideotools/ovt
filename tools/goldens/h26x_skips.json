@@ -1,3 +1,6 @@
 {
-  "syn_h265_sei_unknown_200:hm": "HM 18.0 asserts in TComInputBitstream::read on the unknown SEI payload type 200 (the stream is for the SEI parser tests)"
+  "syn_h265_sei_unknown_200:hm": "HM 18.0 asserts in TComInputBitstream::read on the unknown SEI payload type 200 (the stream is for the SEI parser tests)",
+  "jctvc_RPS_C_ericsson_5:trace_headers": "FFmpeg 7.1 rejects the stream (Invalid data found when processing input) before trace_headers runs",
+  "jctvc_Bitdepth_A_RExt_Sony_1:trace_headers": "FFmpeg 7.1 cannot open a muxer for this stream's codec parameters (RExt extended precision), so trace_headers never runs",
+  "ts_h264_dvb:entry": "FFmpeg cannot size the H.264 track of this transport stream while copying it (dimensions not set)"
 }
