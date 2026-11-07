@@ -193,7 +193,7 @@ TEST_CASE("sniff: every container-smoke corpus entry", "[container][sniff][needs
 
 TEST_CASE("ovt_container_open on a 7-byte file returns OVT_E_UNSUPPORTED", "[container][open][fast]") {
   const TempFile f("seven.bin", Bytes(7, 0x5A));
-  ovt_File handle(ovt::io::RandomAccessFile::open(f.path()));
+  ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
   auto* c = reinterpret_cast<ovt_Container*>(0x1);
   CHECK(ovt_container_open(&handle, &c) == OVT_E_UNSUPPORTED);
   CHECK(c == nullptr);
@@ -201,7 +201,7 @@ TEST_CASE("ovt_container_open on a 7-byte file returns OVT_E_UNSUPPORTED", "[con
 
 TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][fast]") {
   const TempFile f("ivf.ivf", make({'D', 'K', 'I', 'F'}, 64));
-  ovt_File handle(ovt::io::RandomAccessFile::open(f.path()));
+  ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
   ovt_Container* c = nullptr;
   REQUIRE(ovt_container_open(&handle, &c) == OVT_OK);
   REQUIRE(c != nullptr);
@@ -220,7 +220,7 @@ TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][
 
 TEST_CASE("ovt_container_open_format argument rules", "[container][open][fast]") {
   const TempFile f("any.bin", Bytes(64, 0x80));
-  ovt_File handle(ovt::io::RandomAccessFile::open(f.path()));
+  ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
   ovt_Container* c = nullptr;
   CHECK(ovt_container_open_format(&handle, "nonsense", nullptr, nullptr, &c) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_open_format(&handle, "raw", nullptr, nullptr, &c) == OVT_E_INVALID_ARG);

@@ -19,6 +19,8 @@
 
 #include <stdint.h> /* NOLINT(modernize-deprecated-headers): a C11 header */
 
+#include "ovt/color.h"
+#include "ovt/io.h"
 #include "ovt/jobs.h"
 #include "ovt/status.h"
 
@@ -26,12 +28,6 @@
 extern "C" {
 #endif
 
-/** Opaque file handle (chapter 12 §12.3.6). Repeating a typedef is legal in C11 and C++. */
-/* NOLINTNEXTLINE(modernize-use-using): a C11 header */
-typedef struct ovt_File ovt_File;
-/** Colour description struct (chapter 00 §0.5.6); only its address crosses this header. */
-/* NOLINTNEXTLINE(modernize-use-using): a C11 header */
-typedef struct ovt_ColorDescription ovt_ColorDescription;
 /** Opaque container handle. Created by ovt_container_open*(), released with ovt_container_close(). */
 /* NOLINTNEXTLINE(modernize-use-using): a C11 header */
 typedef struct ovt_Container ovt_Container;

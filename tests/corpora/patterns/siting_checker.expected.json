@@ -1,0 +1,21 @@
+{
+  "bit_depth": 10,
+  "chroma_planes_sha256": "daf546b1e76d5f31980b948e85d0aacf4e95a8f25fe1b682833e77d2cb3de183",
+  "chroma_rule": "chroma sample (cx, cy): odd = (cx + cy) & 1; Cb = 768 if odd else 256; Cr = 256 if odd else 768",
+  "chroma_siting": "left (chroma_sample_loc_type 0), signalled in the HEVC VUI",
+  "chroma_values": {
+    "high": 768,
+    "low": 256
+  },
+  "corpus_id": "syn_pat_siting_checker",
+  "frames": 3,
+  "height": 1080,
+  "luma_code": 502,
+  "out_of_gamut_709_samples": 0,
+  "pattern": "siting_checker",
+  "primaries": "BT.709",
+  "range": "limited",
+  "saturated_area_samples": 0,
+  "transfer": "BT.709",
+  "width": 1920
+}

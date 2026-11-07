@@ -25,16 +25,17 @@ add_library(ovt_test_support STATIC test_support/corpus.cpp test_support/env.cpp
 target_include_directories(ovt_test_support PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_compile_definitions(ovt_test_support PRIVATE "OVT_TEST_DEFAULT_CORPORA_DIR=\"${OVT_CORPORA_DIR}\"")
 # Catch2::Catch2 (not WithMain): the support code uses SKIP/FAIL/WARN; the executable decides about main.
-# nlohmann_json is PUBLIC: golden_compare.h exposes nlohmann::json (WI-0.556a).
-target_link_libraries(ovt_test_support PUBLIC Catch2::Catch2 ${nlohmann_json_TARGET} PRIVATE ovt::flags ${fmt_TARGET}
-                                                                                             ${flatbuffers_TARGET})
+# nlohmann_json is PUBLIC: golden_compare.h and fb_normalize.h expose nlohmann::json (WI-0.556). ovt_schemas (the
+# generated FlatBuffers headers) is private: the family writers read the tables, callers see forward declarations.
+target_link_libraries(ovt_test_support PUBLIC Catch2::Catch2 ${nlohmann_json_TARGET}
+                      PRIVATE ovt::flags ${fmt_TARGET} ${flatbuffers_TARGET} ovt_schemas)
 ovt_set_license(ovt_test_support "LGPL-2.1-or-later")
 
 # ---- Golden runner: the one test executable with its own main -------------------------------------
 add_executable(ovt_core_tests main.cpp test_support_corpus.cpp test_support_flatbuffer.cpp test_support_golden.cpp
-                              test_golden_compare.cpp)
-target_link_libraries(ovt_core_tests PRIVATE ovt::core ovt::flags ovt_test_support Catch2::Catch2 ${flatbuffers_TARGET}
-                                             ${nlohmann_json_TARGET})
+                              test_golden_compare.cpp test_fb_normalize_families.cpp)
+target_link_libraries(ovt_core_tests PRIVATE ovt::core ovt::flags ovt_test_support ovt_schemas Catch2::Catch2
+                                             ${flatbuffers_TARGET} ${nlohmann_json_TARGET})
 target_compile_definitions(ovt_core_tests PRIVATE "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
                                                   "OVT_TEST_BINARY_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
 ovt_set_license(ovt_core_tests "LGPL-2.1-or-later")
@@ -56,6 +57,7 @@ ovt_catch_discover_tests(ovt_tests_result)
 add_subdirectory(io)
 add_subdirectory(bitreader)
 add_subdirectory(container)
+add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(jobs)
 add_subdirectory(log)
 add_subdirectory(model)
@@ -71,4 +73,65 @@ if(TARGET tp::dav1d)
   target_link_libraries(ovt_tests_dav1d_probe PRIVATE tp::dav1d ovt::flags ${Catch2_TARGET})
   ovt_set_license(ovt_tests_dav1d_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_dav1d_probe)
+endif()
+
+# WI-0.012: the two FFmpeg flavours (chapter 13 §13.3.3). One source, one executable per flavour: both define the
+# av* symbols, so they cannot be linked into one process outside the plugin.
+foreach(_ovt_ff_flavour core plugin)
+  if(NOT TARGET tp::ffmpeg_${_ovt_ff_flavour})
+    continue()
+  endif()
+  if(_ovt_ff_flavour STREQUAL "core")
+    set(_ovt_ff_test ovt_tests_ffmpeg_probe)
+    set(_ovt_ff_is_plugin 0)
+  else()
+    set(_ovt_ff_test ovt_tests_ffmpeg_plugin_probe)
+    set(_ovt_ff_is_plugin 1)
+  endif()
+  add_executable(${_ovt_ff_test} test_ffmpeg_probe.cpp)
+  target_link_libraries(${_ovt_ff_test} PRIVATE tp::ffmpeg_${_ovt_ff_flavour} ovt_test_support ovt::flags
+                                                ${Catch2_TARGET})
+  set(_ovt_ff_defs "OVT_FFMPEG_PLUGIN_FLAVOUR=${_ovt_ff_is_plugin}")
+  foreach(_ovt_ff_opt OVT_SYSTEM_FFMPEG OVT_PATENT_CODECS_IN_CORE OVT_ENABLE_HW_DECODE)
+    if(${_ovt_ff_opt})
+      set(_ovt_ff_on 1)
+    else()
+      set(_ovt_ff_on 0)
+    endif()
+    string(REPLACE "OVT_SYSTEM_FFMPEG" "OVT_FFMPEG_SYSTEM" _ovt_ff_name "${_ovt_ff_opt}")
+    list(APPEND _ovt_ff_defs "${_ovt_ff_name}=${_ovt_ff_on}")
+  endforeach()
+  if(TARGET tp::dav1d)
+    list(APPEND _ovt_ff_defs OVT_FFMPEG_DAV1D=1)
+  else()
+    list(APPEND _ovt_ff_defs OVT_FFMPEG_DAV1D=0)
+  endif()
+  target_compile_definitions(${_ovt_ff_test} PRIVATE ${_ovt_ff_defs})
+  ovt_set_license(${_ovt_ff_test} "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(${_ovt_ff_test})
+endforeach()
+unset(_ovt_ff_flavour)
+unset(_ovt_ff_test)
+unset(_ovt_ff_is_plugin)
+unset(_ovt_ff_defs)
+unset(_ovt_ff_opt)
+unset(_ovt_ff_on)
+unset(_ovt_ff_name)
+
+# WI-0.015: tp::vmaf (Meson wrapper) links into a test that loads the built-in vmaf_v0.6.1 model.
+if(TARGET tp::vmaf)
+  add_executable(ovt_tests_vmaf_probe test_vmaf_probe.cpp)
+  target_link_libraries(ovt_tests_vmaf_probe PRIVATE tp::vmaf ovt::flags ${Catch2_TARGET})
+  ovt_set_license(ovt_tests_vmaf_probe "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(ovt_tests_vmaf_probe)
+endif()
+
+# WI-0.017: tp::onnxruntime (prebuilt fallback, OVT_ONNXRUNTIME_PREBUILT=ON) links into a plain C program that
+# calls OrtGetApiBase(); it exits 0 when the header is found and the library loads.
+if(TARGET tp::onnxruntime)
+  add_executable(ovt_tests_ort_probe test_ort_probe.c)
+  target_link_libraries(ovt_tests_ort_probe PRIVATE tp::onnxruntime ovt::flags)
+  ovt_set_license(ovt_tests_ort_probe "LGPL-2.1-or-later")
+  add_test(NAME ort_probe COMMAND ovt_tests_ort_probe)
+  set_tests_properties(ort_probe PROPERTIES LABELS "unit;fast;third_party")
 endif()
