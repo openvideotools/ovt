@@ -159,8 +159,7 @@ def test_corpus_reference_can_select_a_non_primary_file(tmp_path, monkeypatch):
 def test_hdr10plus_fixture_reads_the_annex_b_file():
     doc = generate.load_recipes(generate.DEFAULT_RECIPES)
     fixture = next(f for f in doc["fixtures"] if f["id"] == "fixture_hdr10plus_t35")
-    argv = next(a for s in fixture["steps"] for a in generate.step_argvs(s))
-    assert "{corpus:syn_h265_hdr10plus:syn_h265_hdr10plus.265}" in argv  # sei_inject.py --extract reads Annex B only
+    assert "{corpus:syn_h265_hdr10plus:syn_h265_hdr10plus.265}" in fixture["cmd"]  # sei_inject.py --extract reads Annex B only
 
 
 def test_missing_helpers_ignores_out_dir_arguments():
