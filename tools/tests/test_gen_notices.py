@@ -59,7 +59,7 @@ def tree(tmp_path: Path) -> dict:
     for dep, text in (
         ("libaom", "libaom BSD text\r\n"),
         ("libde265", "LGPL text\n\n\n"),
-        ("onnx_runtime", "MIT text\n"),
+        ("onnxruntime", "MIT text\n"),
     ):
         (lic / dep).mkdir(parents=True)
         (lic / dep / "LICENSE").write_text(text, newline="")
@@ -97,7 +97,7 @@ def test_two_runs_are_byte_identical(tree: dict, tmp_path: Path) -> None:
 
 
 def test_missing_licence_text_fails_with_code(tree: dict, tmp_path: Path) -> None:
-    (tree["lic"] / "onnx_runtime" / "LICENSE").unlink()
+    (tree["lic"] / "onnxruntime" / "LICENSE").unlink()
     out = tmp_path / "N.md"
     code, err = run(tree, out)
     assert code == 1
@@ -134,7 +134,7 @@ def test_only_linked_components_need_texts(tree: dict, tmp_path: Path) -> None:
 def test_staging_key_matches_dep_id() -> None:
     import versions_to_cmake as v2c
 
-    for name in ("ONNX Runtime", "Qt Gradle Plugin", "libaom", "Gradle / AGP"):
+    for name in ("Qt Gradle Plugin", "libaom", "Gradle / AGP"):
         assert gn.key_of(name) == v2c.dep_id(name)
 
 
@@ -146,8 +146,8 @@ def test_no_patent_notice_by_default(tree: dict, tmp_path: Path) -> None:
 
 
 def test_vcpkg_and_qt_fallbacks(tree: dict, tmp_path: Path) -> None:
-    (tree["lic"] / "onnx_runtime" / "LICENSE").unlink()
-    share = tmp_path / "share" / "onnx_runtime"
+    (tree["lic"] / "onnxruntime" / "LICENSE").unlink()
+    share = tmp_path / "share" / "onnxruntime"
     share.mkdir(parents=True)
     (share / "copyright").write_text("vcpkg MIT\n")
     report = json.loads((tree["root"] / "report.json").read_text())
@@ -200,6 +200,12 @@ def test_fence_longer_than_text_backticks() -> None:
         ("zstd::libzstd_static", "zstd"),
         ("hwy::hwy", "highway"),
         ("CLI11::CLI11", "cli11"),
+        # the prebuilt ONNX Runtime: four VERSIONS.md rows, one component (third_party/onnxruntime.cmake)
+        ("tp::onnxruntime", "onnxruntime"),
+        ("ONNX Runtime", "onnxruntime"),
+        ("ONNX Runtime osx-arm64", "onnxruntime"),
+        ("ONNX Runtime linux-aarch64", "onnxruntime"),
+        ("ONNX Runtime osx-x86_64", "onnxruntime"),
     ],
 )
 def test_manifest_names_map_to_one_key(name: str, key: str) -> None:

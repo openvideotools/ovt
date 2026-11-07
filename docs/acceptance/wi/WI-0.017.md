@@ -24,3 +24,17 @@ $ ctest --test-dir build/linux-x64-debug -R ort_probe -V
 
 Result: pass. `onnxruntime_c_api.h` is found under `build/third_party/linux-x64-debug/onnxruntime/include`.
 CTest registers the test `ort_probe` (labels `unit;fast;third_party`) only when `OVT_ONNXRUNTIME_PREBUILT=ON`.
+
+## Addendum (#167): notices staging with `OVT_ONNXRUNTIME_PREBUILT=ON`
+
+Machine: cloud container, Ubuntu 24.04 x86_64. Date: 2026-11-06.
+
+```console
+$ cmake --build build/linux-x64-debug --target ovt_notices   # fails on this container's system packages, see below
+$ ls build/linux-x64-debug/notices/licenses/onnxruntime
+LICENSE  ThirdPartyNotices.txt
+$ python3 -I tools/gen_notices.py ... | grep -ci onnx    # E-NOTICE-MISSING lines naming ONNX Runtime
+0
+```
+
+The remaining `E-NOTICE-MISSING` lines are apt-installed libraries (fmt, Catch2, …) that have no texts here; CI uses vcpkg.

@@ -18455,6 +18455,331 @@
       ]
     },
     {
+      "id": "syn_broken_syntax_SYN_GEN_0001",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_GEN_0002",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_GEN_0003",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_GEN_0101",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_GEN_0102",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0001",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0010",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0020",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0030",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0060",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H264_0103",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0001",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0003",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0007",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0010",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0050",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0060",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_H265_0102",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0001",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0003",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0030",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0032",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0101",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_AV1_0102",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
+      "id": "syn_broken_syntax_SYN_CONF_0001",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "49",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "broken"
+      ]
+    },
+    {
       "id": "syn_broken_h265_hash_mismatch",
       "source": "syn",
       "kind": "stream",
@@ -18711,6 +19036,308 @@
       ],
       "tags": [
         "fast"
+      ]
+    },
+    {
+      "id": "syn_raw_420",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_422",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_444",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_444alpha",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_mono",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_411",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw"
+      ]
+    },
+    {
+      "id": "syn_raw_420p10",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "10bit"
+      ]
+    },
+    {
+      "id": "syn_raw_422p10",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "10bit"
+      ]
+    },
+    {
+      "id": "syn_raw_444p10",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "10bit"
+      ]
+    },
+    {
+      "id": "syn_raw_420p12",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "12bit"
+      ]
+    },
+    {
+      "id": "syn_raw_422p12",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "12bit"
+      ]
+    },
+    {
+      "id": "syn_raw_444p12",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "12bit"
+      ]
+    },
+    {
+      "id": "syn_raw_420p14",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "14bit"
+      ]
+    },
+    {
+      "id": "syn_raw_422p14",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "14bit"
+      ]
+    },
+    {
+      "id": "syn_raw_444p14",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "14bit"
+      ]
+    },
+    {
+      "id": "syn_raw_420p16",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "16bit"
+      ]
+    },
+    {
+      "id": "syn_raw_422p16",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "16bit"
+      ]
+    },
+    {
+      "id": "syn_raw_444p16",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "16bit"
+      ]
+    },
+    {
+      "id": "syn_raw_mono10",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "10bit"
+      ]
+    },
+    {
+      "id": "syn_raw_mono12",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "12bit"
+      ]
+    },
+    {
+      "id": "syn_raw_mono14",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "14bit"
+      ]
+    },
+    {
+      "id": "syn_raw_mono16",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "60",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "raw",
+        "16bit"
       ]
     },
     {
@@ -19256,6 +19883,88 @@
       "aliases": [
         "foo_1920x1080_yuv420p10le.yuv"
       ]
+    },
+    {
+      "id": "fixture_fa_4k_dense",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "tests/perf/data/fa_4k_dense.bin",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "local_only": true
+    },
+    {
+      "id": "fixture_fa_1080p_dense",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "tests/perf/data/fa_1080p_dense.bin",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "local_only": true
+    },
+    {
+      "id": "fixture_synthetic_4k_grid",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "render/tests/fixtures/synthetic_4k_grid.fb",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
+    },
+    {
+      "id": "fixture_synthetic_4k_mv",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "render/tests/fixtures/synthetic_4k_mv.fb",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
+    },
+    {
+      "id": "fixture_synthetic_8k_mv",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "render/tests/fixtures/synthetic_8k_mv.fb",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
+    },
+    {
+      "id": "fixture_real_1080p_hevc_frame",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "render/tests/fixtures/real_1080p_hevc_frame.fb",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
+    },
+    {
+      "id": "fixture_real_4k_hevc_frame",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "render/tests/fixtures/real_4k_hevc_frame.fb",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
+    },
+    {
+      "id": "fixture_hdr10plus_t35",
+      "source": "syn",
+      "kind": "fixture",
+      "path": "tests/corpora/hdr10plus/f000.bin",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true
     }
   ]
 }

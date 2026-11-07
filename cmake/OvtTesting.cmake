@@ -13,6 +13,12 @@
 #       The active flag lists (empty when sanitizers are off), for scripts that pass them on to
 #       third-party builds (WI-0.558).
 #
+#   OVT_INSTALL_SANITIZER_LINK_FLAGS
+#       What a project linking the installed, sanitized libovt_core needs on its own link line: the link flags,
+#       plus on Clang (not Apple) -fsanitize-link-c++-runtime and the C++ standard library. Clang links the C++
+#       parts of the runtime (the UBSan vptr checks) only when its C++ driver links, and a C consumer uses the C
+#       driver. Exported as a usage requirement of ovt::core (core/CMakeLists.txt) and in ovt-core.pc.
+#
 #   ovt_catch_discover_tests(<target> [EXTRA_LABELS <label>...] [ENVIRONMENT_MODIFICATION <op>...])
 #       Registers every Catch2 test case of <target> as a CTest test, at test time (PRE_TEST discovery,
 #       which works on macOS when the binary links dylibs from the build tree). Each test gets the CTest
@@ -44,6 +50,18 @@ if(OVT_ENABLE_SANITIZERS)
     set(OVT_SANITIZER_LINK_FLAGS -fsanitize=address,undefined)
   endif()
   message(STATUS "OVT sanitizers: ${OVT_SANITIZER} (${OVT_SANITIZER_COMPILE_FLAGS})")
+endif()
+
+set(OVT_INSTALL_SANITIZER_LINK_FLAGS ${OVT_SANITIZER_LINK_FLAGS})
+if(OVT_SANITIZER_LINK_FLAGS AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND NOT APPLE)
+  list(APPEND OVT_INSTALL_SANITIZER_LINK_FLAGS -fsanitize-link-c++-runtime)
+  foreach(_lib IN LISTS CMAKE_CXX_IMPLICIT_LINK_LIBRARIES)
+    if(_lib MATCHES "^(stdc\\+\\+|c\\+\\+|c\\+\\+abi)$")
+      list(APPEND OVT_INSTALL_SANITIZER_LINK_FLAGS "-l${_lib}")
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES OVT_INSTALL_SANITIZER_LINK_FLAGS)
+  unset(_lib)
 endif()
 
 function(ovt_enable_sanitizers target)
