@@ -464,14 +464,14 @@ TEST_CASE("de265 plugin: garbage units never crash the plugin", "[fast][third_pa
 TEST_CASE("de265 plugin: de265_md5_vs_sei on 20 HEVC_v1 streams", "[fast][third_party][needs-corpus]") {
   // AT1. Main and Main 10 streams that carry a decoded picture hash SEI for every picture and output every picture
   // (no pic_output_flag = 0, no skipped RASL or no_output_of_prior_pics), covering PCM, merge, temporal layers, MV
-  // clipping, SAO, RPS, HRD, AMP, CABAC bin limits, multiple PPS, scaling lists, dependent slices, WPP and 10-bit.
-  // Some HEVC_v1 streams carry no hash SEI (RPS_A, RPS_F, POC_A, AMP_A, CONFWIN_A, STRUCT_B, TILES_B), so they
-  // cannot serve here (issue #254).
+  // clipping, SAO, RPS, long-term refs, HRD, CABAC init types, multiple PPS, scaling lists, dependent slices, WPP
+  // and 10-bit. RPS_A, RPS_F, POC_A, AMP_A, AMP_D, CONFWIN_A, MAXBINS_A, STRUCT_B and TILES_B carry no SEI at all,
+  // so they cannot serve here (issue #254).
   const std::string id = GENERATE(
       as<std::string>{}, "jctvc_ipcm_A_NEC_3", "jctvc_PMERGE_A_TI_3", "jctvc_MERGE_B_TI_3", "jctvc_VPSID_A_VIDYO_2",
       "jctvc_TSCL_A_VIDYO_5", "jctvc_MVEDGE_A_qualcomm_3", "jctvc_SAO_A_MediaTek_4", "jctvc_RPS_C_ericsson_5",
       "jctvc_RPS_D_ericsson_6", "jctvc_RPS_E_qualcomm_5", "jctvc_MVCLIP_A_qualcomm_3", "jctvc_HRD_A_Fujitsu_3",
-      "jctvc_RPS_B_qualcomm_5", "jctvc_AMP_D_Hisilicon_3", "jctvc_MAXBINS_A_TI_5", "jctvc_PPS_A_qualcomm_7",
+      "jctvc_RPS_B_qualcomm_5", "jctvc_CAINIT_A_SHARP_4", "jctvc_LTRPSPS_A_FJ_1", "jctvc_PPS_A_qualcomm_7",
       "jctvc_SLIST_A_Sony_5", "jctvc_DSLICE_A_HHI_5", "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_WPP_A_ericsson_MAIN10_2");
   CAPTURE(id);
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
