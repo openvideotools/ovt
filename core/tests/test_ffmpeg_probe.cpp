@@ -140,9 +140,12 @@ TEST_CASE(OVT_PROBE "the plugin flavour decodes exactly AVC and HEVC", "[fast][t
 
 TEST_CASE(OVT_PROBE "the core flavour has no pool-covered decoder unless OVT_PATENT_CODECS_IN_CORE",
           "[fast][third_party]") {
-  // AVC and HEVC, plus the other pool-covered codecs of POL-PAT-2: VVC, AAC/HE-AAC, MPEG-4 Part 2 and VC-1.
-  constexpr std::array pool_ids{AV_CODEC_ID_H264,     AV_CODEC_ID_HEVC,  AV_CODEC_ID_VVC, AV_CODEC_ID_AAC,
-                                AV_CODEC_ID_AAC_LATM, AV_CODEC_ID_MPEG4, AV_CODEC_ID_VC1, AV_CODEC_ID_WMV3};
+  // AVC and HEVC, plus the other pool-covered codecs of POL-PAT-2: VVC, AAC/HE-AAC, MPEG-4 Part 2 (with its
+  // Microsoft variants MS-MPEG4 v1-v3 and WMV7/8) and VC-1.
+  constexpr std::array pool_ids{AV_CODEC_ID_H264,      AV_CODEC_ID_HEVC,  AV_CODEC_ID_VVC,       AV_CODEC_ID_AAC,
+                                AV_CODEC_ID_AAC_LATM,  AV_CODEC_ID_MPEG4, AV_CODEC_ID_MSMPEG4V1, AV_CODEC_ID_MSMPEG4V2,
+                                AV_CODEC_ID_MSMPEG4V3, AV_CODEC_ID_WMV1,  AV_CODEC_ID_WMV2,      AV_CODEC_ID_VC1,
+                                AV_CODEC_ID_WMV3};
 #if OVT_PATENT_CODECS_IN_CORE
   CHECK(avcodec_find_decoder(AV_CODEC_ID_H264) != nullptr);
   CHECK(avcodec_find_decoder(AV_CODEC_ID_HEVC) != nullptr);
@@ -153,9 +156,13 @@ TEST_CASE(OVT_PROBE "the core flavour has no pool-covered decoder unless OVT_PAT
     CHECK(avcodec_find_decoder(id) == nullptr);
   }
   const std::set<std::string> names = decoder_names();
-  for (const char* name :
-       {"h264", "hevc", "h264_mediacodec", "hevc_mediacodec", "vvc", "aac", "aac_fixed", "aac_latm", "aac_at",
-        "aac_mediacodec", "mpeg4", "mpeg4_mediacodec", "vc1", "vc1image", "wmv3", "wmv3image"}) {
+  // clang-format off
+  constexpr std::array pool_decoders{
+      "h264", "hevc", "h264_mediacodec", "hevc_mediacodec", "vvc", "aac", "aac_fixed", "aac_latm", "aac_at",
+      "aac_mediacodec", "mpeg4", "mpeg4_mediacodec", "msmpeg4v1", "msmpeg4v2", "msmpeg4v3", "wmv1", "wmv2", "vc1",
+      "vc1image", "wmv3", "wmv3image"};
+  // clang-format on
+  for (const char* name : pool_decoders) {
     INFO("decoder " << name);
     CHECK_FALSE(names.contains(name));
   }

@@ -258,12 +258,14 @@
       {"cmd": ["MP4Box", "-for-test", "-crypt", "{repo}/tests/corpora/synthetic/drm_cbcs_constiv.xml", "syn_mp4_frag_single.mp4", "-out", "syn_mp4_frag_cbcs.mp4"]}]},
     {"recipe": "68", "id": "syn_mp4_cbcs_keyrot", "features": ["cbcs", "pssh", "key_rotation"], "tags": ["fast"], "needs": ["syn_h264_gop60_1080p"], "files": ["syn_mp4_cbcs_keyrot.mp4"], "aliases": ["cenc_cbcs_keyrotation.mp4"], "steps": [
       {"cmd": ["MP4Box", "-for-test", "-crypt", "{repo}/tests/corpora/synthetic/drm_cbcs_keyrot.xml", "syn_h264_gop60_1080p.mp4", "-out", "syn_mp4_cbcs_keyrot.mp4"]}]},
-    {"recipe": "68", "id": "syn_mp4_cenc_widevine", "features": ["cenc", "pssh", "widevine"], "tags": ["fast"], "needs": ["syn_h264_multislice_cavlc_mp4"], "files": ["syn_mp4_cenc_widevine.mp4"], "aliases": ["bento4_widevine.mp4"], "note": "fixed IV instead of the spec's ':random', so the hash is reproducible", "steps": [
+    {"recipe": "68", "id": "syn_mp4_cenc_widevine", "features": ["cenc", "pssh", "widevine"], "tags": ["fast"], "needs": ["syn_h264_multislice_cavlc_mp4"], "files": ["syn_mp4_cenc_widevine.mp4"], "aliases": ["bento4_widevine.mp4"], "note": "fixed IV instead of the spec's ':random', and mp4_pin_times.py zeroes the mvhd/tkhd/mdhd times Bento4 takes from the clock, so the hash is reproducible", "steps": [
       {"cmd": ["mp4fragment", "syn_h264_multislice_cavlc.mp4", "f_widevine.mp4"]},
-      {"cmd": ["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "--pssh", "edef8ba979d64acea3c827dcd51d21ed:{repo}/tests/corpora/synthetic/widevine_pssh.bin", "f_widevine.mp4", "syn_mp4_cenc_widevine.mp4"]}]},
+      {"cmd": ["mp4encrypt", "--method", "MPEG-CENC", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "--pssh", "edef8ba979d64acea3c827dcd51d21ed:{repo}/tests/corpora/synthetic/widevine_pssh.bin", "f_widevine.mp4", "e_widevine.mp4"]},
+      {"cmd": ["{python}", "{repo}/tools/mp4_pin_times.py", "e_widevine.mp4", "syn_mp4_cenc_widevine.mp4"]}]},
     {"recipe": "69", "id": "syn_mp4_piff", "features": ["piff", "smooth"], "needs": ["syn_h264_multislice_cavlc_mp4"], "files": ["syn_mp4_piff.ismv"], "aliases": ["smooth_piff.ismv"], "steps": [
       {"cmd": ["mp4fragment", "syn_h264_multislice_cavlc.mp4", "f_piff.mp4"]},
-      {"cmd": ["mp4encrypt", "--method", "PIFF-CTR", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "f_piff.mp4", "syn_mp4_piff.ismv"]}]},
+      {"cmd": ["mp4encrypt", "--method", "PIFF-CTR", "--key", "1:00112233445566778899aabbccddeeff:0a610676cb88f302", "--property", "1:KID:0123456789abcdef0123456789abcdef", "f_piff.mp4", "e_piff.ismv"]},
+      {"cmd": ["{python}", "{repo}/tools/mp4_pin_times.py", "e_piff.ismv", "syn_mp4_piff.ismv"]}]},
     {"recipe": "70", "id": "syn_m4a_itunes", "features": ["ilst"], "tags": ["fast"], "files": ["syn_m4a_itunes.m4a"], "aliases": ["itunes_tagged.m4a"], "steps": [
       {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "sine=f=440:d=5", "-c:a", "aac", "-metadata", "title=Title", "-metadata", "artist=Artist", "-metadata", "location=+48.8584+002.2945/", "-f", "ipod", "syn_m4a_itunes.m4a"]}]},
     {"recipe": "70", "id": "syn_mp4_nero_chapters", "features": ["chpl"], "tags": ["fast"], "needs": ["syn_h264_multislice_cavlc"], "files": ["syn_mp4_nero_chapters.mp4"], "aliases": ["nero_chapters.mp4"], "steps": [
