@@ -1,0 +1,1164 @@
+[
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 0,
+  "value": 3
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 0,
+  "value": 7
+ },
+ {
+  "bit_length": 8,
+  "bit_offset": 8,
+  "name": "profile_idc",
+  "unit": 0,
+  "value": 77
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 16,
+  "name": "constraint_set0_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "constraint_set1_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "constraint_set2_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 19,
+  "name": "constraint_set3_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 20,
+  "name": "constraint_set4_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 21,
+  "name": "constraint_set5_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 22,
+  "name": "reserved_zero_2bits",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 8,
+  "bit_offset": 24,
+  "name": "level_idc",
+  "unit": 0,
+  "value": 21
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 32,
+  "name": "seq_parameter_set_id",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 33,
+  "name": "log2_max_frame_num_minus4",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 34,
+  "name": "pic_order_cnt_type",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 37,
+  "name": "delta_pic_order_always_zero_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 38,
+  "name": "offset_for_non_ref_pic",
+  "unit": 0,
+  "value": -2
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 43,
+  "name": "offset_for_top_to_bottom_field",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 46,
+  "name": "num_ref_frames_in_pic_order_cnt_cycle",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 7,
+  "bit_offset": 49,
+  "name": "offset_for_ref_frame[0]",
+  "unit": 0,
+  "value": 6
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 56,
+  "name": "max_num_ref_frames",
+  "unit": 0,
+  "value": 6
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 61,
+  "name": "gaps_in_frame_num_allowed_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 7,
+  "bit_offset": 62,
+  "name": "pic_width_in_mbs_minus1",
+  "unit": 0,
+  "value": 11
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 69,
+  "name": "pic_height_in_map_units_minus1",
+  "unit": 0,
+  "value": 3
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 74,
+  "name": "frame_mbs_only_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 75,
+  "name": "mb_adaptive_frame_field_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 76,
+  "name": "direct_8x8_inference_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 77,
+  "name": "frame_cropping_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 78,
+  "name": "vui_parameters_present_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 79,
+  "name": "aspect_ratio_info_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 80,
+  "name": "overscan_info_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 81,
+  "name": "video_signal_type_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 82,
+  "name": "chroma_loc_info_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 83,
+  "name": "timing_info_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 84,
+  "name": "nal_hrd_parameters_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 85,
+  "name": "vcl_hrd_parameters_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 86,
+  "name": "pic_struct_present_flag",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 87,
+  "name": "bitstream_restriction_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 88,
+  "name": "motion_vectors_over_pic_boundaries_flag",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 89,
+  "name": "max_bytes_per_pic_denom",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 90,
+  "name": "max_bits_per_mb_denom",
+  "unit": 0,
+  "value": 0
+ },
+ {
+  "bit_length": 7,
+  "bit_offset": 91,
+  "name": "log2_max_mv_length_horizontal",
+  "unit": 0,
+  "value": 13
+ },
+ {
+  "bit_length": 7,
+  "bit_offset": 98,
+  "name": "log2_max_mv_length_vertical",
+  "unit": 0,
+  "value": 10
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 105,
+  "name": "max_num_reorder_frames",
+  "unit": 0,
+  "value": 1
+ },
+ {
+  "bit_length": 7,
+  "bit_offset": 108,
+  "name": "max_dec_frame_buffering",
+  "unit": 0,
+  "value": 7
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 1,
+  "value": 3
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 1,
+  "value": 8
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "pic_parameter_set_id",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 9,
+  "name": "seq_parameter_set_id",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 10,
+  "name": "entropy_coding_mode_flag",
+  "unit": 1,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 11,
+  "name": "bottom_field_pic_order_in_frame_present_flag",
+  "unit": 1,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 12,
+  "name": "num_slice_groups_minus1",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 13,
+  "name": "num_ref_idx_l0_default_active_minus1",
+  "unit": 1,
+  "value": 4
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "num_ref_idx_l1_default_active_minus1",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 19,
+  "name": "weighted_pred_flag",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 20,
+  "name": "weighted_bipred_idc",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 22,
+  "name": "pic_init_qp_minus26",
+  "unit": 1,
+  "value": 2
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 27,
+  "name": "pic_init_qs_minus26",
+  "unit": 1,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 30,
+  "name": "chroma_qp_index_offset",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 31,
+  "name": "deblocking_filter_control_present_flag",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 32,
+  "name": "constrained_intra_pred_flag",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 33,
+  "name": "redundant_pic_cnt_present_flag",
+  "unit": 1,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 2,
+  "value": 3
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 2,
+  "value": 5
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 2,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 12,
+  "name": "pic_parameter_set_id",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 13,
+  "name": "frame_num",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "field_pic_flag",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "idr_pic_id",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 19,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 20,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 21,
+  "name": "no_output_of_prior_pics_flag",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 22,
+  "name": "long_term_reference_flag",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 23,
+  "name": "slice_qp_delta",
+  "unit": 2,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 3,
+  "value": 2
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 3,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 10,
+  "name": "pic_parameter_set_id",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 11,
+  "name": "frame_num",
+  "unit": 3,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 15,
+  "name": "field_pic_flag",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 16,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "num_ref_idx_active_override_flag",
+  "unit": 3,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 19,
+  "name": "num_ref_idx_l0_active_minus1",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 20,
+  "name": "ref_pic_list_modification_flag_l0",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 21,
+  "name": "adaptive_ref_pic_marking_mode_flag",
+  "unit": 3,
+  "value": 1
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 22,
+  "name": "memory_management_control_operation",
+  "unit": 3,
+  "value": 4
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 27,
+  "name": "max_long_term_frame_idx_plus1",
+  "unit": 3,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 30,
+  "name": "memory_management_control_operation",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 31,
+  "name": "cabac_init_idc",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 32,
+  "name": "slice_qp_delta",
+  "unit": 3,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 4,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 4,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 12,
+  "name": "pic_parameter_set_id",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 13,
+  "name": "frame_num",
+  "unit": 4,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "field_pic_flag",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 18,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 4,
+  "value": -2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 23,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 24,
+  "name": "direct_spatial_mv_pred_flag",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 25,
+  "name": "num_ref_idx_active_override_flag",
+  "unit": 4,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 26,
+  "name": "num_ref_idx_l0_active_minus1",
+  "unit": 4,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 29,
+  "name": "num_ref_idx_l1_active_minus1",
+  "unit": 4,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 32,
+  "name": "ref_pic_list_modification_flag_l0",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 33,
+  "name": "ref_pic_list_modification_flag_l1",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 34,
+  "name": "cabac_init_idc",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 35,
+  "name": "slice_qp_delta",
+  "unit": 4,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 5,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 5,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 12,
+  "name": "pic_parameter_set_id",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 13,
+  "name": "frame_num",
+  "unit": 5,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "field_pic_flag",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 19,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 20,
+  "name": "direct_spatial_mv_pred_flag",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 21,
+  "name": "num_ref_idx_active_override_flag",
+  "unit": 5,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 22,
+  "name": "num_ref_idx_l0_active_minus1",
+  "unit": 5,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 25,
+  "name": "num_ref_idx_l1_active_minus1",
+  "unit": 5,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 28,
+  "name": "ref_pic_list_modification_flag_l0",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 29,
+  "name": "ref_pic_list_modification_flag_l1",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 30,
+  "name": "cabac_init_idc",
+  "unit": 5,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 31,
+  "name": "slice_qp_delta",
+  "unit": 5,
+  "value": 3
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 6,
+  "value": 2
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 6,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 10,
+  "name": "pic_parameter_set_id",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 11,
+  "name": "frame_num",
+  "unit": 6,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 15,
+  "name": "field_pic_flag",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 16,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 18,
+  "name": "num_ref_idx_active_override_flag",
+  "unit": 6,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 19,
+  "name": "num_ref_idx_l0_active_minus1",
+  "unit": 6,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 22,
+  "name": "ref_pic_list_modification_flag_l0",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 23,
+  "name": "adaptive_ref_pic_marking_mode_flag",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 24,
+  "name": "cabac_init_idc",
+  "unit": 6,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 25,
+  "name": "slice_qp_delta",
+  "unit": 6,
+  "value": 3
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 0,
+  "name": "forbidden_zero_bit",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 2,
+  "bit_offset": 1,
+  "name": "nal_ref_idc",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 3,
+  "name": "nal_unit_type",
+  "unit": 7,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 8,
+  "name": "first_mb_in_slice",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 9,
+  "name": "slice_type",
+  "unit": 7,
+  "value": 1
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 12,
+  "name": "pic_parameter_set_id",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 4,
+  "bit_offset": 13,
+  "name": "frame_num",
+  "unit": 7,
+  "value": 3
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 17,
+  "name": "field_pic_flag",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 5,
+  "bit_offset": 18,
+  "name": "delta_pic_order_cnt[0]",
+  "unit": 7,
+  "value": -2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 23,
+  "name": "delta_pic_order_cnt[1]",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 24,
+  "name": "direct_spatial_mv_pred_flag",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 25,
+  "name": "num_ref_idx_active_override_flag",
+  "unit": 7,
+  "value": 1
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 26,
+  "name": "num_ref_idx_l0_active_minus1",
+  "unit": 7,
+  "value": 2
+ },
+ {
+  "bit_length": 3,
+  "bit_offset": 29,
+  "name": "num_ref_idx_l1_active_minus1",
+  "unit": 7,
+  "value": 2
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 32,
+  "name": "ref_pic_list_modification_flag_l0",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 33,
+  "name": "ref_pic_list_modification_flag_l1",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 34,
+  "name": "cabac_init_idc",
+  "unit": 7,
+  "value": 0
+ },
+ {
+  "bit_length": 1,
+  "bit_offset": 35,
+  "name": "slice_qp_delta",
+  "unit": 7,
+  "value": 0
+ }
+]
