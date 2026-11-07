@@ -19,5 +19,11 @@ if(TARGET tp::placebo)
   add_executable(ovt_tests_placebo_probe test_placebo_probe.cpp)
   target_link_libraries(ovt_tests_placebo_probe PRIVATE tp::placebo ovt::flags ${Catch2_TARGET})
   ovt_set_license(ovt_tests_placebo_probe "LGPL-2.1-or-later")
-  ovt_catch_discover_tests(ovt_tests_placebo_probe)
+  # Under ASan, the slow unwinder records the full allocation stack through the stripped Vulkan ICD, so the narrow
+  # tests/asan.supp entry for lavapipe's enumeration leak can match its loader frame (#207). Only this binary pays for it.
+  set(placebo_env "")
+  if(OVT_ENABLE_SANITIZERS AND OVT_SANITIZER STREQUAL "asan-ubsan")
+    set(placebo_env ENVIRONMENT_MODIFICATION "LSAN_OPTIONS=string_append::fast_unwind_on_malloc=0")
+  endif()
+  ovt_catch_discover_tests(ovt_tests_placebo_probe ${placebo_env})
 endif()
