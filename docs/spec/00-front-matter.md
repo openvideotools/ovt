@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc14 (2026-11-07) |
+| **Version** | 1.0-rc15 (2026-11-07) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -69,3 +69,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc12 (2026-11-06) | Chapter 14 §14.3.3 recipe 21 encodes its own HEVC with an IDR every 20 frames and 600 ms segments, so the CMAF file has its three segments (see `CHANGELOG.md`). |
 | 1.0-rc13 (2026-11-07) | WI-0.012 FFmpeg core flavour also disables the MS-MPEG4 v1–v3 and WMV7/WMV8 decoders, the Microsoft variants of MPEG-4 Part 2 (owner decision; see `CHANGELOG.md`). |
 | 1.0-rc14 (2026-11-07) | Chapter 14 §14.3.3 rule 2 and recipes 68, 69: Bento4 outputs get their `mvhd`/`tkhd`/`mdhd` times pinned to 0 by `tools/mp4_pin_times.py` (see `CHANGELOG.md`). |
+| 1.0-rc15 (2026-11-07) | WI-0.033 / chapter 13 §13.7.1, §13.7.3: the required check `fuzz-smoke` is a gate job over the matrix job `fuzz-smoke-shard`; the nightly fuzz lane is `fuzz-nightly` plus `fuzz-corpus-pr` (see `CHANGELOG.md`). |

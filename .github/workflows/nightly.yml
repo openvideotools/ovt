@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Nightly jobs (chapter 13 §13.7.1): tsan, macos-asan, the coverage run (WI-0.031) and the corpora jobs (WI-0.552c). Later work items add the long fuzz lane
-# (WI-0.033), distro packaging (WI-0.073) and others to this file.
+# Nightly jobs (chapter 13 §13.7.1): tsan, macos-asan, the coverage run (WI-0.031), the corpora jobs (WI-0.552c) and the long fuzz lane (WI-0.033). Later work items add
+# distro packaging (WI-0.073) and others to this file.
 # Third-party actions are pinned by commit SHA, never by tag.
 #
 # Runners: macos-asan runs on the owner's Mac Mini (self-hosted, label macos-arm64). Scheduled and manual runs
@@ -167,3 +167,172 @@ jobs:
           name: junit-corpora-linux
           path: build/linux-x64-release/junit-corpora.xml
           if-no-files-found: warn
+
+  # Long fuzz lane (chapter 13 §13.7.1, chapter 14 §14.7): 20 minutes per target in four shards (target i runs in
+  # shard i mod 4, the split fuzz-smoke.yml uses, so both share one corpus cache per shard). New coverage is merged
+  # into the cached corpus (`-merge=1`), the entries the committed seeds lack are staged as an artefact, and the
+  # job below turns them into a pull request. A crash is minimised, uploaded as `crash-*` and fails the shard, but
+  # the remaining targets of the shard still run. The canary target is not run here. Raise the shard count (and
+  # fuzz-smoke.yml's) when the targets outgrow a 6 h shard.
+  fuzz-nightly:
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      PRESET: linux-x64-fuzz
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-fuzz
+          triplet: x64-linux-ovt
+
+      # Same toolchain as fuzz-smoke.yml: the preset names clang-16 and jammy has up to clang-15.
+      - name: Clang 16
+        run: |
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-16.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
+
+      - name: Configure and build
+        run: |
+          cmake --preset "$PRESET"
+          cmake --build --preset "$PRESET"
+
+      - name: Restore corpus cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: corpus_cache
+          key: fuzz-corpus-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.shard }}-
+
+      - name: Fuzz 20 min per target
+        id: fuzz
+        env:
+          SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p fuzz-artifacts
+          shopt -s nullglob
+          bins=("build/$PRESET"/fuzz/ovt_fuzz_*)
+          if [ ${#bins[@]} -eq 0 ]; then
+            echo "::error::no ovt_fuzz_* targets in build/$PRESET/fuzz (OVT_ENABLE_FUZZ off or not Clang?)"
+            exit 1
+          fi
+          status=0
+          i=0
+          for bin in "${bins[@]}"; do
+            t="${bin##*/ovt_fuzz_}"
+            [ "$t" != canary ] || continue
+            [ $((i % 4)) -eq "$SHARD" ] || { i=$((i + 1)); continue; }
+            i=$((i + 1))
+            mkdir -p "corpus_cache/$t"
+            echo "::group::$t"
+            rc=0
+            "$bin" -max_total_time=1200 -max_len=1048576 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1 \
+              -artifact_prefix=fuzz-artifacts/ "corpus_cache/$t" "core/tests/fuzz/corpus/$t" 2>&1 | tee "fuzz-artifacts/$t.log" || rc=$?
+            echo "::endgroup::"
+            if [ "$rc" -ne 0 ]; then
+              status=1
+              echo "::error::$t failed (exit $rc)"
+              # A reproducer is minimised before anyone commits it to regressions/ (chapter 14 §14.7.5).
+              for crash in fuzz-artifacts/crash-* fuzz-artifacts/oom-* fuzz-artifacts/timeout-*; do
+                [ -f "$crash" ] || continue
+                "$bin" -minimize_crash=1 -runs=100000 -timeout=10 -rss_limit_mb=2048 \
+                  -exact_artifact_path="fuzz-artifacts/minimized-$t-${crash##*/}" "$crash" >/dev/null 2>&1 || true
+              done
+            elif ! grep -q "inline 8-bit counters" "fuzz-artifacts/$t.log" || grep -q "Is the code instrumented for coverage" "fuzz-artifacts/$t.log"; then
+              status=1
+              echo "::error::$t runs without coverage instrumentation (OVT_SANITIZER must be fuzz)"
+            fi
+          done
+          exit $status
+
+      # Corpus minimisation: keep only the units of the union (cache + committed seeds) that add coverage, so the
+      # cache does not grow without bound. Then the units the committed seeds lack are merged into the checkout
+      # (`-merge=1 <committed> <cache>` adds only coverage-increasing inputs) and staged for the pull request.
+      - name: Minimise corpus and stage new entries
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          shopt -s nullglob
+          mkdir -p corpus_min
+          i=0
+          for bin in "build/$PRESET"/fuzz/ovt_fuzz_*; do
+            t="${bin##*/ovt_fuzz_}"
+            [ "$t" != canary ] || continue
+            [ $((i % 4)) -eq "$SHARD" ] || { i=$((i + 1)); continue; }
+            i=$((i + 1))
+            [ -d "corpus_cache/$t" ] || continue
+            mkdir -p "corpus_min/$t"
+            "$bin" -merge=1 "corpus_min/$t" "corpus_cache/$t" "core/tests/fuzz/corpus/$t" >/dev/null 2>&1
+            rm -rf "corpus_cache/$t"
+            mv "corpus_min/$t" "corpus_cache/$t"
+            "$bin" -merge=1 "core/tests/fuzz/corpus/$t" "corpus_cache/$t" >/dev/null 2>&1
+          done
+          python3 -I tools/fuzz_corpus_pr.py stage --out "fuzz-new-corpus"
+
+      - name: Upload new corpus entries
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-new-corpus-${{ matrix.shard }}
+          path: fuzz-new-corpus/
+          if-no-files-found: ignore
+
+      - name: Upload crash artefacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-crashes-nightly-shard-${{ matrix.shard }}
+          path: fuzz-artifacts/
+          if-no-files-found: warn
+
+  # Opens the corpus pull request. A separate job so that only this one holds write permission and none of the
+  # fuzzing code runs with it: it downloads the staged files, copies them into corpus directories that already
+  # exist (tools/fuzz_corpus_pr.py applies the size limits) and commits. A pull request opened with GITHUB_TOKEN
+  # does not start the other workflows; the repository setting "Allow GitHub Actions to create pull requests"
+  # must be on, and a maintainer closes and reopens the PR to run CI on it.
+  fuzz-corpus-pr:
+    needs: fuzz-nightly
+    if: ${{ !cancelled() && vars.OVT_HOSTED_RUNNERS != 'off' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: true
+
+      - name: Download staged entries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: fuzz-new-corpus-*
+          path: staged
+          merge-multiple: true
+
+      - name: Apply and open the pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -d staged ] || { echo "nothing staged"; exit 0; }
+          rc=0
+          python3 -I tools/fuzz_corpus_pr.py apply --from staged --summary corpus-summary.md || rc=$?
+          [ "$rc" -ne 3 ] || { echo "no new corpus entries"; exit 0; }
+          [ "$rc" -eq 0 ] || exit "$rc"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python3 -I tools/fuzz_corpus_pr.py pr --summary corpus-summary.md

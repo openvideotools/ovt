@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc15 — 2026-11-07
+
+PATCH-level: how the WI-0.033 fuzz lanes are wired. No requirement sentence, acceptance line or WI scope changes.
+
+- 13 §13.7.1 `fuzz-smoke` / `fuzz-nightly` rows and §13.7.3 — the matrix job of `fuzz-smoke.yml` is `fuzz-smoke-shard`; the job `fuzz-smoke` is a gate over its four shards, so the required-check name does not depend on the matrix. `fuzz-nightly` (`nightly.yml`) runs in the same four shards and minimises the corpus with `-merge=1`; a separate job `fuzz-corpus-pr` (the only one with write permission) opens the corpus pull request through `tools/fuzz_corpus_pr.py`. The canary target `ovt_fuzz_canary` (inert unless `OVT_FUZZ_CANARY` is set) backs WI-0.033 acceptance test 1.
+
 ## 1.0.0-rc14 — 2026-11-07
 
 PATCH-level: two recipe commands made reproducible after the WI-0.553 c2 `--check` on the oracle image. No requirement sentence, acceptance line or WI scope changes.
