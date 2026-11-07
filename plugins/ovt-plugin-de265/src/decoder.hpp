@@ -72,6 +72,7 @@ class Decoder {
   /// an hvcC record when @p codec_private is not NULL. OVT_E_CORRUPT for a malformed hvcC.
   static ovt_status create(const uint8_t* codec_private, size_t len, int threads, std::unique_ptr<Decoder>* out);
 
+  Decoder() = default;  // unusable until create() has set it up; public only for std::make_unique
   ~Decoder();
   Decoder(const Decoder&) = delete;
   Decoder& operator=(const Decoder&) = delete;
@@ -87,7 +88,6 @@ class Decoder {
   bool pop(Frame* out);
 
  private:
-  Decoder() = default;
   ovt_status decode_loop();
   void collect_warnings();
   void drain_pictures();
