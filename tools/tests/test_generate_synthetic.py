@@ -140,6 +140,19 @@ def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
     assert err.value.code == 4
 
 
+def test_bento4_clock_without_pin_step_is_rejected(tmp_path):
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text(encoding="utf-8"))
+    rec = next(r for r in doc["recipes"] if r["id"] == "syn_mp4_piff")
+    assert generate.bento4_time_problem(rec["steps"]) is None
+    rec["steps"] = rec["steps"][:-1]  # drop the mp4_pin_times.py step
+    assert "mp4_pin_times.py" in generate.bento4_time_problem(rec["steps"])
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    with pytest.raises(generate.GenError) as err:
+        generate.load_recipes(path)
+    assert err.value.code == 4 and "syn_mp4_piff: not reproducible" in str(err.value)
+
+
 def test_every_encoder_and_muxer_step_is_pinned():
     doc = generate.load_recipes(generate.DEFAULT_RECIPES)  # raises on any unpinned step
     steps = [s for item in [*doc["sources"], *doc["recipes"]] for s in item["steps"]]

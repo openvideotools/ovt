@@ -112,6 +112,24 @@ def aom_option(args: list[str], name: str, default: int) -> int:
     return default
 
 
+BENTO4_CLOCK_TOOLS = {"mp4fragment", "mp4encrypt"}  # write the wall-clock time into mvhd
+PIN_TIMES = "{repo}/tools/mp4_pin_times.py"
+
+
+def bento4_time_problem(steps: list[dict[str, Any]]) -> str | None:
+    """A Bento4 step whose output carries the clock must be followed by tools/mp4_pin_times.py."""
+    last_bento4 = last_pin = -1
+    for i, step in enumerate(steps):
+        for argv in step_argvs(step):
+            if argv[0] in BENTO4_CLOCK_TOOLS:
+                last_bento4 = i
+            elif PIN_TIMES in argv:
+                last_pin = i
+    if last_bento4 >= 0 and last_pin < last_bento4:
+        return "Bento4 mp4fragment/mp4encrypt write the current time into mvhd; pin it with tools/mp4_pin_times.py"
+    return None
+
+
 def av1_scale_problem(argv: list[str]) -> str | None:
     """Why an aomenc command would fail with "Can't find at least one reference frame with valid size", or None.
 
@@ -205,6 +223,9 @@ def load_recipes(path: Path) -> dict[str, Any]:
                 if problem := av1_scale_problem(argv):
                     name = item.get("id", item.get("file"))
                     raise GenError(EXIT_INVALID, f"recipes.json: {name}: {problem}")
+        if problem := bento4_time_problem(item["steps"]):
+            name = item.get("id", item.get("file"))
+            raise GenError(EXIT_INVALID, f"recipes.json: {name}: not reproducible: {problem}")
     doc["_sources"], doc["_ids"] = sources, ids
     return doc
 
