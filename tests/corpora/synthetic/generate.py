@@ -13,7 +13,7 @@ defaults to the fetcher's cache dir (``$OVT_CORPORA_DIR`` or the platform cache 
 
 Every command is an argv list (no shell). Placeholders: ``{python}`` (this interpreter), ``{repo}``,
 ``{hm_cfg}`` / ``{jm_cfg}`` (HM and JM encoder config dirs of the oracle image, overridable with
-``$OVT_HM_CFG_DIR`` / ``$OVT_JM_CFG_DIR``), ``{corpus:ID}`` (a fetched or generated corpus file),
+``$OVT_HM_CFG_DIR`` / ``$OVT_JM_CFG_DIR``), ``{corpus:ID}`` (a fetched or generated corpus's primary file; ``{corpus:ID:NAME}`` picks the file NAME of that corpus),
 ``{glob:PATTERN}`` (the matching work-dir files in natural order, one argument each) and ``{out}`` (fixture
 path). Intermediates live in ``<out>/.work``. Every step runs with ``SOURCE_DATE_EPOCH=0``, ``TZ=UTC`` and
 stdin closed.
@@ -330,9 +330,9 @@ class Runner:
             return names
 
         def corpus(m: re.Match[str]) -> str:
-            return str(corpus_file(self.out, m.group(1)))
+            return str(corpus_file(self.out, m.group(1), m.group(2)))
 
-        arg = re.sub(r"\{corpus:([A-Za-z0-9_]+)\}", corpus, arg)
+        arg = CORPUS_REF.sub(corpus, arg)
         subst = {
             "{python}": sys.executable,
             "{repo}": str(REPO),
@@ -418,14 +418,20 @@ class Runner:
         return record
 
 
-def corpus_file(out: Path, cid: str) -> Path:
-    """The primary file of a generated or fetched corpus id (its .ok record)."""
+CORPUS_REF = re.compile(r"\{corpus:([A-Za-z0-9_]+)(?::([A-Za-z0-9_][A-Za-z0-9_.-]*))?\}")
+
+
+def corpus_file(out: Path, cid: str, name: str | None = None) -> Path:
+    """The primary file of a generated or fetched corpus id (its .ok record), or its file ``name`` when given."""
     for root in (out, Path(os.environ.get("OVT_CORPORA_DIR", out))):
         try:
             record = json.loads((root / cid / ".ok").read_text(encoding="utf-8"))
-            return root / cid / record["primary"]
+            picked = root / cid / (name or record["primary"])
         except (OSError, ValueError, KeyError):
             continue
+        if name is None or picked.is_file():
+            return picked
+        raise GenError(EXIT_STEP, f"corpus {cid} has no file {name} (its files: {sorted(record.get('files', []))})")
     raise GenError(EXIT_STEP, f"corpus {cid} is not available (fetch it with tools/fetch_corpora.py --ids {cid})")
 
 
@@ -443,7 +449,7 @@ def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path,
         for step in rec["steps"]:
             for argv in step_argvs(step):
                 for arg in argv:
-                    for cid in re.findall(r"\{corpus:([A-Za-z0-9_]+)\}", arg):
+                    for cid, _name in CORPUS_REF.findall(arg):
                         if cid not in manual or rid in gaps:
                             continue
                         try:
