@@ -44,8 +44,10 @@ ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 
-# The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on the seed. Its replay entry with
-# the variable set must fail, which is what `ctest -L canary` checks; it is excluded from every lane preset.
+# The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
+# only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
 ovt_add_fuzz_target(canary fuzz_canary.cpp)
-add_test(NAME fuzz_canary_trips COMMAND ovt_fuzz_canary_regress "${CMAKE_CURRENT_SOURCE_DIR}/corpus/canary")
-set_tests_properties(fuzz_canary_trips PROPERTIES LABELS "canary" ENVIRONMENT "OVT_FUZZ_CANARY=1" WILL_FAIL TRUE)
+add_test(NAME fuzz_canary_trips
+         COMMAND "${CMAKE_COMMAND}" "-DEXE=$<TARGET_FILE:ovt_fuzz_canary_regress>"
+                 "-DDIR=${CMAKE_CURRENT_SOURCE_DIR}/corpus/canary" -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_crash.cmake")
+set_tests_properties(fuzz_canary_trips PROPERTIES LABELS "canary")
