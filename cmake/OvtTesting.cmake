@@ -33,8 +33,8 @@ set(OVT_SANITIZER_COMPILE_FLAGS "")
 set(OVT_SANITIZER_LINK_FLAGS "")
 if(OVT_ENABLE_SANITIZERS)
   if(OVT_SANITIZER STREQUAL "asan-ubsan")
-    set(OVT_SANITIZER_COMPILE_FLAGS
-        -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1 -g)
+    set(OVT_SANITIZER_COMPILE_FLAGS -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -O1
+                                    -g)
     set(OVT_SANITIZER_LINK_FLAGS -fsanitize=address,undefined)
   elseif(OVT_SANITIZER STREQUAL "tsan")
     set(OVT_SANITIZER_COMPILE_FLAGS -fsanitize=thread -O1 -g)
@@ -71,8 +71,11 @@ function(ovt_catch_discover_tests target)
   string(JOIN ";" env_mods ${arg_ENVIRONMENT_MODIFICATION})
   # Runs inside ctest: lists the test cases and writes add_test()/set_tests_properties() lines, then
   # includes them. Re-running on every ctest invocation keeps the list in step with the binary.
-  file(GENERATE OUTPUT "${include_file}" CONTENT
-"if(EXISTS \"$<TARGET_FILE:${target}>\")
+  file(
+    GENERATE
+    OUTPUT "${include_file}"
+    CONTENT
+      "if(EXISTS \"$<TARGET_FILE:${target}>\")
   execute_process(COMMAND \"${CMAKE_COMMAND}\"
     -D \"TEST_EXECUTABLE=$<TARGET_FILE:${target}>\"
     -D \"TEST_WORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}\"
