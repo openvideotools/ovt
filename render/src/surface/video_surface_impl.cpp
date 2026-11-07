@@ -303,7 +303,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     params.antiringing_strength = 0.0F;
     // The target was cleared to background_rgba above; keep libplacebo from clearing the border again.
 #if PL_API_VER >= 346
-    params.border = PL_CLEAR_NONE;
+    params.border = PL_CLEAR_SKIP;
 #else
     params.skip_target_clearing = true;
 #endif
