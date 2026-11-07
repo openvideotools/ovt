@@ -9,8 +9,7 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
 endif()
 
 # ---- HEVC analysis plugin (libde265) --------------------------------------------------------------------
-# WI-0.014 builds the patched libde265 (tp::de265) and its probe tests; the plugin itself (WI-2.163) adds
-# ovt-plugin-de265/ here and moves the tests under it.
-if(OVT_BUILD_PLUGIN_DE265 AND OVT_BUILD_TESTS AND TARGET tp::de265)
-  add_subdirectory(ovt-plugin-de265/tests)
+# WI-0.014 builds the patched libde265 (tp::de265); ovt-plugin-de265/ holds the plugin (WI-2.163) and its tests.
+if(OVT_BUILD_PLUGIN_DE265 AND TARGET tp::de265)
+  add_subdirectory(ovt-plugin-de265)
 endif()
