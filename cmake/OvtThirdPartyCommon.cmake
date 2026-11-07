@@ -183,7 +183,12 @@ function(ovt_tp_declare dep)
     set(max_attempts 5)
     set(delay 5)
     foreach(attempt RANGE 1 ${max_attempts})
-      file(DOWNLOAD "${url}" "${archive}.part" STATUS status TLS_VERIFY ON TIMEOUT 900 INACTIVITY_TIMEOUT 60)
+      file(
+        DOWNLOAD "${url}" "${archive}.part"
+        STATUS status
+        TLS_VERIFY ON
+        TIMEOUT 900
+        INACTIVITY_TIMEOUT 60)
       list(GET status 0 code)
       if(code EQUAL 0)
         break()
@@ -191,14 +196,16 @@ function(ovt_tp_declare dep)
       list(GET status 1 msg)
       file(REMOVE "${archive}.part")
       if(attempt LESS max_attempts)
-        message(STATUS "Download of ${url} failed (${msg}); attempt ${attempt} of ${max_attempts}, retrying in ${delay} s")
+        message(
+          STATUS "Download of ${url} failed (${msg}); attempt ${attempt} of ${max_attempts}, retrying in ${delay} s")
         execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep ${delay})
         math(EXPR delay "${delay} * 2")
       endif()
     endforeach()
     if(NOT code EQUAL 0)
-      message(FATAL_ERROR "ovt_tp_declare(${dep}): download of ${url} (${row}) failed after ${max_attempts} attempts: "
-                          "${msg}. Offline builds pre-fetch with tools/third_party_offline.py --out ${OVT_TP_DOWNLOADS}.")
+      message(
+        FATAL_ERROR "ovt_tp_declare(${dep}): download of ${url} (${row}) failed after ${max_attempts} attempts: "
+                    "${msg}. Offline builds pre-fetch with tools/third_party_offline.py --out ${OVT_TP_DOWNLOADS}.")
     endif()
     file(SHA256 "${archive}.part" have)
     if(NOT have STREQUAL sha)
