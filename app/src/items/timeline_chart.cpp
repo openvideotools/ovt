@@ -225,8 +225,8 @@ QSGNode* TimelineChart::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData* 
       mean = build_mean_line(columns, max_value_, w, h, kMeanColor);
     }
     const auto x_span = [&](std::size_t a, std::size_t b) {
-      return std::pair{static_cast<float>(view_.x_of(static_cast<double>(a), w)),
-                       static_cast<float>(view_.x_of(static_cast<double>(b), w))};
+      return std::pair{static_cast<float>(view_.x_of(static_cast<double>(a), static_cast<double>(w))),
+                       static_cast<float>(view_.x_of(static_cast<double>(b), static_cast<double>(w)))};
     };
     if (model_->has_range()) {
       const auto [x0, x1] =
