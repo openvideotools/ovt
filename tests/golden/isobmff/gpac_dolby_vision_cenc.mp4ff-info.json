@@ -1,0 +1,275 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["isom"],
+   "major_brand": "isom",
+   "minor_version": 1
+  },
+  "path": "ftyp",
+  "size": 20
+ },
+ {
+  "path": "moov",
+  "size": 1006
+ },
+ {
+  "fields": {
+   "creation_time": "2020-05-26T16:09:38Z",
+   "duration": 25,
+   "flags": 0,
+   "modification_time": "2020-05-26T16:09:38Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/trak",
+  "size": 890
+ },
+ {
+  "fields": {
+   "creation_time": "2017-11-29T10:03:28Z",
+   "duration": 25,
+   "flags": 7,
+   "height": 15728640,
+   "modification_time": "2020-05-26T16:09:38Z",
+   "track_ID": 1,
+   "version": 0,
+   "width": 20971520
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 790
+ },
+ {
+  "fields": {
+   "creation_time": "2017-11-29T10:03:28Z",
+   "flags": 0,
+   "language": "und",
+   "modification_time": "2020-05-26T16:09:38Z",
+   "timescale": 24000,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "Video Media Handler",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 52
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 698
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 634
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 410
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv",
+  "size": 394
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/hvcC",
+  "size": 31
+ },
+ {
+  "fields": {
+   "hSpacing": 4,
+   "vSpacing": 3
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/pasp",
+  "size": 16
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/colr",
+  "size": 19
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[1]",
+  "size": 96
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[1]/frma",
+  "size": 12
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[1]/schm",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[1]/schi",
+  "size": 56
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[1]/schi/uuid",
+  "size": 48
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[2]",
+  "size": 80
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[2]/frma",
+  "size": 12
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[2]/schm",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[2]/schi",
+  "size": 40
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf[2]/schi/tenc",
+  "size": 32
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/uuid",
+  "size": 34
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/dvcC",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/ctts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/sdtp",
+  "size": 13
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moov/trak/mdia/minf/stbl/sgpd",
+  "size": 27
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/sbgp",
+  "size": 36
+ },
+ {
+  "path": "mdat",
+  "size": 17533
+ },
+ {
+  "path": "free",
+  "size": 72
+ }
+]

@@ -1,0 +1,567 @@
+[
+ {
+  "fields": {
+   "compatible_brands": ["iso6","dsms","msix","dash"],
+   "major_brand": "iso6",
+   "minor_version": 1
+  },
+  "path": "ftyp",
+  "size": 32
+ },
+ {
+  "path": "free[1]",
+  "size": 76
+ },
+ {
+  "path": "moov",
+  "size": 1001
+ },
+ {
+  "fields": {
+   "creation_time": "2021-04-19T13:37:01Z",
+   "duration": 0,
+   "flags": 0,
+   "modification_time": "2021-04-19T13:37:01Z",
+   "timescale": 600,
+   "version": 0
+  },
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "path": "moov/mvex",
+  "size": 56
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/mvex/mehd",
+  "size": 16
+ },
+ {
+  "fields": {
+   "default_sample_description_index": 1,
+   "default_sample_duration": 1000,
+   "default_sample_flags": 65536,
+   "default_sample_size": 0,
+   "flags": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moov/mvex/trex",
+  "size": 32
+ },
+ {
+  "path": "moov/trak",
+  "size": 720
+ },
+ {
+  "fields": {
+   "creation_time": "2021-04-19T08:46:30Z",
+   "duration": 0,
+   "flags": 1,
+   "height": 47185920,
+   "modification_time": "2021-04-19T13:37:01Z",
+   "track_ID": 1,
+   "version": 0,
+   "width": 83886080
+  },
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "path": "moov/trak/mdia",
+  "size": 620
+ },
+ {
+  "fields": {
+   "creation_time": "2021-04-19T08:46:30Z",
+   "flags": 0,
+   "language": "und",
+   "modification_time": "2021-04-19T13:37:01Z",
+   "timescale": 25000,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "vide",
+   "name": "hevc:dur=2@GPAC1.1.0-DEV-rev736-gd1e971268-master",
+   "version": 0
+  },
+  "path": "moov/trak/mdia/hdlr",
+  "size": 82
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "size": 498
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/vmhd",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 434
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 314
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv",
+  "size": 298
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/hvcC",
+  "size": 112
+ },
+ {
+  "fields": {
+   "avgBitrate": 515320,
+   "bufferSizeDB": 15991,
+   "maxBitrate": 615752
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/btrt",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf",
+  "size": 80
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf/frma",
+  "size": 12
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf/schm",
+  "size": 20
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf/schi",
+  "size": 40
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsd/encv/sinf/schi/tenc",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 20
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moov/trak/mdia/minf/stbl/sgpd",
+  "size": 44
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moov/pssh",
+  "size": 109
+ },
+ {
+  "path": "free[2]",
+  "size": 40
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "sidx",
+  "size": 56
+ },
+ {
+  "path": "moof[1]",
+  "size": 2247
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 1,
+   "version": 0
+  },
+  "path": "moof[1]/mfhd",
+  "size": 16
+ },
+ {
+  "path": "moof[1]/traf",
+  "size": 2223
+ },
+ {
+  "fields": {
+   "flags": 131072,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moof[1]/traf/tfhd",
+  "size": 16
+ },
+ {
+  "fields": {
+   "baseMediaDecodeTime": 0,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[1]/traf/tfdt",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[1]/traf/sbgp",
+  "size": 52
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[1]/traf/saiz",
+  "size": 17
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moof[1]/traf/saio",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 2,
+   "version": 0
+  },
+  "path": "moof[1]/traf/senc",
+  "size": 1966
+ },
+ {
+  "fields": {
+   "data_offset": 2255,
+   "entries": [
+    {
+     "sample_size": 5252
+    },
+    {
+     "sample_size": 1165
+    },
+    {
+     "sample_size": 1038
+    },
+    {
+     "sample_size": 2023
+    },
+    {
+     "sample_size": 1305
+    },
+    {
+     "sample_size": 4254
+    },
+    {
+     "sample_size": 1584
+    },
+    {
+     "sample_size": 1632
+    },
+    {
+     "sample_size": 2925
+    },
+    {
+     "sample_size": 1743
+    },
+    {
+     "sample_size": 3189
+    },
+    {
+     "sample_size": 1731
+    },
+    {
+     "sample_size": 1868
+    },
+    {
+     "sample_size": 2696
+    },
+    {
+     "sample_size": 1928
+    },
+    {
+     "sample_size": 2200
+    },
+    {
+     "sample_size": 2711
+    },
+    {
+     "sample_size": 1989
+    },
+    {
+     "sample_size": 2333
+    },
+    {
+     "sample_size": 2492
+    },
+    {
+     "sample_size": 2640
+    },
+    {
+     "sample_size": 2177
+    },
+    {
+     "sample_size": 2169
+    },
+    {
+     "sample_size": 2814
+    },
+    {
+     "sample_size": 2287
+    }
+   ],
+   "first_sample_flags": 0,
+   "flags": 517,
+   "sample_count": 25,
+   "version": 0
+  },
+  "path": "moof[1]/traf/trun",
+  "size": 124
+ },
+ {
+  "path": "mdat[1]",
+  "size": 58153
+ },
+ {
+  "path": "moof[2]",
+  "size": 2255
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 2,
+   "version": 0
+  },
+  "path": "moof[2]/mfhd",
+  "size": 16
+ },
+ {
+  "path": "moof[2]/traf",
+  "size": 2231
+ },
+ {
+  "fields": {
+   "flags": 131072,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moof[2]/traf/tfhd",
+  "size": 16
+ },
+ {
+  "fields": {
+   "baseMediaDecodeTime": 25000,
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[2]/traf/tfdt",
+  "size": 16
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[2]/traf/sbgp",
+  "size": 60
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "path": "moof[2]/traf/saiz",
+  "size": 17
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moof[2]/traf/saio",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 2,
+   "version": 0
+  },
+  "path": "moof[2]/traf/senc",
+  "size": 1966
+ },
+ {
+  "fields": {
+   "data_offset": 2263,
+   "entries": [
+    {
+     "sample_size": 15991
+    },
+    {
+     "sample_size": 2833
+    },
+    {
+     "sample_size": 1876
+    },
+    {
+     "sample_size": 2498
+    },
+    {
+     "sample_size": 1802
+    },
+    {
+     "sample_size": 2492
+    },
+    {
+     "sample_size": 1756
+    },
+    {
+     "sample_size": 1970
+    },
+    {
+     "sample_size": 2090
+    },
+    {
+     "sample_size": 1980
+    },
+    {
+     "sample_size": 2096
+    },
+    {
+     "sample_size": 2150
+    },
+    {
+     "sample_size": 1877
+    },
+    {
+     "sample_size": 2552
+    },
+    {
+     "sample_size": 2014
+    },
+    {
+     "sample_size": 2715
+    },
+    {
+     "sample_size": 2184
+    },
+    {
+     "sample_size": 2127
+    },
+    {
+     "sample_size": 2589
+    },
+    {
+     "sample_size": 2101
+    },
+    {
+     "sample_size": 2546
+    },
+    {
+     "sample_size": 2646
+    },
+    {
+     "sample_size": 2272
+    },
+    {
+     "sample_size": 3067
+    },
+    {
+     "sample_size": 2462
+    }
+   ],
+   "first_sample_flags": 0,
+   "flags": 517,
+   "sample_count": 25,
+   "version": 0
+  },
+  "path": "moof[2]/traf/trun",
+  "size": 124
+ },
+ {
+  "path": "mdat[2]",
+  "size": 70694
+ }
+]
