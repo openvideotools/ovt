@@ -137,8 +137,11 @@ jobs:
       - name: Tool tests
         run: python -m pytest -q tools/tests
 
-  # Licence gate (chapter 15 §15.4.2, chapter 14 §14.3.4). Pure Python, so it runs on the Mini like lint. WI-0.561 adds
-  # the corpora step; the dependency steps (--versions, --sources, --manifest) join this job with their work items.
+  # Licence gate (chapter 15 §15.4.2, chapter 14 §14.3.4; WI-0.032). The inputs that need no build (corpora,
+  # third_party/VERSIONS.md, sources headers, the pip and Gradle reports when their producers exist) run here, on the
+  # Mini like lint. The built-tree input (license_manifest.json plus the vcpkg SPDX files) runs as the last step of
+  # build-linux-x64, which owns the build tree. `--strict-or` deny-checks every OR alternative; a missing input flag
+  # is an error (`--require-all`). Never downgrade a finding to a warning.
   license-gate:
     # SELF_HOSTED_OK: never run a fork's code on the Mini.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -147,17 +150,43 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Corpora licences and tests/corpora/LICENSES.md
+      - name: Licence gate inputs
         run: |
           # The gate needs Python >= 3.11 (tomllib); the same search as the lint job.
-          for py in python3.13 python3.12 python3.11 python3; do
-            if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
-              "$py" -I tools/license_gate.py --policy tools/license_policy.toml --corpora
-              exit $?
+          py=""
+          for cand in python3.13 python3.12 python3.11 python3; do
+            if command -v "$cand" >/dev/null && "$cand" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
+              py="$cand"
+              break
             fi
           done
-          echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
-          exit 1
+          if [ -z "$py" ]; then
+            echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
+            exit 1
+          fi
+          gate="$py -I tools/license_gate.py --policy tools/license_policy.toml"
+
+          # 1. Corpora licences and tests/corpora/LICENSES.md
+          $gate --corpora
+
+          # 2. Dependency pins, source headers, and the optional reports whose producing work items have landed.
+          args="--versions third_party/VERSIONS.md --sources --strict-or"
+          if [ -f python/requirements.txt ]; then args="$args --pip python/requirements.txt"; fi
+          gradle=android/app/build/reports/dependency-license/index.json # written by the Android build (WI-0.034)
+          if [ -f "$gradle" ]; then args="$args --gradle $gradle"; fi
+          # shellcheck disable=SC2086
+          $gate $args --require-all
+
+          # 3. Negative test: the gate must reject a VERSIONS.md that lists an AGPL dependency, naming the row.
+          if out="$($gate --versions tools/tests/fixtures/VERSIONS_bad.md --report "${RUNNER_TEMP}/bad_report.json" 2>&1)"; then
+            echo "::error::the licence gate accepted tools/tests/fixtures/VERSIONS_bad.md"
+            exit 1
+          fi
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -q 'E-DENY .*AGPL-3.0-only' || {
+            echo "::error::the gate failed on VERSIONS_bad.md without the expected E-DENY line"
+            exit 1
+          }
 
   build-linux-x64:
     if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
@@ -178,6 +207,24 @@ jobs:
       # test preset runs a superset of the pr lane on the tree that is shipped (§13.7.1).
       - name: Configure, build, test
         run: cmake --workflow --preset ci-linux-x64
+
+      # WI-0.032: the licence gate on the built tree (chapter 13 §13.2.3). A transitive vcpkg dependency can pull in a
+      # licence that vcpkg.json does not list, so the gate reads the manifest CMake wrote and the installed SPDX files.
+      - name: Licence gate on the built tree
+        run: |
+          cmake --build --preset linux-x64-release --target ovt_license_manifest
+          python -I tools/license_gate.py --policy tools/license_policy.toml --strict-or --require-all \
+            --manifest build/linux-x64-release/license_manifest.json \
+            --vcpkg build/vcpkg_installed/x64-linux-ovt \
+            --report build/linux-x64-release/license_gate_report.json
+
+      - name: Upload licence gate report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: license-gate-report-linux-x64
+          path: build/linux-x64-release/license_gate_report.json
+          if-no-files-found: warn
 
       - name: Package
         run: |

@@ -608,3 +608,38 @@ def test_corpora_denies_compound_expression(tmp_path: Path) -> None:
     )
     code, _, err = run("--corpora", "--manifest", str(manifest))
     assert code == 1 and "E-DENY corpora:bad_nc" in err
+
+
+# --- 3. CI wiring (chapter 13 WI-0.032) ----------------------------------------------------------------------------
+
+
+def test_ci_bad_versions_fixture_names_the_row(tmp_path: Path) -> None:
+    # WI-0.032 acceptance test 1: the fixture the license-gate job feeds to the gate fails and names its row.
+    code, data, err = run("--versions", str(FIX.parent / "VERSIONS_bad.md"), report=tmp_path / "r.json")
+    assert code == 1
+    assert [f for f in data["findings"] if f["code"] == "E-DENY" and "fake-agpl-service" in f["where"]]
+    assert "E-DENY third_party/VERSIONS.md:fake-agpl-service AGPL-3.0-only" in err
+
+
+def test_ci_vcpkg_licence_missing_from_policy_is_unknown(tmp_path: Path) -> None:
+    # WI-0.032 acceptance test 2: a vcpkg port whose licence is in no policy table fails with E-UNKNOWN.
+    vc = tmp_path / "vcpkg_installed"
+    d = vc / "share" / "mysteryport"
+    d.mkdir(parents=True)
+    (d / "vcpkg.spdx.json").write_text(json.dumps({"packages": [{"licenseConcluded": "Frobnicate-1.0"}]}))
+    code, data, err = run("--vcpkg", str(vc), "--strict-or", report=tmp_path / "r.json")
+    assert code == 1
+    assert [(f["code"], f["where"]) for f in data["findings"]] == [("E-UNKNOWN", "vcpkg:mysteryport")]
+    assert "E-UNKNOWN vcpkg:mysteryport" in err
+
+
+def test_ci_workflow_wires_every_gate_input() -> None:
+    text = (REPO / ".github" / "workflows" / "ci.yml").read_text()
+    jobs = {m.group(1): m.start() for m in re.finditer(r"^  ([a-z0-9-]+):\n", text, re.M)}
+    assert "license-gate" in jobs and "build-linux-x64" in jobs
+    gate_job = text[jobs["license-gate"] : jobs["build-linux-x64"]]
+    for needle in ("--corpora", "--versions third_party/VERSIONS.md", "--sources", "--strict-or", "--require-all"):
+        assert needle in gate_job, needle
+    assert "VERSIONS_bad.md" in gate_job and "continue-on-error" not in gate_job
+    assert "ovt_license_manifest" in text
+    assert "--manifest build/linux-x64-release/license_manifest.json" in text
