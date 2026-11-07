@@ -11,8 +11,8 @@ Runs inside the oracle image (chapter 14 §14.2.6; ``ffmpeg``, ``gst_parse_oracl
 and ``ffmpeg_mvs`` on ``PATH``, each overridable with ``$OVT_ORACLE_<NAME>``). For every ``fast`` H.264/HEVC
 manifest entry (plus ``syn_h264_epb_dense``) it writes, below ``--out``:
 
-    h264/<id>.trace_headers.json  h264/<id>.gstparse.json  h264/<id>.jm-trace.json  h264/<id>.ffmpeg-mvs.json
-    h265/<id>.trace_headers.json  h265/<id>.gstparse.json  h265/<id>.hm-grid.json
+    h264/<id>.trace_headers.json.gz  h264/<id>.gstparse.json.gz  h264/<id>.jm-trace.json.gz  h264/<id>.ffmpeg-mvs.json.gz
+    h265/<id>.trace_headers.json.gz  h265/<id>.gstparse.json.gz  h265/<id>.hm-grid.json.gz
     epb/syn_h264_epb_dense.json   h26x-index.json
 
 Every oracle reads the same Annex B elementary stream: the corpus file itself, or the video track copied out of
@@ -27,6 +27,7 @@ or ``--keep-going``), 2 usage, 4 a tool or corpus is missing.
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -413,8 +414,8 @@ def process(
                 record["failed"][oracle] = str(exc)
             continue
         texts[oracle] = text
-        name = f"{cid}.{GOLDEN_SUFFIX[oracle]}.json"
-        (area / name).write_text(text, encoding="utf-8")
+        name = f"{cid}.{GOLDEN_SUFFIX[oracle]}.json.gz"
+        write_gz(area / name, text)
         record["goldens"][oracle] = {
             "file": f"{CODEC_INFO[codec]['area']}/{name}",
             "pictures": pictures,
@@ -429,14 +430,20 @@ def process(
             "pictures": HEADER_PICTURES,
         }
     if "trace_headers" in texts and "gstparse" in texts:
-        record["selfcheck"] = self_check(codec, cid, area, args.known)
+        record["selfcheck"] = self_check(codec, cid, texts, args.known)
     shutil.rmtree(work, ignore_errors=True)
     return record
 
 
-def self_check(codec: str, cid: str, area: Path, known: Path) -> dict[str, Any]:
-    trace = json.loads((area / f"{cid}.trace_headers.json").read_text(encoding="utf-8"))
-    gst = json.loads((area / f"{cid}.gstparse.json").read_text(encoding="utf-8"))
+def write_gz(path: Path, text: str) -> None:
+    """Goldens are stored gzip-compressed (the repository carries them for ever); no name or time in the header."""
+    with path.open("wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, compresslevel=9, mtime=0) as f:
+        f.write(text.encode("utf-8"))
+
+
+def self_check(codec: str, cid: str, texts: dict[str, str], known: Path) -> dict[str, Any]:
+    trace = json.loads(texts["trace_headers"])
+    gst = json.loads(texts["gstparse"])
     report = h26x_selfcheck.check(codec, trace, gst, cid, h26x_selfcheck.load_known(known))
     return {
         k: report[k]

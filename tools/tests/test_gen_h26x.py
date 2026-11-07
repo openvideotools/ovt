@@ -356,9 +356,9 @@ def test_main_writes_goldens_and_index(lab: dict, capsys: pytest.CaptureFixture)
                    "--oracles", "trace_headers,gstparse,hm", "--jobs", "1"])  # fmt: skip
     err = capsys.readouterr().err
     out: Path = lab["out"]
-    assert (out / "h264" / "jvt_A.trace_headers.json").is_file(), err
-    assert (out / "h264" / "jvt_A.gstparse.json").is_file()
-    assert (out / "h265" / "jctvc_B.hm-grid.json").is_file()
+    assert (out / "h264" / "jvt_A.trace_headers.json.gz").is_file(), err
+    assert (out / "h264" / "jvt_A.gstparse.json.gz").is_file()
+    assert (out / "h265" / "jctvc_B.hm-grid.json.gz").is_file()
     index = json.loads((out / "h26x-index.json").read_text(encoding="utf-8"))
     assert set(index["entries"]) == {"jvt_A", "jctvc_B"}
     assert index["entries"]["jvt_A"]["goldens"]["trace_headers"]["pictures"] == gen.HEADER_PICTURES
