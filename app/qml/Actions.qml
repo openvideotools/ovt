@@ -18,8 +18,8 @@ QtObject {
         exclusive: true
     }
 
-    // Ids that do something in this work item: Quit and the three themes.
-    readonly property var enabledIds: ["file.quit", "view.theme.system", "view.theme.light", "view.theme.dark"]
+    // Ids that do something so far: Quit, the three themes and Cancel all jobs (WI-1.453).
+    readonly property var enabledIds: ["file.quit", "analysis.cancelAll", "view.theme.system", "view.theme.light", "view.theme.dark"]
 
     function isEnabled(id) {
         return enabledIds.indexOf(id) >= 0
@@ -34,6 +34,8 @@ QtObject {
     function trigger(id) {
         if (id === "file.quit")
             Qt.quit()
+        else if (id === "analysis.cancelAll")
+            JobsModel.cancelAll()
         else if (id.indexOf("view.theme.") === 0)
             Settings.theme = id.substring("view.theme.".length)
     }
