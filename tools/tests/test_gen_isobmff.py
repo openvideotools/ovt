@@ -46,31 +46,21 @@ def test_every_golden_matches_its_family_schema() -> None:
     for path in sorted(GOLDEN.glob("*.json")):
         if path.name == "ORACLES.json" or path.name.endswith(".pybox.json"):
             continue
-        family = (
-            "sample-table" if path.name.endswith(".mp4box-dts.json") else "box-tree"
-        )
-        assert (
-            canon.validate(json.loads(path.read_text(encoding="utf-8")), family) == []
-        ), path.name
+        family = "sample-table" if path.name.endswith(".mp4box-dts.json") else "box-tree"
+        assert canon.validate(json.loads(path.read_text(encoding="utf-8")), family) == [], path.name
 
 
-def test_an_undocumented_disagreement_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_an_undocumented_disagreement_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     out = copy_goldens(tmp_path)
     target = out / "mpegff_a4_tone_fragmented.mp4ff-info.json"
     doc = json.loads(target.read_text(encoding="utf-8"))
     doc[0]["size"] += 1
     target.write_text(json.dumps(doc), encoding="utf-8")
     assert gen.main(["check", "--out", str(out)]) == 1
-    assert (
-        "undocumented: mpegff_a4_tone_fragmented size ftyp" in capsys.readouterr().out
-    )
+    assert "undocumented: mpegff_a4_tone_fragmented size ftyp" in capsys.readouterr().out
 
 
-def test_a_sample_outside_every_mdat_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_a_sample_outside_every_mdat_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     out = copy_goldens(tmp_path)
     target = out / "mpegff_a4_tone_fragmented.mp4box-dts.json"
     doc = json.loads(target.read_text(encoding="utf-8"))
@@ -80,9 +70,7 @@ def test_a_sample_outside_every_mdat_fails(
     assert "sample-outside-mdat" in capsys.readouterr().out
 
 
-def test_a_stale_known_diffs_row_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_a_stale_known_diffs_row_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     out = copy_goldens(tmp_path)
     with (out / "KNOWN_DIFFS.md").open("a", encoding="utf-8") as fh:
         fh.write("| `mpegff_a4_tone_fragmented` | `size` | `moov` | stale |\n")
@@ -92,9 +80,7 @@ def test_a_stale_known_diffs_row_fails(
 
 def test_known_diffs_table_parses() -> None:
     rows = gen.known_diffs(GOLDEN / "KNOWN_DIFFS.md")
-    assert ("*", "header_length", "*/stsd/????") in rows and all(
-        len(r) == 3 for r in rows
-    )
+    assert ("*", "header_length", "*/stsd/????") in rows and all(len(r) == 3 for r in rows)
 
 
 def mp4box_js_available() -> bool:
@@ -114,9 +100,7 @@ def box(fourcc: bytes, payload: bytes = b"") -> bytes:
     return (8 + len(payload)).to_bytes(4, "big") + fourcc + payload
 
 
-def full(
-    fourcc: bytes, payload: bytes = b"", version: int = 0, flags: int = 0
-) -> bytes:
+def full(fourcc: bytes, payload: bytes = b"", version: int = 0, flags: int = 0) -> bytes:
     return box(fourcc, bytes([version]) + flags.to_bytes(3, "big") + payload)
 
 
@@ -133,9 +117,7 @@ def stsd_dref_file() -> bytes:
         + (48000 << 16).to_bytes(4, "big"),
     )
     stbl = box(b"stbl", full(b"stsd", (1).to_bytes(4, "big") + entry))
-    dinf = box(
-        b"dinf", full(b"dref", (1).to_bytes(4, "big") + full(b"url ", b"", flags=1))
-    )
+    dinf = box(b"dinf", full(b"dref", (1).to_bytes(4, "big") + full(b"url ", b"", flags=1)))
     return box(b"ftyp", b"isom" + bytes(4) + b"isom") + box(
         b"moov", box(b"trak", box(b"mdia", box(b"minf", dinf + stbl)))
     )
@@ -158,18 +140,12 @@ def test_dump_script_emits_version_and_flags_for_every_fullbox_and_recurses_into
     assert missing.returncode == 3 and "error:" in missing.stderr
     src = tmp_path / "t.mp4"
     src.write_bytes(stsd_dref_file())
-    first = subprocess.run(
-        ["node", str(DUMP), str(src)], capture_output=True, text=True, check=True
-    ).stdout
-    again = subprocess.run(
-        ["node", str(DUMP), str(src)], capture_output=True, text=True, check=True
-    ).stdout
+    first = subprocess.run(["node", str(DUMP), str(src)], capture_output=True, text=True, check=True).stdout
+    again = subprocess.run(["node", str(DUMP), str(src)], capture_output=True, text=True, check=True).stdout
     assert first == again  # deterministic
     boxes = {b["path"]: b for b in json.loads(first)}
     base = "moov/trak/mdia/minf/"
     assert base + "dinf/dref/url " in boxes and base + "stbl/stsd/mp4a" in boxes
     for path in (base + "dinf/dref", base + "dinf/dref/url ", base + "stbl/stsd"):
-        assert (
-            "version" in boxes[path]["fields"] and "flags" in boxes[path]["fields"]
-        ), path
+        assert "version" in boxes[path]["fields"] and "flags" in boxes[path]["fields"], path
     assert boxes[base + "dinf/dref/url "]["fields"]["flags"] == 1

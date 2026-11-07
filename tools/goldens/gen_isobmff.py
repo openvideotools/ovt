@@ -59,38 +59,28 @@ class ToolError(Exception):
     pass
 
 
-def run(
-    cmd: list[str], *, stdout_to: Path | None = None, env: dict[str, str] | None = None
-) -> str:
+def run(cmd: list[str], *, stdout_to: Path | None = None, env: dict[str, str] | None = None) -> str:
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False, env=env)
     if proc.returncode != 0:
-        raise ToolError(
-            f"{cmd[0]} exited {proc.returncode}: {proc.stderr.strip()[:300]}"
-        )
+        raise ToolError(f"{cmd[0]} exited {proc.returncode}: {proc.stderr.strip()[:300]}")
     if stdout_to is not None:
         stdout_to.write_text(proc.stdout, encoding="utf-8")
     return proc.stdout
 
 
 def normalise(script: str, raw: Path, *extra: str) -> str:
-    return run(
-        [sys.executable, "-I", str(NORMALIZE / f"{script}.py"), str(raw), *extra]
-    )
+    return run([sys.executable, "-I", str(NORMALIZE / f"{script}.py"), str(raw), *extra])
 
 
 def versions() -> dict[str, str]:
     """The oracle versions in use (the goldens carry them in ORACLES.json)."""
     out: dict[str, str] = {}
-    gpac = subprocess.run(
-        ["MP4Box", "-version"], capture_output=True, text=True, check=False
-    )
+    gpac = subprocess.run(["MP4Box", "-version"], capture_output=True, text=True, check=False)
     m = re.search(r"GPAC version (\S+)", gpac.stdout + gpac.stderr)
     out["MP4Box"] = m.group(1) if m else "unknown"
     out["mediainfo"] = run(["mediainfo", "--Version"]).strip().splitlines()[-1]
     exe = shutil.which("mp4ff-info") or "mp4ff-info"
-    info = subprocess.run(
-        ["go", "version", "-m", exe], capture_output=True, text=True, check=False
-    )
+    info = subprocess.run(["go", "version", "-m", exe], capture_output=True, text=True, check=False)
     m = re.search(r"mod\s+github.com/Eyevinn/mp4ff\s+(\S+)", info.stdout)
     out["mp4ff-info"] = m.group(1) if m else "unknown"
     pkg = next(
@@ -101,9 +91,7 @@ def versions() -> dict[str, str]:
         ),
         None,
     )
-    out["mp4box.js"] = (
-        json.loads(pkg.read_text(encoding="utf-8"))["version"] if pkg else "unknown"
-    )
+    out["mp4box.js"] = json.loads(pkg.read_text(encoding="utf-8"))["version"] if pkg else "unknown"
     out["node"] = run(["node", "--version"]).strip()
     return out
 
@@ -112,17 +100,13 @@ def corpus_file(cache: Path, entry: dict[str, Any]) -> Path | None:
     folder = cache / entry["id"]
     if not (folder / ".ok").exists():
         return None
-    files = sorted(
-        p for p in folder.iterdir() if p.is_file() and not p.name.startswith(".")
-    )
+    files = sorted(p for p in folder.iterdir() if p.is_file() and not p.name.startswith("."))
     return files[0] if len(files) == 1 else None
 
 
 def write(path: Path, text: str) -> None:
     if len(text.encode("utf-8")) > MAX_GOLDEN_BYTES:
-        raise ToolError(
-            f"{path.name}: {len(text)} bytes is over the {MAX_GOLDEN_BYTES} byte golden limit"
-        )
+        raise ToolError(f"{path.name}: {len(text)} bytes is over the {MAX_GOLDEN_BYTES} byte golden limit")
     path.write_text(text, encoding="utf-8")
 
 
@@ -180,10 +164,7 @@ def cmd_generate(args: argparse.Namespace) -> int:
             continue
         try:
             with tempfile.TemporaryDirectory() as tmp:
-                refused += [
-                    (entry["id"], o)
-                    for o in generate_one(entry["id"], src, out, Path(tmp))
-                ]
+                refused += [(entry["id"], o) for o in generate_one(entry["id"], src, out, Path(tmp))]
         except ToolError as exc:
             print(f"error: {entry['id']}: {exc}", file=sys.stderr)
             return 2
@@ -249,9 +230,7 @@ def diffs_for(cid: str, out: Path) -> list[tuple[str, str, str]]:
         if not (out / f"{cid}.{o}.json").exists():
             found.append((f"no-golden:{o}", "-", "the oracle refused the file"))
     if "mediainfo-trace" in trees:
-        trees["mediainfo-trace"] = {
-            fix_fourcc(p): b for p, b in trees["mediainfo-trace"].items()
-        }
+        trees["mediainfo-trace"] = {fix_fourcc(p): b for p, b in trees["mediainfo-trace"].items()}
     present = [o for o in BOX_ORACLES if o in trees]
     paths = sorted(set().union(*(set(t) for t in trees.values())))
     for path in paths:
@@ -265,18 +244,10 @@ def diffs_for(cid: str, out: Path) -> list[tuple[str, str, str]]:
         sizes = {o: trees[o][path]["size"] for o in have}
         if len(set(sizes.values())) > 1:
             found.append(("size", path, str(sizes)))
-        offs = {
-            o: trees[o][path].get("offset")
-            for o in OFFSET_ORACLES
-            if o in trees and path in trees[o]
-        }
+        offs = {o: trees[o][path].get("offset") for o in OFFSET_ORACLES if o in trees and path in trees[o]}
         if len(set(offs.values())) > 1:
             found.append(("offset", path, str(offs)))
-        hdrs = {
-            o: trees[o][path].get("header_length")
-            for o in OFFSET_ORACLES
-            if o in trees and path in trees[o]
-        }
+        hdrs = {o: trees[o][path].get("header_length") for o in OFFSET_ORACLES if o in trees and path in trees[o]}
         if len(set(hdrs.values())) > 1:
             found.append(("header_length", path, str(hdrs)))
     if "mp4boxjs" not in trees or not (out / f"{cid}.mp4box-dts.json").exists():
@@ -288,9 +259,7 @@ def diffs_for(cid: str, out: Path) -> list[tuple[str, str, str]]:
     ]
     samples = json.loads((out / f"{cid}.mp4box-dts.json").read_text(encoding="utf-8"))
     for s in samples:
-        if not any(
-            lo <= s["offset"] and s["offset"] + s["size"] <= hi for lo, hi in mdats
-        ):
+        if not any(lo <= s["offset"] and s["offset"] + s["size"] <= hi for lo, hi in mdats):
             found.append(
                 (
                     "sample-outside-mdat",
@@ -316,9 +285,7 @@ def cmd_check(args: argparse.Namespace) -> int:
                 (
                     n
                     for n, (i, k, p) in enumerate(rules)
-                    if fnmatch.fnmatchcase(cid, i)
-                    and k == kind
-                    and fnmatch.fnmatchcase(path, p)
+                    if fnmatch.fnmatchcase(cid, i) and k == kind and fnmatch.fnmatchcase(path, p)
                 ),
                 None,
             )
@@ -339,9 +306,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="cmd", required=True)
     gen = sub.add_parser("generate")
-    gen.add_argument(
-        "--manifest", default=str(ROOT / "tests" / "corpora" / "manifest.json")
-    )
+    gen.add_argument("--manifest", default=str(ROOT / "tests" / "corpora" / "manifest.json"))
     gen.add_argument(
         "--cache-dir",
         default=os.environ.get("OVT_CORPUS_CACHE", str(ROOT / ".corpus-cache")),
