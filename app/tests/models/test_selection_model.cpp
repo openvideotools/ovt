@@ -231,14 +231,14 @@ TEST_CASE("SelectionModel: RBSP to raw mapping handles 0, 1, many and inner EPBs
   }
   SECTION("one EPB at raw offset 3") {
     const auto u = unit({3});
-    CHECK(map(u, 2 * 8) == 1002);  // before the EPB
-    CHECK(map(u, 3 * 8) == 1004);  // the rbsp byte that follows the EPB lands one later
-    CHECK(map(u, 3 * 8 + 5) == 1004);
+    CHECK(map(u, 2ULL * 8) == 1002);  // before the EPB
+    CHECK(map(u, 3ULL * 8) == 1004);  // the rbsp byte that follows the EPB lands one later
+    CHECK(map(u, 3ULL * 8 + 5) == 1004);
   }
   SECTION("many EPBs") {
     const auto u = unit({3, 7, 11});
-    CHECK(map(u, 5 * 8) == 1006);      // rbsp byte 5: raw 5 -> 6 (EPB at 3 passed)
-    CHECK(map(u, 6 * 8) == 1008);      // raw 6 -> 7 (3) -> 8 (7)
+    CHECK(map(u, 5ULL * 8) == 1006);   // rbsp byte 5: raw 5 -> 6 (EPB at 3 passed)
+    CHECK(map(u, 6ULL * 8) == 1008);   // raw 6 -> 7 (3) -> 8 (7)
     CHECK(map(u, 9 * 8 + 1) == 1012);  // raw 9 -> 10 (3) -> 11 (7) -> 12 (11); bit within the byte unchanged
   }
 }
