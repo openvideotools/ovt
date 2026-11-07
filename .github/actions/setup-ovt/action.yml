@@ -38,6 +38,10 @@ runs:
         sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
         sudo apt-get update -q
         grep -v '^\s*#' tools/apt-packages.txt | xargs sudo apt-get install -y -q --no-install-recommends gcc-13 g++-13
+        # ffmpeg runs the corpora `post` steps (tools/fetch_corpora.py wrap_y4m / ffmpeg_trim_seconds, chapter 14 §14.2.4);
+        # without it the fast-lane netflix_* entries are unavailable and the fetch fails. The raw-to-Y4M wrap and the
+        # stream-copy trim do not depend on the FFmpeg version, so the archive's build is enough.
+        sudo apt-get install -y -q --no-install-recommends ffmpeg
         {
           echo "CC=gcc-13"
           echo "CXX=g++-13"
