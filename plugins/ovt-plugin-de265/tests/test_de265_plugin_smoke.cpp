@@ -156,8 +156,9 @@ bool read_sei_value(const std::vector<uint8_t>& rbsp, size_t* pos, uint32_t* val
   return true;
 }
 
-// decoded_picture_hash (payloadType 132) of an SEI NAL unit, if it carries one.
-bool parse_picture_hash(const uint8_t* nal, size_t len, PictureHash* out) {
+// decoded_picture_hash (payloadType 132) of an SEI NAL unit, if it carries one. Every payloadType read goes to
+// @p types, which names what a stream without a hash carries instead.
+bool parse_picture_hash(const uint8_t* nal, size_t len, PictureHash* out, std::set<uint32_t>* types) {
   const std::vector<uint8_t> rbsp = unescape(nal + 2, len - 2);
   size_t pos = 0;
   while (pos + 2 <= rbsp.size() && rbsp[pos] != 0x80) {
@@ -166,6 +167,7 @@ bool parse_picture_hash(const uint8_t* nal, size_t len, PictureHash* out) {
     if (!read_sei_value(rbsp, &pos, &type) || !read_sei_value(rbsp, &pos, &size) || pos + size > rbsp.size()) {
       return false;
     }
+    types->insert(type);
     if (type == 132 && size >= 1) {
       out->hash_type = rbsp[pos];
       const size_t each = out->hash_type == 0 ? 16 : (out->hash_type == 1 ? 2 : 4);
@@ -230,6 +232,7 @@ struct StreamResult {
   std::map<int, PictureHash> expected;               // decode index -> SEI hash
   std::map<int, std::array<PictureHash, 3>> actual;  // decode index -> hashes of the plugin's planes, per hash_type
   std::vector<int> output_order;                     // decode indices as pull() returned them
+  std::set<uint32_t> sei_types;                      // every SEI payloadType in the stream
   int push_errors = 0;
   int diagnostics = 0;
 };
@@ -299,9 +302,9 @@ StreamResult run_stream(const std::vector<uint8_t>& bytes, int threads, bool pul
       prefix_hashes.clear();
     }
     PictureHash h;
-    if (type == 40 && pic >= 0 && parse_picture_hash(n.data, n.size, &h)) {  // SUFFIX_SEI_NUT
+    if (type == 40 && pic >= 0 && parse_picture_hash(n.data, n.size, &h, &r.sei_types)) {  // SUFFIX_SEI_NUT
       r.expected[pic] = std::move(h);
-    } else if (type == 39 && parse_picture_hash(n.data, n.size, &h)) {  // PREFIX_SEI_NUT
+    } else if (type == 39 && parse_picture_hash(n.data, n.size, &h, &r.sei_types)) {  // PREFIX_SEI_NUT
       prefix_hashes.push_back(std::move(h));
     }
     const ovt_status st = api.push(in.dec, n.data, n.size, std::max(pic, 0), 1000 + std::max(pic, 0));
@@ -330,6 +333,9 @@ void check_stream(const StreamResult& r) {
   CHECK(*seen.begin() == 0);
   CHECK(*seen.rbegin() == r.pictures - 1);
   // Every picture's planes match its decoded picture hash SEI.
+  for (const uint32_t t : r.sei_types) {
+    UNSCOPED_INFO("SEI payloadType " << t);
+  }
   CHECK(static_cast<int>(r.expected.size()) == r.pictures);
   int mismatches = 0;
   for (const auto& [idx, want] : r.expected) {
@@ -456,15 +462,17 @@ TEST_CASE("de265 plugin: garbage units never crash the plugin", "[fast][third_pa
 }
 
 TEST_CASE("de265 plugin: de265_md5_vs_sei on 20 HEVC_v1 streams", "[fast][third_party][needs-corpus]") {
-  // AT1. Main and Main 10 streams whose every picture is output (no pic_output_flag = 0, no skipped RASL or
-  // no_output_of_prior_pics), covering PCM, merge, temporal layers, MV clipping, SAO, RPS, POC, HRD, AMP, conformance
-  // window, scaling lists, dependent slices with WPP, tiles and 10-bit.
+  // AT1. Main and Main 10 streams that carry a decoded picture hash SEI for every picture and output every picture
+  // (no pic_output_flag = 0, no skipped RASL or no_output_of_prior_pics), covering PCM, merge, temporal layers, MV
+  // clipping, SAO, RPS, HRD, AMP, CABAC bin limits, multiple PPS, scaling lists, dependent slices, WPP and 10-bit.
+  // Some HEVC_v1 streams carry no hash SEI (RPS_A, RPS_F, POC_A, AMP_A, CONFWIN_A, STRUCT_B, TILES_B), so they
+  // cannot serve here (issue #254).
   const std::string id = GENERATE(
       as<std::string>{}, "jctvc_ipcm_A_NEC_3", "jctvc_PMERGE_A_TI_3", "jctvc_MERGE_B_TI_3", "jctvc_VPSID_A_VIDYO_2",
-      "jctvc_TSCL_A_VIDYO_5", "jctvc_MVEDGE_A_qualcomm_3", "jctvc_SAO_A_MediaTek_4", "jctvc_RPS_A_docomo_5",
-      "jctvc_RPS_F_docomo_2", "jctvc_POC_A_Bossen_3", "jctvc_MVCLIP_A_qualcomm_3", "jctvc_HRD_A_Fujitsu_3",
-      "jctvc_RPS_B_qualcomm_5", "jctvc_AMP_A_Samsung_7", "jctvc_CONFWIN_A_Sony_1", "jctvc_STRUCT_B_Samsung_7",
-      "jctvc_SLIST_A_Sony_5", "jctvc_DSLICE_A_HHI_5", "jctvc_TILES_B_Cisco_1", "jctvc_WPP_A_ericsson_MAIN10_2");
+      "jctvc_TSCL_A_VIDYO_5", "jctvc_MVEDGE_A_qualcomm_3", "jctvc_SAO_A_MediaTek_4", "jctvc_RPS_C_ericsson_5",
+      "jctvc_RPS_D_ericsson_6", "jctvc_RPS_E_qualcomm_5", "jctvc_MVCLIP_A_qualcomm_3", "jctvc_HRD_A_Fujitsu_3",
+      "jctvc_RPS_B_qualcomm_5", "jctvc_AMP_D_Hisilicon_3", "jctvc_MAXBINS_A_TI_5", "jctvc_PPS_A_qualcomm_7",
+      "jctvc_SLIST_A_Sony_5", "jctvc_DSLICE_A_HHI_5", "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_WPP_A_ericsson_MAIN10_2");
   CAPTURE(id);
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
   check_stream(run_stream(read_file(path), 2));
@@ -472,7 +480,9 @@ TEST_CASE("de265 plugin: de265_md5_vs_sei on 20 HEVC_v1 streams", "[fast][third_
 
 TEST_CASE("de265 plugin: decoding pauses at the outstanding-frame limit and resumes on pull",
           "[fast][third_party][needs-corpus]") {
-  // RPS_A_docomo_5 has more pictures than the limit of 16; nothing is pulled until the stream is flushed.
-  const std::filesystem::path path = ovt::test::corpus_or_skip("jctvc_RPS_A_docomo_5");
-  check_stream(run_stream(read_file(path), 0, /*pull_each_unit=*/false));
+  // SAO_A_MediaTek_4 has more pictures than the limit of 16; nothing is pulled until the stream is flushed.
+  const std::filesystem::path path = ovt::test::corpus_or_skip("jctvc_SAO_A_MediaTek_4");
+  const StreamResult r = run_stream(read_file(path), 0, /*pull_each_unit=*/false);
+  REQUIRE(r.pictures > 16);
+  check_stream(r);
 }
