@@ -58,6 +58,17 @@ std::string export_csv(const std::vector<const fb::FrameAnalysis*>& frames, fb::
   return out.str();
 }
 
+// Field by field rather than designated initializers: GCC's -Wmissing-field-initializers flags omitted members.
+ovt::model::YuviewOptions make_options(std::string basename, double fps, std::vector<std::uint16_t> types = {},
+                                       bool poc_column_is_poc = false) {
+  ovt::model::YuviewOptions options;
+  options.basename = std::move(basename);
+  options.fps = fps;
+  options.types = std::move(types);
+  options.poc_column_is_poc = poc_column_is_poc;
+  return options;
+}
+
 const fb::FrameAnalysis* verified(const Bytes& buffer) {
   flatbuffers::Verifier verifier(buffer.data(), buffer.size());
   REQUIRE(fb::VerifyFrameAnalysisBuffer(verifier));
@@ -120,7 +131,7 @@ const std::filesystem::path kGolden{OVT_GOLDEN_DIR};
 TEST_CASE("yuview_csv: tiny16_hevc.fa exports to the golden CSV (WI-0.089 AT1)", "[model][yuview][golden][fast]") {
   const Bytes fa_bytes = read_file(kGolden / "tiny16_hevc.fa");
   const std::vector<const fb::FrameAnalysis*> frames{verified(fa_bytes)};
-  const ovt::model::YuviewOptions options{.basename = "tiny16", .fps = 25.0};
+  const ovt::model::YuviewOptions options = make_options("tiny16", 25.0);
 
   const std::string first = export_csv(frames, fb::Codec::H265, options);
   const std::string second = export_csv(frames, fb::Codec::H265, options);
@@ -222,7 +233,7 @@ TEST_CASE("yuview_csv: vectors, MVD sentinel, ordering and options", "[model][yu
   // Display order deliberately out of POC-column order: rows must still come out sorted.
   const std::vector<const fb::FrameAnalysis*> frames{verified(b_later), verified(b_hidden), nullptr, verified(b_first)};
 
-  const std::string csv = export_csv(frames, fb::Codec::AV1, {.basename = "a;b", .fps = 30000.0 / 1001.0});
+  const std::string csv = export_csv(frames, fb::Codec::AV1, make_options("a;b", 30000.0 / 1001.0));
   CHECK(csv.starts_with("%;syntax-version;v1.2\n%;seq-specs;a_b;0;16;16;29.97003\n"));
   CHECK(has_line(csv, "%;defaultRange;0;255;jet"));
   CHECK(has_line(csv, "%;vectorColor;0;255;0;255"));
@@ -240,11 +251,11 @@ TEST_CASE("yuview_csv: vectors, MVD sentinel, ordering and options", "[model][yu
   CHECK(csv.find("\n2;") == std::string::npos);  // hidden frame skipped
 
   // POC column = FrameInfo.poc, a type subset, unknown fps.
-  const std::string poc_csv = export_csv(frames, fb::Codec::AV1, {.types = {1}, .poc_column_is_poc = true});
+  const std::string poc_csv = export_csv(frames, fb::Codec::AV1, make_options("", 0.0, {1}, true));
   CHECK(poc_csv ==
         "%;syntax-version;v1.2\n%;seq-specs;;0;16;16;0\n%;type;1;OVT_QP;range\n"
         "%;defaultRange;0;255;jet\n8;0;0;16;16;1;100\n9;0;0;16;16;1;200\n");
 
   // No exportable frame: header only.
-  CHECK(export_csv({}, fb::Codec::H265, {.fps = 25}) == "%;syntax-version;v1.2\n%;seq-specs;;0;0;0;25\n");
+  CHECK(export_csv({}, fb::Codec::H265, make_options("", 25.0)) == "%;syntax-version;v1.2\n%;seq-specs;;0;0;0;25\n");
 }

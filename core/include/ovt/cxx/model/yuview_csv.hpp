@@ -22,12 +22,12 @@ namespace ovt::model {
 /// Options of write_yuview_csv (chapter 12 §12.2.8 `--yuview-types`, `--yuview-poc-column`).
 struct YuviewOptions {
   /// The §6.8.2 type ids to write; empty = every type the frames provide.
-  std::vector<std::uint16_t> types{};
+  std::vector<std::uint16_t> types;
   /// false: the POC column is `FrameId.display_index` (the default); true: `FrameInfo.poc`.
   bool poc_column_is_poc = false;
   /// The `seq-specs` basename (usually the YUV file name without extension). Must not contain `;` or a line
   /// break; such characters are replaced by `_`.
-  std::string basename{};
+  std::string basename;
   /// Frames per second for `seq-specs`; 0 = unknown.
   double fps = 0.0;
 };
