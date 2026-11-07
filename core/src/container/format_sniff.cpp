@@ -8,6 +8,7 @@
 #include <cctype>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 #include "container/format.hpp"
 #include "ovt/cxx/bitreader.hpp"
@@ -166,7 +167,7 @@ bool obu_annexb(std::span<const uint8_t> d, uint64_t file_size) {
       br.seek_bits(pos * 8);
       const uint64_t tus = br.leb128();
       const uint64_t body = br.bit_pos() / 8;
-      if (tus < 1 || tus > file_size - body) {
+      if (tus < 1 || body > file_size || tus > file_size - body) {
         return false;
       }
       const uint64_t fus = br.leb128();
@@ -291,8 +292,9 @@ SniffResult sniff_bytes(std::span<const uint8_t> prefix, uint64_t file_size, std
 }
 
 SniffResult sniff_detail(const io::RandomAccessFile& file) {
-  std::array<uint8_t, kWindow> buf{};
-  const size_t n = file.read(0, buf.size(), buf.data());
+  // On the heap: job threads on macOS and Android can have small stacks.
+  std::vector<uint8_t> buf(static_cast<size_t>(std::min<uint64_t>(file.size(), kWindow)));
+  const size_t n = buf.empty() ? 0 : file.read(0, buf.size(), buf.data());
   return sniff_bytes(std::span<const uint8_t>(buf.data(), n), file.size(), extension_of(file.info().display_name));
 }
 

@@ -26,6 +26,7 @@ project(OpenVideoTools VERSION ${OVT_VERSION} LANGUAGES C CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 include(OvtOptions) # all options of §13.2.2 and their validation
+include(OvtCorpora) # OVT_CORPORA_DIR consumers: tagged-subset gate, skip-not-fail (WI-0.040)
 include(OvtVersion) # OVT_VERSION_FULL = <VERSION>[<suffix>]+<git sha> (FR-GEN-010)
 include(OvtCompilerFlags) # ovt::flags (§13.2.5)
 include(OvtLicenseTags) # ovt_set_license(<target> <SPDX>) and the ovt_license_manifest target

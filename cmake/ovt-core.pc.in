@@ -9,5 +9,5 @@ plugindir=${prefix}/@OVT_PLUGIN_DIR@
 Name: ovt-core
 Description: Open Video Tools core library (C API)
 Version: @PROJECT_VERSION@
-Libs: -L${libdir} -lovt_core
+Libs: -L${libdir} -lovt_core @OVT_PC_SANITIZER_LIBS@
 Cflags: -I${includedir}

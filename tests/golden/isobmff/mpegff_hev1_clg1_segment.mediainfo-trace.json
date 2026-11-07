@@ -1,0 +1,44 @@
+[
+ {
+  "header_length": 8,
+  "offset": 0,
+  "path": "moof",
+  "size": 2396
+ },
+ {
+  "header_length": 8,
+  "offset": 8,
+  "path": "moof/mfhd",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 24,
+  "path": "moof/traf",
+  "size": 2372
+ },
+ {
+  "header_length": 8,
+  "offset": 32,
+  "path": "moof/traf/tfhd",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 52,
+  "path": "moof/traf/tfdt",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 72,
+  "path": "moof/traf/trun",
+  "size": 2324
+ },
+ {
+  "header_length": 8,
+  "offset": 2396,
+  "path": "mdat",
+  "size": 8
+ }
+]

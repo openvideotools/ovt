@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Render tests (WI-1.400 onward). Catch2's CHECK/REQUIRE/SKIP/FAIL macros expand to branches, so helpers and test
+# cases trip readability-function-cognitive-complexity on code that has little control flow of its own. Count only
+# the test's own branches (as core/tests/bitreader/.clang-tidy does).
+InheritParentConfig: true
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true
