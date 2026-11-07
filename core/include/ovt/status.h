@@ -14,6 +14,7 @@
 #include <stdint.h>
 
 /** Marks a function exported from libovt_core (chapter 12 §12.3.2: nothing else is exported). */
+/* clang-format off */
 #ifndef OVT_API
 #  if defined(__GNUC__) || defined(__clang__)
 #    define OVT_API __attribute__((visibility("default")))
@@ -21,6 +22,7 @@
 #    define OVT_API
 #  endif
 #endif
+/* clang-format on */
 
 #ifdef __cplusplus
 extern "C" {

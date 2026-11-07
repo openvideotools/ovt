@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
-//
 // C11: the ABI header (self-contained) first, then ovt/status.h with the same guarded types (#211).
 
 #include "ovt/abi/analysis_decoder_v1.h"
