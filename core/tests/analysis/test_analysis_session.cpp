@@ -23,6 +23,7 @@
 #include <utility>
 #include <vector>
 
+#include "fb_rewrite.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -35,8 +36,6 @@ using ovt::analysis::PluginRegistry;
 using ovt::analysis::Session;
 
 namespace {
-
-// ---- spy over the mock plugin --------------------------------------------------------------------------------
 
 struct Push {
   int32_t hint;
@@ -77,15 +76,6 @@ ovt_status spy_push(ovt_AnalysisDecoder* dec, const uint8_t* unit, size_t len, i
   }
   return g_spy.real->push(dec, unit, len, hint, pts);
 }
-ovt_status spy_pull(ovt_AnalysisDecoder* dec, uint32_t mask, ovt_Buffer* out) noexcept {
-  return g_spy.real->pull(dec, mask, out);
-}
-ovt_status spy_plane(ovt_AnalysisDecoder* dec, const char* id, const uint8_t** data, size_t* size) noexcept {
-  return g_spy.real->plane(dec, id, data, size);
-}
-void spy_release(ovt_AnalysisDecoder* dec, ovt_Buffer fb) noexcept {
-  g_spy.real->release(dec, fb);
-}
 ovt_status spy_flush(ovt_AnalysisDecoder* dec) noexcept {
   ++g_spy.flushes;
   return g_spy.real->flush(dec);
@@ -104,13 +94,10 @@ LoadedPlugin spy_plugin(const char* sub, const char* id) {
   const LoadedPlugin* real = reg->find(id);
   REQUIRE(real != nullptr);
   static ovt_AnalysisDecoderApi api{};
-  api = *real->api;
+  api = *real->api;  // pull/plane/release go straight to the mock
   api.create = spy_create;
   api.destroy = spy_destroy;
   api.push = spy_push;
-  api.pull = spy_pull;
-  api.plane = spy_plane;
-  api.release = spy_release;
   api.flush = spy_flush;
   g_spy = Spy{};
   g_spy.real = real->api;
@@ -118,8 +105,6 @@ LoadedPlugin spy_plugin(const char* sub, const char* id) {
   p.api = &api;
   return p;
 }
-
-// ---- scripted stream --------------------------------------------------------------------------------------------
 
 struct ScriptFrame {
   bool rap = false;
@@ -135,7 +120,6 @@ struct Script {
   std::filesystem::path path;
   std::vector<uint8_t> index;
   std::unique_ptr<ovt::io::RandomAccessFile> file;
-  uint32_t ps_units = 0;
   ~Script() {
     file.reset();
     std::error_code ec;
@@ -167,10 +151,13 @@ std::unique_ptr<Script> make_script(ovt::fb::Codec codec, const std::vector<Scri
   };
   for (const auto& [type, payload] : param_sets) {
     add_unit(type, payload, -1);
-    auto copy = std::make_unique<ovt::fb::UnitT>(*idx.units.back());
-    idx.parameter_sets.push_back(std::move(copy));
+    auto ps = std::make_unique<ovt::fb::UnitT>();  // StreamIndex.parameter_sets repeats the unit
+    ps->index = idx.units.back()->index;
+    ps->file_span = std::make_unique<ovt::fb::ByteSpan>(*idx.units.back()->file_span);
+    ps->type = type;
+    ps->frame = std::make_unique<ovt::fb::FrameId>(-1, -1);
+    idx.parameter_sets.push_back(std::move(ps));
   }
-  s->ps_units = static_cast<uint32_t>(param_sets.size());
   int display = 0;
   for (std::size_t d = 0; d < frames.size(); ++d) {
     const auto& sf = frames[d];
@@ -467,13 +454,66 @@ TEST_CASE("frames are deterministic across sessions", "[analysis][session][fast]
   auto s = h264_script(60, 30);
   std::vector<uint8_t> a;
   std::vector<uint8_t> b;
-  {
-    Session session(*s->file, s->index, plugin, {});
-    REQUIRE(session.frame(40, 0, nullptr, a) == OVT_OK);
-  }
-  {
-    Session session(*s->file, s->index, plugin, {});
-    REQUIRE(session.frame(40, 0, nullptr, b) == OVT_OK);
-  }
+  Session first(*s->file, s->index, plugin, {});
+  Session second(*s->file, s->index, plugin, {});
+  REQUIRE(first.frame(40, 0, nullptr, a) == OVT_OK);
+  REQUIRE(second.frame(40, 0, nullptr, b) == OVT_OK);
   CHECK(a == b);
+}
+
+TEST_CASE("FrameAnalysis rewrite copies every field and applies overrides", "[analysis][session][fast]") {
+  using ovt::analysis::detail::copy_table_with;
+  using ovt::analysis::detail::FieldOverrides;
+  using ovt::analysis::detail::model_object;
+  // A FrameAnalysis with nested tables, structs, strings and vectors of every kind the schema uses.
+  flatbuffers::FlatBufferBuilder src;
+  const ovt::fb::Rect rect(4, 8, 16, 16);
+  const ovt::fb::FrameId id(7, 3);
+  const ovt::fb::FrameId ref_frame(0, 0);
+  const auto block = ovt::fb::CreateBlock(src, 1, -1, 0, ovt::fb::BlockKind::CU, &rect, 2, 3);
+  const auto mv = ovt::fb::CreateMotionVector(src, 1, 0, 1, &rect, -32, 48);
+  const auto ref = ovt::fb::CreateRefSlot(src, 1, &ref_frame, src.CreateString("LAST"), false, 9, 2);
+  const auto plane =
+      ovt::fb::CreatePlaneRef(src, ovt::fb::PlaneStage::Prediction, 1, 8, 8, 64, 8, 1, false, src.CreateString("blob"));
+  const std::vector<uint32_t> units{4, 5};
+  const auto info =
+      ovt::fb::CreateFrameInfo(src, &id, ovt::fb::FrameType::B, true, -1, ovt::fb::PictureStructure::Frame, 0, 0, false,
+                               12, 0, 0, 0, 0, 0, src.CreateVector(units));
+  const std::vector<std::string> names{"a", "b"};
+  const auto fa_off =
+      ovt::fb::CreateFrameAnalysis(src, 1, src.CreateString("mock"), src.CreateString("1.0.0"), info, 0,
+                                   src.CreateVector(std::vector<flatbuffers::Offset<ovt::fb::Block>>{block}),
+                                   src.CreateVector(std::vector<flatbuffers::Offset<ovt::fb::MotionVector>>{mv}),
+                                   src.CreateVector(std::vector<flatbuffers::Offset<ovt::fb::RefSlot>>{ref}), 0, 0, 0,
+                                   src.CreateVector(std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>{plane}), 0,
+                                   src.CreateVectorOfStrings(names));
+  ovt::fb::FinishFrameAnalysisBuffer(src, fa_off);
+  const auto* fa = ovt::fb::GetFrameAnalysis(src.GetBufferPointer());
+
+  flatbuffers::FlatBufferBuilder fbb;
+  FieldOverrides slot;
+  slot.set_struct("frame", ovt::fb::FrameId(5, 2));
+  const auto refs = fbb.CreateVector(std::vector<flatbuffers::Offset<flatbuffers::Table>>{
+      copy_table_with(fbb, model_object("ovt.fb.RefSlot"),
+                      reinterpret_cast<const flatbuffers::Table*>(fa->refs()->Get(0)),  // NOLINT(*-reinterpret-cast)
+                      slot)});
+  FieldOverrides root;
+  root.offsets["refs"] = refs.o;
+  root.scalars["schema_version"] = 1;
+  const auto off = copy_table_with(fbb, model_object("ovt.fb.FrameAnalysis"),
+                                   reinterpret_cast<const flatbuffers::Table*>(fa),  // NOLINT(*-reinterpret-cast)
+                                   root);
+  ovt::fb::FinishFrameAnalysisBuffer(fbb, flatbuffers::Offset<ovt::fb::FrameAnalysis>(off));
+  const std::vector<uint8_t> out(fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize());  // NOLINT
+  const auto* copy = as_fa(out);
+  CHECK(copy->plugin_id()->str() == "mock");
+  CHECK((copy->frame()->id()->decode_index() == 7 && copy->frame()->type() == ovt::fb::FrameType::B));
+  CHECK((copy->frame()->poc() == 12 && copy->frame()->units()->size() == 2));
+  CHECK((copy->blocks()->Get(0)->rect()->w() == 16 && copy->blocks()->Get(0)->partition_type() == 3));
+  CHECK((copy->mvs()->Get(0)->mv_x() == -32 && copy->mvs()->Get(0)->mv_y() == 48));
+  CHECK((copy->planes()->Get(0)->blob_id()->str() == "blob" && copy->planes()->Get(0)->stride_bytes() == 64));
+  CHECK(copy->symbol_names()->Get(1)->str() == "b");
+  const auto* r = copy->refs()->Get(0);
+  CHECK((r->name()->str() == "LAST" && r->slot() == 2 && r->usage_cells() == 9));
+  CHECK((r->frame()->decode_index() == 5 && r->frame()->display_index() == 2));
 }

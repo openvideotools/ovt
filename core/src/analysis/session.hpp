@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // ovt::analysis::Session: the GOP-local analysis driver behind one ovt_Analysis handle (chapter 7 §7.5.2–§7.5.4,
-// WI-2.151). Internal to libovt-core: the C entry points of §0.6.1 (core/src/api/analysis_api.cpp, WI-2.151b)
-// wrap it once ovt_Stream exists.
+// WI-2.151). Internal to libovt-core. WI-2.151b adds the C entry points of §0.6.1 (core/src/api/analysis_api.cpp)
+// once ovt_Stream exists, with the plane path (PlaneRef planes copied into the PictureStore, ovt_analysis_plane).
 //
 // SPEC-ASSUMPTION(#253): the Session reads the StreamIndex FlatBuffer (ovt.fb.StreamIndex) and the stream's file
 // instead of the index module's C++ objects, so the ActiveSets snapshot at R is derived from
@@ -14,7 +14,6 @@
 #define OVT_SRC_ANALYSIS_SESSION_HPP
 
 #include <cstdint>
-#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -25,7 +24,6 @@
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/cxx/jobs.hpp"
-#include "ovt/cxx/model/picture_store.hpp"
 #include "ovt/status.h"
 #include "ovt_model_generated.h"
 
@@ -61,10 +59,9 @@ class SessionCache {
 };
 
 struct SessionOptions {
-  std::vector<uint8_t> codec_private;            // avcC/hvcC/av1C from the container; empty for elementary streams
-  int threads = 0;                               // 0 = min(4, hardware threads) (2 on Android), §7.5.3 A3
-  SessionCache* cache = nullptr;                 // not owned; nullptr = no caching (--no-cache)
-  ovt::model::PictureStore* pictures = nullptr;  // not owned; where target planes are copied; nullptr = drop them
+  std::vector<uint8_t> codec_private;  // avcC/hvcC/av1C from the container; empty for elementary streams
+  int threads = 0;                     // 0 = min(4, hardware threads) (2 on Android), §7.5.3 A3
+  SessionCache* cache = nullptr;       // not owned; nullptr = no caching (--no-cache)
 };
 
 struct FrameRequest {
@@ -90,17 +87,12 @@ class Session {
   ovt_status frame(int decode_index, uint32_t plane_stage_mask, const ovt::jobs::Cancel* cancel,
                    std::vector<uint8_t>& out, FrameRequest request = {});
 
-  // A plane a previous frame() copied into the PictureStore. OVT_E_INVALID_ARG when it is absent or evicted
-  // (chapter 12 §12.3.10 ANA-LRU-0001 is the C API's diagnostic).
-  ovt_status plane(std::string_view blob_id, std::shared_ptr<const ovt::model::PlaneBlob>& out) const;
-
   // Diagnostics raised by the last frame() call, in order.
   [[nodiscard]] const std::vector<HostDiagnostic>& diagnostics() const noexcept { return diagnostics_; }
 
-  // Decoder state, for the tests and the GUI's status line.
+  // Decoder state, for the tests.
   [[nodiscard]] bool has_decoder() const noexcept { return dec_ != nullptr; }
   [[nodiscard]] int last_decoded() const noexcept { return last_decoded_; }
-  [[nodiscard]] int current_rap() const noexcept { return current_rap_; }
 
  private:
   struct Pulled {
@@ -119,12 +111,8 @@ class Session {
   ovt_status feed_parameter_sets(int rap);
   ovt_status push_unit(uint32_t unit_index, int32_t decode_index, int64_t pts);
   ovt_status drain(int target, uint32_t stage_mask, Pulled& result);
-  void copy_planes(const ovt::fb::FrameAnalysis& fa);
   [[nodiscard]] bool is_rasl_of(int d, int rap) const;
   ovt_status post_process(int t, uint32_t stage_mask, std::vector<uint8_t>& fb);
-  void fill_frame_info(int t, ovt::fb::FrameInfoT& info) const;
-  void fill_av1_refs(int t, ovt::fb::FrameAnalysisT& fa) const;
-  void add_missing_stage_diagnostics(uint32_t stage_mask, ovt::fb::FrameAnalysisT& fa);
   void diag(ovt::fb::Severity severity, std::string code, std::string message);
   [[nodiscard]] const ovt::fb::StreamIndex& index() const noexcept { return *index_; }
 

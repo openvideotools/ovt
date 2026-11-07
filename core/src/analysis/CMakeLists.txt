@@ -12,7 +12,7 @@ elseif(APPLE)
 else()
   set(_ovt_plugin_paths plugin_paths_linux.cpp)
 endif()
-target_sources(ovt_core_objects PRIVATE decoder_plugin_registry.cpp session.cpp ${_ovt_plugin_paths})
+target_sources(ovt_core_objects PRIVATE decoder_plugin_registry.cpp fb_rewrite.cpp session.cpp ${_ovt_plugin_paths})
 # dlopen/dlsym; part of libc on macOS, Android and glibc >= 2.34, libdl before that.
 target_link_libraries(ovt_core_objects PUBLIC ${CMAKE_DL_LIBS})
 unset(_ovt_plugin_paths)

@@ -21,8 +21,8 @@
 #include <tuple>
 #include <utility>
 
+#include "fb_rewrite.hpp"
 #include "ovt/cxx/log.hpp"
-#include "ovt/cxx/model/plane.hpp"
 
 namespace ovt::analysis {
 namespace {
@@ -82,24 +82,6 @@ void write_leb128(std::vector<uint8_t>& out, uint64_t value) {
   } while (value != 0);
 }
 
-ovt::model::SampleFormat sample_format_of(const ovt::fb::PlaneRef& ref) {
-  switch (ref.sample_bytes()) {
-    case 1:
-      return ovt::model::SampleFormat::U8;
-    case 2:
-      return ref.is_signed() ? ovt::model::SampleFormat::S16LE : ovt::model::SampleFormat::U16LE;
-    default:
-      return ovt::model::SampleFormat::S32LE;
-  }
-}
-
-void pack(const ovt::fb::FrameAnalysisT& fa, std::vector<uint8_t>& out) {
-  flatbuffers::FlatBufferBuilder fbb(4096);
-  ovt::fb::FinishFrameAnalysisBuffer(fbb, ovt::fb::FrameAnalysis::Pack(fbb, &fa));
-  const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
-  out.assign(bytes.begin(), bytes.end());
-}
-
 // (type, id) of a parameter set; without a parsed header (type, its bytes), so only identical copies merge.
 // AV1 keeps one sequence header.
 using ParameterSetKey = std::tuple<uint8_t, std::optional<uint64_t>, std::string>;
@@ -116,6 +98,75 @@ ParameterSetKey parameter_set_key(const ovt::fb::Unit& unit, bool av1, const ovt
     bytes.resize(file.read(span->offset(), bytes.size(), reinterpret_cast<uint8_t*>(bytes.data())));  // NOLINT
   }
   return {unit.type(), std::nullopt, std::move(bytes)};
+}
+
+using detail::copy_table_with;
+using detail::FieldOverrides;
+using detail::model_object;
+
+// Generated tables derive privately from flatbuffers::Table; reflection works on the base.
+template <class T>
+const flatbuffers::Table* as_table(const T* t) {
+  return reinterpret_cast<const flatbuffers::Table*>(t);  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+}
+
+template <class T>
+bool is_empty(const flatbuffers::Vector<T>* v) {
+  return v == nullptr || v->begin() == v->end();
+}
+
+// Replaces vector field `name` by `src` when the plugin left it empty.
+template <class T>
+void fill_vector(flatbuffers::FlatBufferBuilder& fbb, FieldOverrides& ov, const std::string& name,
+                 const flatbuffers::Vector<T>* plugin, const flatbuffers::Vector<T>* src) {
+  if (is_empty(plugin) && !is_empty(src)) {
+    ov.offsets[name] = fbb.CreateVector(src->data(), src->size()).o;
+  }
+}
+
+// Finishes `fbb` with a copy of the FrameAnalysis `fa` whose fields in `root` are replaced, into `out`.
+void finish_rewrite(flatbuffers::FlatBufferBuilder& fbb, const ovt::fb::FrameAnalysis& fa, const FieldOverrides& root,
+                    std::vector<uint8_t>& out) {
+  const auto off = copy_table_with(fbb, *detail::model_schema().root_table(), as_table(&fa), root);
+  ovt::fb::FinishFrameAnalysisBuffer(fbb, flatbuffers::Offset<ovt::fb::FrameAnalysis>(off));
+  const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  out.assign(bytes.begin(), bytes.end());
+}
+
+// A6: the index is authoritative for identity; other FrameInfo fields only where the plugin left them empty.
+flatbuffers::uoffset_t rebuild_frame_info(flatbuffers::FlatBufferBuilder& fbb, const ovt::fb::FrameInfo& plugin,
+                                          const ovt::fb::FrameInfo& f, int t) {
+  FieldOverrides ov;
+  ov.set_struct("id", ovt::fb::FrameId(t, f.id() != nullptr ? f.id()->display_index() : -1));
+  ov.scalars["is_rap"] = f.is_rap() ? 1 : 0;
+  if (plugin.pts() == 0) {
+    ov.scalars["pts"] = f.pts();
+  }
+  if (plugin.dts() == 0) {
+    ov.scalars["dts"] = f.dts();
+  }
+  if (plugin.timebase_den() == 0) {
+    ov.scalars["timebase_num"] = f.timebase_num();
+    ov.scalars["timebase_den"] = f.timebase_den();
+  }
+  if (plugin.size_bytes() == 0) {
+    ov.scalars["size_bytes"] = static_cast<int64_t>(f.size_bytes());
+  }
+  fill_vector(fbb, ov, "units", plugin.units(), f.units());
+  fill_vector(fbb, ov, "declared_refs", plugin.declared_refs(), f.declared_refs());
+  fill_vector(fbb, ov, "dpb_after", plugin.dpb_after(), f.dpb_after());
+  return copy_table_with(fbb, model_object("ovt.fb.FrameInfo"), as_table(&plugin), ov);
+}
+
+// qp_hist (chapter 6 §6.3, V-028): qp + 128 for H.26x, qindex for AV1 where -1 cells are "not applicable".
+std::vector<uint32_t> qp_hist_of(const flatbuffers::Vector<int16_t>& qp, bool av1) {
+  std::vector<uint32_t> hist(256, 0);
+  for (const int16_t q : qp) {
+    if (!av1 || q >= 0) {
+      ++hist[static_cast<std::size_t>(std::clamp(q + (av1 ? 0 : 128), 0, 255))];
+    }
+  }
+  return hist;
 }
 
 }  // namespace
@@ -192,9 +243,6 @@ ovt_status Session::frame(int decode_index, uint32_t plane_stage_mask, const ovt
   } catch (const std::bad_alloc&) {
     destroy_decoder();
     return OVT_E_NOMEM;
-  } catch (const ovt::model::NoMemError&) {
-    destroy_decoder();
-    return OVT_E_NOMEM;
   } catch (const ovt::io::IoError& e) {
     destroy_decoder();
     diag(Severity::Error, "", e.what());
@@ -244,23 +292,22 @@ ovt_status Session::frame_impl(int t, uint32_t stage_mask, const ovt::jobs::Canc
   if (const ovt_status st = decode_target(shown, stage_mask, cancel, decoded, request); st != OVT_OK) {
     return st;
   }
-  auto fa = ovt::fb::UnPackFrameAnalysis(decoded.data());
-  if (!fa->frame) {
-    fa->frame = std::make_unique<ovt::fb::FrameInfoT>();
-  }
-  auto& info = *fa->frame;
-  info.id = std::make_unique<ovt::fb::FrameId>(t, f->id() != nullptr ? f->id()->display_index() : -1);
-  info.shown = true;
-  info.show_existing_of = shown;
-  info.pts = f->pts();
-  info.dts = f->dts();
-  info.poc = f->poc();
-  info.size_bytes = f->size_bytes();
-  info.units.clear();
+  const auto* fa = ovt::fb::GetFrameAnalysis(decoded.data());
+  flatbuffers::FlatBufferBuilder fbb(decoded.size() + 256);
+  FieldOverrides info;
+  info.set_struct("id", ovt::fb::FrameId(t, f->id() != nullptr ? f->id()->display_index() : -1));
+  info.scalars["shown"] = 1;
+  info.scalars["show_existing_of"] = shown;
+  info.scalars["pts"] = f->pts();
+  info.scalars["dts"] = f->dts();
+  info.scalars["poc"] = f->poc();
+  info.scalars["size_bytes"] = static_cast<int64_t>(f->size_bytes());
   if (f->units() != nullptr) {
-    info.units.assign(f->units()->begin(), f->units()->end());
+    info.offsets["units"] = fbb.CreateVector(f->units()->data(), f->units()->size()).o;
   }
-  pack(*fa, out);
+  FieldOverrides root;
+  root.offsets["frame"] = copy_table_with(fbb, model_object("ovt.fb.FrameInfo"), as_table(fa->frame()), info);
+  finish_rewrite(fbb, *fa, root, out);
   if (options_.cache != nullptr) {
     options_.cache->store(static_cast<uint32_t>(t), out, stage_mask);
   }
@@ -470,46 +517,11 @@ ovt_status Session::drain(int target, uint32_t stage_mask, Pulled& result) {
       const std::span<const uint8_t> bytes(fb.data, fb.size);
       result.fb.assign(bytes.begin(), bytes.end());
       result.have = true;
-      copy_planes(*fa);  // plugin plane buffers are valid only until release()
+      // WI-2.151b copies the PlaneRef planes into the PictureStore here: they are valid only until release().
     } else if (idx >= 0 && idx < target && options_.cache != nullptr) {
       options_.cache->store(static_cast<uint32_t>(idx), {fb.data, fb.size}, 0);
     }
     plugin_.api->release(dec_, fb);
-  }
-}
-
-void Session::copy_planes(const ovt::fb::FrameAnalysis& fa) {
-  if (options_.pictures == nullptr || fa.planes() == nullptr) {
-    return;
-  }
-  for (const auto* ref : *fa.planes()) {
-    if (ref->blob_id() == nullptr) {
-      continue;
-    }
-    const uint8_t* data = nullptr;
-    size_t size = 0;
-    if (plugin_.api->plane(dec_, ref->blob_id()->c_str(), &data, &size) != OVT_OK || data == nullptr) {
-      continue;
-    }
-    ovt::model::PlaneView view;
-    view.data = data;
-    view.width = ref->width();
-    view.height = ref->height();
-    view.stride_bytes = ref->stride_bytes();
-    view.bit_depth = ref->bit_depth();
-    view.sample_bytes = ref->sample_bytes();
-    view.format = sample_format_of(*ref);
-    view.plane = ref->plane();
-    view.stage = static_cast<uint8_t>(ref->stage());
-    if (static_cast<uint64_t>(view.stride_bytes) * view.height > size) {
-      diag(Severity::Warning, "", fmt::format("plane {} is shorter than its PlaneRef", ref->blob_id()->str()));
-      continue;
-    }
-    try {
-      options_.pictures->put(ref->blob_id()->str(), view);
-    } catch (const std::invalid_argument& e) {
-      diag(Severity::Warning, "", fmt::format("plane {} rejected: {}", ref->blob_id()->str(), e.what()));
-    }
   }
 }
 
@@ -538,105 +550,48 @@ bool Session::is_rasl_of(int d, int rap) const {
 }
 
 ovt_status Session::post_process(int t, uint32_t stage_mask, std::vector<uint8_t>& fb) {
-  auto fa = ovt::fb::UnPackFrameAnalysis(fb.data());
-  if (!fa->frame || !fa->frame->id || fa->frame->id->decode_index() != t) {
+  const auto* fa = ovt::fb::GetFrameAnalysis(fb.data());
+  if (fa->frame() == nullptr || fa->frame()->id() == nullptr || fa->frame()->id()->decode_index() != t) {
     destroy_decoder();
     diag(Severity::Error, "", fmt::format("plugin {} returned the wrong frame for {}", plugin_.id, t));
     return OVT_E_PLUGIN;
   }
-  fill_frame_info(t, *fa->frame);
-  fill_av1_refs(t, *fa);
-  // qp_hist (chapter 6 §6.3, V-028): qp + 128 for H.26x, qindex for AV1 where -1 cells are "not applicable".
-  if (fa->qp_hist.empty() && fa->grid && !fa->grid->qp.empty()) {
-    fa->qp_hist.assign(256, 0);
-    const bool av1 = index().codec() == Codec::AV1;
-    for (const int16_t qp : fa->grid->qp) {
-      if (!av1 || qp >= 0) {
-        ++fa->qp_hist[static_cast<std::size_t>(std::clamp(qp + (av1 ? 0 : 128), 0, 255))];
-      }
-    }
+  flatbuffers::FlatBufferBuilder fbb(fb.size() + 1024);
+  FieldOverrides root;
+  root.offsets["frame"] = rebuild_frame_info(fbb, *fa->frame(), *index().frames()->Get(static_cast<uint32_t>(t)), t);
+  // SPEC-ASSUMPTION(#253): RefSlot.frame from the DPB model waits for the WI-1.121 reference maps (WI-2.151b).
+  if (is_empty(fa->qp_hist()) && fa->grid() != nullptr && !is_empty(fa->grid()->qp())) {
+    root.offsets["qp_hist"] = fbb.CreateVector(qp_hist_of(*fa->grid()->qp(), index().codec() == Codec::AV1)).o;
   }
-  add_missing_stage_diagnostics(stage_mask, *fa);
-  pack(*fa, fb);
-  return OVT_OK;
-}
-
-// A6: the index is authoritative for identity; other fields only where the plugin left them empty.
-void Session::fill_frame_info(int t, ovt::fb::FrameInfoT& info) const {
-  const auto* f = index().frames()->Get(static_cast<uint32_t>(t));
-  info.id = std::make_unique<ovt::fb::FrameId>(t, f->id() != nullptr ? f->id()->display_index() : -1);
-  info.is_rap = f->is_rap();
-  if (info.pts == 0) {
-    info.pts = f->pts();
-  }
-  if (info.dts == 0) {
-    info.dts = f->dts();
-  }
-  if (info.timebase_den == 0) {
-    info.timebase_num = f->timebase_num();
-    info.timebase_den = f->timebase_den();
-  }
-  if (info.size_bytes == 0) {
-    info.size_bytes = f->size_bytes();
-  }
-  const auto fill = [](auto& dst, const auto* src) {
-    if (dst.empty() && src != nullptr) {
-      dst.assign(src->begin(), src->end());
-    }
-  };
-  fill(info.units, f->units());
-  fill(info.declared_refs, f->declared_refs());
-  fill(info.dpb_after, f->dpb_after());
-}
-
-// AV1 RefSlot.frame from the slot model: the DPB before T is frames[T-1].dpb_after (#253 rule 5).
-void Session::fill_av1_refs(int t, ovt::fb::FrameAnalysisT& fa) const {
-  if (index().codec() != Codec::AV1 || t == 0) {
-    return;
-  }
-  const auto* frames = index().frames();
-  const auto* before = frames->Get(static_cast<uint32_t>(t - 1))->dpb_after();
-  if (before == nullptr) {
-    return;
-  }
-  for (auto& ref : fa.refs) {
-    const bool unset = ref && (!ref->frame || (ref->frame->decode_index() == 0 && ref->frame->display_index() == 0));
-    if (!unset || ref->slot < 0 || static_cast<uint32_t>(ref->slot) >= before->size()) {
-      continue;
-    }
-    const int target = before->Get(static_cast<uint32_t>(ref->slot));
-    const auto* id = target >= 0 && static_cast<uint32_t>(target) < frames->size()
-                         ? frames->Get(static_cast<uint32_t>(target))->id()
-                         : nullptr;
-    ref->frame = std::make_unique<ovt::fb::FrameId>(target, id != nullptr ? id->display_index() : -1);
-  }
-}
-
-// ANA-0001 for requested stages the plugin did not deliver (§7.5.3).
-void Session::add_missing_stage_diagnostics(uint32_t stage_mask, ovt::fb::FrameAnalysisT& fa) {
+  // ANA-0001 for requested stages the plugin did not deliver (§7.5.3).
+  std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> missing;
   for (unsigned stage = 0; stage < 32; ++stage) {
-    const bool delivered = std::any_of(fa.planes.begin(), fa.planes.end(), [stage](const auto& p) {
-      return p && static_cast<unsigned>(p->stage) == stage;
-    });
+    const bool delivered = fa->planes() != nullptr &&
+                           std::any_of(fa->planes()->begin(), fa->planes()->end(), [stage](const ovt::fb::PlaneRef* p) {
+                             return static_cast<unsigned>(p->stage()) == stage;
+                           });
     if ((stage_mask & (1U << stage)) == 0 || delivered) {
       continue;
     }
-    auto d = std::make_unique<ovt::fb::DiagnosticT>();
-    d->severity = Severity::Info;
-    d->code = "ANA-0001";
-    d->message = fmt::format("stage {} not available from plugin {}", stage_name(stage), plugin_.id);
-    diagnostics_.push_back({d->severity, d->code, d->message});
-    fa.diagnostics.push_back(std::move(d));
+    std::string message = fmt::format("stage {} not available from plugin {}", stage_name(stage), plugin_.id);
+    missing.push_back(
+        ovt::fb::CreateDiagnostic(fbb, Severity::Info, fbb.CreateString("ANA-0001"), fbb.CreateString(message)));
+    diagnostics_.push_back({Severity::Info, "ANA-0001", std::move(message)});
   }
-}
-
-ovt_status Session::plane(std::string_view blob_id, std::shared_ptr<const ovt::model::PlaneBlob>& out) const {
-  out.reset();
-  if (options_.pictures == nullptr) {
-    return OVT_E_INVALID_ARG;
+  if (!missing.empty()) {
+    std::vector<flatbuffers::Offset<flatbuffers::Table>> all;
+    if (fa->diagnostics() != nullptr) {
+      for (const auto* d : *fa->diagnostics()) {
+        all.emplace_back(copy_table_with(fbb, model_object("ovt.fb.Diagnostic"), as_table(d), {}));
+      }
+    }
+    for (const auto& d : missing) {
+      all.emplace_back(d.o);
+    }
+    root.offsets["diagnostics"] = fbb.CreateVector(all).o;
   }
-  out = options_.pictures->get(blob_id);
-  return out ? OVT_OK : OVT_E_INVALID_ARG;
+  finish_rewrite(fbb, *fa, root, fb);
+  return OVT_OK;
 }
 
 }  // namespace ovt::analysis
