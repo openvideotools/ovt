@@ -50,7 +50,7 @@ ALL_ORACLES = ("trace_headers", "gstparse", "jm", "hm", "mvs")
 HEADER_PICTURES = 6
 BLOCK_PICTURES = 2
 MAX_BYTES = 900_000  # header goldens; CLAUDE.md forbids goldens over 2 MB, and a PR carries 100+ of them
-MAX_BLOCK_BYTES = 1_900_000  # block goldens (JM, HM, MVs): one 1080p picture of JM output is 1.2 MB
+MAX_BLOCK_BYTES = {"jm": 1_900_000, "mvs": 1_000_000, "hm": 1_000_000}  # one 1080p picture of JM output is 1.2 MB
 CONTAINER_PACKETS = 16  # packets copied out of a container: enough for HEADER_PICTURES whatever the GOP
 EPB_ID = "syn_h264_epb_dense"
 SKIP_CONTAINERS = {
@@ -365,8 +365,7 @@ class TooLarge(StepError):
 def produce(state: Entry, oracle: str, max_bytes: int) -> tuple[str, int]:
     """Run one oracle on the longest stream prefix whose golden fits ``max_bytes``; returns (text, pictures)."""
     pictures = PICTURE_BUDGET[oracle]
-    if oracle in ("jm", "mvs", "hm"):
-        max_bytes = max(max_bytes, MAX_BLOCK_BYTES)
+    max_bytes = max(max_bytes, MAX_BLOCK_BYTES.get(oracle, 0))
     while True:
         es, kept = state.stream(pictures)
         text = state.trace_headers(es, []) if oracle == "trace_headers" else getattr(state, oracle)(es)
@@ -540,11 +539,10 @@ def main(argv: list[str] | None = None) -> int:
         try:
             return entry["id"], process(entry, args, skips, work_root, args.corpora_dir)
         except (StepError, OSError) as exc:
-            return entry["id"], {
-                "failed": {"entry": str(exc)},
-                "goldens": {},
-                "skipped": {},
-            }
+            reason = skips.get(f"{entry['id']}:entry") or (str(exc) if isinstance(exc, NoStream) else None)
+            if reason:
+                return entry["id"], {"failed": {}, "goldens": {}, "skipped": {"entry": reason}}
+            return entry["id"], {"failed": {"entry": str(exc)}, "goldens": {}, "skipped": {}}
 
     with ThreadPoolExecutor(max_workers=max(1, args.jobs)) as pool:
         for cid, record in pool.map(one, entries):
