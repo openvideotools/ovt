@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstring>
 #include <string>
 
 #include "jobs/job_internal.hpp"
@@ -14,6 +16,11 @@
 namespace ovt::jobs {
 
 namespace {
+
+// Size of ovt_JobProgress as of its first version: the end of its last v1 field (`stage`). Pinned to the field
+// layout, not to sizeof, so appending fields in a later version does not raise the minimum caller size.
+constexpr uint32_t kJobProgressV1Size = offsetof(ovt_JobProgress, stage) + sizeof(const char*);
+static_assert(kJobProgressV1Size <= sizeof(ovt_JobProgress), "v1 size cannot exceed the current struct");
 
 double fraction_of(uint64_t done, uint64_t total) noexcept {
   if (total == 0) {
@@ -83,8 +90,19 @@ void report(ovt_Job& job, const Progress& p) noexcept {
 }
 
 void snapshot(const ovt_Job& job, ovt_JobProgress& out) noexcept {
-  const std::lock_guard<std::mutex> lock(job.m);
-  fill(job, out);
+  // The caller owns `out` and sets struct_size (§12.3.1 rule 7, #88): write only what fits.
+  const uint32_t caller_size = out.struct_size;
+  if (caller_size < kJobProgressV1Size) {
+    return;
+  }
+  ovt_JobProgress full{};
+  {
+    const std::lock_guard<std::mutex> lock(job.m);
+    fill(job, full);
+  }
+  const uint32_t n = std::min<uint32_t>(caller_size, sizeof(ovt_JobProgress));
+  std::memcpy(&out, &full, n);
+  out.struct_size = n;
 }
 
 void set_callback(ovt_Job& job, ovt_progress_fn fn, void* user) noexcept {

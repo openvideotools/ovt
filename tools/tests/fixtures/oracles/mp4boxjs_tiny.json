@@ -1,0 +1,347 @@
+[
+ {
+  "path": "ftyp",
+  "start": 0,
+  "size": 32,
+  "hdr_size": 8,
+  "type": "ftyp",
+  "fields": {
+   "box_name": "FileTypeBox",
+   "major_brand": "isom",
+   "minor_version": 512
+  }
+ },
+ {
+  "path": "free",
+  "start": 32,
+  "size": 8,
+  "hdr_size": 8,
+  "type": "free",
+  "fields": {
+   "box_name": "FreeSpaceBox"
+  }
+ },
+ {
+  "path": "mdat",
+  "start": 40,
+  "size": 5698,
+  "hdr_size": 8,
+  "type": "mdat",
+  "fields": {
+   "box_name": "MediaDataBox"
+  }
+ },
+ {
+  "path": "moov",
+  "start": 5738,
+  "size": 849,
+  "hdr_size": 8,
+  "type": "moov",
+  "fields": {
+   "box_name": "MovieBox"
+  }
+ },
+ {
+  "path": "moov/mvhd",
+  "start": 5746,
+  "size": 108,
+  "hdr_size": 12,
+  "type": "mvhd",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "MovieHeaderBox",
+   "creation_time": 0,
+   "modification_time": 0,
+   "timescale": 1000,
+   "duration": 120,
+   "rate": 65536,
+   "volume": 1,
+   "next_track_id": 2
+  }
+ },
+ {
+  "path": "moov/trak",
+  "start": 5854,
+  "size": 635,
+  "hdr_size": 8,
+  "type": "trak",
+  "fields": {
+   "box_name": "TrackBox",
+   "samples_duration": 1536,
+   "samples_size": 5690
+  }
+ },
+ {
+  "path": "moov/trak/tkhd",
+  "start": 5862,
+  "size": 92,
+  "hdr_size": 12,
+  "type": "tkhd",
+  "fields": {
+   "flags": 3,
+   "version": 0,
+   "box_name": "TrackHeaderBox",
+   "layer": 0,
+   "alternate_group": 0,
+   "creation_time": 0,
+   "modification_time": 0,
+   "track_id": 1,
+   "duration": 120,
+   "volume": 0,
+   "width": 4194304,
+   "height": 4194304
+  }
+ },
+ {
+  "path": "moov/trak/edts",
+  "start": 5954,
+  "size": 36,
+  "hdr_size": 8,
+  "type": "edts",
+  "fields": {
+   "box_name": "EditBox"
+  }
+ },
+ {
+  "path": "moov/trak/edts/elst",
+  "start": 5962,
+  "size": 28,
+  "hdr_size": 12,
+  "type": "elst",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "EditListBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia",
+  "start": 5990,
+  "size": 499,
+  "hdr_size": 8,
+  "type": "mdia",
+  "fields": {
+   "box_name": "MediaBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/mdhd",
+  "start": 5998,
+  "size": 32,
+  "hdr_size": 12,
+  "type": "mdhd",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "MediaHeaderBox",
+   "creation_time": 0,
+   "modification_time": 0,
+   "timescale": 12800,
+   "duration": 1536,
+   "language": 21956,
+   "languageString": "und"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/hdlr",
+  "start": 6030,
+  "size": 45,
+  "hdr_size": 12,
+  "type": "hdlr",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "HandlerBox",
+   "handler": "vide",
+   "name": "VideoHandler"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf",
+  "start": 6075,
+  "size": 414,
+  "hdr_size": 8,
+  "type": "minf",
+  "fields": {
+   "box_name": "MediaInformationBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/vmhd",
+  "start": 6083,
+  "size": 20,
+  "hdr_size": 12,
+  "type": "vmhd",
+  "fields": {
+   "flags": 1,
+   "version": 0,
+   "box_name": "VideoMediaHeaderBox",
+   "graphicsmode": 0
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf",
+  "start": 6103,
+  "size": 36,
+  "hdr_size": 8,
+  "type": "dinf",
+  "fields": {
+   "box_name": "DataInformationBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "start": 6111,
+  "size": 28,
+  "hdr_size": 12,
+  "type": "dref",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "DataReferenceBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl",
+  "start": 6139,
+  "size": 350,
+  "hdr_size": 8,
+  "type": "stbl",
+  "fields": {
+   "box_name": "SampleTableBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "start": 6147,
+  "size": 190,
+  "hdr_size": 12,
+  "type": "stsd",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "SampleDescriptionBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "start": 6337,
+  "size": 24,
+  "hdr_size": 12,
+  "type": "stts",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "TimeToSampleBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stss",
+  "start": 6361,
+  "size": 24,
+  "hdr_size": 12,
+  "type": "stss",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "SyncSampleBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/ctts",
+  "start": 6385,
+  "size": 24,
+  "hdr_size": 12,
+  "type": "ctts",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "CompositionOffsetBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "start": 6409,
+  "size": 28,
+  "hdr_size": 12,
+  "type": "stsc",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "SampleToChunkBox"
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "start": 6437,
+  "size": 32,
+  "hdr_size": 12,
+  "type": "stsz",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "SampleSizeBox",
+   "sample_size": 0,
+   "sample_count": 3
+  }
+ },
+ {
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "start": 6469,
+  "size": 20,
+  "hdr_size": 12,
+  "type": "stco",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "ChunkOffsetBox"
+  }
+ },
+ {
+  "path": "moov/udta",
+  "start": 6489,
+  "size": 98,
+  "hdr_size": 8,
+  "type": "udta",
+  "fields": {
+   "box_name": "UserDataBox"
+  }
+ },
+ {
+  "path": "moov/udta/meta",
+  "start": 6497,
+  "size": 90,
+  "hdr_size": 12,
+  "type": "meta",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "MetaBox"
+  }
+ },
+ {
+  "path": "moov/udta/meta/hdlr",
+  "start": 6509,
+  "size": 33,
+  "hdr_size": 12,
+  "type": "hdlr",
+  "fields": {
+   "flags": 0,
+   "version": 0,
+   "box_name": "HandlerBox",
+   "handler": "mdir",
+   "name": ""
+  }
+ },
+ {
+  "path": "moov/udta/meta/ilst",
+  "start": 6542,
+  "size": 45,
+  "hdr_size": 8,
+  "type": "ilst",
+  "fields": {
+   "box_name": "IlstBox"
+  }
+ }
+]

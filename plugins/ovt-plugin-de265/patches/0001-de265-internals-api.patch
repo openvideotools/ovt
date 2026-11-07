@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-06
+Subject: [PATCH] placeholder: comment-only change proving the OVT patch step
+
+Placeholder for the internals API patch of chapter 07 (WI-2.162). It adds one comment to
+libde265/de265.cc and changes no code, so the patched library is identical to upstream 1.0.15.
+WI-2.162 replaces this file's content with the real patch under the same name.
+
+Upstream-Status: Inappropriate [OVT build placeholder, comment only; never submitted]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-3.0-or-later
+Rationale: exercises tools/apply_patches.py, the .ovt-patched marker and patches.json (WI-0.014)
+  before the internals API patch exists.
+---
+ libde265/de265.cc | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/libde265/de265.cc b/libde265/de265.cc
+--- a/libde265/de265.cc
++++ b/libde265/de265.cc
+@@ -20,6 +20,9 @@
+ 
+ #define DEBUG_INSERT_STREAM_ERRORS 0
+ 
++// Open Video Tools: placeholder patch (comment only). It proves the patch step of the OVT build and is
++// replaced by the internals API patch; the code compiles exactly as upstream.
++
+ 
+ #include "de265.h"
+ #include "decctx.h"

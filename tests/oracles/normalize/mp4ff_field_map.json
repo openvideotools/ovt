@@ -1,0 +1,41 @@
+{
+  "box": {
+    "*": {"version": "version", "flags": ["flags", "hex"], "trackID": "track_ID",
+          "creation time": "creation_time", "modification time": "modification_time"},
+    "ftyp": {"majorBrand": "major_brand", "minorVersion": "minor_version", "compatibleBrand": "compatible_brands[]"},
+    "styp": {"majorBrand": "major_brand", "minorVersion": "minor_version", "compatibleBrand": "compatible_brands[]"},
+    "mvhd": {"timeScale": "timescale", "duration": "duration"},
+    "tkhd": {"duration": "duration", "Width": ["width", "fixed16"], "Height": ["height", "fixed16"]},
+    "mdhd": {"timeScale": "timescale", "language": "language"},
+    "hdlr": {"handlerType": "handler_type", "handlerName": ["name", "str"]},
+    "avc1": {"width": "width", "height": "height", "compressorName": ["compressorname", "str"]},
+    "hvc1": {"width": "width", "height": "height", "compressorName": ["compressorname", "str"]},
+    "hev1": {"width": "width", "height": "height", "compressorName": ["compressorname", "str"]},
+    "av01": {"width": "width", "height": "height", "compressorName": ["compressorname", "str"]},
+    "avcC": {"AVCProfileIndication": "AVCProfileIndication", "profileCompatibility": ["profile_compatibility", "hex"],
+             "AVCLevelIndication": "AVCLevelIndication", "SPS": ["sequenceParameterSetNALUnit[]", "blob"],
+             "PPS": ["pictureParameterSetNALUnit[]", "blob"]},
+    "pasp": {"hSpacing": "hSpacing", "vSpacing": "vSpacing"},
+    "btrt": {"bufferSizeDB": "bufferSizeDB", "maxBitrate": "maxBitrate", "AvgBitrate": "avgBitrate"},
+    "trex": {"defaultSampleDescriptionIndex": "default_sample_description_index",
+             "defaultSampleDuration": "default_sample_duration", "defaultSampleSize": "default_sample_size",
+             "defaultSampleFlags": ["default_sample_flags", "hex"]},
+    "mfhd": {"sequenceNumber": "sequence_number"},
+    "tfhd": {"sampleDescriptionIndex": "sample_description_index", "defaultSampleDuration": "default_sample_duration",
+             "defaultSampleSize": "default_sample_size", "defaultSampleFlags": ["default_sample_flags", "hex"],
+             "baseDataOffset": "base_data_offset"},
+    "tfdt": {"baseMediaDecodeTime": "baseMediaDecodeTime"},
+    "trun": {"sampleCount": "sample_count", "DataOffset": "data_offset",
+             "firstSampleFlags": ["first_sample_flags", "hex"]},
+    "tfra": {"nrEntries": "number_of_entry"},
+    "mfro": {"parentSize": "size"}
+  },
+  "split": {"pasp": {"hSpacing:vSpacing": ["hSpacing", "vSpacing"]}},
+  "entries": {
+    "trun": {"array": "entries", "fields": {"dur": "sample_duration", "size": "sample_size",
+                                           "flags": ["sample_flags", "hex"],
+                                           "compositionTimeOffset": "sample_composition_time_offset"}},
+    "tfra": {"array": "entries", "fields": {"time": "time", "moofOffset": "moof_offset", "trafNr": "traf_number",
+                                           "trunNr": "trun_number", "sampleDelta": "sample_number"}}
+  }
+}

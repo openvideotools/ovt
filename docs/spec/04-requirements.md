@@ -522,7 +522,7 @@
 
 ## 4.9 GUI — ovt-studio
 
-**Rationale.** chapter 3 §3.5 (UX-1 … UX-12) states the conventions users of VQA and SE Studio expect; this area turns each into a testable requirement and adds the panel inventory, keyboard map, layout persistence and large-data behaviour (Appendix B.4). ADR-004 fixes Qt 6 Quick; ADR-003 fixes that the GUI contains no analysis logic. UI acceptance tests use the Qt Quick Test harness in `app/tests/` with the `ui-test:` prefix and golden images in `tests/golden/`.
+**Rationale.** chapter 3 §3.5 (UX-1 … UX-12) states the UX conventions OVT adopts; this area turns each into a testable requirement and adds the panel inventory, keyboard map, layout persistence and large-data behaviour (Appendix B.4). ADR-004 fixes Qt 6 Quick; ADR-003 fixes that the GUI contains no analysis logic. UI acceptance tests use the Qt Quick Test harness in `app/tests/` with the `ui-test:` prefix and golden images in `tests/golden/`.
 
 **FR-GUI-001** (Phase 1) — `ovt-studio` MUST implement the three-pane skeleton of UX-1: a timeline region (bottom), a picture region (centre) and a tabbed side region (right) with the panels Container, Syntax, Hex, Selection Info, Statistics, Metrics, HDR, Diagnostics, Reference Graph, Histogram; every panel MUST be dockable, floatable, closable and re-openable from the View menu.
 - Acceptance: Given a fresh profile, when `ovt-studio` starts, then the three regions are visible with the default panel set, and when the tester drags the Syntax panel out and back, then it docks again (`ui-test:DockingRoundTrip`).
