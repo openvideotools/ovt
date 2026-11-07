@@ -54,6 +54,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/settings.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
+    "${app_dir}/src/models/selection_model.h"
+    "${app_dir}/src/models/selection_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
     "${app_dir}/src/dock/dock_model.cpp"
     RESOURCES
