@@ -32,7 +32,7 @@
 using namespace ovt::app;           // NOLINT(google-build-using-namespace): test file
 using namespace ovt::app::testing;  // NOLINT(google-build-using-namespace): test file
 
-TEST_CASE("StreamIndexHandle verifies the bytes", "[app][timeline][adapter]") {
+TEST_CASE("StreamIndexHandle verifies the bytes", "[fast][gui][timeline][adapter]") {
   CHECK(StreamIndexHandle::adopt({}) == nullptr);
   CHECK(StreamIndexHandle::adopt(std::vector<std::uint8_t>(64, 0xFF)) == nullptr);
   std::vector<std::uint8_t> truncated = build_index(gop60(4, 1), 1, 60);
@@ -41,7 +41,7 @@ TEST_CASE("StreamIndexHandle verifies the bytes", "[app][timeline][adapter]") {
   CHECK(StreamIndexHandle::adopt(build_index(gop60(4, 1), 1, 60)) != nullptr);
 }
 
-TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamIndex", "[app][timeline][adapter]") {
+TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamIndex", "[fast][gui][timeline][adapter]") {
   // Decode order I P B B with display order I B B P: pts 0, 3, 1, 2.
   const std::vector<SyntheticFrame> frames{
       {0, 5000, 20, true, 0}, {3, 800, 26, false, 0}, {1, 300, 30, false, 1}, {2, 310, 30, false, 1}};
@@ -103,7 +103,7 @@ TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamInde
   }
 }
 
-TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[app][timeline][adapter]") {
+TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[fast][gui][timeline][adapter]") {
   ovt::app::testing::qt_app();
   const std::vector<SyntheticFrame> frames{{0, 5000, 20, true, 0}, {1, 800, 26, false, 0}};
   StreamIndexModel model;
@@ -117,7 +117,7 @@ TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[app
 }
 
 TEST_CASE("range statistics: bitrate is Σbytes×8 / Δpts from the time base, exact to one tick",
-          "[app][timeline][stats]") {
+          "[fast][gui][timeline][stats]") {
   // 90 kHz track, 60 fps: 1500 ticks per frame. The drag covers frames 120–240.
   const auto frames = gop60(300, 1500);
   const FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 90000))->index()};
@@ -142,7 +142,7 @@ TEST_CASE("range statistics: bitrate is Σbytes×8 / Δpts from the time base, e
   CHECK(must(table.range_stats(299, 299)).ticks == 1500);
 }
 
-TEST_CASE("display order re-sorts the bars and keeps the selection on the same frame", "[app][timeline][order]") {
+TEST_CASE("display order re-sorts the bars and keeps the selection on the same frame", "[fast][gui][timeline][order]") {
   // Decode order I P B B: pts 0 3 1 2.
   const std::vector<SyntheticFrame> frames{
       {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};
@@ -167,7 +167,7 @@ TEST_CASE("display order re-sorts the bars and keeps the selection on the same f
   CHECK(must(table.range_stats(1, 2)).bytes == 61);
 }
 
-TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[app][timeline][series]") {
+TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[fast][gui][timeline][series]") {
   const std::vector<SyntheticFrame> frames{{0, 500, 20, true, 0}, {1, 80, 26, false, 2}, {2, 30, 30, false, 1}};
   FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 30))->index()};
   CHECK(table.aggregator({Series::Qp, {}, 0}).max(0, 3) == 30.0);
@@ -181,7 +181,7 @@ TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[app][timeline
   CHECK(std::isnan(table.aggregator({Series::Metric, "psnr", 1}).max(0, 3)));  // another plane
 }
 
-TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[app][timeline][model]") {
+TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[fast][gui][timeline][model]") {
   ovt::app::testing::qt_app();
   const std::vector<SyntheticFrame> frames{
       {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};

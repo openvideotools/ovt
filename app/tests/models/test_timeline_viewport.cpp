@@ -20,7 +20,7 @@ using ovt::app::Rgba;
 using ovt::app::SeriesColumn;
 using ovt::app::TimelineViewport;
 
-TEST_CASE("viewport starts fitted and fits again", "[app][timeline][viewport]") {
+TEST_CASE("viewport starts fitted and fits again", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(1000);
   CHECK(v.is_fit());
   CHECK(v.first_frame() == 0);
@@ -32,7 +32,7 @@ TEST_CASE("viewport starts fitted and fits again", "[app][timeline][viewport]") 
   CHECK(v.count() == 1000.0);
 }
 
-TEST_CASE("one wheel notch zooms 1.25x about the cursor and keeps the frame under it", "[app][timeline][viewport]") {
+TEST_CASE("one wheel notch zooms 1.25x about the cursor and keeps the frame under it", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(1000);
   const double width = 800.0;
   const double x = 200.0;  // a quarter across
@@ -45,7 +45,7 @@ TEST_CASE("one wheel notch zooms 1.25x about the cursor and keeps the frame unde
   CHECK(v.is_fit());
 }
 
-TEST_CASE("zoom is clamped to the series and to a minimum count", "[app][timeline][viewport]") {
+TEST_CASE("zoom is clamped to the series and to a minimum count", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(100);
   v.zoom_about(1e9, 0.3);
   CHECK(v.count() == TimelineViewport::kMinCount);
@@ -59,7 +59,7 @@ TEST_CASE("zoom is clamped to the series and to a minimum count", "[app][timelin
   CHECK(empty.frame_at(10, 100) == 0);
 }
 
-TEST_CASE("pan clamps to the series", "[app][timeline][viewport]") {
+TEST_CASE("pan clamps to the series", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(1000);
   v.zoom_about(10.0, 0.0);  // 100 frames from 0
   v.pan_frames(250.0);
@@ -71,7 +71,7 @@ TEST_CASE("pan clamps to the series", "[app][timeline][viewport]") {
   CHECK(v.first() == 0.0);
 }
 
-TEST_CASE("pixel to frame mapping", "[app][timeline][viewport]") {
+TEST_CASE("pixel to frame mapping", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(1000);
   v.zoom_about(10.0, 0.0);  // frames 0..100 over 500 px: 5 px per frame
   CHECK(v.frame_at(0.0, 500.0) == 0);
@@ -83,7 +83,7 @@ TEST_CASE("pixel to frame mapping", "[app][timeline][viewport]") {
   CHECK_THAT(v.x_of(50.0, 500.0), WithinAbs(250.0, 1e-9));
 }
 
-TEST_CASE("a new series length keeps a zoomed view and refits a fitted one", "[app][timeline][viewport]") {
+TEST_CASE("a new series length keeps a zoomed view and refits a fitted one", "[fast][gui][timeline][viewport]") {
   TimelineViewport v(100);
   v.set_total(200);  // was fitted: still fitted
   CHECK(v.is_fit());
@@ -95,7 +95,7 @@ TEST_CASE("a new series length keeps a zoomed view and refits a fitted one", "[a
   CHECK(v.count() == 20.0);
 }
 
-TEST_CASE("bars are scaled to the maximum, grow upward and skip gaps", "[app][timeline][geometry]") {
+TEST_CASE("bars are scaled to the maximum, grow upward and skip gaps", "[fast][gui][timeline][geometry]") {
   const double nan = std::numeric_limits<double>::quiet_NaN();
   const std::vector<SeriesColumn> columns{{0, 1, 100.0, 100.0}, {1, 2, 50.0, 50.0}, {2, 3, nan, nan}, {3, 4, 0.0, 0.0}};
   const std::vector<Rgba> colors(columns.size(), Rgba{1, 2, 3, 255});
@@ -122,7 +122,7 @@ TEST_CASE("bars are scaled to the maximum, grow upward and skip gaps", "[app][ti
   CHECK(bottom == 200.0F);
 }
 
-TEST_CASE("narrow columns leave no gap and a missing colour is grey", "[app][timeline][geometry]") {
+TEST_CASE("narrow columns leave no gap and a missing colour is grey", "[fast][gui][timeline][geometry]") {
   const std::vector<SeriesColumn> columns{{0, 1, 1.0, 1.0}, {1, 2, 1.0, 1.0}};
   const auto bars = ovt::app::build_bars(columns, {}, 1.0, 4.0F, 10.0F);  // 2 px per column
   REQUIRE(bars.size() == 12);
@@ -132,7 +132,7 @@ TEST_CASE("narrow columns leave no gap and a missing colour is grey", "[app][tim
   CHECK(ovt::app::build_bars(columns, {}, 0.0, 4.0F, 10.0F).empty());
 }
 
-TEST_CASE("the mean line joins neighbouring non-gap columns", "[app][timeline][geometry]") {
+TEST_CASE("the mean line joins neighbouring non-gap columns", "[fast][gui][timeline][geometry]") {
   const double nan = std::numeric_limits<double>::quiet_NaN();
   const std::vector<SeriesColumn> columns{
       {0, 1, 4.0, 2.0}, {1, 2, 4.0, 4.0}, {2, 3, nan, nan}, {3, 4, 4.0, 4.0}, {4, 5, 4.0, 0.0}};
@@ -144,7 +144,7 @@ TEST_CASE("the mean line joins neighbouring non-gap columns", "[app][timeline][g
   CHECK(line[3].y == 40.0F);
 }
 
-TEST_CASE("frame type colours follow section 11.4.5", "[app][timeline][geometry]") {
+TEST_CASE("frame type colours follow section 11.4.5", "[fast][gui][timeline][geometry]") {
   using ovt::app::frame_type_color;
   namespace fb = ovt::fb;
   CHECK(frame_type_color(fb::FrameType::I, true) == Rgba{0xE5, 0x39, 0x35, 255});
