@@ -193,10 +193,7 @@ de265_image_allocation g_allocation = {get_buffer, release_buffer};  // libde265
 }  // namespace
 
 ovt_status Decoder::create(const uint8_t* codec_private, size_t len, int threads, std::unique_ptr<Decoder>* out) {
-  std::unique_ptr<Decoder> dec(new (std::nothrow) Decoder());
-  if (!dec) {
-    return OVT_E_NOMEM;
-  }
+  std::unique_ptr<Decoder> dec(new Decoder());  // std::bad_alloc becomes OVT_E_NOMEM in plugin.cpp
   de265_decoder_context* ctx = de265_new_decoder();
   if (ctx == nullptr) {
     return OVT_E_NOMEM;

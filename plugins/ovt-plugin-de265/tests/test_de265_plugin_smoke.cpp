@@ -388,7 +388,7 @@ TEST_CASE("de265 plugin: SCC, RExt and enhancement-layer units are refused with 
   const ovt::fb::FrameAnalysis* fa = as_fa(fb);
   REQUIRE(fa->frame() != nullptr);
   CHECK(fa->frame()->id()->decode_index() == 7);
-  CHECK((fa->planes() == nullptr || fa->planes()->size() == 0));
+  CHECK((fa->planes() == nullptr || fa->planes()->begin() == fa->planes()->end()));
   REQUIRE(fa->diagnostics() != nullptr);
   bool found = false;
   for (const ovt::fb::Diagnostic* d : *fa->diagnostics()) {
