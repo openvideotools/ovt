@@ -29,7 +29,7 @@ std::filesystem::path executable_path() {
   }
   buf.resize(std::char_traits<char>::length(buf.c_str()));
   std::error_code ec;
-  std::filesystem::path p = std::filesystem::canonical(buf, ec);
+  const std::filesystem::path p = std::filesystem::canonical(buf, ec);
   return ec ? std::filesystem::path(buf) : p;
 }
 
