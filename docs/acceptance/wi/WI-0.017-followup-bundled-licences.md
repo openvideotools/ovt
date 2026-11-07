@@ -47,10 +47,14 @@ yadif CUDA filter (`shaders/dithering.c`, `deinterlacing.c`) is LGPL-2.1-or-late
 
 ## Other vendored dependencies (findings, no change in this PR)
 
-- **libaom 3.12.1** (script pending in #154): `third_party/` holds libwebm (BSD-3-Clause + PATENTS.TXT), libyuv
-  (BSD-3-Clause), x86inc (ISC), fastfeat (BSD-3-Clause), vector (BSD-3-Clause), SVT-AV1 (BSD-3-Clause-Clear style
-  `LICENSE.md` + `PATENTS.md`) and googletest (tests only). `LICENSE_FILES` should list `LICENSE`, `PATENTS` and the
-  `third_party/*/LICENSE*` files, and the SVT-AV1 and libwebm patent files belong with the patent notice.
+- **libaom 3.12.1** (script pending in #154): `third_party/` holds libwebm (BSD-3-Clause + `PATENTS.TXT`), libyuv
+  (BSD-3-Clause), x86inc (ISC), fastfeat (BSD-3-Clause, Edward Rosten), vector (MIT), SVT-AV1 (`LICENSE.md`:
+  **BSD-3-Clause-Clear**, with `PATENTS.md`) and googletest (tests only). `LICENSE_FILES` for libaom should list
+  `LICENSE`, `PATENTS` and the `third_party/*/LICENSE*` files. BSD-3-Clause-Clear is not an id in
+  `tools/license_policy.toml`, and its code **is compiled in by default**: `CONFIG_SVT_AV1=1` adds the SVT-AV1 AVX2
+  convolution headers to `aom_dsp` on x86. It is permissive but says explicitly that no patent licence is granted
+  (the AOM PATENTS grant covers libaom's own code). A new licence id is a Karl decision (project rules), so #154 or a
+  follow-up should raise it, or build with `-DCONFIG_SVT_AV1=0` (decoder performance cost only).
 - **dav1d 1.5.1**: `COPYING` is BSD-2-Clause only, but `src/ext/x86/x86inc.asm` is ISC (x264), `src/loongarch/
   loongson_asm.S` is ISC and `src/arm/64/mc16_sve.S` is BSD-2-Clause (Arm). `dav1d.cmake` stages `COPYING` only, so the
   ISC text is missing.
