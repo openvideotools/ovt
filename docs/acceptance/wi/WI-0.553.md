@@ -63,9 +63,9 @@ Machine: Mac Mini (Apple silicon, macOS 15) running Docker Desktop, image `ovt-o
 and `libopus`). Generator tree: `main` at bca3c0c (includes #178, #194 and #201). Date: 2026-11-07.
 `oracle-smoke-test` 51/51 and `oracle-recipe-tools --check` 57 ok, 0 missing on this image.
 
-```console
-$ python3 tests/corpora/synthetic/generate.py --out /work/out --update-manifest --only <49 recipes>   # exit 0
-$ python3 tests/corpora/synthetic/generate.py --out /work/outcheck --check                          # exit 0
+```sh
+python3 tests/corpora/synthetic/generate.py --out /work/out --update-manifest --only <49 recipes>   # exit 0
+python3 tests/corpora/synthetic/generate.py --out /work/outcheck --check                          # exit 0
 ```
 
 The 49 recipes were the 47 new `syn_raw_*` and `syn_broken_syntax_*` ids from #178 plus `syn_mp4_cenc_widevine` and
