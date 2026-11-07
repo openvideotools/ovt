@@ -58,61 +58,6 @@ function(ovt_set_dependency_license name)
   set_property(GLOBAL PROPERTY "OVT_DEP_PATCHED_${name}" "${arg_PATCHED}")
 endfunction()
 
-# Describes a library file of a vcpkg port (an absolute path in a link interface, such as libglslang.a) with the licence
-# the port itself declares in <installed>/<triplet>/share/<port>/vcpkg.spdx.json. Does nothing when the file is absent, so
-# the licence gate then reports the library as NOASSERTION rather than OVT guessing a licence.
-function(ovt_describe_vcpkg_library path port)
-  if(NOT OVT_USE_VCPKG OR NOT IS_ABSOLUTE "${path}")
-    return()
-  endif()
-  set(spdx_file "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share/${port}/vcpkg.spdx.json")
-  if(NOT EXISTS "${spdx_file}")
-    return()
-  endif()
-  file(READ "${spdx_file}" doc)
-  string(
-    JSON
-    spdx
-    ERROR_VARIABLE
-    err
-    GET
-    "${doc}"
-    "packages"
-    0
-    "licenseConcluded")
-  if(err OR spdx STREQUAL "" OR spdx STREQUAL "NOASSERTION")
-    return()
-  endif()
-  string(
-    JSON
-    version
-    ERROR_VARIABLE
-    err
-    GET
-    "${doc}"
-    "packages"
-    0
-    "versionInfo")
-  if(err)
-    set(version "")
-  endif()
-  if(path MATCHES "\\.a$")
-    set(linkage static)
-  else()
-    set(linkage shared)
-  endif()
-  ovt_set_dependency_license(
-    "${path}"
-    SOURCE
-    vcpkg
-    SPDX
-    "${spdx}"
-    VERSION
-    "${version}"
-    LINKAGE
-    ${linkage})
-endfunction()
-
 # Normalises one LINK_LIBRARIES entry: unwraps $<LINK_ONLY:x> and $<BUILD_INTERFACE:x>, drops other generator expressions,
 # linker flags, the ovt::flags interface target and C-runtime platform libraries. Sets out_var to "" for
 # entries to skip.

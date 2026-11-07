@@ -643,3 +643,56 @@ def test_ci_workflow_wires_every_gate_input() -> None:
     assert "VERSIONS_bad.md" in gate_job and "continue-on-error" not in gate_job
     assert "ovt_license_manifest" in text
     assert "--manifest build/linux-x64-release/license_manifest.json" in text
+
+
+def test_manifest_library_file_takes_the_licence_of_its_vcpkg_port(tmp_path: Path) -> None:
+    # tp::placebo links vcpkg's libglslang.a by absolute path; the manifest has no licence for it (NOASSERTION), the
+    # port's vcpkg.spdx.json says null, so the reviewed [vcpkg_overrides] entry applies. WI-0.032.
+    installed = tmp_path / "vcpkg_installed"
+    root = installed / "x64-linux-ovt"
+    (root / "share" / "glslang").mkdir(parents=True)
+    (root / "share" / "glslang" / "vcpkg.spdx.json").write_text(
+        json.dumps({"packages": [{"versionInfo": "16", "licenseConcluded": "LicenseRef-vcpkg-null"}]})
+    )
+    (installed / "vcpkg" / "info").mkdir(parents=True)
+    (installed / "vcpkg" / "info" / "glslang_16.4.0_x64-linux-ovt.list").write_text("x64-linux-ovt/lib/libglslang.a\n")
+    lib = str(root / "lib" / "libglslang.a")
+
+    def manifest(path_name: str) -> Path:
+        m = tmp_path / "m.json"
+        m.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "preset": "x",
+                    "options": {},
+                    "targets": [
+                        {
+                            "name": "ovt_render",
+                            "type": "STATIC",
+                            "spdx": "LGPL-2.1-or-later",
+                            "directory": "render/",
+                            "links": [
+                                {
+                                    "name": path_name,
+                                    "source": "system",
+                                    "version": "",
+                                    "spdx": "NOASSERTION",
+                                    "linkage": "static",
+                                    "patched": False,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+        return m
+
+    code, data, _ = run("--manifest", str(manifest(lib)), "--vcpkg", str(root), report=tmp_path / "ok.json")
+    assert code == 0, data
+    # a file that no port installed stays unknown
+    code, data, _ = run("--manifest", str(manifest(lib + ".x")), "--vcpkg", str(root), report=tmp_path / "bad.json")
+    assert code == 1 and codes(data) == ["E-UNKNOWN"]
+    # without --vcpkg nothing resolves it
+    assert run("--manifest", str(manifest(lib)), report=tmp_path / "novcpkg.json")[0] == 1
