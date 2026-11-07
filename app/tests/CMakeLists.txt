@@ -9,7 +9,8 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS QuickTest)
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
 
 # ---- Models: Settings, Platform and JobsModel, without QML -------------------------------------------------
-add_executable(ovt_tests_app_models models/test_settings.cpp models/test_jobs_model.cpp ../src/settings.cpp
+add_executable(ovt_tests_app_models models/test_settings.cpp models/test_jobs_model.cpp models/test_keymap.cpp
+                                    models/test_goto_parser.cpp ../src/settings.cpp ../src/keymap.cpp ../src/goto_parser.cpp
                                     ../src/platform/platform.cpp ../src/models/jobs_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
 qt_add_resources(

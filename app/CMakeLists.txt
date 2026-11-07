@@ -24,7 +24,9 @@ function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
   set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml")
+                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml"
+                "${app_dir}/qml/ShortcutLayer.qml" "${app_dir}/qml/Dialogs.qml" "${app_dir}/qml/dialogs/GotoDialog.qml"
+                "${app_dir}/qml/dialogs/PreferencesDialog.qml" "${app_dir}/qml/dialogs/KeymapDialog.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -52,6 +54,10 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/platform/platform.cpp"
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
+    "${app_dir}/src/keymap.h"
+    "${app_dir}/src/keymap.cpp"
+    "${app_dir}/src/goto_parser.h"
+    "${app_dir}/src/goto_parser.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
     RESOURCES
