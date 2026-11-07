@@ -130,7 +130,7 @@ class JobsModel : public QAbstractListModel {
   Entry* find(quint64 id);
   [[nodiscard]] int row_of(quint64 id) const;
   // Returns true when the job has just finished (the caller emits jobFinished).
-  bool update_entry(Entry& entry);
+  static bool update_entry(Entry& entry);
   [[nodiscard]] static QString text_of(const Entry& entry);
 
   QThreadPool pool_;

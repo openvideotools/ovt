@@ -179,8 +179,8 @@ class DiagnosticsFilterModel : public QSortFilterProxyModel {
   void setText(const QString& text);
 
   Q_INVOKABLE bool activate(int row);
-  Q_INVOKABLE QString rowText(int row) const;
-  Q_INVOKABLE QString allText() const;
+  [[nodiscard]] Q_INVOKABLE QString rowText(int row) const;
+  [[nodiscard]] Q_INVOKABLE QString allText() const;
 
  Q_SIGNALS:
   void filterChanged();
