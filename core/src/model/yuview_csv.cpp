@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <ostream>
 #include <set>
 #include <span>
@@ -96,7 +97,7 @@ constexpr std::int64_t kNoValue = std::numeric_limits<std::int64_t>::min();
 
 void append_int(std::string& line, std::int64_t value) {
   std::array<char, 24> buf{};
-  const auto res = std::to_chars(buf.data(), buf.data() + buf.size(), value);
+  const auto res = std::to_chars(buf.data(), std::to_address(buf.end()), value);
   line.append(buf.data(), res.ptr);
 }
 
@@ -296,7 +297,7 @@ class FrameView {
   template <typename T>
   [[nodiscard]] std::vector<std::int64_t> copy(const flatbuffers::Vector<T>* vec, T sentinel) const {
     const std::uint64_t cells = std::uint64_t{cells_w_} * cells_h_;
-    if (vec == nullptr || vec->size() == 0 || vec->size() != cells) {
+    if (vec == nullptr || vec->size() != cells) {
       return {};
     }
     std::vector<std::int64_t> out;
