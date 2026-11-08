@@ -146,8 +146,8 @@ TEST_CASE("render_test_overlay_heatmap_mv_magnitude_and_txsize", "[render][overl
   CHECK(s.heat_valid[at(s, 3, 3)] == 0);
   REQUIRE(s.heat_valid[at(s, 4, 3)] == 1);
   const double mag = std::sqrt(((4.0 * 4 - 100) * (4.0 * 4 - 100)) + 9.0) / 16.0;  // mv0 = (4 cx - 100, cy)
-  const double lo = s.heat_lo;
-  const double hi = s.heat_hi;
+  const auto lo = static_cast<double>(s.heat_lo);
+  const auto hi = static_cast<double>(s.heat_hi);
   CHECK(s.heatmap[at(s, 4, 3)] ==
         static_cast<uint16_t>(std::lround(std::clamp((mag - lo) / (hi - lo), 0.0, 1.0) * 65535.0)));
 
