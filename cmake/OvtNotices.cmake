@@ -15,7 +15,8 @@
 #
 # Licence texts come from the dependencies' install prefixes, never from the network:
 #   * ExternalProject dependencies: the LICENSE_FILES of ovt_tp_declare() are staged from the dependency's source
-#     directory into ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
+#     directory (an absolute entry is a text kept in this repository, third_party/licenses/<dep>/) into
+#     ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
 #   * vcpkg ports: <vcpkg installed dir>/<triplet>/share/<port>/copyright;
 #   * Qt: ${QT_ROOT_DIR}/Licenses.
 #
@@ -59,7 +60,14 @@ foreach(_dep IN LISTS OVT_TP_DEPS)
     externalproject_get_property(${_ep} SOURCE_DIR)
     foreach(_f IN LISTS _files)
       get_filename_component(_name "${_f}" NAME) # staged by base name: gen_notices.py reads <dep>/* without recursion
-      list(APPEND _ovt_notices_stage_cmds COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SOURCE_DIR}/${_f}"
+      # An absolute path is a text kept in this repository (code the dependency compiles in besides its own, whose
+      # licence text sits only in source-file headers: third_party/licenses/<dep>/); a relative one is in the archive.
+      if(IS_ABSOLUTE "${_f}")
+        set(_src "${_f}")
+      else()
+        set(_src "${SOURCE_DIR}/${_f}")
+      endif()
+      list(APPEND _ovt_notices_stage_cmds COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_src}"
            "${_ovt_notices_staging}/${_key}/${_name}")
     endforeach()
   endif()
@@ -71,6 +79,7 @@ unset(_key_set)
 unset(_key)
 unset(_files)
 unset(_f)
+unset(_src)
 
 set(_ovt_notices_args
     --report

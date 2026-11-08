@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openvideotools.org/schema/cache-meta-1.json",
+  "title": "OVT cache entry metadata (meta.json), cache_format 1",
+  "description": "Chapter 06 §6.7.2 of the OVT specification; written by core/src/cache/meta_json.cpp (WI-0.091).",
+  "type": "object",
+  "required": ["cache_format", "source_hash", "created", "ovt_version", "schemas", "codec", "frame_count", "plugins"],
+  "properties": {
+    "cache_format": { "const": 1 },
+    "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "source_name": { "type": "string", "description": "basename at creation (informational)" },
+    "source_size": { "type": "integer", "minimum": 0 },
+    "created": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC, e.g. 2026-11-03T14:05:09Z" },
+    "last_used": { "type": "string", "format": "date-time" },
+    "ovt_version": { "type": "string", "description": "e.g. 0.3.0+gabcdef" },
+    "schemas": {
+      "type": "object",
+      "required": ["ovt_model", "ovt_container", "ovt_metrics"],
+      "properties": {
+        "ovt_model":     { "$ref": "#/$defs/schemaRev" },
+        "ovt_container": { "$ref": "#/$defs/schemaRev" },
+        "ovt_metrics":   { "$ref": "#/$defs/schemaRev" }
+      }
+    },
+    "codec": { "type": "string", "enum": ["H264", "H265", "AV1", "VP9", "H266", "MPEG2", "Unknown"] },
+    "frame_count": { "type": "integer", "minimum": 0 },
+    "index_complete": { "type": "boolean" },
+    "plugins": {
+      "type": "array",
+      "description": "one entry per analysis plugin whose FrameAnalysis files exist under frames/",
+      "items": { "type": "object", "required": ["plugin_id", "plugin_version", "frames"],
+        "properties": {
+          "plugin_id": { "type": "string" }, "plugin_version": { "type": "string" },
+          "plane_stage_mask": { "type": "integer" },
+          "frames": { "type": "integer", "description": "number of frames/*.fa.zst written by this plugin" } } }
+    },
+    "planes_cached": { "type": "boolean" }
+  },
+  "$defs": { "schemaRev": { "type": "object", "required": ["major", "sha256"],
+    "properties": { "major": { "type": "integer", "minimum": 1 }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the .fbs file text the writer was built with (tools/schema_hash.py); informational" } } } }
+}

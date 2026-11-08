@@ -119,6 +119,87 @@ path = ["tools/tests/fixtures/oracles/**"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "LGPL-2.1-or-later"
 
+# Licence texts of code that libvmaf and libplacebo compile in besides their own (third_party/licenses/<dep>/,
+# staged into THIRD_PARTY_NOTICES.md by cmake/OvtNotices.cmake; WI-0.017 follow-up). Each file is the text copied
+# verbatim from the header of the bundled source in the pinned archive (libvmaf 3.0.0, libplacebo 7.349.0), or from
+# the upstream project's own licence file where the archive carries none (mkdirp, pdjson, glumpy). The copyright
+# and identifier are the bundled code's, not OVT's.
+[[annotations]]
+path = "third_party/licenses/libvmaf/libsvm-BSD-3-Clause.txt"
+SPDX-FileCopyrightText = "2000-2019 Chih-Chung Chang and Chih-Jen Lin"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/xiph-psnr_hvs-BSD-2-Clause.txt"
+SPDX-FileCopyrightText = "2001-2012 Xiph.Org and contributors"
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/iqa-tdistler-BSD-3-Clause.txt"
+SPDX-FileCopyrightText = "2011 Tom Distler"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/ciede2000-MIT.txt"
+SPDX-FileCopyrightText = "2019 Joshua Holmer"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/dav1d-derived-BSD-2-Clause.txt"
+SPDX-FileCopyrightText = "2018 VideoLAN and dav1d authors"
+SPDX-License-Identifier = "BSD-2-Clause"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/x86inc-ISC.txt"
+SPDX-FileCopyrightText = "2005-2020 x264 project"
+SPDX-License-Identifier = "ISC"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/mkdirp-MIT.txt"
+SPDX-FileCopyrightText = "2013 Stephen Mathieson"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "third_party/licenses/libvmaf/pdjson-Unlicense.txt"
+SPDX-FileCopyrightText = "pdjson authors (public domain)"
+SPDX-License-Identifier = "Unlicense"
+
+[[annotations]]
+path = "third_party/licenses/libplacebo/siphash-CC0-1.0.txt"
+SPDX-FileCopyrightText = "2012-2016 Jean-Philippe Aumasson; 2012-2014 Daniel J. Bernstein"
+SPDX-License-Identifier = "CC0-1.0"
+
+[[annotations]]
+path = "third_party/licenses/libplacebo/ccseqparse-naveros-Zlib.txt"
+SPDX-FileCopyrightText = "2007-2016 Alexis Naveros"
+SPDX-License-Identifier = "Zlib"
+
+[[annotations]]
+path = "third_party/licenses/libplacebo/glumpy-filters-BSD-3-Clause.txt"
+SPDX-FileCopyrightText = "2014 Nicolas P. Rougier"
+SPDX-License-Identifier = "BSD-3-Clause"
+
+[[annotations]]
+path = "third_party/licenses/dav1d/x86inc-ISC.txt"
+SPDX-FileCopyrightText = "2005-2024 x264 project"
+SPDX-License-Identifier = "ISC"
+
+[[annotations]]
+path = "third_party/licenses/dav1d/loongson-asm-ISC.txt"
+SPDX-FileCopyrightText = "2022 Loongson Technology Corporation Limited"
+SPDX-License-Identifier = "ISC"
+
+# libde265's md5.cc: public domain with a permissive fallback grant, no SPDX id (the text is also LICENSES/).
+[[annotations]]
+path = "third_party/licenses/libde265/md5-LicenseRef-Peslyak-md5-public-domain.txt"
+SPDX-FileCopyrightText = "2001 Alexander Peslyak"
+SPDX-License-Identifier = "LicenseRef-Peslyak-md5-public-domain"
+
+[[annotations]]
+path = "third_party/licenses/libaom/x86inc-ISC.txt"
+SPDX-FileCopyrightText = "2005-2019 x264 project"
+SPDX-License-Identifier = "ISC"
+
 # UVQ (WI-3.314): the YouTube-8M class names exported from google/uvq's contentnet_labels.csv (the "Name"
 # column, one per line) are upstream data, Apache-2.0 like the rest of that repository (chapter 9 §9.6.1).
 [[annotations]]
