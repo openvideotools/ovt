@@ -3,9 +3,11 @@
 //
 // libovt_plugin_ffmpeg: the ABI glue of the H.264 analysis plugin (chapter 0 §0.6.2, chapter 07 §7.6.3, WI-2.169).
 // It exports ovt_analysis_decoder_v1() and ovt_plugin_describe() (chapter 13 §13.3.3) and nothing else; every entry
-// point is noexcept and turns an exception into an error status. This skeleton produces frame-level FrameAnalysis
-// buffers (FrameInfo, the empty 4x4 cell grid size, diagnostics) and the Reconstruction planes. The decoder already
-// exports AV_FRAME_DATA_MOTION_VECTORS and AV_FRAME_DATA_VIDEO_ENC_PARAMS; WI-2.170 maps them into the grid.
+// point is noexcept and turns an exception into an error status. It produces FrameAnalysis buffers with FrameInfo,
+// the Reconstruction planes and, from AV_FRAME_DATA_MOTION_VECTORS and AV_FRAME_DATA_VIDEO_ENC_PARAMS (WI-2.170,
+// map_h264_sidedata.cpp), the macroblock tree, the cell grid, the motion vectors and the pseudo references L0 / L1.
+// push() reports on the access unit BEFORE the pushed unit: OVT_E_CORRUPT means that earlier access unit failed to
+// decode, the unit just pushed was accepted and must not be pushed again.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -34,6 +36,8 @@ namespace {
 constexpr uint8_t kCodecH264 = 1;    // ovt.fb.Codec.H264
 constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
 constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
+constexpr int16_t kMvdNotAvailable = -32768;     // MotionVector.mvd_x/y: the side data has no mvd (§7.6.3)
+constexpr uint8_t kPartitionNotAvailable = 255;  // Block.partition_type: no mb_type in the side data
 
 }  // namespace
 
@@ -74,7 +78,9 @@ struct Info {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
     caps.codec = kCodecH264;
     caps.plane_stages = 1U << kStageRecon;
-    caps.grid_fields = 0U;  // none yet: WI-2.170 maps the side data into the grid and announces the bits of §7.6.3
+    // §7.6.3: block_id (MB granularity), pred (Intra/Inter only), qp, mv0/mv1 and the list-only ref0/ref1.
+    caps.grid_fields =
+        OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 | OVT_GRID_REF0 | OVT_GRID_REF1;
     caps.has_symbol_accounting = 0;
     caps.bit_exact = 1;
     caps.supports_threads = 1;  // libavcodec frame + slice threads
@@ -94,6 +100,71 @@ const Info& info() {
 // prefixes the stream's source hash to make the chapter 06 §6.6.2 blob_id.
 std::string blob_id(int32_t decode_index, int plane) {
   return std::to_string(decode_index) + "/recon/" + kPlaneNames.at(static_cast<std::size_t>(plane));
+}
+
+// CellGrid: the vectors named in caps.grid_fields; the others stay empty ("not provided by this plugin").
+flatbuffers::Offset<ovt::fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb, const ovt::ffmpeg::Frame& f) {
+  const ovt::ffmpeg::SideData& sd = f.side;
+  if (!sd.valid) {
+    return ovt::fb::CreateCellGrid(fbb, static_cast<uint32_t>((f.coded_w + 3) / 4),
+                                   static_cast<uint32_t>((f.coded_h + 3) / 4));
+  }
+  const auto block_id = fbb.CreateVector(sd.block_id);
+  const auto pred = fbb.CreateVector(sd.pred);
+  const auto qp = fbb.CreateVector(sd.qp);
+  const auto mv0_x = fbb.CreateVector(sd.mv_x[0]);
+  const auto mv0_y = fbb.CreateVector(sd.mv_y[0]);
+  const auto mv1_x = fbb.CreateVector(sd.mv_x[1]);
+  const auto mv1_y = fbb.CreateVector(sd.mv_y[1]);
+  const auto ref0 = fbb.CreateVector(sd.ref[0]);
+  const auto ref1 = fbb.CreateVector(sd.ref[1]);
+  ovt::fb::CellGridBuilder g(fbb);
+  g.add_cells_w(sd.cells_w);
+  g.add_cells_h(sd.cells_h);
+  g.add_block_id(block_id);
+  g.add_pred(pred);
+  g.add_qp(qp);
+  g.add_mv0_x(mv0_x);
+  g.add_mv0_y(mv0_y);
+  g.add_mv1_x(mv1_x);
+  g.add_mv1_y(mv1_y);
+  g.add_ref0(ref0);
+  g.add_ref1(ref1);
+  return g.Finish();
+}
+
+// blocks[0] is the virtual root (chapter 06 §6.3.2); blocks[1 + n] is macroblock n in raster order (kind MB, no
+// extension table: the side data has no syntax elements).
+void build_blocks(flatbuffers::FlatBufferBuilder& fbb, const ovt::ffmpeg::Frame& f,
+                  std::vector<flatbuffers::Offset<ovt::fb::Block>>* out) {
+  const ovt::ffmpeg::SideData& sd = f.side;
+  std::vector<uint32_t> children(sd.mbs.size());
+  for (std::size_t i = 0; i < children.size(); ++i) {
+    children[i] = 1U + static_cast<uint32_t>(i);
+  }
+  const auto children_v = fbb.CreateVector(children);
+  const ovt::fb::Rect coded(0, 0, f.coded_w, f.coded_h);
+  ovt::fb::BlockBuilder root(fbb);
+  root.add_id(0);
+  root.add_children(children_v);
+  root.add_kind(ovt::fb::BlockKind::Other);
+  root.add_rect(&coded);
+  root.add_partition_type(kPartitionNotAvailable);
+  out->push_back(root.Finish());
+  for (std::size_t i = 0; i < sd.mbs.size(); ++i) {
+    const ovt::ffmpeg::MbBlock& mb = sd.mbs[i];
+    const ovt::fb::Rect rect(mb.rect.x, mb.rect.y, mb.rect.w, mb.rect.h);
+    ovt::fb::BlockBuilder b(fbb);
+    b.add_id(1U + static_cast<uint32_t>(i));
+    b.add_parent(0);
+    b.add_kind(ovt::fb::BlockKind::MB);
+    b.add_rect(&rect);
+    b.add_level(1);
+    b.add_partition_type(kPartitionNotAvailable);
+    b.add_pred(static_cast<ovt::fb::PredKind>(mb.pred));
+    b.add_qp(mb.qp);
+    out->push_back(b.Finish());
+  }
 }
 
 std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::ffmpeg::Frame frame, uint32_t plane_stage_mask) {
@@ -125,8 +196,45 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::ffmpeg::Frame frame, uin
     }
   }
   const auto planes_v = fbb->CreateVector(planes);
-  const auto grid_off = ovt::fb::CreateCellGrid(*fbb, static_cast<uint32_t>((f.coded_w + 3) / 4),
-                                                static_cast<uint32_t>((f.coded_h + 3) / 4));
+  const ovt::ffmpeg::SideData& sd = f.side;
+  const auto grid_off = build_grid(*fbb, f);
+  std::vector<flatbuffers::Offset<ovt::fb::Block>> blocks;
+  std::vector<flatbuffers::Offset<ovt::fb::MotionVector>> mvs;
+  std::vector<flatbuffers::Offset<ovt::fb::RefSlot>> refs;
+  if (sd.valid) {
+    build_blocks(*fbb, f, &blocks);
+    for (const ovt::ffmpeg::MbMotion& m : sd.mvs) {
+      const ovt::fb::Rect rect(m.rect.x, m.rect.y, m.rect.w, m.rect.h);
+      ovt::fb::MotionVectorBuilder mb(*fbb);
+      mb.add_block_id(m.block_id);
+      mb.add_list(m.list);
+      mb.add_ref(m.ref);
+      mb.add_rect(&rect);
+      mb.add_mv_x(m.mv_x);
+      mb.add_mv_y(m.mv_y);
+      mb.add_mvd_x(kMvdNotAvailable);
+      mb.add_mvd_y(kMvdNotAvailable);
+      mb.add_flags(m.flags);
+      mvs.push_back(mb.Finish());
+    }
+    if (!sd.mvs.empty()) {
+      // Two pseudo-slots: the side data names only the direction, not ref_idx (§7.6.3 RefSlot row).
+      const ovt::fb::FrameId unknown(-1, -1);
+      for (uint8_t l = 0; l < 2; ++l) {
+        const auto name = fbb->CreateString(l == 0 ? "L0" : "L1");
+        ovt::fb::RefSlotBuilder rb(*fbb);
+        rb.add_index(l);
+        rb.add_frame(&unknown);
+        rb.add_name(name);
+        rb.add_usage_cells(sd.usage_cells.at(l));
+        refs.push_back(rb.Finish());
+      }
+    }
+  }
+  const auto blocks_v = fbb->CreateVector(blocks);
+  const auto mvs_v = fbb->CreateVector(mvs);
+  const auto refs_v = fbb->CreateVector(refs);
+  const auto qp_hist_v = fbb->CreateVector(sd.qp_hist);
 
   // libavcodec exports no display_index, POC, slice data or picture structure: the host index has them (§7.5.3 A6).
   const ovt::fb::FrameId id(f.decode_index, -1);
@@ -153,7 +261,11 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::ffmpeg::Frame frame, uin
   fa.add_plugin_version(plugin_version);
   fa.add_frame(info_off);
   fa.add_grid(grid_off);
+  fa.add_blocks(blocks_v);
+  fa.add_mvs(mvs_v);
+  fa.add_refs(refs_v);
   fa.add_planes(planes_v);
+  fa.add_qp_hist(qp_hist_v);
   fa.add_diagnostics(diags_v);
   ovt::fb::FinishFrameAnalysisBuffer(*fbb, fa.Finish());
   out->fbb = std::move(fbb);

@@ -4,7 +4,7 @@
 // ovt::ffmpeg::H264Analysis drives one libavcodec h264 decoder the way chapter 07 §7.6.3 "Analysis decoder
 // driving" describes (WI-2.169): raw NAL units are prefixed with a start code and batched into one Annex B packet
 // per decode_index_hint, the packet carries the hint in pts and opaque (AV_CODEC_FLAG_COPY_OPAQUE), and every frame
-// libavcodec returns keeps the decode index of the packet that started it, also with frame threading. Internal to
+// libavcodec returns keeps the decode index of the packet that started it. Internal to
 // the plugin; plugin.cpp wraps it in the ABI.
 #ifndef OVT_PLUGIN_FFMPEG_H264_ANALYSIS_HPP
 #define OVT_PLUGIN_FFMPEG_H264_ANALYSIS_HPP
@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "map_h264_sidedata.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 struct AVCodecContext;
@@ -25,13 +26,6 @@ struct AVFrame;
 struct AVPacket;
 
 namespace ovt::ffmpeg {
-
-/// A Diagnostic for FrameAnalysis.diagnostics; severity is an ovt.fb.Severity value.
-struct Diag {
-  uint8_t severity = 0;
-  std::string code;
-  std::string message;
-};
 
 /// One coded-size plane copied out of the AVFrame: rows of width × sample_bytes bytes, no padding, little-endian.
 struct Plane {
@@ -58,6 +52,7 @@ struct Frame {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   std::array<Plane, 3> planes;  // filled only when pop() is asked for them; planes 1 and 2 are empty for 4:0:0
+  SideData side;                // the grid, blocks, motion vectors and references mapped from the side data (WI-2.170)
   std::vector<Diag> diagnostics;
 };
 
@@ -67,7 +62,8 @@ struct AVFrameDeleter {
 
 class H264Analysis {
  public:
-  /// Opens a libavcodec h264 decoder with @p threads frame + slice threads (one when < 1). An avcC record in
+  /// Opens a libavcodec h264 decoder with @p threads slice threads (one when < 1; no frame threads, see
+  /// SPEC-ASSUMPTION(#302) in h264_analysis.cpp). An avcC record in
   /// @p codec_private is never given to libavcodec as extradata (that switches it to length-prefixed input);
   /// its SPS/PPS are sent as Annex B units in front of the first access unit instead. OVT_E_CORRUPT for a
   /// malformed avcC, OVT_E_UNSUPPORTED when the FFmpeg build has no h264 decoder.
