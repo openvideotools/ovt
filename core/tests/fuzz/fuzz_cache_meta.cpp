@@ -5,12 +5,15 @@
 // WI-0.094 as fuzz_cache_meta). The input is the whole document. A CacheError(OVT_E_CORRUPT) is the expected
 // answer to a malformed document; any other exception, a crash or a sanitizer report is a finding. A document
 // that parses must serialise and parse again to the same record (the writer never produces unreadable text).
+// The cache.json parser shares this target: byte 0 == 0xFE routes the rest to parse_cache_json, which must
+// never throw (a malformed cache.json is rebuilt, not reported).
 
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <span>
 
+#include "cache/cache_json.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
 #include "ovt/status.h"
@@ -27,6 +30,10 @@ void require(bool ok) {
 
 extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
   const std::span<const std::uint8_t> input(data, size);
+  if (!input.empty() && input[0] == 0xFE) {
+    (void)ovt::cache::parse_cache_json(input.subspan(1));
+    return 0;
+  }
   try {
     const ovt::cache::Meta meta = ovt::cache::parse_meta(input);
     const std::string text = ovt::cache::serialize_meta(meta);
