@@ -91,8 +91,57 @@ struct FrameSpec {
   std::string plugin_version = "1.0.0";
   std::uint32_t cells_w = 8;  ///< 1080p is 480 x 270 cells of 4x4 luma samples
   std::uint32_t cells_h = 8;
-  bool with_pts = true;  ///< FrameInfo.pts set (int64: minalign 8, as every real record)
+  bool with_pts = true;           ///< FrameInfo.pts set (int64: minalign 8, as every real record)
+  bool with_recon_y_ref = false;  ///< add a PlaneRef recon/Y of plane_w x plane_h 8-bit samples
+  std::uint32_t plane_w = 64;
+  std::uint32_t plane_h = 32;
 };
+
+/// The mode-dependent values of one cell of make_frame's grid: intra in every fifth block, inter elsewhere.
+struct CellValues {
+  std::uint8_t pred = 0;
+  std::int16_t intra_y = 0;
+  std::int16_t intra_c = 0;
+  std::int16_t mv0_x = 0;
+  std::int16_t mv0_y = 0;
+  std::int8_t ref0 = 0;
+  std::int8_t ref1 = 0;
+  std::uint8_t bs_v = 0;
+  std::uint8_t bs_h = 0;
+};
+
+inline CellValues cell_values(std::uint32_t block, std::uint32_t r, std::uint32_t x, std::uint32_t y) {
+  CellValues v;
+  const bool intra = block % 5U == 0;
+  v.pred = static_cast<std::uint8_t>(intra ? 1 : 2);
+  v.intra_y = static_cast<std::int16_t>(intra ? static_cast<int>(block % 35U) : -1);
+  v.intra_c = static_cast<std::int16_t>(intra ? 4 : -1);
+  v.mv0_x = static_cast<std::int16_t>(static_cast<int>(block % 9U) * 4 - 16 + static_cast<int>(r % 3U));
+  v.mv0_y = static_cast<std::int16_t>(static_cast<int>(block % 5U) * 4 - 8);
+  v.ref0 = static_cast<std::int8_t>(intra ? -1 : 0);
+  v.ref1 = static_cast<std::int8_t>(intra ? -1 : static_cast<int>(block % 2U));
+  v.bs_v = static_cast<std::uint8_t>(x % 4U == 0 ? 2 : 0);
+  v.bs_h = static_cast<std::uint8_t>(y % 4U == 0 ? 2 : 0);
+  return v;
+}
+
+/// One PlaneRef recon/Y of plane_w x plane_h 8-bit samples, as `planes[]` of a FrameAnalysis.
+inline flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fb::PlaneRef>>> make_recon_y_ref(
+    flatbuffers::FlatBufferBuilder& b, const FrameSpec& spec) {
+  const auto blob_id = b.CreateString("blob");
+  fb::PlaneRefBuilder pb(b);
+  pb.add_stage(fb::PlaneStage::Reconstruction);
+  pb.add_plane(0);
+  pb.add_width(spec.plane_w);
+  pb.add_height(spec.plane_h);
+  pb.add_stride_bytes(spec.plane_w);
+  pb.add_bit_depth(8);
+  pb.add_sample_bytes(1);
+  pb.add_is_signed(false);
+  pb.add_blob_id(blob_id);
+  const auto ref = pb.Finish();
+  return b.CreateVector(&ref, 1);
+}
 
 /// A FrameAnalysis ("OVTA", not size-prefixed) with a dense CellGrid: every vector filled, values varying in
 /// 16x16-cell blocks like a real grid so that zstd finds structure (WI-0.091 acceptance test 3).
@@ -129,25 +178,26 @@ inline std::vector<std::uint8_t> make_frame(const FrameSpec& spec) {
       const std::size_t i = static_cast<std::size_t>(y) * spec.cells_w + x;
       const std::uint32_t block = (y / 16U) * ((spec.cells_w + 15U) / 16U) + (x / 16U);
       const std::uint32_t r = next();
+      const CellValues v = cell_values(block, r, x, y);
       block_id[i] = block;
       partition_id[i] = static_cast<std::uint16_t>(y / 64U);
-      pred[i] = static_cast<std::uint8_t>((block % 5U == 0) ? 1 : 2);
+      pred[i] = v.pred;
       qp[i] = static_cast<std::int16_t>(26 + static_cast<int>(block % 7U));
-      intra_y[i] = static_cast<std::int16_t>(pred[i] == 1 ? static_cast<int>(block % 35U) : -1);
-      intra_c[i] = static_cast<std::int16_t>(pred[i] == 1 ? 4 : -1);
-      mv0_x[i] = static_cast<std::int16_t>(static_cast<int>(block % 9U) * 4 - 16 + static_cast<int>(r % 3U));
-      mv0_y[i] = static_cast<std::int16_t>(static_cast<int>(block % 5U) * 4 - 8);
-      mv1_x[i] = static_cast<std::int16_t>(-mv0_x[i]);
-      mv1_y[i] = static_cast<std::int16_t>(-mv0_y[i]);
-      ref0[i] = static_cast<std::int8_t>(pred[i] == 1 ? -1 : 0);
-      ref1[i] = static_cast<std::int8_t>(pred[i] == 1 ? -1 : static_cast<int>(block % 2U));
+      intra_y[i] = v.intra_y;
+      intra_c[i] = v.intra_c;
+      mv0_x[i] = v.mv0_x;
+      mv0_y[i] = v.mv0_y;
+      mv1_x[i] = static_cast<std::int16_t>(-v.mv0_x);
+      mv1_y[i] = static_cast<std::int16_t>(-v.mv0_y);
+      ref0[i] = v.ref0;
+      ref1[i] = v.ref1;
       tx_w[i] = static_cast<std::uint8_t>(2 + block % 3U);
       tx_h[i] = tx_w[i];
       tx_type[i] = 0;
       cbf[i] = static_cast<std::uint8_t>(r & 7U);
       bits[i] = 12U + (r % 40U);
-      bs_v[i] = static_cast<std::uint8_t>(x % 4U == 0 ? 2 : 0);
-      bs_h[i] = static_cast<std::uint8_t>(y % 4U == 0 ? 2 : 0);
+      bs_v[i] = v.bs_v;
+      bs_h[i] = v.bs_h;
       filter[i] = static_cast<std::uint8_t>(block % 3U);
     }
   }
@@ -157,6 +207,10 @@ inline std::vector<std::uint8_t> make_frame(const FrameSpec& spec) {
       b.CreateVector(mv0_y), b.CreateVector(mv1_x), b.CreateVector(mv1_y), b.CreateVector(ref0), b.CreateVector(ref1),
       b.CreateVector(tx_w), b.CreateVector(tx_h), b.CreateVector(tx_type), b.CreateVector(cbf), b.CreateVector(bits),
       b.CreateVector(bs_v), b.CreateVector(bs_h), b.CreateVector(filter));
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fb::PlaneRef>>> planes;
+  if (spec.with_recon_y_ref) {
+    planes = make_recon_y_ref(b, spec);
+  }
   const auto plugin_id = b.CreateString(spec.plugin_id);
   const auto plugin_version = b.CreateString(spec.plugin_version);
   const fb::FrameId id(spec.decode_index, spec.decode_index);
@@ -172,6 +226,9 @@ inline std::vector<std::uint8_t> make_frame(const FrameSpec& spec) {
   fab.add_plugin_version(plugin_version);
   fab.add_frame(frame);
   fab.add_grid(grid);
+  if (spec.with_recon_y_ref) {
+    fab.add_planes(planes);
+  }
   b.Finish(fab.Finish(), "OVTA");
   return bytes_of(b);
 }

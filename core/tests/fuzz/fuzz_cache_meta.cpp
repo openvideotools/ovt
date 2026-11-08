@@ -6,14 +6,17 @@
 // answer to a malformed document; any other exception, a crash or a sanitizer report is a finding. A document
 // that parses must serialise and parse again to the same record (the writer never produces unreadable text).
 // The cache.json parser shares this target: byte 0 == 0xFE routes the rest to parse_cache_json, which must
-// never throw (a malformed cache.json is rebuilt, not reported).
+// never throw (a malformed cache.json is rebuilt, not reported). Byte 0 == 0xFF routes the rest to the
+// option-string parser of ovt_cache_open (OVT_E_INVALID_ARG is its only allowed exception).
 
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <span>
+#include <string_view>
 
 #include "cache/cache_json.hpp"
+#include "ovt/cxx/cache/cache.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
 #include "ovt/status.h"
@@ -32,6 +35,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   const std::span<const std::uint8_t> input(data, size);
   if (!input.empty() && input[0] == 0xFE) {
     (void)ovt::cache::parse_cache_json(input.subspan(1));
+    return 0;
+  }
+  if (!input.empty() && input[0] == 0xFF) {
+    const std::string_view text(reinterpret_cast<const char*>(input.data() + 1), input.size() - 1);
+    try {
+      (void)ovt::cache::parse_options_json(text);
+    } catch (const ovt::cache::CacheError& e) {
+      require(e.code == OVT_E_INVALID_ARG);
+    }
     return 0;
   }
   try {

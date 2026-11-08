@@ -29,6 +29,7 @@
 
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
+#include "ovt/cxx/model/plane.hpp"
 #include "ovt_model_generated.h"
 
 namespace ovt::cache {
@@ -59,6 +60,11 @@ inline constexpr std::uint64_t kDefaultMaxBytes = 2ULL << 30U;
 inline constexpr std::uint64_t kDefaultMaxBytes = 20ULL << 30U;
 #endif
 
+/// Parses the opts_json of ovt_cache_open. Null, empty or "null" give the defaults. Throws
+/// CacheError(OVT_E_INVALID_ARG) for text that is not a JSON object, a `max_bytes` that is not a
+/// non-negative integer or a `read_only` that is not a boolean. Unknown members are ignored.
+[[nodiscard]] Options parse_options_json(std::string_view json);
+
 /// The process default root that ovt_cache_set_dir sets; std::nullopt restores the environment/platform rule.
 void set_default_root(std::optional<std::filesystem::path> root);
 
@@ -67,6 +73,12 @@ void set_default_root(std::optional<std::filesystem::path> root);
 /// ~/.cache/ovt/; Android has no default: the shell calls set_default_root with Context.getCacheDir()/ovt).
 /// Throws CacheError(OVT_E_IO) when nothing yields a directory (HOME unset, or Android without a root).
 [[nodiscard]] std::filesystem::path default_root();
+
+/// A plane read back from the cache: the bytes and a view onto them (tight stride, §6.7.1 planes/ layout).
+struct PlaneData {
+  std::vector<std::uint8_t> bytes;
+  model::PlaneView view;  ///< view.data == bytes.data(); stride_bytes == width * sample_bytes
+};
 
 class Cache;
 
@@ -110,6 +122,22 @@ class Entry {
   /// The stored FrameAnalysis, or std::nullopt when absent; CacheError(OVT_E_CORRUPT) when the file does not
   /// decompress or verify, or names another decode_index.
   [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_frame(std::uint32_t decode_index) const;
+
+  /// planes/<decode_index>/<stage>-<plane>.pl.zst (zstd level 1): exactly height rows of width * sample_bytes
+  /// bytes, stride padding dropped. @p view must pass model::check_plane_view; stage must be a PlaneStage.
+  void put_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane, const model::PlaneView& view);
+  /// The stored plane with the geometry of the frame's PlaneRef (§6.7.1: dimensions come from the frame's
+  /// FrameAnalysis). std::nullopt when the plane file, the frame or a matching PlaneRef is absent;
+  /// CacheError(OVT_E_CORRUPT) when the decompressed size differs from height * width * sample_bytes (I6).
+  [[nodiscard]] std::optional<PlaneData> get_plane(std::uint32_t decode_index, fb::PlaneStage stage,
+                                                   std::uint8_t plane) const;
+
+  /// reports/<kind>.fb.zst (zstd level 3), an opaque FlatBuffer ("metrics", "hdr", "verify", ...). @p kind
+  /// matches [A-Za-z0-9_-]{1,32}, else CacheError(OVT_E_INVALID_ARG).
+  // SPEC-ASSUMPTION(#288): §6.7.1 keys MetricsReports by run_id under metrics/, which the kind-only
+  // ovt_cache_put_report of §12.3.14 cannot address; reports/<kind> is the file this call writes.
+  void put_report(std::string_view kind, std::span<const std::uint8_t> fb);
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_report(std::string_view kind) const;
 
   /// Writes meta.json atomically when it changed (write meta.json.tmp, fsync, rename; §6.7.2). Called by the
   /// destructor and by Cache::flush().
