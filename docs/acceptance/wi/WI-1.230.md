@@ -25,10 +25,8 @@ All tests passed (20070 assertions in 1 test case)
 
 ## Test 2: seek_to_time(30 s, backward)
 
-Automated: `demux: seek_to_time(30 s, backward) lands on a key frame at or before 30 s` (a 60-frame 1 fps Y4M,
-time base 1/1) and `demux: seek_to_time backward on ISOBMFF returns the preceding sync sample`. libavformat's
-`yuv4_read_seek` steps one frame back for `AVSEEK_FLAG_BACKWARD`, so the Y4M case lands on pts 29, which
-satisfies "keyframe with pts ≤ 30 s".
+Automated: `demux: seek_to_time(30 s, backward) lands on a key frame at or before 30 s` (60-frame 1 fps Y4M; FFmpeg's
+`yuv4_read_seek` steps one frame back, so it lands on pts 29) and the ISOBMFF seek case.
 
 ## Test 3: 0-byte file
 
@@ -36,16 +34,11 @@ Automated: `demux: a 0-byte file is rejected without leaking`, over the hints ""
 mpegts, obu, ebml, h264 and av1. Run under ASan + LSan:
 
 ```console
-$ cmake --preset linux-x64-asan-ubsan -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ...
 $ ASAN_OPTIONS=detect_leaks=1 build/linux-x64-asan-ubsan/core/tests/demux/ovt_tests_demux
-test cases:   14 |   13 passed | 1 skipped
-assertions: 3603 | 3603 passed
+test cases:   14 |   13 passed | 1 skipped (the corpus case, run above)
 $ ASAN_OPTIONS=detect_leaks=1 build/linux-x64-asan-ubsan/core/tests/fuzz/ovt_fuzz_demuxer_open_regress \
     core/tests/fuzz/regressions/demuxer_open core/tests/fuzz/corpus/demuxer_open
 fuzz regress: 8 inputs replayed
 ```
 
-## Fuzz seeds
-
-`core/tests/fuzz/corpus/demuxer_open/`: byte 0 selects the hint, the rest is a 16x16, 3-frame `testsrc` file
-made with FFmpeg 6.1.1 (AV1 by libaom in MP4, IVF, OBU and WebM; raw Y4M; MPEG-2 video in MPEG-TS).
+Fuzz seeds (`core/tests/fuzz/corpus/demuxer_open/`): byte 0 selects the hint, then a 16x16 3-frame FFmpeg 6.1.1 file.
