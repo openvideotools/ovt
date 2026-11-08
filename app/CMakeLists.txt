@@ -34,7 +34,9 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/Dialogs.qml"
       "${app_dir}/qml/dialogs/GotoDialog.qml"
       "${app_dir}/qml/dialogs/PreferencesDialog.qml"
-      "${app_dir}/qml/dialogs/KeymapDialog.qml")
+      "${app_dir}/qml/dialogs/KeymapDialog.qml"
+      "${app_dir}/qml/dialogs/OpenAsDialog.qml"
+      "${app_dir}/qml/dialogs/RawFormatDialog.qml")
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
