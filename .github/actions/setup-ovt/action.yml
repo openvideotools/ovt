@@ -86,13 +86,16 @@ runs:
         echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
         exit 1
 
-    - name: Python tools (meson for the third_party Meson builds)
+    - name: Python tools (meson for the third_party Meson builds; test dependencies)
       shell: bash
       run: |
         # A venv works on the hosted images and on the self-hosted Mac (whose Homebrew Python refuses
-        # system-wide pip installs). tools/requirements.txt pins meson (chapter 13 §13.3.5).
+        # system-wide pip installs). tools/requirements.txt pins meson (chapter 13 §13.3.5) and jsonschema;
+        # tools/requirements-test.txt pins pytest, numpy and the flatbuffers runtime. Without them the CTest suites
+        # tools_pytest, cli_schema_validate, schema_python_import and test_fb_python_import are not registered or
+        # skip, and CI would pass without running them. The venv is first on PATH, so FindPython3 picks it.
         python3 -m venv "${RUNNER_TEMP}/ovt-venv"
-        "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt
+        "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt -r tools/requirements-test.txt
         echo "${RUNNER_TEMP}/ovt-venv/bin" >> "$GITHUB_PATH"
 
     - name: vcpkg checkout and bootstrap
