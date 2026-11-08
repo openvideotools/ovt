@@ -162,6 +162,7 @@ OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
 std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
                                                   const uint16_t* custom_cells) {
+  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
   if (fa == nullptr || fa->grid() == nullptr) {

@@ -243,7 +243,7 @@ bool build_heatmap(const ovt::fb::CellGrid& grid, bool is_av1, const OverlayConf
 
   // Pass 2: normalise. A degenerate range (hi <= lo) maps every applicable cell to 0.
   out.values.assign(cells, 0);
-  const double lo = out.lo;
+  const auto lo = static_cast<double>(out.lo);
   const double span = static_cast<double>(out.hi) - lo;
   parallel_ranges(cells, kChunks, [&](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
