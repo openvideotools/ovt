@@ -130,7 +130,7 @@ std::vector<std::uint8_t> read_file(const fs::path& path, std::size_t max_size) 
   if (fd.get() < 0) {
     throw_io("open", path, errno);
   }
-  struct stat st {};
+  struct stat st = {};
   if (::fstat(fd.get(), &st) != 0) {
     throw_io("fstat", path, errno);
   }
