@@ -32,15 +32,15 @@ constexpr uint32_t kH264 = fourcc_le('H', '2', '6', '4');
 
 constexpr size_t kSyncPrefix = 4096;  // payload bytes read to decide is_sync
 
-uint16_t rd16(const uint8_t* p) {
-  return static_cast<uint16_t>(p[0] | p[1] << 8U);
+uint16_t rd16(std::span<const uint8_t> b, size_t off) {
+  return static_cast<uint16_t>(b[off] | b[off + 1] << 8U);
 }
-uint32_t rd32(const uint8_t* p) {
-  return static_cast<uint32_t>(p[0]) | static_cast<uint32_t>(p[1]) << 8U | static_cast<uint32_t>(p[2]) << 16U |
-         static_cast<uint32_t>(p[3]) << 24U;
+uint32_t rd32(std::span<const uint8_t> b, size_t off) {
+  return static_cast<uint32_t>(b[off]) | static_cast<uint32_t>(b[off + 1]) << 8U |
+         static_cast<uint32_t>(b[off + 2]) << 16U | static_cast<uint32_t>(b[off + 3]) << 24U;
 }
-uint64_t rd64(const uint8_t* p) {
-  return static_cast<uint64_t>(rd32(p)) | static_cast<uint64_t>(rd32(p + 4)) << 32U;
+uint64_t rd64(std::span<const uint8_t> b, size_t off) {
+  return static_cast<uint64_t>(rd32(b, off)) | static_cast<uint64_t>(rd32(b, off + 4)) << 32U;
 }
 
 std::string fourcc_string(uint32_t fourcc) {
@@ -258,7 +258,8 @@ class IvfReader final : public Reader {
         fbb.CreateVector(offset), fbb.CreateVector(size), fbb.CreateVector(sync), 0, fbb.CreateVector(desc),
         fbb.CreateVector(chunk), fbb.CreateVector(fragment));
     fbb.Finish(table);
-    return {fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize()};
+    const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+    return {bytes.begin(), bytes.end()};
   }
 
   [[nodiscard]] std::vector<uint8_t> build_tree() const {
@@ -342,7 +343,8 @@ class IvfReader final : public Reader {
     const auto tracks = fbb.CreateVector(&track, 1);
     fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("ivf"), fbb.CreateVector(&root, 1), tracks,
                                        fbb.CreateVector(tree_diags)));
-    return {fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize()};
+    const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+    return {bytes.begin(), bytes.end()};
   }
 };
 
@@ -378,15 +380,15 @@ std::optional<File> parse(const io::RandomAccessFile& file) {
     return std::nullopt;
   }
   Header& h = f.header;
-  h.version = rd16(&hdr[4]);
-  h.header_size = rd16(&hdr[6]);
-  h.fourcc = rd32(&hdr[8]);
-  h.width = rd16(&hdr[12]);
-  h.height = rd16(&hdr[14]);
-  h.timebase_denominator = rd32(&hdr[16]);
-  h.timebase_numerator = rd32(&hdr[20]);
-  h.frame_count = rd32(&hdr[24]);
-  h.unused = rd32(&hdr[28]);
+  h.version = rd16(hdr, 4);
+  h.header_size = rd16(hdr, 6);
+  h.fourcc = rd32(hdr, 8);
+  h.width = rd16(hdr, 12);
+  h.height = rd16(hdr, 14);
+  h.timebase_denominator = rd32(hdr, 16);
+  h.timebase_numerator = rd32(hdr, 20);
+  h.frame_count = rd32(hdr, 24);
+  h.unused = rd32(hdr, 28);
 
   // SPEC-ASSUMPTION(#280): a header_size below 32 would overlap the fixed header; it is reported with
   // CNT-IVF-0001 and the first frame is taken at offset 32, as libvpx does (it ignores the field).
@@ -412,8 +414,8 @@ std::optional<File> parse(const io::RandomAccessFile& file) {
     }
     Frame fr;
     fr.header_offset = pos;
-    fr.declared_size = rd32(fh.data());
-    fr.timestamp = rd64(&fh[4]);
+    fr.declared_size = rd32(fh, 0);
+    fr.timestamp = rd64(fh, 4);
     const uint64_t payload = pos + kFrameHeaderSize;
     const uint64_t remaining = f.file_size - payload;
     if (fr.declared_size > remaining) {
