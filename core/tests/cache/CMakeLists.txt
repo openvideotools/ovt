@@ -29,8 +29,7 @@ if(Python3_Interpreter_FOUND)
       "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/validate_json_schema.py" $<TARGET_FILE:ovt_tests_cache>
       "test_evict: AT3*" "${CMAKE_CURRENT_BINARY_DIR}/schema_at3" "cache.json"
       "${PROJECT_SOURCE_DIR}/docs/spec/cache-json-1.schema.json")
-  set_tests_properties(cache_meta_json_schema cache_json_schema PROPERTIES LABELS "fast;unit;cache" SKIP_RETURN_CODE
-                                                                                                    77)
+  set_tests_properties(cache_meta_json_schema cache_json_schema PROPERTIES LABELS "fast;unit;cache" SKIP_RETURN_CODE 77)
 endif()
 
 # WI-0.091: ovt/cache.h compiles as C11 (chapter 12 §12.3.1 rule 1). A compile-only check, as in core/tests/model.
