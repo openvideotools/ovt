@@ -328,9 +328,13 @@ def mean_of(doc: dict[str, Any], section: str, key: str) -> float:
 
 
 def x264_log_check(pair: Pair, exe: str) -> dict[str, Any]:
-    """SPEC-ASSUMPTION(#306): acceptance test 3: ``x264_ssim`` on the x264 reconstruction equals the ``SSIM Mean Y`` of ``x264 --ssim``."""
+    """SPEC-ASSUMPTION(#306): acceptance test 3: ``x264_ssim`` on the x264 reconstruction equals the ``SSIM Mean Y`` of ``x264 --ssim``.
+
+    ``--bframes 0``: x264 scores a non-reference B frame before its deblocking, so for those frames its figure differs
+    from the decoded picture's by about 2e-3; I and P frames agree exactly.
+    """
     es = pair.work / "x264_check.264"
-    log = run([tool("x264"), "--ssim", "--qp", "28", "--threads", "1", "--output", str(es), str(pair.ref)],
+    log = run([tool("x264"), "--ssim", "--qp", "28", "--threads", "1", "--bframes", "0", "--output", str(es), str(pair.ref)],
               pair.work, "x264 --ssim")  # fmt: skip
     m = re.search(r"SSIM Mean Y:(\d\.\d+)", log)
     if not m:

@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
   if (open_y4m(&a, argv[1]) || open_y4m(&b, argv[2])) return 1;
   if (a.w != b.w || a.h != b.h || a.depth != b.depth)
     return fail("size or bit depth differs from the reference", argv[2]);
-  int cw = a.w / 2, ch = a.h / 2;
+  int cw = (a.w + 1) / 2, ch = (a.h + 1) / 2;
   size_t bps = a.depth > 8 ? 2 : 1;
   size_t bytes[3] = {(size_t)a.w * a.h * bps, (size_t)cw * ch * bps, (size_t)cw * ch * bps};
   int dims[3][2] = {{a.w, a.h}, {cw, ch}, {cw, ch}};

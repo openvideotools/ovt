@@ -70,6 +70,7 @@ STUBS = {
     "x264": """
         import sys
         a = sys.argv[1:]
+        assert a[a.index("--bframes") + 1] == "0"
         open(a[a.index("--output") + 1], "w").write(a[-1])
         sys.stderr.write("x264 [info]: SSIM Mean Y:1.0000000 (inf)\\n")
     """,

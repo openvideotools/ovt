@@ -103,6 +103,10 @@ jobs:
           print("\n```json\n" + json.dumps({k: v for k, v in doc.items() if k != "pairs"}, indent=1) + "\n```")
           PY
 
+      - name: print the index (the artifact store is not reachable from every sandbox)
+        if: always()
+        run: cat "${RUNNER_TEMP}/out1/metrics-index.json" || true
+
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
