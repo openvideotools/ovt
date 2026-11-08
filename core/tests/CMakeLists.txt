@@ -82,9 +82,14 @@ endif()
 # callback. aom_inspection_check is acceptance test 2: the OVT_SYSTEM_LIBAOM configure check rejects a libaom
 # without inspection (fake_libaom) and accepts the bundled one. Both need the bundled build, so they are not
 # registered with OVT_SYSTEM_LIBAOM=ON; the configure check cannot run a probe in a cross build.
+#
+# WI-2.154: test_aom_inspection_smoke.cpp is the inspection-callback smoke program (acceptance test 1): one callback
+# per frame of av1-1-b8-01-size-16x16, read through av1/decoder/inspection.h from LIBAOM_SOURCE_DIR
+# (tp::aom_inspection). Acceptance test 2 (a broken patch fails the build naming it) is
+# tools/tests/test_libaom_patches.py.
 if(TARGET tp::aom AND TARGET tp_libaom)
-  add_executable(ovt_tests_aom_probe test_aom_probe.cpp)
-  target_link_libraries(ovt_tests_aom_probe PRIVATE tp::aom ovt::flags ${Catch2_TARGET})
+  add_executable(ovt_tests_aom_probe test_aom_probe.cpp test_aom_inspection_smoke.cpp)
+  target_link_libraries(ovt_tests_aom_probe PRIVATE tp::aom_inspection ovt_test_support ovt::flags ${Catch2_TARGET})
   target_compile_definitions(ovt_tests_aom_probe PRIVATE "OVT_AOM_PINNED_VERSION=\"${OVT_TP_libaom_VERSION}\"")
   ovt_set_license(ovt_tests_aom_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_aom_probe)
