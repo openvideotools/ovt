@@ -25,7 +25,7 @@ namespace {
 [[noreturn]] void throw_zstd(ovt_status code, std::string_view what, std::size_t rc) {
   std::string msg = "cache: zstd ";
   msg.append(what).append(": ").append(ZSTD_getErrorName(rc));
-  throw CacheError(code, std::move(msg));
+  throw CacheError(code, msg);
 }
 
 struct DCtxDeleter {

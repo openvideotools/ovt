@@ -7,6 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -34,7 +35,7 @@ constexpr std::array<std::string_view, 7> kCodecs = {"H264", "H265", "AV1", "VP9
 [[noreturn]] void bad(std::string_view where, std::string_view what) {
   std::string msg = "cache: meta.json: ";
   msg.append(where).append(": ").append(what);
-  throw CacheError(OVT_E_CORRUPT, std::move(msg));
+  throw CacheError(OVT_E_CORRUPT, msg);
 }
 
 bool is_digits(std::string_view s, std::size_t from, std::size_t count) noexcept {
@@ -152,12 +153,7 @@ bool is_hex64(std::string_view text) noexcept {
   if (text.size() != 64) {
     return false;
   }
-  for (const char c : text) {
-    if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'))) {
-      return false;
-    }
-  }
-  return true;
+  return std::ranges::all_of(text, [](const char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
 
 bool is_iso8601_date_time(std::string_view s) noexcept {
@@ -192,10 +188,12 @@ bool is_iso8601_date_time(std::string_view s) noexcept {
 std::string format_iso8601_utc(std::chrono::system_clock::time_point when) {
   const std::time_t t = std::chrono::system_clock::to_time_t(when);
   std::tm tm{};
-  gmtime_r(&t, &tm);
+  if (gmtime_r(&t, &tm) == nullptr) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: time point not representable as a calendar time");
+  }
   std::array<char, 32> buf{};
   const std::size_t n = std::strftime(buf.data(), buf.size(), "%Y-%m-%dT%H:%M:%SZ", &tm);
-  return std::string(buf.data(), n);
+  return {buf.data(), n};
 }
 
 Meta parse_meta(std::span<const std::uint8_t> bytes) {

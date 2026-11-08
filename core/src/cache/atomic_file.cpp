@@ -35,7 +35,7 @@ std::atomic<bool> g_simulate_crash{false};
 [[noreturn]] void throw_io(std::string_view what, const fs::path& path, int err) {
   std::string msg = "cache: ";
   msg.append(what).append(" '").append(path.string()).append("': ").append(std::generic_category().message(err));
-  throw CacheError(OVT_E_IO, std::move(msg));
+  throw CacheError(OVT_E_IO, msg);
 }
 
 class Fd {
@@ -126,7 +126,7 @@ void write_file_atomic(const fs::path& path, std::span<const std::uint8_t> bytes
 
 std::vector<std::uint8_t> read_file(const fs::path& path, std::size_t max_size) {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg,hicpp-vararg): open(2) is variadic
-  Fd fd(::open(path.c_str(), O_RDONLY | O_CLOEXEC));
+  const Fd fd(::open(path.c_str(), O_RDONLY | O_CLOEXEC));
   if (fd.get() < 0) {
     throw_io("open", path, errno);
   }
@@ -144,7 +144,7 @@ std::vector<std::uint8_t> read_file(const fs::path& path, std::size_t max_size) 
   std::vector<std::uint8_t> out(static_cast<std::size_t>(st.st_size));
   std::size_t done = 0;
   while (done < out.size()) {
-    const ssize_t n = ::read(fd.get(), out.data() + done, out.size() - done);
+    const ssize_t n = ::read(fd.get(), std::span(out).subspan(done).data(), out.size() - done);
     if (n < 0) {
       if (errno == EINTR) {
         continue;
@@ -160,22 +160,34 @@ std::vector<std::uint8_t> read_file(const fs::path& path, std::size_t max_size) 
   return out;
 }
 
-std::size_t remove_stale_tmp_files(const fs::path& dir) {
-  std::size_t removed = 0;
+namespace {
+
+/// Removes @p path if it is a stale temporary; true when a file was removed.
+bool remove_if_stale_tmp(const fs::directory_entry& e) {
   std::error_code ec;
-  fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
+  if (!e.is_regular_file(ec) || e.path().extension() != kTmpSuffix) {
+    return false;
+  }
+  if (fs::remove(e.path(), ec)) {
+    OVT_LOG(log::Level::Info, "cache", "removed stale temporary '{}'", e.path().string());
+    return true;
+  }
+  OVT_LOG(log::Level::Warn, "cache", "cannot remove stale temporary '{}': {}", e.path().string(), ec.message());
+  return false;
+}
+
+}  // namespace
+
+std::size_t remove_stale_tmp_files(const fs::path& dir) {
+  std::error_code ec;
+  const fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
   if (ec) {
     return 0;
   }
+  std::size_t removed = 0;
   for (const fs::directory_entry& e : it) {
-    if (!e.is_regular_file(ec) || e.path().extension() != kTmpSuffix) {
-      continue;
-    }
-    if (fs::remove(e.path(), ec)) {
+    if (remove_if_stale_tmp(e)) {
       ++removed;
-      OVT_LOG(log::Level::Info, "cache", "removed stale temporary '{}'", e.path().string());
-    } else {
-      OVT_LOG(log::Level::Warn, "cache", "cannot remove stale temporary '{}': {}", e.path().string(), ec.message());
     }
   }
   return removed;

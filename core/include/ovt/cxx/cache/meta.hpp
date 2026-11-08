@@ -62,8 +62,8 @@ struct Meta {
 /// rule when the text is not JSON, a required member is missing, a member has the wrong type, a string does
 /// not match its pattern or enum, or an integer is negative or too large. Unknown members are ignored
 /// (additive evolution within cache_format 1).
-[[nodiscard]] Meta parse_meta(std::span<const std::uint8_t> json);
-[[nodiscard]] Meta parse_meta(std::string_view json);
+[[nodiscard]] Meta parse_meta(std::span<const std::uint8_t> bytes);
+[[nodiscard]] Meta parse_meta(std::string_view text);
 
 /// Serialises @p meta as pretty-printed JSON with the members in the schema's order and a trailing newline.
 /// Deterministic for equal records. Throws CacheError(OVT_E_INVALID_ARG) when a string member would not
@@ -74,7 +74,7 @@ struct Meta {
 [[nodiscard]] std::string format_iso8601_utc(std::chrono::system_clock::time_point when);
 
 /// True when @p text has the shape of an RFC 3339 `date-time` (`YYYY-MM-DDThh:mm:ss[.frac](Z|±hh:mm)`).
-[[nodiscard]] bool is_iso8601_date_time(std::string_view text) noexcept;
+[[nodiscard]] bool is_iso8601_date_time(std::string_view s) noexcept;
 
 /// True when @p text is exactly 64 lowercase hex digits.
 [[nodiscard]] bool is_hex64(std::string_view text) noexcept;

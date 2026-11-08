@@ -20,7 +20,7 @@ namespace ovt::cache {
 /// caller's buffer or option is wrong; OVT_E_UNSUPPORTED: a write on a read-only cache.
 struct CacheError : std::runtime_error {
   ovt_status code;
-  CacheError(ovt_status c, std::string msg) : std::runtime_error(std::move(msg)), code(c) {}
+  CacheError(ovt_status c, const std::string& msg) : std::runtime_error(msg), code(c) {}
 };
 
 }  // namespace ovt::cache
