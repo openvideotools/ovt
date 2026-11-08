@@ -13,8 +13,8 @@
 #include <cstdlib>
 #include <span>
 
-#include "../test_support/memory_file.hpp"
 #include "container/ivf.hpp"
+#include "io/memory_file.hpp"
 #include "ovt_container_generated.h"
 
 namespace {
@@ -29,7 +29,7 @@ void require(bool ok) {
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   try {
-    const ovt::test::MemoryFile file(std::span<const uint8_t>(data, size));
+    const ovt::io::MemoryFile file(std::span<const uint8_t>(data, size));
     const auto a = ovt::container::ivf::parse(file);
     const auto b = ovt::container::ivf::parse(file);
     require(a.has_value() == b.has_value());

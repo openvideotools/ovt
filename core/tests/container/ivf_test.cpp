@@ -23,10 +23,10 @@
 #include "container/container.hpp"
 #include "container/diagnostics.h"
 #include "container/ivf.hpp"
+#include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt_container_generated.h"
 #include "test_support/corpus.h"
-#include "test_support/memory_file.hpp"
 
 namespace {
 
@@ -99,6 +99,7 @@ Bytes av1_tu(bool key, size_t pad = 4, bool show_existing = false) {
 
 std::vector<TestFrame> av1_frames(size_t n) {
   std::vector<TestFrame> v;
+  v.reserve(n);
   for (size_t i = 0; i < n; ++i) {
     v.push_back({i, av1_tu(i % 4 == 0, 3 + i)});
   }
@@ -113,6 +114,10 @@ const ovt::fb::SampleTable* table_of(const Bytes& buf) {
   return flatbuffers::GetRoot<ovt::fb::SampleTable>(buf.data());
 }
 
+size_t diag_count(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::Diagnostic>>* v) {
+  return v == nullptr ? 0 : v->size();
+}
+
 bool has_code(const ivf::File& f, const char* code) {
   return std::any_of(f.diagnostics.begin(), f.diagnostics.end(),
                      [&](const ivf::Diagnostic& d) { return ovt::container::diag(d.code).code == code; });
@@ -123,7 +128,7 @@ bool has_code(const ivf::File& f, const char* code) {
 TEST_CASE("ivf: header and frame walk", "[container][ivf][fast]") {
   const auto frames = av1_frames(5);
   const Bytes bytes = make_ivf({}, frames);
-  const ovt::test::MemoryFile file(bytes);
+  const ovt::io::MemoryFile file(bytes);
   const auto parsed = ivf::parse(file);
   REQUIRE(parsed);
   CHECK(parsed->header.width == 64);
@@ -147,18 +152,18 @@ TEST_CASE("ivf: header and frame walk", "[container][ivf][fast]") {
 
 TEST_CASE("ivf: not an IVF file", "[container][ivf][fast]") {
   const Bytes tiny(31, 0);
-  CHECK_FALSE(ivf::parse(ovt::test::MemoryFile(tiny)));
+  CHECK_FALSE(ivf::parse(ovt::io::MemoryFile(tiny)));
   Bytes b = make_ivf({}, av1_frames(1));
   b[0] = 'X';
-  CHECK_FALSE(ivf::parse(ovt::test::MemoryFile(b)));
-  CHECK(ivf::make_reader(ovt::test::MemoryFile(b)) == nullptr);
+  CHECK_FALSE(ivf::parse(ovt::io::MemoryFile(b)));
+  CHECK(ivf::make_reader(ovt::io::MemoryFile(b)) == nullptr);
 }
 
 TEST_CASE("ivf: header frame_count is never trusted", "[container][ivf][fast]") {
   Params p;
   p.header_frame_count = 0;
   const Bytes bytes = make_ivf(p, av1_frames(3));
-  const auto parsed = ivf::parse(ovt::test::MemoryFile(bytes));
+  const auto parsed = ivf::parse(ovt::io::MemoryFile(bytes));
   REQUIRE(parsed);
   CHECK(parsed->frames.size() == 3);
   CHECK(has_code(*parsed, "CNT-IVF-0002"));
@@ -169,7 +174,7 @@ TEST_CASE("ivf: header_size other than 32 moves the first frame", "[container][i
   Params p;
   p.header_size = 48;
   const Bytes bytes = make_ivf(p, av1_frames(2));
-  const auto parsed = ivf::parse(ovt::test::MemoryFile(bytes));
+  const auto parsed = ivf::parse(ovt::io::MemoryFile(bytes));
   REQUIRE(parsed);
   CHECK(parsed->first_frame_offset == 48);
   REQUIRE(parsed->frames.size() == 2);
@@ -179,7 +184,7 @@ TEST_CASE("ivf: header_size other than 32 moves the first frame", "[container][i
   // A header_size below 32 (SPEC-ASSUMPTION): reported, first frame at 32.
   p.header_size = 8;
   const Bytes small = make_ivf(p, av1_frames(2));
-  const auto parsed_small = ivf::parse(ovt::test::MemoryFile(small));
+  const auto parsed_small = ivf::parse(ovt::io::MemoryFile(small));
   REQUIRE(parsed_small);
   CHECK(parsed_small->first_frame_offset == 32);
   CHECK(parsed_small->frames.size() == 2);
@@ -191,7 +196,7 @@ TEST_CASE("ivf: truncated mid-frame", "[container][ivf][fast]") {
   Bytes bytes = make_ivf({}, frames);
   const size_t cut = 5;
   bytes.resize(bytes.size() - cut);
-  const auto parsed = ivf::parse(ovt::test::MemoryFile(bytes));
+  const auto parsed = ivf::parse(ovt::io::MemoryFile(bytes));
   REQUIRE(parsed);
   REQUIRE(parsed->frames.size() == 3);
   CHECK(has_code(*parsed, "CNT-IVF-0003"));
@@ -203,7 +208,7 @@ TEST_CASE("ivf: truncated mid-frame", "[container][ivf][fast]") {
 TEST_CASE("ivf: truncated frame header", "[container][ivf][fast]") {
   Bytes bytes = make_ivf({}, av1_frames(2));
   bytes.insert(bytes.end(), {1, 2, 3, 4, 5});  // 5 stray bytes: not a whole 12-byte frame header
-  const auto parsed = ivf::parse(ovt::test::MemoryFile(bytes));
+  const auto parsed = ivf::parse(ovt::io::MemoryFile(bytes));
   REQUIRE(parsed);
   CHECK(parsed->frames.size() == 2);
   CHECK(has_code(*parsed, "CNT-IVF-0003"));
@@ -211,11 +216,11 @@ TEST_CASE("ivf: truncated frame header", "[container][ivf][fast]") {
 
 TEST_CASE("ivf: empty and header-only files", "[container][ivf][fast]") {
   const Bytes bytes = make_ivf({}, {});
-  const auto parsed = ivf::parse(ovt::test::MemoryFile(bytes));
+  const auto parsed = ivf::parse(ovt::io::MemoryFile(bytes));
   REQUIRE(parsed);
   CHECK(parsed->frames.empty());
   CHECK(parsed->diagnostics.empty());
-  const auto reader = ivf::make_reader(ovt::test::MemoryFile(bytes));
+  const auto reader = ivf::make_reader(ovt::io::MemoryFile(bytes));
   REQUIRE(reader);
   CHECK(reader->track_count() == 1);
 }
@@ -243,7 +248,7 @@ TEST_CASE("ivf: sample table", "[container][ivf][fast]") {
   p.num = 1001;
   const auto frames = av1_frames(6);
   const Bytes bytes = make_ivf(p, frames);
-  const ovt::test::MemoryFile file(bytes);
+  const ovt::io::MemoryFile file(bytes);
   const auto reader = ivf::make_reader(file);
   REQUIRE(reader);
 
@@ -321,7 +326,7 @@ TEST_CASE("ivf: tree and TrackInfo", "[container][ivf][fast]") {
   p.num = 1001;
   const auto frames = av1_frames(6);
   const Bytes bytes = make_ivf(p, frames);
-  const ovt::test::MemoryFile file(bytes);
+  const ovt::io::MemoryFile file(bytes);
   const auto reader = ivf::make_reader(file);
   REQUIRE(reader);
   const Bytes buf = reader->tree();
@@ -347,7 +352,7 @@ TEST_CASE("ivf: tree and TrackInfo", "[container][ivf][fast]") {
   CHECK(frm->fields()->Get(0)->uvalue() == frames[1].payload.size());
   CHECK(frm->fields()->Get(1)->uvalue() == 1);
   CHECK(frm->payload_span()->offset() == frm->file_span()->offset() + 12);
-  CHECK((root->diagnostics() == nullptr || root->diagnostics()->size() == 0));
+  CHECK(diag_count(root->diagnostics()) == 0);
 
   REQUIRE(tree->tracks()->size() == 1);
   const auto* track = tree->tracks()->Get(0);
@@ -365,7 +370,7 @@ TEST_CASE("ivf: tree and TrackInfo", "[container][ivf][fast]") {
 
 TEST_CASE("ivf: output is deterministic", "[container][ivf][fast]") {
   const Bytes bytes = make_ivf({}, av1_frames(7));
-  const ovt::test::MemoryFile file(bytes);
+  const ovt::io::MemoryFile file(bytes);
   const auto a = ivf::make_reader(file);
   const auto b = ivf::make_reader(file);
   REQUIRE((a && b));
@@ -376,11 +381,12 @@ TEST_CASE("ivf: output is deterministic", "[container][ivf][fast]") {
 
 TEST_CASE("ivf: FRM children are lazy, expand adds windows", "[container][ivf][fast]") {
   std::vector<TestFrame> frames;
+  frames.reserve(9000);
   for (uint64_t i = 0; i < 9000; ++i) {
     frames.push_back({i, Bytes{0x12, 0x00}});
   }
   const Bytes bytes = make_ivf({}, frames);
-  const ovt::test::MemoryFile file(bytes);
+  const ovt::io::MemoryFile file(bytes);
   auto reader = ivf::make_reader(file);
   REQUIRE(reader);
   auto count = [&] {
@@ -403,14 +409,14 @@ TEST_CASE("ivf: FRM children are lazy, expand adds windows", "[container][ivf][f
   CHECK(reader->expand(33) == OVT_E_INVALID_ARG);  // not a node
   const Bytes buf = reader->tree();
   const auto* diags = tree_of(buf)->root()->Get(0)->diagnostics();
-  CHECK((diags == nullptr || diags->size() == 0));
+  CHECK(diag_count(diags) == 0);
   // The sample table always lists every frame.
   CHECK(table_of(reader->sample_table(0, 0, 0))->count() == 9000);
 }
 
 TEST_CASE("ivf: through the C API", "[container][ivf][open][fast]") {
   const Bytes bytes = make_ivf({}, av1_frames(4));
-  ovt_File handle{std::make_unique<ovt::test::MemoryFile>(bytes)};
+  ovt_File handle{std::make_unique<ovt::io::MemoryFile>(bytes)};
   ovt_Container* c = nullptr;
   REQUIRE(ovt_container_open(&handle, &c) == OVT_OK);
   CHECK(std::string(ovt_container_format(c)) == "ivf");
@@ -425,7 +431,7 @@ TEST_CASE("ivf: through the C API", "[container][ivf][open][fast]") {
 
 TEST_CASE("ivf: forced IVF on other bytes is corrupt", "[container][ivf][open][fast]") {
   const Bytes bytes(64, 0x41);
-  ovt_File handle{std::make_unique<ovt::test::MemoryFile>(bytes)};
+  ovt_File handle{std::make_unique<ovt::io::MemoryFile>(bytes)};
   ovt_Container* c = nullptr;
   CHECK(ovt_container_open_format(&handle, "ivf", nullptr, nullptr, &c) == OVT_E_CORRUPT);
   CHECK(c == nullptr);
