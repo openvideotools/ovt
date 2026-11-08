@@ -6,7 +6,8 @@
 # public headers under include/aom/. The pin (version, URL, SHA-256) is the libaom row of third_party/VERSIONS.md.
 #
 # Flags: decoder only, CONFIG_INSPECTION=1 and CONFIG_ACCOUNTING=1 (inspection needs accounting for the per-symbol
-# bit costs), multithreaded, PIC, no tests/docs/tools/WebM. OVT_BUILD_AOM_INSPECT=ON also builds libaom's
+# bit costs), multithreaded, PIC, no tests/docs/tools/WebM, and CONFIG_SVT_AV1=0 so that no BSD-3-Clause-Clear code
+# (libaom's third_party/SVT-AV1) is built in. OVT_BUILD_AOM_INSPECT=ON also builds libaom's
 # examples (-DENABLE_EXAMPLES=1) and installs the `inspect` oracle into <prefix>/bin (chapter 07 §7.7).
 #
 # OVT_AOM_CPU is libaom's AOM_TARGET_CPU: arm64 or x86_64 from the Android ABI, the single macOS architecture or
@@ -93,6 +94,9 @@ externalproject_add(
              -DCONFIG_MULTITHREAD=1
              -DCONFIG_PIC=1
              -DCONFIG_WEBM_IO=0
+             # Drops the SVT-AV1 convolution code (third_party/SVT-AV1, BSD-3-Clause-Clear), which is not in
+             # tools/license_policy.toml; libaom's own aom_config_defaults.cmake names this switch for that purpose.
+             -DCONFIG_SVT_AV1=0
              -DENABLE_EXAMPLES=${_ovt_aom_examples}
              -DENABLE_TESTS=0
              -DENABLE_DOCS=0

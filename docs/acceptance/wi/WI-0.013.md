@@ -50,3 +50,9 @@ CMake Error at cmake/OvtAomInspection.cmake (message):
 ```
 
 Result: pass. The check builds and runs the probe instead of only compiling it (spec question #152).
+
+## Licence: no SVT-AV1 code
+
+`third_party/libaom.cmake` passes `-DCONFIG_SVT_AV1=0` (owner decision, 2026-11-08), so libaom's AVX2 convolution
+does not include the BSD-3-Clause-Clear sources of its `third_party/SVT-AV1`. Checked on 2026-11-08 by configuring
+libaom 3.12.1 with the script's flags: `config/aom_config.h` has `#define CONFIG_SVT_AV1 0` and `libaom.a` builds.
