@@ -23,12 +23,12 @@ add_test(NAME metrics_abi_status_copies_match
          COMMAND ${CMAKE_COMMAND} -Da=${_ovt_inc}/status.h -Db=${_ovt_inc}/abi/metric_v1.h
                  -Dguard=OVT_STATUS_TYPES_DEFINED -P "${_ovt_copies}")
 add_test(NAME metrics_abi_frame_id_copies_match
-         COMMAND ${CMAKE_COMMAND} -Da=${_ovt_inc}/decode.h -Db=${_ovt_inc}/abi/metric_v1.h
-                 -Dguard=OVT_FRAME_ID_DEFINED -P "${_ovt_copies}")
+         COMMAND ${CMAKE_COMMAND} -Da=${_ovt_inc}/decode.h -Db=${_ovt_inc}/abi/metric_v1.h -Dguard=OVT_FRAME_ID_DEFINED
+                 -P "${_ovt_copies}")
 add_test(NAME metrics_abi_color_copies_match
          COMMAND ${CMAKE_COMMAND} -Da=${_ovt_inc}/color.h -Db=${_ovt_inc}/abi/metric_v1.h
                  -Dguard=OVT_COLOR_DESCRIPTION_DEFINED -P "${_ovt_copies}")
-set_tests_properties(metrics_abi_status_copies_match metrics_abi_frame_id_copies_match
-                     metrics_abi_color_copies_match PROPERTIES LABELS "fast;unit;metrics")
+set_tests_properties(metrics_abi_status_copies_match metrics_abi_frame_id_copies_match metrics_abi_color_copies_match
+                     PROPERTIES LABELS "fast;unit;metrics")
 unset(_ovt_inc)
 unset(_ovt_copies)
