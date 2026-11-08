@@ -33,7 +33,7 @@ struct ColourSpace {
 };
 
 // nullopt for a `C` value that is not in the table (CNT-Y4M-0002).
-[[nodiscard]] std::optional<ColourSpace> colour_space(std::string_view c) noexcept;
+[[nodiscard]] std::optional<ColourSpace> colour_space(std::string_view c);
 
 // Bytes of one frame's planes (no FRAME line). Zero when the arithmetic overflows.
 [[nodiscard]] uint64_t frame_bytes(const ColourSpace& cs, uint32_t width, uint32_t height) noexcept;

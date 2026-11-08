@@ -368,7 +368,7 @@ void apply_header_tags(File& f, bool& have_w, bool& have_h, bool& have_f, std::s
 
 }  // namespace
 
-std::optional<ColourSpace> colour_space(std::string_view c) noexcept {
+std::optional<ColourSpace> colour_space(std::string_view c) {
   ColourSpace cs;
   struct Row {
     std::string_view name;
