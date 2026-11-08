@@ -27,9 +27,7 @@ import apply_patches  # noqa: E402
 
 CMAKE = shutil.which("cmake")
 CC = shutil.which("cc") or shutil.which("gcc") or shutil.which("clang")
-needs_build = pytest.mark.skipif(
-    CMAKE is None or CC is None, reason="cmake or a C compiler is not installed"
-)
+needs_build = pytest.mark.skipif(CMAKE is None or CC is None, reason="cmake or a C compiler is not installed")
 
 HEADER = "| Name | Version | Licence | URL | Patches | SHA-256 | Build | Notes |\n|---|---|---|---|---|---|---|---|\n"
 
@@ -58,9 +56,7 @@ def patch(name: str, old: str, new: str) -> tuple[str, str]:
     return name, body
 
 
-GOOD = patch(
-    "0001-inspection-extend-mi-data.patch", "/* line one */", "/* line one, patched */"
-)
+GOOD = patch("0001-inspection-extend-mi-data.patch", "/* line one */", "/* line one, patched */")
 BAD = patch(
     "0002-inspection-frame-snapshots.patch",
     "/* a line that is not there */",
@@ -77,9 +73,7 @@ def fixture_archive(tmp: Path) -> tuple[Path, str]:
     (src / "PATENTS").write_text("AOM Patent License 1.0\n")
     (src / "aom" / "aom_decoder.h").write_text("#pragma once\n")
     (src / "av1" / "decoder" / "inspection.c").write_text(INSPECTION_C)
-    (src / "av1" / "decoder" / "inspection.h").write_text(
-        "#pragma once\nint ifd_stub(void);\n"
-    )
+    (src / "av1" / "decoder" / "inspection.h").write_text("#pragma once\nint ifd_stub(void);\n")
     archive = tmp / "upstream" / "libaom-3.12.1.tar.gz"
     archive.parent.mkdir()
     with tarfile.open(archive, "w:gz") as t:
@@ -102,9 +96,7 @@ class Build:
         archive, sha = fixture_archive(tmp)
         versions = tmp / "VERSIONS.md"
         versions.write_text(
-            "# pins\n\n"
-            + HEADER
-            + f"| libaom | 3.12.1 | BSD-2-Clause AND LicenseRef-AOM-Patent-License-1.0 | "
+            "# pins\n\n" + HEADER + f"| libaom | 3.12.1 | BSD-2-Clause AND LicenseRef-AOM-Patent-License-1.0 | "
             f"{archive.as_uri()} | – | `{sha}` | third_party/libaom.cmake | |\n"
         )
         project = tmp / "project"
@@ -135,9 +127,7 @@ class Build:
         ]
 
     def run(self) -> subprocess.CompletedProcess[str]:
-        configured = subprocess.run(
-            self.configure, capture_output=True, text=True, check=False
-        )
+        configured = subprocess.run(self.configure, capture_output=True, text=True, check=False)
         assert configured.returncode == 0, configured.stdout + configured.stderr
         return subprocess.run(
             [str(CMAKE), "--build", str(self.tmp / "build"), "--target", "tp_libaom"],
@@ -159,9 +149,7 @@ def test_patches_apply_in_order_and_are_recorded(tmp_path: Path) -> None:
     build = Build(tmp_path, write_patches(tmp_path, GOOD))
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (
-        "apply_patches: applied 0001-inspection-extend-mi-data.patch" in result.stdout
-    )
+    assert "apply_patches: applied 0001-inspection-extend-mi-data.patch" in result.stdout
     assert (build.prefix / "lib" / "libaom.a").is_file()
     assert build.recorded() == ["0001-inspection-extend-mi-data.patch"]
     assert build.patched_source().count("patched") == 1
@@ -173,10 +161,7 @@ def test_broken_patch_fails_the_build_naming_it(tmp_path: Path) -> None:
     build = Build(tmp_path, write_patches(tmp_path, GOOD, BAD))
     result = build.run()
     assert result.returncode != 0
-    assert (
-        "0002-inspection-frame-snapshots.patch does not apply"
-        in result.stdout + result.stderr
-    )
+    assert "0002-inspection-frame-snapshots.patch does not apply" in result.stdout + result.stderr
     # --check dry-runs the whole series first: nothing is applied, so the tree stays pristine.
     assert "patched" not in build.patched_source()
     assert not (build.source / apply_patches.MARKER).exists()
@@ -191,9 +176,7 @@ def test_missing_patch_dir_builds_upstream_and_exports_source_dir(
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
     assert build.patched_source() == INSPECTION_C
-    source_dir, binary_dir, includes = (
-        (tmp_path / "build" / "libaom_dirs.txt").read_text().splitlines()
-    )
+    source_dir, binary_dir, includes = (tmp_path / "build" / "libaom_dirs.txt").read_text().splitlines()
     assert Path(source_dir) == build.source
     assert (Path(source_dir) / "av1" / "decoder" / "inspection.h").is_file()
     assert Path(binary_dir) == build.prefix / "src" / "tp_libaom-build"
@@ -202,7 +185,4 @@ def test_missing_patch_dir_builds_upstream_and_exports_source_dir(
 
 def test_default_patch_dir_is_the_plugins_patches() -> None:
     text = (REPO / "third_party" / "libaom.cmake").read_text()
-    assert (
-        'set(OVT_AOM_PATCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-aom/patches"'
-        in text
-    )
+    assert 'set(OVT_AOM_PATCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-aom/patches"' in text
