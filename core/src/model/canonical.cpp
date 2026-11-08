@@ -49,6 +49,15 @@ using reflection::BaseType;
 
 constexpr std::string_view kTypeSuffix = "_type";
 constexpr std::size_t kFileIdentifierOffset = sizeof(flatbuffers::uoffset_t);
+/// Nested buffers inside nested buffers. The OVT schemas nest one level (Block.ext, FrameInfo.ref_state,
+/// FrameAnalysis.filter_params); a `_type` string may name any table, including the root, so untrusted input
+/// could chain levels without bound (each with its own verifier and copy). Deeper input is rejected.
+constexpr int kMaxNesting = 4;
+
+[[noreturn]] void too_deep(const char* caller, const std::string& path) {
+  throw std::invalid_argument(std::string(caller) + ": nested buffers deeper than " + std::to_string(kMaxNesting) +
+                              " levels at " + path);
+}
 
 // ---- schema helpers -------------------------------------------------------------------------------------
 
@@ -365,6 +374,7 @@ class Canonicalizer {
 
  private:
   const reflection::Schema& schema_;
+  int nesting_ = 0;  ///< nested-buffer levels above the table being copied
 
   struct RawVector {
     flatbuffers::uoffset_t offset;
@@ -460,7 +470,12 @@ class Canonicalizer {
     const auto src = vector_bytes(table, field, elem);
     if (const auto* type_field = nested_type_field(object, field); type_field != nullptr && count != 0) {
       if (const auto* nested = lookup_table(schema_, object, string_field(table, *type_field)); nested != nullptr) {
+        if (nesting_ == kMaxNesting) {
+          too_deep("canonicalize", path);
+        }
+        ++nesting_;
         const auto bytes = finish(*nested, AlignedCopy(src), nullptr, path);  // §6.3.3: no identifier
+        --nesting_;
         return copy_bytes(builder, bytes, 1);
       }
     }
@@ -759,6 +774,7 @@ class Differ {
  private:
   const reflection::Schema& schema_;
   std::vector<std::string>& out_;
+  int nesting_ = 0;  ///< nested-buffer levels above the tables being compared
 
   static std::string presence(bool present) { return present ? "<present>" : "<absent>"; }
 
@@ -871,12 +887,17 @@ class Differ {
     if (table_object == nullptr) {
       return false;
     }
+    if (nesting_ == kMaxNesting) {
+      too_deep("structural_diff", path);
+    }
     const AlignedCopy ca(vector_bytes(a, field, 1));
     const AlignedCopy cb(vector_bytes(b, field, 1));
     if (!verifies(schema_, *table_object, ca) || !verifies(schema_, *table_object, cb)) {
       return false;
     }
+    ++nesting_;
     tables(*table_object, *flatbuffers::GetAnyRoot(ca.data()), *flatbuffers::GetAnyRoot(cb.data()), path);
+    --nesting_;
     return true;
   }
 

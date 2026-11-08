@@ -185,3 +185,42 @@ TEST_CASE("test_canonical: invalid input is rejected", "[model][fast]") {
   REQUIRE_FALSE(diff.empty());
   CHECK(diff.front().rfind("blocks[2].ext.length: ", 0) == 0);
 }
+
+namespace {
+
+/// A FrameAnalysis whose filter_params nests another FrameAnalysis, @p levels deep (`_type` may name any
+/// table, so untrusted input can do this).
+Bytes nested_chain(int levels) {
+  fb::FrameAnalysisT native;
+  native.schema_version = 1;
+  native.plugin_id = "p";
+  flatbuffers::FlatBufferBuilder inner;
+  inner.Finish(fb::FrameAnalysis::Pack(inner, &native));
+  Bytes bytes(inner.GetBufferPointer(), inner.GetBufferPointer() + inner.GetSize());
+  for (int level = 0; level < levels; ++level) {
+    native.filter_params = bytes;
+    native.filter_params_type = "FrameAnalysis";
+    flatbuffers::FlatBufferBuilder outer;
+    outer.Finish(fb::FrameAnalysis::Pack(outer, &native));
+    bytes.assign(outer.GetBufferPointer(), outer.GetBufferPointer() + outer.GetSize());
+  }
+  return bytes;
+}
+
+}  // namespace
+
+TEST_CASE("test_canonical: nested-buffer recursion is bounded", "[model][fast]") {
+  const Bytes ok = nested_chain(4);
+  const Bytes changed = edited(ok, [](fb::FrameAnalysisT& fa) { fa.plugin_id = "q"; });
+  CHECK(ovt::model::canonicalize(ok, SchemaId::Model, kRoot) == ok);
+  CHECK(ovt::model::structural_diff(ok, changed, SchemaId::Model, kRoot) ==
+        std::vector<std::string>{"plugin_id: \"p\" != \"q\""});
+
+  const Bytes deep = nested_chain(5);
+  CHECK_THROWS_AS(ovt::model::canonicalize(deep, SchemaId::Model, kRoot), std::invalid_argument);
+  CHECK_THROWS_AS(ovt::model::structural_diff(deep, deep, SchemaId::Model, kRoot), std::invalid_argument);
+
+  const Bytes very_deep = nested_chain(200);  // would recurse 200 levels without the cap
+  CHECK_THROWS_AS(ovt::model::canonicalize(very_deep, SchemaId::Model, kRoot), std::invalid_argument);
+  CHECK_THROWS_AS(ovt::model::structural_diff(very_deep, very_deep, SchemaId::Model, kRoot), std::invalid_argument);
+}
