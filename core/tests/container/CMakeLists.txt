@@ -4,7 +4,7 @@
 # Unit tests of the container module (chapter 08 §8.10, WI-1.200). They link the module objects directly
 # because ovt_core exports only the C API.
 
-add_executable(ovt_tests_container sniff_test.cpp)
+add_executable(ovt_tests_container annexb_test.cpp sniff_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_container PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET}
                                                   ${nlohmann_json_TARGET})

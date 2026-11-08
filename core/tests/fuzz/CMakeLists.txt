@@ -39,6 +39,7 @@ function(ovt_add_fuzz_target name source)
   endif()
 endfunction()
 
+ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)

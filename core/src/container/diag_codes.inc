@@ -15,3 +15,14 @@ X(CNT_0006, "CNT-0006", Fatal,
   "file shorter than 8 bytes or first 8 bytes not a plausible box header after sniffing as ISOBMFF", "")
 X(CNT_0007, "CNT-0007", Info,
   "box at offset `o` not yet expanded (lazy; call `ovt_container_expand`)", "")
+
+// WI-1.226 (Annex B splitter, §8.6.3).
+X(CNT_ESB_0001, "CNT-ESB-0001", Warning, "`N` bytes of garbage before the first start code / after the last NAL unit",
+  "H.264 clause B.1.1")
+X(CNT_ESB_0002, "CNT-ESB-0002", Info, "more than 8 `trailing_zero_8bits` after NAL unit `n`", "H.264 clause B.1.2")
+X(CNT_ESB_0003, "CNT-ESB-0003", Warning, "empty NAL unit after start code at offset `o`", "H.264 clause B.1.2")
+X(CNT_ESB_0004, "CNT-ESB-0004", Info,
+  "3-byte start code before SPS/PPS/VPS/AUD/first NAL of an access unit (`zero_byte` required)",
+  "H.264 clause B.1.2, H.265 clause B.1.2")
+X(CNT_ESB_0005, "CNT-ESB-0005", Error,
+  "`forbidden_zero_bit` set in NAL header at offset `o` (false start code or corruption)", "H.264 §7.4.1")
