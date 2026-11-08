@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <span>
 #include <utility>
 
 #include "platform/platform.h"
@@ -751,14 +752,18 @@ QImage RawFormatModel::renderPreview(const QString& path, const RawFormat& forma
     return {};  // shorter than one luma plane
   }
   QImage image(format.width, format.height, QImage::Format_Grayscale8);
-  const auto* src = reinterpret_cast<const unsigned char*>(luma.constData());
   const int shift = format.bit_depth - 8;
+  const auto sample = [&luma](std::size_t index) {
+    return static_cast<unsigned>(static_cast<uchar>(luma.at(static_cast<qsizetype>(index))));
+  };
   for (int y = 0; y < format.height; ++y) {
-    uchar* dst = image.scanLine(y);
+    const std::span<uchar> row(image.scanLine(y), static_cast<std::size_t>(format.width));
     for (int x = 0; x < format.width; ++x) {
       const std::size_t i =
           static_cast<std::size_t>(y) * static_cast<std::size_t>(format.width) + static_cast<std::size_t>(x);
-      dst[x] = wide ? static_cast<uchar>(std::min(255, (src[2 * i] | (src[2 * i + 1] << 8)) >> shift)) : src[i];
+      row[static_cast<std::size_t>(x)] =
+          wide ? static_cast<uchar>(std::min(255U, (sample(2 * i) | (sample(2 * i + 1) << 8)) >> shift))
+               : static_cast<uchar>(sample(i));
     }
   }
   return image;
@@ -776,8 +781,9 @@ void RawFormatModel::update() {
     if (!diagnostic_code_.isEmpty()) {
       diagnostic_message_ = QStringLiteral("raw format does not match the file size (%1 ≠ %2)").arg(expected).arg(size);
     }
-    if (format_.frameSize() != 0) {
-      frame_count_ = static_cast<int>(size / format_.frameSize());
+    const std::uint64_t frame_size = format_.frameSize();
+    if (frame_size != 0) {
+      frame_count_ = static_cast<int>(size / frame_size);
     }
     preview_ = renderPreview(path_, format_);
   }

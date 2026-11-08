@@ -18,6 +18,7 @@ class Setup : public QObject {
   Q_OBJECT
 
  public Q_SLOTS:
+  // NOLINTNEXTLINE(readability-convert-member-functions-to-static): Qt Quick Test calls it as a slot
   void qmlEngineAvailable(QQmlEngine* engine) {
     engine->addImageProvider(QStringLiteral("rawpreview"), new ovt::app::RawPreviewProvider);
   }
