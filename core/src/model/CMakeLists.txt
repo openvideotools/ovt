@@ -34,7 +34,7 @@ unset(_ovt_hash_len)
 
 # WI-0.084: the model helpers of ovt/cxx/model/{grid,tree,units,labels}.hpp.
 # WI-0.087: the PictureStore and PlaneBlob of ovt/cxx/model/{picture_store,plane}.hpp.
-# WI-0.089a: the YUView statistics CSV exporter of ovt/cxx/model/yuview_csv.hpp.
+# WI-0.089: the YUView statistics CSV exporter and importer of ovt/cxx/model/yuview_csv.hpp.
 target_sources(ovt_core_objects PRIVATE bfbs_resources.cpp grid.cpp labels.cpp picture_store.cpp tree.cpp units.cpp
                                         yuview_csv.cpp)
 # ovt_schemas orders the build after flatc/embed_bfbs and adds ${OVT_GENERATED_DIR} (SYSTEM) to the
