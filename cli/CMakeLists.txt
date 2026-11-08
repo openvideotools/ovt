@@ -82,3 +82,43 @@ if(OVT_BUILD_TESTS)
                                     "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_no_args.cmake")
   set_tests_properties(cli_no_args PROPERTIES LABELS "fast;unit;cli")
 endif()
+
+# ---- JSON Schemas of the -f json output (chapter 12 §12.6, WI-1.501) -----------------------------------
+# docs/spec/schemas/<Table>.schema.json and ovt-cli-1.schema.json are generated from core/schema/*.fbs and
+# committed. `ovt_json_schema` rewrites them; `ovt_json_schema_check` (and the fast CTest
+# cli_json_schema_up_to_date) fails with a diff when an .fbs changed without regenerating.
+find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND AND OVT_FLATC_EXECUTABLE)
+  set(_ovt_jsonschema_cmd
+      "${Python3_EXECUTABLE}"
+      -I
+      "${PROJECT_SOURCE_DIR}/tools/fbs_to_jsonschema.py"
+      --flatc
+      "${OVT_FLATC_EXECUTABLE}"
+      --schema-dir
+      "${PROJECT_SOURCE_DIR}/core/schema"
+      --out
+      "${PROJECT_SOURCE_DIR}/docs/spec/schemas")
+  add_custom_target(ovt_json_schema COMMAND ${_ovt_jsonschema_cmd}
+                    COMMENT "Regenerating docs/spec/schemas/*.schema.json from core/schema/*.fbs" VERBATIM)
+  add_custom_target(ovt_json_schema_check COMMAND ${_ovt_jsonschema_cmd} --check
+                    COMMENT "Checking docs/spec/schemas/*.schema.json against core/schema/*.fbs" VERBATIM)
+  if(OVT_BUILD_TESTS)
+    add_test(NAME cli_json_schema_up_to_date COMMAND ${_ovt_jsonschema_cmd} --check)
+    set_tests_properties(cli_json_schema_up_to_date PROPERTIES LABELS "fast;cli;tools")
+    execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest, jsonschema" RESULT_VARIABLE _ovt_no_pytest
+                    OUTPUT_QUIET ERROR_QUIET)
+    if(_ovt_no_pytest EQUAL 0)
+      add_test(NAME cli_schema_validate COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider -rs
+                                                "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_schema_validate.py"
+               WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+      set_tests_properties(
+        cli_schema_validate PROPERTIES LABELS "fast;cli;tools" ENVIRONMENT
+                                       "OVT_CLI=$<TARGET_FILE:ovt_cli>;OVT_FLATC=${OVT_FLATC_EXECUTABLE}")
+    else()
+      message(STATUS "pytest or jsonschema not found for ${Python3_EXECUTABLE}: cli_schema_validate not registered "
+                     "(pip install -r tools/requirements.txt -r tools/requirements-test.txt)")
+    endif()
+    unset(_ovt_no_pytest)
+  endif()
+endif()
