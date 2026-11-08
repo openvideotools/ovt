@@ -197,7 +197,7 @@ struct BlockValues {
 
 template <class Table>
 const Table* nested_root(const flatbuffers::Vector<std::uint8_t>* bytes) {
-  if (bytes == nullptr || bytes->size() == 0) {
+  if (bytes == nullptr || bytes->empty()) {
     return nullptr;
   }
   flatbuffers::Verifier verifier(bytes->data(), bytes->size());
@@ -528,7 +528,7 @@ void write_frame(std::ostream& out, const fb::FrameAnalysis& fa, int ordinal, co
   write_layer(out, "uv_palette", cells, width, [](const Cell& c) { return c.uv_palette; });
   write_map_member(out, "referenceFrame", kRefsMap);
   write_layer(out, "referenceFrame", cells, width, [](const Cell& c) { return c.ref_frame; });
-  if (fa.symbols() != nullptr && fa.symbols()->size() != 0) {
+  if (fa.symbols() != nullptr && !fa.symbols()->empty()) {
     write_accounting(out, fa);
   }
 
