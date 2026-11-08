@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc16 — 2026-11-08
+
+PATCH-level: owner decision (Karl, 2026-11-08) on the golden size cap. No requirement sentence or WI scope changes.
+
+- 16 §16.2.7 and `CLAUDE.md` §5 — the cap on committed goldens is 2 MB gzip-compressed (the size of the file as committed), not 2 MB uncompressed, so the AV1 and HEVC grid goldens fit; golden runners read `.json.gz`
+
 ## 1.0.0-rc15 — 2026-11-07
 
 PATCH-level: WI-0.605 records how branch protection is implemented now that the repository is public. No requirement sentence changes.
