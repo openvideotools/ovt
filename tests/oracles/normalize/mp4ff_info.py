@@ -30,8 +30,10 @@ import canon  # noqa: E402
 
 BOX_RE = re.compile(r"^( *)\[(.{4})\] size=(\d+)(?: version=(\d+) flags=([0-9a-fA-F]+))?")
 FIELD_RE = re.compile(r"^ *- (.*)$")
+BARE_RE = re.compile(r"^ +([A-Za-z]\w*: .*)$")
 ROW_RE = re.compile(r"^(?:\w+\[\d+\]|\d+)$")
 PAIR_RE = re.compile(r"^[A-Za-z][\w ]*: ")
+HEX_RE = re.compile(r"^ +(?:[0-9a-fA-F]{2})+$")
 KV_RE = re.compile(r"(\w+)=(\S+)")
 
 
@@ -55,8 +57,15 @@ def convert(args: argparse.Namespace) -> list[dict[str, Any]]:
             raw.append(pairs)
             rows.append({})
             continue
-        f = FIELD_RE.match(line)
+        f = FIELD_RE.match(line) or BARE_RE.match(line)  # sgpd prints `groupingType: seig` without the dash
         if not f:
+            # An MPEG-4 descriptor header (`Descriptor "tag=3 ES" size=2+44` in esds); its `- name: value` lines
+            # that follow are attached to the esds box and dropped when unmapped.
+            if line.lstrip().startswith('Descriptor "'):
+                continue
+            # A bare hex dump line: the bytes of a parameter-set NAL unit under its `- SPS_33 complete: 1` line.
+            if HEX_RE.match(line):
+                continue
             if line.strip():
                 raise canon.NormalizeError(f"line {n}: neither a box nor a field line: {line!r}")
             continue

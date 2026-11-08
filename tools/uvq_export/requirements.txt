@@ -1,0 +1,16 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Venv of tools/uvq_export/export_uvq.py (chapter 9 §9.6.2; WI-3.314). Not a dependency of OVT itself.
+# torch, torchvision, numpy, pandas and tqdm are the versions google/uvq's requirements.txt pins at UVQ_COMMIT
+# (c204ecc0); torch also needs its CUDA wheels on PyPI, although the export runs on the CPU. onnxruntime matches
+# the C++ runtime pin in third_party/VERSIONS.md, so the validation scores the graphs the host will load.
+torch==2.8.0
+torchvision==0.23.0
+numpy==2.1.2
+pandas==2.2.3
+tqdm==4.67.1
+onnx==1.23.2
+onnxconverter-common==1.16.0
+onnxruntime==1.20.1
+protobuf==7.36.2

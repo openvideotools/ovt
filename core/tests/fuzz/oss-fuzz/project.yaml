@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# OSS-Fuzz project file (chapter 14 §14.7.4, WI-0.569). Copy this directory to projects/ovt/ in a checkout of
+# https://github.com/google/oss-fuzz. Only the owner submits it; see docs/dev/security/fuzzing.md.
+homepage: "https://github.com/openvideotools/ovt"
+language: c++
+# PLACEHOLDER: OSS-Fuzz needs an e-mail address that is tied to a Google account, and it is published in the
+# oss-fuzz repository. The owner fills in both contacts before the submission (docs/dev/security/fuzzing.md).
+primary_contact: "TODO-owner@example.invalid"
+auto_ccs:
+  - "TODO-second-maintainer@example.invalid"
+main_repo: "https://github.com/openvideotools/ovt"
+base_os_version: ubuntu-24-04
+sanitizers:
+  - address
+  - undefined
+fuzzing_engines:
+  - libfuzzer
+labels:
+  "*": [oss-fuzz]

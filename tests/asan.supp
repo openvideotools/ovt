@@ -11,3 +11,12 @@
 # blank line between the comment and the entry. tools/check_suppressions.py enforces this. Procedure:
 # docs/dev/sanitizers.md. Keep entries narrow (one function or one file); never suppress OVT code here,
 # fix it instead.
+
+# Mesa lavapipe (the only Vulkan ICD on the hosted ubuntu-22.04 runner): one 128-byte realloc made inside the driver
+# while the loader enumerates physical devices, in ovt_tests_placebo_probe and ovt_tests_render.
+# https://github.com/openvideotools/ovt/issues/207
+# The ICD is dlclose'd by vkDestroyInstance before LSan runs, so its frames are '<unknown module>' and a library-name
+# entry can never match; this is the deepest named frame, a loader function that only runs ICD enumeration. It needs
+# the full stack, so render/tests/CMakeLists.txt gives those two test binaries fast_unwind_on_malloc=0. Remove when a
+# run without it is clean.
+leak:setup_loader_term_phys_devs

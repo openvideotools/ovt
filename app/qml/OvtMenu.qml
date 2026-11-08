@@ -5,6 +5,8 @@
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
+import OvtStudio
 
 Menu {
     id: menu
@@ -23,9 +25,27 @@ Menu {
 
             required property var entry
 
+            // The label and, right-aligned, the key bound in the Keymap (the Action has no shortcut of its own:
+            // the shortcut layer owns the keys, so a rebinding in keymap.json changes both, WI-1.466).
+            contentItem: RowLayout {
+                spacing: OvtStyle.spacing * 2
+
+                Label {
+                    Layout.fillWidth: true
+                    text: menuItem.text
+                    color: menuItem.enabled ? OvtStyle.text : OvtStyle.textMuted
+                }
+                Label {
+                    readonly property string keys: (Keymap.revision, menu.actions.shortcutText(menuItem.entry.id))
+
+                    text: keys
+                    visible: keys !== ""
+                    color: OvtStyle.textMuted
+                }
+            }
+
             action: Action {
                 text: menuItem.entry.text
-                shortcut: menuItem.entry.shortcut
                 checkable: menuItem.entry.checkable
                 ActionGroup.group: menuItem.entry.group === "theme" ? menu.actions.themeGroup : null
                 enabled: menu.actions.isEnabled(menuItem.entry.id)

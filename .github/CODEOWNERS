@@ -1,0 +1,19 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Chapter 15 §15.7.3, WI-0.605. The last matching pattern wins, so the general rules come first. The teams
+# are created by hand in the GitHub organisation (docs/dev/governance.md lists them); until they exist
+# GitHub ignores these lines, and the live ruleset does not require code-owner review yet.
+*                                   @openvideotools/ovt-maintainers
+/core/include/ovt/                  @openvideotools/ovt-core-api-reviewers
+/core/include/ovt/abi/              @openvideotools/ovt-core-api-reviewers @openvideotools/ovt-licence-reviewers
+/core/schema/                       @openvideotools/ovt-core-api-reviewers
+/render/                            @openvideotools/ovt-render
+/plugins/                           @openvideotools/ovt-decoders
+/app/ /cli/                         @openvideotools/ovt-app
+/android/                           @openvideotools/ovt-android
+/python/                            @openvideotools/ovt-python
+/third_party/ /vcpkg.json           @openvideotools/ovt-build @openvideotools/ovt-licence-reviewers
+/LICENSES/ /LICENSE /DCO /REUSE.toml /tools/license_policy.toml /tools/license_gate.py /tools/gen_notices.py   @openvideotools/ovt-licence-reviewers
+/.github/                           @openvideotools/ovt-build
+/docs/spec/                         @openvideotools/ovt-maintainers

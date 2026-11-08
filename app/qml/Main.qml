@@ -8,6 +8,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import OvtStudio
 
 ApplicationWindow {
     id: root
@@ -80,8 +81,44 @@ ApplicationWindow {
             ToolSeparator {}
             ToolButton { text: "HDR output"; checkable: true; enabled: false }
             Item { Layout.fillWidth: true }
-            ToolButton { text: "Jobs"; enabled: false; Accessible.name: "Jobs" }
+            ToolButton {
+                objectName: "jobsButton"
+                text: JobsModel.activeCount > 0 ? "Jobs (" + JobsModel.activeCount + ")" : "Jobs"
+                Accessible.name: "Jobs"
+                onClicked: jobsPopover.opened ? jobsPopover.close() : jobsPopover.open()
+            }
         }
+    }
+
+    // Window-level shortcuts of the Keymap (§11.4.3, WI-1.466) and the dialogs they open (Go to, Preferences, Keyboard
+    // map). Ctrl+J (action "view.jobs") opens the Jobs popover (§11.3.18).
+    ShortcutLayer {
+        actions: actions
+        blocked: dialogs.anyOpen
+    }
+
+    Dialogs {
+        id: dialogs
+
+        actions: actions
+        overlayParent: Overlay.overlay
+    }
+
+    Connections {
+        target: actions
+
+        function onActivated(id) {
+            if (id === "view.jobs")
+                jobsPopover.opened ? jobsPopover.close() : jobsPopover.open()
+        }
+    }
+
+    JobsPopover {
+        id: jobsPopover
+
+        parent: Overlay.overlay
+        x: parent.width - width - OvtStyle.spacing
+        y: root.header.height + OvtStyle.spacing
     }
 
     Rectangle {
@@ -112,8 +149,24 @@ ApplicationWindow {
             Label { text: "No file open"; color: OvtStyle.textMuted; objectName: "statusFile" }
             Item { Layout.fillWidth: true }
             Label { text: "100 %"; color: OvtStyle.textMuted; objectName: "statusZoom" }
-            // Job progress bar: hidden when idle (§11.2.4).
-            ProgressBar { visible: false; value: 0; objectName: "statusJobs" }
+            Label {
+                objectName: "statusJobText"
+                visible: JobsModel.foregroundActive
+                text: JobsModel.foregroundText
+                color: OvtStyle.textMuted
+                elide: Text.ElideRight
+                Layout.maximumWidth: 420
+            }
+            // Job progress bar: hidden when idle (§11.2.4); indeterminate while the total is unknown.
+            ProgressBar {
+                objectName: "statusJobs"
+                visible: JobsModel.foregroundActive
+                from: 0
+                to: 1
+                value: Math.max(0, JobsModel.foregroundProgress)
+                indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
+                Accessible.name: "Job progress"
+            }
         }
     }
 }

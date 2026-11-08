@@ -1,0 +1,822 @@
+[
+ {
+  "path": "moof",
+  "size": 2396
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 119,
+   "version": 0
+  },
+  "path": "moof/mfhd",
+  "size": 16
+ },
+ {
+  "path": "moof/traf",
+  "size": 2372
+ },
+ {
+  "fields": {
+   "default_sample_duration": 4,
+   "flags": 131080,
+   "track_ID": 1,
+   "version": 0
+  },
+  "path": "moof/traf/tfhd",
+  "size": 20
+ },
+ {
+  "fields": {
+   "baseMediaDecodeTime": 90624,
+   "flags": 0,
+   "version": 1
+  },
+  "path": "moof/traf/tfdt",
+  "size": 20
+ },
+ {
+  "fields": {
+   "data_offset": 2404,
+   "entries": [
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 17174
+    },
+    {
+     "sample_composition_time_offset": 52,
+     "sample_size": 338
+    },
+    {
+     "sample_composition_time_offset": 20,
+     "sample_size": 327
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 52,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 20,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 52,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 20,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 52,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 20,
+     "sample_size": 315
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 314
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 312
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 315
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 324
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 335
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 52,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 20,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 56,
+     "sample_size": 342
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 331
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 56,
+     "sample_size": 17179
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 331
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 60,
+     "sample_size": 338
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 328
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 60,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 60,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 321
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 322
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 60,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 60,
+     "sample_size": 341
+    },
+    {
+     "sample_composition_time_offset": 24,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": 40,
+     "sample_size": 342
+    },
+    {
+     "sample_composition_time_offset": 16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 0,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -8,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -16,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": 4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    },
+    {
+     "sample_composition_time_offset": -12,
+     "sample_size": 330
+    },
+    {
+     "sample_composition_time_offset": -4,
+     "sample_size": 329
+    }
+   ],
+   "flags": 3585,
+   "sample_count": 192,
+   "version": 1
+  },
+  "path": "moof/traf/trun",
+  "size": 2324
+ },
+ {
+  "path": "mdat",
+  "size": 97001
+ }
+]
