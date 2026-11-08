@@ -64,6 +64,14 @@ target_compile_definitions(
 ovt_set_license(test_yuview_csv "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_yuview_csv EXTRA_LABELS golden)
 
+# WI-0.086: the §6.9 validator on the same fixtures (acceptance tests 1-3; mutators in mutate.hpp).
+add_executable(test_validator test_validator.cpp)
+target_link_libraries(test_validator PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ${flatbuffers_TARGET}
+                                             ${Catch2_TARGET})
+target_compile_definitions(test_validator PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
+ovt_set_license(test_validator "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_validator EXTRA_LABELS golden)
+
 # WI-0.090 acceptance test 1: the libaom inspect-compatible JSON export of tiny64_av1.fa against its golden and
 # the key set of aom_inspect_keys.txt.
 add_executable(test_aom_json test_aom_json.cpp)
