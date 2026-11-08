@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # OSS-Fuzz builder image (chapter 14 §14.7.4, WI-0.569): OVT's source plus the tools its build needs. No Qt.
-FROM gcr.io/oss-fuzz-base/base-builder
+# The tag matches base_os_version in project.yaml: the untagged image may still be Ubuntu 20.04, which has no xxd package.
+FROM gcr.io/oss-fuzz-base/base-builder:ubuntu-24-04
 
 # Host tools of the configure step (found out by the first Mini run, WI-0.569):
 #   - Meson >= 1.4: third_party/dav1d.cmake and libvmaf.cmake build through ovt_tp_meson() (cmake/OvtMeson.cmake).
