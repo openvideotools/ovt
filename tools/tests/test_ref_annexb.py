@@ -20,7 +20,9 @@ def test_boundary_rule() -> None:
 
 
 def test_empty_nal_is_skipped_and_garbage_ignored() -> None:
-    assert ref_annexb.split(b"\x11\x22\x00\x00\x01\x00\x00\x01\x65\x80") == [(8, 2, 0x65)]
+    assert ref_annexb.split(b"\x11\x22\x00\x00\x01\x00\x00\x01\x65\x80") == [
+        (8, 2, 0x65)
+    ]
     assert ref_annexb.split(b"\x01\x02\x03") == []
 
 
@@ -32,8 +34,16 @@ def test_trailing_zero_run_is_not_part_of_the_nal() -> None:
 def test_cli_prints_types_per_codec(tmp_path: Path) -> None:
     f = tmp_path / "x.265"
     f.write_bytes(b"\x00\x00\x00\x01\x40\x01\xaa\x00\x00\x01\x42\x01\xbb")
-    run = subprocess.run([sys.executable, str(TOOLS / "ref_annexb.py"), str(f)], capture_output=True, text=True)
+    run = subprocess.run(
+        [sys.executable, str(TOOLS / "ref_annexb.py"), str(f)],
+        capture_output=True,
+        text=True,
+    )
     assert run.returncode == 0
     assert run.stdout.splitlines() == ["4,3,32", "10,3,33"]
-    run = subprocess.run([sys.executable, str(TOOLS / "ref_annexb.py"), "--codec", "h264", str(f)], capture_output=True, text=True)
+    run = subprocess.run(
+        [sys.executable, str(TOOLS / "ref_annexb.py"), "--codec", "h264", str(f)],
+        capture_output=True,
+        text=True,
+    )
     assert run.stdout.splitlines() == ["4,3,0", "10,3,2"]
