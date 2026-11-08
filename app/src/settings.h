@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QString>
+#include <QVariant>
 
 namespace ovt::app {
 
@@ -21,6 +22,8 @@ class Settings : public QObject {
   // "system", "light" or "dark". Setting it writes the file.
   Q_PROPERTY(QString theme READ theme WRITE setTheme NOTIFY themeChanged)
   Q_PROPERTY(QString path READ path CONSTANT)
+  // Incremented by every successful change, so QML bindings on value() re-evaluate.
+  Q_PROPERTY(int revision READ revision NOTIFY valueChanged)
   // The last diagnostic raised while loading (GUI-SET-0001), empty if none.
   Q_PROPERTY(QString diagnosticCode READ diagnosticCode NOTIFY diagnosticChanged)
   Q_PROPERTY(QString diagnosticMessage READ diagnosticMessage NOTIFY diagnosticChanged)
@@ -33,12 +36,19 @@ class Settings : public QObject {
   [[nodiscard]] QString theme() const;
   void setTheme(const QString& theme);
   [[nodiscard]] QString path() const { return path_; }
+  [[nodiscard]] int revision() const { return revision_; }
   [[nodiscard]] QString diagnosticCode() const { return diagnostic_code_; }
   [[nodiscard]] QString diagnosticMessage() const { return diagnostic_message_; }
 
   // The document as it will be written: the defaults with the loaded values and unknown keys merged in.
   [[nodiscard]] const QJsonObject& document() const { return document_; }
   static QJsonObject defaults();
+
+  // Any setting by group and key (the Preferences dialog, §11.2.5): `fallback` when the key is not set.
+  Q_INVOKABLE [[nodiscard]] QVariant value(const QString& group, const QString& key, const QVariant& fallback) const;
+  // Validates against the schema, stores, writes the file and notifies. False (nothing changes) when the schema
+  // rejects the value.
+  Q_INVOKABLE bool setValue(const QString& group, const QString& key, const QVariant& value);
 
   // Validates `document` against the bundled settings.schema.json (a subset of JSON Schema 2020-12: type, enum,
   // const, minimum, maximum, properties, required, items). On failure `reason` says where.
@@ -49,12 +59,14 @@ class Settings : public QObject {
 
  Q_SIGNALS:
   void themeChanged();
+  void valueChanged(const QString& group, const QString& key);
   void diagnosticChanged();
 
  private:
   void load();
   void raise(const QString& reason);
 
+  int revision_ = 0;
   QString path_;
   QJsonObject document_;
   QString diagnostic_code_;

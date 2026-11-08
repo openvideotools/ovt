@@ -194,3 +194,10 @@ SPDX-License-Identifier = "ISC"
 path = "third_party/licenses/libde265/md5-LicenseRef-Peslyak-md5-public-domain.txt"
 SPDX-FileCopyrightText = "2001 Alexander Peslyak"
 SPDX-License-Identifier = "LicenseRef-Peslyak-md5-public-domain"
+
+# UVQ (WI-3.314): the YouTube-8M class names exported from google/uvq's contentnet_labels.csv (the "Name"
+# column, one per line) are upstream data, Apache-2.0 like the rest of that repository (chapter 9 §9.6.1).
+[[annotations]]
+path = ["core/share/models/uvq/labels_yt8m.txt"]
+SPDX-FileCopyrightText = "2025 Google LLC"
+SPDX-License-Identifier = "Apache-2.0"

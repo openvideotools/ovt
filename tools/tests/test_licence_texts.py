@@ -30,6 +30,7 @@ EXPECTED = {
     "Unlicense.txt",
     "Zlib.txt",
     "LicenseRef-Peslyak-md5-public-domain.txt",
+    "Apache-2.0.txt",  # core/share/models/uvq/labels_yt8m.txt, data from google/uvq (WI-3.314)
 }
 
 
