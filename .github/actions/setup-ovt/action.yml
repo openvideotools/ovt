@@ -98,8 +98,9 @@ runs:
         "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt -r tools/requirements-test.txt
         echo "${RUNNER_TEMP}/ovt-venv/bin" >> "$GITHUB_PATH"
         # setup-python exports Python3_ROOT_DIR, which FindPython3 prefers over PATH, so the hosted jobs would
-        # configure against the bare interpreter and not see these packages. VIRTUAL_ENV wins over the root dir.
+        # configure against the bare interpreter and not see these packages. VIRTUAL_ENV and a root dir that points at the venv make it the interpreter.
         echo "VIRTUAL_ENV=${RUNNER_TEMP}/ovt-venv" >> "$GITHUB_ENV"
+        echo "Python3_ROOT_DIR=${RUNNER_TEMP}/ovt-venv" >> "$GITHUB_ENV"
 
     - name: vcpkg checkout and bootstrap
       shell: bash
