@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // WI-0.086: the §6.9 validator on the WI-0.093 golden fixtures. Acceptance test 1 (the fixtures are valid),
-// 2 (each mutated fixture makes exactly its rule fire, table in mutate.h), 3 (truncated buffers report V-001
+// 2 (each mutated fixture makes exactly its rule fire, table in mutate.hpp), 3 (truncated buffers report V-001
 // and never crash; run under linux-x64-asan-ubsan in CI), plus the rule table, the per-rule cap, the
 // partial-record downgrade and the size-prefixed form.
 
@@ -24,7 +24,7 @@
 #include <string>
 #include <vector>
 
-#include "mutate.h"
+#include "mutate.hpp"
 #include "ovt_model_generated.h"
 
 namespace {

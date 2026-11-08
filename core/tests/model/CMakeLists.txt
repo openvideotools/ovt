@@ -52,7 +52,7 @@ target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJ
 ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
 
-# WI-0.086: the §6.9 validator on the same fixtures (acceptance tests 1-3; mutators in mutate.h).
+# WI-0.086: the §6.9 validator on the same fixtures (acceptance tests 1-3; mutators in mutate.hpp).
 add_executable(test_validator test_validator.cpp)
 target_link_libraries(test_validator PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ${flatbuffers_TARGET}
                                              ${Catch2_TARGET})

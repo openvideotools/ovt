@@ -7,8 +7,8 @@
 // also clears grid.bits_x8, which V-020 would otherwise check); test_validator asserts that only the intended
 // rule fires.
 
-#ifndef OVT_TESTS_MODEL_MUTATE_H
-#define OVT_TESTS_MODEL_MUTATE_H
+#ifndef OVT_TESTS_MODEL_MUTATE_HPP
+#define OVT_TESTS_MODEL_MUTATE_HPP
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -109,4 +109,4 @@ inline const std::vector<RuleMutation>& rule_mutations() {
 
 }  // namespace ovt::test
 
-#endif  // OVT_TESTS_MODEL_MUTATE_H
+#endif  // OVT_TESTS_MODEL_MUTATE_HPP

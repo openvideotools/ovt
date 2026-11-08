@@ -404,7 +404,7 @@ void v002(Ctx& c) {
 
 template <class T>
 void check_cell_vector(Ctx& c, const flatbuffers::Vector<T>* v, std::string_view name, std::uint64_t n_cells) {
-  if (v != nullptr && v->size() != 0 && v->size() != n_cells) {
+  if (vsize(v) != 0 && vsize(v) != n_cells) {
     c.report(3,
              "grid." + std::string(name) + " has " + str(v->size()) +
                  " elements, expected cells_w*cells_h = " + std::to_string(n_cells),
