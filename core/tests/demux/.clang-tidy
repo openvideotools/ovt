@@ -1,0 +1,8 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Demux unit tests (WI-1.231). Same reason as core/tests/container/.clang-tidy: Catch2's CHECK/REQUIRE macros
+# expand to branches, so count only the test's own branches.
+InheritParentConfig: true
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true

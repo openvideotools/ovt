@@ -46,3 +46,11 @@ X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
 X(CNT_OBU_0004, "CNT-OBU-0004", Error,
   "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
   "AV1 §4.10.5, §5.3.2")
+
+// WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
+X(CNT_9001, "CNT-9001", Error,
+  "sample bytes do not split into units cleanly (NAL length exceeds sample, OBU size overrun)",
+  "14496-15 §5.3.4.2 / AV1-ISOBMFF §2.4")
+X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
+  "14496-15 §4.3")
+X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")

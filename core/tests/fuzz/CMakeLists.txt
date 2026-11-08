@@ -51,3 +51,5 @@ ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
 ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
+# WI-1.231: the unit splitter of §8.7.4 over every framing.
+ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
