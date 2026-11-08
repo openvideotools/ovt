@@ -11,7 +11,7 @@
 #include <vector>
 
 #include "container/format.hpp"
-#include "ovt/cxx/bitreader.hpp"
+#include "container/obu.hpp"
 
 namespace ovt::container {
 namespace {
@@ -111,87 +111,8 @@ AnnexBCodec guess_annexb_codec(std::span<const uint8_t> d, size_t nal) {
   return h264 ? AnnexBCodec::H264 : AnnexBCodec::None;
 }
 
-// §8.6.4 header check: forbidden bit 0, a known obu_type, reserved bit 0. Returns the type or -1.
-int obu_header_type(uint8_t b) {
-  if ((b & 0x80U) != 0 || (b & 0x01U) != 0) {
-    return -1;
-  }
-  const int type = (b >> 3U) & 0xF;
-  const bool known = (type >= 1 && type <= 8) || type == 15;
-  return known ? type : -1;
-}
-
-// Section 5 attempt: up to three OBUs, each with a size field; the first is a temporal delimiter or a
-// sequence header.
-bool obu_section5(std::span<const uint8_t> d, uint64_t file_size) {
-  int checked = 0;
-  try {
-    BitReader br(d);
-    for (int n = 0; n < 3 && br.bits_left() >= 8; ++n) {
-      ++checked;
-      const auto b = static_cast<uint8_t>(br.u(8));
-      const int type = obu_header_type(b);
-      if (type < 0 || ((b >> 1U) & 1U) == 0) {
-        return false;
-      }
-      if (n == 0 && type != 1 && type != 2) {
-        return false;
-      }
-      if (((b >> 2U) & 1U) != 0) {
-        br.skip_bits(8);  // obu_extension_header
-      }
-      const uint64_t obu_size = br.leb128();
-      const uint64_t end = br.bit_pos() / 8 + obu_size;
-      if (obu_size >= (uint64_t{1} << 32U) || end > file_size) {
-        return false;
-      }
-      if (end >= d.size()) {
-        return true;  // the window ends inside this OBU, which passed
-      }
-      br.seek_bits(end * 8);
-    }
-    return checked > 0;
-  } catch (const ParseError&) {
-    return false;
-  }
-}
-
-// Annex B attempt: temporal_unit_size / frame_unit_size / obu_length nesting, then the OBU header; the
-// second temporal unit is checked when it lies inside the window.
-bool obu_annexb(std::span<const uint8_t> d, uint64_t file_size) {
-  int units = 0;
-  try {
-    BitReader br(d);
-    uint64_t pos = 0;
-    for (; units < 2 && pos < d.size(); ++units) {
-      br.seek_bits(pos * 8);
-      const uint64_t tus = br.leb128();
-      const uint64_t body = br.bit_pos() / 8;
-      if (tus < 1 || body > file_size || tus > file_size - body) {
-        return false;
-      }
-      const uint64_t fus = br.leb128();
-      if (fus < 1 || fus > tus) {
-        return false;
-      }
-      const uint64_t ol = br.leb128();
-      if (ol < 1 || ol > fus) {
-        return false;
-      }
-      const int type = obu_header_type(static_cast<uint8_t>(br.peek_bits(8)));
-      if (type < 0 || (units == 0 && type != 1 && type != 2)) {
-        return false;
-      }
-      pos = body + tus;
-    }
-    return units > 0;
-  } catch (const ParseError&) {
-    return units > 0;  // ran out of window on a later unit; the first one passed
-  }
-}
-
 bool is_obu(std::span<const uint8_t> d, uint64_t file_size) {
-  return obu_section5(d, file_size) || obu_annexb(d, file_size);
+  return obu_detect(d, file_size).framing != ObuFraming::NotAv1;
 }
 
 bool raw_extension(std::string_view ext) {

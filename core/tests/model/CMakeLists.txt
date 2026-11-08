@@ -51,3 +51,15 @@ target_link_libraries(test_model_roundtrip PRIVATE ovt_golden_fixtures ovt::flag
 target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
 ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
+
+# WI-0.089a: the YUView statistics CSV exporter; acceptance test 1 compares the export of
+# tiny16_hevc.fa with core/tests/golden/tiny16_hevc.csv (a mismatch writes tiny16_hevc.actual.csv here).
+add_executable(test_yuview_csv test_yuview_csv.cpp)
+target_link_libraries(test_yuview_csv PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
+                                              ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  test_yuview_csv
+  PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"" "OVT_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+          "OVT_TEST_OUTPUT_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+ovt_set_license(test_yuview_csv "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_yuview_csv EXTRA_LABELS golden)

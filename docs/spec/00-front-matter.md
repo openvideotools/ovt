@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc15 (2026-11-07) |
+| **Version** | 1.0-rc16 (2026-11-08) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |

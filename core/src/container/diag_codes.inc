@@ -30,3 +30,19 @@ X(CNT_ESB_0004, "CNT-ESB-0004", Info,
   "H.264 clause B.1.2, H.265 clause B.1.2")
 X(CNT_ESB_0005, "CNT-ESB-0005", Error,
   "`forbidden_zero_bit` set in NAL header at offset `o` (false start code or corruption)", "H.264 §7.4.1")
+
+// WI-1.227 (raw AV1 OBU reader, §8.6.4).
+X(CNT_OBU_0001, "CNT-OBU-0001", Error,
+  "OBU at offset `o` has `obu_has_size_field == 0` outside Annex B framing (undecodable); open fails with "
+  "`OVT_E_UNSUPPORTED`",
+  "AV1 §5.3.1")
+X(CNT_OBU_0002, "CNT-OBU-0002", Info,
+  "both Section 5 and Annex B framings parse; `framing` chosen by the first-byte rule", "AV1 §5.2, Annex B")
+// SPEC-ASSUMPTION(#279): §8.5 has no row for a length that overruns its enclosing unit or for a malformed OBU
+// header / leb128; CNT-OBU-0003 and CNT-OBU-0004 are the proposed rows.
+X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
+  "length at offset `o` exceeds the bytes left in the file or enclosing unit; unit clamped to `N` bytes",
+  "AV1 §5.3, Annex B")
+X(CNT_OBU_0004, "CNT-OBU-0004", Error,
+  "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
+  "AV1 §4.10.5, §5.3.2")
