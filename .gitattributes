@@ -7,3 +7,6 @@ core/tests/fuzz/regressions/** binary
 # WI-0.093 golden fixtures: raw FlatBuffers and YUV bytes must never be line-ending normalised.
 core/tests/golden/*.fa binary
 core/tests/golden/*.yuv binary
+
+# WI-1.201 broken-ISOBMFF corpus: raw bytes, never line-ending normalised.
+tests/corpora/synthetic/isobmff-broken/** binary

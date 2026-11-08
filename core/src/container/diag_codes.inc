@@ -35,3 +35,16 @@ X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
 X(CNT_OBU_0004, "CNT-OBU-0004", Error,
   "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
   "AV1 §4.10.5, §5.3.2")
+
+// WI-1.201 (ISOBMFF box header walk, §8.2.3).
+X(CNT_0101, "CNT-0101", Warning, "trailing bytes in a container that cannot hold a box header", "14496-12 §4.2")
+X(CNT_0102, "CNT-0102", Error, "truncated `largesize`", "14496-12 §4.2")
+X(CNT_0103, "CNT-0103", Error, "`largesize < 16`", "14496-12 §4.2")
+X(CNT_0104, "CNT-0104", Warning, "`size == 0` box not at top level", "14496-12 §4.2.2")
+X(CNT_0105, "CNT-0105", Error, "nesting deeper than 32", "")
+X(CNT_0106, "CNT-0106", Error, "`size < 8` (negative / tiny size)", "14496-12 §4.2")
+X(CNT_0107, "CNT-0107", Error, "`uuid` box too short for usertype", "14496-12 §4.2")
+X(CNT_0108, "CNT-0108", Error, "box exceeds parent/file end (truncated)", "14496-12 §4.2")
+X(CNT_0109, "CNT-0109", Warning, "non-printable box type", "")
+X(CNT_0110, "CNT-0110", Error, "FullBox shorter than 4 bytes", "14496-12 §4.2")
+X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "QTFF")
