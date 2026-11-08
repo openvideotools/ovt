@@ -215,7 +215,7 @@ TEST_CASE("aom plugin: caps through the registry", "[fast][third_party]") {
   CHECK(caps->grid_fields == 0U);
   CHECK(std::string(caps->id) == "aom");
   CHECK(std::string(caps->version).find("libaom") != std::string::npos);
-  Instance inst;
+  const Instance inst;
   CHECK(inst.status == OVT_OK);
 }
 
@@ -269,7 +269,7 @@ TEST_CASE("aom plugin: hints that disagree with libaom's frame count", "[fast][t
 }
 
 TEST_CASE("aom plugin: malformed OBUs return OVT_E_CORRUPT", "[fast][third_party]") {
-  Instance inst;
+  const Instance inst;
   REQUIRE(inst.status == OVT_OK);
   const std::vector<uint8_t> no_size = {0x30, 0x00};         // OBU_FRAME without obu_has_size_field
   const std::vector<uint8_t> bad_size = {0x32, 0x05, 0x00};  // obu_size 5, one payload byte
