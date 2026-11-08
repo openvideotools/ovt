@@ -155,6 +155,9 @@ TEST_CASE("test_cache_meta: zstd records carry their size and reject malformed f
   const std::vector<std::uint8_t> garbage = {1, 2, 3, 4, 5, 6, 7, 8};
   CHECK(status_of([&] { (void)ovt::cache::decompress(garbage, 1U << 20U); }) == OVT_E_CORRUPT);
   CHECK(status_of([&] { (void)ovt::cache::decompress({}, 1U << 20U); }) == OVT_E_CORRUPT);
+  // A skippable frame (magic 0x184D2A50, 4-byte size, payload) decodes to nothing: not a record.
+  const std::vector<std::uint8_t> skippable = {0x50, 0x2A, 0x4D, 0x18, 0x02, 0x00, 0x00, 0x00, 0xAB, 0xCD};
+  CHECK(status_of([&] { (void)ovt::cache::decompress(skippable, 1U << 20U); }) == OVT_E_CORRUPT);
 }
 
 TEST_CASE("test_cache_meta: write_file_atomic replaces the target and leaves no temporary", "[cache][fast]") {

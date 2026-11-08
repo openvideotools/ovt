@@ -105,7 +105,13 @@ void write_file_atomic(const fs::path& path, std::span<const std::uint8_t> bytes
     if (fd.get() < 0) {
       throw_io("create", tmp, errno);
     }
-    write_all(fd.get(), bytes, tmp);
+    try {
+      write_all(fd.get(), bytes, tmp);
+    } catch (const CacheError&) {
+      fd.close();
+      ::unlink(tmp.c_str());  // leave no temporary behind on a failed write either
+      throw;
+    }
     if (::fsync(fd.get()) != 0) {
       const int err = errno;
       fd.close();

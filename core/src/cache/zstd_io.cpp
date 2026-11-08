@@ -78,8 +78,27 @@ std::vector<std::uint8_t> Compressor::compress(std::span<const std::uint8_t> inp
   return out;
 }
 
+namespace {
+
+/// A zstd skippable frame (magic 0x184D2A5? little-endian) carries no data: ZSTD_getFrameContentSize reports 0
+/// for it, so it would otherwise pass every size check and decode to an empty record.
+bool is_skippable_frame(std::span<const std::uint8_t> bytes) noexcept {
+  if (bytes.size() < 4) {
+    return false;
+  }
+  const std::uint32_t magic = static_cast<std::uint32_t>(bytes[0]) | (static_cast<std::uint32_t>(bytes[1]) << 8U) |
+                              (static_cast<std::uint32_t>(bytes[2]) << 16U) |
+                              (static_cast<std::uint32_t>(bytes[3]) << 24U);
+  return (magic & 0xFFFFFFF0U) == 0x184D2A50U;
+}
+
+}  // namespace
+
 std::vector<std::uint8_t> decompress(std::span<const std::uint8_t> compressed, std::size_t max_size,
                                      std::optional<std::size_t> expected_size) {
+  if (is_skippable_frame(compressed)) {
+    throw CacheError(OVT_E_CORRUPT, "cache: zstd skippable frame is not a record");
+  }
   const unsigned long long content = ZSTD_getFrameContentSize(compressed.data(), compressed.size());
   if (content == ZSTD_CONTENTSIZE_ERROR) {
     throw CacheError(OVT_E_CORRUPT, "cache: not a zstd frame");
