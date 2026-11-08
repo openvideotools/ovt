@@ -35,6 +35,8 @@ class Reader {
     (void)box_offset;
     return OVT_E_UNSUPPORTED;
   }
+  // RawVideoFormat FlatBuffer (Y4M and raw readers); empty otherwise.
+  [[nodiscard]] virtual std::vector<uint8_t> raw_format() const { return {}; }
   // SampleTable FlatBuffer of `count` samples from `first` (count 0 = all); empty when unsupported.
   [[nodiscard]] virtual std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const {
     (void)track_index;
@@ -46,8 +48,10 @@ class Reader {
 
 // True when a reader exists for `f` in this build (phase 1 formats only).
 [[nodiscard]] bool has_reader(Format f) noexcept;
-// nullptr when there is no reader for `f` (has_reader false) or `file` is not a valid `f` stream.
-[[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file);
+// nullptr when there is no reader for `f` (has_reader false) or `file` is not a valid `f` stream; then *why (if
+// given) says OVT_E_UNSUPPORTED or OVT_E_CORRUPT.
+[[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file,
+                                                  ovt_status* why = nullptr);
 
 }  // namespace ovt::container
 

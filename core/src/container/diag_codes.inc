@@ -19,3 +19,7 @@ X(CNT_IVF_0001, "CNT-IVF-0001", Info, "IVF `header_size` is `N` (≠ 32); first 
 X(CNT_IVF_0002, "CNT-IVF-0002", Info, "IVF header `frame_count` `N` differs from the walked count `M`", "libvpx ivfdec.c")
 X(CNT_IVF_0003, "CNT-IVF-0003", Warning,
   "last IVF frame truncated: `frame_size` `N` exceeds EOF by `M` bytes (clamped)", "")
+X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
+X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
+  "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
+X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")
