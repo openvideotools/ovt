@@ -41,6 +41,7 @@ endfunction()
 
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
+ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
