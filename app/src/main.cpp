@@ -18,6 +18,7 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantMap>
@@ -32,6 +33,7 @@
 #include "ovt/ovt.h"
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
 #include "platform/platform.h"
+#include "project.h"
 
 namespace {
 
@@ -92,6 +94,9 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   const QCommandLineOption self_test(QStringLiteral("self-test"),
                                      QStringLiteral("Open the main window, exit 0 after the first rendered frame."));
   parser.addOption(self_test);
+  parser.addPositionalArgument(QStringLiteral("file"),
+                               QStringLiteral("A video, elementary stream or .ovtproj to open."),
+                               QStringLiteral("[file]"));
   parser.process(app);  // exits on --help and unknown options; --version was handled above
   const bool self_testing = parser.isSet(self_test);
 
@@ -99,7 +104,11 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   QQuickStyle::setStyle(QStringLiteral("Fusion"));  // OvtStyle.qml supplies the palette (§11.4.5)
 
   QQmlApplicationEngine engine;
-  engine.setInitialProperties({{QStringLiteral("title"), QStringLiteral(OVT_PRODUCT_NAME_VALUE)}});
+  engine.addImageProvider(QStringLiteral("rawpreview"), new ovt::app::RawPreviewProvider);  // owned by the engine
+  const QStringList positional = parser.positionalArguments();
+  engine.setInitialProperties(
+      {{QStringLiteral("title"), QStringLiteral(OVT_PRODUCT_NAME_VALUE)},
+       {QStringLiteral("initialFile"), positional.isEmpty() ? QString() : positional.constFirst()}});
   engine.load(QUrl(QStringLiteral("qrc:/qt/qml/OvtStudio/Main.qml")));
   if (engine.rootObjects().isEmpty()) {
     report(QStringLiteral("could not load the main window"));
