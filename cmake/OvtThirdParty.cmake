@@ -37,6 +37,33 @@ else()
   message(STATUS "OVT: dav1d skipped, third_party/VERSIONS.md has no SHA-256 for it yet")
 endif()
 
+# ---- libaom (WI-0.013) ------------------------------------------------------------------------------
+# tp::aom, the static libaom of third_party/libaom.cmake with CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1, for the
+# AV1 analysis plugin (ADR-008). OVT_SYSTEM_LIBAOM=ON takes the system libaom instead, which must have been
+# built with inspection: configure fails otherwise (§13.2.2; distro libaom builds usually lack it).
+if(OVT_BUILD_PLUGIN_AOM)
+  if(OVT_SYSTEM_LIBAOM)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_aom REQUIRED IMPORTED_TARGET aom)
+    add_library(tp::aom INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::aom INTERFACE PkgConfig::ovt_system_aom)
+    include(OvtAomInspection)
+    ovt_aom_require_inspection(tp::aom)
+    ovt_set_dependency_license(
+      tp::aom
+      SOURCE
+      system
+      SPDX
+      "BSD-2-Clause AND LicenseRef-AOM-Patent-License-1.0"
+      VERSION
+      "${ovt_system_aom_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libaom.cmake")
+  endif()
+endif()
+
 # ---- FFmpeg (WI-0.012) ------------------------------------------------------------------------------
 # tp::ffmpeg_core and tp::ffmpeg_plugin from third_party/ffmpeg.cmake (two flavours, §13.3.3), or both from the
 # system FFmpeg, dynamically linked, with OVT_SYSTEM_FFMPEG=ON (distro preset; ovt_plugin_ffmpeg is then a thin
