@@ -58,11 +58,7 @@ def main(argv: list[str]) -> int:
     except OSError as e:
         print(f"ref_annexb.py: {e}", file=sys.stderr)
         return 2
-    codec = args.codec or (
-        "h265"
-        if args.file.suffix.lower() in {".265", ".h265", ".hevc", ".bin"}
-        else "h264"
-    )
+    codec = args.codec or ("h265" if args.file.suffix.lower() in {".265", ".h265", ".hevc", ".bin"} else "h264")
     for offset, length, header in split(data):
         print(f"{offset},{length},{nal_type(header, codec)}")
     return 0

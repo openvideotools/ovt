@@ -20,9 +20,7 @@ def test_boundary_rule() -> None:
 
 
 def test_empty_nal_is_skipped_and_garbage_ignored() -> None:
-    assert ref_annexb.split(b"\x11\x22\x00\x00\x01\x00\x00\x01\x65\x80") == [
-        (8, 2, 0x65)
-    ]
+    assert ref_annexb.split(b"\x11\x22\x00\x00\x01\x00\x00\x01\x65\x80") == [(8, 2, 0x65)]
     assert ref_annexb.split(b"\x01\x02\x03") == []
 
 
