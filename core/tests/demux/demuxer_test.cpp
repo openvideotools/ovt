@@ -180,11 +180,7 @@ Mp4 make_mp4(int samples = 10) {
 
   Bytes tkhd;
   put32s(tkhd, {0x00000003, 0, 0, Mp4::kTrackId, 0, n});
-  zeros(tkhd, 8);
-  put16(tkhd, 0);
-  put16(tkhd, 0);
-  put16(tkhd, 0);
-  put16(tkhd, 0);
+  zeros(tkhd, 16);  // reserved, layer, alternate_group, volume, reserved
   for (const uint32_t v : {0x00010000U, 0U, 0U, 0U, 0x00010000U, 0U, 0U, 0U, 0x40000000U}) {
     put32(tkhd, v);
   }
@@ -211,19 +207,13 @@ Mp4 make_mp4(int samples = 10) {
   dref = cat({dref, box("url ", url)});
 
   // avcC: version 1, profile 66, compat 0, level 30, lengthSizeMinusOne 3, one SPS, one PPS (pseudo bytes).
-  put(m.avcc, std::string_view("\x01\x42\x00\x1e\xff\xe1", 6));
-  put16(m.avcc, 4);
-  put(m.avcc, std::string_view("\x67\x42\x00\x1e", 4));
-  put8(m.avcc, 1);
-  put16(m.avcc, 2);
-  put(m.avcc, std::string_view("\x68\xce", 2));
+  put(m.avcc, std::string_view("\x01\x42\x00\x1e\xff\xe1\x00\x04\x67\x42\x00\x1e\x01\x00\x02\x68\xce", 17));
 
   Bytes avc1;
   zeros(avc1, 6);
   put16(avc1, 1);
   zeros(avc1, 16);
-  put16(avc1, 16);
-  put16(avc1, 16);
+  put32(avc1, 0x00100010);  // width 16, height 16
   put32s(avc1, {0x00480000, 0x00480000, 0});
   put16(avc1, 1);
   zeros(avc1, 32);

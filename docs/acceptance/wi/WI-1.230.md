@@ -45,8 +45,6 @@ $ ASAN_OPTIONS=detect_leaks=1 build/linux-x64-asan-ubsan/core/tests/fuzz/ovt_fuz
 fuzz regress: 8 inputs replayed
 ```
 
-(The skipped case is the corpus parity test, which ran separately above.)
-
 ## Fuzz seeds
 
 `core/tests/fuzz/corpus/demuxer_open/`: byte 0 selects the hint, the rest is a 16x16, 3-frame `testsrc` file
