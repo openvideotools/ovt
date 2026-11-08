@@ -67,3 +67,13 @@ yadif CUDA filter (`shaders/dithering.c`, `deinterlacing.c`) is LGPL-2.1-or-late
 - **HM, MoltenVK, ONNX Runtime**: not examined (MoltenVK and ONNX Runtime stage their own notice files).
 
 No licence incompatibility was found: every bundled text is permissive (BSD, MIT, ISC, Zlib, CC0, Unlicense) or LGPL.
+
+## Update: libaom (follow-up PR)
+
+Karl chose `CONFIG_SVT_AV1=0` (#154), so no BSD-3-Clause-Clear code is built. The encoder is off too
+(`CONFIG_AV1_ENCODER=0`), so fastfeat and vector are not built, and libwebm and libyuv belong to the tools. What
+remains on x86_64 is `third_party/x86inc/x86inc.asm` (ISC), included by the decoder's `aom_dsp` SIMD assembly. Its
+text is staged from `third_party/licenses/libaom/x86inc-ISC.txt` (the archive's `LICENSE` would collide with libaom's
+own `LICENSE` when staged by base name), and the libaom row of `third_party/VERSIONS.md` now reads
+`BSD-2-Clause AND ISC AND LicenseRef-AOM-Patent-License-1.0`. The spec rows (chapter 13 §13.3.7, chapter 15) still
+show the old string; that is a spec-amendment item.
