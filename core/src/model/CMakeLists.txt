@@ -6,22 +6,28 @@
 #
 # WI-0.083: the embedded binary schemas (bfbs_resources.cpp includes the ovt_schemas_bfbs.inc fragment that
 # cmake/OvtFlatBuffers.cmake generates) and kModelSchemaSha256, computed here at configure time by
-# tools/schema_hash.py and written by configure_file below ${OVT_GENERATED_DIR}/model/.
+# tools/schema_hash.py and written by configure_file below ${OVT_GENERATED_DIR}/model/ (all three schemas since WI-0.091).
 
 find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)
-set(_ovt_model_fbs "${PROJECT_SOURCE_DIR}/core/schema/ovt_model.fbs")
-# A schema edit re-runs the configure step, so the hash never goes stale.
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_ovt_model_fbs}"
-                                       "${PROJECT_SOURCE_DIR}/tools/schema_hash.py")
-execute_process(COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/schema_hash.py" "${_ovt_model_fbs}"
-                OUTPUT_VARIABLE _ovt_hash_out RESULT_VARIABLE _ovt_hash_rc)
-string(REGEX MATCH "^[0-9a-f]+" OVT_MODEL_SCHEMA_SHA256 "${_ovt_hash_out}")
-string(LENGTH "${OVT_MODEL_SCHEMA_SHA256}" _ovt_hash_len)
-if(NOT _ovt_hash_rc EQUAL 0 OR NOT _ovt_hash_len EQUAL 64)
-  message(FATAL_ERROR "tools/schema_hash.py failed on ${_ovt_model_fbs}: ${_ovt_hash_out}")
-endif()
+# One hash per schema (WI-0.091: meta.json records all three, §6.7.2). A schema edit re-runs the configure
+# step, so the hashes never go stale.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/tools/schema_hash.py")
+foreach(_ovt_schema model container metrics)
+  set(_ovt_fbs "${PROJECT_SOURCE_DIR}/core/schema/ovt_${_ovt_schema}.fbs")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_ovt_fbs}")
+  execute_process(COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/schema_hash.py" "${_ovt_fbs}"
+                  OUTPUT_VARIABLE _ovt_hash_out RESULT_VARIABLE _ovt_hash_rc)
+  string(TOUPPER "${_ovt_schema}" _ovt_schema_upper)
+  string(REGEX MATCH "^[0-9a-f]+" OVT_${_ovt_schema_upper}_SCHEMA_SHA256 "${_ovt_hash_out}")
+  string(LENGTH "${OVT_${_ovt_schema_upper}_SCHEMA_SHA256}" _ovt_hash_len)
+  if(NOT _ovt_hash_rc EQUAL 0 OR NOT _ovt_hash_len EQUAL 64)
+    message(FATAL_ERROR "tools/schema_hash.py failed on ${_ovt_fbs}: ${_ovt_hash_out}")
+  endif()
+endforeach()
 configure_file(schema_hash.inc.in "${OVT_GENERATED_DIR}/model/schema_hash.inc" @ONLY)
-unset(_ovt_model_fbs)
+unset(_ovt_schema)
+unset(_ovt_fbs)
+unset(_ovt_schema_upper)
 unset(_ovt_hash_out)
 unset(_ovt_hash_rc)
 unset(_ovt_hash_len)
