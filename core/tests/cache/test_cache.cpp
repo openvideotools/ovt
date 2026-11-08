@@ -41,8 +41,8 @@ using ovt::cache::test::TempRoot;
 
 struct StatusIs : Catch::Matchers::MatcherGenericBase {
   explicit StatusIs(ovt_status s) : status(s) {}
-  bool match(const CacheError& e) const { return e.code == status; }
-  std::string describe() const override { return std::string("has status ") + ovt_status_string(status); }
+  [[nodiscard]] bool match(const CacheError& e) const { return e.code == status; }
+  [[nodiscard]] std::string describe() const override { return std::string("has status ") + ovt_status_string(status); }
   ovt_status status;
 };
 
