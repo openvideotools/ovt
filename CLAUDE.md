@@ -135,7 +135,8 @@ Preset names are fixed by chapter 13 §13.2.4 (D23). Do not invent new ones.
   full corpora, long fuzzing, sanitizer matrix and performance runs belong to CI and the Mac Mini
   runner. Do not re-run the whole world after every edit.
 - **Determinism:** run your WI's output twice; if the bytes differ, the WI is not Done (§0.7.5).
-- Never commit corpus media, goldens over 2 MB gzip-compressed (`.json.gz` and similar; the size of the file as committed), or generated FlatBuffers code.
+- Never commit corpus media, goldens over 2 MB gzip-compressed (the size of the file as committed), or
+  generated FlatBuffers code.
 - A third-party pin moves only in its own PR touching `third_party/VERSIONS.md` and the affected
   script (chapter 13 §13.3.7).
 - Hardware-bound WIs (§16.5.3, label `needs-hardware:<id>`) run only where that device exists,
