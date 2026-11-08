@@ -90,7 +90,8 @@ JobsModel::JobsModel(int threads, QObject* parent) : QAbstractListModel(parent) 
 JobsModel::~JobsModel() {
   timer_.stop();
   cancelAll();
-  pool_.waitForDone();
+  // Bounded: a detached job that ignores cancellation must not hang application exit.
+  pool_.waitForDone(kShutdownWaitMs);
 }
 
 quint64 JobsModel::enqueue(const QString& name, JobBody body, const QString& owner) {
@@ -200,7 +201,7 @@ void JobsModel::clearFinished() {
   Q_EMIT changed();
 }
 
-void JobsModel::update_entry(Entry& entry) {
+bool JobsModel::update_entry(Entry& entry) {
   auto& shared = *entry.shared;
   const int phase = shared.phase.load();
   if (phase == kFinished && entry.phase != kFinished) {
@@ -214,11 +215,10 @@ void JobsModel::update_entry(Entry& entry) {
       entry.progress = 1.0;
     }
     entry.eta = -1.0;
-    Q_EMIT jobFinished(entry.id, static_cast<int>(entry.status));
-    return;
+    return true;  // the caller emits jobFinished once it no longer holds references into entries_
   }
   if (phase == kQueued) {
-    return;
+    return false;
   }
   entry.phase = kRunning;
   bool reported = false;
@@ -246,9 +246,13 @@ void JobsModel::update_entry(Entry& entry) {
     const double elapsed = static_cast<double>(now_ns() - shared.started_ns.load()) / 1e9;
     entry.eta = elapsed * (1.0 - entry.progress) / entry.progress;
   }
+  return false;
 }
 
 void JobsModel::tick() {
+  // jobFinished slots may call clearFinished() or cancelOwner(), which erase entries, so they are
+  // emitted only after the loop has dropped every reference into entries_.
+  std::vector<std::pair<quint64, int>> finished;
   for (std::size_t i = 0; i < entries_.size(); ++i) {
     Entry& entry = *entries_[i];
     if (!entry.active()) {
@@ -258,13 +262,18 @@ void JobsModel::tick() {
     const std::uint64_t before_done = entry.done;
     const std::uint64_t before_total = entry.total;
     const QString before_stage = entry.stage;
-    update_entry(entry);
+    if (update_entry(entry)) {
+      finished.emplace_back(entry.id, static_cast<int>(entry.status));
+    }
     if (entry.phase != before_phase || entry.done != before_done || entry.total != before_total ||
         entry.stage != before_stage) {
       const QModelIndex index = this->index(static_cast<int>(i));
       Q_EMIT dataChanged(index, index);
       Q_EMIT changed();
     }
+  }
+  for (const auto& [id, status] : finished) {
+    Q_EMIT jobFinished(id, status);
   }
   prune(std::chrono::steady_clock::now());
   const int wanted = activeCount() > 0 ? kTickMs : 1000;

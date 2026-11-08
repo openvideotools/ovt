@@ -83,7 +83,7 @@ Popup {
                     Label {
                         text: row.text
                         elide: Text.ElideRight
-                        color: row.state === "failed" ? "#c62828" : OvtStyle.text
+                        color: row.state === "failed" ? OvtStyle.error : OvtStyle.text
                         Layout.fillWidth: true
                     }
                     Button {
