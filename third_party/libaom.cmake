@@ -15,9 +15,20 @@
 # Android uses the NDK toolchain file forwarded by OVT_TP_CMAKE_TOOLCHAIN_ARGS, never libaom's own
 # build/cmake/toolchains/*-android.cmake.
 #
-# Patches: every third_party/patches/libaom/NNNN-*.patch, applied once with `git apply --check` first and recorded
-# in <prefix>/share/ovt/patches.json. There are none yet; the inspection extension and snapshot patches of
-# chapter 07 §7.6.1 arrive with WI-2.154 and later, each with its `Upstream-Status:` header (chapter 15 §15.5).
+# Extension-patch hook (WI-2.154): every OVT_AOM_PATCH_DIR/NNNN-*.patch (default plugins/ovt-plugin-aom/patches,
+# where WI-2.159 puts 0001-inspection-extend-mi-data.patch and 0002-inspection-frame-snapshots.patch of chapter 07
+# §7.6.1), in lexical order, each with its `Upstream-Status:` header (chapter 15 §15.5). tools/apply_patches.py
+# --check dry-runs every patch against the pristine tarball first and fails the build naming the first one that does
+# not apply (never a silent skip), applies them once and records them in <prefix>/share/ovt/patches.json. A missing
+# or empty directory is a no-op. SPEC-ASSUMPTION(#274): the patches live under the plugin (chapter 07), not
+# third_party/patches/libaom (chapter 13 §13.3.4). SPEC-ASSUMPTION(#275): `git apply --check`, not `--3way`,
+# which git refuses outside a repository and the extracted tarball is not one.
+#
+# Semi-public headers (chapter 07 §7.6.1): libaom does not install av1/decoder/inspection.h or accounting.h, and
+# they include config/aom_config.h from the build tree. LIBAOM_SOURCE_DIR and LIBAOM_BINARY_DIR name the
+# ExternalProject's source and build trees, and the INTERFACE target tp::aom_inspection adds both as include
+# directories on top of tp::aom, so the plugin includes `av1/decoder/inspection.h` from the pinned source and never
+# from a vendored copy. They are set only for the bundled build (OVT_SYSTEM_LIBAOM=OFF).
 #
 # Licence: BSD-2-Clause plus the AOM Patent License 1.0. The archive's LICENSE and PATENTS files are kept with
 # the build (chapter 15 WI-0.600 compares PATENTS with LICENSES/LicenseRef-AOM-Patent-License-1.0.txt).
@@ -58,10 +69,16 @@ endif()
 message(STATUS "OVT: libaom AOM_TARGET_CPU=${OVT_AOM_CPU}")
 
 # ---- build ------------------------------------------------------------------------------------------
-ovt_tp_declare(libaom LICENSE_FILES LICENSE PATENTS)
+# aom_dsp's x86 assembly includes third_party/x86inc/x86inc.asm (ISC, x264). Its LICENSE would collide with the
+# archive's LICENSE once staged by base name, so the text is kept in third_party/licenses/libaom/. The other
+# third_party/ code of the archive is not built here: SVT-AV1 is off (CONFIG_SVT_AV1=0), and libwebm, libyuv,
+# fastfeat and vector belong to the encoder and the tools, which are off.
+ovt_tp_declare(libaom LICENSE_FILES LICENSE PATENTS ${CMAKE_CURRENT_LIST_DIR}/licenses/libaom/x86inc-ISC.txt)
 
 set(_ovt_aom_prefix "${OVT_THIRD_PARTY_PREFIX}/libaom")
-set(_ovt_aom_patch_dir "${CMAKE_CURRENT_LIST_DIR}/patches/libaom")
+set(OVT_AOM_PATCH_DIR "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-aom/patches"
+    CACHE PATH "Directory of the libaom extension patches, applied in lexical order (chapter 07 §7.6.1)")
+set(_ovt_aom_patch_dir "${OVT_AOM_PATCH_DIR}")
 cmake_path(NORMAL_PATH _ovt_aom_patch_dir)
 ovt_tp_apply_patches(_ovt_aom_patch DIR "${_ovt_aom_patch_dir}" INSTALL_DIR "${_ovt_aom_prefix}")
 # A new or changed patch re-extracts the pristine tarball, so the patch step never meets a patched tree.
@@ -128,6 +145,21 @@ if(NOT APPLE)
   list(APPEND _ovt_aom_libs m)
 endif()
 set_property(TARGET tp::aom PROPERTY INTERFACE_LINK_LIBRARIES "${_ovt_aom_libs}")
+
+# ---- semi-public headers (WI-2.154) -------------------------------------------------------------------
+externalproject_get_property(tp_libaom SOURCE_DIR BINARY_DIR)
+set(LIBAOM_SOURCE_DIR "${SOURCE_DIR}" CACHE INTERNAL "Source tree of the bundled libaom (av1/decoder/inspection.h)")
+set(LIBAOM_BINARY_DIR "${BINARY_DIR}" CACHE INTERNAL "Build tree of the bundled libaom (config/aom_config.h)")
+# INTERFACE_INCLUDE_DIRECTORIES must exist at generate time, before the download step extracts the tree.
+file(MAKE_DIRECTORY "${LIBAOM_SOURCE_DIR}" "${LIBAOM_BINARY_DIR}")
+add_library(tp::aom_inspection INTERFACE IMPORTED GLOBAL)
+# Imported include directories are SYSTEM: libaom's internal headers are not held to ovt::flags' warnings.
+set_target_properties(
+  tp::aom_inspection PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LIBAOM_SOURCE_DIR};${LIBAOM_BINARY_DIR}"
+                                INTERFACE_LINK_LIBRARIES tp::aom)
+add_dependencies(tp::aom_inspection tp_libaom)
+unset(SOURCE_DIR)
+unset(BINARY_DIR)
 
 unset(_ovt_aom_libs)
 unset(_ovt_aom_examples)

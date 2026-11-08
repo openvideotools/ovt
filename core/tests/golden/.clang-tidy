@@ -6,11 +6,14 @@
 # `byte`/`int8` fields are small signed numbers (QP, reference index, sentinel -1), not characters, so the two
 # signed-char checks only produce noise on every assignment. The spec structs give every member an initializer
 # on purpose: GCC's -Wmissing-field-initializers (an error under -Werror) fires on designated initializers
-# that leave out a member without one.
+# that leave out a member without one. inspect_json.cpp calls the generated UnPackTo(): Apple clang's analyzer
+# reports clang-analyzer-cplusplus.NewDeleteLeaks inside that flatc-generated code (unique_ptr members assigned
+# from a fresh allocation), a false positive in code we do not write (same override as core/tests/model/).
 InheritParentConfig: true
 Checks: >
   -bugprone-signed-char-misuse,
   -cert-str34-c,
-  -readability-redundant-member-init
+  -readability-redundant-member-init,
+  -clang-analyzer-cplusplus.NewDeleteLeaks
 CheckOptions:
   readability-function-cognitive-complexity.Threshold: 120

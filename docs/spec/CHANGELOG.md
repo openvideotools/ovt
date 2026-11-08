@@ -2,12 +2,18 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc16 — 2026-11-08
+## 1.0.0-rc17 — 2026-11-08
 
 PATCH-level: WI-3.300 folds in the accepted answer of `spec-question` #156 and aligns chapter 9 with the backbone and chapter 13. No requirement sentence changes.
 
 - 0 §0.6.3, 9 §9.2.2, 9 §9.2.4, 9 §9.5.4, 9 §9.10, 2 glossary — the multi-plane view a metric plugin scores is `ovt_MetricPlanes` (with `struct_size`, D4), not `ovt_PlaneView`, which `ovt/decode.h` (chapter 6, WI-1.237) defines as one plane with another layout; `ovt_MetricPlanes` is owned by chapter 9 and declared only in `metric_v1.h`; chapter 9's copy of `ovt_MetricApi` carries the backbone's `struct_size` — WI-3.300
 - 9 WI-3.300 Produces and step 3 — the ABI header carries `ovt_MetricPlanes`; metric plugins are discovered in `OVT_PLUGIN_DIR` (chapter 13 §13.2.6, same rules as decoder plugins, chapter 12 §12.3.11) and `$OVT_METRIC_PATH`; there is no `share/ovt/metrics/` — WI-3.300
+
+## 1.0.0-rc16 — 2026-11-08
+
+PATCH-level: owner decision (Karl, 2026-11-08) on the golden size cap. No requirement sentence or WI scope changes.
+
+- 16 §16.2.7 and `CLAUDE.md` §5 — the cap on committed goldens is 2 MB gzip-compressed (the size of the file as committed), not 2 MB uncompressed, so the AV1 and HEVC grid goldens fit; golden runners read `.json.gz`
 
 ## 1.0.0-rc15 — 2026-11-07
 

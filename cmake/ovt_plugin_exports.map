@@ -1,0 +1,13 @@
+/* SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ *
+ * Linker version script of the FFmpeg plugin (ovt_ffmpeg_hide_symbols, cmake/OvtThirdParty.cmake; chapter 13
+ * section 13.3.3): only the two plugin entry points stay global. -fvisibility=hidden alone leaves the C++ template
+ * instantiations of namespace std, which libstdc++ declares with default visibility, in the dynamic symbol table. */
+{
+  global:
+    ovt_analysis_decoder_v1;
+    ovt_plugin_describe;
+  local:
+    *;
+};

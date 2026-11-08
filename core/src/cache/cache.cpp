@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // ovt::cache::Cache and Entry (chapter 06 §6.7.1–6.7.2, WI-0.091): directory layout, cache.json, meta.json
-// bookkeeping, the mmap-ed index.fb and the zstd record files. open_entry, invalidating reads and last_used
-// throttling are WI-0.092 (§6.7.3, §6.7.4; the rules are in invalidate.cpp).
+// bookkeeping, the mmap-ed index.fb and the zstd record files. open_entry, invalidating reads, last_used
+// throttling and the eviction trigger are WI-0.092 (§6.7.3, §6.7.4; rules in invalidate.cpp, eviction in
+// evict.cpp).
 //
 // Lock order: Cache::Impl::open_mu, then an Entry::Impl::mu, then Cache::Impl::mu. open_mu serialises the
-// creation of entries with open_entry, so a directory is never deleted while it is being opened.
+// creation of entries with eviction and clear, so neither deletes a directory that is being opened.
 
 #include "ovt/cxx/cache/cache.hpp"
 
@@ -28,6 +29,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <set>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -38,6 +40,7 @@
 
 #include "cache/atomic_file.hpp"
 #include "cache/cache_json.hpp"
+#include "cache/evict.hpp"
 #include "cache/fb_verify.hpp"
 #include "cache/invalidate.hpp"
 #include "cache/zstd_io.hpp"
@@ -144,21 +147,6 @@ std::uint64_t file_size_or_zero(const fs::path& path) noexcept {
   std::error_code ec;
   const auto size = fs::file_size(path, ec);
   return ec ? 0 : size;
-}
-
-std::uint64_t directory_bytes(const fs::path& dir) {
-  std::uint64_t total = 0;
-  std::error_code ec;
-  const fs::recursive_directory_iterator it(dir, fs::directory_options::skip_permission_denied, ec);
-  if (ec) {
-    return 0;
-  }
-  for (const fs::directory_entry& e : it) {
-    if (e.is_regular_file(ec)) {
-      total += e.file_size(ec);
-    }
-  }
-  return total;
 }
 
 void ensure_directory(const fs::path& dir) {
@@ -409,24 +397,62 @@ struct Cache::Impl {
 
   fs::path root;
   Options options;
-  std::mutex open_mu;  // entry creation and open_entry (lock order: before mu)
+  std::mutex open_mu;  // entry creation, open_entry, eviction and clear (lock order: before mu)
   mutable std::mutex mu;
   std::uint64_t size_cap_bytes = kDefaultMaxBytes;
   std::map<std::string, Record> records;             // hex source hash → cache.json entries[] (guarded by mu)
   std::map<std::string, std::weak_ptr<Entry>> live;  // guarded by mu
   bool dirty = false;
-  // The byte account after a write to an open entry (§6.7.4: updated after every write, incrementally). The
-  // caller holds no lock.
-  void note_write(const std::string& hash, std::uint64_t bytes, const std::string& last_used) {
+  bool warned_all_open = false;  // MDL-CCH-0002 is logged once per Cache (guarded by mu)
+
+  // Entries that eviction and clear must not touch: every hash in `live`, including one whose Entry is being
+  // destroyed (its destructor still flushes into the directory). Caller holds mu.
+  [[nodiscard]] std::set<std::string> open_set_locked() const {
+    std::set<std::string> out;
+    for (const auto& [hash, weak] : live) {
+      out.insert(hash);
+    }
+    return out;
+  }
+
+  // §6.7.4 eviction. Takes open_mu and mu; the caller holds neither (nor any Entry lock).
+  EvictionResult run_eviction() {
+    if (options.read_only) {
+      return {};
+    }
+    const std::lock_guard<std::mutex> open_lock(open_mu);
     const std::lock_guard<std::mutex> lock(mu);
-    Record& r = records[hash];
-    if (r.bytes != bytes) {
-      r.bytes = bytes;
+    EvictionResult result = evict(root, records, open_set_locked(), size_cap_bytes);
+    if (!result.removed.empty() || !result.trimmed.empty()) {
       dirty = true;
     }
-    if (r.last_used.empty()) {
-      r.last_used = last_used;
-      dirty = true;
+    if (result.all_open && !warned_all_open) {
+      warned_all_open = true;
+      OVT_LOG_CODE(log::Level::Warn, kModule, "MDL-CCH-0002", "disk cache cap exceeded: all entries are open");
+    }
+    save_locked();
+    return result;
+  }
+
+  // The byte account after a write to an open entry (§6.7.4: updated after every write, incrementally);
+  // evicts when the write pushed the total above the cap. The caller holds no lock.
+  void note_write(const std::string& hash, std::uint64_t bytes, const std::string& last_used) {
+    bool over = false;
+    {
+      const std::lock_guard<std::mutex> lock(mu);
+      Record& r = records[hash];
+      if (r.bytes != bytes) {
+        r.bytes = bytes;
+        dirty = true;
+      }
+      if (r.last_used.empty()) {
+        r.last_used = last_used;
+        dirty = true;
+      }
+      over = ovt::cache::total_bytes(records) > size_cap_bytes;
+    }
+    if (over) {
+      (void)run_eviction();
     }
   }
 
@@ -589,7 +615,7 @@ struct Entry::Impl {
     touch_locked();
   }
 
-  // Reports the byte account to the cache after a write. No lock held.
+  // Reports the byte account to the cache after a write, which may evict other entries. No lock held.
   void after_write() {
     std::uint64_t b = 0;
     std::string last_used;
@@ -622,6 +648,32 @@ struct Entry::Impl {
       bytes -= std::min(size, bytes);
       OVT_LOG(log::Level::Info, kModule, "deleted '{}' ({})", path.string(), to_string(reason));
     }
+  }
+
+  void discard(const fs::path& path, InvalidationReason reason) {
+    const std::lock_guard<std::mutex> lock(mu);
+    discard_locked(path, reason);
+  }
+
+  // I6 on an invalidating read: the plane bytes, or std::nullopt after deleting a plane without a matching
+  // PlaneRef (garbage, §6.7.1) or of the wrong size.
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> read_plane_invalidating(const fs::path& path,
+                                                                                 const fb::FrameAnalysis& fa,
+                                                                                 fb::PlaneStage stage,
+                                                                                 std::uint8_t plane) {
+    std::vector<std::uint8_t> samples;
+    InvalidationReason reason = InvalidationReason::Plane;
+    try {
+      samples = decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes);
+      reason = check_plane(fa, stage, plane, samples.size());
+    } catch (const CacheError& e) {
+      OVT_LOG(log::Level::Info, kModule, "{}", e.what());
+    }
+    if (reason != InvalidationReason::None) {
+      discard(path, reason);
+      return std::nullopt;
+    }
+    return samples;
   }
 
   // The frame file of @p decode_index decompressed, and the I5 verdict on it; reason Frame for a file that
@@ -943,26 +995,16 @@ std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneS
   const auto prefixed = policy.invalidating ? impl_->get_frame_invalidating(decode_index, policy.plugin)
                                             : impl_->load_frame_prefixed(decode_index);
   if (!prefixed) {
+    if (policy.invalidating) {  // I6: no frame means no PlaneRef, so the plane is garbage too (§6.7.1)
+      impl_->discard(path, InvalidationReason::Plane);
+    }
     return std::nullopt;
   }
   const auto* fa = flatbuffers::GetSizePrefixedRoot<fb::FrameAnalysis>(prefixed->data());
   const fb::PlaneRef* ref = find_plane_ref(*fa, stage, plane);
   if (policy.invalidating) {
-    // I6: a plane without a matching PlaneRef (garbage, §6.7.1) or of the wrong size is deleted; then a miss.
-    std::vector<std::uint8_t> bytes;
-    InvalidationReason reason = InvalidationReason::Plane;
-    try {
-      bytes = decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes);
-      reason = check_plane(*fa, stage, plane, bytes.size());
-    } catch (const CacheError& e) {
-      OVT_LOG(log::Level::Info, kModule, "{}", e.what());
-    }
-    if (reason != InvalidationReason::None) {
-      const std::lock_guard<std::mutex> lock(impl_->mu);
-      impl_->discard_locked(path, reason);
-      return std::nullopt;
-    }
-    return plane_data(*ref, stage, plane, std::move(bytes));
+    auto bytes = impl_->read_plane_invalidating(path, *fa, stage, plane);
+    return bytes ? std::optional(plane_data(*ref, stage, plane, std::move(*bytes))) : std::nullopt;
   }
   if (ref == nullptr) {
     return std::nullopt;
@@ -1066,6 +1108,7 @@ std::shared_ptr<Cache> Cache::open(std::optional<fs::path> root, Options options
     const std::lock_guard<std::mutex> lock(impl->mu);
     impl->save_locked();
   }
+  (void)impl->run_eviction();  // §6.7.4: eviction also runs at startup
   return std::shared_ptr<Cache>(new Cache(std::move(impl)));
 }
 
@@ -1080,6 +1123,20 @@ const Options& Cache::options() const noexcept {
 std::uint64_t Cache::max_bytes() const noexcept {
   const std::lock_guard<std::mutex> lock(impl_->mu);
   return impl_->size_cap_bytes;
+}
+
+void Cache::set_max_bytes(std::uint64_t max_bytes) {
+  if (impl_->options.read_only) {
+    throw CacheError(OVT_E_UNSUPPORTED, "cache: set_max_bytes on a read-only cache");
+  }
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  const std::uint64_t cap = max_bytes == 0 ? kDefaultMaxBytes : max_bytes;
+  if (cap != impl_->size_cap_bytes) {
+    impl_->size_cap_bytes = cap;
+    impl_->warned_all_open = false;
+    impl_->dirty = true;
+    impl_->save_locked();
+  }
 }
 
 std::vector<SourceHash> Cache::entries() const {
@@ -1185,6 +1242,8 @@ std::shared_ptr<Entry> Cache::open_entry(const SourceHash& hash, fb::Codec codec
   bool open = false;
   {
     const std::lock_guard<std::mutex> lock(impl_->mu);
+    // A key whose Entry is being destroyed still counts as open: its destructor may be flushing meta.json into
+    // the directory, so a failing directory survives that one open rather than being deleted under it.
     open = impl_->live.contains(hex_hash);
   }
   // An open entry was checked when it was created; deleting it under its handles is not an option.
@@ -1201,6 +1260,43 @@ std::shared_ptr<Entry> Cache::open_entry(const SourceHash& hash, fb::Codec codec
     e->impl_->plugin = std::move(plugin);
   }
   return e;
+}
+
+std::uint64_t Cache::total_bytes() const {
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  return ovt::cache::total_bytes(impl_->records);
+}
+
+EvictionResult Cache::enforce_cap() {
+  flush();  // the records of open entries carry their latest byte counts
+  return impl_->run_eviction();
+}
+
+ClearResult Cache::clear(const ClearFilter& filter) {
+  if (impl_->options.read_only) {
+    throw CacheError(OVT_E_UNSUPPORTED, "cache: clear on a read-only cache");
+  }
+  const std::lock_guard<std::mutex> open_lock(impl_->open_mu);
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  ClearResult result = clear_entries(impl_->root, impl_->records, impl_->open_set_locked(), filter);
+  if (!result.removed.empty() || !result.trimmed.empty()) {
+    impl_->dirty = true;
+    impl_->save_locked();
+  }
+  return result;
+}
+
+std::vector<ListedRecord> Cache::list() {
+  flush();
+  const std::lock_guard<std::mutex> open_lock(impl_->open_mu);
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  bool changed = false;
+  std::vector<ListedRecord> rows = list_entries(impl_->root, impl_->records, changed);
+  if (changed) {
+    impl_->dirty = true;
+    impl_->save_locked();
+  }
+  return rows;
 }
 
 void Cache::flush() {
