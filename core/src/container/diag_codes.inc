@@ -46,3 +46,10 @@ X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
 X(CNT_OBU_0004, "CNT-OBU-0004", Error,
   "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
   "AV1 §4.10.5, §5.3.2")
+X(CNT_TS_1001, "CNT-TS-1001", Error,
+  "TS_sync_loss: `N` consecutive packets without `0x47` at offset `o`", "TR 101 290 §5.2.1 (1.1)")
+X(CNT_TS_1002, "CNT-TS-1002", Error, "Sync_byte_error at packet `k`", "TR 101 290 §5.2.1 (1.2)")
+X(CNT_TS_1006, "CNT-TS-1006", Warning,
+  "Continuity_count_error on PID `pid` at packet `k` (`expected`/`got`)", "TR 101 290 §5.2.1 (1.4)")
+X(CNT_TS_2001, "CNT-TS-2001", Warning,
+  "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
