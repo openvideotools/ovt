@@ -51,3 +51,32 @@ target_link_libraries(test_model_roundtrip PRIVATE ovt_golden_fixtures ovt::flag
 target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
 ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
+
+# WI-0.090 acceptance test 1: the libaom inspect-compatible JSON export of tiny64_av1.fa against its golden and
+# the key set of aom_inspect_keys.txt.
+add_executable(test_aom_json test_aom_json.cpp)
+target_link_libraries(test_aom_json PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
+                                            ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(test_aom_json PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\""
+                                                 "OVT_TEST_PRODUCT_VERSION=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\"")
+ovt_set_license(test_aom_json "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_aom_json EXTRA_LABELS golden)
+
+# WI-0.090 acceptance test 2: tools/aomanalyzer_smoke.js on the golden export (the file test_aom_json proves the
+# exporter writes). Needs Node.js; skipped (77) without it.
+find_program(OVT_NODE_EXECUTABLE node)
+if(OVT_NODE_EXECUTABLE)
+  add_test(NAME test_aom_json_smoke
+           COMMAND "${OVT_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/aomanalyzer_smoke.js"
+                   "${PROJECT_SOURCE_DIR}/core/tests/golden/tiny64_av1.inspect.json" --expect-mi 16x16)
+  set_tests_properties(test_aom_json_smoke PROPERTIES LABELS "fast;unit;golden")
+  # The script must reject what aomanalyzer cannot load: the wrong MI grid, and a file that is not JSON.
+  add_test(NAME test_aom_json_smoke_rejects_grid
+           COMMAND "${OVT_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/aomanalyzer_smoke.js"
+                   "${PROJECT_SOURCE_DIR}/core/tests/golden/tiny64_av1.inspect.json" --expect-mi 16x15)
+  add_test(NAME test_aom_json_smoke_rejects_text
+           COMMAND "${OVT_NODE_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/aomanalyzer_smoke.js"
+                   "${PROJECT_SOURCE_DIR}/core/tests/golden/aom_inspect_keys.txt")
+  set_tests_properties(test_aom_json_smoke_rejects_grid test_aom_json_smoke_rejects_text PROPERTIES LABELS "fast;unit"
+                                                                                                    WILL_FAIL TRUE)
+endif()
