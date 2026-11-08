@@ -314,7 +314,7 @@ TEST_CASE("test_cache_c_api: ovt_cache_report lists the default cache per entry 
   SECTION("a root that does not exist yet gives an empty report and is not created") {
     const Report r = report();
     CHECK(r.root->dir()->str() == tmp.path().string());
-    CHECK(r.root->entries()->size() == 0);
+    CHECK(r.root->entries()->begin() == r.root->entries()->end());
     CHECK(r.root->total_bytes() == 0);
     CHECK(r.root->max_bytes() == ovt_cache_max_bytes());
     CHECK_FALSE(fs::exists(tmp.path()));
@@ -374,7 +374,10 @@ TEST_CASE("test_cache_c_api: ovt_cache_clear deletes by kind or everything", "[c
   CHECK(fs::exists(dir / "index.fb"));
   CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);
   CHECK_FALSE(fs::exists(dir));
-  CHECK(report().root->entries()->size() == 0);
+  {
+    const auto after = report();
+    CHECK(after.root->entries()->begin() == after.root->entries()->end());
+  }
 }
 
 TEST_CASE("test_cache_c_api: a default open keeps the cap cache.json records unless one is set", "[cache][fast]") {
