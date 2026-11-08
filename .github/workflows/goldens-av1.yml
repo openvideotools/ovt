@@ -86,6 +86,20 @@ jobs:
       - name: the two runs are byte-identical
         run: diff -r "${RUNNER_TEMP}/out1" "${RUNNER_TEMP}/out2"
 
+      - name: committed goldens are what the generator writes
+        run: |
+          # Every golden committed under tests/golden/av1 must be byte-identical to the one just generated.
+          if [ -d tests/golden/av1 ]; then
+            for f in tests/golden/av1/*.gz; do cmp "$f" "${RUNNER_TEMP}/out1/av1/$(basename "$f")"; done
+          fi
+          if [ -f tests/golden/av1-index.json ]; then cmp tests/golden/av1-index.json "${RUNNER_TEMP}/out1/av1-index.json"; fi
+
+      - name: print the index and the generated syn_* goldens (to commit by hand without the artifact)
+        if: always()
+        run: |
+          cat "${RUNNER_TEMP}/out1/av1-index.json" || true
+          for f in "${RUNNER_TEMP}"/out1/av1/syn_*; do [ -f "$f" ] && { echo "== $(basename "$f")"; base64 -w0 "$f"; echo; }; done || true
+
       - name: summary
         if: always()
         run: |
