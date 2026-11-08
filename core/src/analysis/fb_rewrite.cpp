@@ -6,6 +6,7 @@
 #include "fb_rewrite.hpp"
 
 #include <cstddef>
+#include <cstring>
 #include <stdexcept>
 #include <utility>
 

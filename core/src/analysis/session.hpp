@@ -8,7 +8,7 @@
 // SPEC-ASSUMPTION(#253): the Session reads the StreamIndex FlatBuffer (ovt.fb.StreamIndex) and the stream's file
 // instead of the index module's C++ objects, so the ActiveSets snapshot at R is derived from
 // StreamIndex.parameter_sets; the cache is reached through the SessionCache seam that WI-2.152 fills with
-// FrameCache; host diagnostics use the codes ANA-0002..ANA-0007 proposed in the issue.
+// FrameCache; host diagnostics use the codes ANA-0002..ANA-0010 proposed in the issue.
 
 #ifndef OVT_SRC_ANALYSIS_SESSION_HPP
 #define OVT_SRC_ANALYSIS_SESSION_HPP

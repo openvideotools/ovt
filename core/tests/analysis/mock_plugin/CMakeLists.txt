@@ -37,7 +37,6 @@ ovt_add_mock_plugin(ovt_plugin_mock_wrong_id DIR bad_id ID wrongid DEFINES "OVT_
 ovt_add_mock_plugin(ovt_plugin_mock_bad_codec DIR bad_codec ID badcodec DEFINES "OVT_MOCK_ID=\"badcodec\""
                     OVT_MOCK_CODEC=200)
 ovt_add_mock_plugin(ovt_plugin_mock_hevc DIR hevc ID mockhevc DEFINES "OVT_MOCK_ID=\"mockhevc\"" OVT_MOCK_CODEC=2)
-# WI-2.151 Session tests: an AV1 id (show_existing_frame, OBU rewrite).
 ovt_add_mock_plugin(ovt_plugin_mock_av1 DIR av1 ID mockav1 DEFINES "OVT_MOCK_ID=\"mockav1\"" OVT_MOCK_CODEC=3)
 ovt_add_mock_plugin(ovt_plugin_mock_small DIR bad_size ID small DEFINES "OVT_MOCK_ID=\"small\"" OVT_MOCK_API_SIZE=16)
 ovt_add_mock_plugin(ovt_plugin_mock_null DIR bad_null ID nullentry DEFINES "OVT_MOCK_ID=\"nullentry\""

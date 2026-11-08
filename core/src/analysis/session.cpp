@@ -245,11 +245,11 @@ ovt_status Session::frame(int decode_index, uint32_t plane_stage_mask, const ovt
     return OVT_E_NOMEM;
   } catch (const ovt::io::IoError& e) {
     destroy_decoder();
-    diag(Severity::Error, "", e.what());
+    diag(Severity::Error, "ANA-0008", e.what());
     return OVT_E_IO;
   } catch (const std::exception& e) {
     destroy_decoder();
-    diag(Severity::Error, "", e.what());
+    diag(Severity::Error, "ANA-0008", e.what());
     return OVT_E_INTERNAL;
   }
 }
@@ -285,7 +285,7 @@ ovt_status Session::frame_impl(int t, uint32_t stage_mask, const ovt::jobs::Canc
   }
   // AV1 show_existing_frame: analyse the shown frame, then give the result this frame's identity.
   if (shown >= t || frames->Get(static_cast<uint32_t>(shown))->show_existing_of() >= 0) {
-    diag(Severity::Error, "", fmt::format("frame {} shows frame {}, which is not a decoded frame", t, shown));
+    diag(Severity::Error, "ANA-0010", fmt::format("frame {} shows frame {}, which is not a decoded frame", t, shown));
     return OVT_E_CORRUPT;
   }
   std::vector<uint8_t> decoded;
@@ -464,7 +464,8 @@ ovt_status Session::push_unit(uint32_t unit_index, int32_t decode_index, int64_t
   const auto* units = index().units();
   if (units == nullptr || unit_index >= units->size()) {
     destroy_decoder();
-    diag(Severity::Error, "", fmt::format("frame {} names unit {} outside the index", decode_index, unit_index));
+    diag(Severity::Error, "ANA-0010",
+         fmt::format("frame {} names unit {} outside the index", decode_index, unit_index));
     return OVT_E_CORRUPT;
   }
   const auto* unit = units->Get(unit_index);
@@ -508,7 +509,7 @@ ovt_status Session::drain(int target, uint32_t stage_mask, Pulled& result) {
     if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
       plugin_.api->release(dec_, fb);
       destroy_decoder();
-      diag(Severity::Error, "", fmt::format("plugin {} returned an invalid FrameAnalysis", plugin_.id));
+      diag(Severity::Error, "ANA-0009", fmt::format("plugin {} returned an invalid FrameAnalysis", plugin_.id));
       return OVT_E_PLUGIN;
     }
     const auto* fa = ovt::fb::GetFrameAnalysis(fb.data);
@@ -553,7 +554,7 @@ ovt_status Session::post_process(int t, uint32_t stage_mask, std::vector<uint8_t
   const auto* fa = ovt::fb::GetFrameAnalysis(fb.data());
   if (fa->frame() == nullptr || fa->frame()->id() == nullptr || fa->frame()->id()->decode_index() != t) {
     destroy_decoder();
-    diag(Severity::Error, "", fmt::format("plugin {} returned the wrong frame for {}", plugin_.id, t));
+    diag(Severity::Error, "ANA-0009", fmt::format("plugin {} returned the wrong frame for {}", plugin_.id, t));
     return OVT_E_PLUGIN;
   }
   flatbuffers::FlatBufferBuilder fbb(fb.size() + 1024);

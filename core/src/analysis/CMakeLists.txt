@@ -2,8 +2,7 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # The `analysis` module of libovt-core (chapter 0 §0.3, chapter 7 §7.5). WI-2.150: the plugin registry and the
-# per-platform default plugin directories; WI-2.151: the GOP-local analysis Session (session.cpp). Sources go
-# into ovt_core_objects, which ovt_core absorbs.
+# per-platform default plugin directories. Sources go into ovt_core_objects, which ovt_core absorbs.
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(_ovt_plugin_paths plugin_paths_android.cpp)
