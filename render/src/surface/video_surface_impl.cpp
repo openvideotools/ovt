@@ -8,6 +8,8 @@
 // dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
 // and export arrive with their own work items; until then those entry points are inert.
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -348,6 +350,50 @@ class VideoSurfaceImpl final : public VideoSurface {
     return false;
   }
 
+  // Waits until the device is idle in the driver's own sense, not only libplacebo's. pl_vulkan_destroy() waits on its
+  // timeline semaphores and then destroys the VkDevice. On MoltenVK those semaphores are MTLEvents that the GPU signals
+  // before Metal runs the command buffer's completion handler, and that handler (MVKQueueCommandBufferSubmission::
+  // finish) still reads the queue and device. A surface destroyed right after a download could therefore free the
+  // device under a handler that was still running on Metal's completion thread: an intermittent SIGSEGV in teardown.
+  // vkDeviceWaitIdle on MoltenVK commits an empty command buffer to each queue and waits for it, which orders it after
+  // the earlier handlers. Every queue is locked through libplacebo while it runs (the call needs external
+  // synchronisation of all queues).
+  void wait_device_idle() {
+    if (vk_ == nullptr || vk_->device == VK_NULL_HANDLE || vk_->get_proc_addr == nullptr) {
+      return;
+    }
+    pl_gpu_finish(vk_->gpu);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
+    const auto get_device_proc =
+        reinterpret_cast<PFN_vkGetDeviceProcAddr>(vk_->get_proc_addr(vk_->instance, "vkGetDeviceProcAddr"));
+    if (get_device_proc == nullptr) {
+      return;
+    }
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
+    const auto device_wait_idle =
+        reinterpret_cast<PFN_vkDeviceWaitIdle>(get_device_proc(vk_->device, "vkDeviceWaitIdle"));
+    if (device_wait_idle == nullptr) {
+      return;
+    }
+    // The graphics, compute and transfer families may coincide; lock each (family, index) once.
+    std::vector<std::pair<uint32_t, uint32_t>> queues;
+    for (const pl_vulkan_queue& q : {vk_->queue_graphics, vk_->queue_compute, vk_->queue_transfer}) {
+      for (uint32_t i = 0; i < q.count; ++i) {
+        const std::pair<uint32_t, uint32_t> key{q.index, i};
+        if (std::find(queues.begin(), queues.end(), key) == queues.end()) {
+          queues.push_back(key);
+        }
+      }
+    }
+    for (const auto& [qf, qi] : queues) {
+      vk_->lock_queue(vk_, qf, qi);
+    }
+    static_cast<void>(device_wait_idle(vk_->device));
+    for (const auto& [qf, qi] : queues) {
+      vk_->unlock_queue(vk_, qf, qi);
+    }
+  }
+
   void destroy() {
     overlays_.reset();
     if (vk_ != nullptr) {
@@ -355,6 +401,7 @@ class VideoSurfaceImpl final : public VideoSurface {
       pl_tex_destroy(vk_->gpu, &tex_);
     }
     pl_renderer_destroy(&renderer_);
+    wait_device_idle();
     pl_vulkan_destroy(&vk_);
     pl_vk_inst_destroy(&inst_);
     pl_log_destroy(&log_);

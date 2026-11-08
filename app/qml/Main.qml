@@ -13,6 +13,11 @@ import OvtStudio
 ApplicationWindow {
     id: root
 
+    // A file path from the command line (main.cpp): opened once the window exists (FR-GUI-027).
+    property string initialFile: ""
+    // The Open-as dialog, for tests.
+    readonly property var openAsDialogItem: openAsDialog
+
     width: 1280
     height: 800
     minimumWidth: 1024
@@ -41,6 +46,37 @@ ApplicationWindow {
 
     Actions {
         id: actions
+    }
+
+    Component.onCompleted: {
+        if (initialFile !== "")
+            Project.openFile(initialFile)
+    }
+
+    // A second file while one is open: ask how to open it (§11.8).
+    Connections {
+        target: Project
+        function onSecondFileRequested(path) {
+            openAsDialog.path = path
+            openAsDialog.open()
+        }
+    }
+
+    // Drag-and-drop of files onto the window (FR-GUI-027); .ovtproj files load as projects.
+    DropArea {
+        objectName: "dropArea"
+        anchors.fill: parent
+        onDropped: drop => {
+            for (const url of drop.urls)
+                Project.openFile(url.toString())
+        }
+    }
+
+    OpenAsDialog {
+        id: openAsDialog
+
+        parent: Overlay.overlay
+        onNewWindowRequested: path => Project.launchNewWindow(path)
     }
 
     menuBar: OvtMenuBar {
@@ -121,10 +157,29 @@ ApplicationWindow {
         y: root.header.height + OvtStyle.spacing
     }
 
+    // GUI-JOB-0001 (§11.7): a job that did not stop in time is detached and reported.
+    Connections {
+        target: JobsModel
+        function onJobDetached(name) {
+            DiagnosticsModel.addGui(1, "GUI-JOB-0001", "job " + name + " did not stop within 2 s; detached")
+        }
+    }
+
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
     DockWorkspace {
         anchors.fill: parent
         actions: actions
+    }
+
+    // Until the Diagnostics / Log panel is a dock panel it sits over the bottom of the workspace, opened from the
+    // status bar badge.
+    DiagnosticsPanel {
+        id: diagnosticsPanel
+
+        visible: false
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
     }
 
     footer: ToolBar {
@@ -140,7 +195,11 @@ ApplicationWindow {
             anchors.rightMargin: OvtStyle.spacing
             spacing: OvtStyle.spacing * 2
 
-            Label { text: "No file open"; color: OvtStyle.textMuted; objectName: "statusFile" }
+            Label {
+                text: Project.fileCount > 0 ? Project.files.map(f => f.name).join("  |  ") : "No file open"
+                color: OvtStyle.textMuted
+                objectName: "statusFile"
+            }
             Item { Layout.fillWidth: true }
             Label { text: "100 %"; color: OvtStyle.textMuted; objectName: "statusZoom" }
             Label {
@@ -160,6 +219,14 @@ ApplicationWindow {
                 value: Math.max(0, JobsModel.foregroundProgress)
                 indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
                 Accessible.name: "Job progress"
+            }
+            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click shows or hides the panel.
+            ToolButton {
+                objectName: "statusDiagnostics"
+                text: DiagnosticsModel.errorCount > 0 ? DiagnosticsModel.errorCount + " errors" : "Diagnostics"
+                onClicked: diagnosticsPanel.visible = !diagnosticsPanel.visible
+                Accessible.name: "Diagnostics"
+                palette.buttonText: DiagnosticsModel.errorCount > 0 ? "#ff6b6b" : OvtStyle.text
             }
         }
     }

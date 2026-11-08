@@ -52,6 +52,18 @@ target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJ
 ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
 
+# WI-0.089a: the YUView statistics CSV exporter; acceptance test 1 compares the export of
+# tiny16_hevc.fa with core/tests/golden/tiny16_hevc.csv (a mismatch writes tiny16_hevc.actual.csv here).
+add_executable(test_yuview_csv test_yuview_csv.cpp)
+target_link_libraries(test_yuview_csv PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
+                                              ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  test_yuview_csv
+  PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"" "OVT_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+          "OVT_TEST_OUTPUT_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+ovt_set_license(test_yuview_csv "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_yuview_csv EXTRA_LABELS golden)
+
 # WI-0.090 acceptance test 1: the libaom inspect-compatible JSON export of tiny64_av1.fa against its golden and
 # the key set of aom_inspect_keys.txt.
 add_executable(test_aom_json test_aom_json.cpp)
@@ -63,7 +75,7 @@ ovt_set_license(test_aom_json "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_aom_json EXTRA_LABELS golden)
 
 # WI-0.090 acceptance test 2: tools/aomanalyzer_smoke.js on the golden export (the file test_aom_json proves the
-# exporter writes). Needs Node.js; skipped (77) without it.
+# exporter writes). Registered only when Node.js is found (hosted Linux CI has it; the Mac Mini runner does not).
 find_program(OVT_NODE_EXECUTABLE node)
 if(OVT_NODE_EXECUTABLE)
   add_test(NAME test_aom_json_smoke

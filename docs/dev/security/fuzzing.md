@@ -18,7 +18,7 @@ platform by `test_fuzz_regressions`, so a fixed bug stays fixed.
 | File | Purpose |
 |---|---|
 | `project.yaml` | language `c++`, sanitizers `address` and `undefined`, engine `libfuzzer`, `main_repo` |
-| `Dockerfile` | builder image: cmake 3.25 or newer, Ninja, zip, and a clone of this repository with the vcpkg submodule. No Qt |
+| `Dockerfile` | builder image: cmake 3.25 or newer, Ninja, Meson 1.4 or newer, nasm, xxd, make, pkg-config, zip, and a clone of this repository with the vcpkg submodule. No Qt |
 | `build.sh` | configures with `-DOVT_ENABLE_FUZZ=ON -DOVT_FUZZ_ENGINE="$LIB_FUZZING_ENGINE"`, builds every `ovt_fuzz_*` target, copies the binaries, dictionaries and one `_seed_corpus.zip` per corpus directory to `$OUT` |
 
 There is no `oss-fuzz` CMake preset (§14.7.4, D23). `build.sh` takes `CC`, `CXX`, `CFLAGS` and `CXXFLAGS` from the
@@ -37,8 +37,8 @@ Needs Docker and a checkout of <https://github.com/google/oss-fuzz>.
 cp -r core/tests/fuzz/oss-fuzz/ /path/to/oss-fuzz/projects/ovt/
 cd /path/to/oss-fuzz
 python infra/helper.py build_image ovt
-python infra/helper.py build_fuzzers --sanitizer address --external ovt "$OVT_CHECKOUT"
-python infra/helper.py check_build --sanitizer address --external ovt "$OVT_CHECKOUT"
+python infra/helper.py build_fuzzers --sanitizer address ovt "$OVT_CHECKOUT"
+python infra/helper.py check_build --sanitizer address ovt
 ```
 
 Repeat with `--sanitizer undefined`. The WI-0.569 acceptance record goes to

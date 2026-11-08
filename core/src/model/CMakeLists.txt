@@ -34,9 +34,10 @@ unset(_ovt_hash_len)
 
 # WI-0.084: the model helpers of ovt/cxx/model/{grid,tree,units,labels}.hpp.
 # WI-0.087: the PictureStore and PlaneBlob of ovt/cxx/model/{picture_store,plane}.hpp.
+# WI-0.089a: the YUView statistics CSV exporter of ovt/cxx/model/yuview_csv.hpp.
 # WI-0.090: the libaom inspect-compatible JSON exporter of ovt/cxx/model/aom_inspect_json.hpp.
 target_sources(ovt_core_objects PRIVATE aom_inspect_json.cpp bfbs_resources.cpp grid.cpp labels.cpp picture_store.cpp
-                                        tree.cpp units.cpp)
+                                        tree.cpp units.cpp yuview_csv.cpp)
 # The exporter writes the product version into "configString" (§6.8.3); ovt_version_string() lives in ovt_core,
 # which the module objects do not link, so the same value is passed to that one source.
 set_property(SOURCE aom_inspect_json.cpp TARGET_DIRECTORY ovt_core_objects APPEND
