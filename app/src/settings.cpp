@@ -268,11 +268,46 @@ void Settings::setTheme(const QString& theme) {
     return;
   }
   document_ = candidate;
+  ++revision_;
   Q_EMIT themeChanged();
+  Q_EMIT valueChanged(QStringLiteral("general"), QStringLiteral("theme"));
   if (!save()) {
     // No diagnostics model yet (WI-1.453): say so on stderr instead of failing silently.
     static_cast<void>(std::fprintf(stderr, "settings: could not write %s\n", path_.toLocal8Bit().constData()));
   }
+}
+
+QVariant Settings::value(const QString& group, const QString& key, const QVariant& fallback) const {
+  const QJsonValue found = document_.value(group).toObject().value(key);
+  return found.isUndefined() || found.isNull() ? fallback : found.toVariant();
+}
+
+bool Settings::setValue(const QString& group, const QString& key, const QVariant& value) {
+  const QJsonValue json = QJsonValue::fromVariant(value);
+  QJsonObject candidate = document_;
+  QJsonObject section = candidate.value(group).toObject();
+  if (section.value(key) == json) {
+    return true;
+  }
+  section.insert(key, json);
+  candidate.insert(group, section);
+  QString reason;
+  if (!validate(candidate, &reason)) {
+    static_cast<void>(std::fprintf(stderr, "settings: %s/%s rejected (%s)\n", group.toLocal8Bit().constData(),
+                                   key.toLocal8Bit().constData(), reason.toLocal8Bit().constData()));
+    return false;
+  }
+  const bool theme_changed = group == QLatin1String("general") && key == QLatin1String("theme");
+  document_ = candidate;
+  ++revision_;
+  if (theme_changed) {
+    Q_EMIT themeChanged();
+  }
+  Q_EMIT valueChanged(group, key);
+  if (!save()) {
+    static_cast<void>(std::fprintf(stderr, "settings: could not write %s\n", path_.toLocal8Bit().constData()));
+  }
+  return true;
 }
 
 bool Settings::save() {

@@ -24,6 +24,7 @@ EXPECTED = {
     "CC0-1.0.txt",  # generated corpus test patterns (WI-1.413)
     "LicenseRef-AOM-Patent-License-1.0.txt",
     "LicenseRef-DCO-verbatim.txt",  # DCO, taken verbatim (WI-0.604)
+    "Apache-2.0.txt",  # core/share/models/uvq/labels_yt8m.txt, data from google/uvq (WI-3.314)
 }
 
 

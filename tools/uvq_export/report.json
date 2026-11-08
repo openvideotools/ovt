@@ -1,0 +1,914 @@
+{
+  "clips": {
+    "1.0": {
+      "ytugc_clip01": {
+        "file": "Gaming_360P-187a_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0010375499725343573,
+          "max_combo_delta": 0.0028959274291993076,
+          "mos": 3.165234327316284,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.291534425604482e-07,
+          "max_combo_delta": 1.0013580320489268e-06,
+          "mos": 3.1641972064971924,
+          "pass": true
+        },
+        "reference_mos": 3.16419677734375,
+        "top1_labels_match": true
+      },
+      "ytugc_clip02": {
+        "file": "Sports_360P-3e68_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0006032466888425958,
+          "max_combo_delta": 0.003361558914184659,
+          "mos": 2.5791015625,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 6.484985351384864e-06,
+          "max_combo_delta": 8.106231689453125e-06,
+          "mos": 2.578504800796509,
+          "pass": true
+        },
+        "reference_mos": 2.5784983158111574,
+        "top1_labels_match": true
+      },
+      "ytugc_clip03": {
+        "file": "Vlog_360P-2e9d_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.004130125045776367,
+          "max_combo_delta": 0.00428638458251962,
+          "mos": 2.8216795921325684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 9.5367431640625e-07,
+          "max_combo_delta": 1.5258789063388178e-06,
+          "mos": 2.8175504207611084,
+          "pass": true
+        },
+        "reference_mos": 2.817549467086792,
+        "top1_labels_match": true
+      },
+      "ytugc_clip04": {
+        "file": "Gaming_360P-5e0f_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.002358627319336115,
+          "max_combo_delta": 0.00262265205383283,
+          "mos": 3.0361328125,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 1.9073486345888568e-07,
+          "max_combo_delta": 3.814697265625e-06,
+          "mos": 3.0337743759155273,
+          "pass": true
+        },
+        "reference_mos": 3.033774185180664,
+        "top1_labels_match": true
+      },
+      "ytugc_clip05": {
+        "file": "Gaming_360P-73c7_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0013184547424316406,
+          "max_combo_delta": 0.0022693157196043146,
+          "mos": 3.301953077316284,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -7.152557373046875e-07,
+          "max_combo_delta": 3.385543823064552e-06,
+          "mos": 3.3006339073181152,
+          "pass": true
+        },
+        "reference_mos": 3.3006346225738525,
+        "top1_labels_match": true
+      },
+      "ytugc_clip06": {
+        "file": "Gaming_360P-7acb_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0029420852661132812,
+          "max_combo_delta": 0.0035860538482666016,
+          "mos": 3.0287108421325684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 2.86102294921875e-06,
+          "max_combo_delta": 2.86102294921875e-06,
+          "mos": 3.0257716178894043,
+          "pass": true
+        },
+        "reference_mos": 3.025768756866455,
+        "top1_labels_match": true
+      },
+      "ytugc_clip07": {
+        "file": "Gaming_360P-3794_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.001044893264770419,
+          "max_combo_delta": 0.002253961563110529,
+          "mos": 2.1297364234924316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -8.106231690341303e-07,
+          "max_combo_delta": 1.6689300537109375e-06,
+          "mos": 2.128690719604492,
+          "pass": true
+        },
+        "reference_mos": 2.128691530227661,
+        "top1_labels_match": true
+      },
+      "ytugc_clip08": {
+        "file": "Gaming_360P-2330_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0014365196228025567,
+          "max_combo_delta": 0.002294111251830877,
+          "mos": 2.969531297683716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -4.291534425604482e-07,
+          "max_combo_delta": 9.059906007635732e-07,
+          "mos": 2.9680943489074707,
+          "pass": true
+        },
+        "reference_mos": 2.9680947780609133,
+        "top1_labels_match": true
+      },
+      "ytugc_clip09": {
+        "file": "Gaming_360P-586d_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.00016188621520996094,
+          "max_combo_delta": 0.0025978565216062677,
+          "mos": 3.064257860183716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_combo_delta": 1.0013580320489268e-06,
+          "mos": 3.0644195079803467,
+          "pass": true
+        },
+        "reference_mos": 3.064419746398926,
+        "top1_labels_match": true
+      },
+      "ytugc_clip10": {
+        "file": "Sports_360P-3960_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0012821197509764737,
+          "max_combo_delta": 0.007031869888305842,
+          "mos": 2.8843750953674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 3.719329833895557e-06,
+          "max_combo_delta": 5.245208740234375e-06,
+          "mos": 2.883096694946289,
+          "pass": true
+        },
+        "reference_mos": 2.883092975616455,
+        "top1_labels_match": true
+      },
+      "ytugc_clip11": {
+        "file": "Sports_360P-02c3_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.002322626113891779,
+          "max_combo_delta": 0.0030896663665771484,
+          "mos": 3.3980469703674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 1.9073486345888568e-07,
+          "max_combo_delta": 7.152557373046875e-07,
+          "mos": 3.3957245349884033,
+          "pass": true
+        },
+        "reference_mos": 3.39572434425354,
+        "top1_labels_match": true
+      },
+      "ytugc_clip12": {
+        "file": "Sports_360P-11b7_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0005725860595702237,
+          "max_combo_delta": 0.0026353836059569424,
+          "mos": 2.6333985328674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 2.765655517489307e-06,
+          "max_combo_delta": 3.767013549982323e-06,
+          "mos": 2.632828712463379,
+          "pass": true
+        },
+        "reference_mos": 2.6328259468078614,
+        "top1_labels_match": true
+      },
+      "ytugc_clip13": {
+        "file": "Sports_360P-65f3_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0004588127136231357,
+          "max_combo_delta": 0.006419754028320401,
+          "mos": 2.7548828125,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.62532043465913e-06,
+          "max_combo_delta": 4.62532043465913e-06,
+          "mos": 2.7544286251068115,
+          "pass": true
+        },
+        "reference_mos": 2.754423999786377,
+        "top1_labels_match": true
+      },
+      "ytugc_clip14": {
+        "file": "Sports_360P-5ded_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0021593570709228516,
+          "max_combo_delta": 0.0039174556732177734,
+          "mos": 3.7900390625,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_combo_delta": 1.0967254637783697e-06,
+          "mos": 3.787879467010498,
+          "pass": true
+        },
+        "reference_mos": 3.787879705429077,
+        "top1_labels_match": true
+      },
+      "ytugc_clip15": {
+        "file": "Sports_360P-61f6_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0014342308044432706,
+          "max_combo_delta": 0.0030062198638916016,
+          "mos": 3.39404296875,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 1.0967254637783697e-06,
+          "max_combo_delta": 1.0967254637783697e-06,
+          "mos": 3.3926098346710205,
+          "pass": true
+        },
+        "reference_mos": 3.3926087379455567,
+        "top1_labels_match": true
+      },
+      "ytugc_clip16": {
+        "file": "Vlog_360P-2973_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0011956214904786933,
+          "max_combo_delta": 0.003153944015502841,
+          "mos": 2.9242186546325684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.291534425604482e-07,
+          "max_combo_delta": 1.5258789063388178e-06,
+          "mos": 2.9230234622955322,
+          "pass": true
+        },
+        "reference_mos": 2.9230230331420897,
+        "top1_labels_match": true
+      },
+      "ytugc_clip17": {
+        "file": "Vlog_360P-433e_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0007667064666749823,
+          "max_combo_delta": 0.0032421112060547763,
+          "mos": 3.217578172683716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 6.675720216620107e-07,
+          "max_combo_delta": 1.7642974854403803e-06,
+          "mos": 3.2168121337890625,
+          "pass": true
+        },
+        "reference_mos": 3.216811466217041,
+        "top1_labels_match": true
+      },
+      "ytugc_clip18": {
+        "file": "Vlog_360P-4697_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.001474618911743164,
+          "max_combo_delta": 0.0023867607116700995,
+          "mos": 3.56787109375,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 2.384185791015625e-07,
+          "max_combo_delta": 1.6212463380682607e-06,
+          "mos": 3.566396713256836,
+          "pass": true
+        },
+        "reference_mos": 3.566396474838257,
+        "top1_labels_match": true
+      },
+      "ytugc_clip19": {
+        "file": "Vlog_360P-76ae_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.00044674873352068545,
+          "max_combo_delta": 0.0038773536682130683,
+          "mos": 2.7499022483825684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 9.059906007635732e-07,
+          "max_combo_delta": 1.2397766111504893e-06,
+          "mos": 2.7494564056396484,
+          "pass": true
+        },
+        "reference_mos": 2.7494554996490477,
+        "top1_labels_match": true
+      },
+      "ytugc_clip20": {
+        "file": "Vlog_360P-1e5b_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": 0.0005807876586914062,
+          "max_combo_delta": 0.0014112472534177911,
+          "mos": 3.26171875,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.76837158203125e-07,
+          "max_combo_delta": 5.245208738458018e-07,
+          "mos": 3.261138439178467,
+          "pass": true
+        },
+        "reference_mos": 3.2611379623413086,
+        "top1_labels_match": true
+      }
+    },
+    "1.5": {
+      "ytugc_clip01": {
+        "file": "Gaming_360P-187a_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0011086463928222656,
+          "max_frame_delta": 0.002062082290649414,
+          "mos": 3.10205078125,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 0.0,
+          "max_frame_delta": 3.0994415283203125e-06,
+          "mos": 3.1031594276428223,
+          "pass": true
+        },
+        "reference_mos": 3.1031594276428223
+      },
+      "ytugc_clip02": {
+        "file": "Sports_360P-3e68_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0004591941833496094,
+          "max_frame_delta": 0.0017087459564208984,
+          "mos": 2.0263671875,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.76837158203125e-07,
+          "max_frame_delta": 1.9073486328125e-06,
+          "mos": 2.026826858520508,
+          "pass": true
+        },
+        "reference_mos": 2.0268263816833496
+      },
+      "ytugc_clip03": {
+        "file": "Vlog_360P-2e9d_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0004706382751464844,
+          "max_frame_delta": 0.0013899803161621094,
+          "mos": 2.388671875,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 0.0,
+          "max_frame_delta": 3.0994415283203125e-06,
+          "mos": 2.3891425132751465,
+          "pass": true
+        },
+        "reference_mos": 2.3891425132751465
+      },
+      "ytugc_clip04": {
+        "file": "Gaming_360P-5e0f_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.00042700767517089844,
+          "max_frame_delta": 0.0012326240539550781,
+          "mos": 2.6756834983825684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -7.152557373046875e-07,
+          "max_frame_delta": 4.5299530029296875e-06,
+          "mos": 2.676109790802002,
+          "pass": true
+        },
+        "reference_mos": 2.6761105060577393
+      },
+      "ytugc_clip05": {
+        "file": "Gaming_360P-73c7_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.00019049644470214844,
+          "max_frame_delta": 0.0013189315795898438,
+          "mos": 3.063183546066284,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -4.76837158203125e-07,
+          "max_frame_delta": 1.6689300537109375e-06,
+          "mos": 3.063373565673828,
+          "pass": true
+        },
+        "reference_mos": 3.0633740425109863
+      },
+      "ytugc_clip06": {
+        "file": "Gaming_360P-7acb_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0008184909820556641,
+          "max_frame_delta": 0.003335237503051758,
+          "mos": 2.6573243141174316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -7.152557373046875e-07,
+          "max_frame_delta": 4.0531158447265625e-06,
+          "mos": 2.65814208984375,
+          "pass": true
+        },
+        "reference_mos": 2.6581428050994873
+      },
+      "ytugc_clip07": {
+        "file": "Gaming_360P-3794_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0001100301742553711,
+          "max_frame_delta": 0.0008838176727294922,
+          "mos": 1.8250000476837158,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 0.0,
+          "max_frame_delta": 2.9802322387695312e-06,
+          "mos": 1.8251100778579712,
+          "pass": true
+        },
+        "reference_mos": 1.8251100778579712
+      },
+      "ytugc_clip08": {
+        "file": "Gaming_360P-2330_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0002455711364746094,
+          "max_frame_delta": 0.001268625259399414,
+          "mos": 2.5234375,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.76837158203125e-07,
+          "max_frame_delta": 4.0531158447265625e-06,
+          "mos": 2.523683547973633,
+          "pass": true
+        },
+        "reference_mos": 2.5236830711364746
+      },
+      "ytugc_clip09": {
+        "file": "Gaming_360P-586d_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0014045238494873047,
+          "max_frame_delta": 0.0023279190063476562,
+          "mos": 2.934375047683716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 2.384185791015625e-07,
+          "max_frame_delta": 3.0994415283203125e-06,
+          "mos": 2.9357798099517822,
+          "pass": true
+        },
+        "reference_mos": 2.935779571533203
+      },
+      "ytugc_clip10": {
+        "file": "Sports_360P-3960_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.000354766845703125,
+          "max_frame_delta": 0.001424551010131836,
+          "mos": 2.5308594703674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_frame_delta": 2.1457672119140625e-06,
+          "mos": 2.5312139987945557,
+          "pass": true
+        },
+        "reference_mos": 2.5312142372131348
+      },
+      "ytugc_clip11": {
+        "file": "Sports_360P-02c3_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0008473396301269531,
+          "max_frame_delta": 0.002073526382446289,
+          "mos": 3.094531297683716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -4.76837158203125e-07,
+          "max_frame_delta": 2.384185791015625e-06,
+          "mos": 3.0953781604766846,
+          "pass": true
+        },
+        "reference_mos": 3.0953786373138428
+      },
+      "ytugc_clip12": {
+        "file": "Sports_360P-11b7_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0005903244018554688,
+          "max_frame_delta": 0.0015482902526855469,
+          "mos": 2.3833985328674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 2.384185791015625e-07,
+          "max_frame_delta": 1.9073486328125e-06,
+          "mos": 2.383989095687866,
+          "pass": true
+        },
+        "reference_mos": 2.383988857269287
+      },
+      "ytugc_clip13": {
+        "file": "Sports_360P-65f3_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0005567073822021484,
+          "max_frame_delta": 0.0016064643859863281,
+          "mos": 2.4419922828674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_frame_delta": 2.6226043701171875e-06,
+          "mos": 2.4425487518310547,
+          "pass": true
+        },
+        "reference_mos": 2.442548990249634
+      },
+      "ytugc_clip14": {
+        "file": "Sports_360P-5ded_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0002777576446533203,
+          "max_frame_delta": 0.0016107559204101562,
+          "mos": 3.785839796066284,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 4.76837158203125e-07,
+          "max_frame_delta": 1.6689300537109375e-06,
+          "mos": 3.7861180305480957,
+          "pass": true
+        },
+        "reference_mos": 3.7861175537109375
+      },
+      "ytugc_clip15": {
+        "file": "Sports_360P-61f6_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0003020763397216797,
+          "max_frame_delta": 0.0012578964233398438,
+          "mos": 3.2994141578674316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 0.0,
+          "max_frame_delta": 2.1457672119140625e-06,
+          "mos": 3.2997162342071533,
+          "pass": true
+        },
+        "reference_mos": 3.2997162342071533
+      },
+      "ytugc_clip16": {
+        "file": "Vlog_360P-2973_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0008313655853271484,
+          "max_frame_delta": 0.0017061233520507812,
+          "mos": 2.694628953933716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 0.0,
+          "max_frame_delta": 2.384185791015625e-06,
+          "mos": 2.695460319519043,
+          "pass": true
+        },
+        "reference_mos": 2.695460319519043
+      },
+      "ytugc_clip17": {
+        "file": "Vlog_360P-433e_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0001678466796875,
+          "max_frame_delta": 0.001130819320678711,
+          "mos": 3.1014647483825684,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_frame_delta": 3.814697265625e-06,
+          "mos": 3.1016323566436768,
+          "pass": true
+        },
+        "reference_mos": 3.101632595062256
+      },
+      "ytugc_clip18": {
+        "file": "Vlog_360P-4697_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0007662773132324219,
+          "max_frame_delta": 0.0014827251434326172,
+          "mos": 3.2978515625,
+          "pass": true
+        },
+        "fp32": {
+          "delta": 1.1920928955078125e-06,
+          "max_frame_delta": 2.6226043701171875e-06,
+          "mos": 3.298619031906128,
+          "pass": true
+        },
+        "reference_mos": 3.2986178398132324
+      },
+      "ytugc_clip19": {
+        "file": "Vlog_360P-76ae_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0004329681396484375,
+          "max_frame_delta": 0.0015614032745361328,
+          "mos": 2.326953172683716,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_frame_delta": 2.0265579223632812e-06,
+          "mos": 2.327385902404785,
+          "pass": true
+        },
+        "reference_mos": 2.3273861408233643
+      },
+      "ytugc_clip20": {
+        "file": "Vlog_360P-1e5b_crf_10_ss_00_t_20.0.mp4",
+        "fp16": {
+          "delta": -0.0005235671997070312,
+          "max_frame_delta": 0.0013935565948486328,
+          "mos": 2.9375977516174316,
+          "pass": true
+        },
+        "fp32": {
+          "delta": -2.384185791015625e-07,
+          "max_frame_delta": 3.0994415283203125e-06,
+          "mos": 2.9381210803985596,
+          "pass": true
+        },
+        "reference_mos": 2.9381213188171387
+      }
+    }
+  },
+  "converter": "torch.onnx.export (TorchScript) torch 2.8.0+cu128",
+  "custom_ops": [
+    {
+      "mapping": "identity: the tensor is already dense, so the op is a no-op and exports as nothing",
+      "op": "aten::to_dense",
+      "where": "PermuteLayerNHWC.forward in uvq1p5_pytorch/utils/custom_nn_layers.py and uvq_pytorch/utils/custom_nn_layers.py (DistortionNet heads)"
+    }
+  ],
+  "execution_provider": "CPUExecutionProvider",
+  "ffmpeg": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "models": {
+    "uvq10_aggregation": {
+      "fp16": {
+        "bytes": 3169075,
+        "max_abs_diff_vs_torch": 0.0005037784576416016,
+        "max_abs_torch_output": 1.6655118465423584,
+        "sha256": "7a9601c68d1b7a0711dfa7d09fe4d49e78403f450494b1ad73e656c37f2ca092"
+      },
+      "fp32": {
+        "bytes": 6261795,
+        "max_abs_diff_vs_torch": 3.5762786865234375e-07,
+        "max_abs_torch_output": 1.6655118465423584,
+        "sha256": "0e3203262f04316f76cd374331af463800b4c38ce357e12d9101fbc408fb1aaa"
+      },
+      "inputs": {
+        "compression": [
+          1,
+          16,
+          16,
+          100
+        ],
+        "content": [
+          1,
+          16,
+          16,
+          100
+        ],
+        "distortion": [
+          1,
+          16,
+          16,
+          100
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "scores"
+      ]
+    },
+    "uvq10_compression": {
+      "fp16": {
+        "bytes": 25035959,
+        "max_abs_diff_vs_torch": 0.002818465232849121,
+        "max_abs_torch_output": 2.5771970748901367,
+        "sha256": "1b8ead3709646be4f620929adb5019df3483c09abfbf136a0bca423b99c6c3e5"
+      },
+      "fp32": {
+        "bytes": 46889165,
+        "max_abs_diff_vs_torch": 2.995133399963379e-06,
+        "max_abs_torch_output": 2.5771970748901367,
+        "sha256": "5ee655fcbff415dceec5f9d9a1d8c47fe73fc49377597dc0c31100ee73ce50a1"
+      },
+      "inputs": {
+        "rgb": [
+          1,
+          3,
+          5,
+          720,
+          1280
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "features",
+        "compression_level"
+      ]
+    },
+    "uvq10_content": {
+      "fp16": {
+        "bytes": 25429799,
+        "max_abs_diff_vs_torch": 0.1036376953125,
+        "max_abs_torch_output": 159.198486328125,
+        "sha256": "f5a3ad624343707826013b11d7411ba1d0776e1404eaf5f6cab64428686dccf9"
+      },
+      "fp32": {
+        "bytes": 49451520,
+        "max_abs_diff_vs_torch": 5.340576171875e-05,
+        "max_abs_torch_output": 159.198486328125,
+        "sha256": "1f175725f227bd0c87cf91a9a20f9d5d759e78883fc2a438a8d76561d68c5017"
+      },
+      "inputs": {
+        "rgb": [
+          1,
+          3,
+          496,
+          496
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "features",
+        "label_probs"
+      ]
+    },
+    "uvq10_distortion": {
+      "fp16": {
+        "bytes": 30207272,
+        "max_abs_diff_vs_torch": 1.4884872436523438,
+        "max_abs_torch_output": 550.8934936523438,
+        "sha256": "6e7a1a40ebaceeb03774125e8e8b2ab5c6bf9e2182b71b6ee215ae75ccabc73c"
+      },
+      "fp32": {
+        "bytes": 59006632,
+        "max_abs_diff_vs_torch": 0.007965087890625,
+        "max_abs_torch_output": 550.8934936523438,
+        "sha256": "7e4437dc2e92408c834d46f1cea7e2c3aad4ddb77eb79e83e2ca7c8a53e589e7"
+      },
+      "inputs": {
+        "rgb": [
+          1,
+          3,
+          720,
+          1280
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "features",
+        "distortion_probs"
+      ]
+    },
+    "uvq15_aggregation": {
+      "fp16": {
+        "bytes": 153030,
+        "max_abs_diff_vs_torch": 0.00043189525604248047,
+        "max_abs_torch_output": 1.1069899797439575,
+        "sha256": "45f7c6aefe4425f0eb0bd6f53c70ec5ac13e90a9a34d203ee11fc5e27343a130"
+      },
+      "fp32": {
+        "bytes": 300000,
+        "max_abs_diff_vs_torch": 4.76837158203125e-07,
+        "max_abs_torch_output": 1.1069899797439575,
+        "sha256": "01ff01e42f4dacaf86a687d3d8ba825f2ed34274b8f2ddcf142caace5536407a"
+      },
+      "inputs": {
+        "content": [
+          1,
+          8,
+          8,
+          128
+        ],
+        "distortion": [
+          1,
+          24,
+          24,
+          128
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "mos"
+      ]
+    },
+    "uvq15_content": {
+      "fp16": {
+        "bytes": 8676666,
+        "max_abs_diff_vs_torch": 0.97802734375,
+        "max_abs_torch_output": 3076.7099609375,
+        "sha256": "6c10b33f1a6fac9f8e78ead6ab024b54fb8d2c1241529ac696f1702d32d93eec"
+      },
+      "fp32": {
+        "bytes": 15842636,
+        "max_abs_diff_vs_torch": 0.026611328125,
+        "max_abs_torch_output": 3076.7099609375,
+        "sha256": "fc0a413c693e14571a06215b283f8b143a09eb40118983d5c72a965ccf0c0a37"
+      },
+      "inputs": {
+        "rgb": [
+          1,
+          3,
+          1080,
+          1920
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "features"
+      ]
+    },
+    "uvq15_distortion": {
+      "fp16": {
+        "bytes": 8676879,
+        "max_abs_diff_vs_torch": 0.35378265380859375,
+        "max_abs_torch_output": 196.5211639404297,
+        "sha256": "eae92c66dcfacbba9c39ed34c6bc053a5e72556a18d20486bd82870610e8b5c7"
+      },
+      "fp32": {
+        "bytes": 15843032,
+        "max_abs_diff_vs_torch": 0.00035858154296875,
+        "max_abs_torch_output": 196.5211639404297,
+        "sha256": "e643c526a147efbf11f27c592861314e105b66521d3985d6a2f454151e3f1030"
+      },
+      "inputs": {
+        "rgb": [
+          1,
+          3,
+          1080,
+          1920
+        ]
+      },
+      "opset": 17,
+      "outputs": [
+        "features"
+      ]
+    }
+  },
+  "onnxruntime": "1.20.1",
+  "opset": 17,
+  "python": "3.13.18",
+  "summary": {
+    "1.0": {
+      "fp16": {
+        "all_pass": true,
+        "max_abs_delta": 0.004130125045776367
+      },
+      "fp32": {
+        "all_pass": true,
+        "max_abs_delta": 6.484985351384864e-06
+      }
+    },
+    "1.5": {
+      "fp16": {
+        "all_pass": true,
+        "max_abs_delta": 0.0014045238494873047
+      },
+      "fp32": {
+        "all_pass": true,
+        "max_abs_delta": 1.1920928955078125e-06
+      }
+    }
+  },
+  "tolerance": {
+    "fp16": 0.02,
+    "fp32": 0.01
+  },
+  "uvq_commit": "c204ecc04f093e90c941cb126c7ac3d5beca0414"
+}
