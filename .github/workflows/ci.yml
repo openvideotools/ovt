@@ -171,6 +171,7 @@ jobs:
           preset: linux-x64-release
           triplet: x64-linux-ovt
           corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
+          ffmpeg-container: "true" # ffmpeg 6.1 for the byte-exact pattern check of tools_pytest
           qt: "true" # ovt_studio and its --self-test CTest test (WI-0.019)
 
       # configure, build and the linux-x64-release test preset; JUnit at build/linux-x64-release/junit.xml.
@@ -279,6 +280,7 @@ jobs:
           preset: linux-x64-asan-ubsan
           triplet: x64-linux-ovt
           corpora: fast # tools/fetch_corpora.py --tags fast, cached by manifest hash (chapter 14 §14.2.4)
+          ffmpeg-container: "true" # ffmpeg 6.1 for the byte-exact pattern check of tools_pytest
 
       - name: Clang 16
         run: |

@@ -19,6 +19,12 @@ inputs:
   python-version:
     description: Python used by configure-time tools (needs >= 3.11).
     default: "3.12"
+  ffmpeg-container:
+    description: >-
+      'true' (Linux only) puts an `ffmpeg` wrapper first on PATH that runs Ubuntu 24.04's ffmpeg 6.1 in a container
+      (tools/ci/ffmpeg-container), after the corpora fetch. tools_pytest needs it: its byte-exact check of the committed
+      pattern streams cannot pass with ubuntu-22.04's ffmpeg 4.4.
+    default: "false"
   corpora:
     description: >-
       Test corpora (chapter 14 §14.2.4): 'fast' fetches the PR-lane subset (tools/fetch_corpora.py --tags fast, at most
@@ -231,3 +237,23 @@ runs:
         # shellcheck disable=SC2086
         python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --verify-only
         echo "OVT_CORPORA_DIR=${GITHUB_WORKSPACE}/build/corpora" >> "$GITHUB_ENV"
+
+    - name: ffmpeg 6.1 in a container (tools_pytest)
+      if: inputs.ffmpeg-container == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        # After the corpora fetch on purpose: the corpus post steps keep using the archive's ffmpeg.
+        docker build -t ovt-ffmpeg-container tools/ci/ffmpeg-container
+        wrapper="${RUNNER_TEMP}/ffmpeg-container/ffmpeg"
+        mkdir -p "$(dirname "$wrapper")"
+        cat > "$wrapper" <<EOF
+        #!/bin/sh
+        # Same paths inside and outside: the workspace, the runner temp dir and /tmp are mounted at their own names.
+        case "\$PWD" in "${GITHUB_WORKSPACE}"*|"${RUNNER_TEMP}"*|/tmp*) wd="\$PWD" ;; *) wd=/tmp ;; esac
+        exec docker run --rm -i --user "\$(id -u):\$(id -g)" -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \\
+          -v "${RUNNER_TEMP}:${RUNNER_TEMP}" -v /tmp:/tmp -w "\$wd" ovt-ffmpeg-container ffmpeg "\$@"
+        EOF
+        chmod +x "$wrapper"
+        "$wrapper" -hide_banner -version | head -1
+        "$wrapper" -hide_banner -encoders | grep libx265
+        echo "$(dirname "$wrapper")" >> "$GITHUB_PATH"
