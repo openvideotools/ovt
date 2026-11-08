@@ -18,6 +18,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -180,12 +181,55 @@ void for_cells_in(const fb::Rect& r, std::uint32_t cells_w, std::uint32_t cells_
 
 // ---- context --------------------------------------------------------------------------------------------------
 
-class Ctx {
+bool has_fatal(const flatbuffers::Vector<flatbuffers::Offset<fb::Diagnostic>>* diags) {
+  if (diags == nullptr) {
+    return false;
+  }
+  return std::any_of(diags->begin(), diags->end(),
+                     [](const fb::Diagnostic* d) { return d != nullptr && d->severity() == Severity::Fatal; });
+}
+
+// Collects violations with the per-rule cap; a partial record (Fatal diagnostic) downgrades the §6.9 rules.
+class Reporter {
+ public:
+  explicit Reporter(bool partial) : partial_(partial) {}
+
+  void report(int rule, std::string message, std::string path) {
+    auto& count = counts_.at(static_cast<std::size_t>(rule));
+    ++count;
+    if (count > kMaxViolationsPerRule) {
+      return;
+    }
+    out_.push_back({rule_id(rule), severity(rule), std::move(message), std::move(path)});
+  }
+
+  std::vector<Violation> finish() {
+    for (int rule = 1; rule <= 32; ++rule) {
+      const auto count = counts_.at(static_cast<std::size_t>(rule));
+      if (count > kMaxViolationsPerRule) {
+        out_.push_back({rule_id(rule), severity(rule),
+                        "... and " + std::to_string(count - kMaxViolationsPerRule) + " more violations of this rule",
+                        ""});
+      }
+    }
+    return std::move(out_);
+  }
+
+ private:
+  [[nodiscard]] Severity severity(int rule) const noexcept {
+    return (partial_ && downgraded_when_partial(rule)) ? Severity::Warning : Severity::Error;
+  }
+
+  bool partial_;
+  std::array<std::size_t, 33> counts_{};
+  std::vector<Violation> out_;
+};
+
+class Ctx : public Reporter {
  public:
   Ctx(const fb::FrameAnalysis& fa, std::optional<std::span<const std::uint8_t, 32>> hash,
       std::optional<Codec> codec_override)
-      : fa_(fa), hash_(hash) {
-    partial_ = has_fatal(fa.diagnostics());
+      : Reporter(has_fatal(fa.diagnostics())), fa_(fa), hash_(hash) {
     codec_ = codec_override.value_or(infer_codec());
     const auto* frame = fa.frame();
     if (frame != nullptr && frame->coded_size() != nullptr) {
@@ -229,42 +273,7 @@ class Ctx {
     return id < grid_leaf_.size() && grid_leaf_[static_cast<std::size_t>(id)];
   }
 
-  void report(int rule, std::string message, std::string path) {
-    auto& count = counts_.at(static_cast<std::size_t>(rule));
-    ++count;
-    if (count > kMaxViolationsPerRule) {
-      return;
-    }
-    out_.push_back({rule_id(rule), severity(rule), std::move(message), std::move(path)});
-  }
-
-  std::vector<Violation> finish() {
-    for (int rule = 1; rule <= 32; ++rule) {
-      const auto count = counts_.at(static_cast<std::size_t>(rule));
-      if (count > kMaxViolationsPerRule) {
-        report_suppressed(out_, rule, count - kMaxViolationsPerRule, severity(rule));
-      }
-    }
-    return std::move(out_);
-  }
-
-  static void report_suppressed(std::vector<Violation>& out, int rule, std::size_t more, Severity sev) {
-    out.push_back({rule_id(rule), sev, "... and " + std::to_string(more) + " more violations of this rule", ""});
-  }
-
  private:
-  [[nodiscard]] Severity severity(int rule) const noexcept {
-    return (partial_ && downgraded_when_partial(rule)) ? Severity::Warning : Severity::Error;
-  }
-
-  static bool has_fatal(const flatbuffers::Vector<flatbuffers::Offset<fb::Diagnostic>>* diags) {
-    if (diags == nullptr) {
-      return false;
-    }
-    return std::any_of(diags->begin(), diags->end(),
-                       [](const fb::Diagnostic* d) { return d != nullptr && d->severity() == Severity::Fatal; });
-  }
-
   // §6.9 implementation note: blocks[1].kind, else the ext_type strings.
   [[nodiscard]] Codec infer_codec() const {
     const auto* blocks = fa_.blocks();
@@ -323,7 +332,6 @@ class Ctx {
   const fb::FrameAnalysis& fa_;
   std::optional<std::span<const std::uint8_t, 32>> hash_;
   Codec codec_ = Codec::Unknown;
-  bool partial_ = false;
   std::int64_t coded_w_ = 0;
   std::int64_t coded_h_ = 0;
   std::uint32_t cells_w_ = 0;
@@ -331,8 +339,6 @@ class Ctx {
   std::uint64_t n_cells_ = 0;
   std::size_t n_blocks_ = 0;
   std::vector<bool> grid_leaf_;
-  std::array<std::size_t, 33> counts_{};
-  std::vector<Violation> out_;
 };
 
 // ---- V-002 frame ----------------------------------------------------------------------------------------------
@@ -1540,6 +1546,447 @@ void v024(Ctx& c) {
   }
 }
 
+// ---- V-025 canonical orders -----------------------------------------------------------------------------------
+
+// Blocks must be a pre-order traversal (children in stored order): a DFS from the root meets ids 0, 1, 2, ...
+// Revisits (a duplicate child entry, V-005) and out-of-range ids (V-005) are skipped, not reported here.
+void v025_blocks(Ctx& c) {
+  const std::size_t n = c.n_blocks();
+  if (n == 0) {
+    return;
+  }
+  std::vector<bool> seen(n, false);
+  std::vector<std::uint32_t> stack{0};
+  std::uint64_t next = 0;
+  while (!stack.empty()) {
+    const auto id = stack.back();
+    stack.pop_back();
+    if (seen[id]) {
+      continue;
+    }
+    seen[id] = true;
+    if (id != next) {
+      c.report(25, "blocks are not in pre-order: expected block " + std::to_string(next) + " here, found " + str(id),
+               at("blocks", id));
+      return;  // one report: every later position is shifted too
+    }
+    ++next;
+    const auto* children = c.block(id)->children();
+    for (std::size_t k = vsize(children); k > 0; --k) {
+      const auto child = children->Get(static_cast<flatbuffers::uoffset_t>(k - 1));
+      if (child < n && !seen[child]) {
+        stack.push_back(child);
+      }
+    }
+  }
+}
+
+// Reports the first position where @p key(v[i - 1]) > @p key(v[i]).
+template <class T, class Key>
+void check_sorted(Ctx& c, const flatbuffers::Vector<flatbuffers::Offset<T>>* v, std::string_view name,
+                  std::string_view order, Key key) {
+  for (std::size_t i = 1; i < vsize(v); ++i) {
+    if (key(*v->Get(static_cast<flatbuffers::uoffset_t>(i - 1))) >
+        key(*v->Get(static_cast<flatbuffers::uoffset_t>(i)))) {
+      c.report(25, std::string(name) + " is not sorted by " + std::string(order), at(name, i));
+      return;
+    }
+  }
+}
+
+void v025(Ctx& c) {
+  v025_blocks(c);
+  const auto& fa = c.fa();
+  check_sorted(c, fa.mvs(), "mvs", "(block_id, list, rect.y, rect.x)", [](const fb::MotionVector& m) {
+    const auto* r = m.rect();
+    return std::tuple(m.block_id(), m.list(), r != nullptr ? r->y() : 0, r != nullptr ? r->x() : 0);
+  });
+  check_sorted(c, fa.partitions(), "partitions", "index", [](const fb::PartitionInfo& p) { return p.index(); });
+  check_sorted(c, fa.planes(), "planes", "(stage, plane)",
+               [](const fb::PlaneRef& p) { return std::pair(static_cast<int>(p.stage()), p.plane()); });
+  check_sorted(c, fa.symbols(), "symbols", "(y4, x4, symbol_id)",
+               [](const fb::SymbolCost& s) { return std::tuple(s.y4(), s.x4(), s.symbol_id()); });
+  check_sorted(c, fa.refs(), "refs", "index", [](const fb::RefSlot& r) { return r.index(); });
+}
+
+// ---- V-026 prediction vs references ---------------------------------------------------------------------------
+
+bool av1_cell_uses_intrabc(const Ctx& c, std::size_t i) {
+  const auto* ids = c.cells(c.fa().grid()->block_id());
+  const auto* b = ids != nullptr ? c.block(ids->Get(static_cast<flatbuffers::uoffset_t>(i))) : nullptr;
+  const auto* ext = b != nullptr ? ext_as<fb::Av1Block>(*b) : nullptr;
+  return ext != nullptr && ext->use_intrabc() == 1;
+}
+
+void v026_cell(Ctx& c, std::size_t i, fb::PredKind pred, int ref0, int ref1) {
+  constexpr int kRule = 26;
+  using P = fb::PredKind;
+  const int min_ref = c.codec() == Codec::AV1 ? 1 : 0;  // AV1 index 0 is the INTRA placeholder
+  const std::string path = at("grid.pred", i);
+  if (pred == P::Intra || pred == P::PCM || pred == P::Palette || pred == P::None) {
+    if (ref0 != -1 || ref1 != -1) {
+      c.report(kRule, std::string(fb::EnumNamePredKind(pred)) + " cell has references " + str(ref0) + "/" + str(ref1),
+               path);
+    }
+  } else if (pred == P::Inter || pred == P::Skip) {
+    if (ref0 < min_ref && ref1 < min_ref) {
+      c.report(kRule, std::string(fb::EnumNamePredKind(pred)) + " cell has no reference", path);
+    }
+  } else if (pred == P::IntraBC) {
+    if (ref0 != -1) {
+      c.report(kRule, "IntraBC cell has ref0 " + str(ref0) + ", must be -1", path);
+    }
+    if (c.codec() == Codec::AV1 && !av1_cell_uses_intrabc(c, i)) {
+      c.report(kRule, "IntraBC cell's block does not have Av1Block.use_intrabc = 1", path);
+    }
+  }
+}
+
+void v026(Ctx& c) {
+  const auto* g = c.fa().grid();
+  const auto* pred = g != nullptr ? c.cells(g->pred()) : nullptr;
+  const auto* ref0 = g != nullptr ? c.cells(g->ref0()) : nullptr;
+  if (pred == nullptr || ref0 == nullptr) {
+    return;
+  }
+  const auto* ref1 = c.cells(g->ref1());
+  for (std::size_t i = 0; i < pred->size(); ++i) {
+    const auto ui = static_cast<flatbuffers::uoffset_t>(i);
+    const auto p = pred->Get(ui);
+    if (p > static_cast<std::uint8_t>(fb::PredKind::MAX)) {
+      continue;  // V-013
+    }
+    // NOLINTNEXTLINE(bugprone-signed-char-misuse,cert-str34-c): int8 indices, not characters
+    const int r0 = ref0->Get(ui);
+    // NOLINTNEXTLINE(bugprone-signed-char-misuse,cert-str34-c)
+    const int r1 = ref1 != nullptr ? ref1->Get(ui) : -1;
+    v026_cell(c, i, static_cast<fb::PredKind>(p), r0, r1);
+  }
+}
+
+// ---- V-027 codec ranges ---------------------------------------------------------------------------------------
+
+// Reports every cell of @p v whose value fails @p allowed.
+template <class T, class Pred>
+void check_values(Ctx& c, const flatbuffers::Vector<T>* v, std::string_view name, Pred allowed) {
+  for (std::size_t i = 0; i < vsize(v); ++i) {
+    const int value = v->Get(static_cast<flatbuffers::uoffset_t>(i));
+    if (!allowed(value)) {
+      c.report(
+          27, std::string(name) + " value " + str(value) + " is outside the " + fb::EnumNameCodec(c.codec()) + " range",
+          at("grid." + std::string(name), i));
+    }
+  }
+}
+
+// §6.3.1 intra_mode_y values per codec (-1 = not intra).
+bool intra_mode_allowed(Codec codec, int v) noexcept {
+  switch (codec) {
+    case Codec::H264:
+      return v == -1 || (v >= 0 && v <= 8) || (v >= 16 && v <= 19) || v == 32;
+    case Codec::H265:
+      return v == -1 || (v >= 0 && v <= 34) || v == 64 || v == 65;
+    default:  // AV1
+      return v == -1 || (v >= 0 && v <= 12) || v == 32 || v == 33;
+  }
+}
+
+bool deblock_allowed(Codec codec, int v) noexcept {
+  switch (codec) {
+    case Codec::H264:
+      return v <= 4 || v == 255;
+    case Codec::H265:
+      return v <= 2 || v == 255;
+    default:  // AV1: the derived filter size, not a strength
+      return v == 0 || v == 4 || v == 6 || v == 8 || v == 16 || v == 255;
+  }
+}
+
+bool filter_idx_allowed(Codec codec, int v) noexcept {
+  switch (codec) {
+    case Codec::H264:
+      return v == 0 || v == 255;
+    case Codec::H265:
+      return v <= 2 || v == 255;
+    default:  // AV1 cdef_idx, 254 = not signalled
+      return v <= 7 || v == 254 || v == 255;
+  }
+}
+
+// Largest Block.partition_type per kind (§6.3.1 table); 255 is always allowed, CTU and Other allow only 255.
+int partition_type_max(BlockKind kind) noexcept {
+  switch (kind) {
+    case BlockKind::MB:
+      return static_cast<int>(fb::AvcMbType::SI);
+    case BlockKind::SubMB:
+      return static_cast<int>(fb::AvcSubMbType::B_Bi_4x4);
+    case BlockKind::CU:
+      return static_cast<int>(fb::HevcPartMode::PART_nRx2N);
+    case BlockKind::PU:
+      return 3;  // partIdx
+    case BlockKind::TU:
+      return 4;  // trafoDepth: a 64x64 CTB split down to 4x4 TBs
+    case BlockKind::SB:
+    case BlockKind::Block:
+      return static_cast<int>(fb::Av1Partition::PARTITION_VERT_4);
+    case BlockKind::TXB:
+      return 2;  // plane
+    default:
+      return -1;
+  }
+}
+
+void v027(Ctx& c) {
+  const Codec codec = c.codec();
+  if (codec != Codec::H264 && codec != Codec::H265 && codec != Codec::AV1) {
+    return;
+  }
+  if (const auto* g = c.fa().grid(); g != nullptr) {
+    const int tx_max = codec == Codec::H264 ? 3 : (codec == Codec::AV1 ? 6 : 5);
+    const auto tx_log2 = [tx_max](int v) { return (v >= 2 && v <= tx_max) || v == 255; };
+    check_values(c, c.cells(g->tx_log2_w()), "tx_log2_w", tx_log2);
+    check_values(c, c.cells(g->tx_log2_h()), "tx_log2_h", tx_log2);
+    const int type_max = codec == Codec::AV1 ? 16 : 3;
+    check_values(c, c.cells(g->tx_type()), "tx_type", [type_max](int v) { return v <= type_max || v == 255; });
+    check_values(c, c.cells(g->cbf()), "cbf", [](int v) { return v <= 7 || v == 255; });
+    check_values(c, c.cells(g->filter_idx()), "filter_idx", [codec](int v) { return filter_idx_allowed(codec, v); });
+    check_values(c, c.cells(g->deblock_bs_v()), "deblock_bs_v", [codec](int v) { return deblock_allowed(codec, v); });
+    check_values(c, c.cells(g->deblock_bs_h()), "deblock_bs_h", [codec](int v) { return deblock_allowed(codec, v); });
+    check_values(c, c.cells(g->intra_mode_y()), "intra_mode_y",
+                 [codec](int v) { return intra_mode_allowed(codec, v); });
+  }
+  for (std::size_t i = 0; i < c.n_blocks(); ++i) {
+    const auto* b = c.block(i);
+    const int value = b->partition_type();
+    if (value != 255 && value > partition_type_max(b->kind())) {
+      c.report(27, "partition_type " + str(value) + " is outside the range of kind " + fb::EnumNameBlockKind(b->kind()),
+               at("blocks", i, "partition_type"));
+    }
+  }
+}
+
+// ---- V-028 QP -------------------------------------------------------------------------------------------------
+
+void v028_hist(Ctx& c, const flatbuffers::Vector<std::int16_t>& qp, const flatbuffers::Vector<std::uint32_t>& hist) {
+  constexpr int kRule = 28;
+  const bool av1 = c.codec() == Codec::AV1;
+  std::array<std::uint64_t, 256> expected{};
+  for (const auto v : qp) {
+    const int bin = av1 ? v : v + 128;
+    if (bin >= 0 && bin <= 255) {
+      ++expected.at(static_cast<std::size_t>(bin));
+    }
+  }
+  std::uint64_t sum = 0;
+  for (const auto v : hist) {
+    sum += v;
+  }
+  if (sum != qp.size()) {
+    c.report(kRule, "qp_hist sums to " + std::to_string(sum) + ", expected cells_w*cells_h = " + str(qp.size()),
+             "qp_hist");
+    return;
+  }
+  for (std::size_t b = 0; b < 256; ++b) {
+    if (hist.Get(static_cast<flatbuffers::uoffset_t>(b)) != expected.at(b)) {
+      c.report(kRule,
+               "qp_hist bin " + str(static_cast<std::int64_t>(b)) + " is " +
+                   str(hist.Get(static_cast<flatbuffers::uoffset_t>(b))) + ", grid.qp gives " +
+                   std::to_string(expected.at(b)),
+               at("qp_hist", b));
+    }
+  }
+}
+
+void v028(Ctx& c) {
+  constexpr int kRule = 28;
+  const auto* g = c.fa().grid();
+  const auto* qp = g != nullptr ? c.cells(g->qp()) : nullptr;
+  if (qp == nullptr) {
+    return;
+  }
+  const auto* f = c.fa().frame();
+  const bool av1 = c.codec() == Codec::AV1;
+  const int lo = av1 ? 0 : (f != nullptr ? -6 * (f->bit_depth_luma() - 8) : 0);
+  const int hi = av1 ? 255 : 51;
+  const auto* ids = c.cells(g->block_id());
+  for (std::size_t i = 0; i < qp->size(); ++i) {
+    const int v = qp->Get(static_cast<flatbuffers::uoffset_t>(i));
+    if (c.codec() != Codec::Unknown && v != -1 && (v < lo || v > hi)) {
+      c.report(kRule, "qp " + str(v) + " is outside " + str(lo) + ".." + str(hi), at("grid.qp", i));
+    }
+    const auto id = ids != nullptr ? ids->Get(static_cast<flatbuffers::uoffset_t>(i)) : 0U;
+    const auto* b = c.is_grid_leaf(id) ? c.block(id) : nullptr;
+    if (b != nullptr && v != -1 && b->qp() != -1 && b->qp() != v) {
+      c.report(kRule, "grid qp " + str(v) + " != Block.qp " + str(b->qp()) + " of block " + str(id), at("grid.qp", i));
+    }
+  }
+  if (const auto* hist = c.fa().qp_hist(); vsize(hist) == 256) {
+    v028_hist(c, *qp, *hist);
+  }
+}
+
+// ---- V-029 diagnostic codes -----------------------------------------------------------------------------------
+
+// ^(CNT|SYN|DEC|VQ|MDL|IO|BR|VER|ANA|RND|GUI|CLI)(-[A-Z0-9]{2,8})?-[0-9]{4}$ (chapter 5 §5.7), without std::regex.
+bool diagnostic_code_ok(std::string_view code) noexcept {
+  constexpr std::array<std::string_view, 12> kFamilies{"CNT", "SYN", "DEC", "VQ",  "MDL", "IO",
+                                                       "BR",  "VER", "ANA", "RND", "GUI", "CLI"};
+  const auto dash = code.find('-');
+  if (dash == std::string_view::npos ||
+      std::find(kFamilies.begin(), kFamilies.end(), code.substr(0, dash)) == kFamilies.end()) {
+    return false;
+  }
+  std::string_view rest = code.substr(dash + 1);
+  const auto all_of = [](std::string_view s, std::string_view chars) {
+    return s.find_first_not_of(chars) == std::string_view::npos;
+  };
+  constexpr std::string_view kDigits = "0123456789";
+  if (const auto second = rest.find('-'); second != std::string_view::npos) {
+    const auto qualifier = rest.substr(0, second);
+    if (qualifier.size() < 2 || qualifier.size() > 8 || !all_of(qualifier, "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")) {
+      return false;
+    }
+    rest = rest.substr(second + 1);
+  }
+  return rest.size() == 4 && all_of(rest, kDigits);
+}
+
+using DiagnosticVector = flatbuffers::Vector<flatbuffers::Offset<fb::Diagnostic>>;
+
+void check_diagnostics(Reporter& c, const DiagnosticVector* diags, const std::string& base) {
+  for (std::size_t i = 0; i < vsize(diags); ++i) {
+    const auto* d = diags->Get(static_cast<flatbuffers::uoffset_t>(i));
+    if (!diagnostic_code_ok(sv(d->code())) || sv(d->message()).empty()) {
+      c.report(29, "diagnostic code \"" + std::string(sv(d->code())) + "\" is malformed or its message is empty",
+               at(base, i));
+    }
+  }
+}
+
+// Syntax trees nest diagnostics at every node; walked with an explicit stack (depth is bounded by the
+// Verifier's max_depth anyway).
+void check_syntax_diagnostics(Reporter& c, const fb::SyntaxNode* root, const std::string& root_path) {
+  std::vector<std::pair<const fb::SyntaxNode*, std::string>> stack;
+  if (root != nullptr) {
+    stack.emplace_back(root, root_path);
+  }
+  while (!stack.empty()) {
+    auto [node, path] = std::move(stack.back());
+    stack.pop_back();
+    check_diagnostics(c, node->diagnostics(), path + ".diagnostics");
+    const auto* children = node->children();
+    for (std::size_t k = vsize(children); k > 0; --k) {
+      stack.emplace_back(children->Get(static_cast<flatbuffers::uoffset_t>(k - 1)), at(path + ".children", k - 1));
+    }
+  }
+}
+
+void v029(Ctx& c) {
+  check_diagnostics(c, c.fa().diagnostics(), "diagnostics");
+  const auto* parts = c.fa().partitions();
+  for (std::size_t p = 0; p < vsize(parts); ++p) {
+    const auto* part = parts->Get(static_cast<flatbuffers::uoffset_t>(p));
+    check_diagnostics(c, part->diagnostics(), at("partitions", p, "diagnostics"));
+    check_syntax_diagnostics(c, part->header(), at("partitions", p, "header"));
+  }
+}
+
+// ---- V-031 StreamIndex ----------------------------------------------------------------------------------------
+
+constexpr int kRuleV031 = 31;
+
+// display_order holds, at position d, the first decoded frame (field) with display_index d, once per d.
+void v031_display_order(Reporter& r, const fb::StreamIndex& si) {
+  const auto* frames = si.frames();
+  std::vector<std::int64_t> first;  // display index -> first decode index, -1 = none
+  for (std::size_t i = 0; i < vsize(frames); ++i) {
+    const auto* id = frames->Get(static_cast<flatbuffers::uoffset_t>(i))->id();
+    const std::int64_t d = id != nullptr ? id->display_index() : -1;
+    if (d < 0 || d > static_cast<std::int64_t>(vsize(frames))) {
+      continue;  // hidden frames; an out-of-range index cannot name a display_order slot
+    }
+    if (first.size() <= static_cast<std::size_t>(d)) {
+      first.resize(static_cast<std::size_t>(d) + 1, -1);
+    }
+    if (first[static_cast<std::size_t>(d)] < 0) {
+      first[static_cast<std::size_t>(d)] = static_cast<std::int64_t>(i);
+    }
+  }
+  const auto* order = si.display_order();
+  if (vsize(order) != first.size()) {
+    r.report(kRuleV031,
+             "display_order has " + str(static_cast<std::int64_t>(vsize(order))) + " entries, frames give " +
+                 str(static_cast<std::int64_t>(first.size())),
+             "display_order");
+  }
+  for (std::size_t d = 0; d < std::min(first.size(), vsize(order)); ++d) {
+    const std::int64_t got = order->Get(static_cast<flatbuffers::uoffset_t>(d));
+    if (got != first[d]) {
+      r.report(kRuleV031, "display_order[d] is " + str(got) + ", expected decode_index " + str(first[d]),
+               at("display_order", d));
+    }
+  }
+}
+
+void v031_frame(Reporter& r, const fb::StreamIndex& si, std::size_t i, const fb::FrameInfo& f) {
+  constexpr int kRule = kRuleV031;
+  const auto* units = si.units();
+  const std::size_t n_units = vsize(units);
+  const auto n_frames = static_cast<std::int64_t>(vsize(si.frames()));
+  if (f.id() == nullptr || f.id()->decode_index() != static_cast<std::int64_t>(i)) {
+    r.report(kRule, "frames[i].id.decode_index must equal i", at("frames", i, "id"));
+  }
+  std::uint64_t size = 0;
+  const auto* fu = f.units();
+  for (std::size_t k = 0; k < vsize(fu); ++k) {
+    const auto u = fu->Get(static_cast<flatbuffers::uoffset_t>(k));
+    const auto* unit = u < n_units ? units->Get(u) : nullptr;
+    if (unit == nullptr || unit->frame() == nullptr || unit->frame()->decode_index() != static_cast<std::int64_t>(i)) {
+      r.report(kRule, "unit " + str(u) + " is not a unit of this frame", at(at("frames", i, "units"), k));
+      continue;
+    }
+    size += (unit->file_span() != nullptr ? unit->file_span()->length() : 0) +
+            (unit->prefix_span() != nullptr ? unit->prefix_span()->length() : 0);
+  }
+  if (f.size_bytes() != size) {
+    r.report(kRule, "size_bytes " + std::to_string(f.size_bytes()) + " != sum of unit spans " + std::to_string(size),
+             at("frames", i, "size_bytes"));
+  }
+  for (const auto& [vec, name] :
+       {std::pair{f.declared_refs(), "declared_refs"}, std::pair{f.dpb_after(), "dpb_after"}}) {
+    for (std::size_t k = 0; k < vsize(vec); ++k) {
+      const std::int64_t v = vec->Get(static_cast<flatbuffers::uoffset_t>(k));
+      if (v < 0 || v >= n_frames || v == static_cast<std::int64_t>(i)) {
+        r.report(kRule, std::string(name) + " entry " + str(v) + " must name another frame",
+                 at(at("frames", i, name), k));
+      }
+    }
+  }
+}
+
+void v031(Reporter& r, const fb::StreamIndex& si) {
+  constexpr int kRule = kRuleV031;
+  const auto* units = si.units();
+  for (std::size_t i = 0; i < vsize(units); ++i) {
+    if (units->Get(static_cast<flatbuffers::uoffset_t>(i))->index() != i) {
+      r.report(kRule, "units[i].index must equal i", at("units", i, "index"));
+    }
+  }
+  const auto* frames = si.frames();
+  for (std::size_t i = 0; i < vsize(frames); ++i) {
+    v031_frame(r, si, i, *frames->Get(static_cast<flatbuffers::uoffset_t>(i)));
+  }
+  v031_display_order(r, si);
+  for (const auto& [vec, name] : {std::pair{si.parameter_sets(), "parameter_sets"}, std::pair{si.sei(), "sei"}}) {
+    for (std::size_t k = 0; k < vsize(vec); ++k) {
+      const auto index = vec->Get(static_cast<flatbuffers::uoffset_t>(k))->index();
+      if (index >= vsize(units)) {
+        r.report(kRule, "unit index " + str(index) + " is not in units", at(name, k));
+      }
+    }
+  }
+}
+
 // ---- driver ---------------------------------------------------------------------------------------------------
 
 const fb::FrameAnalysis* verify_frame_analysis(std::span<const std::uint8_t> buffer) {
@@ -1598,10 +2045,58 @@ std::vector<Violation> run_frame_analysis(std::span<const std::uint8_t> buffer,
   v022(c);
   v023(c);
   v024(c);
+  v025(c);
+  v026(c);
+  v027(c);
+  v028(c);
+  v029(c);
   return c.finish();
 }
 
+const fb::StreamIndex* verify_stream_index(std::span<const std::uint8_t> buffer) {
+  // StreamIndex has no file_identifier in the schema; the cache writes "OVTI", other producers none.
+  const auto opts = verifier_options();
+  {
+    flatbuffers::Verifier verifier(buffer.data(), buffer.size(), opts);
+    if (verifier.VerifyBuffer<fb::StreamIndex>(nullptr)) {
+      return flatbuffers::GetRoot<fb::StreamIndex>(buffer.data());
+    }
+  }
+  flatbuffers::Verifier verifier(buffer.data(), buffer.size(), opts);
+  if (verifier.VerifySizePrefixedBuffer<fb::StreamIndex>(nullptr)) {
+    return flatbuffers::GetSizePrefixedRoot<fb::StreamIndex>(buffer.data());
+  }
+  return nullptr;
+}
+
+void check_unit_diagnostics(Reporter& r, const flatbuffers::Vector<flatbuffers::Offset<fb::Unit>>* units,
+                            std::string_view name) {
+  for (std::size_t i = 0; i < vsize(units); ++i) {
+    const auto* unit = units->Get(static_cast<flatbuffers::uoffset_t>(i));
+    check_diagnostics(r, unit->diagnostics(), at(name, i, "diagnostics"));
+    check_syntax_diagnostics(r, unit->header(), at(name, i, "header"));
+  }
+}
+
 }  // namespace
+
+std::vector<Violation> validate_stream_index(std::span<const std::uint8_t> buffer) {
+  const auto* si = buffer.empty() ? nullptr : verify_stream_index(buffer);
+  if (si == nullptr) {
+    return {{"V-001", Severity::Error,
+             "buffer (" + std::to_string(buffer.size()) +
+                 " bytes) does not pass flatbuffers::Verifier for ovt.fb.StreamIndex",
+             ""}};
+  }
+  Reporter r(has_fatal(si->diagnostics()));
+  if (si->schema_version() != 1) {
+    r.report(1, "schema_version must be 1, is " + str(si->schema_version()), "schema_version");
+  }
+  check_diagnostics(r, si->diagnostics(), "diagnostics");
+  check_unit_diagnostics(r, si->units(), "units");
+  v031(r, *si);
+  return r.finish();
+}
 
 std::vector<Violation> validate_frame_analysis(std::span<const std::uint8_t> buffer,
                                                std::span<const std::uint8_t, 32> expected_source_hash,
