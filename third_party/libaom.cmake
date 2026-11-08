@@ -58,7 +58,11 @@ endif()
 message(STATUS "OVT: libaom AOM_TARGET_CPU=${OVT_AOM_CPU}")
 
 # ---- build ------------------------------------------------------------------------------------------
-ovt_tp_declare(libaom LICENSE_FILES LICENSE PATENTS)
+# aom_dsp's x86 assembly includes third_party/x86inc/x86inc.asm (ISC, x264). Its LICENSE would collide with the
+# archive's LICENSE once staged by base name, so the text is kept in third_party/licenses/libaom/. The other
+# third_party/ code of the archive is not built here: SVT-AV1 is off (CONFIG_SVT_AV1=0), and libwebm, libyuv,
+# fastfeat and vector belong to the encoder and the tools, which are off.
+ovt_tp_declare(libaom LICENSE_FILES LICENSE PATENTS ${CMAKE_CURRENT_LIST_DIR}/licenses/libaom/x86inc-ISC.txt)
 
 set(_ovt_aom_prefix "${OVT_THIRD_PARTY_PREFIX}/libaom")
 set(_ovt_aom_patch_dir "${CMAKE_CURRENT_LIST_DIR}/patches/libaom")

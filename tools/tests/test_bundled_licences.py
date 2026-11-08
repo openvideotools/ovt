@@ -39,7 +39,7 @@ def reuse_annotations() -> dict[str, str]:
 
 
 def test_dependencies_with_bundled_texts() -> None:
-    assert DEPS == ["dav1d", "libde265", "libplacebo", "libvmaf"]
+    assert DEPS == ["dav1d", "libaom", "libde265", "libplacebo", "libvmaf"]
 
 
 @pytest.mark.parametrize("dep", DEPS)
