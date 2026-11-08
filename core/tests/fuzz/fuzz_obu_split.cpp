@@ -84,6 +84,18 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     v2.on_obu = [&](const ObuNode& n) { again.push_back(n); };
     obu_walk(bytes, 0, framing, v2);
     require(again.size() == obus.size());
+
+    // The same bytes at a shifted base offset give the same walk, shifted.
+    constexpr uint64_t kShift = 777;
+    std::vector<ObuNode> shifted;
+    ObuVisitor v3;
+    v3.on_obu = [&](const ObuNode& n) { shifted.push_back(n); };
+    obu_walk(bytes, kShift, framing, v3);
+    require(shifted.size() == obus.size());
+    for (size_t i = 0; i < obus.size(); ++i) {
+      require(shifted[i].file_span.offset == obus[i].file_span.offset + kShift &&
+              shifted[i].file_span.length == obus[i].file_span.length);
+    }
   } catch (...) {
     std::abort();
   }

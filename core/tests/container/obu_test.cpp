@@ -350,3 +350,27 @@ TEST_CASE("sniff and obu_detect agree on the raw OBU corpus files", "[container]
     }
   }
 }
+
+TEST_CASE("walking a span at a non-zero base offset shifts every span", "[container][obu][fast]") {
+  for (const auto framing : {ObuFraming::Section5, ObuFraming::AnnexB}) {
+    const Bytes s = framing == ObuFraming::Section5 ? section5_stream(3) : annexb_stream(3);
+    const auto at0 = walk(s, framing);
+    Walk shifted;
+    ObuVisitor v;
+    v.on_obu = [&](const ObuNode& n) { shifted.obus.push_back(n); };
+    v.on_temporal_unit = [&](const TemporalUnitNode& n) { shifted.tus.push_back(n); };
+    constexpr uint64_t kBase = 1000;
+    obu_walk(s, kBase, framing, v, [&](const Finding& f) { shifted.findings.push_back(f); });
+    CHECK(shifted.findings.empty());
+    REQUIRE(shifted.obus.size() == at0.obus.size());
+    REQUIRE(shifted.tus.size() == at0.tus.size());
+    for (size_t i = 0; i < at0.obus.size(); ++i) {
+      CHECK(shifted.obus[i].file_span.offset == at0.obus[i].file_span.offset + kBase);
+      CHECK(shifted.obus[i].file_span.length == at0.obus[i].file_span.length);
+      CHECK(shifted.obus[i].prefix_span.length == at0.obus[i].prefix_span.length);
+    }
+    for (size_t i = 0; i < at0.tus.size(); ++i) {
+      CHECK(shifted.tus[i].file_span.offset == at0.tus[i].file_span.offset + kBase);
+    }
+  }
+}

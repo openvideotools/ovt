@@ -24,6 +24,7 @@ class Source {
   Source(const Source&) = delete;
   Source& operator=(const Source&) = delete;
   virtual ~Source() = default;
+  [[nodiscard]] virtual uint64_t begin() const { return 0; }  // file offset of the first byte
   [[nodiscard]] virtual uint64_t size() const = 0;
   virtual size_t read(uint64_t offset, size_t len, uint8_t* dst) const = 0;
 };
@@ -41,6 +42,7 @@ class FileSource final : public Source {
 class SpanSource final : public Source {
  public:
   SpanSource(std::span<const uint8_t> d, uint64_t base) : d_(d), base_(base) {}
+  [[nodiscard]] uint64_t begin() const override { return base_; }
   [[nodiscard]] uint64_t size() const override { return base_ + d_.size(); }
   size_t read(uint64_t offset, size_t len, uint8_t* dst) const override {
     if (offset < base_ || offset - base_ >= d_.size()) {
@@ -227,12 +229,14 @@ bool attempt_annexb(std::span<const uint8_t> d, uint64_t file_size) {
 
 struct Walker {
   Window w;
+  uint64_t begin;
   uint64_t size;
   const ObuVisitor& visitor;
   const FindingSink& sink;
   ObuWalkSummary summary;
 
-  Walker(const Source& s, const ObuVisitor& v, const FindingSink& f) : w(s), size(s.size()), visitor(v), sink(f) {}
+  Walker(const Source& s, const ObuVisitor& v, const FindingSink& f)
+      : w(s), begin(s.begin()), size(s.size()), visitor(v), sink(f) {}
 
   void emit(const ObuNode& n) {
     ++summary.obu_count;
@@ -270,7 +274,7 @@ struct Walker {
   }
 
   void section5() {
-    uint64_t pos = 0;
+    uint64_t pos = begin;
     bool have_tu = false;
     TemporalUnitNode tu;
     const auto close_tu = [&](uint64_t end) {
@@ -325,7 +329,7 @@ struct Walker {
   }
 
   void annexb() {
-    uint64_t pos = 0;
+    uint64_t pos = begin;
     uint64_t tu_index = 0;
     while (pos < size) {
       const Leb128 tl = leb_at(pos, size);
