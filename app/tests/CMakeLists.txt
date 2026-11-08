@@ -20,6 +20,7 @@ add_executable(
   models/test_project.cpp
   models/test_series_aggregator.cpp
   models/test_stream_index_model.cpp
+  models/test_unit_list_model.cpp
   ../src/project.cpp
   models/test_keymap.cpp
   models/test_goto_parser.cpp
@@ -36,6 +37,7 @@ add_executable(
   ../src/models/frame_table.cpp
   ../src/models/stream_index_adapter.cpp
   ../src/models/stream_index_model.cpp
+  ../src/models/unit_list_model.cpp
   ../src/dock/dock_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
 qt_add_resources(
