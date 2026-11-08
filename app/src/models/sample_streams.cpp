@@ -21,7 +21,7 @@ namespace {
 
 bool has_tag(const QJsonObject& entry, const QString& tag) {
   const QJsonArray tags = entry.value(QStringLiteral("tags")).toArray();
-  return std::ranges::any_of(tags, [&](const QJsonValue& t) { return t.toString() == tag; });
+  return std::ranges::any_of(tags, [&](const QJsonValue t) { return t.toString() == tag; });
 }
 
 }  // namespace
@@ -59,7 +59,7 @@ bool SampleStreams::load(const QString& manifest_path) {
   if (file.open(QIODevice::ReadOnly)) {
     const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
     std::vector<QJsonObject> picked;
-    for (const QJsonValue& v : doc.object().value(QStringLiteral("entries")).toArray()) {
+    for (const QJsonValue v : doc.object().value(QStringLiteral("entries")).toArray()) {
       const QJsonObject entry = v.toObject();
       if (entry.value(QStringLiteral("url")).toString().isEmpty() || !has_tag(entry, QStringLiteral("fast")) ||
           entry.value(QStringLiteral("size_bytes")).toDouble() <= 0) {
