@@ -157,17 +157,10 @@ ApplicationWindow {
         y: root.header.height + OvtStyle.spacing
     }
 
-    Rectangle {
+    // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
+    DockWorkspace {
         anchors.fill: parent
-        color: OvtStyle.window
-
-        Label {
-            anchors.centerIn: parent
-            text: Project.fileCount > 0 ? Project.files[0].name : "No file open"
-            color: OvtStyle.textMuted
-            objectName: "centerLabel"
-            Accessible.name: text
-        }
+        actions: actions
     }
 
     footer: ToolBar {

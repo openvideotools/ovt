@@ -37,6 +37,13 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/dialogs/KeymapDialog.qml"
       "${app_dir}/qml/dialogs/OpenAsDialog.qml"
       "${app_dir}/qml/dialogs/RawFormatDialog.qml")
+  # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
+  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
+    list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
+  endforeach()
+  if(NOT ANDROID)
+    list(APPEND qml_files "${app_dir}/qml/dock/DockFloatingWindow.qml")
+  endif()
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -84,12 +91,15 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/stream_index_adapter.cpp"
     "${app_dir}/src/models/stream_index_model.h"
     "${app_dir}/src/models/stream_index_model.cpp"
+    "${app_dir}/src/dock/dock_model.h"
+    "${app_dir}/src/dock/dock_model.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
     "${schema}"
     "${project_schema}")
   # src/platform too: the generated type registration includes the headers by file name.
-  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
+                                               "${app_dir}/src/dock")
   # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).

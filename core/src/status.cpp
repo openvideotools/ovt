@@ -13,7 +13,9 @@ OVT_API void ovt_buffer_free(ovt_Buffer* buf) {
   if (buf == nullptr) {
     return;
   }
-  // No API function hands out a caller-owned buffer yet; once one does, its allocator is released here.
+  // Caller-owned buffers (§12.3.1 rule 3a) are allocated with new[] by the API that hands them out
+  // (core/src/api/*.cpp) and released here; a zeroed buffer is a no-op.
+  delete[] buf->data;  // NOLINT(cppcoreguidelines-owning-memory): the one release point of rule 3a
   buf->data = nullptr;
   buf->size = 0;
 }

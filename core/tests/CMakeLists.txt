@@ -57,6 +57,8 @@ ovt_catch_discover_tests(ovt_tests_result)
 add_subdirectory(io)
 add_subdirectory(analysis)
 add_subdirectory(bitreader)
+add_subdirectory(cache)
+add_subdirectory(container)
 add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(golden) # WI-0.093: hand-built FrameAnalysis fixtures and their generator
 add_subdirectory(jobs)
@@ -74,6 +76,45 @@ if(TARGET tp::dav1d)
   target_link_libraries(ovt_tests_dav1d_probe PRIVATE tp::dav1d ovt::flags ${Catch2_TARGET})
   ovt_set_license(ovt_tests_dav1d_probe "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_tests_dav1d_probe)
+endif()
+
+# WI-0.013: tp::aom (bundled libaom with CONFIG_INSPECTION) is the pinned version and accepts the inspection
+# callback. aom_inspection_check is acceptance test 2: the OVT_SYSTEM_LIBAOM configure check rejects a libaom
+# without inspection (fake_libaom) and accepts the bundled one. Both need the bundled build, so they are not
+# registered with OVT_SYSTEM_LIBAOM=ON; the configure check cannot run a probe in a cross build.
+#
+# WI-2.154: test_aom_inspection_smoke.cpp is the inspection-callback smoke program (acceptance test 1): one callback
+# per frame of av1-1-b8-01-size-16x16, read through av1/decoder/inspection.h from LIBAOM_SOURCE_DIR
+# (tp::aom_inspection). Acceptance test 2 (a broken patch fails the build naming it) is
+# tools/tests/test_libaom_patches.py.
+if(TARGET tp::aom AND TARGET tp_libaom)
+  add_executable(ovt_tests_aom_probe test_aom_probe.cpp test_aom_inspection_smoke.cpp)
+  target_link_libraries(ovt_tests_aom_probe PRIVATE tp::aom_inspection ovt_test_support ovt::flags ${Catch2_TARGET})
+  target_compile_definitions(ovt_tests_aom_probe PRIVATE "OVT_AOM_PINNED_VERSION=\"${OVT_TP_libaom_VERSION}\"")
+  ovt_set_license(ovt_tests_aom_probe "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(ovt_tests_aom_probe)
+
+  if(NOT CMAKE_CROSSCOMPILING)
+    add_library(ovt_test_fake_aom STATIC aom_inspection_check/fake_libaom.c)
+    target_link_libraries(ovt_test_fake_aom PRIVATE tp::aom ovt::flags)
+    ovt_set_license(ovt_test_fake_aom "LGPL-2.1-or-later")
+    get_target_property(_ovt_aom_include tp::aom INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(_ovt_aom_library tp::aom IMPORTED_LOCATION)
+    add_test(
+      NAME aom_inspection_check
+      COMMAND
+        "${CMAKE_COMMAND}" -D "OVT_CMAKE_DIR=${PROJECT_SOURCE_DIR}/cmake" -D
+        "CHECK_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/aom_inspection_check" -D
+        "WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/aom_inspection_check" -D "GENERATOR=${CMAKE_GENERATOR}" -D
+        "C_COMPILER=${CMAKE_C_COMPILER}" -D "C_FLAGS=${OVT_TP_SANITIZER_C_FLAGS}" -D
+        "LINK_FLAGS=${OVT_TP_SANITIZER_LINK_FLAGS}" -D "AOM_INCLUDE_DIR=${_ovt_aom_include}" -D
+        "FAKE_LIBRARY=$<TARGET_FILE:ovt_test_fake_aom>" -D "REAL_LIBRARY=${_ovt_aom_library}" -P
+        "${CMAKE_CURRENT_SOURCE_DIR}/aom_inspection_check/run_check.cmake")
+    # Two configures of a one-file C project: a few seconds, so it runs in the fast lane.
+    set_tests_properties(aom_inspection_check PROPERTIES LABELS "fast;third_party" TIMEOUT 300)
+    unset(_ovt_aom_include)
+    unset(_ovt_aom_library)
+  endif()
 endif()
 
 # WI-0.012: the two FFmpeg flavours (chapter 13 §13.3.3). One source, one executable per flavour: both define the
