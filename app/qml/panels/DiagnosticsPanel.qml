@@ -5,6 +5,7 @@
 // ref; filter by severity, module and text; double-click navigates) and the Log tab (level, module and text filters,
 // pause/follow, Save…). The tab badge counts errors. Both tabs show the models' filtered views; nothing is parsed here.
 
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -14,6 +15,8 @@ Item {
     id: panel
 
     objectName: "diagnosticsPanel"
+    // Set by the dock workspace when it creates the panel item (it passes {"panelId": id}).
+    property string panelId: "diagnostics"
     implicitHeight: 220
     Accessible.name: "Diagnostics"
 
@@ -157,6 +160,11 @@ Item {
                         text: LogSink.paused ? "Resume" : "Pause"
                         onClicked: LogSink.paused = !LogSink.paused
                     }
+                    Button {
+                        objectName: "saveLog"
+                        text: "Save…"
+                        onClicked: saveLogPopup.open()
+                    }
                 }
                 ListView {
                     id: logView
@@ -175,6 +183,68 @@ Item {
                         elide: Text.ElideRight
                         color: OvtStyle.text
                     }
+                }
+            }
+        }
+    }
+
+    // "Save…" writes the lines the Log filter shows (LogSink::save, format of ovt::log::format_line). A path field
+    // instead of a native file dialog keeps the panel free of QtQuick.Dialogs and testable offscreen.
+    Popup {
+        id: saveLogPopup
+
+        objectName: "saveLogPopup"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(480, parent.width - 2 * OvtStyle.spacing)
+        modal: true
+        padding: OvtStyle.spacing
+        onAboutToShow: {
+            if (savePath.text === "") {
+                const dir = StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString()
+                savePath.text = decodeURIComponent(dir.replace(/^file:\/\//, "")) + "/ovt-log.txt"
+            }
+            saveResult.text = ""
+        }
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: OvtStyle.spacing
+
+            Label {
+                text: "Save the log lines shown to"
+                color: OvtStyle.text
+            }
+            TextField {
+                id: savePath
+
+                objectName: "savePath"
+                Layout.fillWidth: true
+                Accessible.name: "Log file path"
+                onAccepted: saveConfirm.clicked()
+            }
+            Label {
+                id: saveResult
+
+                objectName: "saveResult"
+                visible: text !== ""
+                color: OvtStyle.textMuted
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+            }
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                Button {
+                    text: "Close"
+                    onClicked: saveLogPopup.close()
+                }
+                Button {
+                    id: saveConfirm
+
+                    objectName: "saveConfirm"
+                    text: "Save"
+                    enabled: savePath.text !== ""
+                    onClicked: saveResult.text = LogSink.save(savePath.text) ? "Saved " + savePath.text : "Could not write " + savePath.text
                 }
             }
         }
