@@ -14,8 +14,8 @@
 namespace ovt::container {
 namespace {
 
-constexpr size_t kWindowBytes = 64U * 1024U;
-constexpr uint64_t kDetectWindow = 64U * 1024U;
+constexpr size_t kWindowBytes = size_t{64} * 1024;
+constexpr uint64_t kDetectWindow = uint64_t{64} * 1024;
 
 // Random access over a file or a span, with a small read cache for the walkers.
 class Source {
@@ -73,7 +73,7 @@ class Window {
     if (offset < base_ || offset >= base_ + len_) {
       return {};
     }
-    return {buf_.data() + (offset - base_), std::min<size_t>(len, len_ - (offset - base_))};
+    return std::span<const uint8_t>(buf_).subspan(offset - base_, std::min<size_t>(len, len_ - (offset - base_)));
   }
 
  private:
@@ -145,65 +145,80 @@ Section5Attempt attempt_section5(std::span<const uint8_t> d, uint64_t file_size)
   return r;
 }
 
+// Outcome of reading one field inside the detection window.
+enum class Probe : uint8_t { Ok, WindowEnd, Reject };
+
+Probe probe_leb(std::span<const uint8_t> d, uint64_t pos, Leb128& out) {
+  if (pos >= d.size()) {
+    return Probe::WindowEnd;
+  }
+  out = read_leb128(d.subspan(pos));
+  if (out.status == LebStatus::TooLong) {
+    return Probe::Reject;
+  }
+  return out.status == LebStatus::Ok ? Probe::Ok : Probe::WindowEnd;
+}
+
+// The OBU header at `obody` inside an Annex B obu_length of `obu_length` bytes.
+Probe probe_annexb_obu(std::span<const uint8_t> d, uint64_t obody, uint64_t obu_length, bool first_unit) {
+  if (obody >= d.size()) {
+    return Probe::WindowEnd;
+  }
+  const ObuHeader h = parse_obu_header(d.subspan(obody, std::min<size_t>(2, d.size() - obody)));
+  if (!h.valid || (first_unit && h.obu_type != kObuSequenceHeader && h.obu_type != kObuTemporalDelimiter)) {
+    return Probe::Reject;
+  }
+  if (h.has_size_field && obody + h.header_bytes < d.size()) {
+    const Leb128 sz = read_leb128(d.subspan(obody + h.header_bytes));
+    if (sz.status == LebStatus::Ok && h.header_bytes + sz.bytes + sz.value != obu_length) {
+      return Probe::Reject;
+    }
+  }
+  return Probe::Ok;
+}
+
+// One temporal unit of the Annex B attempt starting at `pos`; `next` is set to the start of the following one.
+Probe probe_annexb_unit(std::span<const uint8_t> d, uint64_t pos, uint64_t file_size, bool first_unit, uint64_t& next) {
+  Leb128 tus;
+  Leb128 fus;
+  Leb128 ol;
+  Probe p = probe_leb(d, pos, tus);
+  if (p != Probe::Ok) {
+    return p;
+  }
+  const uint64_t body = pos + tus.bytes;
+  if (tus.value < 1 || body > file_size || tus.value > file_size - body) {
+    return Probe::Reject;
+  }
+  p = probe_leb(d, body, fus);
+  if (p != Probe::Ok) {
+    return p;
+  }
+  if (fus.value < 1 || fus.value > tus.value) {
+    return Probe::Reject;
+  }
+  const uint64_t fbody = body + fus.bytes;
+  p = probe_leb(d, fbody, ol);
+  if (p != Probe::Ok) {
+    return p;
+  }
+  if (ol.value < 1 || ol.value > fus.value) {
+    return Probe::Reject;
+  }
+  p = probe_annexb_obu(d, fbody + ol.bytes, ol.value, first_unit);
+  next = body + tus.value;
+  return p;
+}
+
 // temporal_unit_size / frame_unit_size / obu_length nesting, then the OBU header; the second temporal unit is
-// checked when it lies inside the window.
+// checked when it lies inside the window. Running out of the window after a unit that passed is a pass.
 bool attempt_annexb(std::span<const uint8_t> d, uint64_t file_size) {
   uint64_t pos = 0;
   for (int units = 0; units < 2 && pos < d.size(); ++units) {
-    const auto stop = [&] { return units > 0; };  // ran out of window after a unit that passed
-    const Leb128 tus = read_leb128(d.subspan(pos));
-    if (tus.status == LebStatus::TooLong) {
-      return false;
+    const Probe p = probe_annexb_unit(d, pos, file_size, units == 0, pos);
+    if (p != Probe::Ok) {
+      return p == Probe::WindowEnd && units > 0;
     }
-    if (tus.status == LebStatus::Truncated) {
-      return stop();
-    }
-    const uint64_t body = pos + tus.bytes;
-    if (tus.value < 1 || body > file_size || tus.value > file_size - body) {
-      return false;
-    }
-    if (body >= d.size()) {
-      return stop();
-    }
-    const Leb128 fus = read_leb128(d.subspan(body));
-    if (fus.status == LebStatus::TooLong) {
-      return false;
-    }
-    if (fus.status == LebStatus::Truncated) {
-      return stop();
-    }
-    if (fus.value < 1 || fus.value > tus.value) {
-      return false;
-    }
-    const uint64_t fbody = body + fus.bytes;
-    if (fbody >= d.size()) {
-      return stop();
-    }
-    const Leb128 ol = read_leb128(d.subspan(fbody));
-    if (ol.status == LebStatus::TooLong) {
-      return false;
-    }
-    if (ol.status == LebStatus::Truncated) {
-      return stop();
-    }
-    if (ol.value < 1 || ol.value > fus.value) {
-      return false;
-    }
-    const uint64_t obody = fbody + ol.bytes;
-    if (obody >= d.size()) {
-      return stop();
-    }
-    const ObuHeader h = parse_obu_header(d.subspan(obody, std::min<size_t>(2, d.size() - obody)));
-    if (!h.valid || (units == 0 && h.obu_type != kObuSequenceHeader && h.obu_type != kObuTemporalDelimiter)) {
-      return false;
-    }
-    if (h.has_size_field && obody + h.header_bytes < d.size()) {
-      const Leb128 sz = read_leb128(d.subspan(obody + h.header_bytes));
-      if (sz.status == LebStatus::Ok && h.header_bytes + sz.bytes + sz.value != ol.value) {
-        return false;
-      }
-    }
-    pos = body + tus.value;
   }
   return pos > 0;
 }
