@@ -10,13 +10,16 @@
 // and WITHOUT a size prefix. The cache adds the 4-byte prefix when it stores a record and strips it when it
 // reads one back, so put/get round trips are byte-identical.
 //
-// Invalidation (§6.7.3 I1–I7) and size-cap eviction (§6.7.4) are WI-0.092: this class reports a malformed
-// file as CacheError(OVT_E_CORRUPT) and never deletes an entry on its own.
+// Invalidation (§6.7.3 I1–I7) is WI-0.092 part a; size-cap eviction (§6.7.4) follows in part b. Cache::entry() is the
+// raw access of `ovt cache import` and the C object API: it reports a malformed file as CacheError(OVT_E_CORRUPT) and
+// deletes nothing. Cache::open_entry() is the access of stream analysis: it applies I1–I4 to the directory
+// and switches the entry to invalidating reads (I5, I6), which delete a bad file and report a miss.
 
 #ifndef OVT_CXX_CACHE_CACHE_HPP
 #define OVT_CXX_CACHE_CACHE_HPP
 
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -74,6 +77,35 @@ void set_default_root(std::optional<std::filesystem::path> root);
 /// Throws CacheError(OVT_E_IO) when nothing yields a directory (HOME unset, or Android without a root).
 [[nodiscard]] std::filesystem::path default_root();
 
+/// The rule of §6.7.3 that rejected cached data, or None. Each rule is one check function (WI-0.092 step 1);
+/// a rejection is logged at info level with to_string() of its reason.
+enum class InvalidationReason : std::uint8_t {
+  None = 0,
+  ForeignSourceHash,  ///< I1: meta.source_hash differs from the directory name
+  CacheFormat,        ///< I2: meta.json is missing, unreadable or its cache_format is not 1
+  SchemaMajor,        ///< I3: a schemas.*.major differs from the compiled-in major
+  Index,              ///< I4: index.fb does not verify, has another schema_version, or its codec differs
+  Frame,              ///< I5: a frame file does not decompress or verify, names another decode_index or plugin
+  Plane,              ///< I6: a plane file has no matching PlaneRef or the wrong size
+  OvtVersion,         ///< I7: meta.ovt_version differs from the running version (informational, no action)
+};
+
+/// "I1 source hash", "I2 cache format", ... ("none" for None).
+[[nodiscard]] std::string_view to_string(InvalidationReason reason) noexcept;
+
+/// The analysis plugin a stream session selected (§6.7.3 I5): a cached FrameAnalysis written by another
+/// plugin id or version is discarded on read.
+struct SelectedPlugin {
+  std::string plugin_id;
+  std::string plugin_version;
+  friend bool operator==(const SelectedPlugin&, const SelectedPlugin&) = default;
+};
+
+/// The clock of last_used: system_clock::now(), unless a test fixed it.
+[[nodiscard]] std::chrono::system_clock::time_point now();
+/// Test hook: fixes now() (std::nullopt restores the system clock). Process-wide.
+void set_now_for_testing(std::optional<std::chrono::system_clock::time_point> when);
+
 /// A plane read back from the cache: the bytes and a view onto them (tight stride, §6.7.1 planes/ layout).
 struct PlaneData {
   std::vector<std::uint8_t> bytes;
@@ -121,6 +153,8 @@ class Entry {
   void put_frame(std::uint32_t decode_index, std::span<const std::uint8_t> frame_analysis);
   /// The stored FrameAnalysis, or std::nullopt when absent; CacheError(OVT_E_CORRUPT) when the file does not
   /// decompress or verify, or names another decode_index.
+  /// On an entry from Cache::open_entry() a file that fails I5 (including a plugin other than the selected
+  /// one) is deleted instead, and the result is std::nullopt (a miss); other frames are untouched.
   [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_frame(std::uint32_t decode_index) const;
 
   /// planes/<decode_index>/<stage>-<plane>.pl.zst (zstd level 1): exactly height rows of width * sample_bytes
@@ -129,6 +163,8 @@ class Entry {
   /// The stored plane with the geometry of the frame's PlaneRef (§6.7.1: dimensions come from the frame's
   /// FrameAnalysis). std::nullopt when the plane file, the frame or a matching PlaneRef is absent;
   /// CacheError(OVT_E_CORRUPT) when the decompressed size differs from height * width * sample_bytes (I6).
+  /// On an entry from Cache::open_entry() a plane file without a matching PlaneRef or of the wrong size is
+  /// deleted instead (I6), and the result is std::nullopt.
   [[nodiscard]] std::optional<PlaneData> get_plane(std::uint32_t decode_index, fb::PlaneStage stage,
                                                    std::uint8_t plane) const;
 
@@ -138,6 +174,10 @@ class Entry {
   // ovt_cache_put_report of §12.3.14 cannot address; reports/<kind> is the file this call writes.
   void put_report(std::string_view kind, std::span<const std::uint8_t> fb);
   [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_report(std::string_view kind) const;
+
+  /// Whether reads apply I5/I6 (set by Cache::open_entry()), and the plugin they compare against.
+  [[nodiscard]] bool invalidating() const;
+  [[nodiscard]] std::optional<SelectedPlugin> selected_plugin() const;
 
   /// Writes meta.json atomically when it changed (write meta.json.tmp, fsync, rename; §6.7.2). Called by the
   /// destructor and by Cache::flush().
@@ -172,11 +212,21 @@ class Cache {
   [[nodiscard]] const Options& options() const noexcept;
   /// `size_cap_bytes` as cache.json records it.
   [[nodiscard]] std::uint64_t max_bytes() const noexcept;
-
   /// The entry of @p hash, creating its directory and meta.json when absent (read-only: CacheError(OVT_E_IO)
   /// when absent). Stale *.tmp files under the directory are removed (crash recovery, §6.7.2).
   /// CacheError(OVT_E_CORRUPT) when meta.json exists but does not parse.
   [[nodiscard]] std::shared_ptr<Entry> entry(const SourceHash& hash);
+
+  /// The entry of @p hash for a stream session (§6.7.3): when the directory exists and is not open, I1–I4 are
+  /// checked and a failing directory is deleted and recreated (I7 is only logged); then the entry reads with
+  /// I5/I6 against @p plugin (std::nullopt: no plugin check). @p codec is the stream's codec: an index.fb of
+  /// another codec fails I4. On a read-only cache a failing entry throws CacheError(OVT_E_CORRUPT).
+  /// @p reason, when given, receives the rule that rejected the old directory (None when it was kept or new).
+  // SPEC-ASSUMPTION(#295): open_entry applies I1–I7 and invalidating reads; entry() and the C object API stay
+  // raw; plugin_caps is the selected plugin's id and version, codec the stream's codec (I4).
+  [[nodiscard]] std::shared_ptr<Entry> open_entry(const SourceHash& hash, fb::Codec codec,
+                                                  std::optional<SelectedPlugin> plugin,
+                                                  InvalidationReason* reason = nullptr);
 
   /// Source hashes of every entry directory listed in cache.json, sorted.
   [[nodiscard]] std::vector<SourceHash> entries() const;
@@ -188,6 +238,8 @@ class Cache {
 
  private:
   explicit Cache(std::shared_ptr<Impl> impl);
+  /// entry() with Impl::open_mu held.
+  [[nodiscard]] std::shared_ptr<Entry> entry_locked(const SourceHash& hash);
   std::shared_ptr<Impl> impl_;
 };
 
