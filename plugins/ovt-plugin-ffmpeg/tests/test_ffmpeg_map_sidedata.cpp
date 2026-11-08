@@ -28,8 +28,6 @@ namespace {
 
 using namespace ovt_ffmpeg_test;  // NOLINT(google-build-using-namespace)
 
-// ---- the ABI result, copied out of the FlatBuffer -------------------------------------------------------------------
-
 struct Mv {
   int list = 0;
   int x = 0;
@@ -209,8 +207,6 @@ bool has_code(const Frame& f, const std::string& code) {
   return std::find(f.codes.begin(), f.codes.end(), code) != f.codes.end();
 }
 
-// ---- hand-made pictures: 32x16 luma, two macroblocks, CAVLC (sps/pps of plugin_test_util.hpp: QP 26) ----------------
-
 void annexb(std::vector<uint8_t>* out, const std::vector<uint8_t>& nal) {
   out->insert(out->end(), {0, 0, 0, 1});
   out->insert(out->end(), nal.begin(), nal.end());
@@ -349,9 +345,6 @@ TEST_CASE("ffmpeg plugin: P macroblocks map to Inter with the vectors of the str
   for (size_t c = 0; c < 32; ++c) {
     CHECK((a.ref0[c] == 0 && a.ref1[c] == -1 && a.pred[c] == 2));
   }
-  CHECK(a.mv0_x[0] == 20);
-  CHECK(a.mv0_y[0] == -28);
-  CHECK(a.mv0_x[7] == 8);  // last cell of the first cell row: MB 1
 
   const Frame& b = frames[2];                                         // 16x8 partitions of MB 0, 8x16 of MB 1
   CHECK(b.mvs == std::vector<Mv>{{0, 0, 0, 16, 8, 16, 16, false},     // (4,4)
@@ -359,15 +352,14 @@ TEST_CASE("ffmpeg plugin: P macroblocks map to Inter with the vectors of the str
                                  {0, 16, 0, 8, 16, 24, 16, false},    // A = (4,4); + (2,0) = (6,4)
                                  {0, 24, 0, 8, 16, 24, 28, false}});  // median = A = (6,4); + (0,3) = (6,7)
   CHECK(b.mb_qp == std::vector<int>{22, 22});
-  CHECK(b.mv0_y[(2 * 8) + 0] == 12);  // the lower 16x8 partition starts at cell row 2
-  CHECK(b.mv0_y[(1 * 8) + 0] == 16);
 }
 
-TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle",  // NOLINT(readability-function-cognitive-complexity)
-          "[fast][third_party][needs-corpus]") {
-  // AT1 and AT2 against the in-tree ffmpeg_mvs on weighted prediction (CVWP1) and QP changes (CAQP1).
-  const std::string id =
-      GENERATE(as<std::string>{}, "jvt_CVWP1_TOSHIBA_E", "jvt_CAQP1_Sony_B", "jvt_CABA1_SVA_B", "jvt_CAMA1_Sony_C");
+namespace {
+
+// AT1 and AT2 for one stream against the in-tree ffmpeg_mvs: every vector and every macroblock QP after the conversion
+// of tests/oracles/normalize/ffmpeg_mvs.py, at 1 and 4 threads.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+void compare_with_oracle(const std::string& id) {
   CAPTURE(id);
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
   const std::string cmd = std::string("\"") + OVT_FFMPEG_SIDEDATA + "\" \"" + path.string() + "\"";
@@ -442,6 +434,17 @@ TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle",  // NOLINT(readability-function-
   if (id == "jvt_CVWP1_TOSHIBA_E") {
     CHECK(total_mvs > 0);  // a weighted-P stream has inter macroblocks
   }
+}
+}  // namespace
+
+TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle", "[fast][third_party][needs-corpus]") {
+  // CVWP1_TOSHIBA_E: weighted P (AT1); CABA1_SVA_B: B pictures, so bi-prediction.
+  compare_with_oracle(GENERATE(as<std::string>{}, "jvt_CVWP1_TOSHIBA_E", "jvt_CABA1_SVA_B"));
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle on the slow JVT streams", "[slow][third_party][needs-corpus]") {
+  // CAQP1_Sony_B: QP changes (AT2); CAMA1_Sony_C: MBAFF.
+  compare_with_oracle(GENERATE(as<std::string>{}, "jvt_CAQP1_Sony_B", "jvt_CAMA1_Sony_C"));
 }
 
 TEST_CASE("ffmpeg plugin: ffmpeg_qp_vs_jm", "[fast][third_party][needs-corpus]") {

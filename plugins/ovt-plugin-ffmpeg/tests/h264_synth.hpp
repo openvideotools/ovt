@@ -1,8 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Hand-made H.264 units for the tests of ovt-plugin-ffmpeg (no host dependency): a bit writer, a 32x16 Constrained
-// Baseline SPS / PPS.
+// Hand-made H.264 units for the plugin tests (no host dependency): a bit writer and a 32x16 Baseline SPS / PPS.
 #ifndef OVT_PLUGIN_FFMPEG_TESTS_H264_SYNTH_HPP
 #define OVT_PLUGIN_FFMPEG_TESTS_H264_SYNTH_HPP
 

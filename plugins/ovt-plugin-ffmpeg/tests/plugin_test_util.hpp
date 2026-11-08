@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Helpers shared by the tests that drive ovt-plugin-ffmpeg through the host's PluginRegistry (WI-2.169, WI-2.170):
-// the loaded plugin, one decoder instance, FlatBuffer access and a bit writer for hand-made H.264 units.
+// Helpers for tests that drive ovt-plugin-ffmpeg through the host's PluginRegistry: the loaded plugin, one decoder
+// instance, FlatBuffer access, Annex B splitting and a whole-stream driver.
 #ifndef OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_HPP
 #define OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_HPP
 

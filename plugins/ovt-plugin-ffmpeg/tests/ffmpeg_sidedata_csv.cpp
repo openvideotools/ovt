@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // ovt_plugin_ffmpeg_sidedata <file.264>: the in-tree `ffmpeg_mvs` of chapter 14 §14.4.3a (WI-2.170 oracle, so CI
-// needs no oracle image). h264 parser + decoder with export_side_data = mvs + venc_params. Per output frame, in
-// output order, it prints one row per AVMotionVector,
-//   M <packet index> <source> <w> <h> <src_x> <src_y> <dst_x> <dst_y> <flags> <motion_x> <motion_y> <motion_scale>
-// and one per AVVideoBlockParams,
-//   Q <packet index> <src_x> <src_y> <w> <h> <qp> <delta_qp>
-// where the packet index (in pts) is the access unit that started the frame, as in ovt_plugin_ffmpeg_framemd5.
-// Rows are raw side-data fields: the conversion to OVT units is the test's job. Exit 0 on success, 1 on error.
+// needs no oracle image). h264 parser + decoder with export_side_data = mvs + venc_params. Per output frame, in output
+// order, it prints the raw side-data fields, keyed by the packet index (in pts) that started the frame:
+//   M <idx> <source> <w> <h> <src_x> <src_y> <dst_x> <dst_y> <flags> <motion_x> <motion_y> <motion_scale>
+//   Q <idx> <src_x> <src_y> <w> <h> <qp> <delta_qp>
+// The conversion to OVT units is the test's job. Exit 0 on success, 1 on error.
 
 extern "C" {
 #include <libavcodec/avcodec.h>

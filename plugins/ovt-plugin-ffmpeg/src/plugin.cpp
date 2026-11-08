@@ -6,8 +6,6 @@
 // point is noexcept and turns an exception into an error status. It produces FrameAnalysis buffers with FrameInfo,
 // the Reconstruction planes and, from AV_FRAME_DATA_MOTION_VECTORS and AV_FRAME_DATA_VIDEO_ENC_PARAMS (WI-2.170,
 // map_h264_sidedata.cpp), the macroblock tree, the cell grid, the motion vectors and the pseudo references L0 / L1.
-// push() reports on the access unit BEFORE the pushed unit: OVT_E_CORRUPT means that earlier access unit failed to
-// decode, the unit just pushed was accepted and must not be pushed again.
 
 #include <flatbuffers/flatbuffers.h>
 
