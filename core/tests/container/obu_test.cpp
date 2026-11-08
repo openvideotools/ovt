@@ -22,7 +22,7 @@ using Bytes = std::vector<uint8_t>;
 // One OBU in Section 5 form (obu_has_size_field = 1 unless `sized` is false).
 Bytes obu(uint8_t type, const Bytes& payload, bool sized = true, bool ext = false) {
   Bytes b;
-  b.push_back(static_cast<uint8_t>((type << 3U) | (ext ? 4U : 0U) | (sized ? 2U : 0U)));
+  b.push_back(static_cast<uint8_t>((static_cast<unsigned>(type) << 3U) | (ext ? 4U : 0U) | (sized ? 2U : 0U)));
   if (ext) {
     b.push_back(0x28);  // temporal_id 1, spatial_id 1
   }
