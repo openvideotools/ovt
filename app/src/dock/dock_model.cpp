@@ -51,6 +51,7 @@ constexpr std::array kAreaOrder{DockArea::Left, DockArea::Center, DockArea::Righ
                                 DockArea::Floating};
 
 constexpr qreal kMinAreaSize = 0.05;
+constexpr qreal kFractionStep = 0.0001;  // the serialised resolution of sizeFraction
 constexpr qreal kMaxAreaSize = 0.9;
 
 DockGroup group(DockArea area, QStringList panels, qreal fraction) {
@@ -132,6 +133,20 @@ void showArea(Layout& layout, DockArea area) {
     case DockArea::Floating:
       break;
   }
+}
+
+// Appends the panel as the current tab of the first group of its home area, or as a new group there.
+void addToHome(Layout& layout, const PanelInfo& info) {
+  const QString id = QString::fromLatin1(info.id);
+  const QList<int> members = groupsIn(layout, info.home);
+  if (members.isEmpty()) {
+    layout.groups.append(group(info.home, {id}, 1.0));
+  } else {
+    DockGroup& target = layout.groups[members.front()];
+    target.panelIds.append(id);
+    target.currentIndex = static_cast<int>(target.panelIds.size()) - 1;
+  }
+  showArea(layout, info.home);
 }
 
 // Accepts `next` only if it is valid after normalising.
@@ -248,13 +263,22 @@ void normalise(Layout& layout) {
       positive = positive && std::isfinite(f) && f > 0;
       sum += f;
     }
+    // Already normalised up to the 4-decimal rounding: only round, so that normalise() is idempotent.
+    const auto n = static_cast<qreal>(members.size());
+    const bool normalised = positive && std::abs(sum - 1.0) <= kFractionStep * n;
     for (const int i : members) {
       DockGroup& g = layout.groups[i];
       g.currentIndex = std::clamp(g.currentIndex, 0, static_cast<int>(g.panelIds.size()) - 1);
       // Floating groups are alone in their window.
       const bool alone = area == DockArea::Floating || area == DockArea::Center;
-      g.sizeFraction =
-          alone ? 1.0 : round4(positive && sum > 0 ? g.sizeFraction / sum : 1.0 / static_cast<qreal>(members.size()));
+      qreal f = 1.0 / n;
+      if (normalised) {
+        f = g.sizeFraction;
+      } else if (positive && sum > 0) {
+        f = g.sizeFraction / sum;
+      }
+      // Never round a share down to 0, which the next pass would treat as invalid.
+      g.sizeFraction = alone ? 1.0 : std::clamp(round4(f), kFractionStep, 1.0);
     }
   }
   const auto clampSize = [](qreal size) {
@@ -390,6 +414,10 @@ std::optional<Layout> fromJsonObject(const QJsonObject& object, QString* error) 
     }
     layout.groups.append(group);
   }
+  // A layout saved on the desktop opens on Android with its floating panels docked again.
+  if (!floatingSupported()) {
+    foldFloating(layout);
+  }
   normalise(layout);
   QString reason;
   if (!validate(layout, &reason)) {
@@ -490,16 +518,25 @@ bool openPanel(Layout& layout, const QString& panelId) {
     return setCurrentPanel(layout, panelId);
   }
   Layout next = layout;
-  const QList<int> members = groupsIn(next, info->home);
-  if (members.isEmpty()) {
-    next.groups.append(group(info->home, {panelId}, 1.0));
-  } else {
-    DockGroup& target = next.groups[members.front()];
-    target.panelIds.append(panelId);
-    target.currentIndex = static_cast<int>(target.panelIds.size()) - 1;
-  }
-  showArea(next, info->home);
+  addToHome(next, *info);
   return accept(layout, std::move(next));
+}
+
+void foldFloating(Layout& layout) {
+  QStringList floating;
+  for (const DockGroup& g : std::as_const(layout.groups)) {
+    if (g.area == DockArea::Floating) {
+      floating.append(g.panelIds);
+    }
+  }
+  layout.groups.erase(std::remove_if(layout.groups.begin(), layout.groups.end(),
+                                     [](const DockGroup& g) { return g.area == DockArea::Floating; }),
+                      layout.groups.end());
+  for (const QString& id : std::as_const(floating)) {
+    if (const PanelInfo* info = findPanel(id); info != nullptr && groupOf(layout, id) < 0) {
+      addToHome(layout, *info);
+    }
+  }
 }
 
 bool setCurrentPanel(Layout& layout, const QString& panelId) {

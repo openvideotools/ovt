@@ -37,7 +37,7 @@ int groupsIn(const Layout& layout, DockArea area) {
 
 }  // namespace
 
-TEST_CASE("Every preset is valid and round-trips byte-identically", "[dock]") {
+TEST_CASE("Every preset is valid and round-trips byte-identically", "[fast][gui][dock]") {
   for (const QString& name : dock::presetNames()) {
     INFO(name.toStdString());
     const Layout layout = dock::preset(name).value_or(Layout{});
@@ -55,7 +55,8 @@ TEST_CASE("Every preset is valid and round-trips byte-identically", "[dock]") {
   CHECK_FALSE(dock::preset(u"Nonexistent"));
 }
 
-TEST_CASE("AT1: Analyze serialised and restored gives identical JSON and equal groups", "[dock][acceptance]") {
+TEST_CASE("AT1: Analyze serialised and restored gives identical JSON and equal groups",
+          "[fast][gui][dock][acceptance]") {
   const Layout layout = analyze();
   const QByteArray json = dock::toJson(layout);
   const Layout restored = dock::fromJson(json, nullptr).value_or(Layout{});
@@ -66,7 +67,8 @@ TEST_CASE("AT1: Analyze serialised and restored gives identical JSON and equal g
   CHECK(json.startsWith("{\"preset\":\"Analyze\","));
 }
 
-TEST_CASE("AT2: a tab dropped on the right edge makes a new Right group with that panel", "[dock][acceptance]") {
+TEST_CASE("AT2: a tab dropped on the right edge makes a new Right group with that panel",
+          "[fast][gui][dock][acceptance]") {
   Layout layout = analyze();
   const int before = groupsIn(layout, DockArea::Right);
   REQUIRE(dock::movePanelToNewGroup(layout, QStringLiteral("hex"), DockArea::Right, -1));
@@ -80,7 +82,7 @@ TEST_CASE("AT2: a tab dropped on the right edge makes a new Right group with tha
   CHECK(dock::validate(layout, nullptr));
 }
 
-TEST_CASE("Moving tabs between groups", "[dock]") {
+TEST_CASE("Moving tabs between groups", "[fast][gui][dock]") {
   Layout layout = analyze();
   const int syntax = dock::groupOf(layout, u"syntax");
   REQUIRE(dock::movePanelToGroup(layout, QStringLiteral("units"), syntax, 0));
@@ -98,7 +100,7 @@ TEST_CASE("Moving tabs between groups", "[dock]") {
   CHECK(layout.groups[target].panelIds == QStringList{QStringLiteral("syntax"), QStringLiteral("units")});
 }
 
-TEST_CASE("The Picture never leaves Center and Center keeps one group", "[dock]") {
+TEST_CASE("The Picture never leaves Center and Center keeps one group", "[fast][gui][dock]") {
   Layout layout = analyze();
   const Layout before = layout;
   const int right = dock::groupOf(layout, u"syntax");
@@ -113,7 +115,7 @@ TEST_CASE("The Picture never leaves Center and Center keeps one group", "[dock]"
   CHECK(layout.groups[dock::groupOf(layout, u"hex")].area == DockArea::Center);
 }
 
-TEST_CASE("Close and re-open panels from the View menu", "[dock]") {
+TEST_CASE("Close and re-open panels from the View menu", "[fast][gui][dock]") {
   Layout layout = analyze();
   REQUIRE(dock::closePanel(layout, QStringLiteral("hex")));
   CHECK(dock::groupOf(layout, u"hex") < 0);
@@ -133,13 +135,13 @@ TEST_CASE("Close and re-open panels from the View menu", "[dock]") {
   CHECK(syntax.leftVisible);
 }
 
-TEST_CASE("Tab order for Ctrl+Shift+[1-9]", "[dock]") {
+TEST_CASE("Tab order for Ctrl+Shift+[1-9]", "[fast][gui][dock]") {
   const QStringList order = dock::tabOrder(analyze());
   CHECK(order ==
         QStringList{"container", "units", "picture", "syntax", "selection_info", "block_samples", "timeline", "hex"});
 }
 
-TEST_CASE("Floating groups exist only on the desktop", "[dock]") {
+TEST_CASE("Floating groups exist only on the desktop", "[fast][gui][dock]") {
   Layout layout = analyze();
   const bool floated = dock::movePanelToNewGroup(layout, QStringLiteral("hex"), DockArea::Floating, -1);
   CHECK(floated == dock::floatingSupported());
@@ -150,7 +152,7 @@ TEST_CASE("Floating groups exist only on the desktop", "[dock]") {
   }
 }
 
-TEST_CASE("Invalid JSON is rejected with a reason; unknown panels are dropped", "[dock]") {
+TEST_CASE("Invalid JSON is rejected with a reason; unknown panels are dropped", "[fast][gui][dock]") {
   QString error;
   CHECK_FALSE(dock::fromJson("not json", &error));
   CHECK_FALSE(error.isEmpty());
@@ -179,7 +181,7 @@ TEST_CASE("Invalid JSON is rejected with a reason; unknown panels are dropped", 
   CHECK(layout.leftSize == 0.9);  // clamped
 }
 
-TEST_CASE("DockModel persists the layout to layouts.json, debounced", "[dock]") {
+TEST_CASE("DockModel persists the layout to layouts.json, debounced", "[fast][gui][dock]") {
   ovt::app::testing::qt_app();
   const QTemporaryDir dir;
   REQUIRE(dir.isValid());
@@ -222,7 +224,7 @@ TEST_CASE("DockModel persists the layout to layouts.json, debounced", "[dock]") 
   CHECK_FALSE(restored.restoreJson(QStringLiteral("{}")));
 }
 
-TEST_CASE("DockModel falls back to Analyze for a corrupt layouts.json", "[dock]") {
+TEST_CASE("DockModel falls back to Analyze for a corrupt layouts.json", "[fast][gui][dock]") {
   const QTemporaryDir dir;
   const QString path = dir.filePath(QStringLiteral("layouts.json"));
   QFile file(path);
@@ -235,7 +237,7 @@ TEST_CASE("DockModel falls back to Analyze for a corrupt layouts.json", "[dock]"
   CHECK(model.allPanels().size() == 17);
 }
 
-TEST_CASE("DockModel helpers for QML: areas, cycleTab, resetSizes", "[dock]") {
+TEST_CASE("DockModel helpers for QML: areas, cycleTab, resetSizes", "[fast][gui][dock]") {
   DockModel model(QString(), nullptr);  // in memory only
   const QVariantMap areas = model.areas();
   CHECK(areas.value(QStringLiteral("right")).toList().size() == 3);
@@ -256,4 +258,52 @@ TEST_CASE("DockModel helpers for QML: areas, cycleTab, resetSizes", "[dock]") {
   CHECK(model.rightSize() == 0.24);
   CHECK(model.groups(QStringLiteral("right"))[0].toMap()[QStringLiteral("sizeFraction")].toDouble() == 0.3333);
   CHECK(model.save());  // no path: nothing to write
+}
+
+TEST_CASE("normalise() is idempotent", "[fast][gui][dock]") {
+  // Shares that do not divide evenly into 4 decimals, a tiny share and an unnormalised area.
+  Layout layout = analyze();
+  for (const QString& id : {QStringLiteral("hdr"), QStringLiteral("metrics"), QStringLiteral("statistics")}) {
+    REQUIRE(dock::openPanel(layout, id));
+    REQUIRE(dock::movePanelToNewGroup(layout, id, DockArea::Right, -1));
+  }
+  const QList<qreal> sizes{0.7, 0.00001, 1.0 / 3.0, 2.0 / 7.0, 0.123456, 5.0};
+  int k = 0;
+  for (DockGroup& g : layout.groups) {
+    if (g.area == DockArea::Right) {
+      g.sizeFraction = sizes.value(k++, 1.0);
+    }
+  }
+  dock::normalise(layout);
+  const Layout once = layout;
+  dock::normalise(layout);
+  CHECK(layout == once);
+  CHECK(dock::validate(layout, nullptr));
+  for (const DockGroup& g : layout.groups) {
+    CHECK(g.sizeFraction > 0);
+  }
+  // And for every preset after a round trip.
+  for (const QString& name : dock::presetNames()) {
+    Layout preset = dock::fromJson(dock::toJson(dock::preset(name).value_or(Layout{})), nullptr).value_or(Layout{});
+    const Layout before = preset;
+    dock::normalise(preset);
+    CHECK(preset == before);
+  }
+}
+
+TEST_CASE("foldFloating docks floating panels in their home areas", "[fast][gui][dock]") {
+  Layout layout = analyze();
+  layout.groups.append(DockGroup{.area = DockArea::Floating,
+                                 .panelIds = {QStringLiteral("metrics"), QStringLiteral("hex")},
+                                 .currentIndex = 0,
+                                 .sizeFraction = 1.0});
+  layout.groups.removeIf([](const DockGroup& g) { return g.panelIds == QStringList{QStringLiteral("hex")}; });
+  dock::foldFloating(layout);
+  dock::normalise(layout);
+  CHECK(dock::validate(layout, nullptr));
+  for (const DockGroup& g : layout.groups) {
+    CHECK(g.area != DockArea::Floating);
+  }
+  CHECK(layout.groups[dock::groupOf(layout, u"metrics")].area == DockArea::Right);
+  CHECK(layout.groups[dock::groupOf(layout, u"hex")].area == DockArea::Bottom);
 }
