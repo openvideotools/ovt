@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -74,6 +75,16 @@ constexpr std::array<char, 4> kPlaneLetters = {'y', 'u', 'v', 'a'};
 
 std::string now_iso8601() {
   return format_iso8601_utc(now());
+}
+
+// The counters of lookup_counters().
+std::atomic<std::uint64_t> g_hits{0};    // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+std::atomic<std::uint64_t> g_misses{0};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+template <class T>
+std::optional<T> counted(std::optional<T> result) noexcept {
+  (result ? g_hits : g_misses).fetch_add(1, std::memory_order_relaxed);
+  return result;
 }
 
 // The clock override of set_now_for_testing().
@@ -236,6 +247,10 @@ PlaneData plane_data(const fb::PlaneRef& ref, fb::PlaneStage stage, std::uint8_t
 std::chrono::system_clock::time_point now() {
   const std::lock_guard<std::mutex> lock(clock_mutex());
   return clock_slot().value_or(std::chrono::system_clock::now());
+}
+
+LookupCounters lookup_counters() noexcept {
+  return {g_hits.load(std::memory_order_relaxed), g_misses.load(std::memory_order_relaxed)};
 }
 
 void set_now_for_testing(std::optional<std::chrono::system_clock::time_point> when) {
@@ -423,14 +438,16 @@ struct Cache::Impl {
     const std::lock_guard<std::mutex> open_lock(open_mu);
     const std::lock_guard<std::mutex> lock(mu);
     EvictionResult result = evict(root, records, open_set_locked(), size_cap_bytes);
-    if (!result.removed.empty() || !result.trimmed.empty()) {
-      dirty = true;
-    }
     if (result.all_open && !warned_all_open) {
       warned_all_open = true;
       OVT_LOG_CODE(log::Level::Warn, kModule, "MDL-CCH-0002", "disk cache cap exceeded: all entries are open");
     }
-    save_locked();
+    // Rewritten only when eviction changed a record: above the cap with every entry open, each write would
+    // otherwise rewrite cache.json; the byte account of writes is saved at flush (§6.7.4, incrementally).
+    if (!result.removed.empty() || !result.trimmed.empty()) {
+      dirty = true;
+      save_locked();
+    }
     return result;
   }
 
@@ -883,6 +900,10 @@ void Entry::put_index(std::span<const std::uint8_t> stream_index) {
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_index() const {
+  return counted(get_index_uncounted());
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_index_uncounted() const {
   const std::lock_guard<std::mutex> lock(impl_->mu);
   impl_->touch_locked();
   if (impl_->index_corrupt) {
@@ -932,6 +953,10 @@ void Entry::put_frame(std::uint32_t decode_index, std::span<const std::uint8_t> 
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_frame(std::uint32_t decode_index) const {
+  return counted(get_frame_uncounted(decode_index));
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_frame_uncounted(std::uint32_t decode_index) const {
   impl_->touch();
   const Impl::ReadPolicy policy = impl_->read_policy();
   const auto prefixed = policy.invalidating ? impl_->get_frame_invalidating(decode_index, policy.plugin)
@@ -981,6 +1006,11 @@ void Entry::put_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uin
 }
 
 std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane) const {
+  return counted(get_plane_uncounted(decode_index, stage, plane));
+}
+
+std::optional<PlaneData> Entry::get_plane_uncounted(std::uint32_t decode_index, fb::PlaneStage stage,
+                                                    std::uint8_t plane) const {
   if (model::stage_token(stage).empty() || plane >= kPlaneLetters.size()) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: plane stage or index outside the enum");
   }
@@ -1037,6 +1067,10 @@ void Entry::put_report(std::string_view kind, std::span<const std::uint8_t> fb) 
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_report(std::string_view kind) const {
+  return counted(get_report_uncounted(kind));
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_report_uncounted(std::string_view kind) const {
   if (!valid_report_kind(kind)) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: report kind must match [A-Za-z0-9_-]{1,32}");
   }

@@ -1,7 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
    SPDX-License-Identifier: LGPL-2.1-or-later
 
-   WI-0.091: ovt/cache.h compiles as C11 (chapter 12 §12.3.1 rule 1) and is reachable through ovt/ovt.h.
+   WI-0.091, WI-0.092: ovt/cache.h compiles as C11 (chapter 12 §12.3.1 rule 1) and is reachable through ovt/ovt.h.
    Built as an object library; there is nothing to run. */
 #include <stddef.h>
 #include <stdint.h>
@@ -25,5 +25,12 @@ ovt_status ovt_c_api_cache_compile_check(const uint8_t hash[32], ovt_Buffer* out
   (void)ovt_cache_dir();
   (void)ovt_cache_enabled();
   (void)ovt_cache_max_bytes();
+  if (st == OVT_OK) {
+    ovt_buffer_free(out);
+    st = ovt_cache_report(out);
+  }
+  if (st == OVT_OK) {
+    st = ovt_cache_clear("analysis", NULL, 30);
+  }
   return st;
 }

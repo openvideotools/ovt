@@ -143,6 +143,15 @@ struct ListedRecord {
 /// The kinds of ClearFilter::kind and ListedRecord::kind; std::nullopt for meta.json and unknown files.
 [[nodiscard]] std::optional<std::string_view> kind_of(const std::filesystem::path& relative);
 
+/// Lookups answered (hits) and missed (misses) by Entry::get_index, get_frame, get_plane and get_report in this
+/// process, over every Cache (CacheReport.hits / misses, §12.2.13). A read that throws counts as neither.
+// SPEC-ASSUMPTION(#300): process-lifetime counters; cache.json does not persist them.
+struct LookupCounters {
+  std::uint64_t hits = 0;
+  std::uint64_t misses = 0;
+};
+[[nodiscard]] LookupCounters lookup_counters() noexcept;
+
 /// The clock of last_used and of the eviction order: system_clock::now(), unless a test fixed it.
 [[nodiscard]] std::chrono::system_clock::time_point now();
 /// Test hook: fixes now() (std::nullopt restores the system clock). Process-wide.
@@ -230,6 +239,12 @@ class Entry {
  private:
   friend class Cache;
   Entry(std::shared_ptr<Impl> impl, SourceHash hash, std::filesystem::path dir);
+  // The reads without the lookup counters.
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_index_uncounted() const;
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_frame_uncounted(std::uint32_t decode_index) const;
+  [[nodiscard]] std::optional<PlaneData> get_plane_uncounted(std::uint32_t decode_index, fb::PlaneStage stage,
+                                                             std::uint8_t plane) const;
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_report_uncounted(std::string_view kind) const;
 
   std::shared_ptr<Impl> impl_;
   SourceHash hash_;

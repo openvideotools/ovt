@@ -1,12 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// ovt/cache.h entry points (chapter 12 §12.3.14, chapter 06 §6.7, WI-0.091): thin wrappers around
-// ovt::cache::Cache and Entry. No exception crosses the ABI (§12.3.1 rule 8): a CacheError becomes its code,
-// std::bad_alloc OVT_E_NOMEM, anything else OVT_E_INTERNAL. Caller-owned buffers (rule 3a) are allocated
-// with new[] and released by ovt_buffer_free().
+// ovt/cache.h entry points (chapter 12 §12.3.14, chapter 06 §6.7, WI-0.091; ovt_cache_report and
+// ovt_cache_clear WI-0.092): thin wrappers around ovt::cache::Cache and Entry. No exception crosses the ABI (§12.3.1
+// rule 8): a CacheError becomes its code, std::bad_alloc OVT_E_NOMEM, anything else OVT_E_INTERNAL. Caller-owned
+// buffers (rule 3a) are allocated with new[] and released by ovt_buffer_free().
 
 #include "ovt/cache.h"
+
+#include <flatbuffers/flatbuffers.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -19,6 +21,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -90,12 +93,25 @@ struct Defaults {
   std::mutex mu;
   bool enabled = true;
   std::uint64_t max_bytes = ovt::cache::kDefaultMaxBytes;
-  std::string dir_text;  // the last ovt_cache_dir() answer; owned by the library (rule 3b)
+  bool max_bytes_set = false;  // ovt_cache_set_max_bytes() was called with a non-zero cap
+  std::string dir_text;        // the last ovt_cache_dir() answer; owned by the library (rule 3b)
 };
 
 Defaults& defaults() {
   static Defaults d;
   return d;
+}
+
+// Options of the default cache: the process-wide cap when one was set, else the cap cache.json records (so
+// that a default open never overwrites the persistent `ovt cache --max-size`, #294 review).
+ovt::cache::Options default_options() {
+  Defaults& d = defaults();
+  const std::lock_guard<std::mutex> lock(d.mu);
+  ovt::cache::Options options;
+  if (d.max_bytes_set) {
+    options.max_bytes = d.max_bytes;
+  }
+  return options;
 }
 
 bool plane_in_range(std::uint8_t stage, std::uint8_t plane) noexcept {
@@ -158,6 +174,7 @@ OVT_API ovt_status ovt_cache_set_max_bytes(uint64_t max_bytes) {
   Defaults& d = defaults();
   const std::lock_guard<std::mutex> lock(d.mu);
   d.max_bytes = max_bytes == 0 ? ovt::cache::kDefaultMaxBytes : max_bytes;
+  d.max_bytes_set = max_bytes != 0;
   return OVT_OK;
 }
 
@@ -177,7 +194,7 @@ OVT_API ovt_status ovt_cache_open(const char* root, const char* opts_json, ovt_C
     if (opts_json != nullptr) {
       options = ovt::cache::parse_options_json(opts_json);
     } else if (root == nullptr) {
-      options.max_bytes = ovt_cache_max_bytes();  // the default cache takes the process-wide cap
+      options = default_options();
     }
     std::optional<std::filesystem::path> path;
     if (root != nullptr && *root != '\0') {
@@ -318,6 +335,71 @@ OVT_API ovt_status ovt_cache_get_report(ovt_CacheEntry* entry, const char* kind,
     return OVT_E_INVALID_ARG;
   }
   return guarded([&] { return give_optional(entry->entry->get_report(kind), out); });
+}
+
+OVT_API ovt_status ovt_cache_report(ovt_Buffer* out) {
+  zero(out);
+  if (out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  return guarded([&] {
+    const std::filesystem::path root = ovt::cache::default_root();
+    std::vector<ovt::cache::ListedRecord> rows;
+    std::uint64_t total = 0;
+    std::uint64_t cap = ovt_cache_max_bytes();
+    std::error_code ec;
+    if (std::filesystem::exists(root, ec)) {
+      ovt::cache::Options read_only;  // a query: nothing is created, written or evicted
+      read_only.read_only = true;
+      const auto cache = ovt::cache::Cache::open(root, read_only);
+      rows = cache->list();
+      total = cache->total_bytes();
+      cap = cache->max_bytes();
+    }
+    const ovt::cache::LookupCounters counters = ovt::cache::lookup_counters();
+    flatbuffers::FlatBufferBuilder b;
+    std::vector<flatbuffers::Offset<ovt::fb::CacheEntry>> entries;
+    entries.reserve(rows.size());
+    for (const ovt::cache::ListedRecord& r : rows) {
+      entries.push_back(ovt::fb::CreateCacheEntryDirect(b, ovt::cache::hex(r.key).c_str(), r.kind.c_str(),
+                                                        r.source_name.c_str(), r.size_bytes, r.created.c_str(),
+                                                        r.last_used.c_str()));
+    }
+    b.Finish(ovt::fb::CreateCacheReportDirect(b, root.string().c_str(), &entries, total, cap, counters.hits,
+                                              counters.misses));
+    return give({b.GetBufferPointer(), b.GetSize()}, out);
+  });
+}
+
+OVT_API ovt_status ovt_cache_clear(const char* kind, const char* source_path, int older_than_days) {
+  if (older_than_days < 0) {
+    return OVT_E_INVALID_ARG;
+  }
+  if (kind != nullptr) {
+    const std::string_view k(kind);
+    if (k != "index" && k != "analysis" && k != "metrics") {
+      return OVT_E_INVALID_ARG;
+    }
+  }
+  if (source_path != nullptr) {
+    // SPEC-ASSUMPTION(#300): the §6.2.8 source hasher arrives with the stream index (WI-1.121); until then a
+    // source cannot be mapped to its entry.
+    return OVT_E_UNSUPPORTED;
+  }
+  return guarded([&] {
+    const std::filesystem::path root = ovt::cache::default_root();
+    std::error_code ec;
+    if (!std::filesystem::exists(root, ec)) {
+      return OVT_OK;
+    }
+    ovt::cache::ClearFilter filter;
+    if (kind != nullptr) {
+      filter.kind = std::string(kind);
+    }
+    filter.older_than_days = static_cast<std::uint32_t>(older_than_days);
+    (void)ovt::cache::Cache::open(root, default_options())->clear(filter);
+    return OVT_OK;
+  });
 }
 
 OVT_API void ovt_cache_entry_release(ovt_CacheEntry* entry) {
