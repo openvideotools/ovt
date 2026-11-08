@@ -33,9 +33,9 @@ endif()
 # macOS). Links the shared libovt_render; the download helper is an exported internal symbol (src/surface/), so the
 # test also sees render/src.
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-add_executable(ovt_tests_render test_h273_map.cpp test_init.cpp)
+add_executable(ovt_tests_render test_h273_map.cpp test_init.cpp test_overlay_builder.cpp fixtures/make_synthetic.cpp)
 target_link_libraries(ovt_tests_render PRIVATE ovt::render ovt::flags ${Catch2_TARGET})
-target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render/src" "${CMAKE_CURRENT_SOURCE_DIR}")
 # WI-1.402: the H.273 map (src/color/, exported internal symbols) speaks libplacebo's colour types, so the test also
 # needs libplacebo's headers; it calls only pl_color_*_guess itself, everything else goes through libovt_render.
 target_link_libraries(ovt_tests_render PRIVATE tp::placebo)
