@@ -216,6 +216,7 @@ ovt::Result<std::unique_ptr<Demuxer>> Demuxer::open(std::shared_ptr<ovt::io::Ran
   }
 
   try {
+    // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive (macOS libc++), every path destroys d
     std::unique_ptr<Demuxer> d(new Demuxer());
     d->file_ = std::move(file);
     d->tree_ = tree;

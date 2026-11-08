@@ -22,6 +22,8 @@ extern "C" {
 namespace ovt::demux::detail {
 
 std::unique_ptr<AvioAdapter> AvioAdapter::create(std::shared_ptr<ovt::io::RandomAccessFile> file) {
+  // The raw pointer handed to avio_alloc_context as `opaque` is not an owner; every path destroys `adapter`.
+  // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive (macOS libc++)
   std::unique_ptr<AvioAdapter> adapter(new AvioAdapter(std::move(file)));
   auto* buffer = static_cast<unsigned char*>(av_malloc(kBufferSize));
   if (buffer == nullptr) {
