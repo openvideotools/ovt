@@ -216,7 +216,77 @@ TEST_CASE("test_model_roundtrip: tiny16_hevc.fa carries the values of chapter 06
   CHECK(slice->header()->children()->size() == 8U);
 }
 
+TEST_CASE("test_model_roundtrip: tiny32_h264.fa has the four macroblock types of WI-0.093 step 2",
+          "[model][golden][fast]") {
+  const Bytes file = load("tiny32_h264");
+  const auto* fa = fb::GetFrameAnalysis(file.data());
+  check_by_construction(*fa);
+
+  const auto* blocks = fa->blocks();
+  REQUIRE(blocks->size() == 9U);
+  CHECK(static_cast<fb::AvcMbType>((*blocks)[1]->partition_type()) == fb::AvcMbType::I_16x16_2_0_0);
+  CHECK(static_cast<fb::AvcMbType>((*blocks)[2]->partition_type()) == fb::AvcMbType::P_L0_16x16);
+  CHECK(static_cast<fb::AvcMbType>((*blocks)[3]->partition_type()) == fb::AvcMbType::P_8x8);
+  CHECK(static_cast<fb::AvcMbType>((*blocks)[8]->partition_type()) == fb::AvcMbType::P_Skip);
+  CHECK(to_vector((*blocks)[3]->children()) == std::vector<std::uint32_t>{4, 5, 6, 7});
+  const auto* mb2 = flatbuffers::GetRoot<fb::AvcMb>((*blocks)[3]->ext()->data());
+  CHECK(to_vector(mb2->sub_mb_type()).size() == 4U);
+
+  // P_L0_16x16 mv (3, -1) quarter-pel -> neutral (12, -4) in every cell of MB1 (cell x 4..7, y 0..3).
+  const auto* grid = fa->grid();
+  for (std::uint32_t y = 0; y < 4; ++y) {
+    for (std::uint32_t x = 4; x < 8; ++x) {
+      CHECK((*grid->mv0_x())[(y * 8) + x] == 12);
+      CHECK((*grid->mv0_y())[(y * 8) + x] == -4);
+    }
+  }
+  REQUIRE(fa->refs()->size() == 2U);
+  CHECK(std::string_view((*fa->refs())[0]->name()->c_str()) == "L0[0]");
+  CHECK(std::string_view((*fa->refs())[1]->name()->c_str()) == "L0[1]");
+}
+
+TEST_CASE("test_model_roundtrip: tiny64_av1.fa has the four blocks of WI-0.093 step 3", "[model][golden][fast]") {
+  const Bytes file = load("tiny64_av1");
+  const auto* fa = fb::GetFrameAnalysis(file.data());
+  check_by_construction(*fa);
+
+  const auto* blocks = fa->blocks();
+  REQUIRE(blocks->size() == 10U);
+  const auto* sb = flatbuffers::GetRoot<fb::Av1Block>((*blocks)[1]->ext()->data());
+  CHECK(sb->partition() == fb::Av1Partition::PARTITION_SPLIT);
+  CHECK(sb->is_superblock() == 1);
+
+  const auto block = [&](std::uint32_t id) { return flatbuffers::GetRoot<fb::Av1Block>((*blocks)[id]->ext()->data()); };
+  CHECK(block(2)->YMode() == fb::Av1YMode::DC_PRED);
+  const auto* newmv = block(4);
+  CHECK(newmv->YMode() == fb::Av1YMode::NEWMV);
+  CHECK(to_vector(newmv->Mv())[0] == -5);
+  CHECK(to_vector(newmv->Mv())[1] == 7);
+  CHECK(block(6)->YMode() == fb::Av1YMode::GLOBALMV);
+  CHECK(block(6)->is_global() == 1);
+  const auto* compound = block(8);
+  CHECK(compound->YMode() == fb::Av1YMode::NEAREST_NEARESTMV);
+  CHECK(to_vector(compound->RefFrame()) == std::vector<std::int8_t>{1, 7});
+
+  // NEWMV Mv (-5, 7) in 1/8-pel -> neutral (-10, 14) as (row, col): cells of block 4 (x4 8..15, y4 0..7).
+  const auto* grid = fa->grid();
+  CHECK((*grid->mv0_y())[8] == -10);
+  CHECK((*grid->mv0_x())[8] == 14);
+  // The compound block (x4 8..15, y4 8..15) fills ref0 = LAST and ref1 = ALTREF and mv1 (V-016 counts both).
+  const std::size_t compound_cell = (8U * 16U) + 8U;
+  CHECK((*grid->ref0())[compound_cell] == 1);
+  CHECK((*grid->ref1())[compound_cell] == 7);
+  CHECK((*fa->refs())[0]->usage_cells() == 0U);
+  CHECK((*fa->refs())[7]->usage_cells() == 64U);
+
+  const auto filter = to_vector(fa->filter_params());
+  const auto* params = flatbuffers::GetRoot<fb::Av1FilterParams>(filter.data());
+  CHECK(to_vector(params->cdef()->cdef_idx()) == std::vector<std::int8_t>{2});
+  CHECK(params->lr_units()->size() == 3U);
+}
+
 TEST_CASE("test_model_roundtrip: auxiliary fixture files are the generator's output", "[model][golden][fast]") {
   CHECK(read_file("tiny16.yuv") == ovt::golden::build_tiny16_yuv());
   CHECK(read_file("tiny16.yuv").size() == 384U);
+  CHECK(read_text("tiny64_av1.inspect.json") == ovt::golden::build_tiny64_av1_inspect_json(read_file("tiny64_av1.fa")));
 }
