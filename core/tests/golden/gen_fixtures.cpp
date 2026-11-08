@@ -6,8 +6,8 @@
 //
 //   build/<preset>/core/tests/golden/gen_fixtures core/tests/golden
 //
-// Output: tiny16_hevc.fa with a `.sha256` next to it (sha256sum format) and tiny16.yuv (its picture).
-// WI-0.093b adds tiny32_h264.fa, tiny64_av1.fa and tiny64_av1.inspect.json.
+// Output: tiny16_hevc.fa, tiny32_h264.fa, tiny64_av1.fa and a `.sha256` next to each (sha256sum format),
+// tiny16.yuv (the picture of tiny16_hevc.fa) and tiny64_av1.inspect.json (WI-0.090's golden).
 // Exit codes: 0 written, 1 usage or I/O error.
 
 #include <cstdint>
@@ -50,13 +50,18 @@ int run(int argc, char** argv) {
     return 1;
   }
   bool ok = true;
+  ovt::golden::Bytes av1;
   for (const auto& fixture : ovt::golden::kFixtures) {
     const ovt::golden::Bytes bytes = fixture.build();
     const std::string name = std::string(fixture.stem) + ".fa";
     ok = write_bytes(dir / name, bytes) && ok;
     ok = write_file(dir / (name + ".sha256"), ovt::golden::sha256_hex(bytes) + "  " + name + "\n") && ok;
+    if (fixture.stem == "tiny64_av1") {
+      av1 = bytes;
+    }
   }
   ok = write_bytes(dir / "tiny16.yuv", ovt::golden::build_tiny16_yuv()) && ok;
+  ok = write_file(dir / "tiny64_av1.inspect.json", ovt::golden::build_tiny64_av1_inspect_json(av1)) && ok;
   if (!ok) {
     std::fputs("gen_fixtures: write failed\n", stderr);
     return 1;
