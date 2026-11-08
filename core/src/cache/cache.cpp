@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "cache/atomic_file.hpp"
+#include "cache/cache_json.hpp"
 #include "cache/zstd_io.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
@@ -91,20 +92,46 @@ const T* verify_size_prefixed(std::span<const std::uint8_t> buf, const char* ide
   return flatbuffers::GetSizePrefixedRoot<T>(buf.data());
 }
 
-// `FinishSizePrefixed` framing (§6.1.1): the little-endian 32-bit length, then the buffer.
+// `FinishSizePrefixed` framing (§6.1.1) of a buffer that `Finish` produced with an identifier:
+// [size:4][root uoffset:4][ident:4][pad:4][body]. The pad is what FinishSizePrefixed inserts for minalign 8
+// (every record with an int64: pts, poc, ...), so the body keeps its alignment modulo 8, the Verifier accepts
+// the stored buffer and the mmap-ed index.fb is safe for zero-copy readers. The root uoffset is relative to
+// its own position and moves by the pad; a minalign-4 body tolerates the pad, so one layout serves every record.
+constexpr std::size_t kHeaderBytes = 2 * kSizePrefix;  // root uoffset + identifier
+constexpr std::size_t kPadBytes = kSizePrefix;
+
 std::vector<std::uint8_t> add_size_prefix(std::span<const std::uint8_t> buf) {
-  if (buf.size() > std::numeric_limits<flatbuffers::uoffset_t>::max() - kSizePrefix) {
+  if (buf.size() < kHeaderBytes) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: FlatBuffer shorter than its header");
+  }
+  if (buf.size() > std::numeric_limits<flatbuffers::uoffset_t>::max() - kSizePrefix - kPadBytes) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: FlatBuffer too large for a size prefix");
   }
-  std::vector<std::uint8_t> out(kSizePrefix + buf.size());
-  const auto size = static_cast<flatbuffers::uoffset_t>(buf.size());
-  flatbuffers::WriteScalar(out.data(), size);
-  std::copy(buf.begin(), buf.end(), out.begin() + static_cast<std::ptrdiff_t>(kSizePrefix));
+  std::vector<std::uint8_t> out(kSizePrefix + kHeaderBytes + kPadBytes + (buf.size() - kHeaderBytes));
+  flatbuffers::WriteScalar(out.data(), static_cast<flatbuffers::uoffset_t>(out.size() - kSizePrefix));
+  const auto root = flatbuffers::ReadScalar<flatbuffers::uoffset_t>(buf.data());
+  flatbuffers::WriteScalar(std::span(out).subspan(kSizePrefix).data(),
+                           static_cast<flatbuffers::uoffset_t>(root + kPadBytes));
+  std::ranges::copy(buf.subspan(kSizePrefix, kSizePrefix), std::span(out).subspan(2 * kSizePrefix).begin());
+  std::ranges::copy(buf.subspan(kHeaderBytes), std::span(out).subspan(kSizePrefix + kHeaderBytes + kPadBytes).begin());
   return out;
 }
 
+// The inverse of add_size_prefix for a buffer that verify_size_prefixed accepted.
 std::vector<std::uint8_t> strip_size_prefix(std::span<const std::uint8_t> prefixed) {
-  return {prefixed.begin() + static_cast<std::ptrdiff_t>(kSizePrefix), prefixed.end()};
+  const std::span<const std::uint8_t> framed = prefixed.subspan(kSizePrefix);
+  if (framed.size() < kHeaderBytes + kPadBytes) {
+    throw CacheError(OVT_E_CORRUPT, "cache: size-prefixed record shorter than its header");
+  }
+  std::vector<std::uint8_t> out(framed.size() - kPadBytes);
+  const auto root = flatbuffers::ReadScalar<flatbuffers::uoffset_t>(framed.data());
+  if (root < kHeaderBytes + kPadBytes) {
+    throw CacheError(OVT_E_CORRUPT, "cache: size-prefixed record has no pad after its header");
+  }
+  flatbuffers::WriteScalar(out.data(), static_cast<flatbuffers::uoffset_t>(root - kPadBytes));
+  std::ranges::copy(framed.subspan(kSizePrefix, kSizePrefix), std::span(out).subspan(kSizePrefix).begin());
+  std::ranges::copy(framed.subspan(kHeaderBytes + kPadBytes), std::span(out).subspan(kHeaderBytes).begin());
+  return out;
 }
 
 std::string frame_file_name(std::uint32_t decode_index) {
@@ -249,13 +276,60 @@ fs::path default_root() {
 #endif
 }
 
+// ---- cache.json ------------------------------------------------------------------------------------
+
+namespace {
+
+// One element of cache.json "entries": {source_hash, last_used, bytes}. Every member is type-checked before
+// it is read, so a wrong type is skipped instead of thrown (the reader must never fail on its own file).
+std::optional<std::pair<std::string, CacheRecord>> parse_record(const nlohmann::json& e) {
+  const auto hash = e.is_object() ? e.find("source_hash") : e.end();
+  if (hash == e.end() || !hash->is_string() || !is_hex64(hash->get_ref<const std::string&>())) {
+    return std::nullopt;
+  }
+  CacheRecord r;
+  if (const auto lu = e.find("last_used"); lu != e.end() && lu->is_string()) {
+    r.last_used = lu->get<std::string>();
+  }
+  if (const auto b = e.find("bytes"); b != e.end() && b->is_number_unsigned()) {
+    r.bytes = b->get<std::uint64_t>();
+  }
+  return std::make_pair(hash->get<std::string>(), std::move(r));
+}
+
+}  // namespace
+
+std::optional<CacheJson> parse_cache_json(std::span<const std::uint8_t> bytes) {
+  const nlohmann::json doc = nlohmann::json::parse(bytes.begin(), bytes.end(), nullptr, false, false);
+  if (!doc.is_object()) {
+    return std::nullopt;
+  }
+  const auto format = doc.find("cache_format");
+  if (format == doc.end() || !format->is_number_integer() || format->get<std::int64_t>() != kCacheFormat) {
+    return std::nullopt;
+  }
+  const auto entries = doc.find("entries");
+  if (entries == doc.end() || !entries->is_array()) {
+    return std::nullopt;
+  }
+  CacheJson out;
+  if (const auto cap = doc.find("size_cap_bytes"); cap != doc.end() && cap->is_number_unsigned()) {
+    out.size_cap_bytes = cap->get<std::uint64_t>();
+  }
+  for (const auto& e : *entries) {
+    auto parsed = parse_record(e);
+    if (!parsed) {
+      return std::nullopt;  // a malformed element means the document is stale: rebuild it
+    }
+    out.records[parsed->first] = std::move(parsed->second);
+  }
+  return out;
+}
+
 // ---- Cache::Impl ----------------------------------------------------------------------------------
 
 struct Cache::Impl {
-  struct Record {
-    std::string last_used;
-    std::uint64_t bytes = 0;
-  };
+  using Record = CacheRecord;
 
   fs::path root;
   Options options;
@@ -280,7 +354,9 @@ struct Cache::Impl {
 
   bool try_load_cache_json(const fs::path& path) {
     try {
-      if (parse_cache_json(read_file(path, kMaxJsonBytes))) {
+      if (std::optional<CacheJson> doc = parse_cache_json(read_file(path, kMaxJsonBytes))) {
+        size_cap_bytes = doc->size_cap_bytes.value_or(size_cap_bytes);
+        records = std::move(doc->records);
         return true;
       }
     } catch (const CacheError& e) {
@@ -288,44 +364,6 @@ struct Cache::Impl {
     }
     OVT_LOG(log::Level::Warn, kModule, "malformed '{}', rebuilding it from the entry directories", path.string());
     return false;
-  }
-
-  // Fills size_cap_bytes and records from a cache.json document; false when the document is not one.
-  bool parse_cache_json(std::span<const std::uint8_t> bytes) {
-    const nlohmann::json doc = nlohmann::json::parse(bytes.begin(), bytes.end(), nullptr, false, false);
-    if (!doc.is_object() || doc.value("cache_format", 0) != static_cast<int>(kCacheFormat)) {
-      return false;
-    }
-    if (const auto cap = doc.find("size_cap_bytes"); cap != doc.end() && cap->is_number_unsigned()) {
-      size_cap_bytes = cap->get<std::uint64_t>();
-    }
-    const auto entries = doc.find("entries");
-    if (entries == doc.end() || !entries->is_array()) {
-      return false;
-    }
-    for (const auto& e : *entries) {
-      if (auto parsed = parse_record(e)) {
-        records[parsed->first] = std::move(parsed->second);
-      }
-    }
-    return true;
-  }
-
-  // One element of cache.json "entries": {source_hash, last_used, bytes}. Malformed elements are skipped.
-  static std::optional<std::pair<std::string, Record>> parse_record(const nlohmann::json& e) {
-    if (!e.is_object() || !e.contains("source_hash") || !e["source_hash"].is_string()) {
-      return std::nullopt;
-    }
-    auto hash = e["source_hash"].get<std::string>();
-    if (!is_hex64(hash)) {
-      return std::nullopt;
-    }
-    Record r;
-    r.last_used = e.value("last_used", std::string());
-    if (const auto b = e.find("bytes"); b != e.end() && b->is_number_unsigned()) {
-      r.bytes = b->get<std::uint64_t>();
-    }
-    return std::make_pair(std::move(hash), std::move(r));
   }
 
   void rebuild() {

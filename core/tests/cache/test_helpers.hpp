@@ -58,14 +58,20 @@ inline std::vector<std::uint8_t> bytes_of(const flatbuffers::FlatBufferBuilder& 
 }
 
 /// A StreamIndex ("OVTI", not size-prefixed) with @p frame_count frames whose decode_index is their position.
+/// With @p with_pts every FrameInfo carries pts and poc (int64), so the buffer's minalign is 8 as for every
+/// real record; without, it is 4.
 inline std::vector<std::uint8_t> make_index(const SourceHash& hash, std::uint32_t frame_count,
-                                            fb::Codec codec = fb::Codec::H265) {
+                                            fb::Codec codec = fb::Codec::H265, bool with_pts = true) {
   flatbuffers::FlatBufferBuilder b;
   std::vector<flatbuffers::Offset<fb::FrameInfo>> frames;
   for (std::uint32_t i = 0; i < frame_count; ++i) {
     const fb::FrameId id(static_cast<std::int32_t>(i), static_cast<std::int32_t>(i));
     fb::FrameInfoBuilder fib(b);
     fib.add_id(&id);
+    if (with_pts) {
+      fib.add_pts(static_cast<std::int64_t>(i) * 3000);
+      fib.add_poc(static_cast<std::int64_t>(i));
+    }
     frames.push_back(fib.Finish());
   }
   const auto hash_v = b.CreateVector(hash.data(), hash.size());
@@ -85,6 +91,7 @@ struct FrameSpec {
   std::string plugin_version = "1.0.0";
   std::uint32_t cells_w = 8;  ///< 1080p is 480 x 270 cells of 4x4 luma samples
   std::uint32_t cells_h = 8;
+  bool with_pts = true;  ///< FrameInfo.pts set (int64: minalign 8, as every real record)
 };
 
 /// A FrameAnalysis ("OVTA", not size-prefixed) with a dense CellGrid: every vector filled, values varying in
@@ -155,6 +162,9 @@ inline std::vector<std::uint8_t> make_frame(const FrameSpec& spec) {
   const fb::FrameId id(spec.decode_index, spec.decode_index);
   fb::FrameInfoBuilder fib(b);
   fib.add_id(&id);
+  if (spec.with_pts) {
+    fib.add_pts(static_cast<std::int64_t>(spec.decode_index) * 3000);
+  }
   const auto frame = fib.Finish();
   fb::FrameAnalysisBuilder fab(b);
   fab.add_schema_version(1);
