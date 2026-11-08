@@ -40,6 +40,7 @@ function(ovt_add_fuzz_target name source)
 endfunction()
 
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
+ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / structural_diff
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
