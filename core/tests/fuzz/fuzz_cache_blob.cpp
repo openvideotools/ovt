@@ -5,7 +5,8 @@
 // WI-0.091 step 3): the zstd frame of a frames/*.fa.zst file followed by the size-prefixed FrameAnalysis
 // verification the Entry applies. The input is the compressed file. A CacheError(OVT_E_CORRUPT) is the expected
 // answer to malformed bytes, a failed verification is a normal outcome; any other exception, a crash, an
-// allocation beyond the stated limit or a sanitizer report is a finding.
+// allocation beyond the stated limit or a sanitizer report is a finding. The decompressed record also goes
+// through the I5 and I6 checks of invalidating reads (WI-0.092), which must agree with the verifier.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -15,6 +16,7 @@
 #include <span>
 #include <vector>
 
+#include "cache/invalidate.hpp"
 #include "cache/zstd_io.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/status.h"
@@ -45,8 +47,13 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
   opts.max_depth = 64;
   opts.max_tables = 10'000'000;
   flatbuffers::Verifier verifier(record.data(), record.size(), opts);
-  if (verifier.VerifySizePrefixedBuffer<ovt::fb::FrameAnalysis>("OVTA")) {
+  const bool verified = verifier.VerifySizePrefixedBuffer<ovt::fb::FrameAnalysis>("OVTA");
+  const std::uint32_t decode_index = size > 0 ? data[0] : 0U;
+  const auto i5 = ovt::cache::check_frame(record, decode_index, ovt::cache::SelectedPlugin{"p", "1"});
+  require(verified || i5 == ovt::cache::InvalidationReason::Frame);
+  if (verified) {
     const auto* fa = flatbuffers::GetSizePrefixedRoot<ovt::fb::FrameAnalysis>(record.data());
+    (void)ovt::cache::check_plane(*fa, ovt::fb::PlaneStage::Reconstruction, 0, record.size());
     // The fields the Entry reads after verification.
     if (fa->frame() != nullptr && fa->frame()->id() != nullptr) {
       (void)fa->frame()->id()->decode_index();

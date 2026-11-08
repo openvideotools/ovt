@@ -7,7 +7,9 @@
 // that parses must serialise and parse again to the same record (the writer never produces unreadable text).
 // The cache.json parser shares this target: byte 0 == 0xFE routes the rest to parse_cache_json, which must
 // never throw (a malformed cache.json is rebuilt, not reported). Byte 0 == 0xFF routes the rest to the
-// option-string parser of ovt_cache_open (OVT_E_INVALID_ARG is its only allowed exception).
+// option-string parser of ovt_cache_open (OVT_E_INVALID_ARG is its only allowed exception). Every other input
+// also goes through check_cache_format, the I2 check of open_entry (WI-0.092), which must never throw and must
+// accept exactly the documents parse_meta accepts.
 
 #include <cstddef>
 #include <cstdint>
@@ -16,6 +18,7 @@
 #include <string_view>
 
 #include "cache/cache_json.hpp"
+#include "cache/invalidate.hpp"
 #include "ovt/cxx/cache/cache.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
@@ -46,12 +49,15 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     }
     return 0;
   }
+  const bool i2_ok = ovt::cache::check_cache_format(input) == ovt::cache::InvalidationReason::None;
   try {
     const ovt::cache::Meta meta = ovt::cache::parse_meta(input);
     const std::string text = ovt::cache::serialize_meta(meta);
     require(ovt::cache::parse_meta(text) == meta);
+    require(i2_ok);
   } catch (const ovt::cache::CacheError& e) {
     require(e.code == OVT_E_CORRUPT);
+    require(!i2_ok);
   }
   return 0;
 }

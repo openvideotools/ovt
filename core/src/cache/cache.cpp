@@ -2,7 +2,11 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // ovt::cache::Cache and Entry (chapter 06 §6.7.1–6.7.2, WI-0.091): directory layout, cache.json, meta.json
-// bookkeeping, the mmap-ed index.fb and the zstd record files.
+// bookkeeping, the mmap-ed index.fb and the zstd record files. open_entry, invalidating reads and last_used
+// throttling are WI-0.092 (§6.7.3, §6.7.4; the rules are in invalidate.cpp).
+//
+// Lock order: Cache::Impl::open_mu, then an Entry::Impl::mu, then Cache::Impl::mu. open_mu serialises the
+// creation of entries with open_entry, so a directory is never deleted while it is being opened.
 
 #include "ovt/cxx/cache/cache.hpp"
 
@@ -34,6 +38,8 @@
 
 #include "cache/atomic_file.hpp"
 #include "cache/cache_json.hpp"
+#include "cache/fb_verify.hpp"
+#include "cache/invalidate.hpp"
 #include "cache/zstd_io.hpp"
 #include "ovt/cxx/cache/error.hpp"
 #include "ovt/cxx/cache/meta.hpp"
@@ -64,35 +70,17 @@ constexpr std::chrono::seconds kLastUsedThrottle{60};  // §6.7.4: at most one l
 constexpr std::array<char, 4> kPlaneLetters = {'y', 'u', 'v', 'a'};
 
 std::string now_iso8601() {
-  return format_iso8601_utc(std::chrono::system_clock::now());
+  return format_iso8601_utc(now());
 }
 
-// Verifier limits of chapter 06 WI-0.094 (a 4K HEVC block tree exceeds the FlatBuffers default max_tables).
-flatbuffers::Verifier::Options verifier_options() {
-  flatbuffers::Verifier::Options opts;
-  opts.max_depth = 64;
-  opts.max_tables = 10'000'000;
-  return opts;
+// The clock override of set_now_for_testing().
+std::mutex& clock_mutex() {
+  static std::mutex mu;
+  return mu;
 }
-
-template <class T>
-const T* verify_root(std::span<const std::uint8_t> buf, const char* identifier) {
-  const auto opts = verifier_options();
-  flatbuffers::Verifier verifier(buf.data(), buf.size(), opts);
-  if (!verifier.VerifyBuffer<T>(identifier)) {
-    return nullptr;
-  }
-  return flatbuffers::GetRoot<T>(buf.data());
-}
-
-template <class T>
-const T* verify_size_prefixed(std::span<const std::uint8_t> buf, const char* identifier) {
-  const auto opts = verifier_options();
-  flatbuffers::Verifier verifier(buf.data(), buf.size(), opts);
-  if (!verifier.VerifySizePrefixedBuffer<T>(identifier)) {
-    return nullptr;
-  }
-  return flatbuffers::GetSizePrefixedRoot<T>(buf.data());
+std::optional<std::chrono::system_clock::time_point>& clock_slot() {
+  static std::optional<std::chrono::system_clock::time_point> slot;
+  return slot;
 }
 
 // `FinishSizePrefixed` framing (§6.1.1) of a buffer that `Finish` produced with an identifier:
@@ -212,9 +200,60 @@ std::string env_or_empty(const char* name) {
   return v != nullptr ? std::string(v) : std::string();
 }
 
+// The PlaneRef of @p stage / @p plane in @p fa, or nullptr.
+const fb::PlaneRef* find_plane_ref(const fb::FrameAnalysis& fa, fb::PlaneStage stage, std::uint8_t plane) {
+  if (fa.planes() != nullptr) {
+    for (const fb::PlaneRef* candidate : *fa.planes()) {
+      if (candidate->stage() == stage && candidate->plane() == plane) {
+        return candidate;
+      }
+    }
+  }
+  return nullptr;
+}
+
+// A plane read back with the geometry of its PlaneRef (§6.7.1); @p bytes holds height * width * sample_bytes.
+PlaneData plane_data(const fb::PlaneRef& ref, fb::PlaneStage stage, std::uint8_t plane,
+                     std::vector<std::uint8_t> bytes) {
+  PlaneData out;
+  out.view.width = ref.width();
+  out.view.height = ref.height();
+  out.view.sample_bytes = ref.sample_bytes();
+  out.view.bit_depth = ref.bit_depth();
+  out.view.plane = plane;
+  out.view.stage = static_cast<std::uint8_t>(stage);
+  switch (ref.sample_bytes()) {
+    case 1:
+      out.view.format = model::SampleFormat::U8;
+      break;
+    case 2:
+      out.view.format = ref.is_signed() ? model::SampleFormat::S16LE : model::SampleFormat::U16LE;
+      break;
+    case 4:
+      out.view.format = model::SampleFormat::S32LE;
+      break;
+    default:
+      throw CacheError(OVT_E_CORRUPT, "cache: PlaneRef.sample_bytes outside 1, 2, 4");
+  }
+  out.bytes = std::move(bytes);
+  out.view.stride_bytes = ref.width() * ref.sample_bytes();
+  out.view.data = out.bytes.data();
+  return out;
+}
+
 }  // namespace
 
 // ---- free functions ------------------------------------------------------------------------------
+
+std::chrono::system_clock::time_point now() {
+  const std::lock_guard<std::mutex> lock(clock_mutex());
+  return clock_slot().value_or(std::chrono::system_clock::now());
+}
+
+void set_now_for_testing(std::optional<std::chrono::system_clock::time_point> when) {
+  const std::lock_guard<std::mutex> lock(clock_mutex());
+  clock_slot() = when;
+}
 
 std::string hex(const SourceHash& hash) {
   constexpr std::string_view kDigits = "0123456789abcdef";
@@ -370,11 +409,53 @@ struct Cache::Impl {
 
   fs::path root;
   Options options;
+  std::mutex open_mu;  // entry creation and open_entry (lock order: before mu)
   mutable std::mutex mu;
   std::uint64_t size_cap_bytes = kDefaultMaxBytes;
   std::map<std::string, Record> records;             // hex source hash → cache.json entries[] (guarded by mu)
   std::map<std::string, std::weak_ptr<Entry>> live;  // guarded by mu
   bool dirty = false;
+  // The byte account after a write to an open entry (§6.7.4: updated after every write, incrementally). The
+  // caller holds no lock.
+  void note_write(const std::string& hash, std::uint64_t bytes, const std::string& last_used) {
+    const std::lock_guard<std::mutex> lock(mu);
+    Record& r = records[hash];
+    if (r.bytes != bytes) {
+      r.bytes = bytes;
+      dirty = true;
+    }
+    if (r.last_used.empty()) {
+      r.last_used = last_used;
+      dirty = true;
+    }
+  }
+
+  // open_entry: deletes <root>/<hash> when it exists and fails I1–I4 (§6.7.3); the rule, or None. Caller holds
+  // open_mu and has checked that the entry is not open.
+  InvalidationReason discard_failing_dir(const std::string& hash, fb::Codec codec) {
+    const fs::path dir = root / hash;
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec)) {
+      return InvalidationReason::None;
+    }
+    const InvalidationReason r = check_entry_dir(dir, hash, codec);
+    if (r == InvalidationReason::None) {
+      return r;
+    }
+    if (options.read_only) {
+      throw CacheError(OVT_E_CORRUPT,
+                       "cache: entry '" + hash + "' fails " + std::string(to_string(r)) + " (read-only)");
+    }
+    OVT_LOG(log::Level::Info, kModule, "deleting entry {} ({}) and recreating it", hash, to_string(r));
+    fs::remove_all(dir, ec);
+    if (ec) {
+      throw CacheError(OVT_E_IO, "cache: cannot delete '" + dir.string() + "': " + ec.message());
+    }
+    const std::lock_guard<std::mutex> lock(mu);
+    records.erase(hash);
+    dirty = true;
+    return r;
+  }
 
   // Loads cache.json; a missing or malformed file is rebuilt from the entry directories (§6.7.4 notes).
   void load() {
@@ -473,6 +554,10 @@ struct Entry::Impl {
   std::shared_ptr<const io::RandomAccessFile> index_file;
   io::RandomAccessFile::Holder index_view;
   bool index_corrupt = false;
+  // WI-0.092: reads apply I5/I6 once Cache::open_entry() handed the entry out (guarded by mu).
+  bool invalidating = false;
+  std::optional<SelectedPlugin> plugin;
+  std::optional<std::chrono::system_clock::time_point> last_touch;  // last last_used update (guarded by mu)
 
   [[nodiscard]] bool read_only() const noexcept { return cache->options.read_only; }
 
@@ -487,6 +572,102 @@ struct Entry::Impl {
     const std::uint64_t before = file_size_or_zero(path);
     write_file_atomic(path, content);
     bytes = bytes - std::min(before, bytes) + content.size();
+  }
+
+  // last_used at most once per minute while open (§6.7.4). Caller holds mu.
+  void touch_locked() {
+    const auto t = now();
+    if (!last_touch || t - *last_touch >= kLastUsedThrottle) {
+      meta.last_used = format_iso8601_utc(t);
+      last_touch = t;
+      dirty = true;
+    }
+  }
+
+  void touch() {
+    const std::lock_guard<std::mutex> lock(mu);
+    touch_locked();
+  }
+
+  // Reports the byte account to the cache after a write. No lock held.
+  void after_write() {
+    std::uint64_t b = 0;
+    std::string last_used;
+    {
+      const std::lock_guard<std::mutex> lock(mu);
+      b = bytes;
+      last_used = meta.last_used.value_or(meta.created);
+    }
+    cache->note_write(hex_hash, b, last_used);
+  }
+
+  struct ReadPolicy {
+    bool invalidating = false;
+    std::optional<SelectedPlugin> plugin;
+  };
+
+  [[nodiscard]] ReadPolicy read_policy() const {
+    const std::lock_guard<std::mutex> lock(mu);
+    return {invalidating, plugin};
+  }
+
+  // Deletes a file that failed I5 or I6 (§6.7.3: that file only, not the entry). Caller holds mu.
+  void discard_locked(const fs::path& path, InvalidationReason reason) {
+    if (read_only()) {
+      return;
+    }
+    const std::uint64_t size = file_size_or_zero(path);
+    std::error_code ec;
+    if (fs::remove(path, ec)) {
+      bytes -= std::min(size, bytes);
+      OVT_LOG(log::Level::Info, kModule, "deleted '{}' ({})", path.string(), to_string(reason));
+    }
+  }
+
+  // The frame file of @p decode_index decompressed, and the I5 verdict on it; reason Frame for a file that
+  // does not decompress. std::nullopt when absent.
+  [[nodiscard]] std::optional<std::pair<InvalidationReason, std::vector<std::uint8_t>>> try_frame(
+      std::uint32_t decode_index, const std::optional<SelectedPlugin>& selected) const {
+    const fs::path path = frame_path(decode_index);
+    std::error_code ec;
+    if (!fs::is_regular_file(path, ec)) {
+      return std::nullopt;
+    }
+    try {
+      std::vector<std::uint8_t> prefixed = decompress(read_file(path, kMaxRecordBytes), kMaxRecordBytes);
+      const InvalidationReason reason = check_frame(prefixed, decode_index, selected);
+      return std::make_pair(reason, std::move(prefixed));
+    } catch (const CacheError& e) {
+      OVT_LOG(log::Level::Info, kModule, "{}", e.what());
+      return std::make_pair(InvalidationReason::Frame, std::vector<std::uint8_t>());
+    }
+  }
+
+  // get_frame on an invalidating entry: a file that fails I5 is deleted and the read is a miss.
+  [[nodiscard]] std::optional<std::vector<std::uint8_t>> get_frame_invalidating(
+      std::uint32_t decode_index, const std::optional<SelectedPlugin>& selected) {
+    auto got = try_frame(decode_index, selected);
+    if (!got) {
+      return std::nullopt;
+    }
+    if (got->first == InvalidationReason::None) {
+      return std::move(got->second);
+    }
+    const std::lock_guard<std::mutex> lock(mu);
+    got = try_frame(decode_index, selected);  // again under the write lock: a writer may have replaced it
+    if (!got) {
+      return std::nullopt;
+    }
+    if (got->first == InvalidationReason::None) {
+      return std::move(got->second);
+    }
+    if (const auto* old = verify_size_prefixed<fb::FrameAnalysis>(got->second, "OVTA")) {
+      plugin_frames_locked(old->plugin_id() != nullptr ? old->plugin_id()->string_view() : std::string_view(),
+                           old->plugin_version() != nullptr ? old->plugin_version()->string_view() : std::string_view(),
+                           -1);
+    }
+    discard_locked(frame_path(decode_index), InvalidationReason::Frame);
+    return std::nullopt;
   }
 
   // Caller holds mu.
@@ -636,17 +817,22 @@ void Entry::put_index(std::span<const std::uint8_t> stream_index) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: StreamIndex.source_hash differs from the entry's source hash");
   }
   const std::vector<std::uint8_t> prefixed = add_size_prefix(stream_index);
-  const std::lock_guard<std::mutex> lock(impl_->mu);
-  impl_->replace_file_locked(dir_ / kIndexFb, prefixed);
-  impl_->meta.codec = fb::EnumNameCodec(index->codec());
-  impl_->meta.frame_count = index->frames() != nullptr ? index->frames()->size() : 0U;
-  impl_->meta.index_complete = true;
-  impl_->dirty = true;
-  impl_->map_index_locked();
+  {
+    const std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->replace_file_locked(dir_ / kIndexFb, prefixed);
+    impl_->meta.codec = fb::EnumNameCodec(index->codec());
+    impl_->meta.frame_count = index->frames() != nullptr ? index->frames()->size() : 0U;
+    impl_->meta.index_complete = true;
+    impl_->dirty = true;
+    impl_->touch_locked();
+    impl_->map_index_locked();
+  }
+  impl_->after_write();
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_index() const {
   const std::lock_guard<std::mutex> lock(impl_->mu);
+  impl_->touch_locked();
   if (impl_->index_corrupt) {
     throw CacheError(OVT_E_CORRUPT, "cache: '" + (dir_ / kIndexFb).string() + "' is malformed");
   }
@@ -670,28 +856,34 @@ void Entry::put_frame(std::uint32_t decode_index, std::span<const std::uint8_t> 
   const std::string_view plugin_version =
       fa->plugin_version() != nullptr ? fa->plugin_version()->string_view() : std::string_view();
   const std::vector<std::uint8_t> prefixed = add_size_prefix(frame_analysis);
-
-  const std::lock_guard<std::mutex> lock(impl_->mu);
-  const fs::path path = impl_->frame_path(decode_index);
-  ensure_directory(path.parent_path());
-  // Only one FrameAnalysis per decode_index (§6.7.2): the previous writer loses its frame.
-  try {
-    if (const auto old = impl_->load_frame_prefixed(decode_index)) {
-      const auto* old_fa = flatbuffers::GetSizePrefixedRoot<fb::FrameAnalysis>(old->data());
-      impl_->plugin_frames_locked(
-          old_fa->plugin_id() != nullptr ? old_fa->plugin_id()->string_view() : std::string_view(),
-          old_fa->plugin_version() != nullptr ? old_fa->plugin_version()->string_view() : std::string_view(), -1);
+  {
+    const std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->touch_locked();
+    const fs::path path = impl_->frame_path(decode_index);
+    ensure_directory(path.parent_path());
+    // Only one FrameAnalysis per decode_index (§6.7.2): the previous writer loses its frame.
+    try {
+      if (const auto old = impl_->load_frame_prefixed(decode_index)) {
+        const auto* old_fa = flatbuffers::GetSizePrefixedRoot<fb::FrameAnalysis>(old->data());
+        impl_->plugin_frames_locked(
+            old_fa->plugin_id() != nullptr ? old_fa->plugin_id()->string_view() : std::string_view(),
+            old_fa->plugin_version() != nullptr ? old_fa->plugin_version()->string_view() : std::string_view(), -1);
+      }
+    } catch (const CacheError& e) {  // an unreadable old file is simply replaced
+      OVT_LOG(log::Level::Info, kModule, "replacing unreadable frame file: {}", e.what());
     }
-  } catch (const CacheError& e) {  // an unreadable old file is simply replaced
-    OVT_LOG(log::Level::Info, kModule, "replacing unreadable frame file: {}", e.what());
+    const std::vector<std::uint8_t> compressed = impl_->compressor.compress(prefixed, kZstdLevelFrames);
+    impl_->replace_file_locked(path, compressed);
+    impl_->plugin_frames_locked(plugin_id, plugin_version, +1);
   }
-  const std::vector<std::uint8_t> compressed = impl_->compressor.compress(prefixed, kZstdLevelFrames);
-  impl_->replace_file_locked(path, compressed);
-  impl_->plugin_frames_locked(plugin_id, plugin_version, +1);
+  impl_->after_write();
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_frame(std::uint32_t decode_index) const {
-  const auto prefixed = impl_->load_frame_prefixed(decode_index);
+  impl_->touch();
+  const Impl::ReadPolicy policy = impl_->read_policy();
+  const auto prefixed = policy.invalidating ? impl_->get_frame_invalidating(decode_index, policy.plugin)
+                                            : impl_->load_frame_prefixed(decode_index);
   if (!prefixed) {
     return std::nullopt;
   }
@@ -721,15 +913,19 @@ void Entry::put_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uin
     std::memcpy(std::span(tight).subspan(static_cast<std::size_t>(row) * row_bytes, row_bytes).data(),
                 source.subspan(static_cast<std::size_t>(row) * view.stride_bytes, row_bytes).data(), row_bytes);
   }
-  const std::lock_guard<std::mutex> lock(impl_->mu);
-  const fs::path path = impl_->plane_path(decode_index, stage, plane);
-  ensure_directory(path.parent_path());
-  const std::vector<std::uint8_t> compressed = impl_->compressor.compress(tight, kZstdLevelPlanes);
-  impl_->replace_file_locked(path, compressed);
-  if (!impl_->meta.planes_cached.value_or(false)) {
-    impl_->meta.planes_cached = true;
-    impl_->dirty = true;
+  {
+    const std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->touch_locked();
+    const fs::path path = impl_->plane_path(decode_index, stage, plane);
+    ensure_directory(path.parent_path());
+    const std::vector<std::uint8_t> compressed = impl_->compressor.compress(tight, kZstdLevelPlanes);
+    impl_->replace_file_locked(path, compressed);
+    if (!impl_->meta.planes_cached.value_or(false)) {
+      impl_->meta.planes_cached = true;
+      impl_->dirty = true;
+    }
   }
+  impl_->after_write();
 }
 
 std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane) const {
@@ -741,52 +937,41 @@ std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneS
   if (!fs::is_regular_file(path, ec)) {
     return std::nullopt;
   }
-  // Dimensions come from the frame's PlaneRef (§6.7.1).
-  const auto prefixed = impl_->load_frame_prefixed(decode_index);
+  impl_->touch();
+  const Impl::ReadPolicy policy = impl_->read_policy();
+  // Dimensions come from the frame's PlaneRef (§6.7.1); on an invalidating entry the frame passes I5 first.
+  const auto prefixed = policy.invalidating ? impl_->get_frame_invalidating(decode_index, policy.plugin)
+                                            : impl_->load_frame_prefixed(decode_index);
   if (!prefixed) {
     return std::nullopt;
   }
   const auto* fa = flatbuffers::GetSizePrefixedRoot<fb::FrameAnalysis>(prefixed->data());
-  const fb::PlaneRef* ref = nullptr;
-  if (fa->planes() != nullptr) {
-    for (const fb::PlaneRef* candidate : *fa->planes()) {
-      if (candidate->stage() == stage && candidate->plane() == plane) {
-        ref = candidate;
-        break;
-      }
+  const fb::PlaneRef* ref = find_plane_ref(*fa, stage, plane);
+  if (policy.invalidating) {
+    // I6: a plane without a matching PlaneRef (garbage, §6.7.1) or of the wrong size is deleted; then a miss.
+    std::vector<std::uint8_t> bytes;
+    InvalidationReason reason = InvalidationReason::Plane;
+    try {
+      bytes = decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes);
+      reason = check_plane(*fa, stage, plane, bytes.size());
+    } catch (const CacheError& e) {
+      OVT_LOG(log::Level::Info, kModule, "{}", e.what());
     }
+    if (reason != InvalidationReason::None) {
+      const std::lock_guard<std::mutex> lock(impl_->mu);
+      impl_->discard_locked(path, reason);
+      return std::nullopt;
+    }
+    return plane_data(*ref, stage, plane, std::move(bytes));
   }
   if (ref == nullptr) {
     return std::nullopt;
-  }
-  PlaneData out;
-  out.view.width = ref->width();
-  out.view.height = ref->height();
-  out.view.sample_bytes = ref->sample_bytes();
-  out.view.bit_depth = ref->bit_depth();
-  out.view.plane = plane;
-  out.view.stage = static_cast<std::uint8_t>(stage);
-  switch (ref->sample_bytes()) {
-    case 1:
-      out.view.format = model::SampleFormat::U8;
-      break;
-    case 2:
-      out.view.format = ref->is_signed() ? model::SampleFormat::S16LE : model::SampleFormat::U16LE;
-      break;
-    case 4:
-      out.view.format = model::SampleFormat::S32LE;
-      break;
-    default:
-      throw CacheError(OVT_E_CORRUPT, "cache: PlaneRef.sample_bytes outside 1, 2, 4");
   }
   const std::size_t expected = static_cast<std::size_t>(ref->width()) * ref->sample_bytes() * ref->height();
   if (expected > kMaxPlaneBytes) {
     throw CacheError(OVT_E_CORRUPT, "cache: PlaneRef describes a plane larger than 1 GiB");
   }
-  out.bytes = decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes, expected);  // I6 size check
-  out.view.stride_bytes = ref->width() * ref->sample_bytes();
-  out.view.data = out.bytes.data();
-  return out;
+  return plane_data(*ref, stage, plane, decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes, expected));
 }
 
 void Entry::put_report(std::string_view kind, std::span<const std::uint8_t> fb) {
@@ -798,11 +983,15 @@ void Entry::put_report(std::string_view kind, std::span<const std::uint8_t> fb) 
     throw CacheError(OVT_E_INVALID_ARG, "cache: empty report");
   }
   const std::vector<std::uint8_t> prefixed = add_size_prefix(fb);
-  const std::lock_guard<std::mutex> lock(impl_->mu);
-  const fs::path path = impl_->report_path(kind);
-  ensure_directory(path.parent_path());
-  const std::vector<std::uint8_t> compressed = impl_->compressor.compress(prefixed, kZstdLevelFrames);
-  impl_->replace_file_locked(path, compressed);
+  {
+    const std::lock_guard<std::mutex> lock(impl_->mu);
+    impl_->touch_locked();
+    const fs::path path = impl_->report_path(kind);
+    ensure_directory(path.parent_path());
+    const std::vector<std::uint8_t> compressed = impl_->compressor.compress(prefixed, kZstdLevelFrames);
+    impl_->replace_file_locked(path, compressed);
+  }
+  impl_->after_write();
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_report(std::string_view kind) const {
@@ -814,12 +1003,21 @@ std::optional<std::vector<std::uint8_t>> Entry::get_report(std::string_view kind
   if (!fs::is_regular_file(path, ec)) {
     return std::nullopt;
   }
+  impl_->touch();
   const std::vector<std::uint8_t> prefixed = decompress(read_file(path, kMaxRecordBytes), kMaxRecordBytes);
   if (prefixed.size() < kSizePrefix ||
       flatbuffers::ReadScalar<flatbuffers::uoffset_t>(prefixed.data()) != prefixed.size() - kSizePrefix) {
     throw CacheError(OVT_E_CORRUPT, "cache: '" + path.string() + "' has a wrong size prefix");
   }
   return strip_size_prefix(prefixed);
+}
+
+bool Entry::invalidating() const {
+  return impl_->read_policy().invalidating;
+}
+
+std::optional<SelectedPlugin> Entry::selected_plugin() const {
+  return impl_->read_policy().plugin;
 }
 
 void Entry::flush() {
@@ -914,16 +1112,23 @@ void load_or_create_meta(Entry::Impl& impl, bool dir_exists) {
   if (impl.meta.source_hash != impl.hex_hash) {
     throw CacheError(OVT_E_CORRUPT, "cache: '" + meta_path.string() + "' names another source_hash");
   }
+  const auto t = now();
   const std::string previous = impl.meta.last_used.value_or(std::string());
-  if (previous.empty() || previous < format_iso8601_utc(std::chrono::system_clock::now() - kLastUsedThrottle)) {
-    impl.meta.last_used = now_iso8601();
+  if (previous.empty() || previous < format_iso8601_utc(t - kLastUsedThrottle)) {
+    impl.meta.last_used = format_iso8601_utc(t);
     impl.dirty = true;
   }
+  impl.last_touch = t;
 }
 
 }  // namespace
 
 std::shared_ptr<Entry> Cache::entry(const SourceHash& hash) {
+  const std::lock_guard<std::mutex> open_lock(impl_->open_mu);
+  return entry_locked(hash);
+}
+
+std::shared_ptr<Entry> Cache::entry_locked(const SourceHash& hash) {
   const std::string hex_hash = hex(hash);
   std::optional<std::uint64_t> known_bytes;
   {
@@ -964,15 +1169,38 @@ std::shared_ptr<Entry> Cache::entry(const SourceHash& hash) {
   std::shared_ptr<Entry> entry(new Entry(eimpl, hash, eimpl->dir));
   {
     const std::lock_guard<std::mutex> lock(impl_->mu);
-    if (const auto it = impl_->live.find(hex_hash); it != impl_->live.end()) {
-      if (auto alive = it->second.lock()) {
-        return alive;  // another thread won the race; ours is discarded (its destructor flushes nothing new)
-      }
-    }
-    impl_->live[hex_hash] = entry;
+    impl_->live[hex_hash] = entry;  // open_mu is held: no other thread created this entry meanwhile
   }
   entry->flush();  // records the entry in cache.json
   return entry;
+}
+
+std::shared_ptr<Entry> Cache::open_entry(const SourceHash& hash, fb::Codec codec, std::optional<SelectedPlugin> plugin,
+                                         InvalidationReason* reason) {
+  if (reason != nullptr) {
+    *reason = InvalidationReason::None;
+  }
+  const std::string hex_hash = hex(hash);
+  const std::lock_guard<std::mutex> open_lock(impl_->open_mu);
+  bool open = false;
+  {
+    const std::lock_guard<std::mutex> lock(impl_->mu);
+    open = impl_->live.contains(hex_hash);
+  }
+  // An open entry was checked when it was created; deleting it under its handles is not an option.
+  if (!open) {
+    const InvalidationReason r = impl_->discard_failing_dir(hex_hash, codec);
+    if (reason != nullptr) {
+      *reason = r;
+    }
+  }
+  std::shared_ptr<Entry> e = entry_locked(hash);
+  {
+    const std::lock_guard<std::mutex> lock(e->impl_->mu);
+    e->impl_->invalidating = true;
+    e->impl_->plugin = std::move(plugin);
+  }
+  return e;
 }
 
 void Cache::flush() {
