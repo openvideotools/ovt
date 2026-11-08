@@ -16,8 +16,8 @@ endforeach()
 
 file(GLOB names RELATIVE "${WORK}/a" "${WORK}/a/*")
 list(LENGTH names count)
-if(count LESS 3)
-  message(FATAL_ERROR "gen_fixtures wrote only ${count} files, expected at least 3")
+if(count LESS 8)
+  message(FATAL_ERROR "gen_fixtures wrote only ${count} files, expected at least 8")
 endif()
 foreach(name IN LISTS names)
   execute_process(COMMAND "${CMAKE_COMMAND}" -E compare_files "${WORK}/a/${name}" "${WORK}/b/${name}"

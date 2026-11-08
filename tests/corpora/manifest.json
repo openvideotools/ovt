@@ -21403,7 +21403,11 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true
+      "sha256": "a6a40473f15d3487852b5e0f03141f6dac2defadd1405e8b2624e9ed32ec5ffc",
+      "size_bytes": 5625896,
+      "files": {
+        "synthetic_4k_grid.fb": "a6a40473f15d3487852b5e0f03141f6dac2defadd1405e8b2624e9ed32ec5ffc"
+      }
     },
     {
       "id": "fixture_synthetic_4k_mv",
@@ -21413,7 +21417,11 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true
+      "sha256": "a13988b49df005f249ec232a0d50a28ed7ba9738264de99dc01dab32b6ccd2be",
+      "size_bytes": 45193568,
+      "files": {
+        "synthetic_4k_mv.fb": "a13988b49df005f249ec232a0d50a28ed7ba9738264de99dc01dab32b6ccd2be"
+      }
     },
     {
       "id": "fixture_synthetic_8k_mv",
@@ -21423,7 +21431,11 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true
+      "sha256": "d1360c8344568f5a88a4e55ff891cff19107013472742d03da5c4a6f81084f3c",
+      "size_bytes": 180783728,
+      "files": {
+        "synthetic_8k_mv.fb": "d1360c8344568f5a88a4e55ff891cff19107013472742d03da5c4a6f81084f3c"
+      }
     },
     {
       "id": "fixture_real_1080p_hevc_frame",
@@ -21453,7 +21465,13 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true
+      "sha256": "886e7d8c6df3ef980a4c7e930229963af0b3357fe2db985b0510556878a7b0a2",
+      "size_bytes": 64,
+      "files": {
+        "f000.bin": "886e7d8c6df3ef980a4c7e930229963af0b3357fe2db985b0510556878a7b0a2",
+        "f030.bin": "b0c12ef6cd3e6fa09b12e3d764b16dd419c79457d258bacb1f39c0c439a16431",
+        "f059.bin": "97894b0fabe0cf4ab854fea09da85e417ae5a6e90d70f6b228153d8011a7529f"
+      }
     }
   ]
 }

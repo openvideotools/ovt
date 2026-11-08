@@ -50,7 +50,11 @@ Menu {
                 ActionGroup.group: menuItem.entry.group === "theme" ? menu.actions.themeGroup : null
                 enabled: menu.actions.isEnabled(menuItem.entry.id)
                 checked: menu.actions.isChecked(menuItem.entry.id)
-                onTriggered: menu.actions.trigger(menuItem.entry.id)
+                onTriggered: {
+                    menu.actions.trigger(menuItem.entry.id)
+                    // Clicking a checkable item sets `checked` itself, which breaks the binding; restore it.
+                    checked = Qt.binding(() => menu.actions.isChecked(menuItem.entry.id))
+                }
             }
         }
     }

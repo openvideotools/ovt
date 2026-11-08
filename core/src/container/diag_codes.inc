@@ -15,6 +15,10 @@ X(CNT_0006, "CNT-0006", Fatal,
   "file shorter than 8 bytes or first 8 bytes not a plausible box header after sniffing as ISOBMFF", "")
 X(CNT_0007, "CNT-0007", Info,
   "box at offset `o` not yet expanded (lazy; call `ovt_container_expand`)", "")
+X(CNT_IVF_0001, "CNT-IVF-0001", Info, "IVF `header_size` is `N` (≠ 32); first frame taken at that offset", "libvpx ivfdec.c")
+X(CNT_IVF_0002, "CNT-IVF-0002", Info, "IVF header `frame_count` `N` differs from the walked count `M`", "libvpx ivfdec.c")
+X(CNT_IVF_0003, "CNT-IVF-0003", Warning,
+  "last IVF frame truncated: `frame_size` `N` exceeds EOF by `M` bytes (clamped)", "")
 
 // WI-1.226 (Annex B splitter, §8.6.3).
 X(CNT_ESB_0001, "CNT-ESB-0001", Warning, "`N` bytes of garbage before the first start code / after the last NAL unit",

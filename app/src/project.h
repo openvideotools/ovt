@@ -3,7 +3,7 @@
 //
 // The project model of chapter 11 §11.2.6 (WI-1.454): the files of a session with their roles, the `.ovtproj`
 // JSON document (schema docs/spec/schemas/ovtproj.schema.json), relative paths, autosave and recovery, the recent
-// files list (FR-GUI-027). The Raw format dialog model and the dialogs follow in part b of the work item.
+// files list (FR-GUI-027) and the raw-YUV format model behind the Raw format dialog (§11.8).
 //
 // SPEC-ASSUMPTION(#243): ovt_container_open and ovt_stream_build_index (WI-1.217, WI-1.121) are not merged yet.
 // Project therefore records the opened file and emits fileOpened(id); the container -> track choice -> index job
@@ -14,9 +14,11 @@
 
 #include <QtQml/qqmlregistration.h>
 #include <QDateTime>
+#include <QImage>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QObject>
+#include <QQuickImageProvider>
 #include <QString>
 #include <QTimer>
 #include <QVariantList>
@@ -208,6 +210,75 @@ class RecentFiles : public QObject {
 
   QString file_;
   QVector<Entry> entries_;
+};
+
+// Model of the Raw format dialog (§11.8, WI-1.454 acceptance test 3): width, height, chroma format, bit depth and
+// frame rate of a raw .yuv file. Every change re-checks the file size (GUI-RAW-0001) and re-renders the luma of
+// frame 0 into `preview` synchronously (well inside the 200 ms budget for pictures up to 4K).
+class RawFormatModel : public QObject {
+  Q_OBJECT
+  QML_ELEMENT
+  Q_PROPERTY(QString path READ path WRITE setPath NOTIFY changed)
+  Q_PROPERTY(int width READ width WRITE setWidth NOTIFY changed)
+  Q_PROPERTY(int height READ height WRITE setHeight NOTIFY changed)
+  Q_PROPERTY(QString chromaFormat READ chromaFormat WRITE setChromaFormat NOTIFY changed)
+  Q_PROPERTY(int bitDepth READ bitDepth WRITE setBitDepth NOTIFY changed)
+  Q_PROPERTY(double fps READ fps WRITE setFps NOTIFY changed)
+  Q_PROPERTY(QString diagnosticCode READ diagnosticCode NOTIFY changed)
+  Q_PROPERTY(QString diagnosticMessage READ diagnosticMessage NOTIFY changed)
+  Q_PROPERTY(int frameCount READ frameCount NOTIFY changed)
+  Q_PROPERTY(QString previewSource READ previewSource NOTIFY changed)
+
+ public:
+  explicit RawFormatModel(QObject* parent = nullptr);
+
+  [[nodiscard]] QString path() const { return path_; }
+  void setPath(const QString& path);
+  [[nodiscard]] int width() const { return format_.width; }
+  void setWidth(int width);
+  [[nodiscard]] int height() const { return format_.height; }
+  void setHeight(int height);
+  [[nodiscard]] QString chromaFormat() const { return format_.chroma_format; }
+  void setChromaFormat(const QString& chroma);
+  [[nodiscard]] int bitDepth() const { return format_.bit_depth; }
+  void setBitDepth(int bit_depth);
+  [[nodiscard]] double fps() const { return format_.fps; }
+  void setFps(double fps);
+  [[nodiscard]] const RawFormat& format() const { return format_; }
+  [[nodiscard]] QString diagnosticCode() const { return diagnostic_code_; }
+  [[nodiscard]] QString diagnosticMessage() const { return diagnostic_message_; }
+  [[nodiscard]] int frameCount() const { return frame_count_; }
+  [[nodiscard]] const QImage& preview() const { return preview_; }
+  // "image://rawpreview/<serial>": changes with every re-render so QML reloads the image.
+  [[nodiscard]] QString previewSource() const;
+
+  // The whole-frame size check without a model (used by the tests and the open flow).
+  static QString checkSize(const RawFormat& format, std::uint64_t file_size, std::uint64_t* expected);
+  // Luma of frame 0 as an 8-bit gray image; null when the file or the format is unusable.
+  static QImage renderPreview(const QString& path, const RawFormat& format);
+
+ Q_SIGNALS:
+  void changed();
+
+ private:
+  void update();
+
+  QString path_;
+  RawFormat format_;
+  QString diagnostic_code_;
+  QString diagnostic_message_;
+  int frame_count_ = 0;
+  QImage preview_;
+  int serial_ = 0;
+};
+
+// Serves the latest Raw-format preview as image://rawpreview/<serial> (register with
+// QQmlEngine::addImageProvider("rawpreview", new RawPreviewProvider)).
+class RawPreviewProvider : public QQuickImageProvider {
+ public:
+  RawPreviewProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
+  QImage requestImage(const QString& id, QSize* size, const QSize& requested_size) override;
+  static void publish(const QImage& image);
 };
 
 }  // namespace ovt::app

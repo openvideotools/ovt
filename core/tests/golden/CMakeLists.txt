@@ -5,7 +5,7 @@
 # directory are written by gen_fixtures from builder code and are never edited by hand; test_model_roundtrip
 # (core/tests/model/) reads them, golden_fixtures_regen regenerates them and diffs.
 
-add_library(ovt_golden_fixtures STATIC fixture_hevc.cpp sha256.cpp)
+add_library(ovt_golden_fixtures STATIC fixture_av1.cpp fixture_h264.cpp fixture_hevc.cpp inspect_json.cpp sha256.cpp)
 target_include_directories(ovt_golden_fixtures PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 # ovt_schemas orders the build after flatc and puts the generated headers on the (system) include path.
 target_link_libraries(ovt_golden_fixtures PUBLIC ovt_schemas ${flatbuffers_TARGET} PRIVATE ovt::flags)

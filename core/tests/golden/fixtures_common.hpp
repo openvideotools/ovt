@@ -128,6 +128,35 @@ struct GridPainter {
   return std::make_unique<fb::FrameId>(decode, display);
 }
 
+/// One MotionVector record (§6.2.3 units already applied by the caller).
+struct MvSpec {
+  std::uint32_t block_id;
+  std::uint8_t list;
+  std::int8_t ref;
+  Box box;
+  std::int16_t mv_x;
+  std::int16_t mv_y;
+  std::int16_t mvd_x;
+  std::int16_t mvd_y;
+  std::string predictor;
+  std::uint16_t flags;
+};
+
+[[nodiscard]] inline std::unique_ptr<fb::MotionVectorT> make_mv(MvSpec spec) {
+  auto mv = std::make_unique<fb::MotionVectorT>();
+  mv->block_id = spec.block_id;
+  mv->list = spec.list;
+  mv->ref = spec.ref;
+  mv->rect = rect(spec.box);
+  mv->mv_x = spec.mv_x;
+  mv->mv_y = spec.mv_y;
+  mv->mvd_x = spec.mvd_x;
+  mv->mvd_y = spec.mvd_y;
+  mv->predictor = std::move(spec.predictor);
+  mv->flags = spec.flags;
+  return mv;
+}
+
 /// A SyntaxNode leaf (§0.5.2).
 struct NodeSpec {
   std::string name;
@@ -182,6 +211,18 @@ struct NodeSpec {
     planes.push_back(std::move(ref));
   }
   return planes;
+}
+
+/// Number of cells of @p grid whose ref0 or ref1 equals @p index (rule V-016).
+[[nodiscard]] inline std::uint32_t usage_cells(const fb::CellGridT& grid, std::int8_t index) {
+  std::uint32_t n = 0;
+  for (const auto ref : grid.ref0) {
+    n += ref == index ? 1U : 0U;
+  }
+  for (const auto ref : grid.ref1) {
+    n += ref == index ? 1U : 0U;
+  }
+  return n;
 }
 
 /// 256-bin QP histogram (rule V-028): bin = qp + @p bias, bias 128 for H.26x, 0 for AV1.

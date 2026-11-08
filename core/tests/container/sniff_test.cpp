@@ -205,12 +205,13 @@ TEST_CASE("ovt_container_open on a 7-byte file returns OVT_E_UNSUPPORTED", "[con
 }
 
 TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][fast]") {
-  const TempFile f("ivf.ivf", make({'D', 'K', 'I', 'F'}, 64));
+  // ISOBMFF keeps the stub reader until WI-1.201; the IVF reader has its own tests (ivf_test.cpp).
+  const TempFile f("stub.mp4", box(32, "ftyp", 64));
   ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
   ovt_Container* c = nullptr;
   REQUIRE(ovt_container_open(&handle, &c) == OVT_OK);
   REQUIRE(c != nullptr);
-  CHECK(std::string(ovt_container_format(c)) == "ivf");
+  CHECK(std::string(ovt_container_format(c)) == "isobmff");
   CHECK(ovt_container_size(c) == 64);
   CHECK(ovt_container_track_count(c) == 0);
   const ovt_Buffer tree = ovt_container_tree(c);
