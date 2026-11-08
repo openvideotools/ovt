@@ -244,6 +244,7 @@ runs:
       run: |
         # After the corpora fetch on purpose: the corpus post steps keep using the archive's ffmpeg.
         docker build -t ovt-ffmpeg-container tools/ci/ffmpeg-container
+        docker image inspect --format 'base image digest: {{index .RepoDigests 0}}' ubuntu:24.04 || true
         wrapper="${RUNNER_TEMP}/ffmpeg-container/ffmpeg"
         mkdir -p "$(dirname "$wrapper")"
         cat > "$wrapper" <<EOF
