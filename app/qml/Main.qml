@@ -167,19 +167,18 @@ ApplicationWindow {
 
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
     DockWorkspace {
+        id: dockWorkspace
+
         anchors.fill: parent
         actions: actions
+        panelComponents: ({"diagnostics": diagnosticsComponent})
     }
 
-    // Until the Diagnostics / Log panel is a dock panel it sits over the bottom of the workspace, opened from the
-    // status bar badge.
-    DiagnosticsPanel {
-        id: diagnosticsPanel
+    // The Diagnostics / Log panel (§11.3.16) is a dock panel in the Bottom area; the status bar badge toggles it.
+    Component {
+        id: diagnosticsComponent
 
-        visible: false
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
+        DiagnosticsPanel {}
     }
 
     footer: ToolBar {
@@ -220,11 +219,11 @@ ApplicationWindow {
                 indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
                 Accessible.name: "Job progress"
             }
-            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click shows or hides the panel.
+            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click opens or closes the Diagnostics panel.
             ToolButton {
                 objectName: "statusDiagnostics"
                 text: DiagnosticsModel.errorCount > 0 ? DiagnosticsModel.errorCount + " errors" : "Diagnostics"
-                onClicked: diagnosticsPanel.visible = !diagnosticsPanel.visible
+                onClicked: DockModel.togglePanel("diagnostics")
                 Accessible.name: "Diagnostics"
                 palette.buttonText: DiagnosticsModel.errorCount > 0 ? "#ff6b6b" : OvtStyle.text
             }
