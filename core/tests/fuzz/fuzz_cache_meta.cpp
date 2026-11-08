@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// Fuzz target of the cache meta.json reader (chapter 06 §6.7.2, chapter 14 §14.7.1; WI-0.091 step 4, listed by
+// WI-0.094 as fuzz_cache_meta). The input is the whole document. A CacheError(OVT_E_CORRUPT) is the expected
+// answer to a malformed document; any other exception, a crash or a sanitizer report is a finding. A document
+// that parses must serialise and parse again to the same record (the writer never produces unreadable text).
+
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <span>
+
+#include "ovt/cxx/cache/error.hpp"
+#include "ovt/cxx/cache/meta.hpp"
+#include "ovt/status.h"
+
+namespace {
+
+void require(bool ok) {
+  if (!ok) {
+    std::abort();
+  }
+}
+
+}  // namespace
+
+extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size) {
+  const std::span<const std::uint8_t> input(data, size);
+  try {
+    const ovt::cache::Meta meta = ovt::cache::parse_meta(input);
+    const std::string text = ovt::cache::serialize_meta(meta);
+    require(ovt::cache::parse_meta(text) == meta);
+  } catch (const ovt::cache::CacheError& e) {
+    require(e.code == OVT_E_CORRUPT);
+  }
+  return 0;
+}
