@@ -10,8 +10,8 @@
 // and WITHOUT a size prefix. The cache adds the 4-byte prefix when it stores a record and strips it when it
 // reads one back, so put/get round trips are byte-identical.
 //
-// Invalidation (§6.7.3 I1–I7) is WI-0.092 part a; size-cap eviction (§6.7.4) follows in part b. Cache::entry() is the
-// raw access of `ovt cache import` and the C object API: it reports a malformed file as CacheError(OVT_E_CORRUPT) and
+// Invalidation (§6.7.3 I1–I7) and size-cap eviction (§6.7.4) are WI-0.092. Cache::entry() is the raw access
+// of `ovt cache import` and the C object API: it reports a malformed file as CacheError(OVT_E_CORRUPT) and
 // deletes nothing. Cache::open_entry() is the access of stream analysis: it applies I1–I4 to the directory
 // and switches the entry to invalidating reads (I5, I6), which delete a bad file and report a miss.
 
@@ -101,7 +101,49 @@ struct SelectedPlugin {
   friend bool operator==(const SelectedPlugin&, const SelectedPlugin&) = default;
 };
 
-/// The clock of last_used: system_clock::now(), unless a test fixed it.
+/// What one Cache::enforce_cap() run did (§6.7.4).
+struct EvictionResult {
+  std::uint64_t bytes_before = 0;
+  std::uint64_t bytes_after = 0;
+  std::vector<SourceHash> removed;  ///< entries deleted whole, in eviction order
+  std::vector<SourceHash> trimmed;  ///< entries that lost planes/, maps/ or frames/ but stayed
+  bool all_open = false;            ///< still above the cap because every remaining entry is open (MDL-CCH-0002)
+};
+
+/// Filters of Cache::clear(), as `ovt cache clear [--kind k] [--older-than <days>] [--source <path>]` (§12.2.13).
+/// An unset member matches everything.
+struct ClearFilter {
+  /// "index" (index.fb, container.fb.zst), "analysis" (frames/, planes/, reports/ other than metrics) or
+  /// "metrics" (maps/, metrics/, reports/metrics.fb.zst): only those files are deleted from matching entries.
+  std::optional<std::string> kind;
+  /// Entries whose last_used is at least this many days in the past; 0 matches every entry.
+  std::uint32_t older_than_days = 0;
+  /// The entry of one source (its §6.2.8 source hash).
+  std::optional<SourceHash> source;
+};
+
+/// What Cache::clear() did.
+struct ClearResult {
+  std::uint64_t bytes_freed = 0;
+  std::vector<SourceHash> removed;       ///< entries deleted whole
+  std::vector<SourceHash> trimmed;       ///< entries that lost the files of ClearFilter::kind
+  std::vector<SourceHash> skipped_open;  ///< matching entries left alone because they are open
+};
+
+/// One row of Cache::list() (`ovt cache list`, §12.2.13): one per entry and kind present in it.
+struct ListedRecord {
+  SourceHash key{};
+  std::string kind;         ///< "index", "analysis" or "metrics"
+  std::string source_name;  ///< meta.source_name, or "" when unknown
+  std::uint64_t size_bytes = 0;
+  std::string created;    ///< ISO-8601 UTC, "" when meta.json is unreadable
+  std::string last_used;  ///< ISO-8601 UTC
+};
+
+/// The kinds of ClearFilter::kind and ListedRecord::kind; std::nullopt for meta.json and unknown files.
+[[nodiscard]] std::optional<std::string_view> kind_of(const std::filesystem::path& relative) noexcept;
+
+/// The clock of last_used and of the eviction order: system_clock::now(), unless a test fixed it.
 [[nodiscard]] std::chrono::system_clock::time_point now();
 /// Test hook: fixes now() (std::nullopt restores the system clock). Process-wide.
 void set_now_for_testing(std::optional<std::chrono::system_clock::time_point> when);
@@ -212,6 +254,11 @@ class Cache {
   [[nodiscard]] const Options& options() const noexcept;
   /// `size_cap_bytes` as cache.json records it.
   [[nodiscard]] std::uint64_t max_bytes() const noexcept;
+  /// Records a new `size_cap_bytes` in cache.json (the persistent `--max-size` of §12.2.13; 0 restores
+  /// kDefaultMaxBytes). Does not evict by itself: call enforce_cap(). CacheError(OVT_E_UNSUPPORTED) when
+  /// read-only.
+  void set_max_bytes(std::uint64_t max_bytes);
+
   /// The entry of @p hash, creating its directory and meta.json when absent (read-only: CacheError(OVT_E_IO)
   /// when absent). Stale *.tmp files under the directory are removed (crash recovery, §6.7.2).
   /// CacheError(OVT_E_CORRUPT) when meta.json exists but does not parse.
@@ -222,14 +269,30 @@ class Cache {
   /// I5/I6 against @p plugin (std::nullopt: no plugin check). @p codec is the stream's codec: an index.fb of
   /// another codec fails I4. On a read-only cache a failing entry throws CacheError(OVT_E_CORRUPT).
   /// @p reason, when given, receives the rule that rejected the old directory (None when it was kept or new).
-  // SPEC-ASSUMPTION(#295): open_entry applies I1–I7 and invalidating reads; entry() and the C object API stay
-  // raw; plugin_caps is the selected plugin's id and version, codec the stream's codec (I4).
   [[nodiscard]] std::shared_ptr<Entry> open_entry(const SourceHash& hash, fb::Codec codec,
                                                   std::optional<SelectedPlugin> plugin,
                                                   InvalidationReason* reason = nullptr);
 
   /// Source hashes of every entry directory listed in cache.json, sorted.
   [[nodiscard]] std::vector<SourceHash> entries() const;
+
+  /// Sum of cache.json `entries[].bytes`, kept incrementally (no directory walk).
+  [[nodiscard]] std::uint64_t total_bytes() const;
+
+  /// The eviction of §6.7.4: when the total exceeds max_bytes(), entries that are not open are trimmed in
+  /// order of oldest last_used (planes/, then maps/, then frames/, then the whole directory) until the total
+  /// is at most 0.9 x max_bytes(). If only open entries remain above the cap, MDL-CCH-0002 is logged once per
+  /// Cache. Runs at open() and after every write that pushes the total above the cap; a no-op when read-only.
+  EvictionResult enforce_cap();
+
+  /// Deletes the entries (or, with ClearFilter::kind, the files of that kind) that match @p filter; open
+  /// entries are skipped. cache.json follows. CacheError(OVT_E_INVALID_ARG) for an unknown kind,
+  /// CacheError(OVT_E_UNSUPPORTED) on a read-only cache.
+  ClearResult clear(const ClearFilter& filter);
+
+  /// One row per entry and kind (`ovt cache list`), sorted by key and kind. Re-walks every entry directory and
+  /// corrects cache.json `bytes` from what it finds (the only walk besides a missing cache.json, §6.7.4 notes).
+  [[nodiscard]] std::vector<ListedRecord> list();
 
   /// Flushes every live entry's meta.json and then cache.json.
   void flush();
