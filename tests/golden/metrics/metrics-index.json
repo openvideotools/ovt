@@ -1,0 +1,108 @@
+{
+ "bd": {
+  "aom6_overlap": "bd/aom6_overlap.bd.json",
+  "aom6_partial": "bd/aom6_partial.bd.json",
+  "jvet4_overlap": "bd/jvet4_overlap.bd.json",
+  "jvet4_partial": "bd/jvet4_partial.bd.json"
+ },
+ "pairs": {
+  "netflix_src01_576x324": {
+   "bit_depth": 8,
+   "checks": {
+    "netflix_vmaf_mean": {
+     "got": 76.668905,
+     "want": 76.66890519623931
+    },
+    "x264_log": {
+     "frames": 48,
+     "x264_log_mean_y": 0.9389421,
+     "x264_ssim_mean_y": 0.9388505
+    }
+   },
+   "dist_sha256": "20f2c0bff4af864c7ead1f47369fe2d72354c092e0b4020f28a5b82de05c850c",
+   "failed": {},
+   "frames": 48,
+   "goldens": {
+    "ciede": "netflix_src01_576x324.ciede.json.gz",
+    "ffpsnr": "netflix_src01_576x324.ffpsnr.json.gz",
+    "ffvmaf": "netflix_src01_576x324.ffvmaf.json.gz",
+    "psnrhvs": "netflix_src01_576x324.psnrhvs.json.gz",
+    "vmaf_4k_v0.6.1.vmaf": "netflix_src01_576x324.vmaf_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_b_v0.6.3.vmaf": "netflix_src01_576x324.vmaf_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_4k_v0.6.1.vmaf": "netflix_src01_576x324.vmaf_float_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_float_b_v0.6.3.vmaf": "netflix_src01_576x324.vmaf_float_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_v0.6.1.vmaf": "netflix_src01_576x324.vmaf_float_v0.6.1.vmaf.json.gz",
+    "vmaf_float_v0.6.1neg.vmaf": "netflix_src01_576x324.vmaf_float_v0.6.1neg.vmaf.json.gz",
+    "vmaf_v0.6.1-sub5.vmaf": "netflix_src01_576x324.vmaf_v0.6.1-sub5.vmaf.json.gz",
+    "vmaf_v0.6.1.vmaf": "netflix_src01_576x324.vmaf_v0.6.1.vmaf.json.gz",
+    "vmaf_v0.6.1neg.vmaf": "netflix_src01_576x324.vmaf_v0.6.1neg.vmaf.json.gz",
+    "x264ssim": "netflix_src01_576x324.x264ssim.json.gz"
+   },
+   "height": 324,
+   "ref_sha256": "0d960a3552f21e4f1b2879c09c9b4cf3b2f1bab495f70a43c4861730d46c3f6a",
+   "skipped": {},
+   "width": 576
+  },
+  "syn_metrics_1080p": {
+   "bit_depth": 8,
+   "checks": {},
+   "dist_sha256": "02be738268d69daed43a3d1747e24c1f243ce3400a4b4dab18b7c415c5e7a387",
+   "failed": {},
+   "frames": 60,
+   "goldens": {
+    "ciede": "syn_metrics_1080p.ciede.json.gz",
+    "ffpsnr": "syn_metrics_1080p.ffpsnr.json.gz",
+    "ffvmaf": "syn_metrics_1080p.ffvmaf.json.gz",
+    "psnrhvs": "syn_metrics_1080p.psnrhvs.json.gz",
+    "vmaf_4k_v0.6.1.vmaf": "syn_metrics_1080p.vmaf_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_b_v0.6.3.vmaf": "syn_metrics_1080p.vmaf_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_4k_v0.6.1.vmaf": "syn_metrics_1080p.vmaf_float_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_float_b_v0.6.3.vmaf": "syn_metrics_1080p.vmaf_float_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_v0.6.1.vmaf": "syn_metrics_1080p.vmaf_float_v0.6.1.vmaf.json.gz",
+    "vmaf_float_v0.6.1neg.vmaf": "syn_metrics_1080p.vmaf_float_v0.6.1neg.vmaf.json.gz",
+    "vmaf_v0.6.1-sub5.vmaf": "syn_metrics_1080p.vmaf_v0.6.1-sub5.vmaf.json.gz",
+    "vmaf_v0.6.1.vmaf": "syn_metrics_1080p.vmaf_v0.6.1.vmaf.json.gz",
+    "vmaf_v0.6.1neg.vmaf": "syn_metrics_1080p.vmaf_v0.6.1neg.vmaf.json.gz",
+    "x264ssim": "syn_metrics_1080p.x264ssim.json.gz"
+   },
+   "height": 1080,
+   "ref_sha256": "9edf3d9586e057a335983fae538939fa0e0e564ffac4db618a54f22c896858e1",
+   "skipped": {},
+   "width": 1920
+  },
+  "syn_metrics_pq_1080p": {
+   "bit_depth": 10,
+   "checks": {},
+   "dist_sha256": "f939be50c02651436f9457ce796e55d178e0ea36824290e835b6d9384a864bab",
+   "failed": {},
+   "frames": 60,
+   "goldens": {
+    "ciede": "syn_metrics_pq_1080p.ciede.json.gz",
+    "ffpsnr": "syn_metrics_pq_1080p.ffpsnr.json.gz",
+    "ffvmaf": "syn_metrics_pq_1080p.ffvmaf.json.gz",
+    "psnrhvs": "syn_metrics_pq_1080p.psnrhvs.json.gz",
+    "vmaf_4k_v0.6.1.vmaf": "syn_metrics_pq_1080p.vmaf_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_b_v0.6.3.vmaf": "syn_metrics_pq_1080p.vmaf_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_4k_v0.6.1.vmaf": "syn_metrics_pq_1080p.vmaf_float_4k_v0.6.1.vmaf.json.gz",
+    "vmaf_float_b_v0.6.3.vmaf": "syn_metrics_pq_1080p.vmaf_float_b_v0.6.3.vmaf.json.gz",
+    "vmaf_float_v0.6.1.vmaf": "syn_metrics_pq_1080p.vmaf_float_v0.6.1.vmaf.json.gz",
+    "vmaf_float_v0.6.1neg.vmaf": "syn_metrics_pq_1080p.vmaf_float_v0.6.1neg.vmaf.json.gz",
+    "vmaf_v0.6.1-sub5.vmaf": "syn_metrics_pq_1080p.vmaf_v0.6.1-sub5.vmaf.json.gz",
+    "vmaf_v0.6.1.vmaf": "syn_metrics_pq_1080p.vmaf_v0.6.1.vmaf.json.gz",
+    "vmaf_v0.6.1neg.vmaf": "syn_metrics_pq_1080p.vmaf_v0.6.1neg.vmaf.json.gz",
+    "x264ssim": "syn_metrics_pq_1080p.x264ssim.json.gz"
+   },
+   "height": 1080,
+   "ref_sha256": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e",
+   "skipped": {},
+   "width": 1920
+  }
+ },
+ "versions": {
+  "bjontegaard": "1.3.0",
+  "daala": "Daala 24f889aaabe33bc390b993d737d830b8dd367e61",
+  "ffmpeg": "ffmpeg version n7.1.1 Copyright (c) 2000-2025 the FFmpeg developers",
+  "vmaf": "17a67b2",
+  "x264": "x264 0.164.3191 4613ac3"
+ }
+}

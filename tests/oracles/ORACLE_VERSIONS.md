@@ -84,8 +84,8 @@ the `v3.0.0` tag, so it reports the pinned commit's short hash.
 <!-- oracle-versions:end -->
 
 `gst_parse_oracle` (WI-0.562), `hm_cu_dump` and `ffmpeg_mvs` (WI-0.563) are built from the sources in this directory.
-`x264_ssim` (WI-0.565) is built from `x264_ssim/` the same way; the other in-house oracle program (`mpv_capture.py`) is added to
-the image's `oracles` stage, and to this table, by WI-1.575.
+`x264_ssim` (WI-0.565) is built from `x264_ssim/` the same way; the other in-house oracle program
+(`mpv_capture.py`) is added to the image's `oracles` stage, and to this table, by WI-1.575.
 
 ## Licences and distribution
 

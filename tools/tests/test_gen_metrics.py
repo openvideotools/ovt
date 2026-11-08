@@ -247,3 +247,22 @@ def test_a_golden_over_the_cap_is_refused(tmp_path: Path, monkeypatch: pytest.Mo
         ).returncode
         == 2
     )
+
+
+GOLDENS = REPO / "tests" / "golden" / "metrics"
+
+
+def test_committed_metric_goldens_are_complete_and_valid() -> None:
+    """WI-0.565: every golden in the index exists, matches the scores schema and is under the 2 MB gzip cap."""
+    index = json.loads((GOLDENS / "metrics-index.json").read_text(encoding="utf-8"))
+    assert set(index["pairs"]) == set(gen.PAIRS)
+    for pid, rec in index["pairs"].items():
+        assert rec["failed"] == {}, pid
+        assert len(rec["goldens"]) == 5 + len(gen.VMAF_MODELS) + 1, pid
+        for name in rec["goldens"].values():
+            path = GOLDENS / name
+            assert 0 < path.stat().st_size <= gen.MAX_GOLDEN_BYTES, name
+            assert canon.validate(json.loads(gzip.decompress(path.read_bytes())), "scores") == [], name
+    assert abs(index["pairs"][gen.NETFLIX_PAIR]["checks"]["netflix_vmaf_mean"]["got"] - gen.NETFLIX_VMAF) < 0.005
+    for name in index["bd"].values():
+        assert canon.validate(json.loads((GOLDENS / name).read_text(encoding="utf-8")), "scores") == [], name
