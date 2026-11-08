@@ -27,6 +27,8 @@ class Setup : public QObject {
     if (config_dir_.isValid()) {
       qputenv("OVT_CONFIG_DIR", config_dir_.path().toLocal8Bit());
     }
+    // A fresh profile: decide first-run now, before any test writes settings.json (WI-1.464).
+    static_cast<void>(ovt::app::Platform::isFirstRun());
     ovt::app::Platform::selectGraphicsApi();
     // As in main.cpp: the default style on macOS is the native one, whose menus have no content item.
     QQuickStyle::setStyle(QStringLiteral("Fusion"));

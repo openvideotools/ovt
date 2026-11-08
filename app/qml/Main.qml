@@ -158,9 +158,20 @@ ApplicationWindow {
     }
 
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
-    DockWorkspace {
+    // The first-run banners (§11.8) sit above the dock areas; the Welcome page is the Picture panel's content while no
+    // file is open (DockWorkspace).
+    ColumnLayout {
         anchors.fill: parent
-        actions: actions
+        spacing: 0
+
+        FirstRunBanner {
+            Layout.fillWidth: true
+        }
+        DockWorkspace {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            actions: actions
+        }
     }
 
     footer: ToolBar {

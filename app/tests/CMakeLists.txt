@@ -21,11 +21,13 @@ add_executable(
   models/test_keymap.cpp
   models/test_goto_parser.cpp
   models/test_dock_model.cpp
+  models/test_sample_streams.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
   ../src/goto_parser.cpp
   ../src/platform/platform.cpp
   ../src/models/jobs_model.cpp
+  ../src/models/sample_streams.cpp
   ../src/models/selection_model.cpp
   ../src/models/series_aggregator.cpp
   ../src/models/frame_table.cpp
