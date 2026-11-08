@@ -77,6 +77,8 @@ def reference_ssim(a: list[int], b: list[int], w: int, h: int, depth: int) -> fl
                     ss += a[i] * a[i] + b[i] * b[i]
                     s12 += a[i] * b[i]
             sums[bx, by] = (s1, s2, ss, s12)
+    c1: float
+    c2: float
     if depth <= 9:
         c1 = int(0.01 * 0.01 * peak * peak * 64 + 0.5)
         c2 = int(0.03 * 0.03 * peak * peak * 64 * 63 + 0.5)
