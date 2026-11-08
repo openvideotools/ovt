@@ -85,7 +85,7 @@ On every `git commit` they check the staged files:
 | `cmake-format` | `CMakeLists.txt`, `*.cmake` | Reformats with `.cmake-format.yaml`. |
 | `ruff`, `ruff-format` | Python | Lint and format, 120 columns. |
 | `mypy` | `tools/`, `python/` | Type check. |
-| `check-added-large-files` | all | Rejects committed files over 2 MB, so a golden must be stored gzip-compressed (corpora and big goldens are never committed). |
+| `check-added-large-files` | all | Rejects committed files over 2 MB, so a golden must be stored gzip-compressed (corpora are never committed). |
 | `end-of-file-fixer`, `trailing-whitespace` | all | Whitespace fixes. |
 | `shellcheck` | shell scripts | Lint. |
 | `pretty-format-kotlin` | `*.kt` | ktlint; needs a JDK. |
