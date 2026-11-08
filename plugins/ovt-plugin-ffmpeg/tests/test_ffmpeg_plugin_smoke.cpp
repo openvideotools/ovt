@@ -396,7 +396,7 @@ TEST_CASE("ffmpeg plugin: ovt_plugin_describe carries avcodec_configuration", "[
   std::printf("ovt_plugin_describe(): %s\n", s.c_str());
   CHECK(s.find("avcodec_configuration(): ") != std::string::npos);
 #if !OVT_FFMPEG_SYSTEM
-  CHECK(s.find("--enable-decoder=h264") != std::string::npos);
+  CHECK(s.find("--enable-decoder='h264") != std::string::npos);  // configure quotes values with a comma
 #if defined(__ANDROID__) && OVT_FFMPEG_HW_DECODE
   CHECK(s.find("--enable-mediacodec") != std::string::npos);
 #endif
