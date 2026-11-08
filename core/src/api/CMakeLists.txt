@@ -5,4 +5,4 @@
 # (§12.3.1 rule 8). WI-1.512 adds ovt/jobs.h and ovt/log.h; WI-1.101 adds ovt/io.h. Sources go into
 # ovt_core_objects.
 
-target_sources(ovt_core_objects PRIVATE file_api.cpp jobs_api.cpp log_api.cpp)
+target_sources(ovt_core_objects PRIVATE cache_api.cpp file_api.cpp jobs_api.cpp log_api.cpp)

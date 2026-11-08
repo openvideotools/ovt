@@ -9,11 +9,12 @@
 #   is included here. It defines OVT_TP_<dep>_{VERSION,URL,SHA256,LICENSE,PATCHES,ROW} per VERSIONS.md row and
 #   OVT_TP_DEPS. Editing VERSIONS.md re-runs configure. A version or hash is never written anywhere else.
 #
-#   ovt_tp_declare(<dep> [URL <url>] [SHA256 <hex>] [LICENSE <spdx>] [LICENSE_FILES <file>...] [NO_DOWNLOAD])
+#   ovt_tp_declare(<dep> [URL <url>] [SHA256 <hex>] [LICENSE <spdx>] [NO_DOWNLOAD] [LICENSE_FILES <file>...])
 #       Declares the use of the VERSIONS.md row <dep> (the lower-cased id: libaom, ffmpeg, ...). URL, SHA256
 #       and LICENSE default to the row's values and, when given, must equal them. Fails when the row is
 #       missing or has no SHA-256 yet. Downloads the archive into OVT_TP_DOWNLOADS at configure time and
 #       verifies its SHA-256; a mismatch fails configure naming the row (§13.3.7: every hash is verified).
+#       LICENSE_FILES comes last: every word after it is a file of the archive (LICENSE, PATENTS, COPYING, ...).
 #       Sets OVT_TP_<dep>_ARCHIVE to the local archive path. NO_DOWNLOAD skips the fetch (prebuilt kits
 #       verified by their own installer). Records the licence for ovt_tp_import_static().
 #
@@ -134,7 +135,17 @@ endif()
 
 # ---- ovt_tp_declare ---------------------------------------------------------------------------------
 function(ovt_tp_declare dep)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "NO_DOWNLOAD" "URL;SHA256;LICENSE" "LICENSE_FILES")
+  # Every word after LICENSE_FILES is a file name, even one spelled like a keyword: most archives ship a file
+  # called LICENSE, which cmake_parse_arguments would take for the LICENSE keyword.
+  set(args ${ARGN})
+  set(arg_LICENSE_FILES "")
+  list(FIND args LICENSE_FILES files_at)
+  if(NOT files_at EQUAL -1)
+    math(EXPR first_file "${files_at} + 1")
+    list(SUBLIST args ${first_file} -1 arg_LICENSE_FILES)
+    list(SUBLIST args 0 ${files_at} args)
+  endif()
+  cmake_parse_arguments(arg "NO_DOWNLOAD" "URL;SHA256;LICENSE" "" ${args})
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_declare(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
