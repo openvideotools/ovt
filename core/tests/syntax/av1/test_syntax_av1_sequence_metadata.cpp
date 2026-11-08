@@ -89,7 +89,7 @@ Bytes cat(std::initializer_list<Bytes> parts) {
 
 // A whole OBU: header byte (type, has_size), leb128 size, payload.
 Bytes obu(uint8_t type, const Bytes& payload) {
-  Bytes out{static_cast<uint8_t>((type << 3U) | 0x02U)};
+  Bytes out{static_cast<uint8_t>((static_cast<unsigned>(type) << 3U) | 0x02U)};
   size_t n = payload.size();
   do {
     auto byte = static_cast<uint8_t>(n & 0x7FU);
