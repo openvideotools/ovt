@@ -38,14 +38,14 @@ QString write_manifest(const QTemporaryDir& dir, const QJsonArray& entries) {
 }  // namespace
 
 TEST_CASE("SampleStreams: the smallest fast entries with a URL, at most five", "[fast][gui][welcome]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   QJsonArray entries;
   for (int i = 0; i < 8; ++i) {
     entries.append(entry(qPrintable(QString("s%1").arg(8 - i)), 2048.0 * (8 - i), true));
   }
   entries.append(entry("slow", 1.0, false));
   entries.append(entry("nourl", 2.0, true, ""));
-  ovt::app::SampleStreams model(write_manifest(dir, entries));
+  const ovt::app::SampleStreams model(write_manifest(dir, entries));
   REQUIRE(model.available());
   const QVariantList list = model.entries();
   REQUIRE(list.size() == ovt::app::SampleStreams::kMaxEntries);
@@ -58,7 +58,7 @@ TEST_CASE("SampleStreams: the smallest fast entries with a URL, at most five", "
 }
 
 TEST_CASE("SampleStreams: a missing or broken manifest gives an empty list", "[fast][gui][welcome]") {
-  QTemporaryDir dir;
+  const QTemporaryDir dir;
   ovt::app::SampleStreams missing(dir.filePath("none.json"));
   CHECK_FALSE(missing.available());
   QFile bad(dir.filePath("bad.json"));

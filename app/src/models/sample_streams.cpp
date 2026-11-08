@@ -21,7 +21,7 @@ namespace {
 
 bool has_tag(const QJsonObject& entry, const QString& tag) {
   const QJsonArray tags = entry.value(QStringLiteral("tags")).toArray();
-  return std::ranges::any_of(tags, [&](const QJsonValue t) { return t.toString() == tag; });
+  return std::ranges::any_of(tags, [&](const QJsonValue& t) { return t.toString() == tag; });
 }
 
 }  // namespace
