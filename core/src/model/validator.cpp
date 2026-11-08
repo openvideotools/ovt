@@ -13,6 +13,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <string>
@@ -20,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "ovt/cxx/model/grid.hpp"
 #include "ovt/cxx/model/tree.hpp"
 #include "ovt_model_generated.h"
 
@@ -159,6 +161,20 @@ bool is_grid_kind(Codec codec, BlockKind kind) noexcept {
       return kind == BlockKind::Block || kind == BlockKind::SB;
     default:
       return false;
+  }
+}
+
+// Calls fn(index) for every grid cell inside rect r (clipped to the grid).
+template <class Fn>
+void for_cells_in(const fb::Rect& r, std::uint32_t cells_w, std::uint32_t cells_h, Fn&& fn) {
+  const std::int64_t x0 = std::max<std::int64_t>(0, r.x()) / 4;
+  const std::int64_t y0 = std::max<std::int64_t>(0, r.y()) / 4;
+  const std::int64_t x1 = std::min<std::int64_t>(cells_w, (std::int64_t{r.x()} + r.w() + 3) / 4);
+  const std::int64_t y1 = std::min<std::int64_t>(cells_h, (std::int64_t{r.y()} + r.h() + 3) / 4);
+  for (std::int64_t y = y0; y < y1; ++y) {
+    for (std::int64_t x = x0; x < x1; ++x) {
+      fn(static_cast<std::size_t>((y * cells_w) + x));
+    }
   }
 }
 
@@ -746,6 +762,784 @@ void v010_v011_v012(Ctx& c) {
   }
 }
 
+// ---- V-013 pred -----------------------------------------------------------------------------------------------
+
+void v013(Ctx& c) {
+  constexpr int kRule = 13;
+  const auto* g = c.fa().grid();
+  const auto* pred = g != nullptr ? c.cells(g->pred()) : nullptr;
+  if (pred == nullptr) {
+    return;
+  }
+  const auto* ids = c.cells(g->block_id());
+  for (std::size_t i = 0; i < pred->size(); ++i) {
+    const auto p = pred->Get(static_cast<flatbuffers::uoffset_t>(i));
+    if (p > static_cast<std::uint8_t>(fb::PredKind::MAX)) {
+      c.report(kRule, "pred " + str(p) + " is not a PredKind", at("grid.pred", i));
+      continue;
+    }
+    const auto* b = ids != nullptr ? c.block(ids->Get(static_cast<flatbuffers::uoffset_t>(i))) : nullptr;
+    if (b != nullptr && b->pred() != fb::PredKind::None && static_cast<std::uint8_t>(b->pred()) != p) {
+      c.report(kRule,
+               std::string("pred ") + fb::EnumNamePredKind(static_cast<fb::PredKind>(p)) + " != block " + str(b->id()) +
+                   " pred " + fb::EnumNamePredKind(b->pred()),
+               at("grid.pred", i));
+    }
+  }
+}
+
+// ---- V-014 refs -----------------------------------------------------------------------------------------------
+
+bool av1_intra_frame(const Ctx& c) {
+  const auto* f = c.fa().frame();
+  return f != nullptr && (f->type() == fb::FrameType::Key || f->type() == fb::FrameType::IntraOnly);
+}
+
+bool av1_inter_frame(const Ctx& c) {
+  const auto* f = c.fa().frame();
+  return f != nullptr && (f->type() == fb::FrameType::Inter || f->type() == fb::FrameType::Switch);
+}
+
+constexpr int kRuleV014 = 14;
+
+void v014_cells(Ctx& c, std::size_t n) {
+  constexpr int kRule = kRuleV014;
+  const auto* g = c.fa().grid();
+  const bool av1 = c.codec() == Codec::AV1;
+  for (const auto& [vec, name] : {std::pair{g != nullptr ? c.cells(g->ref0()) : nullptr, "grid.ref0"},
+                                  std::pair{g != nullptr ? c.cells(g->ref1()) : nullptr, "grid.ref1"}}) {
+    for (std::size_t i = 0; i < vsize(vec); ++i) {
+      // NOLINTNEXTLINE(bugprone-signed-char-misuse,cert-str34-c): an int8 index, not a character
+      const auto v = static_cast<int>(vec->Get(static_cast<flatbuffers::uoffset_t>(i)));
+      if (v < -1 || (v >= 0 && static_cast<std::size_t>(v) >= n)) {
+        c.report(kRule, "reference " + str(v) + " must be -1 or < refs.size() " + str(static_cast<std::int64_t>(n)),
+                 at(name, i));
+      } else if (av1 && v == 0) {
+        c.report(kRule, "AV1 cells never reference index 0 (the INTRA placeholder)", at(name, i));
+      }
+    }
+  }
+}
+
+void v014_av1(Ctx& c, const flatbuffers::Vector<flatbuffers::Offset<fb::RefSlot>>& refs) {
+  constexpr int kRule = kRuleV014;
+  const std::size_t n = refs.size();
+  if (n != 8) {
+    c.report(kRule, "AV1 refs must have 8 entries, has " + str(static_cast<std::int64_t>(n)), "refs");
+  }
+  const auto* r0 = refs.Get(0);
+  if (sv(r0->name()) != "INTRA") {
+    c.report(kRule, R"(AV1 refs[0].name must be "INTRA", is ")" + std::string(sv(r0->name())) + "\"", "refs[0].name");
+  }
+  if (r0->usage_cells() != 0) {
+    c.report(kRule, "AV1 refs[0].usage_cells must be 0, is " + str(r0->usage_cells()), "refs[0].usage_cells");
+  }
+  for (std::size_t t = 1; t < n; ++t) {
+    // NOLINTNEXTLINE(bugprone-signed-char-misuse,cert-str34-c): an int8 index, not a character
+    const auto slot = static_cast<int>(refs.Get(static_cast<flatbuffers::uoffset_t>(t))->slot());
+    if (av1_inter_frame(c) && (slot < 0 || slot > 7)) {
+      c.report(kRule, "AV1 inter frame: slot must be 0..7, is " + str(slot), at("refs", t, "slot"));
+    } else if (av1_intra_frame(c) && slot != -1) {
+      c.report(kRule, "AV1 intra frame: slot must be -1, is " + str(slot), at("refs", t, "slot"));
+    }
+  }
+}
+
+void v014(Ctx& c) {
+  constexpr int kRule = kRuleV014;
+  const auto* refs = c.fa().refs();
+  const std::size_t n = vsize(refs);
+  for (std::size_t k = 0; k < n; ++k) {
+    const auto* r = refs->Get(static_cast<flatbuffers::uoffset_t>(k));
+    if (r->index() != k) {
+      c.report(kRule, "refs[k].index must equal k, is " + str(r->index()), at("refs", k, "index"));
+    }
+    if (r->frame() != nullptr && r->frame()->decode_index() < -1) {
+      c.report(kRule, "frame.decode_index must be >= -1, is " + str(r->frame()->decode_index()),
+               at("refs", k, "frame.decode_index"));
+    }
+    if (r->slot() < -1 || r->slot() > 7) {
+      c.report(kRule, "slot must be -1 or 0..7, is " + str(r->slot()), at("refs", k, "slot"));
+    }
+  }
+  v014_cells(c, n);
+  if (c.codec() == Codec::AV1 && n > 0) {
+    v014_av1(c, *refs);
+  }
+}
+
+// ---- V-015 motion vectors -------------------------------------------------------------------------------------
+
+// V-015, grid part: every cell inside the MV's rect carries its vector and reference (when grid MVs exist).
+void v015_grid(Ctx& c, const fb::MotionVector& m, const fb::Rect& r, const std::string& path) {
+  const auto* g = c.fa().grid();
+  if (g == nullptr) {
+    return;
+  }
+  const auto* gx = c.cells(m.list() == 0 ? g->mv0_x() : g->mv1_x());
+  const auto* gy = c.cells(m.list() == 0 ? g->mv0_y() : g->mv1_y());
+  const auto* gr = c.cells(m.list() == 0 ? g->ref0() : g->ref1());
+  if (gx == nullptr) {
+    return;  // grid MVs compared only when present (WI-0.086 notes)
+  }
+  bool mismatch = false;
+  for_cells_in(r, c.cells_w(), c.cells_h(), [&](std::size_t i) {
+    const auto ui = static_cast<flatbuffers::uoffset_t>(i);
+    const bool differs = gx->Get(ui) != m.mv_x() || (gy != nullptr && gy->Get(ui) != m.mv_y()) ||
+                         (gr != nullptr && gr->Get(ui) != m.ref());
+    if (!mismatch && differs) {
+      mismatch = true;
+      c.report(15,
+               "grid list " + str(m.list()) + " cell " + str(static_cast<std::int64_t>(i)) +
+                   " disagrees with the motion vector (mv " + str(m.mv_x()) + "," + str(m.mv_y()) + " ref " +
+                   str(m.ref()) + ")",
+               path);
+    }
+  });
+}
+
+void v015(Ctx& c) {
+  constexpr int kRule = 15;
+  const auto* mvs = c.fa().mvs();
+  const auto n_refs = static_cast<std::int64_t>(vsize(c.fa().refs()));
+  for (std::size_t k = 0; k < vsize(mvs); ++k) {
+    const auto* m = mvs->Get(static_cast<flatbuffers::uoffset_t>(k));
+    const std::string path = at("mvs", k);
+    const auto* b = c.block(m->block_id());
+    if (b == nullptr) {
+      c.report(kRule, "block_id " + str(m->block_id()) + " is outside blocks", path + ".block_id");
+    }
+    if (m->list() > 1) {
+      c.report(kRule, "list must be 0 or 1, is " + str(m->list()), path + ".list");
+      continue;
+    }
+    if (m->ref() < 0 || m->ref() >= n_refs) {
+      c.report(kRule, "ref " + str(m->ref()) + " must be 0..refs.size()-1 (" + str(n_refs - 1) + ")", path + ".ref");
+    }
+    const auto* r = m->rect();
+    if (r == nullptr) {
+      c.report(kRule, "rect is missing", path + ".rect");
+      continue;
+    }
+    if (b != nullptr && b->rect() != nullptr && !rect_within(*r, *b->rect())) {
+      c.report(kRule, "rect " + rect_str(*r) + " is not within block " + str(b->id()) + " " + rect_str(*b->rect()),
+               path + ".rect");
+    }
+    v015_grid(c, *m, *r, path);
+  }
+}
+
+// ---- V-016 usage_cells ----------------------------------------------------------------------------------------
+
+void v016(Ctx& c) {
+  constexpr int kRule = 16;
+  const auto* refs = c.fa().refs();
+  if (vsize(refs) == 0) {
+    return;
+  }
+  std::array<std::uint64_t, 256> uses{};
+  const auto* g = c.fa().grid();
+  for (const auto* vec : {g != nullptr ? c.cells(g->ref0()) : nullptr, g != nullptr ? c.cells(g->ref1()) : nullptr}) {
+    for (std::size_t i = 0; i < vsize(vec); ++i) {
+      ++uses.at(static_cast<std::uint8_t>(vec->Get(static_cast<flatbuffers::uoffset_t>(i))));
+    }
+  }
+  for (std::size_t k = 0; k < refs->size(); ++k) {
+    const auto expected = k < 128 ? uses.at(k) : 0;
+    const auto actual = refs->Get(static_cast<flatbuffers::uoffset_t>(k))->usage_cells();
+    if (actual != expected) {
+      c.report(kRule, "usage_cells " + str(actual) + " != " + std::to_string(expected) + " cells referencing it",
+               at("refs", k, "usage_cells"));
+    }
+  }
+}
+
+// ---- V-017 partitions -----------------------------------------------------------------------------------------
+
+bool partition_kind_in_codec(Codec codec, fb::PartitionKind kind) noexcept {
+  using P = fb::PartitionKind;
+  switch (codec) {
+    case Codec::H264:
+      return kind == P::Slice;
+    case Codec::H265:
+      return kind == P::Slice || kind == P::SliceSegment || kind == P::Tile || kind == P::Substream;
+    case Codec::AV1:
+      return kind == P::TileGroup || kind == P::Tile;
+    default:
+      return kind <= P::MAX;
+  }
+}
+
+constexpr int kRuleV017 = 17;
+
+void v017_partition(Ctx& c, std::size_t p, const fb::PartitionInfo& part) {
+  constexpr int kRule = kRuleV017;
+  const auto* frame = c.fa().frame();
+  const auto* units = frame != nullptr ? frame->units() : nullptr;
+  if (part.index() != p) {
+    c.report(kRule, "partitions[p].index must equal p, is " + str(part.index()), at("partitions", p, "index"));
+  }
+  if (part.parent() < -1 || (part.parent() >= 0 && static_cast<std::size_t>(part.parent()) >= p)) {
+    c.report(kRule, "parent " + str(part.parent()) + " must be -1 or < " + str(static_cast<std::int64_t>(p)),
+             at("partitions", p, "parent"));
+  }
+  if (!partition_kind_in_codec(c.codec(), part.kind())) {
+    c.report(kRule,
+             std::string("kind ") + fb::EnumNamePartitionKind(part.kind()) + " is not used by " +
+                 fb::EnumNameCodec(c.codec()),
+             at("partitions", p, "kind"));
+  }
+  if (units == nullptr || std::find(units->begin(), units->end(), part.unit_index()) == units->end()) {
+    c.report(kRule, "unit_index " + str(part.unit_index()) + " is not one of frame.units",
+             at("partitions", p, "unit_index"));
+  }
+  if (const auto* span = part.file_span();
+      span != nullptr && span->length() <= UINT64_MAX / 8 && part.bit_count() > span->length() * 8) {
+    c.report(kRule,
+             "bit_count " + std::to_string(part.bit_count()) + " exceeds file_span.length*8 (" +
+                 std::to_string(span->length()) + " bytes)",
+             at("partitions", p, "bit_count"));
+  }
+}
+
+// Tiles (rect, partition index) must not overlap: sweep by x with a comparison budget, as in V-007.
+void v017_tile_overlap(Ctx& c, std::vector<std::pair<const fb::Rect*, std::size_t>>& tiles) {
+  std::sort(tiles.begin(), tiles.end(), [](const auto& a, const auto& b) {
+    return std::pair(a.first->x(), a.second) < std::pair(b.first->x(), b.second);
+  });
+  std::uint64_t budget = 16'000'000;
+  for (std::size_t i = 0; i < tiles.size() && budget > 0; ++i) {
+    const std::int64_t right = std::int64_t{tiles[i].first->x()} + tiles[i].first->w();
+    for (std::size_t j = i + 1; j < tiles.size() && tiles[j].first->x() < right && budget > 0; ++j, --budget) {
+      if (rects_overlap(*tiles[i].first, *tiles[j].first)) {
+        const auto lo = std::min(tiles[i].second, tiles[j].second);
+        const auto hi = std::max(tiles[i].second, tiles[j].second);
+        c.report(
+            kRuleV017,
+            "tiles " + str(static_cast<std::int64_t>(lo)) + " and " + str(static_cast<std::int64_t>(hi)) + " overlap",
+            at("partitions", hi, "rect"));
+      }
+    }
+  }
+}
+
+void v017(Ctx& c) {
+  constexpr int kRule = kRuleV017;
+  const auto* parts = c.fa().partitions();
+  const std::size_t n = vsize(parts);
+  const auto* frame = c.fa().frame();
+  const auto* coded = frame != nullptr ? frame->coded_size() : nullptr;
+  std::vector<std::pair<const fb::Rect*, std::size_t>> tiles;
+  for (std::size_t p = 0; p < n; ++p) {
+    const auto* part = parts->Get(static_cast<flatbuffers::uoffset_t>(p));
+    v017_partition(c, p, *part);
+    if (part->kind() != fb::PartitionKind::Tile) {
+      continue;
+    }
+    const auto* r = part->rect();
+    if (r == nullptr || coded == nullptr || r->w() <= 0 || r->h() <= 0 || !rect_within(*r, *coded)) {
+      c.report(kRule,
+               "tile rect " + (r == nullptr ? std::string("missing") : rect_str(*r)) + " must lie within coded_size",
+               at("partitions", p, "rect"));
+    } else {
+      tiles.emplace_back(r, p);
+    }
+  }
+  v017_tile_overlap(c, tiles);
+  const auto* g = c.fa().grid();
+  const auto* pid = g != nullptr ? c.cells(g->partition_id()) : nullptr;
+  for (std::size_t i = 0; i < vsize(pid); ++i) {
+    const auto v = pid->Get(static_cast<flatbuffers::uoffset_t>(i));
+    if (v >= n) {
+      c.report(kRule, "partition_id " + str(v) + " must be < partitions.size() " + str(static_cast<std::int64_t>(n)),
+               at("grid.partition_id", i));
+    }
+  }
+}
+
+// ---- V-018 field flag -----------------------------------------------------------------------------------------
+
+// True when the MB owning block @p id (the block itself or its nearest MB ancestor) is a field MB.
+bool owned_by_field_mb(const Ctx& c, std::uint32_t id) {
+  const fb::Block* mb = c.block(id);
+  for (int hops = 0; mb != nullptr && mb->kind() != BlockKind::MB && hops < 64; ++hops) {
+    mb = mb->parent() >= 0 ? c.block(static_cast<std::uint64_t>(mb->parent())) : nullptr;
+  }
+  const fb::AvcMb* ext = (mb != nullptr && mb->kind() == BlockKind::MB) ? ext_as<fb::AvcMb>(*mb) : nullptr;
+  return ext != nullptr && ext->mb_field_decoding_flag() == 1;
+}
+
+void v018(Ctx& c) {
+  constexpr int kRule = 18;
+  constexpr std::uint16_t kFieldBit = 0x10;
+  const auto* mvs = c.fa().mvs();
+  const auto* frame = c.fa().frame();
+  const bool field_picture = frame != nullptr && (frame->structure() == fb::PictureStructure::TopField ||
+                                                  frame->structure() == fb::PictureStructure::BottomField);
+  for (std::size_t k = 0; k < vsize(mvs); ++k) {
+    const auto* m = mvs->Get(static_cast<flatbuffers::uoffset_t>(k));
+    const bool has_bit = (m->flags() & kFieldBit) != 0;
+    if (c.codec() != Codec::H264) {
+      if (has_bit && c.codec() != Codec::Unknown) {
+        c.report(kRule, std::string("field flag (bit 4) set on a ") + fb::EnumNameCodec(c.codec()) + " frame",
+                 at("mvs", k, "flags"));
+      }
+      continue;
+    }
+    const bool field_mb = owned_by_field_mb(c, m->block_id());
+    const bool expected = field_picture || field_mb;
+    if (has_bit != expected) {
+      c.report(kRule,
+               std::string("field flag (bit 4) must be ") + (expected ? "set" : "clear") +
+                   (field_picture ? " in a field picture" : (field_mb ? " for a field MB" : " for a frame MB")),
+               at("mvs", k, "flags"));
+    }
+  }
+}
+
+// ---- V-019 / V-020 bits ---------------------------------------------------------------------------------------
+
+void v019(Ctx& c) {
+  constexpr int kRule = 19;
+  for (std::size_t i = 0; i < c.n_blocks(); ++i) {
+    const auto* b = c.block(i);
+    const auto* children = b->children();
+    if (vsize(children) == 0 || b->bits_x8() == 0) {
+      continue;
+    }
+    std::uint64_t sum = 0;
+    bool all_known = true;
+    for (const auto id : *children) {
+      const auto* child = c.block(id);
+      if (child == nullptr || child->bits_x8() == 0) {
+        all_known = false;
+        break;
+      }
+      sum += child->bits_x8();
+    }
+    if (all_known && sum > b->bits_x8()) {
+      c.report(kRule, "bits_x8 " + str(b->bits_x8()) + " < sum of children " + std::to_string(sum),
+               at("blocks", i, "bits_x8"));
+    }
+  }
+}
+
+// V-020 for one leaf block whose cells (raster order) are @p cells.
+void v020_block(Ctx& c, std::size_t id, std::span<const std::uint32_t> cells,
+                const flatbuffers::Vector<std::uint32_t>& bits) {
+  const std::uint64_t total = c.block(id)->bits_x8();
+  const std::uint64_t count = cells.size();
+  std::uint64_t sum = 0;
+  std::optional<std::uint32_t> bad;
+  for (std::uint64_t k = 0; k < count; ++k) {
+    const std::uint32_t cell = cells[k];
+    const std::uint64_t value = bits.Get(cell);
+    sum += value;
+    const std::uint64_t expected = (total / count) + (k < total % count ? 1U : 0U);
+    if (!bad && value != expected) {
+      bad = cell;
+    }
+  }
+  if (sum != total) {
+    c.report(20,
+             "cells of block " + str(static_cast<std::int64_t>(id)) + " sum to " + std::to_string(sum) +
+                 ", block bits_x8 is " + std::to_string(total),
+             at("blocks", id, "bits_x8"));
+  } else if (bad) {
+    c.report(
+        20,
+        "cells of block " + str(static_cast<std::int64_t>(id)) + " do not follow the floor + remainder distribution",
+        at("grid.bits_x8", *bad));
+  }
+}
+
+void v020(Ctx& c) {
+  const auto* g = c.fa().grid();
+  const auto* bits = g != nullptr ? c.cells(g->bits_x8()) : nullptr;
+  const auto* ids = g != nullptr ? c.cells(g->block_id()) : nullptr;
+  if (bits == nullptr || ids == nullptr) {
+    return;
+  }
+  // Cells of each block in raster order (counting sort).
+  const std::size_t n = c.n_blocks();
+  std::vector<std::uint32_t> start(n + 1, 0);
+  for (const auto id : *ids) {
+    if (id < n) {
+      ++start[id + 1];
+    }
+  }
+  std::partial_sum(start.begin(), start.end(), start.begin());
+  std::vector<std::uint32_t> order(start[n]);
+  std::vector<std::uint32_t> fill(start.begin(), start.end() - 1);
+  for (std::uint32_t i = 0; i < ids->size(); ++i) {
+    const auto id = ids->Get(i);
+    if (id < n) {
+      order[fill[id]++] = i;
+    }
+  }
+  for (std::size_t id = 1; id < n; ++id) {
+    const std::uint32_t count = start[id + 1] - start[id];
+    if (c.is_grid_leaf(id) && count != 0) {
+      v020_block(c, id, std::span(order).subspan(start[id], count), *bits);
+    }
+  }
+}
+
+// ---- V-021 extension type names -------------------------------------------------------------------------------
+
+std::string_view ext_type_for(BlockKind kind) noexcept {
+  switch (kind) {
+    case BlockKind::MB:
+      return "AvcMb";
+    case BlockKind::SubMB:
+      return "AvcSubMb";
+    case BlockKind::CTU:
+      return "HevcCtu";
+    case BlockKind::CU:
+      return "HevcCu";
+    case BlockKind::PU:
+      return "HevcPu";
+    case BlockKind::TU:
+      return "HevcTu";
+    case BlockKind::SB:
+    case BlockKind::Block:
+      return "Av1Block";
+    case BlockKind::TXB:
+      return "Av1Txb";
+    default:
+      return "";
+  }
+}
+
+// The frame-level nested type name for @p codec: index 0 = filter_params, 1 = ref_state.
+std::string_view frame_type_for(Codec codec, int which) noexcept {
+  switch (codec) {
+    case Codec::H264:
+      return which == 0 ? "AvcFilterParams" : "AvcRefMarking";
+    case Codec::H265:
+      return which == 0 ? "HevcFilterParams" : "HevcRps";
+    case Codec::AV1:
+      return which == 0 ? "Av1FilterParams" : "Av1RefState";
+    default:
+      return "";
+  }
+}
+
+bool known_frame_type(std::string_view name, int which) noexcept {
+  constexpr std::array<Codec, 3> kCodecs{Codec::H264, Codec::H265, Codec::AV1};
+  return std::any_of(kCodecs.begin(), kCodecs.end(), [&](Codec codec) { return name == frame_type_for(codec, which); });
+}
+
+void check_frame_type(Ctx& c, std::string_view name, std::size_t bytes, int which, std::string_view field) {
+  constexpr int kRule = 21;
+  const std::string path(field);
+  if (name.empty()) {
+    if (bytes != 0) {
+      c.report(kRule, path + " is non-empty but its type name is \"\"", path);
+    }
+    return;
+  }
+  if (!known_frame_type(name, which)) {
+    c.report(kRule, "type name \"" + std::string(name) + "\" is not allowed for " + path, path + "_type");
+  } else if (c.codec() != Codec::Unknown && name != frame_type_for(c.codec(), which)) {
+    c.report(kRule, "type name \"" + std::string(name) + "\" does not fit codec " + fb::EnumNameCodec(c.codec()),
+             path + "_type");
+  }
+}
+
+void v021(Ctx& c) {
+  constexpr int kRule = 21;
+  for (std::size_t i = 0; i < c.n_blocks(); ++i) {
+    const auto* b = c.block(i);
+    const auto name = sv(b->ext_type());
+    if (name.empty()) {
+      if (vsize(b->ext()) != 0) {
+        c.report(kRule, "ext is non-empty but ext_type is \"\"", at("blocks", i, "ext"));
+      }
+    } else if (name != ext_type_for(b->kind())) {
+      c.report(kRule, "ext_type \"" + std::string(name) + "\" does not match kind " + fb::EnumNameBlockKind(b->kind()),
+               at("blocks", i, "ext_type"));
+    }
+  }
+  check_frame_type(c, sv(c.fa().filter_params_type()), vsize(c.fa().filter_params()), 0, "filter_params");
+  if (const auto* f = c.fa().frame(); f != nullptr) {
+    check_frame_type(c, sv(f->ref_state_type()), vsize(f->ref_state()), 1, "frame.ref_state");
+  }
+}
+
+// ---- V-022 nested buffers -------------------------------------------------------------------------------------
+
+template <class T>
+bool verifies_as(const flatbuffers::Vector<std::uint8_t>& bytes) {
+  const auto opts = verifier_options();
+  flatbuffers::Verifier verifier(bytes.data(), bytes.size(), opts);
+  return verifier.VerifyBuffer<T>(nullptr);
+}
+
+// Verifies @p bytes as the table named @p name; nullopt when the name is not a nested table type.
+std::optional<bool> verify_nested(std::string_view name, const flatbuffers::Vector<std::uint8_t>& bytes) {
+  using Fn = bool (*)(const flatbuffers::Vector<std::uint8_t>&);
+  static constexpr std::array<std::pair<std::string_view, Fn>, 16> kTables{{
+      {"AvcMb", &verifies_as<fb::AvcMb>},
+      {"AvcSubMb", &verifies_as<fb::AvcSubMb>},
+      {"HevcCtu", &verifies_as<fb::HevcCtu>},
+      {"HevcCu", &verifies_as<fb::HevcCu>},
+      {"HevcPu", &verifies_as<fb::HevcPu>},
+      {"HevcTu", &verifies_as<fb::HevcTu>},
+      {"Av1Block", &verifies_as<fb::Av1Block>},
+      {"Av1Txb", &verifies_as<fb::Av1Txb>},
+      {"AvcFilterParams", &verifies_as<fb::AvcFilterParams>},
+      {"HevcFilterParams", &verifies_as<fb::HevcFilterParams>},
+      {"Av1FilterParams", &verifies_as<fb::Av1FilterParams>},
+      {"AvcRefMarking", &verifies_as<fb::AvcRefMarking>},
+      {"HevcRps", &verifies_as<fb::HevcRps>},
+      {"Av1RefState", &verifies_as<fb::Av1RefState>},
+      {"HevcPalette", &verifies_as<fb::HevcPalette>},
+      {"Av1Palette", &verifies_as<fb::Av1Palette>},
+  }};
+  for (const auto& [table, fn] : kTables) {
+    if (table == name) {
+      return fn(bytes);
+    }
+  }
+  return std::nullopt;
+}
+
+void check_nested(Ctx& c, std::string_view name, const flatbuffers::Vector<std::uint8_t>* bytes,
+                  const std::string& path) {
+  if (vsize(bytes) == 0) {
+    return;
+  }
+  if (const auto ok = verify_nested(name, *bytes); ok.has_value() && !*ok) {
+    c.report(22, "nested buffer does not verify as " + std::string(name), path);
+  }
+}
+
+// Width and height of an Av1BlockSize in luma samples, {0, 0} for an unknown value.
+std::pair<int, int> av1_block_size(fb::Av1BlockSize bsize) noexcept {
+  static constexpr std::array<std::pair<int, int>, 22> kSizes{{
+      {4, 4},   {4, 8},   {8, 4},    {8, 8},    {8, 16},    {16, 8}, {16, 16}, {16, 32}, {32, 16}, {32, 32}, {32, 64},
+      {64, 32}, {64, 64}, {64, 128}, {128, 64}, {128, 128}, {4, 16}, {16, 4},  {8, 32},  {32, 8},  {16, 64}, {64, 16},
+  }};
+  const auto index = static_cast<std::size_t>(bsize);
+  return index < kSizes.size() ? kSizes.at(index) : std::pair{0, 0};
+}
+
+// Raster MB address of an MB rect; in MBAFF the pair-derived address (2 * pair index + bottom).
+std::int64_t avc_mb_addr(const Ctx& c, const fb::Rect& r, const fb::AvcMb& mb) {
+  const std::int64_t width_mbs = c.coded_w() / 16;
+  const auto* f = c.fa().frame();
+  if (f != nullptr && f->structure() == fb::PictureStructure::Mbaff) {
+    const std::int64_t pair = ((r.y() / 32) * width_mbs) + (r.x() / 16);
+    const std::int64_t bottom = mb.mb_field_decoding_flag() == 1 ? (mb.pair_parity() == 1 ? 1 : 0) : (r.y() % 32) / 16;
+    return (2 * pair) + bottom;
+  }
+  return ((r.y() / 16) * width_mbs) + (r.x() / 16);
+}
+
+void v022_block(Ctx& c, std::size_t i, const fb::Block& b) {
+  constexpr int kRule = 22;
+  const auto name = sv(b.ext_type());
+  check_nested(c, name, b.ext(), at("blocks", i, "ext"));
+  const auto* r = b.rect();
+  if (r == nullptr || name != ext_type_for(b.kind())) {
+    return;
+  }
+  const std::string path = at("blocks", i, "ext");
+  if (const auto* av1 = ext_as<fb::Av1Block>(b); av1 != nullptr) {
+    const auto [w, h] = av1_block_size(av1->bsize());
+    if (std::int64_t{av1->MiRow()} != r->y() / 4 || std::int64_t{av1->MiCol()} != r->x() / 4) {
+      c.report(
+          kRule,
+          "Av1Block MiRow/MiCol " + str(av1->MiRow()) + "/" + str(av1->MiCol()) + " do not match rect " + rect_str(*r),
+          path);
+    }
+    if (w != r->w() || h != r->h()) {
+      c.report(kRule,
+               std::string("Av1Block bsize ") + fb::EnumNameAv1BlockSize(av1->bsize()) + " does not match rect " +
+                   rect_str(*r),
+               path);
+    }
+    check_nested(c, "Av1Palette", av1->palette(), path + ".palette");
+  } else if (const auto* cu = ext_as<fb::HevcCu>(b); cu != nullptr) {
+    const std::int64_t size = cu->log2CbSize() < 31 ? (std::int64_t{1} << cu->log2CbSize()) : -1;
+    if (size != r->w() || size != r->h()) {
+      c.report(kRule, "HevcCu log2CbSize " + str(cu->log2CbSize()) + " does not match rect " + rect_str(*r), path);
+    }
+    check_nested(c, "HevcPalette", cu->palette(), path + ".palette");
+  } else if (const auto* mb = ext_as<fb::AvcMb>(b); mb != nullptr && c.coded_w() > 0) {
+    const auto expected = avc_mb_addr(c, *r, *mb);
+    if (std::int64_t{mb->mb_addr()} != expected) {
+      c.report(kRule,
+               "AvcMb mb_addr " + str(mb->mb_addr()) + " != " + str(expected) + " derived from rect " + rect_str(*r),
+               path);
+    }
+  }
+}
+
+void v022(Ctx& c) {
+  for (std::size_t i = 0; i < c.n_blocks(); ++i) {
+    v022_block(c, i, *c.block(i));
+  }
+  check_nested(c, sv(c.fa().filter_params_type()), c.fa().filter_params(), "filter_params");
+  if (const auto* f = c.fa().frame(); f != nullptr) {
+    check_nested(c, sv(f->ref_state_type()), f->ref_state(), "frame.ref_state");
+  }
+}
+
+// ---- V-023 planes ---------------------------------------------------------------------------------------------
+
+std::string_view stage_token(fb::PlaneStage stage) noexcept {
+  static constexpr std::array<std::string_view, 7> kTokens{"recon",      "pred",  "resid", "predeblock",
+                                                           "presaocdef", "prelr", "coeff"};
+  const auto index = static_cast<std::size_t>(stage);
+  return index < kTokens.size() ? kTokens.at(index) : std::string_view{};
+}
+
+// Checks one blob_id against §6.6.2; returns the reason it does not match, or "" when it does.
+std::string blob_id_problem(const Ctx& c, std::string_view id, const fb::PlaneRef& plane) {
+  std::array<std::string_view, 4> parts{};
+  std::size_t n = 0;
+  while (n < 4) {
+    const auto slash = id.find('/');
+    parts.at(n++) = id.substr(0, slash);
+    if (slash == std::string_view::npos) {
+      id = {};
+      break;
+    }
+    id.remove_prefix(slash + 1);
+    if (n == 4) {
+      return "has more than four '/'-separated fields";
+    }
+  }
+  if (n != 4) {
+    return "does not have the form source-hash/decode-index/stage/plane";
+  }
+  const auto& [hash, decode, stage, plane_token] = parts;
+  constexpr std::string_view kHex = "0123456789abcdef";
+  if (hash.size() != 64 || hash.find_first_not_of(kHex) != std::string_view::npos) {
+    return "source-hash is not 64 lowercase hex digits";
+  }
+  if (const auto& expected = c.hash(); expected.has_value()) {
+    for (std::size_t k = 0; k < 32; ++k) {
+      const auto byte = (*expected)[k];
+      if (hash[2 * k] != kHex[byte >> 4U] || hash[(2 * k) + 1] != kHex[byte & 0xFU]) {
+        return "source-hash is not the stream's hash";
+      }
+    }
+  }
+  if (decode.empty() || decode.find_first_not_of("0123456789") != std::string_view::npos ||
+      (decode.size() > 1 && decode[0] == '0')) {
+    return "decode-index is not an unpadded decimal number";
+  }
+  const auto* f = c.fa().frame();
+  if (f != nullptr && f->id() != nullptr && decode != std::to_string(f->id()->decode_index())) {
+    return "decode-index differs from frame.id.decode_index";
+  }
+  if (stage != stage_token(plane.stage())) {
+    return "stage token \"" + std::string(stage) + "\" does not match stage " + fb::EnumNamePlaneStage(plane.stage());
+  }
+  constexpr std::string_view kPlanes = "yuva";
+  if (plane_token.size() != 1 || plane.plane() >= kPlanes.size() || plane_token[0] != kPlanes[plane.plane()]) {
+    return "plane token \"" + std::string(plane_token) + "\" does not match plane " + str(plane.plane());
+  }
+  return {};
+}
+
+// Luma width of the planes of @p stage: UpscaledWidth for the AV1 super-resolution exception, else coded_size.w.
+std::int64_t plane_reference_width(const Ctx& c, fb::PlaneStage stage) {
+  if (c.codec() == Codec::AV1 &&
+      (stage == fb::PlaneStage::Reconstruction || stage == fb::PlaneStage::PreLoopRestoration)) {
+    const auto* fp = nested_as<fb::Av1FilterParams>(c.fa().filter_params(), c.fa().filter_params_type());
+    if (fp != nullptr && fp->use_superres() == 1) {
+      return fp->UpscaledWidth();
+    }
+  }
+  return c.coded_w();
+}
+
+void v023_geometry(Ctx& c, const fb::PlaneRef& p, const std::string& path) {
+  constexpr int kRule = 23;
+  const auto* f = c.fa().frame();
+  if (f == nullptr || c.coded_w() <= 0 || c.coded_h() <= 0 || f->chroma_format() > 3 || p.plane() > 2) {
+    return;
+  }
+  const std::int64_t ref_w = plane_reference_width(c, p.stage());
+  std::int64_t w = ref_w;
+  std::int64_t h = c.coded_h();
+  if (p.plane() > 0) {
+    if (f->chroma_format() == 0) {
+      c.report(kRule, "4:0:0 frame has no chroma planes", path);
+      return;
+    }
+    const auto size = chroma_plane_size(static_cast<std::uint32_t>(std::min<std::int64_t>(ref_w, UINT32_MAX)),
+                                        static_cast<std::uint32_t>(c.coded_h()), f->chroma_format());
+    w = size.width;
+    h = size.height;
+  }
+  if (p.width() != w || p.height() != h) {
+    c.report(kRule, "plane size " + str(p.width()) + "x" + str(p.height()) + " != expected " + str(w) + "x" + str(h),
+             path);
+  }
+}
+
+void v023_plane(Ctx& c, std::size_t k, const fb::PlaneRef& p) {
+  constexpr int kRule = 23;
+  const std::string path = at("planes", k);
+  if (const auto problem = blob_id_problem(c, sv(p.blob_id()), p); !problem.empty()) {
+    c.report(kRule, "blob_id \"" + std::string(sv(p.blob_id())) + "\" " + problem, path + ".blob_id");
+  }
+  v023_geometry(c, p, path);
+  const auto sb = p.sample_bytes();
+  if (sb != 1 && sb != 2 && sb != 4) {
+    c.report(kRule, "sample_bytes must be 1, 2 or 4, is " + str(sb), path + ".sample_bytes");
+  }
+  if ((sb == 1) != (p.bit_depth() == 8 && !p.is_signed())) {
+    c.report(kRule, "sample_bytes == 1 must hold exactly for unsigned 8-bit planes", path + ".sample_bytes");
+  }
+  if (p.stage() == fb::PlaneStage::Residual && (!p.is_signed() || sb != 2)) {
+    c.report(kRule, "Residual planes are signed with 2-byte samples", path);
+  }
+  if (p.stage() == fb::PlaneStage::Coefficients && (!p.is_signed() || sb != 4)) {
+    c.report(kRule, "Coefficients planes are signed with 4-byte samples", path);
+  }
+  if (std::uint64_t{p.stride_bytes()} < std::uint64_t{p.width()} * sb) {
+    c.report(kRule, "stride_bytes " + str(p.stride_bytes()) + " < width * sample_bytes", path + ".stride_bytes");
+  }
+}
+
+void v023(Ctx& c) {
+  const auto* planes = c.fa().planes();
+  std::vector<std::pair<int, int>> seen;
+  for (std::size_t k = 0; k < vsize(planes); ++k) {
+    const auto* p = planes->Get(static_cast<flatbuffers::uoffset_t>(k));
+    const std::pair key{static_cast<int>(p->stage()), static_cast<int>(p->plane())};
+    if (std::find(seen.begin(), seen.end(), key) != seen.end()) {
+      c.report(23, "(stage, plane) pair is not unique", at("planes", k));
+    }
+    seen.push_back(key);
+    v023_plane(c, k, *p);
+  }
+}
+
+// ---- V-024 symbols --------------------------------------------------------------------------------------------
+
+void v024(Ctx& c) {
+  constexpr int kRule = 24;
+  const auto* symbols = c.fa().symbols();
+  const auto names = vsize(c.fa().symbol_names());
+  for (std::size_t k = 0; k < vsize(symbols); ++k) {
+    const auto* s = symbols->Get(static_cast<flatbuffers::uoffset_t>(k));
+    if (s->symbol_id() >= names || s->x4() >= c.cells_w() || s->y4() >= c.cells_h() || s->count() < 1) {
+      c.report(kRule,
+               "symbol " + str(s->symbol_id()) + " at (" + str(s->x4()) + "," + str(s->y4()) + ") count " +
+                   str(s->count()) + ": needs symbol_id < " + str(static_cast<std::int64_t>(names)) +
+                   ", a cell inside the grid and count >= 1",
+               at("symbols", k));
+    }
+  }
+}
+
 // ---- driver ---------------------------------------------------------------------------------------------------
 
 const fb::FrameAnalysis* verify_frame_analysis(std::span<const std::uint8_t> buffer) {
@@ -792,6 +1586,18 @@ std::vector<Violation> run_frame_analysis(std::span<const std::uint8_t> buffer,
   v008(c);
   v009(c);
   v010_v011_v012(c);
+  v013(c);
+  v014(c);
+  v015(c);
+  v016(c);
+  v017(c);
+  v018(c);
+  v019(c);
+  v020(c);
+  v021(c);
+  v022(c);
+  v023(c);
+  v024(c);
   return c.finish();
 }
 

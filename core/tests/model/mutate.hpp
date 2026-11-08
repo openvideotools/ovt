@@ -51,6 +51,17 @@ inline void set_width(std::unique_ptr<fb::Rect>& rect, std::int32_t w) {
   rect = std::make_unique<fb::Rect>(rect->x(), rect->y(), w, rect->h());
 }
 
+/// Unpacks the nested FlatBuffer @p bytes (root table @p T), applies @p fn and repacks it in place.
+template <class T, class Fn>
+void edit_nested(std::vector<std::uint8_t>& bytes, Fn fn) {
+  typename T::NativeTableType native;
+  flatbuffers::GetRoot<T>(bytes.data())->UnPackTo(&native);
+  fn(native);
+  flatbuffers::FlatBufferBuilder builder;
+  builder.Finish(T::Pack(builder, &native));
+  bytes.assign(builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize());
+}
+
 /// One row of the table-driven rule test: applying @p mutate to @p fixture must make exactly @p rule fire.
 struct RuleMutation {
   std::string_view rule;
@@ -65,6 +76,8 @@ inline constexpr std::uint32_t kHevcCu = 2;
 inline constexpr std::uint32_t kHevcPu = 3;
 inline constexpr std::uint32_t kHevcTu = 4;
 inline constexpr std::uint32_t kH264SubMb = 4;
+inline constexpr std::uint32_t kH264Mb = 1;
+inline constexpr std::uint32_t kAv1Block = 2;
 
 inline const std::vector<RuleMutation>& rule_mutations() {
   static const std::vector<RuleMutation> rows{
@@ -103,6 +116,54 @@ inline const std::vector<RuleMutation>& rule_mutations() {
          fa.grid->block_id[0] = 5;
          fa.grid->bits_x8.clear();
        }},
+      {"V-013", Fixture::Hevc16, "grid.pred value outside PredKind",
+       [](fb::FrameAnalysisT& fa) { fa.grid->pred[0] = 7; }},
+      {"V-014", Fixture::H264_32, "H.264 RefSlot.slot 9", [](fb::FrameAnalysisT& fa) { fa.refs[0]->slot = 9; }},
+      {"V-015", Fixture::H264_32, "MV x disagrees with grid.mv0_x",
+       [](fb::FrameAnalysisT& fa) { fa.mvs[0]->mv_x += 1; }},
+      {"V-016", Fixture::H264_32, "usage_cells off by one",
+       [](fb::FrameAnalysisT& fa) { fa.refs[0]->usage_cells += 1; }},
+      {"V-017", Fixture::Hevc16, "slice bit_count beyond its bytes",
+       [](fb::FrameAnalysisT& fa) { fa.partitions[0]->bit_count = 100000; }},
+      {"V-018", Fixture::H264_32, "field flag on a frame MB",
+       [](fb::FrameAnalysisT& fa) { fa.mvs[0]->flags |= 0x10U; }},
+      {"V-019", Fixture::Hevc16, "CU bits below PU + TU bits",
+       [](fb::FrameAnalysisT& fa) {
+         fa.blocks[kHevcCu]->bits_x8 = 200;
+         fa.grid->bits_x8.clear();
+       }},
+      {"V-020", Fixture::Hevc16, "one bit moved between two cells of a CU",
+       [](fb::FrameAnalysisT& fa) {
+         fa.grid->bits_x8[0] += 1;
+         fa.grid->bits_x8[1] -= 1;
+       }},
+      {"V-021", Fixture::Hevc16, "PU ext kept but ext_type cleared",
+       [](fb::FrameAnalysisT& fa) { fa.blocks[kHevcPu]->ext_type.clear(); }},
+      {"V-022", Fixture::Hevc16, "HevcCu log2CbSize 4 on an 8x8 CU",
+       [](fb::FrameAnalysisT& fa) {
+         edit_nested<fb::HevcCu>(fa.blocks[kHevcCu]->ext, [](fb::HevcCuT& cu) { cu.log2CbSize = 4; });
+       }},
+      {"V-023", Fixture::Hevc16, "luma plane stride below its width",
+       [](fb::FrameAnalysisT& fa) { fa.planes[0]->stride_bytes = 8; }},
+      {"V-024", Fixture::Hevc16, "symbol cost without a symbol name",
+       [](fb::FrameAnalysisT& fa) {
+         auto symbol = std::make_unique<fb::SymbolCostT>();
+         symbol->count = 1;
+         fa.symbols.push_back(std::move(symbol));
+       }},
+      // Extra rows: the codec-specific branches of rules already covered above.
+      {"V-014", Fixture::Av1_64, "AV1 refs[0] not named INTRA",
+       [](fb::FrameAnalysisT& fa) { fa.refs[0]->name = "LAST0"; }},
+      {"V-022", Fixture::Av1_64, "Av1Block MiCol off by one",
+       [](fb::FrameAnalysisT& fa) {
+         edit_nested<fb::Av1Block>(fa.blocks[kAv1Block]->ext, [](fb::Av1BlockT& b) { b.MiCol += 1; });
+       }},
+      {"V-022", Fixture::H264_32, "AvcMb mb_addr off by one",
+       [](fb::FrameAnalysisT& fa) {
+         edit_nested<fb::AvcMb>(fa.blocks[kH264Mb]->ext, [](fb::AvcMbT& mb) { mb.mb_addr += 1; });
+       }},
+      {"V-023", Fixture::Av1_64, "blob_id names another stream",
+       [](fb::FrameAnalysisT& fa) { fa.planes[1]->blob_id[0] = '7'; }},
   };
   return rows;
 }
