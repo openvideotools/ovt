@@ -20,3 +20,6 @@ add_executable(ovt_tests_syntax test_syntax_builder.cpp)
 target_link_libraries(ovt_tests_syntax PRIVATE ovt_core_objects ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_tests_syntax "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax)
+
+# H.265 parameter-set parsers (WI-1.112).
+add_subdirectory(h265)

@@ -17,3 +17,11 @@ target_sources(ovt_core_objects PRIVATE common/syntax_builder.cpp common/syntax_
 # header, so the generated include directory and flatbuffers are PUBLIC on the objects, inside BUILD_INTERFACE
 # (core-objects rule 1, #62).
 target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
+
+# WI-1.112: H.265 header parsers (chapter 7 §7.3.5 rows 1–9); typed structs live in core/include/ovt/cxx/syntax/h265/
+# (§7.3.7). Part a: nal_unit_header, profile_tier_level, hrd_parameters.
+target_sources(
+  ovt_core_objects
+  PRIVATE h265/nal_header.cpp
+          h265/profile_tier_level.cpp
+          h265/hrd_parameters.cpp)

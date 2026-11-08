@@ -50,3 +50,5 @@ ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
 ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
+# WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
+ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
