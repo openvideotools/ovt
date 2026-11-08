@@ -12,6 +12,7 @@
 #include <cstring>
 #include <memory>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -45,7 +46,8 @@ bool is_av1_frame(const ovt::fb::FrameAnalysis& fa) {
       return true;
     }
   }
-  if (fa.blocks() != nullptr && fa.blocks()->size() > 0 && fa.blocks()->Get(0)->ext_type() != nullptr) {
+  if (fa.blocks() != nullptr && fa.blocks()->begin() != fa.blocks()->end() &&
+      fa.blocks()->Get(0)->ext_type() != nullptr) {
     return contains(fa.blocks()->Get(0)->ext_type()->string_view(), "Av1");
   }
   return false;
@@ -64,38 +66,55 @@ const V* sized(const V* v, size_t cells, const char* name, std::vector<std::stri
   return v;
 }
 
+// Columns of the CellGrid the attribute texels read; null = not provided.
+struct AttrColumns {
+  const flatbuffers::Vector<uint8_t>* pred = nullptr;
+  const flatbuffers::Vector<int8_t>* ref0 = nullptr;
+  const flatbuffers::Vector<int8_t>* ref1 = nullptr;
+  const flatbuffers::Vector<uint32_t>* block_id = nullptr;
+  const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::Block>>* blocks = nullptr;
+};
+
+// Attribute A: bit0 skip (pred == Skip or the owning block is skip), bit1 merge/direct, bit2 bi-predicted.
+uint8_t attribute_flags(const AttrColumns& c, flatbuffers::uoffset_t idx) {
+  bool skip = c.pred != nullptr && c.pred->Get(idx) == static_cast<uint8_t>(ovt::fb::PredKind::Skip);
+  bool merge = false;
+  if (c.block_id != nullptr && c.blocks != nullptr) {
+    const uint32_t id = c.block_id->Get(idx);  // 0xFFFFFFFF = no owning block
+    if (id < c.blocks->size() && c.blocks->Get(id)->id() == id) {
+      skip = skip || c.blocks->Get(id)->skip();
+      merge = c.blocks->Get(id)->merge_or_direct();
+    }
+  }
+  const bool bi = c.ref0 != nullptr && c.ref1 != nullptr && c.ref0->Get(idx) >= 0 && c.ref1->Get(idx) >= 0;
+  return static_cast<uint8_t>((skip ? 1U : 0U) | (merge ? 2U : 0U) | (bi ? 4U : 0U));
+}
+
+// ref + 1 (0 = no reference), or 0xFF when the plugin gave no vector.
+uint8_t ref_texel(const flatbuffers::Vector<int8_t>* v, flatbuffers::uoffset_t idx) {
+  return v != nullptr ? static_cast<uint8_t>(std::max<int>(v->Get(idx), -1) + 1) : 0xFF;
+}
+
 void build_attributes(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   const ovt::fb::CellGrid& grid = *fa.grid();
   const size_t cells = static_cast<size_t>(set.cells_w) * set.cells_h;
-  const auto* pred = sized(grid.pred(), cells, "pred", set.diagnostics);
-  const auto* ref0 = sized(grid.ref0(), cells, "ref0", set.diagnostics);
-  const auto* ref1 = sized(grid.ref1(), cells, "ref1", set.diagnostics);
-  const auto* block_id = sized(grid.block_id(), cells, "block_id", set.diagnostics);
-  const auto* blocks = fa.blocks();
+  AttrColumns c;
+  c.pred = sized(grid.pred(), cells, "pred", set.diagnostics);
+  c.ref0 = sized(grid.ref0(), cells, "ref0", set.diagnostics);
+  c.ref1 = sized(grid.ref1(), cells, "ref1", set.diagnostics);
+  c.block_id = sized(grid.block_id(), cells, "block_id", set.diagnostics);
+  c.blocks = fa.blocks();
 
   set.cell_attributes.assign(cells * 4, 0);
-  uint8_t* out = set.cell_attributes.data();
+  const std::span<uint8_t> out(set.cell_attributes);
   detail::parallel_ranges(cells, kChunks, [&](size_t begin, size_t end) {
     for (size_t i = begin; i < end; ++i) {
       const auto idx = static_cast<flatbuffers::uoffset_t>(i);
-      uint8_t* t = out + (i * 4);
-      const uint8_t kind = pred != nullptr ? pred->Get(idx) : 0xFF;
-      t[0] = kind;
-      t[1] = ref0 != nullptr ? static_cast<uint8_t>(std::max<int>(ref0->Get(idx), -1) + 1) : 0xFF;
-      t[2] = ref1 != nullptr ? static_cast<uint8_t>(std::max<int>(ref1->Get(idx), -1) + 1) : 0xFF;
-      uint8_t flags = 0;
-      bool skip = kind == static_cast<uint8_t>(ovt::fb::PredKind::Skip);
-      bool merge = false;
-      if (block_id != nullptr && blocks != nullptr) {
-        const uint32_t id = block_id->Get(idx);
-        if (id < blocks->size() && blocks->Get(id)->id() == id) {  // 0xFFFFFFFF = no owning block
-          skip = skip || blocks->Get(id)->skip();
-          merge = blocks->Get(id)->merge_or_direct();
-        }
-      }
-      const bool bi = ref0 != nullptr && ref1 != nullptr && ref0->Get(idx) >= 0 && ref1->Get(idx) >= 0;
-      flags = static_cast<uint8_t>((skip ? 1U : 0U) | (merge ? 2U : 0U) | (bi ? 4U : 0U));
-      t[3] = flags;
+      const size_t t = i * 4;
+      out[t] = c.pred != nullptr ? c.pred->Get(idx) : 0xFF;
+      out[t + 1] = ref_texel(c.ref0, idx);
+      out[t + 2] = ref_texel(c.ref1, idx);
+      out[t + 3] = attribute_flags(c, idx);
     }
   });
 }
@@ -140,6 +159,7 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
 
 OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
 
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
 std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
                                                   const uint16_t* custom_cells) {
   auto set = std::make_unique<OverlaySet>();

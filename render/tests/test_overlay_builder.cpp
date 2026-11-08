@@ -28,6 +28,8 @@ using ovt::render::test::expected_qp;
 using ovt::render::test::make_synthetic;
 using ovt::render::test::SyntheticOptions;
 
+constexpr size_t kCells = size_t{80} * 64;  // the default fixture grid
+
 constexpr uint32_t layer(OverlayLayer l) {
   return static_cast<uint32_t>(l);
 }
@@ -60,7 +62,7 @@ TEST_CASE("render_test_overlay_heatmap_qp_texel", "[render][overlay]") {
   cfg.heatmap = HeatmapSource::QP;
   const auto b = build({}, cfg);
   const auto& s = *b.set;
-  REQUIRE(s.heatmap.size() == 80U * 64U);
+  REQUIRE(s.heatmap.size() == kCells);
   // Acceptance 1: texel (cx, cy) = (qp - 0) / 51 * 65535.
   const uint32_t cx = 12;
   const uint32_t cy = 9;
@@ -159,7 +161,7 @@ TEST_CASE("render_test_overlay_heatmap_mv_magnitude_and_txsize", "[render][overl
 }
 
 TEST_CASE("render_test_overlay_heatmap_custom_passes_through", "[render][overlay]") {
-  std::vector<uint16_t> custom(80U * 64U);
+  std::vector<uint16_t> custom(kCells);
   for (size_t i = 0; i < custom.size(); ++i) {
     custom[i] = static_cast<uint16_t>(i * 7U);
   }
@@ -179,7 +181,7 @@ TEST_CASE("render_test_overlay_attributes_skip_flag", "[render][overlay]") {
   cfg.layers = layer(OverlayLayer::SkipHatch) | layer(OverlayLayer::PredFill);
   const auto b = build({}, cfg);
   const auto& s = *b.set;
-  REQUIRE(s.cell_attributes.size() == 80U * 64U * 4U);
+  REQUIRE(s.cell_attributes.size() == kCells * 4U);
   const auto texel = [&](uint32_t cx, uint32_t cy, int c) {
     return s.cell_attributes[(at(s, cx, cy) * 4) + static_cast<size_t>(c)];
   };
@@ -239,7 +241,7 @@ TEST_CASE("render_test_overlay_malformed_input", "[render][overlay]") {
   SyntheticOptions o;
   o.short_qp = true;  // qp has cells - 1 entries: never trusted against cells_w x cells_h
   const auto b = build(o, cfg);
-  CHECK(b.set->heat_valid.size() == 80U * 64U);
+  CHECK(b.set->heat_valid.size() == kCells);
   CHECK_FALSE(b.set->diagnostics.empty());
   for (const uint8_t v : b.set->heat_valid) {
     CHECK(v == 0);
