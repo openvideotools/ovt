@@ -47,8 +47,8 @@ endif()
 #   For the shared object that links tp::ffmpeg_plugin (ovt_plugin_ffmpeg, WI-2.169, and the symbol-leak fixture of
 #   plugins/ovt-plugin-ffmpeg/tests): hidden visibility for its own code, and the linker options of §13.3.3 that keep
 #   every symbol of the static FFmpeg archives inside it. Linux/Android: --exclude-libs,ALL, plus -Bsymbolic so
-#   FFmpeg's references bind inside the plugin. macOS: an exported-symbol list naming only the two plugin entry points
-#   (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
+#   FFmpeg's references bind inside the plugin, and the version script cmake/ovt_plugin_exports.map. macOS: an
+#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
 #   the plugin links the system FFmpeg dynamically.
 function(ovt_ffmpeg_hide_symbols target)
   set_target_properties(${target} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden
@@ -60,7 +60,12 @@ function(ovt_ffmpeg_hide_symbols target)
     target_link_options(${target} PRIVATE "LINKER:-exported_symbol,_ovt_analysis_decoder_v1"
                         "LINKER:-exported_symbol,_ovt_plugin_describe")
   else()
-    target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL" "LINKER:-Bsymbolic")
+    # The version script keeps the dynamic symbol table to the two entry points: hidden visibility does not cover
+    # the libstdc++ template instantiations of a C++ plugin (WI-2.169).
+    target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL" "LINKER:-Bsymbolic"
+                        "LINKER:--version-script=${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ovt_plugin_exports.map")
+    set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
+                                                  "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ovt_plugin_exports.map")
   endif()
 endfunction()
 

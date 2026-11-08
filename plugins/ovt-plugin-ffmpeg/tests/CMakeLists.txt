@@ -1,14 +1,30 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
-#
-# Symbol-leak test of the FFmpeg plugin flavour (WI-0.012, chapter 13 §13.3.3): a shared object that links
-# tp::ffmpeg_plugin must export the two plugin entry points and nothing else, in particular no av*/sws*/swr*/ff_*
-# symbol of the static FFmpeg copy.
-#
-# Until WI-2.169 builds ovt_plugin_ffmpeg, the test runs on ovt_ffmpeg_symbol_leak_fixture, a module linked exactly
-# like the plugin (tp::ffmpeg_plugin + ovt_ffmpeg_hide_symbols) whose two entry points are stubs. WI-2.169 points the
-# same script at $<TARGET_FILE:ovt_plugin_ffmpeg>.
-# SPEC-ASSUMPTION(#129): acceptance test 2 of WI-0.012 runs on the fixture until the plugin exists.
+
+# ---- WI-2.169: the plugin, loaded through the host's plugin registry ----------------------------------------------
+# ovt_plugin_ffmpeg_framemd5 is the in-tree `ffmpeg -f framemd5` of acceptance test 1. It links the static plugin
+# flavour, so it lives in its own executable: the smoke test links the host (ovt_core_objects), whose core flavour
+# defines the same av* symbols (chapter 13 §13.3.3).
+ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
+
+add_executable(ovt_plugin_ffmpeg_framemd5 ffmpeg_framemd5.cpp)
+target_link_libraries(ovt_plugin_ffmpeg_framemd5 PRIVATE tp::ffmpeg_plugin ovt::flags)
+ovt_set_license(ovt_plugin_ffmpeg_framemd5 "LGPL-2.1-or-later")
+
+add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp)
+target_link_libraries(ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
+                                                            ovt_test_support ovt::flags ${Catch2_TARGET})
+target_compile_definitions(ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_SYSTEM=$<BOOL:${OVT_SYSTEM_FFMPEG}>"
+                                                                 "OVT_FFMPEG_HW_DECODE=$<BOOL:${OVT_ENABLE_HW_DECODE}>")
+target_compile_definitions(
+  ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
+                                        "OVT_FFMPEG_FRAMEMD5=\"$<TARGET_FILE:ovt_plugin_ffmpeg_framemd5>\"")
+add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmpeg_framemd5)
+ovt_set_license(ovt_plugin_ffmpeg_smoke_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_ffmpeg_smoke_tests)
+
+# ---- WI-0.012: symbol-leak test of the plugin flavour (chapter 13 §13.3.3) ------------------------------------------
+# The plugin, and a fixture module linked like it (SPEC-ASSUMPTION(#129)), export the two entry points and nothing else.
 
 if(NOT TARGET tp::ffmpeg_plugin OR OVT_SYSTEM_FFMPEG)
   return()
@@ -26,3 +42,6 @@ ovt_set_license(ovt_ffmpeg_symbol_leak_fixture "LGPL-2.1-or-later")
 add_test(NAME ffmpeg_plugin_symbol_leak COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/test_symbol_leak.sh"
                                                 $<TARGET_FILE:ovt_ffmpeg_symbol_leak_fixture>)
 set_tests_properties(ffmpeg_plugin_symbol_leak PROPERTIES LABELS "fast;unit;third_party")
+add_test(NAME ffmpeg_plugin_symbol_leak_plugin COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/test_symbol_leak.sh"
+                                                       $<TARGET_FILE:ovt_plugin_ffmpeg>)
+set_tests_properties(ffmpeg_plugin_symbol_leak_plugin PROPERTIES LABELS "fast;unit;third_party")
