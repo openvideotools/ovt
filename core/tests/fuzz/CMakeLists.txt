@@ -43,3 +43,5 @@ ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
+# WI-3.300a: the NormalizationConfig parser of the metrics module (chapter 14 §14.1.2 item 3).
+ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)

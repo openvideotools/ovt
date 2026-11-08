@@ -110,12 +110,13 @@ core/tests/metrics/                    Catch2 tests, golden files, oracle script
 
 ```c
 typedef struct ovt_MetricApi {
+  uint32_t struct_size;                       /* D4 */
   uint32_t abi_version;                       /* = 1 */
   ovt_Buffer (*descriptor)(void);             /* MetricDescriptor FlatBuffer */
   ovt_status (*create)(const char* options_json, ovt_Metric** out);
   void       (*destroy)(ovt_Metric*);
   /* Frames are delivered already normalised into descriptor.domain; ref == NULL for NoReference metrics. */
-  ovt_status (*score)(ovt_Metric*, const ovt_PlaneView* ref /* nullable */, const ovt_PlaneView* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
+  ovt_status (*score)(ovt_Metric*, const ovt_MetricPlanes* ref /* nullable */, const ovt_MetricPlanes* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
   ovt_status (*finish)(ovt_Metric*, ovt_Buffer* out /* optional sequence-level FrameScore */);
 } ovt_MetricApi;
 const ovt_MetricApi* ovt_metric_v1(void);
@@ -130,12 +131,13 @@ Rules (binding on all plugins, in-tree or third-party):
 5. Plugins MUST NOT write to `ref`/`dist` buffers.
 6. `options_json` is a JSON object; unknown keys MUST be rejected with `OVT_E_INVALID_ARG` (so typos are caught).
 
-Supporting types (owned by the Data Model chapter; reproduced here for implementers of this chapter — if Chapter 6 differs, Chapter 6 wins):
+Supporting types (`ovt_FrameId` is owned by the Data Model chapter and reproduced here; `ovt_MetricPlanes` is owned by this chapter and lives only in `metric_v1.h` — if Chapter 6 differs on `ovt_FrameId`, Chapter 6 wins):
 
 ```c
 typedef struct ovt_FrameId { int32_t decode_index; int32_t display_index; } ovt_FrameId;
 
-typedef struct ovt_PlaneView {
+typedef struct ovt_MetricPlanes {   /* the multi-plane view a metric scores; not ovt_PlaneView of ovt/decode.h, which is one plane (#156) */
+  uint32_t struct_size;            /* D4: sizeof(ovt_MetricPlanes) as compiled into the host */
   const uint8_t* data[3];          /* Y, U, V (or R,G,B / I,Ct,Cp for RGB-like domains); data[1],data[2] NULL for 4:0:0 */
   int32_t  stride_bytes[3];
   uint32_t width[3], height[3];    /* per plane, in samples */
@@ -144,9 +146,9 @@ typedef struct ovt_PlaneView {
   uint8_t  sample_bytes;           /* 1, 2 or 4 */
   uint8_t  sample_format;          /* 0 = unsigned integer, 1 = IEEE float32 */
   uint8_t  domain;                 /* ovt.fb.WorkingDomain */
-  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered */
+  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered; frozen, embedded by value */
   double   display_peak_nits;      /* display model peak used for linear/pu21/ictcp; 0 for code_value */
-} ovt_PlaneView;
+} ovt_MetricPlanes;
 ```
 
 Sample layout per domain (normative):
@@ -215,7 +217,7 @@ Created ──run()──▶ Probing ──▶ Aligning ──▶ Scoring ──
 
 ### 9.2.4 Normalisation stage
 
-The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_PlaneView` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
+The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_MetricPlanes` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
 
 ```
 crop → scale → chroma_upsample → bit_depth → range → colour(zimg) → domain → temporal(offset/pairing)
@@ -755,7 +757,7 @@ All models are compiled in (`built_in_models=true`) and loaded with `vmaf_model_
 
 Each id is a separate `ovt_MetricApi` exported from `libovt-core` itself (`ovt_metric_vmaf_<id>()`), registered by the host at start-up; third-party plugins use the same ABI.
 
-### 9.5.4 Filling `VmafPicture` from `ovt_PlaneView`
+### 9.5.4 Filling `VmafPicture` from `ovt_MetricPlanes`
 
 ```cpp
 VmafPixelFormat fmt = (pv.planes == 1) ? VMAF_PIX_FMT_YUV400P
@@ -1052,7 +1054,7 @@ What Chapter 11 (GUI) and Chapter 10 (rendering) MAY assume from this module, vi
 /* core/include/ovt/metrics.h — metrics C API (WI-3.300 skeleton, WI-3.316 final) */
 typedef struct ovt_MetricsJob ovt_MetricsJob;                /* opaque */
 typedef struct ovt_MapView { uint32_t struct_size; /* D4 d: = sizeof(ovt_MapView) */ const struct ovt_MapBlobHeader* header; const float* values; } ovt_MapView;
-typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_PlaneView ref, dist; } ovt_PlanePair;
+typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_MetricPlanes ref, dist; } ovt_PlanePair;
 typedef void (*ovt_MetricsEventFn)(const char* event_json, void* user);   /* JobEvent as JSON, ≤ 10 Hz */
 
 ovt_status ovt_metrics_list_descriptors(ovt_Buffer* out_descriptors_json);               /* JSON array of MetricDescriptor */
@@ -1164,15 +1166,15 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 ### WI-3.300 — Create the metrics schema, C API skeleton and plugin ABI header
 **Goal:** land `ovt_metrics.fbs`, `metric_v1.h`, `metrics.h` and an empty `MetricJob` so every later WI compiles against fixed interfaces.
 **Depends on:** WI-0.082 (`ovt_metrics.fbs`), WI-0.083 (generated headers), WI-1.512 (`jobs::Pool`).
-**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_PlaneView`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
+**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_MetricPlanes`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
 **Interface:** §9.2.2, §9.2.3, §9.2.4 schema.
-**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `share/ovt/metrics/` and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
+**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `OVT_PLUGIN_DIR` (chapter 13 §13.2.6, the same directories and `$OVT_PLUGIN_PATH` rule as decoder plugins, chapter 12 §12.3.11) and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
 **Acceptance tests:** 1. Given a `NormalizationConfig` of `{}`, When resolved, Then the output JSON equals `golden/norm_defaults.json` byte for byte. 2. Given `{"scale":{"kernel":"nearest"}}`, When parsed, Then `OVT_E_INVALID_ARG` with message naming `scale.kernel`. 3. Given a dummy plugin `libovt_metric_example`, When the registry loads, Then `ovt_metrics_list_descriptors()` contains id `example`.
 **Size:** M.
 **Notes / pitfalls:** `MetricsResult.normalization` uses chapter 06's canonical form (sorted keys, no whitespace — V-030); only the pretty export of §9.9.2 uses schema order. The ABI header must not include any C++ or FlatBuffers headers.
 
 ### WI-3.301 — Implement the normalisation pipeline (crop, bit depth, range, pairing) without zimg
-**Goal:** produce `ovt_PlaneView` pairs in `CodeValue` for equal-geometry inputs.
+**Goal:** produce `ovt_MetricPlanes` pairs in `CodeValue` for equal-geometry inputs.
 **Depends on:** WI-3.300, WI-2.171 (playback decoder for frame access).
 **Produces:** `core/src/metrics/normalize/{pipeline.h,.cpp,crop.cpp,bit_depth.cpp,frame_pairing.cpp}`.
 **Interface:** §9.2.4 steps 1, 4, 8; `AlignmentReport` fields `ref_frames,dist_frames,paired_frames,skipped_*`.

@@ -553,7 +553,7 @@ typedef struct ovt_MetricApi {
   ovt_status (*create)(const char* options_json, ovt_Metric** out);
   void       (*destroy)(ovt_Metric*);
   /* Frames are delivered already normalised into descriptor.domain; ref == NULL for NoReference metrics. */
-  ovt_status (*score)(ovt_Metric*, const ovt_PlaneView* ref /* nullable */, const ovt_PlaneView* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
+  ovt_status (*score)(ovt_Metric*, const ovt_MetricPlanes* ref /* nullable */, const ovt_MetricPlanes* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);  /* ovt_MetricPlanes: chapter 9 §9.2.2 */
   ovt_status (*finish)(ovt_Metric*, ovt_Buffer* out /* optional sequence-level FrameScore */);
 } ovt_MetricApi;
 const ovt_MetricApi* ovt_metric_v1(void);   /* the only exported symbol of a metric plugin; noexcept */
