@@ -13,7 +13,9 @@
       "name": {"type": "string"},
       "bit_offset": {"type": "integer"},
       "bit_length": {"type": "integer", "minimum": 1},
-      "value": {"type": ["integer", "string"]}
+      "value": {"type": ["integer", "string"]},
+      "file_byte": {"type": "integer", "minimum": 0, "description": "--epb-offsets only: file offset of the byte holding the element's first bit"},
+      "file_bit": {"type": "integer", "minimum": 0, "description": "--epb-offsets only: bit within that byte, 0 = most significant"}
     }
   }
 }

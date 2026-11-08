@@ -23,6 +23,6 @@ Columns: Name | Version / commit | Licence (SPDX) | URL | Patches (relative path
 | Qt Gradle Plugin | 1.2 | LGPL-3.0-only | Maven Central `org.qtproject.qt.gradleplugin` | – | – (Gradle verifies) | android/build.gradle.kts | versioned independently of Qt |
 | KDDockWidgets | 2.2.x | GPL-2.0-only OR GPL-3.0-only (open-source) | <https://github.com/KDAB/KDDockWidgets> | – | `<sha>` | third_party/kddockwidgets.cmake | GUI docking (chapter 11) — GPL-3 chosen |
 | QHexView | `<commit>` | MIT | <https://github.com/Dax89/QHexView> | – | – | app/third_party (vendored) | |
-| UVQ models | google/uvq `<commit>` | Apache-2.0 | <https://github.com/google/uvq> | – | `<sha>` of exported .onnx | tools/export_uvq_onnx.py | models downloaded at build, not committed |
+| UVQ models | google/uvq `c204ecc04f093e90c941cb126c7ac3d5beca0414` (`UVQ_COMMIT`) | Apache-2.0 | <https://github.com/google/uvq> | – | – (git); checkpoint hashes in tools/uvq_export/weights.sha256, exported .onnx hashes in core/share/models/uvq/manifest.json | tools/uvq_export/export_uvq.py | PyTorch revision (#47), same pin as the oracle image; models downloaded on first use (§9.6.3), not committed |
 | VMAF models | in libvmaf | BSD-2-Clause-Patent | – | – | – | built-in | |
 | Conformance corpora | manifests | various (ITU/AOM test data, free for testing) | tests/corpora/manifest.json (chapter 14 §14.2.4) | – | per file | tools/fetch_corpora.py | never redistributed in releases |
