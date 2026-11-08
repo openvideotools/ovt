@@ -192,7 +192,7 @@ TEST_CASE("annexb: the file overload equals the span overload across window edge
     data.push_back(static_cast<uint8_t>(0x41 | (next() & 0x1CU)));
     const size_t len = next() % 3000;
     for (size_t i = 0; i < len; ++i) {
-      uint8_t b = static_cast<uint8_t>(next());
+      auto b = static_cast<uint8_t>(next());
       if (b == 0 && (next() & 3U) != 0) {
         b = 0x55;  // keep zero pairs rare, the NAL payload must not contain 00 00 0x
       }

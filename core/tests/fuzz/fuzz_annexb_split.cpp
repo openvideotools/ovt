@@ -48,7 +48,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       const auto nal = bytes.subspan(n.file_span.offset, n.file_span.length);
       require(nal[0] == n.header_byte && nal[nal.size() - 1] != 0);
       for (size_t i = 2; i < nal.size(); ++i) {
-        require(!(nal[i - 2] == 0 && nal[i - 1] == 0 && nal[i] <= 1));
+        require(nal[i - 2] != 0 || nal[i - 1] != 0 || nal[i] > 1);
       }
       floor = n.file_span.end();
     }

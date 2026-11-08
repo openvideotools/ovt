@@ -72,18 +72,7 @@ class Splitter {
         ++i;
         continue;
       }
-      const uint8_t b = window[i];
-      if (b == 0) {
-        ++zeros_;
-      } else if (b == 1 && zeros_ >= 2) {
-        start_code(pos);
-      } else {
-        if (!garbage_) {
-          garbage_ = true;
-          garbage_start_ = pos;
-        }
-        zeros_ = 0;
-      }
+      outside_byte(window[i], pos);
       ++i;
     }
   }
@@ -115,6 +104,21 @@ class Splitter {
   void too_many_zeros(uint64_t offset, uint64_t count) const {
     report(DiagCode::CNT_ESB_0002, offset,
            std::to_string(count) + " trailing_zero_8bits after NAL unit " + std::to_string(index_ - 1));
+  }
+
+  // One byte outside a NAL unit: a zero, the `01` of a start code, or garbage.
+  void outside_byte(uint8_t b, uint64_t pos) {
+    if (b == 0) {
+      ++zeros_;
+    } else if (b == 1 && zeros_ >= 2) {
+      start_code(pos);
+    } else {
+      if (!garbage_) {
+        garbage_ = true;
+        garbage_start_ = pos;
+      }
+      zeros_ = 0;
+    }
   }
 
   // The start code's final `01` is at `pos`; zeros_ >= 2 zero bytes precede it in this region.
