@@ -380,6 +380,37 @@ TEST_CASE("test_cache_c_api: ovt_cache_clear deletes by kind or everything", "[c
   }
 }
 
+TEST_CASE("test_cache_c_api: ovt_cache_clear skips an entry held open through another handle", "[cache][fast]") {
+  const TempRoot tmp("c_api_clear_open");
+  const DefaultRoot root(tmp.path());
+  const ovt::cache::SourceHash held = hash_of(0x34);
+  const ovt::cache::SourceHash closed = hash_of(0x35);
+  put_entry(closed);
+  ovt_Cache* cache = nullptr;
+  REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);
+  ovt_CacheEntry* entry = nullptr;
+  REQUIRE(ovt_cache_entry(cache, held.data(), &entry) == OVT_OK);
+  const std::vector<std::uint8_t> blob(64, 0x42);
+  REQUIRE(ovt_cache_put_report(entry, "verify", blob.data(), blob.size()) == OVT_OK);
+
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);
+  CHECK_FALSE(fs::exists(tmp.path() / hex_of(closed)));
+  CHECK(fs::exists(tmp.path() / hex_of(held) / "meta.json"));
+  ovt_Buffer buf{};
+  CHECK(ovt_cache_get_report(entry, "verify", &buf) == OVT_OK);  // the held handle still reads
+  ovt_buffer_free(&buf);
+  // A second default open shares the root's state: its startup eviction also sees the held entry.
+  ovt_Cache* second = nullptr;
+  REQUIRE(ovt_cache_open(nullptr, R"({"max_bytes": 1})", &second) == OVT_OK);
+  CHECK(fs::exists(tmp.path() / hex_of(held) / "meta.json"));
+  ovt_cache_close(second);
+
+  ovt_cache_entry_release(entry);
+  ovt_cache_close(cache);
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);  // released: now cleared
+  CHECK_FALSE(fs::exists(tmp.path() / hex_of(held)));
+}
+
 TEST_CASE("test_cache_c_api: a default open keeps the cap cache.json records unless one is set", "[cache][fast]") {
   const TempRoot tmp("c_api_default_cap");
   const DefaultRoot root(tmp.path());

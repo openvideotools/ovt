@@ -253,11 +253,16 @@ class Entry {
 
 /// One cache root (§6.7.1). Open with Cache::open(); entries are obtained with entry(). Releasing the last
 /// reference flushes cache.json; entries may outlive the Cache object (they keep what they need alive).
+/// Every Cache handle on one root in a process shares its state (records, cap, open entries), so eviction and
+/// clear() through any handle skip the entries open through the others. Options::read_only is per handle;
+/// entries of a read-only handle are read-only.
 class Cache {
  public:
   /// Opens (creating when needed, mode 0700 for a new root) the cache at @p root, or at default_root() when
   /// @p root is std::nullopt. Reads cache.json, or rebuilds it from the entry directories when it is missing
-  /// or malformed. Throws CacheError(OVT_E_IO) when the root cannot be created or is not a directory.
+  /// or malformed. Throws CacheError(OVT_E_IO) when the root cannot be created or is not a directory. When the
+  /// root is already open in this process, the new handle shares that state; a writable handle then applies
+  /// Options::max_bytes (when set) and runs the eviction.
   [[nodiscard]] static std::shared_ptr<Cache> open(std::optional<std::filesystem::path> root, Options options = {});
   ~Cache();
   Cache(const Cache&) = delete;
@@ -297,7 +302,8 @@ class Cache {
   /// The eviction of §6.7.4: when the total exceeds max_bytes(), entries that are not open are trimmed in
   /// order of oldest last_used (planes/, then maps/, then frames/, then the whole directory) until the total
   /// is at most 0.9 x max_bytes(). If only open entries remain above the cap, MDL-CCH-0002 is logged once per
-  /// Cache. Runs at open() and after every write that pushes the total above the cap; a no-op when read-only.
+  /// Cache. Runs at open() and after every write that pushes the total above the cap; a no-op on a read-only
+  /// handle.
   EvictionResult enforce_cap();
 
   /// Deletes the entries (or, with ClearFilter::kind, the files of that kind) that match @p filter; open
@@ -315,10 +321,11 @@ class Cache {
   struct Impl;
 
  private:
-  explicit Cache(std::shared_ptr<Impl> impl);
+  Cache(std::shared_ptr<Impl> impl, Options options);
   /// entry() with Impl::open_mu held.
   [[nodiscard]] std::shared_ptr<Entry> entry_locked(const SourceHash& hash);
   std::shared_ptr<Impl> impl_;
+  Options options_;  // this handle's: read_only is per handle, the cap is the root's
 };
 
 }  // namespace ovt::cache

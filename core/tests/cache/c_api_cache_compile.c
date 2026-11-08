@@ -30,7 +30,8 @@ ovt_status ovt_c_api_cache_compile_check(const uint8_t hash[32], ovt_Buffer* out
     st = ovt_cache_report(out);
   }
   if (st == OVT_OK) {
-    st = ovt_cache_clear("analysis", NULL, 30);
+    /* An unknown kind: OVT_E_INVALID_ARG before any I/O, so running this never clears a real cache. */
+    st = ovt_cache_clear("compile-check", NULL, 30);
   }
   return st;
 }

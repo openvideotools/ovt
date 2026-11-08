@@ -307,6 +307,40 @@ TEST_CASE("test_evict: clear filters by source, age and kind and skips open entr
   ovt::cache::set_now_for_testing(std::nullopt);
 }
 
+TEST_CASE("test_evict: handles on one root share its open entries", "[cache][fast]") {
+  const TempRoot tmp("evict_shared_root");
+  const SourceHash h = hash_of(0x66);
+  auto first = Cache::open(tmp.path());
+  auto held = first->entry(h);
+  held->put_frame(0, make_frame(FrameSpec{}));
+
+  SECTION("clear through another handle skips the held entry") {
+    auto second = Cache::open(tmp.path() / "." / "");  // another spelling of the same root
+    const auto result = second->clear({});
+    CHECK(result.removed.empty());
+    CHECK(result.skipped_open == std::vector<SourceHash>{h});
+    CHECK(fs::exists(tmp.path() / ovt::cache::hex(h) / "meta.json"));
+  }
+  SECTION("a second open with a tiny cap does not evict the held entry") {
+    auto second = Cache::open(tmp.path(), Options{.max_bytes = 1});
+    CHECK(fs::exists(tmp.path() / ovt::cache::hex(h) / "frames"));
+    CHECK(first->max_bytes() == 1);  // the cap is the root's
+  }
+  SECTION("read_only is per handle") {
+    Options ro;
+    ro.read_only = true;
+    auto reader = Cache::open(tmp.path(), ro);
+    CHECK_THROWS_AS(reader->clear({}), CacheError);
+    CHECK_THROWS_AS(reader->set_max_bytes(1), CacheError);
+    CHECK(reader->enforce_cap().removed.empty());
+    auto read_entry = reader->entry(h);
+    CHECK(read_entry != held);
+    CHECK(read_entry->get_frame(0).has_value());
+    CHECK_THROWS_AS(read_entry->put_frame(1, make_frame(FrameSpec{.decode_index = 1})), CacheError);
+    held->put_frame(1, make_frame(FrameSpec{.decode_index = 1}));  // the writable handle still writes
+  }
+}
+
 TEST_CASE("test_evict: list re-walks the entries and reports one row per kind", "[cache][fast]") {
   const TempRoot tmp("evict_list");
   const SourceHash h = hash_of(0x44);
