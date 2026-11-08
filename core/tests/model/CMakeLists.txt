@@ -42,3 +42,12 @@ if(Python3_Interpreter_FOUND)
   set_tests_properties(test_fb_python_import PROPERTIES ENVIRONMENT "PYTHONPATH=${OVT_GENERATED_DIR}/python" LABELS
                                                         "fast;unit;schema" SKIP_RETURN_CODE 77)
 endif()
+
+# WI-0.093: the round-trip test over the golden fixtures of core/tests/golden/ (the test the phase-0 exit gate
+# runs, chapter 16 §16.1.1 #10). Needs only the generated schema code.
+add_executable(test_model_roundtrip test_model_roundtrip.cpp)
+target_link_libraries(test_model_roundtrip PRIVATE ovt_golden_fixtures ovt::flags ${flatbuffers_TARGET}
+                                                   ${Catch2_TARGET})
+target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
+ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
