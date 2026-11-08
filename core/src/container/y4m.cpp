@@ -295,7 +295,7 @@ class Y4mReader final : public Reader {
     }
 
     // TrackInfo (§8.6.5): codec Unknown, timescale F.num, duration = frames * F.den.
-    const uint64_t dur = static_cast<uint64_t>(f_.frames.size()) * f_.fps_den;
+    const uint64_t dur = f_.frames.size() * f_.fps_den;
     const double dur_s = f_.fps_num == 0 ? -1.0 : static_cast<double>(dur) / f_.fps_num;
     const auto handler_fourcc = fbb.CreateString("vide");
     fb::TrackInfoBuilder tb(fbb);
