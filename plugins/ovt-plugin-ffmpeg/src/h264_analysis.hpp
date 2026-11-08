@@ -46,7 +46,6 @@ struct Plane {
 struct Frame {
   int32_t decode_index = -1;
   int64_t pts = 0;
-  // FrameInfo
   uint8_t frame_type = 7;  // ovt.fb.FrameType: 0 I, 1 P, 2 B, 7 Unknown
   bool is_rap = false;
   int32_t coded_w = 0;
@@ -62,7 +61,6 @@ struct Frame {
   std::vector<Diag> diagnostics;
 };
 
-/// Frees an AVFrame (av_frame_free); used by the output queue.
 struct AVFrameDeleter {
   void operator()(AVFrame* f) const noexcept;
 };

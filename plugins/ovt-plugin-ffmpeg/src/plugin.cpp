@@ -50,8 +50,7 @@ struct ovt_AnalysisDecoder {
 
 namespace {
 
-// The SPDX id of the libavcodec the plugin runs with: the plugin flavour is LGPL unless OVT_FFMPEG_GPL, and a
-// system FFmpeg (OVT_SYSTEM_FFMPEG) may be either; avcodec_license() says which.
+// The SPDX id of the linked libavcodec (GPL with OVT_FFMPEG_GPL or some system builds), from avcodec_license().
 const char* ffmpeg_spdx() {
   const char* lic = avcodec_license();
   const bool lgpl = std::strstr(lic, "LGPL") != nullptr;
@@ -129,8 +128,7 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::ffmpeg::Frame frame, uin
   const auto grid_off = ovt::fb::CreateCellGrid(*fbb, static_cast<uint32_t>((f.coded_w + 3) / 4),
                                                 static_cast<uint32_t>((f.coded_h + 3) / 4));
 
-  // display_index, POC, slice data and the picture structure come from the host's index (chapter 07 §7.5.3 A6):
-  // libavcodec does not export them.
+  // libavcodec exports no display_index, POC, slice data or picture structure: the host index has them (§7.5.3 A6).
   const ovt::fb::FrameId id(f.decode_index, -1);
   const ovt::fb::Rect coded(0, 0, f.coded_w, f.coded_h);
   const ovt::fb::Rect crop(f.crop_x, f.crop_y, f.crop_w, f.crop_h);

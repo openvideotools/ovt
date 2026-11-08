@@ -361,6 +361,32 @@ std::vector<std::pair<int, std::string>> framemd5_oracle(const std::filesystem::
   return out;
 }
 
+// AT1 for one stream: one FrameAnalysis per output frame, each access unit at most once, with the decode index and
+// cropped-picture MD5 of `ffmpeg -f framemd5` (the oracle), in output order.
+void md5_vs_framemd5(const std::string& id, int threads) {
+  CAPTURE(id, threads);
+  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  const std::vector<std::pair<int, std::string>> want = framemd5_oracle(path);
+  REQUIRE(!want.empty());
+  const StreamResult r = run_stream(read_file(path), threads);
+  CHECK(r.push_errors == 0);
+  REQUIRE(r.frames.size() == want.size());
+  std::set<int> seen;
+  int mismatches = 0;
+  for (size_t i = 0; i < want.size(); ++i) {
+    const OutFrame& f = r.frames[i];
+    CHECK(seen.insert(f.decode_index).second);
+    CHECK((f.decode_index >= 0 && f.decode_index < r.access_units));
+    CHECK(f.pts == 1000 + f.decode_index);
+    if (f.decode_index != want[i].first || f.cropped_md5 != want[i].second) {
+      ++mismatches;
+      UNSCOPED_INFO("output frame " << i << ": decode index " << f.decode_index << " md5 " << f.cropped_md5
+                                    << ", framemd5 access unit " << want[i].first << " md5 " << want[i].second);
+    }
+  }
+  CHECK(mismatches == 0);
+}
+
 }  // namespace
 
 TEST_CASE("ffmpeg plugin: caps and ABI table", "[fast][third_party]") {
@@ -520,35 +546,13 @@ TEST_CASE("ffmpeg plugin: garbage units never crash the plugin", "[fast][third_p
   CHECK((st == OVT_OK || st == OVT_E_CORRUPT));
 }
 
-TEST_CASE("ffmpeg plugin: ffmpeg_plugin_md5_vs_framemd5 on the h264-analysis-smoke JVT streams",
-          "[fast][third_party][needs-corpus]") {
-  // AT1. The 10 streams of the h264-analysis-smoke tag (chapter 14 §14.2): CAVLC and CABAC, MBAFF, weighted
-  // prediction, multiple and long-term references, 8x8 transforms, interlace and non-reference frames.
+TEST_CASE("ffmpeg plugin: ffmpeg_plugin_md5_vs_framemd5 on the fast JVT streams", "[fast][third_party][needs-corpus]") {
   const std::string id = GENERATE(as<std::string>{}, "jvt_BA1_Sony_D", "jvt_BA_MW_D", "jvt_CABA1_SVA_B",
-                                  "jvt_CABA3_TOSHIBA_E", "jvt_CAMA1_Sony_C", "jvt_CVWP1_TOSHIBA_E", "jvt_MR1_BT_A",
-                                  "jvt_CAPM3_Sony_D", "jvt_CI1_FT_B", "jvt_NRF_MW_E");
-  const int threads = GENERATE(1, 4);
-  CAPTURE(id, threads);
-  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
-  const std::vector<std::pair<int, std::string>> want = framemd5_oracle(path);
-  REQUIRE(!want.empty());
-  const StreamResult r = run_stream(read_file(path), threads);
-  CHECK(r.push_errors == 0);
-  // One FrameAnalysis per output frame, each access unit at most once, identified by its decode index.
-  REQUIRE(r.frames.size() == want.size());
-  std::set<int> seen;
-  int mismatches = 0;
-  for (size_t i = 0; i < want.size(); ++i) {
-    const OutFrame& f = r.frames[i];
-    CHECK(seen.insert(f.decode_index).second);
-    CHECK(f.decode_index >= 0);
-    CHECK(f.decode_index < r.access_units);
-    CHECK(f.pts == 1000 + f.decode_index);
-    if (f.decode_index != want[i].first || f.cropped_md5 != want[i].second) {
-      ++mismatches;
-      UNSCOPED_INFO("output frame " << i << ": decode index " << f.decode_index << " md5 " << f.cropped_md5
-                                    << ", framemd5 access unit " << want[i].first << " md5 " << want[i].second);
-    }
-  }
-  CHECK(mismatches == 0);
+                                  "jvt_CVWP1_TOSHIBA_E", "jvt_MR1_BT_A", "jvt_CI1_FT_B", "jvt_NRF_MW_E");
+  md5_vs_framemd5(id, GENERATE(1, 4));
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_plugin_md5_vs_framemd5 on the slow JVT streams", "[slow][third_party][needs-corpus]") {
+  const std::string id = GENERATE(as<std::string>{}, "jvt_CABA3_TOSHIBA_E", "jvt_CAMA1_Sony_C", "jvt_CAPM3_Sony_D");
+  md5_vs_framemd5(id, GENERATE(1, 4));
 }
