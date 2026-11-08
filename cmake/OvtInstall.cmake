@@ -25,6 +25,34 @@ install(
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ovt)
 
+# libovt_core links the shared core FFmpeg flavour (libav*_ovt, chapter 13 §13.3.3) since the demuxer of WI-1.230.
+# Install those libraries next to it (symlinks preserved, so the SONAME names exist) and give libovt_core a
+# relative run path, so an installed prefix is self-contained: the linker of a downstream consumer and the loader
+# both find libav*_ovt through it. The FFmpeg libraries carry RUNPATH $ORIGIN themselves (third_party/ffmpeg.cmake).
+# Packaging and relocation proper (macOS install names, bundles) belong to WI-0.036. The system-FFmpeg build
+# installs nothing: the distribution provides the libraries.
+if(TARGET ovt_core)
+  if(APPLE)
+    set_target_properties(ovt_core PROPERTIES INSTALL_RPATH "@loader_path")
+  else()
+    set_target_properties(ovt_core PROPERTIES INSTALL_RPATH "$ORIGIN")
+  endif()
+endif()
+if(TARGET tp::ffmpeg_core_avformat AND NOT OVT_SYSTEM_FFMPEG)
+  get_target_property(_ovt_ff_lib tp::ffmpeg_core_avformat IMPORTED_LOCATION)
+  get_filename_component(_ovt_ff_libdir "${_ovt_ff_lib}" DIRECTORY)
+  install(
+    DIRECTORY "${_ovt_ff_libdir}/"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    COMPONENT core
+    FILES_MATCHING
+    PATTERN "lib*_ovt.so*"
+    PATTERN "lib*_ovt.*dylib"
+    PATTERN "pkgconfig" EXCLUDE)
+  unset(_ovt_ff_lib)
+  unset(_ovt_ff_libdir)
+endif()
+
 if(TARGET ovt_cli)
   install(TARGETS ovt_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT cli)
 endif()
