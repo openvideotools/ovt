@@ -39,6 +39,7 @@
 #include "ovt/cxx/cache/meta.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/cxx/log.hpp"
+#include "ovt/cxx/model/plane.hpp"
 #include "ovt/cxx/model/schema_version.hpp"
 #include "ovt/cxx/model/units.hpp"
 #include "ovt/status.h"
@@ -57,8 +58,10 @@ constexpr const char* kMetaJson = "meta.json";
 constexpr const char* kIndexFb = "index.fb";
 constexpr std::size_t kMaxJsonBytes = 64U << 20U;   // cache.json / meta.json
 constexpr std::size_t kMaxRecordBytes = 1U << 30U;  // one FlatBuffer record, compressed or not
+constexpr std::size_t kMaxPlaneBytes = 1U << 30U;   // one plane
 constexpr std::size_t kSizePrefix = sizeof(flatbuffers::uoffset_t);
 constexpr std::chrono::seconds kLastUsedThrottle{60};  // §6.7.4: at most one last_used write per minute
+constexpr std::array<char, 4> kPlaneLetters = {'y', 'u', 'v', 'a'};
 
 std::string now_iso8601() {
   return format_iso8601_utc(std::chrono::system_clock::now());
@@ -138,6 +141,15 @@ std::string frame_file_name(std::uint32_t decode_index) {
   std::array<char, 24> buf{};
   const int n = std::snprintf(buf.data(), buf.size(), "%08u", decode_index);
   return {buf.data(), static_cast<std::size_t>(n)};
+}
+
+bool valid_report_kind(std::string_view kind) noexcept {
+  if (kind.empty() || kind.size() > 32) {
+    return false;
+  }
+  return std::ranges::all_of(kind, [](const char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' || c == '-';
+  });
 }
 
 std::uint64_t file_size_or_zero(const fs::path& path) noexcept {
@@ -239,6 +251,31 @@ std::optional<SourceHash> parse_hex(std::string_view text) noexcept {
     out[i] = static_cast<std::uint8_t>(value);
   }
   return out;
+}
+
+Options parse_options_json(std::string_view json) {
+  Options opts;
+  if (json.empty() || json == "null") {
+    return opts;
+  }
+  const nlohmann::json doc = nlohmann::json::parse(json, nullptr, false, false);
+  if (doc.is_discarded() || !doc.is_object()) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: options are not a JSON object");
+  }
+  if (const auto it = doc.find("max_bytes"); it != doc.end()) {
+    if (!it->is_number_integer() ||
+        (it->is_number_integer() && !it->is_number_unsigned() && it->get<std::int64_t>() < 0)) {
+      throw CacheError(OVT_E_INVALID_ARG, "cache: option max_bytes is not a non-negative integer");
+    }
+    opts.max_bytes = it->get<std::uint64_t>();
+  }
+  if (const auto it = doc.find("read_only"); it != doc.end()) {
+    if (!it->is_boolean()) {
+      throw CacheError(OVT_E_INVALID_ARG, "cache: option read_only is not a boolean");
+    }
+    opts.read_only = it->get<bool>();
+  }
+  return opts;
 }
 
 void set_default_root(std::optional<fs::path> root) {
@@ -498,6 +535,18 @@ struct Entry::Impl {
     return dir / "frames" / (frame_file_name(decode_index) + ".fa.zst");
   }
 
+  [[nodiscard]] fs::path plane_path(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane) const {
+    std::string name(model::stage_token(stage));
+    name.push_back('-');
+    name.push_back(kPlaneLetters.at(plane));
+    name += ".pl.zst";
+    return dir / "planes" / frame_file_name(decode_index) / name;
+  }
+
+  [[nodiscard]] fs::path report_path(std::string_view kind) const {
+    return dir / "reports" / (std::string(kind) + ".fb.zst");
+  }
+
   // Reads and verifies a stored FrameAnalysis; nullopt when absent.
   [[nodiscard]] std::optional<std::vector<std::uint8_t>> load_frame_prefixed(std::uint32_t decode_index) const {
     const fs::path path = frame_path(decode_index);
@@ -647,6 +696,130 @@ std::optional<std::vector<std::uint8_t>> Entry::get_frame(std::uint32_t decode_i
     return std::nullopt;
   }
   return strip_size_prefix(*prefixed);
+}
+
+void Entry::put_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane,
+                      const model::PlaneView& view) {
+  impl_->require_writable();
+  if (model::stage_token(stage).empty() || plane >= kPlaneLetters.size()) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: plane stage or index outside the enum");
+  }
+  try {
+    model::check_plane_view(view);
+  } catch (const std::invalid_argument& e) {
+    throw CacheError(OVT_E_INVALID_ARG, std::string("cache: malformed plane view: ") + e.what());
+  }
+  const std::size_t row_bytes = static_cast<std::size_t>(view.width) * view.sample_bytes;
+  const std::size_t total = row_bytes * view.height;
+  if (total > kMaxPlaneBytes) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: plane larger than 1 GiB");
+  }
+  // Exactly height rows of width * sample_bytes bytes, no stride padding (§6.7.1).
+  std::vector<std::uint8_t> tight(total);
+  const std::span<const std::uint8_t> source(view.data, static_cast<std::size_t>(view.height) * view.stride_bytes);
+  for (std::uint32_t row = 0; row < view.height; ++row) {  // plane rows are stride_bytes apart (§6.6.1)
+    std::memcpy(std::span(tight).subspan(static_cast<std::size_t>(row) * row_bytes, row_bytes).data(),
+                source.subspan(static_cast<std::size_t>(row) * view.stride_bytes, row_bytes).data(), row_bytes);
+  }
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  const fs::path path = impl_->plane_path(decode_index, stage, plane);
+  ensure_directory(path.parent_path());
+  const std::vector<std::uint8_t> compressed = impl_->compressor.compress(tight, kZstdLevelPlanes);
+  impl_->replace_file_locked(path, compressed);
+  if (!impl_->meta.planes_cached.value_or(false)) {
+    impl_->meta.planes_cached = true;
+    impl_->dirty = true;
+  }
+}
+
+std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane) const {
+  if (model::stage_token(stage).empty() || plane >= kPlaneLetters.size()) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: plane stage or index outside the enum");
+  }
+  const fs::path path = impl_->plane_path(decode_index, stage, plane);
+  std::error_code ec;
+  if (!fs::is_regular_file(path, ec)) {
+    return std::nullopt;
+  }
+  // Dimensions come from the frame's PlaneRef (§6.7.1).
+  const auto prefixed = impl_->load_frame_prefixed(decode_index);
+  if (!prefixed) {
+    return std::nullopt;
+  }
+  const auto* fa = flatbuffers::GetSizePrefixedRoot<fb::FrameAnalysis>(prefixed->data());
+  const fb::PlaneRef* ref = nullptr;
+  if (fa->planes() != nullptr) {
+    for (const fb::PlaneRef* candidate : *fa->planes()) {
+      if (candidate->stage() == stage && candidate->plane() == plane) {
+        ref = candidate;
+        break;
+      }
+    }
+  }
+  if (ref == nullptr) {
+    return std::nullopt;
+  }
+  PlaneData out;
+  out.view.width = ref->width();
+  out.view.height = ref->height();
+  out.view.sample_bytes = ref->sample_bytes();
+  out.view.bit_depth = ref->bit_depth();
+  out.view.plane = plane;
+  out.view.stage = static_cast<std::uint8_t>(stage);
+  switch (ref->sample_bytes()) {
+    case 1:
+      out.view.format = model::SampleFormat::U8;
+      break;
+    case 2:
+      out.view.format = ref->is_signed() ? model::SampleFormat::S16LE : model::SampleFormat::U16LE;
+      break;
+    case 4:
+      out.view.format = model::SampleFormat::S32LE;
+      break;
+    default:
+      throw CacheError(OVT_E_CORRUPT, "cache: PlaneRef.sample_bytes outside 1, 2, 4");
+  }
+  const std::size_t expected = static_cast<std::size_t>(ref->width()) * ref->sample_bytes() * ref->height();
+  if (expected > kMaxPlaneBytes) {
+    throw CacheError(OVT_E_CORRUPT, "cache: PlaneRef describes a plane larger than 1 GiB");
+  }
+  out.bytes = decompress(read_file(path, kMaxPlaneBytes), kMaxPlaneBytes, expected);  // I6 size check
+  out.view.stride_bytes = ref->width() * ref->sample_bytes();
+  out.view.data = out.bytes.data();
+  return out;
+}
+
+void Entry::put_report(std::string_view kind, std::span<const std::uint8_t> fb) {
+  impl_->require_writable();
+  if (!valid_report_kind(kind)) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: report kind must match [A-Za-z0-9_-]{1,32}");
+  }
+  if (fb.empty()) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: empty report");
+  }
+  const std::vector<std::uint8_t> prefixed = add_size_prefix(fb);
+  const std::lock_guard<std::mutex> lock(impl_->mu);
+  const fs::path path = impl_->report_path(kind);
+  ensure_directory(path.parent_path());
+  const std::vector<std::uint8_t> compressed = impl_->compressor.compress(prefixed, kZstdLevelFrames);
+  impl_->replace_file_locked(path, compressed);
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_report(std::string_view kind) const {
+  if (!valid_report_kind(kind)) {
+    throw CacheError(OVT_E_INVALID_ARG, "cache: report kind must match [A-Za-z0-9_-]{1,32}");
+  }
+  const fs::path path = impl_->report_path(kind);
+  std::error_code ec;
+  if (!fs::is_regular_file(path, ec)) {
+    return std::nullopt;
+  }
+  const std::vector<std::uint8_t> prefixed = decompress(read_file(path, kMaxRecordBytes), kMaxRecordBytes);
+  if (prefixed.size() < kSizePrefix ||
+      flatbuffers::ReadScalar<flatbuffers::uoffset_t>(prefixed.data()) != prefixed.size() - kSizePrefix) {
+    throw CacheError(OVT_E_CORRUPT, "cache: '" + path.string() + "' has a wrong size prefix");
+  }
+  return strip_size_prefix(prefixed);
 }
 
 void Entry::flush() {

@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # The `cache` module of libovt-core (chapter 0 §0.3, chapter 06 §6.7): ovt::cache::Cache, the on-disk analysis
-# cache (WI-0.091). Sources go into ovt_core_objects, which ovt_core absorbs. The C API of ovt/cache.h follows
-# in core/src/api/ (WI-0.091b).
+# cache (WI-0.091). Sources go into ovt_core_objects, which ovt_core absorbs. The C API of ovt/cache.h lives in
+# core/src/api/cache_api.cpp.
 
 target_sources(ovt_core_objects PRIVATE atomic_file.cpp cache.cpp meta_json.cpp zstd_io.cpp)
 # zstd (record compression) and nlohmann_json (meta.json, cache.json, option strings) are implementation
