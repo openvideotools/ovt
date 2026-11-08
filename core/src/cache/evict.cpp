@@ -183,7 +183,7 @@ bool trim_entry(const fs::path& dir, const std::string& hash, CacheRecord& r, st
 }  // namespace
 
 // SPEC-ASSUMPTION(#297): the file-to-kind map of `ovt cache list` and `clear --kind` (accepted by the reviewer).
-std::optional<std::string_view> kind_of(const fs::path& relative) noexcept {
+std::optional<std::string_view> kind_of(const fs::path& relative) {
   auto it = relative.begin();
   if (it == relative.end()) {
     return std::nullopt;

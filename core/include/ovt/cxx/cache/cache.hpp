@@ -141,7 +141,7 @@ struct ListedRecord {
 };
 
 /// The kinds of ClearFilter::kind and ListedRecord::kind; std::nullopt for meta.json and unknown files.
-[[nodiscard]] std::optional<std::string_view> kind_of(const std::filesystem::path& relative) noexcept;
+[[nodiscard]] std::optional<std::string_view> kind_of(const std::filesystem::path& relative);
 
 /// The clock of last_used and of the eviction order: system_clock::now(), unless a test fixed it.
 [[nodiscard]] std::chrono::system_clock::time_point now();
