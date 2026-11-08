@@ -13,9 +13,10 @@
  * Buffers are stored size-prefixed in the cache but cross this API without a size prefix (§6.1.1): a caller
  * puts the bytes of a plain `FinishBuffer` and gets the same bytes back.
  *
- * Invalidation (§6.7.3) and size-cap eviction (§6.7.4) arrive with WI-0.092; ovt_cache_report and
- * ovt_cache_clear of §12.3.14 are declared by that work item. Until then a malformed file is reported as
- * OVT_E_CORRUPT and the cap is recorded but not enforced.
+ * Size-cap eviction (§6.7.4, WI-0.092) runs when a cache opens and after every write that pushes it above its
+ * cap; it only removes entries that no handle holds. The object API is raw access: a malformed file is
+ * reported as OVT_E_CORRUPT and never deleted (the invalidation rules of §6.7.3 apply to stream sessions).
+ * ovt_cache_report() and ovt_cache_clear() serve `ovt cache` (§12.2.13) on the default cache.
  *
  * Threading (§12.3.1 rule 4): an ovt_Cache and its ovt_CacheEntry handles may be used from several threads
  * at once; every function takes the handle's own lock.
@@ -64,20 +65,21 @@ OVT_API int ovt_cache_enabled(void);
 
 /**
  * Size cap of the default cache in bytes (chapter 06 §6.7.4, NFR-010): default 20 GiB on desktop, 2 GiB
- * on Android. 0 restores the default. Recorded in `cache.json` by the next ovt_cache_open() of the default
- * root; enforced by the eviction of WI-0.092.
+ * on Android. Recorded in `cache.json` by the next ovt_cache_open() of the default root, which evicts down to
+ * it. 0 withdraws the setting: the default cache then keeps the cap its `cache.json` records.
  */
 OVT_API ovt_status ovt_cache_set_max_bytes(uint64_t max_bytes);
 
-/** The size cap of the default cache in bytes. */
+/** The cap set by ovt_cache_set_max_bytes(), or the platform default when none is set. */
 OVT_API uint64_t ovt_cache_max_bytes(void);
 
 /**
  * Opens the cache at @p root (UTF-8; NULL = the default root of ovt_cache_dir()), creating the directory
  * with mode 0700 when absent. @p opts_json is NULL or a JSON object `{"max_bytes": n, "read_only": false}`
  * (D4 d: options are a JSON string, not a struct); unknown members are ignored; a NULL @p opts_json for the
- * default root takes ovt_cache_set_max_bytes(). On success *@p out receives a handle the caller releases
- * with ovt_cache_close().
+ * default root takes the cap of ovt_cache_set_max_bytes() when one is set, else the cap `cache.json` records
+ * (the platform default for a new cache). Opening evicts down to the cap. On success *@p out receives a handle the
+ * caller releases with ovt_cache_close().
  *
  * @return OVT_OK; OVT_E_INVALID_ARG for a NULL @p out, an @p opts_json that is not a JSON object or has a
  *         member of the wrong type; OVT_E_IO when the root cannot be created or read, or when no default
@@ -184,6 +186,33 @@ OVT_API ovt_status ovt_cache_put_report(ovt_CacheEntry* entry, const char* kind,
  *         *@p out is zeroed on failure.
  */
 OVT_API ovt_status ovt_cache_get_report(ovt_CacheEntry* entry, const char* kind, ovt_Buffer* out);
+
+/**
+ * A `CacheReport` (chapter 06 §6.3, `ovt_model.fbs`; root table without file identifier, not size-prefixed)
+ * of the default cache: `dir` = ovt_cache_dir(); one `CacheEntry` per entry and kind present ("index",
+ * "analysis", "metrics"; `key` = source hash hex, `source_basename`, `size_bytes`, `created`, `last_used`),
+ * sorted by key and kind; `total_bytes`; `max_bytes` = the cap `cache.json` records; `hits` and `misses` =
+ * cache lookups (get_index, get_frame, get_plane, get_report) answered or missed by this process. Every
+ * entry directory is re-walked, so `size_bytes` is exact. Nothing is created or written: a root that does
+ * not exist yet gives an empty report. *@p out is owned by the caller and released with ovt_buffer_free().
+ *
+ * @return OVT_OK; OVT_E_INVALID_ARG for a NULL @p out; OVT_E_IO when no default root exists or it cannot be
+ *         read. *@p out is zeroed on failure.
+ */
+OVT_API ovt_status ovt_cache_report(ovt_Buffer* out);
+
+/**
+ * Deletes entries of the default cache, as `ovt cache clear` (§12.2.13). Filters combine; NULL / 0 match
+ * everything. @p kind ("index", "analysis" or "metrics") deletes only the files of that kind from matching
+ * entries, and an entry left with nothing else is removed. @p older_than_days > 0 matches entries last used
+ * at least that many days ago. @p source_path selects the entry of one source file (its §6.2.8 source hash).
+ * Entries open in this process are skipped. A root that does not exist yet is left uncreated.
+ *
+ * @return OVT_OK; OVT_E_INVALID_ARG for an unknown @p kind or a negative @p older_than_days;
+ *         OVT_E_UNSUPPORTED for a non-NULL @p source_path until the source hasher of chapter 06 §6.2.8 is in
+ *         the library; OVT_E_IO when no default root exists or a file-system call fails.
+ */
+OVT_API ovt_status ovt_cache_clear(const char* kind, const char* source_path, int older_than_days);
 
 /**
  * Releases @p entry (NULL is ignored), writing `meta.json` when it changed and the entry's `cache.json`

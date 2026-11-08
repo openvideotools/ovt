@@ -157,10 +157,29 @@ ApplicationWindow {
         y: root.header.height + OvtStyle.spacing
     }
 
+    // GUI-JOB-0001 (§11.7): a job that did not stop in time is detached and reported.
+    Connections {
+        target: JobsModel
+        function onJobDetached(name) {
+            DiagnosticsModel.addGui(1, "GUI-JOB-0001", "job " + name + " did not stop within 2 s; detached")
+        }
+    }
+
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
     DockWorkspace {
         anchors.fill: parent
         actions: actions
+    }
+
+    // Until the Diagnostics / Log panel is a dock panel it sits over the bottom of the workspace, opened from the
+    // status bar badge.
+    DiagnosticsPanel {
+        id: diagnosticsPanel
+
+        visible: false
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
     }
 
     footer: ToolBar {
@@ -200,6 +219,14 @@ ApplicationWindow {
                 value: Math.max(0, JobsModel.foregroundProgress)
                 indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
                 Accessible.name: "Job progress"
+            }
+            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click shows or hides the panel.
+            ToolButton {
+                objectName: "statusDiagnostics"
+                text: DiagnosticsModel.errorCount > 0 ? DiagnosticsModel.errorCount + " errors" : "Diagnostics"
+                onClicked: diagnosticsPanel.visible = !diagnosticsPanel.visible
+                Accessible.name: "Diagnostics"
+                palette.buttonText: DiagnosticsModel.errorCount > 0 ? "#ff6b6b" : OvtStyle.text
             }
         }
     }
