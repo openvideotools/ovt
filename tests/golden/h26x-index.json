@@ -1,0 +1,2507 @@
+{
+ "entries": {
+  "hdr_hdr10plus_dv81": {
+   "failed": {},
+   "goldens": {},
+   "skipped": {
+    "entry": "no hevc video stream in regular.mkv"
+   }
+  },
+  "jctvc_AMP_A_Samsung_7": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_AMP_A_Samsung_7.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_AMP_A_Samsung_7.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "09a9c0d78a502ece45f1df02c773b18bb3133fe21a8f1e9046db19bfa68f7c29",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 124,
+    "documented": 0,
+    "gst_only": 13258,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 7709477 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_AMP_D_Hisilicon_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_AMP_D_Hisilicon_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_AMP_D_Hisilicon_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "a0d7fea2136ae47739bab1fa8c760705538a20b35467f34606f4bf9da5019a63",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3883228 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_Bitdepth_A_RExt_Sony_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_Bitdepth_A_RExt_Sony_1.gstparse.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "0519f266d11fad0a25878f29d5dac153ba00629aacef34ecd78f5f5ad0fb2174",
+   "skipped": {
+    "hm": "the golden of one picture is 3913387 bytes (limit 1000000)",
+    "trace_headers": "FFmpeg 7.1 cannot open a muxer for this stream's codec parameters (RExt extended precision), so trace_headers never runs"
+   }
+  },
+  "jctvc_CAINIT_A_SHARP_4": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_CAINIT_A_SHARP_4.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_CAINIT_A_SHARP_4.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_CAINIT_A_SHARP_4.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e7a4b9ab27dde802001582e8a189aaf8a72e7a95480b22c002a725fa02d25105",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 115,
+    "documented": 0,
+    "gst_only": 13267,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_CONFWIN_A_Sony_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_CONFWIN_A_Sony_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_CONFWIN_A_Sony_1.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_CONFWIN_A_Sony_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "688c2684539ffdca60335e7da650da0236f76c20179c844a33395cceaebb1ca3",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 139,
+    "documented": 0,
+    "gst_only": 13243,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_DSLICE_A_HHI_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_DSLICE_A_HHI_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_DSLICE_A_HHI_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "8398fb23c814a197bba497ad2c6103f81ca8003434fa40ec347d4d0a07c9468a",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 564,
+    "documented": 0,
+    "gst_only": 55826,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3885963 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_ENTP_A_QUALCOMM_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_ENTP_A_QUALCOMM_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_ENTP_A_QUALCOMM_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "1dc1dfb16f676f59cebde3a4732209ce5ce0d0f49ef697970987c0c3e0e087b1",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 105,
+    "documented": 0,
+    "gst_only": 13279,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3952013 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_EXT_A_ericsson_4": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_EXT_A_ericsson_4.gstparse.json.gz",
+     "pictures": 3
+    },
+    "hm": {
+     "file": "h265/jctvc_EXT_A_ericsson_4.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_EXT_A_ericsson_4.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "1322c36a7c283f258fed90fc15f6f8dfe40bd621b090716dde9cce5c06f71e05",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 167,
+    "documented": 0,
+    "gst_only": 22565,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_FILLER_A_Sony_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_FILLER_A_Sony_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_FILLER_A_Sony_1.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_FILLER_A_Sony_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "63669795a10c50c898ef19bd75568cd8a6ae0a16797898f629692d4c6315fa31",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 135,
+    "documented": 0,
+    "gst_only": 13247,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_HRD_A_Fujitsu_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_HRD_A_Fujitsu_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_HRD_A_Fujitsu_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_HRD_A_Fujitsu_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "61af83565147e9dc23842847111e748d32d95830d88cd3855a66143ea08d6915",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 416,
+    "documented": 0,
+    "gst_only": 21030,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_MAXBINS_A_TI_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_MAXBINS_A_TI_5.gstparse.json.gz",
+     "pictures": 2
+    },
+    "hm": {
+     "file": "h265/jctvc_MAXBINS_A_TI_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_MAXBINS_A_TI_5.trace_headers.json.gz",
+     "pictures": 2
+    }
+   },
+   "input_sha256": "efddf49ed997d5a0ddcc7c85fe8f609768d4e8ddd88b32532e0833144ec939e4",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 61,
+    "documented": 0,
+    "gst_only": 11529,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_MERGE_B_TI_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_MERGE_B_TI_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_MERGE_B_TI_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_MERGE_B_TI_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "a61399c23cff77098300cf96392cbcedd70c82c474458f8acf67a515df08cf19",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 135,
+    "documented": 0,
+    "gst_only": 13247,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_MVCLIP_A_qualcomm_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_MVCLIP_A_qualcomm_3.gstparse.json.gz",
+     "pictures": 5
+    },
+    "hm": {
+     "file": "h265/jctvc_MVCLIP_A_qualcomm_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_MVCLIP_A_qualcomm_3.trace_headers.json.gz",
+     "pictures": 5
+    }
+   },
+   "input_sha256": "9b287e76e0aa6943239debb517250e26489e72ad1bf504b5b2dd77d2a57dcba5",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 110,
+    "documented": 0,
+    "gst_only": 12824,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_MVEDGE_A_qualcomm_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_MVEDGE_A_qualcomm_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_MVEDGE_A_qualcomm_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_MVEDGE_A_qualcomm_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "aa19456c21b304b23e7dc568e8546982d66547bba15225a5d13b65ea27befa10",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 124,
+    "documented": 0,
+    "gst_only": 13258,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_Main_422_10_A_RExt_Sony_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_Main_422_10_A_RExt_Sony_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_Main_422_10_A_RExt_Sony_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "4004fe9c86d10f36acc6e111b8e6a473351ceeceb6b0649f1d3efb442d27a231",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 159,
+    "documented": 0,
+    "gst_only": 13223,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3834555 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_NUT_A_ericsson_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_NUT_A_ericsson_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_NUT_A_ericsson_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_NUT_A_ericsson_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 194,
+    "documented": 0,
+    "gst_only": 23882,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_NoOutPrior_A_Qualcomm_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_NoOutPrior_A_Qualcomm_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_NoOutPrior_A_Qualcomm_1.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_NoOutPrior_A_Qualcomm_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "cd01eedf3929a1ca4d917e933dfa5011ce7a5cc6ea46b23cb78a6e638fa50d2e",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_OPFLAG_A_Qualcomm_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_OPFLAG_A_Qualcomm_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_OPFLAG_A_Qualcomm_1.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_OPFLAG_A_Qualcomm_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "1fb75cf1426c0682f324fe0dcb029561cbc50aa813b9d91aa434d061610a123a",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 126,
+    "documented": 0,
+    "gst_only": 13256,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_PICSIZE_A_Bossen_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_PICSIZE_A_Bossen_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_PICSIZE_A_Bossen_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "3e490a54e23594294fe9e12b1c01880546ab2efcc7979d87d330a8428f1a1480",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 136,
+    "documented": 0,
+    "gst_only": 13249,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 16920965 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_PMERGE_A_TI_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_PMERGE_A_TI_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_PMERGE_A_TI_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_PMERGE_A_TI_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 135,
+    "documented": 0,
+    "gst_only": 13247,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_POC_A_Bossen_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_POC_A_Bossen_3.gstparse.json.gz",
+     "pictures": 5
+    },
+    "hm": {
+     "file": "h265/jctvc_POC_A_Bossen_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_POC_A_Bossen_3.trace_headers.json.gz",
+     "pictures": 5
+    }
+   },
+   "input_sha256": "0830773b2c3f6ef85ec973f09a08dfd0f1e7a36e05936d4b1fc0b6c014a3a639",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 69,
+    "documented": 0,
+    "gst_only": 12865,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_PPS_A_qualcomm_7": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_PPS_A_qualcomm_7.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_PPS_A_qualcomm_7.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_PPS_A_qualcomm_7.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "2382b56a09bc9bff001cc4b1e90826219c17324de944acce5dde490032322128",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 1702,
+    "documented": 0,
+    "gst_only": 103488,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RAP_A_docomo_6": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RAP_A_docomo_6.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RAP_A_docomo_6.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RAP_A_docomo_6.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "931db64702a056cddf66dab87e80598f16031bd147ed56c25d98b3f555424029",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 122,
+    "documented": 0,
+    "gst_only": 13260,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RAP_B_Bossen_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RAP_B_Bossen_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RAP_B_Bossen_2.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RAP_B_Bossen_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "f8718a7b9a58a40845601879a167566fea4a842e4919be63569836974518224a",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 115,
+    "documented": 0,
+    "gst_only": 13267,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RPS_A_docomo_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_A_docomo_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_A_docomo_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RPS_A_docomo_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e7a90335952dc5718d931adb461d90049eb558b4d08c90ff1706612f8bca4439",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RPS_B_qualcomm_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_B_qualcomm_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_B_qualcomm_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RPS_B_qualcomm_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "a5e2097201740c15824b75540b6d0d5050763681bedf7209cde80d93a3b88996",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RPS_C_ericsson_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_C_ericsson_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_C_ericsson_5.hm-grid.json.gz",
+     "pictures": 2
+    }
+   },
+   "input_sha256": "b0aa060407b3ad9a558a1212645a1bf137187f2dce8bf47f312efa1bd19ded6e",
+   "skipped": {
+    "trace_headers": "FFmpeg 7.1 rejects the stream (Invalid data found when processing input) before trace_headers runs"
+   }
+  },
+  "jctvc_RPS_D_ericsson_6": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_D_ericsson_6.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_D_ericsson_6.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RPS_D_ericsson_6.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 191,
+    "documented": 0,
+    "gst_only": 23885,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RPS_E_qualcomm_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_E_qualcomm_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_E_qualcomm_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RPS_E_qualcomm_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "b82c5c8c251943cc41b59e7f63f72890641fdcdbcec8e916223e4ee28a16c7ad",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 126,
+    "documented": 0,
+    "gst_only": 13256,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_RPS_F_docomo_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_RPS_F_docomo_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_RPS_F_docomo_2.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_RPS_F_docomo_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "57588b676e3d1c2b82b761671c66383fac2b5c9c3eb98644c70a8e5fed486ed6",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_SAO_A_MediaTek_4": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_SAO_A_MediaTek_4.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_SAO_A_MediaTek_4.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_SAO_A_MediaTek_4.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "88f693ac4aec4dea03cb4bc0cb9d8c98a4023a015905369bb62688064fb58944",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_SDH_A_Orange_4": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_SDH_A_Orange_4.gstparse.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_SDH_A_Orange_4.trace_headers.json.gz",
+     "pictures": 2
+    }
+   },
+   "input_sha256": "ff68e351105a1c9b8a0293663e0275260684b50f8be4dbdb850bd2db1c7c8e27",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 68,
+    "documented": 0,
+    "gst_only": 11522,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3890180 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_SLIST_A_Sony_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_SLIST_A_Sony_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_SLIST_A_Sony_5.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_SLIST_A_Sony_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "be5532289143b068bfe451243b750b8162017c0569046c680931987469f47095",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 208,
+    "documented": 0,
+    "gst_only": 20454,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_STRUCT_B_Samsung_7": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_STRUCT_B_Samsung_7.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_STRUCT_B_Samsung_7.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_STRUCT_B_Samsung_7.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e58b04f1434449721957857ca38adab3865b71cb93ae9705a4361b7cb4400d8e",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 111,
+    "documented": 0,
+    "gst_only": 13271,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_TILES_B_Cisco_1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_TILES_B_Cisco_1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_TILES_B_Cisco_1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "d2f65167917e42030db804c60ca7775452445a61930ccee3fa2ad2cd3830a57a",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 1261,
+    "documented": 0,
+    "gst_only": 66489,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3961801 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_TSCL_A_VIDYO_5": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_TSCL_A_VIDYO_5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_TSCL_A_VIDYO_5.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_TSCL_A_VIDYO_5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "cab7d7ea801a5ee7d1ff495c98cf5e4eafa2c4fb32cc1473443f69f2457cfd16",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 132,
+    "documented": 0,
+    "gst_only": 13250,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_TSKIP_A_MS_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_TSKIP_A_MS_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_TSKIP_A_MS_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "8407a07198b8db84e2fb2aef5c06d2d73f32bd0e4ddf08c5a9455481dcd73141",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 13262,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 1763757 bytes (limit 1000000)"
+   }
+  },
+  "jctvc_VPSID_A_VIDYO_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_VPSID_A_VIDYO_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_VPSID_A_VIDYO_2.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_VPSID_A_VIDYO_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "d86bb746dadb63bdf561615a1de7860b2336c7616462507453e0fcec3ddf27f3",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 114,
+    "documented": 0,
+    "gst_only": 14780,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_WPP_A_ericsson_MAIN10_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN10_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN10_2.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN10_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "3b0d7323bf81d64d3c1443c9cebb8df6a42e0719ed422e64125e03971999b956",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 716,
+    "documented": 0,
+    "gst_only": 32826,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_WPP_A_ericsson_MAIN_2": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN_2.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN_2.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_WPP_A_ericsson_MAIN_2.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "54d896d9fbdfa0aae15629001105c6ee132c8459e152abb06efc62cead4324ae",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 716,
+    "documented": 0,
+    "gst_only": 32826,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_WP_A_Toshiba_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_WP_A_Toshiba_3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "hm": {
+     "file": "h265/jctvc_WP_A_Toshiba_3.hm-grid.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_WP_A_Toshiba_3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "d052c54c39078ee6d546a431094b53df633e0c17777e2bed693e7999b0ba29c5",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 175,
+    "documented": 0,
+    "gst_only": 13207,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jctvc_ipcm_A_NEC_3": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/jctvc_ipcm_A_NEC_3.gstparse.json.gz",
+     "pictures": 1
+    },
+    "hm": {
+     "file": "h265/jctvc_ipcm_A_NEC_3.hm-grid.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h265/jctvc_ipcm_A_NEC_3.trace_headers.json.gz",
+     "pictures": 1
+    }
+   },
+   "input_sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 54,
+    "documented": 0,
+    "gst_only": 11088,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_BA1_Sony_D": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_BA1_Sony_D.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_BA1_Sony_D.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_BA1_Sony_D.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_BA1_Sony_D.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "90c84dee7e57151b80918e4b81910d33885fba2ce131fa119e1753c1892086fc",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 147,
+    "documented": 0,
+    "gst_only": 3701,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_BA_MW_D": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_BA_MW_D.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_BA_MW_D.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_BA_MW_D.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_BA_MW_D.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "47c59fbe8de6edad04457b8b412579d10cf6ecf87393f252cb2493f9c20dca32",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 82,
+    "documented": 0,
+    "gst_only": 1300,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CABA1_SVA_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CABA1_SVA_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CABA1_SVA_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CABA1_SVA_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CABA1_SVA_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "2c1319be664863d68bf22c26ccfff417b7eeca1d8d6360f1862b5b3aa4c24c0a",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 69,
+    "documented": 0,
+    "gst_only": 1259,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CI1_FT_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CI1_FT_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CI1_FT_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CI1_FT_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CI1_FT_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "900f033372ebd2f7b621a708eea82494b5a635140e5563a989ed9b824282fea6",
+   "selfcheck": {
+    "ambiguous": 40,
+    "compared": 240,
+    "documented": 0,
+    "gst_only": 2692,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CVPCMNL1_SVA_C": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CVPCMNL1_SVA_C.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CVPCMNL1_SVA_C.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CVPCMNL1_SVA_C.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CVPCMNL1_SVA_C.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "6d8dee9086d4cedaa255c0c40fa61165fc9dd56d2bbec16b0bfed6f1f1d33f0c",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 75,
+    "documented": 0,
+    "gst_only": 1253,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CVSE2_Sony_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CVSE2_Sony_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CVSE2_Sony_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CVSE2_Sony_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CVSE2_Sony_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "f10009500cef910947b3e9f0369f27c44a1de2f966a5c75d852a1c8d70e2cfa7",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 181,
+    "documented": 0,
+    "gst_only": 3691,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CVSE3_Sony_H": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CVSE3_Sony_H.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CVSE3_Sony_H.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CVSE3_Sony_H.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CVSE3_Sony_H.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "abe5743d9ee4e94fed9f203b6eaec147a0654c865407dd1b27a18917f141f827",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 183,
+    "documented": 0,
+    "gst_only": 3707,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_CVWP1_TOSHIBA_E": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_CVWP1_TOSHIBA_E.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_CVWP1_TOSHIBA_E.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_CVWP1_TOSHIBA_E.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CVWP1_TOSHIBA_E.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "a2cbf860dd8e15fd66cdda72ba37cb81c378b49fe7439200f9c2c9c1ec9f2dbb",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 188,
+    "documented": 0,
+    "gst_only": 3720,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_FRExt1_Panasonic_D": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_FRExt1_Panasonic_D.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_FRExt1_Panasonic_D.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_FRExt1_Panasonic_D.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_FRExt1_Panasonic_D.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "6232852ac82c164ce1f68cd15c0d51a91a2c538be3988d8dae64113e485d2223",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 165,
+    "documented": 0,
+    "gst_only": 3731,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_HCAFF1_HHI_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_HCAFF1_HHI_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_HCAFF1_HHI_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_HCAFF1_HHI_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_HCAFF1_HHI_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "752efafeb176bbf622565e5b3853c82e35bb50143e7175239802576b18e9f22c",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 113,
+    "documented": 0,
+    "gst_only": 1257,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_Hi422FR1_SONY_A": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_Hi422FR1_SONY_A.gstparse.json.gz",
+     "pictures": 5
+    },
+    "jm": {
+     "file": "h264/jvt_Hi422FR1_SONY_A.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_Hi422FR1_SONY_A.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_Hi422FR1_SONY_A.trace_headers.json.gz",
+     "pictures": 5
+    }
+   },
+   "input_sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 120,
+    "documented": 0,
+    "gst_only": 3178,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_MIDR_MW_D": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_MIDR_MW_D.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_MIDR_MW_D.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_MIDR_MW_D.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_MIDR_MW_D.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "b39ba07a9734328a61d23ebc798ce32a17d6a88290d92501e94e5da731ba2a49",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 82,
+    "documented": 0,
+    "gst_only": 1300,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_MR1_BT_A": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_MR1_BT_A.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_MR1_BT_A.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_MR1_BT_A.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_MR1_BT_A.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "20dc67331c81adcf40048bb37357883a69b3ab002b0927e599f43d86be9c3d8b",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 143,
+    "documented": 0,
+    "gst_only": 1692,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_MR6_BT_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_MR6_BT_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_MR6_BT_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_MR6_BT_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_MR6_BT_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "6b7fc0b3e6d57d7b5f58286c1fb4f5afb2324cc21e6d1c9ee9a846471fc21ae8",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 116,
+    "documented": 0,
+    "gst_only": 1280,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_MR9_BT_B": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_MR9_BT_B.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_MR9_BT_B.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_MR9_BT_B.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_MR9_BT_B.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "dd2712e64c602bfd5b79b1eff6ac9ed5826bd3619b0d70653850768ab95c4817",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 127,
+    "documented": 0,
+    "gst_only": 1261,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_NRF_MW_E": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_NRF_MW_E.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_NRF_MW_E.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_NRF_MW_E.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_NRF_MW_E.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "02e5b0f3e018a998adcd4cfbeed184298a1c8e0cf27ef4f16bcf780b23a03c00",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 80,
+    "documented": 0,
+    "gst_only": 1260,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "jvt_aud_mw_e": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/jvt_aud_mw_e.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/jvt_aud_mw_e.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/jvt_aud_mw_e.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_aud_mw_e.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "173b75a2883f3208894877549362f118721f45633bf08007396703ef2c358987",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 88,
+    "documented": 0,
+    "gst_only": 1294,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "mkv_test1": {
+   "failed": {},
+   "goldens": {},
+   "skipped": {
+    "entry": "no h264 video stream in test1.mkv"
+   }
+  },
+  "mkv_test3": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/mkv_test3.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h264/mkv_test3.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "1722b0d93a6ef1a14dd513bd031cd5901c233b45aa3e3c87be0b0d7348d7d1b5",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 442,
+    "documented": 0,
+    "gst_only": 2542,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "mkv_test5": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/mkv_test5.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h264/mkv_test5.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "92acdc33bb0b5d7a4d9b0d6ca792230a78c786a30179dc9999cee41c28642842",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 442,
+    "documented": 0,
+    "gst_only": 2542,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "mpegff_a1_foreman_qcif": {
+   "failed": {},
+   "goldens": {},
+   "skipped": {
+    "entry": "no h264 video stream in a1-foreman-QCIF.mp4"
+   }
+  },
+  "mpegff_hevc_dual_track": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/mpegff_hevc_dual_track.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/mpegff_hevc_dual_track.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "20933b79db875c2c01d3d130c90e05e0d05f260778d8e2619e24c5be5f0b909b",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 125,
+    "documented": 0,
+    "gst_only": 13257,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "mpegff_hvc1_only": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/mpegff_hvc1_only.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/mpegff_hvc1_only.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "20933b79db875c2c01d3d130c90e05e0d05f260778d8e2619e24c5be5f0b909b",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 125,
+    "documented": 0,
+    "gst_only": 13257,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h264_epb_dense": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "epb": {
+     "file": "epb/syn_h264_epb_dense.json",
+     "pictures": 6
+    },
+    "gstparse": {
+     "file": "h264/syn_h264_epb_dense.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/syn_h264_epb_dense.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/syn_h264_epb_dense.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/syn_h264_epb_dense.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "cd07c483e0770487fc8104e52feec84ae8f816430d5190e05cdd81f028976b2a",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 134,
+    "documented": 0,
+    "gst_only": 1234,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h264_gop60_1080p": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/syn_h264_gop60_1080p.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/syn_h264_gop60_1080p.jm-trace.json.gz",
+     "pictures": 1
+    },
+    "mvs": {
+     "file": "h264/syn_h264_gop60_1080p.ffmpeg-mvs.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h264/syn_h264_gop60_1080p.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "7293709ba0101e5e7b05f2bfbc6b8b017de787afe3e017216b87e84abd216bd6",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 149,
+    "documented": 0,
+    "gst_only": 1255,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h264_hrd_cbr": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/syn_h264_hrd_cbr.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/syn_h264_hrd_cbr.jm-trace.json.gz",
+     "pictures": 1
+    },
+    "mvs": {
+     "file": "h264/syn_h264_hrd_cbr.ffmpeg-mvs.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h264/syn_h264_hrd_cbr.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "3c2e708e491175f0eccb344678bdd4051cfebcf3ad51c60a000487dca936406b",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 150,
+    "documented": 0,
+    "gst_only": 1254,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h264_hrd_vbr": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/syn_h264_hrd_vbr.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/syn_h264_hrd_vbr.jm-trace.json.gz",
+     "pictures": 1
+    },
+    "mvs": {
+     "file": "h264/syn_h264_hrd_vbr.ffmpeg-mvs.json.gz",
+     "pictures": 1
+    },
+    "trace_headers": {
+     "file": "h264/syn_h264_hrd_vbr.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "6a379e39083c28c42d642dd594115562cd768ddb6d7de677c6f3589d7953ba05",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 150,
+    "documented": 0,
+    "gst_only": 1254,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h264_multislice_cavlc_mp4": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/syn_h264_multislice_cavlc_mp4.gstparse.json.gz",
+     "pictures": 6
+    },
+    "jm": {
+     "file": "h264/syn_h264_multislice_cavlc_mp4.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "mvs": {
+     "file": "h264/syn_h264_multislice_cavlc_mp4.ffmpeg-mvs.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/syn_h264_multislice_cavlc_mp4.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "670a81ee31d36199d2d994e2d34a32789e71b7ca51330706d1b4ed4a997df72d",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 293,
+    "documented": 0,
+    "gst_only": 1959,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "syn_h265_amp_sao_on": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_amp_sao_on.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_amp_sao_on.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "ee4e23b16ebeda4550912bebe63befef05621811c6295777923c63db2254facf",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 160,
+    "documented": 0,
+    "gst_only": 13222,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 1771557 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_bpyramid": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_bpyramid.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_bpyramid.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "9697816c8bd56c68257259110a3fb1e08b413af99bc0c2b7c20ac633e754e41f",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 132,
+    "documented": 0,
+    "gst_only": 13250,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 1771071 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_crop_1080_in_1088": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_crop_1080_in_1088.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_crop_1080_in_1088.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "9f454a5a63aba8c3ee27e91846d2336c72f93bed0901ccbd430aa96cbee85752",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 124,
+    "documented": 0,
+    "gst_only": 13258,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 4010170 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_gop60_1080p": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_gop60_1080p.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_gop60_1080p.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "241184b283a3ad3fb7e3b070d0ac9f51617e61106fb6b807b568cce9a75f7292",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 188,
+    "documented": 0,
+    "gst_only": 23888,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3982066 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_hdr10plus": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_hdr10plus.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_hdr10plus.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "4f2f27ccba734a43cba6d9e79051c68540bab42b5a5b8bfab7795f4abf23d3eb",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 207,
+    "documented": 0,
+    "gst_only": 23869,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_hrd_cbr": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_hrd_cbr.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_hrd_cbr.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "5577f0e94cf9919e090a1da84c1a2b596c94a71839085a576c41d5c03d37819f",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 149,
+    "documented": 0,
+    "gst_only": 13233,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3981700 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_hrd_vbr": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_hrd_vbr.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_hrd_vbr.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "5f6eaa1942cf3b8c3122c50a62814c5474eefc145c7cb7da89f2fefe7367afbf",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 149,
+    "documented": 0,
+    "gst_only": 13233,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3982066 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_main10_hev1": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_main10_hev1.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_main10_hev1.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "7e1797ae3059057bfabcf02eb82134b922de60f2daa1ccbb18103a49235519a2",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 207,
+    "documented": 0,
+    "gst_only": 23869,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_main10_pq_hdr": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_main10_pq_hdr.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_main10_pq_hdr.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "b6aaa3e6d3a2e5de0b212ede75b169e94e808818c2c9df93372251b3d0d950c7",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 207,
+    "documented": 0,
+    "gst_only": 23869,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_multi_pps": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_multi_pps.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_multi_pps.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "223798a697898847511e5e7dcfa7c122cd082464706d118b51e9b4a91b9c51a5",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 204,
+    "documented": 0,
+    "gst_only": 16090,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 1771557 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_pq_colr_only": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_pq_colr_only.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_pq_colr_only.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "1c0fa52557773331c62144ce9d1509899280223fa8d00039b598dd1738cbd1c0",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 133,
+    "documented": 0,
+    "gst_only": 13249,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3945213 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_pq_sei_only": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_pq_sei_only.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_pq_sei_only.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "e6452064329dd8f89bfa9d587c617815a1b61a82cab1e142bb80fcf67448794e",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 151,
+    "documented": 0,
+    "gst_only": 13231,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3952900 bytes (limit 1000000)"
+   }
+  },
+  "syn_h265_sei_unknown_200": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_h265_sei_unknown_200.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h265/syn_h265_sei_unknown_200.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "cdc4812b398ba7e2342c684d5b7c24e4bf83e525455db2e52441a2da75b00b11",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 160,
+    "documented": 0,
+    "gst_only": 13222,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "HM 18.0 asserts in TComInputBitstream::read on the unknown SEI payload type 200 (the stream is for the SEI parser tests)"
+   }
+  },
+  "syn_pat_hlg_patches": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_pat_hlg_patches.gstparse.json.gz",
+     "pictures": 3
+    },
+    "trace_headers": {
+     "file": "h265/syn_pat_hlg_patches.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "f5805d12ba9d7bdf8919ba557205e206bbc9d5bfd0f537cbd997657227521586",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 85,
+    "documented": 0,
+    "gst_only": 11953,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3727310 bytes (limit 1000000)"
+   }
+  },
+  "syn_pat_p3_saturation": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_pat_p3_saturation.gstparse.json.gz",
+     "pictures": 3
+    },
+    "trace_headers": {
+     "file": "h265/syn_pat_p3_saturation.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "880c4b78e13f444af12caff39185d8ca350be0235d74819535ba39839b5c8a30",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 85,
+    "documented": 0,
+    "gst_only": 11953,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3723485 bytes (limit 1000000)"
+   }
+  },
+  "syn_pat_pq_patches_1000": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_pat_pq_patches_1000.gstparse.json.gz",
+     "pictures": 3
+    },
+    "trace_headers": {
+     "file": "h265/syn_pat_pq_patches_1000.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "87ec595a7b25b9a42da6f6412c66901a61b0a47bcd1095e01531181fc53524e5",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 85,
+    "documented": 0,
+    "gst_only": 11953,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3711433 bytes (limit 1000000)"
+   }
+  },
+  "syn_pat_sdr709_ramp": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_pat_sdr709_ramp.gstparse.json.gz",
+     "pictures": 3
+    },
+    "trace_headers": {
+     "file": "h265/syn_pat_sdr709_ramp.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "8e5bff6b76d7656cc0eccc24aa0ea57b3efccc7b2b8ff400772f98074fdfde6f",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 85,
+    "documented": 0,
+    "gst_only": 11953,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3752333 bytes (limit 1000000)"
+   }
+  },
+  "syn_pat_siting_checker": {
+   "codec": "h265",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h265/syn_pat_siting_checker.gstparse.json.gz",
+     "pictures": 3
+    },
+    "trace_headers": {
+     "file": "h265/syn_pat_siting_checker.trace_headers.json.gz",
+     "pictures": 3
+    }
+   },
+   "input_sha256": "888a306b6ada738a1c069bf809715f7659aa1fab79bce56cc701111c7264eb59",
+   "selfcheck": {
+    "ambiguous": 0,
+    "compared": 85,
+    "documented": 0,
+    "gst_only": 11953,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {
+    "hm": "the golden of one picture is 3758725 bytes (limit 1000000)"
+   }
+  },
+  "ts_h264_dvb": {
+   "failed": {},
+   "goldens": {},
+   "skipped": {
+    "entry": "FFmpeg cannot size the H.264 track of this transport stream while copying it (dimensions not set)"
+   }
+  },
+  "ytugc_clip01": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/ytugc_clip01.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h264/ytugc_clip01.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "950a1b1a9ac8ef9c0a202018a6261a07b1152bc665e7bba3bfc60cfc087425a9",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 150,
+    "documented": 0,
+    "gst_only": 1218,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  },
+  "ytugc_clip03": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "gstparse": {
+     "file": "h264/ytugc_clip03.gstparse.json.gz",
+     "pictures": 6
+    },
+    "trace_headers": {
+     "file": "h264/ytugc_clip03.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "5b84d248a44982d7813fd82d43f6bc870718b1d427814e645609fed5e93873bb",
+   "selfcheck": {
+    "ambiguous": 20,
+    "compared": 150,
+    "documented": 0,
+    "gst_only": 1218,
+    "problems": [],
+    "undocumented": {}
+   },
+   "skipped": {}
+  }
+ },
+ "skipped_entries": {
+  "cta_cmaf_video_cmfv": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "cta_hdr10_hevc": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "gpac_dolby_vision_cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "gpac_enc_cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "hdr_hlg_bt2020": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "heif_C001": "an image item, not a video track",
+  "heif_heic_grid": "an image item, not a video track",
+  "jctvc_DBLK_A_SONY_4": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jctvc_GENERAL_444_8bit_RExt_Sony_2": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jctvc_INITQP_B_Sony_1": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jctvc_LTRPSPS_A_FJ_1": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jvt_ALPHACONFORMANCEG": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jvt_CVFC1_SVA_C": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "jvt_src19td_IBP_264": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "mpegff_hev1_clg1_header": "an initialisation or media segment on its own: no sample description or no samples",
+  "mpegff_hev1_clg1_segment": "an initialisation or media segment on its own: no sample description or no samples",
+  "mpegff_video_cenc_128iv": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "mpegff_video_cenc_roll_frag1s": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones"
+ }
+}

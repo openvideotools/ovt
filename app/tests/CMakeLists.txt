@@ -8,7 +8,7 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS QuickTest Test)
 # ovt_find_package targets are directory-scoped (core/tests found Catch2 for itself).
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
 
-# ---- Models: Settings, Platform, JobsModel, SelectionModel, the Timeline index model and the dock model -----
+# ---- Models: Settings, Platform, JobsModel, SelectionModel, Timeline index model, Keymap and Go to, without QML ----
 add_executable(
   ovt_tests_app_models
   models/test_settings.cpp
@@ -16,8 +16,12 @@ add_executable(
   models/test_selection_model.cpp
   models/test_series_aggregator.cpp
   models/test_stream_index_model.cpp
+  models/test_keymap.cpp
+  models/test_goto_parser.cpp
   models/test_dock_model.cpp
   ../src/settings.cpp
+  ../src/keymap.cpp
+  ../src/goto_parser.cpp
   ../src/platform/platform.cpp
   ../src/models/jobs_model.cpp
   ../src/models/selection_model.cpp
