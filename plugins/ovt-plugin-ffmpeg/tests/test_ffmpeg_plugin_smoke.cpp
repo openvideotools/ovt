@@ -120,7 +120,7 @@ class BitWriter {
 
  private:
   void bit(uint32_t b) {
-    cur_ = static_cast<uint8_t>((cur_ << 1) | b);
+    cur_ = static_cast<uint8_t>((static_cast<uint32_t>(cur_) << 1U) | b);
     if (++n_ == 8) {
       out_.push_back(cur_);
       cur_ = 0;
@@ -473,7 +473,7 @@ TEST_CASE("ffmpeg plugin: malformed avcC and arguments are rejected", "[fast][th
   CHECK(api.create(truncated.data(), truncated.size(), 1, &dec) == OVT_E_CORRUPT);
   CHECK(dec == nullptr);
   CHECK(api.create(nullptr, 0, 1, nullptr) == OVT_E_INVALID_ARG);
-  Instance in(api);
+  const Instance in(api);
   REQUIRE(in.status == OVT_OK);
   CHECK(api.push(in.dec, nullptr, 0, 0, 0) == OVT_E_INVALID_ARG);
   const uint8_t* data = nullptr;
@@ -489,7 +489,7 @@ TEST_CASE("ffmpeg plugin: malformed avcC and arguments are rejected", "[fast][th
 
 TEST_CASE("ffmpeg plugin: garbage units never crash the plugin", "[fast][third_party]") {
   const ovt_AnalysisDecoderApi& api = plugin_api();
-  Instance in(api, 2);
+  const Instance in(api, 2);
   REQUIRE(in.status == OVT_OK);
   uint32_t state = 0x2169U;  // xorshift32: deterministic garbage
   const auto next = [&state] {

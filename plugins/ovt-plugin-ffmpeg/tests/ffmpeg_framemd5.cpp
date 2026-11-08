@@ -96,18 +96,18 @@ bool run(std::vector<uint8_t>& bytes, size_t data_size) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  const std::vector<const char*> args(argv, argv + argc);  // NOLINT(*-pointer-arithmetic)
-  if (args.size() != 2) {
-    std::cerr << "usage: ovt_plugin_ffmpeg_framemd5 <file.264>\n";
-    return 1;
+  try {
+    const std::vector<const char*> args(argv, argv + argc);  // NOLINT(*-pointer-arithmetic)
+    std::ifstream in(args.size() == 2 ? args[1] : "", std::ios::binary);
+    if (args.size() != 2 || !in) {
+      std::cerr << "usage: ovt_plugin_ffmpeg_framemd5 <readable file.264>\n";
+      return 1;
+    }
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    const size_t data_size = bytes.size();
+    bytes.resize(data_size + AV_INPUT_BUFFER_PADDING_SIZE, 0);
+    return run(bytes, data_size) ? 0 : 1;
+  } catch (...) {
+    return 1;  // out of memory or a stream error: no exception leaves main
   }
-  std::ifstream in(args[1], std::ios::binary);
-  if (!in) {
-    std::cerr << "cannot open " << args[1] << '\n';
-    return 1;
-  }
-  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  const size_t data_size = bytes.size();
-  bytes.resize(data_size + AV_INPUT_BUFFER_PADDING_SIZE, 0);
-  return run(bytes, data_size) ? 0 : 1;
 }
