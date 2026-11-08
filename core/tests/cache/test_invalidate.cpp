@@ -331,6 +331,11 @@ TEST_CASE("test_invalidate: a plane without PlaneRef or of the wrong size is del
   CHECK_FALSE(entry->get_plane(0, ovt::fb::PlaneStage::Reconstruction, 0).has_value());
   CHECK_FALSE(fs::exists(planes / "00000000" / "recon-y.pl.zst"));
   CHECK(entry->get_frame(0).has_value());  // the frame stays
+  // A plane whose frame file is gone is garbage too.
+  REQUIRE(fs::remove(entry_dir(tmp, h) / "frames" / "00000003.fa.zst"));
+  entry->put_plane(3, ovt::fb::PlaneStage::Reconstruction, 0, view);
+  CHECK_FALSE(entry->get_plane(3, ovt::fb::PlaneStage::Reconstruction, 0).has_value());
+  CHECK_FALSE(fs::exists(planes / "00000003" / "recon-y.pl.zst"));
   // Regenerated with the right geometry, the plane reads back.
   view.height = 32;
   entry->put_plane(0, ovt::fb::PlaneStage::Reconstruction, 0, view);

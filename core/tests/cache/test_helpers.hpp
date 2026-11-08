@@ -12,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -44,6 +45,17 @@ class TempRoot {
  private:
   fs::path path_;
 };
+
+/// The directory an acceptance test leaves behind for a JSON Schema check: $OVT_TEST_FIXED_DIR when set (the
+/// validate_json_schema.py driver sets it, so that its run never races the plain CTest run of the same test
+/// case), else <build>/core/tests/cache/<name>.
+inline fs::path fixed_dir(std::string_view name) {
+  const char* dir = std::getenv("OVT_TEST_FIXED_DIR");  // NOLINT(concurrency-mt-unsafe): read-only lookup
+  if (dir != nullptr && *dir != '\0') {
+    return {dir};
+  }
+  return fs::path(OVT_TEST_BINARY_DIR) / std::string(name);
+}
 
 inline SourceHash hash_of(std::uint8_t seed) {
   SourceHash h{};

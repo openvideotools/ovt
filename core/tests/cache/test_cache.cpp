@@ -94,11 +94,11 @@ TEST_CASE("test_cache: hex encodes and parse_hex decodes a source hash", "[cache
   CHECK_FALSE(ovt::cache::parse_hex(std::string(63, 'a') + "g").has_value());
 }
 
-// Acceptance test 1. The directory is a fixed one so that the CTest test cache_meta_json_schema (a cmake -P
-// script, core/tests/cache/validate_meta_schema.cmake) can validate the meta.json it leaves behind with
+// Acceptance test 1. The directory is a fixed one so that the CTest test cache_meta_json_schema
+// (core/tests/cache/validate_json_schema.py) can validate the meta.json it leaves behind with
 // `python -m jsonschema`.
 TEST_CASE("test_cache: AT1 index and three frames read back byte-identical after reopen", "[cache][fast]") {
-  const fs::path root = fs::path(OVT_TEST_BINARY_DIR) / "at1";
+  const fs::path root = ovt::cache::test::fixed_dir("at1");
   fs::remove_all(root);
   const SourceHash h = hash_of(0x10);
   const std::vector<std::uint8_t> index = make_index(h, 3);  // FrameInfo.pts set: minalign 8 like every real index
