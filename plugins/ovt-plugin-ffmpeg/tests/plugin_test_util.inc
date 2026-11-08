@@ -1,8 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Helpers for tests that drive ovt-plugin-ffmpeg through the host's PluginRegistry: the loaded plugin, one decoder
-// instance, FlatBuffer access, Annex B splitting and a whole-stream driver.
+// Helpers for tests that drive ovt-plugin-ffmpeg through the host's PluginRegistry (plugin, decoder, Annex B driver).
 // Not a .hpp on purpose: it needs Catch2, which clang-tidy-diff cannot resolve when it parses a header on its own.
 #ifndef OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_INC
 #define OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_INC

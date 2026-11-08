@@ -1,8 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Unit tests of the side-data mapping (WI-2.170) on AVFrames built by hand. This executable compiles the mapping next
-// to the static plugin flavour of FFmpeg, like ovt_plugin_ffmpeg itself; it does not use the host.
+// Unit tests of the side-data mapping (WI-2.170) on AVFrames built by hand, without the host.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -33,7 +32,6 @@ struct FrameDeleter {
 };
 using FramePtr = std::unique_ptr<AVFrame, FrameDeleter>;
 
-// A frame of w x h coded luma samples; no pixel buffers are needed by the mapping.
 FramePtr make_frame(int w, int h) {
   FramePtr f(av_frame_alloc());
   f->width = w;
@@ -132,6 +130,23 @@ TEST_CASE("map_h264_sidedata: bi-prediction, units and canonical order", "[fast]
   CHECK(sd.qp[0] == 26);
   CHECK(sd.qp[4] == 29);
   CHECK_FALSE(has_code(diags, "ANA-H264-0002"));  // every macroblock has a vector: nothing is inferred intra
+}
+
+TEST_CASE("map_h264_sidedata: a 1080p frame full of bi-predicted 4x4 vectors maps in linear time",
+          "[fast][third_party]") {
+  const FramePtr f = make_frame(1920, 1088);  // 8160 macroblocks x 16 sub-blocks x 2 lists = 261,120 vectors
+  std::vector<AVMotionVector> in;
+  for (int y = 2; y < 1088; y += 4) {
+    for (int x = 2; x < 1920; x += 4) {
+      in.push_back(motion(-1, 4, 4, x, y, 4, 4));
+      in.push_back(motion(+1, 4, 4, x, y, -4, -4));
+    }
+  }
+  add_motion(f.get(), in);
+  std::vector<Diag> diags;
+  const SideData sd = ovt::ffmpeg::map_h264_sidedata(f.get(), 8, &diags);  // O(n^2) pairing would take minutes
+  REQUIRE(sd.mvs.size() == in.size());
+  CHECK(std::all_of(sd.mvs.begin(), sd.mvs.end(), [](const auto& m) { return (m.flags & 1U) == 1U; }));
 }
 
 TEST_CASE("map_h264_sidedata: QpBdOffsetY is removed and intra is inferred from QP without vectors",

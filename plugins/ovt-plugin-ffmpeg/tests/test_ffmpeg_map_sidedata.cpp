@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the side-data mapping of ovt-plugin-ffmpeg (WI-2.170, chapter 07 §7.6.3), through the plugin ABI.
-// Hand-made streams have known vectors and QPs (computed from H.264 8.4.1.3 and 7.4.5 by hand). AT1, AT2 and AT4
-// compare against the in-tree `ffmpeg_mvs` (ovt_plugin_ffmpeg_sidedata, chapter 14 §14.4.3a) and the committed JM
-// trace goldens on the JVT streams.
+// Hand-made streams have vectors and QPs computed by hand (H.264 8.4.1.3, 7.4.5); AT1, AT2 and AT4 compare with the
+// in-tree `ffmpeg_mvs` (ovt_plugin_ffmpeg_sidedata) and the committed JM trace goldens.
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -65,8 +64,7 @@ std::vector<T> vec(const V* v) {
   return v == nullptr ? std::vector<T>{} : std::vector<T>(v->begin(), v->end());
 }
 
-// Copies a FrameAnalysis out and checks the model rules the mapping must satisfy (chapter 06 §6.9: V-003..V-016,
-// V-025, V-026, V-028) on the way.
+// Copies a FrameAnalysis out, checking the model rules (chapter 06 §6.9: V-003..V-016, V-025, V-026, V-028).
 Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one validator
     const ovt::fb::FrameAnalysis* fa) {
   Frame f;
@@ -261,8 +259,7 @@ std::vector<uint8_t> synthetic_stream() {
   return s;
 }
 
-// The per-macroblock QP_Y of the first picture in a JM trace golden (tests/golden/h264/<id>.jm-trace.json.gz, the
-// `normalize/jm_trace.py` block-grid): the "qp" of every {"mb_addr": …} entry up to the next mb_addr 0.
+// QP_Y per macroblock of the first picture in tests/golden/h264/<id>.jm-trace.json.gz.
 std::vector<int> jm_first_picture_qps(const std::string& golden_json) {
   static const std::regex kMb(R"re("mb_addr":\s*(\d+)[^}]*?"qp":\s*(-?\d+))re");
   std::vector<int> qps;
@@ -330,7 +327,6 @@ TEST_CASE("ffmpeg plugin: intra macroblocks map to Intra with their QP", "[fast]
 }
 
 TEST_CASE("ffmpeg plugin: P macroblocks map to Inter with the vectors of the stream", "[fast][third_party]") {
-  // Quarter-sample vectors from H.264 8.4.1.3 (see synthetic_stream()), scaled to 1/16: multiply by 4.
   const int threads = GENERATE(1, 4);
   const std::vector<Frame> frames = analyse(synthetic_stream(), threads);
   REQUIRE(frames.size() == 3);
@@ -357,8 +353,7 @@ TEST_CASE("ffmpeg plugin: P macroblocks map to Inter with the vectors of the str
 
 namespace {
 
-// AT1 and AT2 for one stream against the in-tree ffmpeg_mvs: every vector and every macroblock QP after the conversion
-// of tests/oracles/normalize/ffmpeg_mvs.py, at 1 and 4 threads.
+// AT1 and AT2 for one stream against the in-tree ffmpeg_mvs (normalize/ffmpeg_mvs.py conversion), at 1 and 4 threads.
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void compare_with_oracle(const std::string& id) {
   CAPTURE(id);
@@ -374,8 +369,7 @@ void compare_with_oracle(const std::string& id) {
   }
   REQUIRE(pclose(p) == 0);
 
-  // Rows -> per packet index: the vectors after the conversion of tests/oracles/normalize/ffmpeg_mvs.py (rect from the
-  // centre, mv * 16 / motion_scale, list from the sign), and the QP of every 16x16 block.
+  // Rows -> per packet index: vectors converted (centre -> rect, mv * 16 / motion_scale, sign -> list), QP per block.
   std::map<int, std::vector<Mv>> want_mvs;
   std::map<int, std::map<std::pair<int, int>, int>> want_qp;  // (x, y) -> qp + delta_qp
   std::istringstream lines(text);
@@ -396,7 +390,6 @@ void compare_with_oracle(const std::string& id) {
     }
   }
   for (auto& [pts, v] : want_mvs) {
-    // both lists for the same rect make bi-prediction, which the oracle rows only imply
     for (Mv& a : v) {
       a.bi = std::any_of(v.begin(), v.end(), [&](const Mv& b) {
         return b.list != a.list && b.x == a.x && b.y == a.y && b.w == a.w && b.h == a.h;
@@ -439,18 +432,15 @@ void compare_with_oracle(const std::string& id) {
 }  // namespace
 
 TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle", "[fast][third_party][needs-corpus]") {
-  // CVWP1_TOSHIBA_E: weighted P (AT1); CABA1_SVA_B: B pictures, so bi-prediction.
   compare_with_oracle(GENERATE(as<std::string>{}, "jvt_CVWP1_TOSHIBA_E", "jvt_CABA1_SVA_B"));
 }
 
 TEST_CASE("ffmpeg plugin: ffmpeg_mv_vs_oracle on the slow JVT streams", "[slow][third_party][needs-corpus]") {
-  // CAQP1_Sony_B: QP changes (AT2); CAMA1_Sony_C: MBAFF.
   compare_with_oracle(GENERATE(as<std::string>{}, "jvt_CAQP1_Sony_B", "jvt_CAMA1_Sony_C"));
 }
 
 TEST_CASE("ffmpeg plugin: ffmpeg_qp_vs_jm", "[fast][third_party][needs-corpus]") {
-  // AT4: 10-bit 4:2:2 intra stream. Every grid.qp lies in -12..51 and the first picture's QPs are those JM traced
-  // (SliceQPY plus the mb_qp_delta accumulation, QpBdOffsetY already removed).
+  // AT4: 10-bit 4:2:2 intra stream: grid.qp lies in -12..51 and the first picture's QPs are those JM traced.
   const std::string id = "jvt_Hi422FR1_SONY_A";
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
   const std::vector<int> jm =

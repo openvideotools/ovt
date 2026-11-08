@@ -85,8 +85,8 @@ bool fits_macroblock(const Box& r, int scale, int32_t mb_w, int32_t mb_h) {
          r.y / kMbSize < mb_h;
 }
 
-// Motion vectors: the rect from the block centre, the vector in 1/16 sample, the list from the sign of `source`,
-// then the canonical order of chapter 06 §6.3.7 and the bi-prediction flag (both lists for the same rect).
+// Motion vectors: rect from the block centre, 1/16 sample, list from the sign of `source`, canonical order (chapter 06
+// §6.3.7), bi-prediction flag (both lists for the same rect).
 void map_motion(const AVFrame* frame, int32_t mb_w, int32_t mb_h, bool interlaced, std::vector<MbMotion>* mvs,
                 Counts* counts) {
   const AVFrameSideData* sd = av_frame_get_side_data(frame, AV_FRAME_DATA_MOTION_VECTORS);
@@ -117,18 +117,23 @@ void map_motion(const AVFrame* frame, int32_t mb_w, int32_t mb_h, bool interlace
   std::sort(mvs->begin(), mvs->end(), [](const MbMotion& a, const MbMotion& b) {
     return std::tie(a.block_id, a.list, a.rect.y, a.rect.x) < std::tie(b.block_id, b.list, b.rect.y, b.rect.x);
   });
-  for (MbMotion& a : *mvs) {
-    const auto other = std::find_if(mvs->begin(), mvs->end(), [&a](const MbMotion& b) {
-      return a.block_id == b.block_id && a.list != b.list && a.rect == b.rect;
-    });
-    if (other != mvs->end()) {
-      a.flags |= kFlagBiPred;
+  // Only vectors of one block_id can pair up: search the run, not the frame (the frame-wide search was O(n^2)).
+  for (auto run = mvs->begin(); run != mvs->end();) {
+    const auto run_end =
+        std::find_if(run, mvs->end(), [run](const MbMotion& b) { return b.block_id != run->block_id; });
+    for (auto a = run; a != run_end; ++a) {
+      const bool paired =
+          std::any_of(run, run_end, [a](const MbMotion& b) { return a->list != b.list && a->rect == b.rect; });
+      if (paired) {
+        a->flags |= kFlagBiPred;
+      }
     }
+    run = run_end;
   }
 }
 
-// Classification (no mb_type in the side data): a macroblock with a vector is Inter, one without it is Intra when the
-// frame carries its QP, else unknown. True when any macroblock was inferred Intra.
+// No mb_type in the side data: a macroblock with a vector is Inter, one with only a QP is Intra. True if any is
+// inferred.
 bool classify(SideData* out, const std::vector<uint8_t>& qp_known) {
   std::vector<uint8_t> has_mv(out->mbs.size(), 0);
   for (const MbMotion& m : out->mvs) {

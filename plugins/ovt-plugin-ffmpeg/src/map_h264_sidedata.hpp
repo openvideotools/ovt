@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The mapping of libavcodec's H.264 side data into the OVT model (chapter 07 §7.6.3 "Exact mapping of side data ->
-// model", WI-2.170): AV_FRAME_DATA_VIDEO_ENC_PARAMS gives the macroblocks and their QP, AV_FRAME_DATA_MOTION_VECTORS
-// the motion vectors; intra/inter is inferred from them. Pure data in, plain structs out: plugin.cpp turns SideData
-// into FlatBuffers, so the mapping is testable without the ABI.
+// libavcodec's H.264 side data -> OVT model (chapter 07 §7.6.3, WI-2.170): VIDEO_ENC_PARAMS gives macroblocks and QP,
+// MOTION_VECTORS the vectors; intra/inter is inferred. Plain structs out (plugin.cpp builds the FlatBuffers).
 #ifndef OVT_PLUGIN_FFMPEG_MAP_H264_SIDEDATA_HPP
 #define OVT_PLUGIN_FFMPEG_MAP_H264_SIDEDATA_HPP
 
@@ -56,8 +54,7 @@ struct MbMotion {
   uint16_t flags = 0;  // ovt.fb.MotionVector.flags: bit0 bi-pred, bit4 field
 };
 
-/// The CellGrid vectors and block/MV/reference tables of one frame. `valid` is false when the picture has no
-/// macroblocks to describe (all other members are then empty).
+/// The CellGrid vectors and block/MV/reference tables of one frame; `valid` is false (rest empty) without macroblocks.
 struct SideData {
   bool valid = false;
   uint32_t cells_w = 0;  // ceil(coded_w / 4)

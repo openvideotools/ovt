@@ -76,12 +76,11 @@ struct Info {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
     caps.codec = kCodecH264;
     caps.plane_stages = 1U << kStageRecon;
-    // §7.6.3: block_id (MB granularity), pred (Intra/Inter only), qp, mv0/mv1 and the list-only ref0/ref1.
     caps.grid_fields =
         OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 | OVT_GRID_REF0 | OVT_GRID_REF1;
     caps.has_symbol_accounting = 0;
     caps.bit_exact = 1;
-    caps.supports_threads = 1;  // libavcodec frame + slice threads
+    caps.supports_threads = 1;  // libavcodec slice threads (SPEC-ASSUMPTION(#302))
     caps.id = "ffmpeg";
     caps.version = version.c_str();
     caps.license = ffmpeg_spdx();
@@ -131,8 +130,7 @@ flatbuffers::Offset<ovt::fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder
   return g.Finish();
 }
 
-// blocks[0] is the virtual root (chapter 06 §6.3.2); blocks[1 + n] is macroblock n in raster order (kind MB, no
-// extension table: the side data has no syntax elements).
+// blocks[0] is the virtual root (chapter 06 §6.3.2); blocks[1 + n] is macroblock n in raster order.
 void build_blocks(flatbuffers::FlatBufferBuilder& fbb, const ovt::ffmpeg::Frame& f,
                   std::vector<flatbuffers::Offset<ovt::fb::Block>>* out) {
   const ovt::ffmpeg::SideData& sd = f.side;
@@ -216,7 +214,6 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::ffmpeg::Frame frame, uin
       mvs.push_back(mb.Finish());
     }
     if (!sd.mvs.empty()) {
-      // Two pseudo-slots: the side data names only the direction, not ref_idx (§7.6.3 RefSlot row).
       const ovt::fb::FrameId unknown(-1, -1);
       for (uint8_t l = 0; l < 2; ++l) {
         const auto name = fbb->CreateString(l == 0 ? "L0" : "L1");

@@ -1,12 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// ovt_plugin_ffmpeg_sidedata <file.264>: the in-tree `ffmpeg_mvs` of chapter 14 §14.4.3a (WI-2.170 oracle, so CI
-// needs no oracle image). h264 parser + decoder with export_side_data = mvs + venc_params. Per output frame, in output
-// order, it prints the raw side-data fields, keyed by the packet index (in pts) that started the frame:
+// ovt_plugin_ffmpeg_sidedata <file.264>: the in-tree `ffmpeg_mvs` of chapter 14 §14.4.3a (WI-2.170 oracle). Per output
+// frame it prints the raw side-data fields, keyed by the packet index (pts) that started the frame:
 //   M <idx> <source> <w> <h> <src_x> <src_y> <dst_x> <dst_y> <flags> <motion_x> <motion_y> <motion_scale>
 //   Q <idx> <src_x> <src_y> <w> <h> <qp> <delta_qp>
-// The conversion to OVT units is the test's job. Exit 0 on success, 1 on error.
+// Exit 0 on success, 1 on error.
 
 extern "C" {
 #include <libavcodec/avcodec.h>
