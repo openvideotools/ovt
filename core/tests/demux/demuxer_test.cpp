@@ -55,6 +55,11 @@ void put32(Bytes& b, uint32_t v) {
   put16(b, v >> 16U);
   put16(b, v);
 }
+void put32s(Bytes& b, std::initializer_list<uint32_t> vs) {
+  for (const uint32_t v : vs) {
+    put32(b, v);
+  }
+}
 void put16le(Bytes& b, uint32_t v) {
   put8(b, v);
   put8(b, v >> 8U);
@@ -164,12 +169,7 @@ Mp4 make_mp4(int samples = 10) {
   const auto n = static_cast<uint32_t>(samples);
 
   Bytes mvhd;
-  put32(mvhd, 0);
-  put32(mvhd, 0);
-  put32(mvhd, 0);
-  put32(mvhd, Mp4::kTimescale);
-  put32(mvhd, n);
-  put32(mvhd, 0x00010000);
+  put32s(mvhd, {0, 0, 0, Mp4::kTimescale, n, 0x00010000});
   put16(mvhd, 0x0100);
   zeros(mvhd, 10);
   for (const uint32_t v : {0x00010000U, 0U, 0U, 0U, 0x00010000U, 0U, 0U, 0U, 0x40000000U}) {
@@ -179,12 +179,7 @@ Mp4 make_mp4(int samples = 10) {
   put32(mvhd, Mp4::kTrackId + 1);
 
   Bytes tkhd;
-  put32(tkhd, 0x00000003);
-  put32(tkhd, 0);
-  put32(tkhd, 0);
-  put32(tkhd, Mp4::kTrackId);
-  put32(tkhd, 0);
-  put32(tkhd, n);
+  put32s(tkhd, {0x00000003, 0, 0, Mp4::kTrackId, 0, n});
   zeros(tkhd, 8);
   put16(tkhd, 0);
   put16(tkhd, 0);
@@ -193,21 +188,15 @@ Mp4 make_mp4(int samples = 10) {
   for (const uint32_t v : {0x00010000U, 0U, 0U, 0U, 0x00010000U, 0U, 0U, 0U, 0x40000000U}) {
     put32(tkhd, v);
   }
-  put32(tkhd, 16U << 16U);
-  put32(tkhd, 16U << 16U);
+  put32s(tkhd, {16U << 16U, 16U << 16U});
 
   Bytes mdhd;
-  put32(mdhd, 0);
-  put32(mdhd, 0);
-  put32(mdhd, 0);
-  put32(mdhd, Mp4::kTimescale);
-  put32(mdhd, n);
+  put32s(mdhd, {0, 0, 0, Mp4::kTimescale, n});
   put16(mdhd, 0x55C4);  // "und"
   put16(mdhd, 0);
 
   Bytes hdlr;
-  put32(hdlr, 0);
-  put32(hdlr, 0);
+  put32s(hdlr, {0, 0});
   put(hdlr, "vide");
   zeros(hdlr, 12);
   put8(hdlr, 0);
@@ -218,8 +207,7 @@ Mp4 make_mp4(int samples = 10) {
   Bytes url;
   put32(url, 1);
   Bytes dref;
-  put32(dref, 0);
-  put32(dref, 1);
+  put32s(dref, {0, 1});
   dref = cat({dref, box("url ", url)});
 
   // avcC: version 1, profile 66, compat 0, level 30, lengthSizeMinusOne 3, one SPS, one PPS (pseudo bytes).
@@ -236,47 +224,32 @@ Mp4 make_mp4(int samples = 10) {
   zeros(avc1, 16);
   put16(avc1, 16);
   put16(avc1, 16);
-  put32(avc1, 0x00480000);
-  put32(avc1, 0x00480000);
-  put32(avc1, 0);
+  put32s(avc1, {0x00480000, 0x00480000, 0});
   put16(avc1, 1);
   zeros(avc1, 32);
   put16(avc1, 0x0018);
   put16(avc1, 0xFFFF);
   avc1 = cat({avc1, box("avcC", m.avcc)});
   Bytes stsd;
-  put32(stsd, 0);
-  put32(stsd, 1);
+  put32s(stsd, {0, 1});
   stsd = cat({stsd, box("avc1", avc1)});
 
   Bytes stts;
-  put32(stts, 0);
-  put32(stts, 1);
-  put32(stts, n);
-  put32(stts, 1);
+  put32s(stts, {0, 1, n, 1});
   Bytes stss;
-  put32(stss, 0);
-  put32(stss, static_cast<uint32_t>(m.sync.size()));
+  put32s(stss, {0, static_cast<uint32_t>(m.sync.size())});
   for (const size_t s : m.sync) {
     put32(stss, static_cast<uint32_t>(s + 1));
   }
   Bytes stsc;
-  put32(stsc, 0);
-  put32(stsc, 1);
-  put32(stsc, 1);
-  put32(stsc, n);
-  put32(stsc, 1);
+  put32s(stsc, {0, 1, 1, n, 1});
   Bytes stsz;
-  put32(stsz, 0);
-  put32(stsz, 0);
-  put32(stsz, n);
+  put32s(stsz, {0, 0, n});
   for (const uint32_t s : m.sizes) {
     put32(stsz, s);
   }
   Bytes stco;
-  put32(stco, 0);
-  put32(stco, 1);
-  put32(stco, static_cast<uint32_t>(first));
+  put32s(stco, {0, 1, static_cast<uint32_t>(first)});
 
   const Bytes stbl = box("stbl", cat({box("stsd", stsd), box("stts", stts), box("stss", stss), box("stsc", stsc),
                                       box("stsz", stsz), box("stco", stco)}));
