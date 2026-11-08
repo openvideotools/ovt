@@ -50,7 +50,7 @@ import h26x_selfcheck  # noqa: E402
 ALL_ORACLES = ("trace_headers", "gstparse", "jm", "hm", "mvs")
 HEADER_PICTURES = 6
 BLOCK_PICTURES = 2
-MAX_BYTES = 900_000  # header goldens; CLAUDE.md forbids goldens over 2 MB, and a PR carries 100+ of them
+MAX_BYTES = 900_000  # header goldens; CLAUDE.md caps goldens at 2 MB gzip-compressed, and a PR carries 100+ of them
 MAX_BLOCK_BYTES = {"jm": 1_900_000, "mvs": 1_000_000, "hm": 1_000_000}  # one 1080p picture of JM output is 1.2 MB
 CONTAINER_PACKETS = 16  # packets copied out of a container: enough for HEADER_PICTURES whatever the GOP
 EPB_ID = "syn_h264_epb_dense"
