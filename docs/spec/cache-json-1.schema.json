@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openvideotools.org/schema/cache-json-1.json",
+  "title": "OVT cache-wide index (cache.json), cache_format 1",
+  "description": "Chapter 06 §6.7.1 and §6.7.4 of the OVT specification; written by core/src/cache/cache.cpp (WI-0.091, WI-0.092).",
+  "type": "object",
+  "required": ["cache_format", "size_cap_bytes", "entries"],
+  "properties": {
+    "cache_format": { "const": 1 },
+    "size_cap_bytes": { "type": "integer", "minimum": 0, "description": "size cap of the cache in bytes (§6.7.4); default 20 GiB desktop, 2 GiB Android" },
+    "entries": {
+      "type": "array",
+      "description": "one record per <source_hash>/ entry directory, sorted by source_hash",
+      "items": {
+        "type": "object",
+        "required": ["source_hash", "last_used", "bytes"],
+        "properties": {
+          "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "last_used": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC; the eviction order (oldest first)" },
+          "bytes": { "type": "integer", "minimum": 0, "description": "sum of the sizes of every file under the entry directory, kept incrementally" }
+        }
+      }
+    }
+  }
+}

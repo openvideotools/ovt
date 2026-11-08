@@ -117,6 +117,9 @@ bool movePanelToNewGroup(Layout& layout, const QString& panelId, DockArea area, 
 bool closePanel(Layout& layout, const QString& panelId);
 bool openPanel(Layout& layout, const QString& panelId);
 bool setCurrentPanel(Layout& layout, const QString& panelId);
+// Docks the panels of floating groups in their home areas. fromJson() does this where floating is not supported
+// (Android), so a layout saved on the desktop still opens there.
+void foldFloating(Layout& layout);
 
 }  // namespace dock
 

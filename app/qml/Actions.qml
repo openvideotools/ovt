@@ -19,9 +19,19 @@ QtObject {
     }
 
     // Ids that do something so far: Quit, the three themes, Cancel all jobs (WI-1.453), the Jobs popover, Go to,
-    // Preferences and the Keyboard map (WI-1.466).
+    // Preferences and the Keyboard map (WI-1.466), the dock actions (WI-1.451: presets, Reset Layout, Picture only,
+    // area toggles, focus panel N and tab cycling; the last two are handled by DockWorkspace through activated()).
     readonly property var enabledIds: ["file.quit", "analysis.cancelAll", "view.theme.system", "view.theme.light", "view.theme.dark",
-        "view.jobs", "edit.goTo", "edit.preferences", "help.keyboardMap"]
+        "view.jobs", "edit.goTo", "edit.preferences", "help.keyboardMap",
+        "view.layout.analyze", "view.layout.syntax", "view.layout.quality", "view.layout.hdr", "view.layout.compare",
+        "view.resetLayout", "view.pictureOnly", "view.area.left", "view.area.right", "view.area.bottom",
+        "view.nextTab", "view.previousTab", "view.focusPanel1", "view.focusPanel2", "view.focusPanel3",
+        "view.focusPanel4", "view.focusPanel5", "view.focusPanel6", "view.focusPanel7", "view.focusPanel8",
+        "view.focusPanel9"]
+
+    readonly property var presetIds: ({"view.layout.analyze": "Analyze", "view.layout.syntax": "Syntax",
+                                       "view.layout.quality": "Quality", "view.layout.hdr": "HDR",
+                                       "view.layout.compare": "Compare"})
 
     // Emitted for every enabled action, from a menu or a shortcut (the shortcut layer calls trigger()). The windows
     // and dialogs that implement an action listen here; later work items add their actions the same way.
@@ -37,12 +47,19 @@ QtObject {
     }
 
     function isEnabled(id) {
+        // Every panel but the Picture can be closed and re-opened (FR-GUI-001).
+        if (id.indexOf("view.panels.") === 0)
+            return id !== "view.panels.picture"
         return enabledIds.indexOf(id) >= 0
     }
 
     function isChecked(id) {
         if (id.indexOf("view.theme.") === 0)
             return Settings.theme === id.substring("view.theme.".length)
+        if (id.indexOf("view.panels.") === 0)
+            return DockModel.openPanels.indexOf(id.substring("view.panels.".length)) >= 0
+        if (id === "view.pictureOnly")
+            return DockModel.pictureOnly
         return false
     }
 
@@ -56,6 +73,25 @@ QtObject {
             JobsModel.cancelAll()
         else if (id.indexOf("view.theme.") === 0)
             Settings.theme = id.substring("view.theme.".length)
+        else if (presetIds[id] !== undefined)
+            DockModel.applyPreset(presetIds[id])
+        else if (id === "view.resetLayout")
+            DockModel.resetLayout()
+        else if (id === "view.pictureOnly")
+            DockModel.pictureOnly = !DockModel.pictureOnly
+        else if (id === "view.area.left")
+            DockModel.leftVisible = !DockModel.leftVisible
+        else if (id === "view.area.right")
+            DockModel.rightVisible = !DockModel.rightVisible
+        else if (id === "view.area.bottom")
+            DockModel.bottomVisible = !DockModel.bottomVisible
+        else if (id.indexOf("view.panels.") === 0)
+            DockModel.togglePanel(id.substring("view.panels.".length))
+    }
+
+    // View ▸ Panels: one checkable entry per dock panel.
+    function panelItems() {
+        return DockModel.allPanels().map(p => item("view.panels." + p, DockModel.panelTitle(p), true))
     }
 
     // Entries: {id, text, shortcut, checkable}, {separator: true} or {text, items: [...]} for a submenu.
@@ -103,8 +139,10 @@ QtObject {
                 separator,
                 item("view.layout.save", "Save current…"),
                 item("view.layout.manage", "Manage…")]},
-            {"text": "Panels", "items": [item("view.panels.none", "No panels yet")]},
-            item("view.pictureOnly", "Picture only"),
+            // FR-GUI-002 (chapter 4 wins over the §11.2.3 menu table, which does not list it).
+            item("view.resetLayout", "Reset Layout"),
+            {"text": "Panels", "items": panelItems()},
+            item("view.pictureOnly", "Picture only", true),
             item("view.dualView", "Dual view", true),
             {"text": "Arrangement", "items": [
                 item("view.arrangement.horizontal", "Horizontal", true),

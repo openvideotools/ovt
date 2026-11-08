@@ -66,6 +66,9 @@ ovt_plugin_hm = "BSD-3-Clause"
 ovt_tests_ffmpeg_probe = "LGPL-2.1-or-later"
 ovt_tests_ffmpeg_plugin_probe = "LGPL-2.1-or-later"
 ovt_ffmpeg_symbol_leak_fixture = "LGPL-2.1-or-later"
+# The plugin smoke test (WI-2.169) and its framemd5 oracle.
+ovt_plugin_ffmpeg_smoke_tests = "LGPL-2.1-or-later"
+ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
 
