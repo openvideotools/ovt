@@ -94,7 +94,8 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
 
   const auto* blocks = fa->blocks();
   REQUIRE(blocks != nullptr);
-  REQUIRE(blocks->Length() >= 1);
+  const uint32_t n_blocks = blocks->size();
+  REQUIRE(n_blocks >= 1);
   const ovt::fb::Block* root = blocks->Get(0);  // V-004
   CHECK((root->parent() == -1 && root->kind() == ovt::fb::BlockKind::Other && root->level() == 0));
   CHECK((root->rect()->w() == fa->frame()->coded_size()->w() && root->rect()->h() == fa->frame()->coded_size()->h()));
