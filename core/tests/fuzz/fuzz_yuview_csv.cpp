@@ -13,6 +13,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ovt/cxx/model/yuview_csv.hpp"
@@ -35,8 +36,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     if (grid->qp() != nullptr && grid->qp()->size() != cells) {
       std::abort();
     }
-  } else if (fa->diagnostics() == nullptr || fa->diagnostics()->size() == 0) {
-    std::abort();  // no grid must come with the MDL-CSV-0004 diagnostic
+    return 0;
+  }
+  // No grid must come with the MDL-CSV-0004 diagnostic.
+  bool has_0004 = false;
+  if (const auto* diags = fa->diagnostics(); diags != nullptr) {
+    for (const auto* diag : *diags) {
+      has_0004 = has_0004 || (diag->code() != nullptr && diag->code()->string_view() == "MDL-CSV-0004");
+    }
+  }
+  if (!has_0004) {
+    std::abort();
   }
   return 0;
 }
