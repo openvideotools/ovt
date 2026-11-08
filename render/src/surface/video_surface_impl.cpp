@@ -27,6 +27,7 @@
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "vk_wait_shim.h"
 
 namespace ovt::render {
 namespace {
@@ -122,7 +123,10 @@ class VideoSurfaceImpl final : public VideoSurface {
 
     struct pl_vulkan_params vk_params = pl_vulkan_default_params;
     vk_params.instance = inst_->instance;
-    vk_params.get_proc_addr = inst_->get_proc_addr;
+    // libplacebo loads every Vulkan function through this; the shim answers its zero-timeout semaphore polls without
+    // MoltenVK's notification blocks, which can otherwise free a semaphore under themselves at teardown
+    // (vk_wait_shim.cpp).
+    vk_params.get_proc_addr = detail::wait_shim_get_proc_addr(inst_->get_proc_addr);
     // Software rasterizers (lavapipe on GPU-less CI hosts) are accepted; libplacebo still prefers a hardware device.
     vk_params.allow_software = true;
     vk_ = pl_vulkan_create(log_, &vk_params);
