@@ -23,6 +23,19 @@ add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmp
 ovt_set_license(ovt_plugin_ffmpeg_smoke_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_smoke_tests)
 
+# ---- WI-4.100: the FFmpeg patch series applies to the pinned tarball (chapter 07 §7.6.3, chapter 13 §13.3.6) ---
+# Only the files the patches touch are extracted, so this stays in the fast lane. With OVT_SYSTEM_FFMPEG there is no
+# pinned tarball. SPEC-ASSUMPTION(#331): the FFmpeg build itself applies the series from a later WI.
+if(NOT OVT_SYSTEM_FFMPEG AND DEFINED OVT_TP_ffmpeg_ARCHIVE)
+  add_test(
+    NAME ffmpeg_patches_apply
+    COMMAND
+      "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/check_patches_apply.py" --archive
+      "${OVT_TP_ffmpeg_ARCHIVE}" --series "${CMAKE_CURRENT_SOURCE_DIR}/../patches/series" --apply-patches
+      "${CMAKE_SOURCE_DIR}/tools/apply_patches.py")
+  set_tests_properties(ffmpeg_patches_apply PROPERTIES LABELS "fast;unit;third_party")
+endif()
+
 # ---- WI-0.012: symbol-leak test of the plugin flavour (chapter 13 §13.3.3) ------------------------------------------
 # The plugin, and a fixture module linked like it (SPEC-ASSUMPTION(#129)), export the two entry points and nothing else.
 
