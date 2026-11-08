@@ -21,7 +21,7 @@
 #include <tuple>
 #include <vector>
 
-#include "plugin_test_util.hpp"
+#include "plugin_test_util.inc"
 #include "test_support/corpus.h"
 
 namespace {
@@ -94,7 +94,7 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
 
   const auto* blocks = fa->blocks();
   REQUIRE(blocks != nullptr);
-  REQUIRE(blocks->size() >= 1);
+  REQUIRE(blocks->Length() >= 1);
   const ovt::fb::Block* root = blocks->Get(0);  // V-004
   CHECK((root->parent() == -1 && root->kind() == ovt::fb::BlockKind::Other && root->level() == 0));
   CHECK((root->rect()->w() == fa->frame()->coded_size()->w() && root->rect()->h() == fa->frame()->coded_size()->h()));
@@ -102,7 +102,7 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
   for (uint32_t i = 1; i < blocks->size(); ++i) {  // V-005, V-006, V-008, V-009, V-021
     const ovt::fb::Block* b = blocks->Get(i);
     CHECK((b->id() == i && b->parent() == 0 && b->kind() == ovt::fb::BlockKind::MB && b->level() == 1));
-    CHECK((b->ext_type() == nullptr || b->ext_type()->size() == 0));
+    CHECK((b->ext_type() == nullptr || b->ext_type()->str().empty()));
     CHECK((b->rect()->w() == 16 && b->rect()->h() == 16 && b->rect()->x() % 16 == 0 && b->rect()->y() % 16 == 0));
     CHECK(root->children()->Get(i - 1) == i);
     f.mb_qp.push_back(b->qp());

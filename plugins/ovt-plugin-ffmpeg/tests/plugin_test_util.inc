@@ -3,8 +3,9 @@
 //
 // Helpers for tests that drive ovt-plugin-ffmpeg through the host's PluginRegistry: the loaded plugin, one decoder
 // instance, FlatBuffer access, Annex B splitting and a whole-stream driver.
-#ifndef OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_HPP
-#define OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_HPP
+// Not a .hpp on purpose: it needs Catch2, which clang-tidy-diff cannot resolve when it parses a header on its own.
+#ifndef OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_INC
+#define OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_INC
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -141,4 +142,4 @@ void for_each_frame(const std::vector<uint8_t>& bytes, int threads, F&& on_frame
 
 }  // namespace ovt_ffmpeg_test
 
-#endif  // OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_HPP
+#endif  // OVT_PLUGIN_FFMPEG_TESTS_PLUGIN_TEST_UTIL_INC
