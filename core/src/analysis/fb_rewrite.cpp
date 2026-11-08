@@ -63,6 +63,21 @@ void write_scalar_field(flatbuffers::FlatBufferBuilder& fbb, const reflection::F
   }
 }
 
+// One vector of scalars or structs, copied byte for byte. FlatBuffers 23 added the alignment argument and
+// deprecated the old overload; the local system package can still be 2.x.
+flatbuffers::uoffset_t copy_raw_vector(flatbuffers::FlatBufferBuilder& fbb, const flatbuffers::VectorOfAny& v,
+                                       std::size_t elem_size, std::size_t align) {
+  uint8_t* dst = nullptr;
+#if FLATBUFFERS_VERSION_MAJOR >= 23
+  const auto off = fbb.CreateUninitializedVector(v.size(), elem_size, align, &dst);
+#else
+  fbb.ForceVectorAlignment(v.size(), elem_size, align);
+  const auto off = fbb.CreateUninitializedVector(v.size(), elem_size, &dst);
+#endif
+  std::memcpy(dst, v.Data(), v.size() * elem_size);
+  return off;
+}
+
 flatbuffers::uoffset_t copy_vector(flatbuffers::FlatBufferBuilder& fbb, const reflection::Schema& schema,
                                    const reflection::Field& field, const flatbuffers::Table& table) {
   const auto elem = field.type()->element();
@@ -86,20 +101,11 @@ flatbuffers::uoffset_t copy_vector(flatbuffers::FlatBufferBuilder& fbb, const re
       }
       return fbb.CreateVector(out).o;
     }
-    const auto* v = flatbuffers::GetFieldAnyV(table, field);
-    const auto size = static_cast<std::size_t>(sub->bytesize());
-    fbb.ForceVectorAlignment(v->size(), size, static_cast<std::size_t>(sub->minalign()));
-    uint8_t* dst = nullptr;
-    const auto off = fbb.CreateUninitializedVector(v->size(), size, &dst);
-    std::memcpy(dst, v->Data(), v->size() * size);
-    return off;
+    return copy_raw_vector(fbb, *flatbuffers::GetFieldAnyV(table, field), static_cast<std::size_t>(sub->bytesize()),
+                           static_cast<std::size_t>(sub->minalign()));
   }
-  const auto* v = flatbuffers::GetFieldAnyV(table, field);
   const std::size_t size = flatbuffers::GetTypeSize(elem);
-  uint8_t* dst = nullptr;
-  const auto off = fbb.CreateUninitializedVector(v->size(), size, &dst);
-  std::memcpy(dst, v->Data(), v->size() * size);
-  return off;
+  return copy_raw_vector(fbb, *flatbuffers::GetFieldAnyV(table, field), size, size);
 }
 
 flatbuffers::uoffset_t copy_offset_field(flatbuffers::FlatBufferBuilder& fbb, const reflection::Schema& schema,
