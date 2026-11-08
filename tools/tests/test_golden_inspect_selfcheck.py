@@ -18,7 +18,9 @@ sys.path.insert(0, str(REPO / "tools" / "goldens"))
 
 import av1_selfcheck as sc  # noqa: E402
 
-INDEX = json.loads((GOLDEN / "av1-index.json").read_text(encoding="utf-8")) if (GOLDEN / "av1-index.json").is_file() else {}
+INDEX = (
+    json.loads((GOLDEN / "av1-index.json").read_text(encoding="utf-8")) if (GOLDEN / "av1-index.json").is_file() else {}
+)
 ENTRIES = {cid: e["goldens"]["aom-inspect"] for cid, e in INDEX.get("entries", {}).items() if e["goldens"]}
 
 pytestmark = pytest.mark.skipif(not ENTRIES, reason="no AV1 goldens committed")
