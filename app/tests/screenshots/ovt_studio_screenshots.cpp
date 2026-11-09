@@ -103,12 +103,12 @@ int main(int argc, char* argv[]) {
     qputenv("QT_QPA_PLATFORM", "offscreen");
   }
   // The scene must not read or write the user's settings.json.
-  QTemporaryDir config_dir;
+  const QTemporaryDir config_dir;
   if (config_dir.isValid() && !qEnvironmentVariableIsSet("OVT_CONFIG_DIR")) {
     qputenv("OVT_CONFIG_DIR", config_dir.path().toLocal8Bit());
   }
   QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
-  QGuiApplication app(argc, argv);
+  const QGuiApplication app(argc, argv);
 
   QCommandLineParser parser;
   parser.setApplicationDescription(QStringLiteral("Renders one OVT Studio scene to a PNG (chapter 14 §14.10.2)."));
