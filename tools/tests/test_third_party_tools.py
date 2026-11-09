@@ -116,6 +116,27 @@ def test_check_flags_a_script_that_spells_its_version(tmp_path: Path) -> None:
     assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 0
 
 
+def test_git_row_is_pinned_by_its_commit(tmp_path: Path) -> None:
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    row = vtc.parse(table(f"| Bar | BAR-2.0 (`{commit}`) | MIT | <https://e.org/bar.git> | – | – (git) | x | |"))[0]
+    assert row.commit == commit and row.sha256 == ""
+    assert f'set(OVT_TP_bar_COMMIT "{commit}")' in vtc.to_cmake([row], Path("VERSIONS.md"))
+    assert vtc.parse(table("| Foo | 1.0 | MIT | – | – | – | x | |"))[0].commit == ""
+    # The script of a git row reads OVT_TP_<dep>_COMMIT, not _SHA256, and never spells the commit.
+    (tmp_path / "third_party").mkdir()
+    script = tmp_path / "third_party" / "bar.cmake"
+    versions = tmp_path / "VERSIONS.md"
+    versions.write_text(
+        table(f"| bar | BAR-2.0 (`{commit}`) | MIT | <https://e.org/bar.git> | – | – | third_party/bar.cmake | |")
+    )
+    script.write_text("URL ${OVT_TP_bar_URL} SHA ${OVT_TP_bar_SHA256}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 1
+    script.write_text(f"URL ${{OVT_TP_bar_URL}} COMMIT ${{OVT_TP_bar_COMMIT}} {commit}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 1
+    script.write_text("URL ${OVT_TP_bar_URL} COMMIT ${OVT_TP_bar_COMMIT}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 0
+
+
 def test_template_passes_the_script_check() -> None:
     rows = vtc.parse(table("| mydep | 1.0 | MIT | – | – | – | third_party/_template.cmake | |"))
     assert vtc.check_scripts(rows, REPO) == []
