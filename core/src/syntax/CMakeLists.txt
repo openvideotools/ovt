@@ -22,5 +22,7 @@ target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
 # rows 1, 7, 8, 9 and 30). WI-1.116b adds the sequence header (rows 2–6).
 target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/metadata.cpp av1/tile_list.cpp)
 # WI-1.112: H.265 header parsers (chapter 7 §7.3.5 rows 1–9); typed structs live in core/include/ovt/cxx/syntax/h265/
-# (§7.3.7). Part a: nal_unit_header, profile_tier_level, hrd_parameters.
-target_sources(ovt_core_objects PRIVATE h265/nal_header.cpp h265/profile_tier_level.cpp h265/hrd_parameters.cpp)
+# (§7.3.7). Parts a–b: nal_unit_header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
+# st_ref_pic_set (shared with WI-1.113).
+target_sources(ovt_core_objects PRIVATE h265/nal_header.cpp h265/profile_tier_level.cpp h265/hrd_parameters.cpp
+                                        h265/vui.cpp h265/scaling_list.cpp h265/st_ref_pic_set.cpp)
