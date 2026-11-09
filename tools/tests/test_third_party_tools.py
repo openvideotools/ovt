@@ -236,6 +236,33 @@ def test_failing_patch_is_named_and_nothing_is_applied(tmp_path: Path, capsys: p
     assert not (src / apply_patches.MARKER).exists()
 
 
+def test_check_is_cumulative_and_leaves_the_tree_alone_on_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 0002 changes the line 0001 wrote, as FFmpeg patch 0002 (WI-4.107) builds on 0001: --check applies the series
+    # in order to a scratch copy, so it passes; a later patch that fails is named and nothing is applied.
+    src = source_tree(tmp_path)
+    (src / "other.txt").write_text("untouched\n")
+    second = PATCH.replace("-hello\n+hello, patched\n", "-hello, patched\n+hello, patched twice\n")
+    d = patches_dir(tmp_path, ("0001-greeting.patch", PATCH), ("0002-on-top.patch", second))
+    assert apply_patches.main(["--check", "--dir", str(d), "--source", str(src)]) == 0
+    assert (src / "hello.txt").read_text() == "hello, patched twice\n"
+    assert (src / "other.txt").read_text() == "untouched\n"
+
+    src2 = tmp_path / "src2"
+    src2.mkdir()
+    (src2 / "hello.txt").write_text("hello\n")
+    bad = second.replace("-hello, patched\n", "-hello, broken\n")
+    d2 = tmp_path / "patches2"
+    d2.mkdir()
+    (d2 / "0001-greeting.patch").write_text(PATCH)
+    (d2 / "0002-bad.patch").write_text(bad)
+    assert apply_patches.main(["--check", "--dir", str(d2), "--source", str(src2)]) == 1
+    assert "0002-bad.patch" in capsys.readouterr().err
+    assert (src2 / "hello.txt").read_text() == "hello\n"
+    assert not (src2 / apply_patches.MARKER).exists()
+
+
 def test_series_order_and_missing_header(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = source_tree(tmp_path)
     d = patches_dir(tmp_path, ("a.patch", PATCH.replace("Upstream-Status: Pending\n", "")))

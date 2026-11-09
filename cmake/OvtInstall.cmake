@@ -36,7 +36,7 @@ install(FILES "${CMAKE_SOURCE_DIR}/core/share/models/uvq/manifest.json"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/ovt/models/uvq" COMPONENT core)
 
 set(_ovt_plugin_targets "")
-foreach(_t ovt_plugin_aom ovt_plugin_ffmpeg ovt_plugin_de265)
+foreach(_t ovt_plugin_aom ovt_plugin_ffmpeg ovt_plugin_ffmpeg_hevc ovt_plugin_de265)
   if(TARGET ${_t})
     list(APPEND _ovt_plugin_targets ${_t})
   endif()
