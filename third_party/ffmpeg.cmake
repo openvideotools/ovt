@@ -15,6 +15,12 @@
 #                       Per library: tp::ffmpeg_plugin_<lib> (STATIC IMPORTED). Built only with
 #                       OVT_BUILD_PLUGIN_FFMPEG=ON.
 #
+# Patches: the plugin flavour applies the series plugins/ovt-plugin-ffmpeg/patches/series (chapter 07 §7.6.3, the
+# block-params side data of WI-4.100/4.101) through tools/apply_patches.py (§13.3.6), which records them in
+# ffmpeg-plugin/share/ovt/patches.json; the core flavour applies third_party/patches/ffmpeg (none). A changed series
+# or patch re-extracts the pristine tarball. SPEC-ASSUMPTION(#331): the plugin flavour is patched whatever
+# OVT_FFMPEG_GPL is (the patch is LGPL-2.1-or-later), never the core flavour.
+#
 # Each flavour is its own ExternalProject (tp_ffmpeg_core, tp_ffmpeg_plugin) extracting the archive into its own
 # SOURCE_DIR: two configures in one tree overwrite each other's config.h (WI-0.012 pitfall). Both install into
 # OVT_THIRD_PARTY_PREFIX/ffmpeg-<flavour>. The flag lists are in third_party/ffmpeg/configure_flags.cmake; on
@@ -28,6 +34,10 @@
 include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
 include("${CMAKE_CURRENT_LIST_DIR}/ffmpeg/configure_flags.cmake")
+
+set(OVT_FFMPEG_PLUGIN_PATCH_SERIES "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-ffmpeg/patches/series"
+    CACHE FILEPATH "Series of the patches applied to the FFmpeg plugin flavour (chapter 13 §13.3.6)")
+cmake_path(NORMAL_PATH OVT_FFMPEG_PLUGIN_PATCH_SERIES)
 
 # LICENSE stays the row's prose cell; each imported target below records its own SPDX id.
 ovt_tp_declare(ffmpeg LICENSE_FILES COPYING.LGPLv2.1 COPYING.GPLv2 LICENSE.md)
@@ -228,9 +238,15 @@ function(_ovt_ffmpeg_flavour flavour)
   if(flavour STREQUAL "core")
     set(gpl ${_ovt_ff_core_gpl})
     set(depends ${_ovt_ff_core_depends})
+    set(patch_command ${OVT_TP_PATCH} ${CMAKE_SOURCE_DIR}/third_party/patches/ffmpeg)
+    set(patch_files "")
   else()
     set(gpl ${_ovt_ff_plugin_gpl})
     set(depends "")
+    ovt_tp_apply_patches(patch_command SERIES "${OVT_FFMPEG_PLUGIN_PATCH_SERIES}" INSTALL_DIR "${prefix}")
+    cmake_path(GET OVT_FFMPEG_PLUGIN_PATCH_SERIES PARENT_PATH patch_dir)
+    file(GLOB patch_files CONFIGURE_DEPENDS "${patch_dir}/*.patch")
+    list(APPEND patch_files "${OVT_FFMPEG_PLUGIN_PATCH_SERIES}")
   endif()
 
   ovt_ffmpeg_configure_flags(
@@ -317,7 +333,7 @@ function(_ovt_ffmpeg_flavour flavour)
     BINARY_DIR ${bin}
     INSTALL_DIR ${prefix}
     DEPENDS ${depends}
-    PATCH_COMMAND ${OVT_TP_PATCH} ${CMAKE_SOURCE_DIR}/third_party/patches/ffmpeg
+    PATCH_COMMAND ${patch_command}
     CONFIGURE_COMMAND sh ${script}
     BUILD_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} -j${_ovt_ff_jobs}
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} install
@@ -326,6 +342,9 @@ function(_ovt_ffmpeg_flavour flavour)
     LOG_OUTPUT_ON_FAILURE ON)
 
   externalproject_add_stepdependencies(tp_ffmpeg_${flavour} configure "${script}")
+  if(patch_files)
+    externalproject_add_stepdependencies(tp_ffmpeg_${flavour} download ${patch_files})
+  endif()
 
   # INTERFACE_INCLUDE_DIRECTORIES must exist at generate time, before the build installs anything.
   file(MAKE_DIRECTORY "${prefix}/include")
