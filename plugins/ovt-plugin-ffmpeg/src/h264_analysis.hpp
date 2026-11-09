@@ -77,14 +77,27 @@ class H264Analysis {
   H264Analysis& operator=(H264Analysis&&) = delete;
 
   /// Adds one NAL unit (no start code, emulation-prevention bytes kept) to the access unit of
-  /// @p decode_index_hint. A new hint first sends the previous access unit to the decoder. OVT_E_CORRUPT when
-  /// libavcodec rejected that access unit; the Diagnostic travels with the next frame out.
+  /// @p decode_index_hint. A new hint first sends the previous access unit to the decoder.
+  /// The status concerns the PREVIOUS access unit: OVT_E_CORRUPT means libavcodec rejected it (or failed while
+  /// decoding it), although @p unit itself was accepted and is part of the new access unit. The Diagnostic
+  /// travels with the next frame out. Callers must not push @p unit again.
   ovt_status push(const uint8_t* unit, size_t len, int32_t decode_index_hint, int64_t pts);
-  /// End of input: sends the last access unit, drains the decoder (avcodec_send_packet(NULL)).
+  /// End of input: sends the last access unit, drains the decoder (avcodec_send_packet(NULL)). The decode-index to
+  /// pts table is emptied once the decoder is drained.
   ovt_status flush();
   /// Moves the next frame (libavcodec output order) into @p out, with its planes copied when @p want_planes;
   /// false when there is none.
   bool pop(Frame* out, bool want_planes);
+
+  /// Decode indices still waiting for the pts of their frame (tests: the table stays bounded).
+  [[nodiscard]] size_t pending_pts() const { return pts_.size(); }
+  /// Most entries pts_ keeps; the oldest entries go first. libavcodec reorders by at most 16 frames plus
+  /// one per frame thread, so no live entry is near the limit.
+  static constexpr size_t kMaxPendingPts = 256;
+  /// Most Diagnostics kept for the next frame out; later ones are dropped.
+  static constexpr size_t kMaxPendingDiags = 64;
+  /// Attempts at one avcodec_send_packet() while the decoder answers EAGAIN (its output is read in between).
+  static constexpr int kMaxSendAttempts = 4;
 
  private:
   struct Pending {
@@ -106,7 +119,8 @@ class H264Analysis {
   bool flushed_ = false;
   std::deque<Pending> frames_;
   std::vector<Diag> pending_diags_;  // attached to the next frame that comes out
-  std::map<int32_t, int64_t> pts_;   // decode index -> host pts (libavcodec's pts carries the decode index)
+  std::map<int32_t, int64_t> pts_;   // decode index -> host pts; AUs libavcodec drops leave entries (bounded)
+  std::deque<int32_t> pts_order_;    // decode indices in push order: the oldest go first when pts_ is full
 };
 
 }  // namespace ovt::ffmpeg
