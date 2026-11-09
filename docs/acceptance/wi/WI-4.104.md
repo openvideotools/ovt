@@ -3,7 +3,7 @@
 Machine: cloud container, Ubuntu 24.04 x86_64, GCC 13.3.0, clang 18.1, CMake 3.28.3, Ninja.
 Date: 2026-11-09. Spec version: 1.0-rc14. Commit: the head of the WI-4.104 pull request.
 
-## Test 1: pending on the conformance stream; checked here on HM-encoded streams
+## Test 1: checked here on HM-encoded streams
 
 AT1: given the build, when the smoke program runs on `WPP_A_ericsson_MAIN_2`, then POCs 0..N print and the MD5 SEI
 check reports OK for every picture. That is the CTest `ovt_plugin_hm_smoke_wpp_a` (labels `third_party;needs-corpus`),
@@ -59,14 +59,22 @@ The HM libraries also build with clang 18 and `-fsanitize=address,undefined` thr
 Running the smoke program under UBSan stops in HM's own code (signed overflow, `SEIFilmGrainSynthesizer.cpp:688`,
 see #345). No CI preset builds HM yet.
 
-Still owed: the run on `WPP_A_ericsson_MAIN_2` itself, and a macOS arm64 build. Both need a machine that reaches
-`vcgit.hhi.fraunhofer.de` and the ITU site, such as the Mac Mini:
+## Test 1 on the conformance stream: macOS arm64 (Mac Mini)
+
+Run on the owner's Mac Mini (macOS, Apple Silicon) at commit 1cd390d of the pull request, on 2026-11-09:
 
 ```sh
 cmake --preset macos-arm64-release -DOVT_BUILD_PLUGIN_HM=ON
 cmake --build --preset macos-arm64-release --target ovt_plugin_hm_smoke
+export OVT_CORPORA_DIR="$PWD/build/corpora"
 python3 tools/fetch_corpora.py --ids jctvc_WPP_A_ericsson_MAIN_2
 OVT_REQUIRE_CORPORA=1 ctest --test-dir build/macos-arm64-release -R ovt_plugin_hm_smoke --output-on-failure
 ```
 
-Record the output here.
+Result:
+
+- The HM fetch matched the pin `fb4486d5ab5d0cd3b6a71659c7d5eb4509f2a4ce`.
+- The build exited 0.
+- `ovt_plugin_hm_smoke_wpp_a` passed: 48 pictures, every MD5 hash SEI OK, POCs 0..47.
+
+`OVT_CORPORA_DIR` has to name the directory that `fetch_corpora.py` writes into, or ctest doesn't find the stream.
