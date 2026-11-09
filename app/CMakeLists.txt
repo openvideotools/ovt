@@ -37,7 +37,8 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/dialogs/KeymapDialog.qml"
       "${app_dir}/qml/dialogs/OpenAsDialog.qml"
       "${app_dir}/qml/dialogs/RawFormatDialog.qml"
-      "${app_dir}/qml/panels/DiagnosticsPanel.qml")
+      "${app_dir}/qml/panels/DiagnosticsPanel.qml"
+      "${app_dir}/qml/panels/UnitListPanel.qml")
   # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
   foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
     list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
@@ -96,6 +97,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/stream_index_adapter.cpp"
     "${app_dir}/src/models/stream_index_model.h"
     "${app_dir}/src/models/stream_index_model.cpp"
+    "${app_dir}/src/models/unit_list_model.h"
+    "${app_dir}/src/models/unit_list_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
     "${app_dir}/src/dock/dock_model.cpp"
     RESOURCES
