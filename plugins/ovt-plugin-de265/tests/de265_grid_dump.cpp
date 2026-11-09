@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <exception>
 #include <fstream>
 #include <iterator>
 #include <vector>
@@ -77,14 +78,7 @@ std::vector<std::vector<uint8_t>> split_annexb(const std::vector<uint8_t>& s) {
   return nals;
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  if (argc != 2) {
-    (void)std::fprintf(stderr, "usage: ovt_plugin_de265_grid_dump <stream.265>\n");
-    return 2;
-  }
-  const char* path = argv[1];  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): main's argument vector
+int run(const char* path) {
   std::ifstream in(path, std::ios::binary);
   if (!in) {
     (void)std::fprintf(stderr, "cannot open %s\n", path);
@@ -135,4 +129,21 @@ int main(int argc, char** argv) {
   decode();
   de265_free_decoder(ctx);
   return rc;
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  if (argc != 2) {
+    (void)std::fprintf(stderr, "usage: ovt_plugin_de265_grid_dump <stream.265>\n");
+    return 2;
+  }
+  try {
+    return run(argv[1]);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): main's argument vector
+  } catch (const std::exception& e) {
+    (void)std::fprintf(stderr, "ovt_plugin_de265_grid_dump: %s\n", e.what());
+    return 1;
+  } catch (...) {
+    return 1;
+  }
 }
