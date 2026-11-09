@@ -3,13 +3,12 @@
 #
 # Unit tests of the metrics module (chapter 9 §9.2; WI-3.300). They link the module objects directly because
 # ovt_core exports only the C API (#62 rule 2); the C API test links ovt::core instead, the way a consumer does.
-# WI-3.300c adds the job and JobSpec tests.
 
 add_subdirectory(example_plugin)
 
-# ---- Module tests: ABI header (C11 + C++20), NormalizationConfig resolver, registry ----
-add_executable(ovt_tests_metrics abi_header_c.c test_metric_abi.cpp test_metrics_plugin_registry.cpp
-                                 test_normalization_config.cpp)
+# ---- Module tests: ABI header (C11 + C++20), NormalizationConfig resolver, JobSpec parser, registry, job ----
+add_executable(ovt_tests_metrics abi_header_c.c test_metric_abi.cpp test_metric_job.cpp test_metrics_jobspec.cpp
+                                 test_metrics_plugin_registry.cpp test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_metrics PRIVATE ovt_core_objects ovt_test_support ovt::flags ${flatbuffers_TARGET}
                                                 ${Catch2_TARGET})
