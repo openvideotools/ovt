@@ -169,7 +169,7 @@ ovt_status MetricJob::run(ovt_Job* cancel) {
   return status_;
 }
 
-const std::vector<flatbuffers::DetachedBuffer>& MetricJob::results() const noexcept {
+const std::vector<ovt::fb::MetricsResultT>& MetricJob::results() const noexcept {
   return results_;
 }
 

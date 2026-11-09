@@ -29,6 +29,7 @@
 #include "ovt/cxx/jobs.hpp"
 #include "ovt/jobs.h"
 #include "ovt/status.h"
+#include "ovt_metrics_generated.h"
 
 namespace ovt::metrics {
 
@@ -109,8 +110,10 @@ class MetricJob {
   // a second call returns OVT_E_INVALID_ARG without changing the state.
   ovt_status run(ovt_Job* cancel);
 
-  // One MetricsResult FlatBuffer per MetricRequest; filled when state() == Done.
-  [[nodiscard]] const std::vector<flatbuffers::DetachedBuffer>& results() const noexcept;
+  // One MetricsResult per MetricRequest (FlatBuffers object API; the C API packs them into the MetricsReport
+  // without unpacking, which the clang analyzer cannot follow through the generated UnPack); filled when
+  // state() == Done.
+  [[nodiscard]] const std::vector<ovt::fb::MetricsResultT>& results() const noexcept;
   [[nodiscard]] const AlignmentReport& alignment() const noexcept;
   [[nodiscard]] JobState state() const noexcept;
   // The status run() returned (OVT_OK before run()).
@@ -135,7 +138,7 @@ class MetricJob {
   bool started_ = false;
   std::string normalization_;
   AlignmentReport alignment_;
-  std::vector<flatbuffers::DetachedBuffer> results_;
+  std::vector<ovt::fb::MetricsResultT> results_;
 };
 
 }  // namespace ovt::metrics

@@ -131,10 +131,8 @@ OVT_API ovt_status ovt_metrics_job_results(const ovt_MetricsJob* job, ovt_Buffer
     // One MetricsReport (§9.9.3) holding a copy of every MetricsResult the job produced.
     flatbuffers::FlatBufferBuilder fbb;
     std::vector<flatbuffers::Offset<ovt::fb::MetricsResult>> results;
-    for (const flatbuffers::DetachedBuffer& buf : job->job->results()) {
-      ovt::fb::MetricsResultT unpacked;
-      flatbuffers::GetRoot<ovt::fb::MetricsResult>(buf.data())->UnPackTo(&unpacked);
-      results.push_back(ovt::fb::MetricsResult::Pack(fbb, &unpacked));
+    for (const ovt::fb::MetricsResultT& r : job->job->results()) {
+      results.push_back(ovt::fb::MetricsResult::Pack(fbb, &r));
     }
     const auto results_vec = fbb.CreateVector(results);
     const auto ref_name = fbb.CreateString(job->reference_name);
