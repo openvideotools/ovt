@@ -5,8 +5,8 @@
 // three bits of the first input byte select the structure parsed after nal_unit_header(): 0 profile_tier_level()
 // (bits 3–5: max_num_sub_layers_minus1), 1 hrd_parameters() (bit 3: commonInfPresentFlag, bits 4–6: sub-layers),
 // 2 vui_parameters() (bits 3–5: sub-layers, bits 6–7: ChromaArrayType), 3 scaling_list_data(), 4 st_ref_pic_set()
-// (bits 3–7: num_short_term_ref_pic_sets, each earlier set parsed from the same bytes); other values are reserved
-// for the later parts of the work item and parse nothing.
+// (bits 3–7: num_short_term_ref_pic_sets, each earlier set parsed from the same bytes), 5 VPS, 6 SPS; 7 is reserved
+// for the PPS part of the work item and parses nothing.
 // The remaining bytes are the NAL unit (header included) and go through rbsp_from_nal, so emulation prevention is
 // exercised too. Invariants, each an abort when violated: only ovt::ParseError escapes a parser; the builder always
 // finishes into a tree; a second parse of the same bytes yields the same JSON (determinism, §0.7.5).
@@ -24,7 +24,9 @@
 #include "ovt/cxx/syntax/h265/nal_header.hpp"
 #include "ovt/cxx/syntax/h265/profile_tier_level.hpp"
 #include "ovt/cxx/syntax/h265/scaling_list.hpp"
+#include "ovt/cxx/syntax/h265/sps.hpp"
 #include "ovt/cxx/syntax/h265/st_ref_pic_set.hpp"
+#include "ovt/cxx/syntax/h265/vps.hpp"
 #include "ovt/cxx/syntax/h265/vui.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "syntax/common/syntax_node_buffer.h"
@@ -69,6 +71,12 @@ void parse_structure(BitReader& br, SyntaxBuilder& b, uint8_t sel) {
       }
       break;
     }
+    case 5:
+      (void)h265::parse_vps(br, b);
+      break;
+    case 6:
+      (void)h265::parse_sps(br, b);
+      break;
     default:
       break;
   }
