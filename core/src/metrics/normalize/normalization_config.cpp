@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 
 #include <exception>
-#include <mutex>
 #include <string>
 #include <string_view>
 #include <utility>
