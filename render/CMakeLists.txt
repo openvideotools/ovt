@@ -9,8 +9,6 @@ add_library(ovt_render SHARED src/color/h273_map.cpp src/surface/video_surface_i
 add_library(ovt::render ALIAS ovt_render)
 # WI-1.401: Picture -> pl_frame upload (§10.3.1).
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
-# Zero-timeout vkWaitSemaphores shim for libplacebo (MoltenVK teardown race, see the source).
-target_sources(ovt_render PRIVATE src/surface/vk_wait_shim.cpp)
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
