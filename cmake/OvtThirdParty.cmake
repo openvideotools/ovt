@@ -75,8 +75,8 @@ endif()
 #   plugins/ovt-plugin-ffmpeg/tests): hidden visibility for its own code, and the linker options of §13.3.3 that keep
 #   every symbol of the static FFmpeg archives inside it. Linux/Android: --exclude-libs,ALL, plus -Bsymbolic so
 #   FFmpeg's references bind inside the plugin, and the version script cmake/ovt_plugin_exports.map. macOS: an
-#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
-#   the plugin links the system FFmpeg dynamically.
+#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with
+#   default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where the plugin links the system FFmpeg dynamically.
 function(ovt_ffmpeg_hide_symbols target)
   set_target_properties(${target} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden
                                              VISIBILITY_INLINES_HIDDEN ON)
