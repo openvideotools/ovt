@@ -74,6 +74,17 @@ class UsageError(Exception):
 # namespace and `lib` prefix is not enough.
 ALIASES = {
     "hwy": "highway",
+    # libplacebo's static libraries are linked by file name (third_party/libplacebo.cmake): glslang's pieces and lcms2.
+    "glslang_default_resource_limits": "glslang",
+    "machineindependent": "glslang",
+    "genericcodegen": "glslang",
+    "osdependent": "glslang",
+    "spirv": "glslang",
+    "lcms2": "lcms",
+    # Staging directories are named after the VERSIONS.md row (third_party/*.cmake), the manifest after the CMake target.
+    "aom": "libaom",
+    "placebo": "libplacebo",
+    "z": "zlib",
     "libzstd_static": "zstd",
     "libzstd_shared": "zstd",
     # The prebuilt ONNX Runtime has one VERSIONS.md row per archive (third_party/onnxruntime.cmake) but is one component,
@@ -93,6 +104,10 @@ def key_of(name: str) -> str:
     `zstd::libzstd_static` -> `zstd`, so one component reached by several spellings is one key.
     """
     n = name
+    if re.match(r"^(Qt6?|Wrap[A-Za-z0-9]*)::", n):  # every Qt module and Qt's helper targets are the one component
+        return "qt"
+    if re.match(r"^tp::ffmpeg_(plugin|core)", n):  # the FFmpeg flavours and their libraries share one row
+        return "ffmpeg"
     if n.startswith("/"):  # a library file
         n = re.sub(r"\.(so|a|dylib|lib)(\.[\d.]+)?$", "", n.rsplit("/", 1)[1])
         n = re.sub(r"^lib", "", n)

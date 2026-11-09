@@ -165,7 +165,7 @@ check_notice() { # <file in Frameworks> <name in the notices>
 }
 check_notice 'libav*_ovt*.dylib' FFmpeg
 check_notice 'libMoltenVK.dylib' MoltenVK
-check_notice 'QtCore.framework' 'Qt'
+check_notice 'QtCore.framework' '^### Qt'
 
 # ---- (9) ad-hoc signature (WI-0.061 replaces this with real signing) -----------------------------------------------
 if [ "${OVT_BUNDLE_ADHOC_SIGN:-1}" = 1 ]; then

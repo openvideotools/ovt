@@ -608,3 +608,33 @@ def test_corpora_denies_compound_expression(tmp_path: Path) -> None:
     )
     code, _, err = run("--corpora", "--manifest", str(manifest))
     assert code == 1 and "E-DENY corpora:bad_nc" in err
+
+
+def test_only_targets_limits_the_manifest_check(tmp_path: Path) -> None:
+    """The notices of a bundle gate its shipping targets; the CI gate (no option) still checks every target."""
+    data = json.loads((FIX / "license_manifest_ok.json").read_text())
+    data["targets"].append(
+        {
+            "name": "ovt_tests_probe",  # not in policy [targets], links an undescribed library
+            "type": "EXECUTABLE",
+            "spdx": "LGPL-2.1-or-later",
+            "directory": "tests/",
+            "links": [{"name": "libmystery", "source": "system", "version": "", "spdx": "NOASSERTION"}],
+        }
+    )
+    manifest = tmp_path / "license_manifest.json"
+    manifest.write_text(json.dumps(data))
+    code, _, err = run("--manifest", str(manifest), report=tmp_path / "all.json")
+    assert code == 1 and "ovt_tests_probe" in err
+    code, report, _ = run("--manifest", str(manifest), "--only-targets", "ovt_core", report=tmp_path / "only.json")
+    assert code == 0 and report["status"] == "PASS"
+
+
+def test_only_targets_still_fails_a_named_target(tmp_path: Path) -> None:
+    data = json.loads((FIX / "license_manifest_ok.json").read_text())
+    data["targets"][0]["links"].append({"name": "libmystery", "source": "system", "version": "", "spdx": "NOASSERTION"})
+    manifest = tmp_path / "license_manifest.json"
+    manifest.write_text(json.dumps(data))
+    name = data["targets"][0]["name"]
+    code, _, err = run("--manifest", str(manifest), "--only-targets", name, report=tmp_path / "r.json")
+    assert code == 1 and f"E-UNKNOWN {name} NOASSERTION" in err

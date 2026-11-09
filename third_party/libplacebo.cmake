@@ -78,6 +78,16 @@ foreach(
   find_library(OVT_PLACEBO_LIB_${_id} NAMES ${_name} ${_ovt_pl_hints} PATH_SUFFIXES lib)
   if(OVT_PLACEBO_LIB_${_id})
     list(APPEND _ovt_pl_libs "${OVT_PLACEBO_LIB_${_id}}")
+    # The licence manifest names the library by its path (tp::placebo links the file). glslang's libraries share its
+    # concluded expression from tools/license_policy.toml [vcpkg_overrides]; lcms2 is MIT; SPIRV-Tools is Apache-2.0.
+    if(_name MATCHES "^SPIRV-Tools")
+      set(_ovt_pl_spdx "Apache-2.0")
+    elseif(_name STREQUAL "lcms2")
+      set(_ovt_pl_spdx "MIT")
+    else()
+      set(_ovt_pl_spdx "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0")
+    endif()
+    ovt_set_dependency_license("${OVT_PLACEBO_LIB_${_id}}" SOURCE vcpkg SPDX "${_ovt_pl_spdx}" LINKAGE static)
     get_filename_component(_ovt_pl_libdir "${OVT_PLACEBO_LIB_${_id}}" DIRECTORY)
     list(APPEND _ovt_pl_libdirs "${_ovt_pl_libdir}")
   elseif(_name MATCHES "^(SPIRV|glslang|lcms2)$")

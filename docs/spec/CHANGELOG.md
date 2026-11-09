@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc18 — 2026-11-09
+
+PATCH-level: WI-0.060 follow-up after the Mac Mini run and the reviewer's nits. No requirement sentence or acceptance line changes.
+
+- 13 §13.5.2 — the final `fix_rpaths.py` verification runs after `strip.sh`, so it checks the shipped bytes; the macOS bundle's `THIRD_PARTY_NOTICES.md` is generated for the shipping targets only (the gate still checks every shipping target) — WI-0.060
+
 ## 1.0.0-rc17 — 2026-11-09
 
 PATCH-level: WI-0.060 implementation detail. No requirement sentence or acceptance line changes.

@@ -506,12 +506,20 @@ def read_pip(path: Path, rep: Report, policy: dict, strict_or: bool) -> None:
         )
 
 
-def read_manifest(path: Path, rep: Report, policy: dict, strict_or: bool) -> None:
-    """Link-graph rules of §15.4.2 step 4 on `license_manifest.json` (chapter 13 §13.2.3)."""
+def read_manifest(
+    path: Path, rep: Report, policy: dict, strict_or: bool, only_targets: list[str] | None = None
+) -> None:
+    """Link-graph rules of §15.4.2 step 4 on `license_manifest.json` (chapter 13 §13.2.3).
+
+    `only_targets` (the notices of one artefact, cmake/OvtNotices.cmake) limits the check to the named targets: every
+    named target that is in the manifest gets the full check; test, fuzz and fixture targets that are not shipped are
+    left out. Without it every target in the manifest is checked, as the CI gate does."""
     data = json.loads(path.read_text(encoding="utf-8"))
     declared = policy["targets"]
     seen: dict[tuple[str, str, str], dict] = {}
     for tgt in data.get("targets", []):
+        if only_targets is not None and tgt["name"] not in only_targets:
+            continue
         name, own = tgt["name"], tgt["spdx"]
         plugin = name.startswith("ovt_plugin_")
         if name not in declared:
@@ -718,6 +726,12 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--sources", action="store_true")
     ap.add_argument("--require-all", action="store_true", help="an input flag whose file is missing is an error")
     ap.add_argument("--strict-or", action="store_true", help="deny-check every OR alternative, not only the chosen one")
+    ap.add_argument(
+        "--only-targets",
+        nargs="+",
+        metavar="TARGET",
+        help="check only these targets of --manifest (the shipping ones); the default is every target",
+    )
     ap.add_argument("--export-table", type=Path)
     ap.add_argument("--report", type=Path, help="default: license_gate_report.json next to --manifest")
     ap.add_argument("--root", type=Path, default=REPO_ROOT, help="repository root (for --sources)")
@@ -736,7 +750,7 @@ def run(args: argparse.Namespace) -> tuple[dict, Report]:
     inputs = [
         ("versions", args.versions, lambda p: read_versions(p, rep, policy, args.strict_or)),
         ("vcpkg", args.vcpkg, lambda p: read_vcpkg(p, rep, policy, args.strict_or)),
-        ("manifest", args.manifest, lambda p: read_manifest(p, rep, policy, args.strict_or)),
+        ("manifest", args.manifest, lambda p: read_manifest(p, rep, policy, args.strict_or, args.only_targets)),
         ("gradle", args.gradle, lambda p: read_gradle(p, rep, policy, args.strict_or)),
         ("pip", args.pip, None),
         ("release-manifest", args.release_manifest, lambda p: read_release_manifest(p, rep, policy)),

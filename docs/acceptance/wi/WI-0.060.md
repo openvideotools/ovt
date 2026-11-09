@@ -28,7 +28,7 @@ Pending, on the Mini (real `otool`, real Qt, real `macdeployqt`), as the `ovt-bu
 
 ```sh
 tools/bootstrap.sh --no-qt   # only if the toolchain is not there yet
-export QT_ROOT_DIR=<Qt 6.8.3 install, from tools/install_qt.py>
+export QT_ROOT_DIR=<Qt version directory from tools/install_qt.py, e.g. $HOME/Qt/ovt/6.8.3, not its macos/ subdirectory>
 cmake --preset macos-arm64-release
 cmake --build --preset macos-arm64-release
 tools/mac/bundle.sh macos-arm64-release      # prints the .app path; exit 0 includes fix_rpaths.py verification
@@ -43,6 +43,14 @@ ls "build/macos-arm64-release/bundle/OVT Studio.app/Contents/Resources" | head -
 ```
 
 Record: command output, date, machine (to fill in).
+
+First Mini run (f5ba822, macOS 15.8.2 arm64, Qt 6.8.3, 2026-11-08): configure and build exit 0, then `bundle.sh` stopped in
+the `ovt_notices` target with `license gate: FAIL (135 findings, 83 components)` (log: the coordinator's copy of the run,
+`/mnt/project-files/w060-step1-bundle.log`). Causes found in its `license_manifest.json`: the gate checked every target of the
+build tree, including tests and fixtures that are not in the policy `[targets]` table, and the shipping targets linked
+items with no licence description (CMake's `::@(0x...)` list markers, the in-tree `ovt_schemas` and `tp::aom_inspection`,
+the macOS SDK's `OpenGL.framework`, and libplacebo's glslang and lcms2 static libraries linked by file name). Fixed in the
+follow-up PR; the steps above are re-run on that head.
 
 Second run for determinism of the script outputs: repeat `bundle.sh` and compare `fix_rpaths.py` stdout; the file
 list and the `otool -L` set must be identical (Mach-O bytes carry build timestamps and are not compared).

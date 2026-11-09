@@ -69,7 +69,9 @@ function(_ovt_license_normalise_item item out_var)
   if(result MATCHES "^\\$<BUILD_INTERFACE:(.+)>$")
     set(result "${CMAKE_MATCH_1}")
   endif()
-  if(result MATCHES "^\\$<" OR result MATCHES "^-" OR result STREQUAL "")
+  # `::@` and `::@(0x...)` are the markers CMake puts around the items of a target_link_libraries() made from another
+  # directory (CMP0079); the libraries in between are separate items, so the markers are not libraries.
+  if(result MATCHES "^\\$<" OR result MATCHES "^-" OR result MATCHES "^::@" OR result STREQUAL "")
     set(result "")
   else()
     _ovt_license_resolve("${result}" resolved)
@@ -79,6 +81,17 @@ function(_ovt_license_normalise_item item out_var)
     # Platform libraries of the C runtime (pthread, libm, libdl) are system libraries under the GPL's
     # system-library exception; they are neither built nor distributed by OVT, so they are not listed.
     if(result MATCHES "^(Threads::Threads|pthread|m|dl|rt)$")
+      set(result "")
+    endif()
+    # Frameworks of the macOS SDK (an absolute path when a package such as Qt's WrapOpenGL found it by file name) are
+    # part of the operating system: not built, not distributed by OVT, like the C runtime above.
+    if(result MATCHES "^/.*/System/Library/Frameworks/[A-Za-z0-9_]+\\.framework$")
+      set(result "")
+    endif()
+    # Targets that only carry OVT's own generated code (ovt_schemas: FlatBuffers-generated headers, whose runtime
+    # flatbuffers::flatbuffers is described) and libaom's include directories (tp::aom_inspection links tp::aom, which
+    # is described) have no licence of their own to declare.
+    if(result MATCHES "^(ovt_schemas|tp::aom_inspection)$")
       set(result "")
     endif()
   endif()
