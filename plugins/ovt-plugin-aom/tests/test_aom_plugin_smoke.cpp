@@ -20,7 +20,7 @@
 #include <string>
 #include <vector>
 
-#include "aom_test_util.hpp"
+#include "aom_test_util.inc"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt_model_generated.h"
 #include "test_support/corpus.h"

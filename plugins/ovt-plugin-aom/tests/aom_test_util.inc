@@ -3,8 +3,10 @@
 //
 // Shared helpers of the ovt-plugin-aom tests (WI-2.155, WI-2.156): the plugin loaded through the host's
 // PluginRegistry, one decoder instance, and IVF reading split into Section 5 OBUs as the host index delivers them.
-#ifndef OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_HPP
-#define OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_HPP
+// Not a .hpp on purpose: it needs Catch2 and the plugin ABI headers, which clang-tidy-diff cannot resolve when it
+// parses a header on its own (same as ovt-plugin-ffmpeg's plugin_test_util.inc).
+#ifndef OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_INC
+#define OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_INC
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -110,4 +112,4 @@ inline std::vector<TemporalUnit> read_ivf(const std::filesystem::path& path) {
 
 }  // namespace ovt::aom::test
 
-#endif  // OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_HPP
+#endif  // OVT_PLUGIN_AOM_TESTS_AOM_TEST_UTIL_INC
