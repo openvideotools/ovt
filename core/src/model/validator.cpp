@@ -1828,7 +1828,7 @@ void v028(Ctx& c) {
 // ---- V-029 diagnostic codes -----------------------------------------------------------------------------------
 
 // ^(CNT|SYN|DEC|VQ|MDL|IO|BR|VER|ANA|RND|GUI|CLI)(-[A-Z0-9]{2,8})?-[0-9]{4}$ (chapter 5 §5.7), without std::regex.
-bool diagnostic_code_ok(std::string_view code) noexcept {
+bool diagnostic_code_ok(std::string_view code) {
   constexpr std::array<std::string_view, 12> kFamilies{"CNT", "SYN", "DEC", "VQ",  "MDL", "IO",
                                                        "BR",  "VER", "ANA", "RND", "GUI", "CLI"};
   const auto dash = code.find('-');
