@@ -36,14 +36,14 @@ class Source {
     if (!load(off)) {
       return -1;
     }
-    return buf_[static_cast<size_t>(off - base_)];
+    return buf_[off - base_];
   }
 
   // Copies bytes starting at off into out; returns the number copied.
   size_t copy(uint64_t off, std::span<uint8_t> out) {
     size_t done = 0;
     while (done < out.size() && load(off + done)) {
-      const auto at_block = static_cast<size_t>(off + done - base_);
+      const size_t at_block = off + done - base_;
       const size_t take = std::min(out.size() - done, len_ - at_block);
       std::memcpy(out.subspan(done).data(), std::span<const uint8_t>(buf_).subspan(at_block, take).data(), take);
       done += take;
