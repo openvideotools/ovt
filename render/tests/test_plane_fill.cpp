@@ -24,6 +24,7 @@
 #include <link.h>
 #endif
 
+#include "crash_backtrace.h"
 #include "ovt/render/picture.h"
 #include "ovt/render/video_surface.h"
 #include "surface/output_download.h"
@@ -127,6 +128,7 @@ void pin_vulkan_icds() {}
 #endif
 
 std::unique_ptr<VideoSurface> surface_or_skip(int w, int h) {
+  ovt::render::test::install_crash_backtrace();  // a crash anywhere below prints the faulting thread's stack
   auto surface = VideoSurface::create("plane-fill-test");
   REQUIRE(surface != nullptr);
   DisplayTarget t;
