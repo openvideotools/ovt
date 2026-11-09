@@ -45,7 +45,9 @@ void read_sub_layer_ordering_info(BitReader& br, SyntaxBuilder& b, Sps& sps) {
   }
 }
 
-constexpr uint32_t kMaxLumaDimension = 16888;  // Sqrt(MaxLumaPs * 8), A.4.1 level 6.2
+// Arithmetic-safety bound only: with 16-bit dimensions every Ctb/MinCb count and PicSizeInSamplesY (uint64) stays in
+// range. The level limit (A.4.1 MaxLumaPs) is the Warning SYN-CONF-0001 of WI-4.109, so oversize pictures keep parsing.
+constexpr uint32_t kMaxLumaDimension = 65535;
 
 void read_picture_format(BitReader& br, SyntaxBuilder& b, Sps& sps) {
   sps.chroma_format_idc = static_cast<uint8_t>(b.read_ue("chroma_format_idc"));
@@ -56,8 +58,6 @@ void read_picture_format(BitReader& br, SyntaxBuilder& b, Sps& sps) {
     sps.separate_colour_plane_flag = b.read_flag("separate_colour_plane_flag");
   }
   sps.pic_width_in_luma_samples = b.read_ue("pic_width_in_luma_samples");
-  // Hard bound: A.4.1 caps the dimensions at Sqrt(MaxLumaPs * 8) = 16888 for level 6.2 (MaxLumaPs = 35 651 584);
-  // every Ctb- and MinCb-indexed derivation and table below is sized from these two values.
   detail::require_range(br, "pic_width_in_luma_samples", sps.pic_width_in_luma_samples, 1, kMaxLumaDimension);
   sps.pic_height_in_luma_samples = b.read_ue("pic_height_in_luma_samples");
   detail::require_range(br, "pic_height_in_luma_samples", sps.pic_height_in_luma_samples, 1, kMaxLumaDimension);
