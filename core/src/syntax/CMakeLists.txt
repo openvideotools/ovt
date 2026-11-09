@@ -20,5 +20,5 @@ target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
 
 # WI-1.116: AV1 OBU header, sequence header (timing, decoder model, color_config), temporal delimiter, padding,
 # metadata and tile list parsers (chapter 7 §7.3.6 rows 1–9 and 30).
-target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.cpp av1/color_config.cpp
-                                        av1/timing.cpp av1/metadata.cpp av1/tile_list.cpp)
+target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.cpp av1/color_config.cpp av1/timing.cpp
+                                        av1/metadata.cpp av1/tile_list.cpp)
