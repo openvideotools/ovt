@@ -17,3 +17,8 @@ target_sources(ovt_core_objects PRIVATE common/syntax_builder.cpp common/syntax_
 # header, so the generated include directory and flatbuffers are PUBLIC on the objects, inside BUILD_INTERFACE
 # (core-objects rule 1, #62).
 target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
+
+# WI-1.108a: H.264 NAL header and SPS (VUI, HRD, scaling lists) parsers; H.273 code-point names shared with the
+# H.265 and AV1 parsers. WI-1.108b adds h264/pps.cpp.
+target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp
+                                        h264/vui.cpp h264/sps.cpp)
