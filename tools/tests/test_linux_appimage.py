@@ -40,12 +40,23 @@ def appdir(tmp_path: Path) -> Path:
     return d
 
 
-def _run_apprun(appdir: Path, *args: str, env: dict[str, str] | None = None, argv0: str | None = None):
+def _run_apprun(
+    appdir: Path,
+    *args: str,
+    env: dict[str, str] | None = None,
+    argv0: str | None = None,
+):
     full = {"PATH": "/usr/bin:/bin", "APPDIR": str(appdir)}
     if argv0:
         full["ARGV0"] = argv0
     full.update(env or {})
-    return subprocess.run(["sh", str(APPRUN), *args], env=full, capture_output=True, text=True, check=False)
+    return subprocess.run(
+        ["sh", str(APPRUN), *args],
+        env=full,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
 def test_apprun_starts_the_gui_by_default(appdir: Path) -> None:
@@ -93,7 +104,7 @@ def fake_tools(tmp_path: Path):
     # cmake: --build ... is a no-op that creates the notices; --install --prefix P creates the install tree.
     _exe(
         bin_dir / "cmake",
-        f"""#!/bin/sh
+        """#!/bin/sh
 case "$1" in
   --build) exit 0 ;;
   --install)
@@ -154,15 +165,22 @@ done
 
 def test_script_runs_linuxdeploy_as_the_spec_says(fake_tools) -> None:
     env, out, log, preset = fake_tools
-    r = subprocess.run([str(SCRIPT), preset, "--out", str(out), "--skip-notices-build"], env=env,
-                       capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        [str(SCRIPT), preset, "--out", str(out), "--skip-notices-build"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert r.returncode == 0, r.stderr
     text = log.read_text()
     assert "--plugin qt --output appimage" in text
     assert "--custom-apprun" in text and "packaging/appimage/AppRun" in text
     assert "EXTRA_QT_MODULES=svg;quickcontrols2;graphs" in text
     assert "DEPLOY_PLATFORM_THEMES=1" in text
-    assert "LDAI_UPDATE_INFORMATION=gh-releases-zsync|openvideotools|ovt|latest|OVT_Studio-*-x86_64.AppImage.zsync" in text
+    assert (
+        "LDAI_UPDATE_INFORMATION=gh-releases-zsync|openvideotools|ovt|latest|OVT_Studio-*-x86_64.AppImage.zsync" in text
+    )
     assert "qt/gcc_64/bin/qmake" in text
     assert (out / "OVT_Studio-9.9.9-x86_64.AppImage").exists()
     assert (out / "OVT_Studio-9.9.9-x86_64.AppImage.zsync").exists()
@@ -172,13 +190,22 @@ def test_script_runs_linuxdeploy_as_the_spec_says(fake_tools) -> None:
 
 def test_script_passes_plugins_to_linuxdeploy(fake_tools) -> None:
     env, out, log, preset = fake_tools
-    subprocess.run([str(SCRIPT), preset, "--out", str(out), "--skip-notices-build"], env=env, check=True,
-                   capture_output=True)
+    subprocess.run(
+        [str(SCRIPT), preset, "--out", str(out), "--skip-notices-build"],
+        env=env,
+        check=True,
+        capture_output=True,
+    )
     assert f"--library {out}/AppDir/usr/lib/ovt/plugins/libovt_plugin_aom.so" in log.read_text()
 
 
 def test_script_rejects_a_non_linux_preset() -> None:
-    r = subprocess.run([str(SCRIPT), "macos-arm64-release"], capture_output=True, text=True, check=False)
+    r = subprocess.run(
+        [str(SCRIPT), "macos-arm64-release"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert r.returncode == 1
     assert "not a linux-x64-* or linux-arm64-* preset" in r.stderr
 
@@ -186,7 +213,12 @@ def test_script_rejects_a_non_linux_preset() -> None:
 def test_script_requires_qt_root_dir(fake_tools) -> None:
     env, out, _log, preset = fake_tools
     env = {k: v for k, v in env.items() if k != "QT_ROOT_DIR"}
-    r = subprocess.run([str(SCRIPT), preset, "--out", str(out)], env=env, capture_output=True, text=True,
-                       check=False)
+    r = subprocess.run(
+        [str(SCRIPT), preset, "--out", str(out)],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     assert r.returncode == 1
     assert "QT_ROOT_DIR" in r.stderr
