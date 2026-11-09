@@ -25,7 +25,7 @@
 # ICDs must load); (5) check that the plugin directory and the AppRun made it into the image. The AppImage is
 # not signed and nothing is uploaded: release signing and publishing belong to WI-0.036.
 #
-# The patent-codec plugins (ovt_plugin_ffmpeg, ovt_plugin_de265) never go into the AppImage: §13.6.2 ships them only
+# The patent-codec plugins (ovt_plugin_ffmpeg*, ovt_plugin_de265*) never go into the AppImage: §13.6.2 ships them only
 # in the separate codec pack. They are moved to <out>/codec-pack-plugins/ and the script fails if any is left.
 #
 # Inside the image, the CLI is `OVT_Studio-<ver>-<arch>.AppImage --ovt-cli <args>` (or a symlink named `ovt` to it).
@@ -90,12 +90,14 @@ if [ -d "$appdir/usr/lib64" ]; then
 fi
 
 # ---- (1b) patent-codec plugins stay out (§13.6.2: separate codec pack) -------------------------------------------
-codec_plugins="libovt_plugin_ffmpeg.so libovt_plugin_de265.so"
-for name in $codec_plugins; do
-  if [ -e "$appdir/usr/lib/ovt/plugins/$name" ]; then
+# Globs, so a further FFmpeg/de265 plugin (e.g. libovt_plugin_ffmpeg_hevc.so) is kept out too.
+codec_globs="libovt_plugin_ffmpeg*.so libovt_plugin_de265*.so"
+for g in $codec_globs; do
+  for f in "$appdir"/usr/lib/ovt/plugins/$g; do
+    [ -e "$f" ] || continue
     mkdir -p "$out/codec-pack-plugins"
-    mv "$appdir/usr/lib/ovt/plugins/$name" "$out/codec-pack-plugins/"
-  fi
+    mv "$f" "$out/codec-pack-plugins/"
+  done
 done
 
 # ---- (2) notices, licences, PATENTS --------------------------------------------------------------------------------
@@ -159,8 +161,10 @@ image="$out/OVT_Studio-$version-$arch.AppImage"
 [ -f "$image" ] || die "linuxdeploy did not produce $image"
 [ -x "$appdir/AppRun" ] || die "AppRun is missing or not executable in $appdir"
 cmp -s "$appdir/AppRun" "$repo/packaging/appimage/AppRun" || die "AppDir/AppRun is not packaging/appimage/AppRun"
-for name in $codec_plugins; do
-  [ ! -e "$appdir/usr/lib/ovt/plugins/$name" ] || die "$name is in the AppImage: it belongs to the codec pack only (§13.6.2)"
+for g in $codec_globs; do
+  for f in "$appdir"/usr/lib/ovt/plugins/$g; do
+    [ ! -e "$f" ] || die "$(basename "$f") is in the AppImage: it belongs to the codec pack only (§13.6.2)"
+  done
 done
 if [ -e "$appdir/usr/lib/libvulkan.so.1" ]; then
   die "libvulkan.so.1 was bundled: the host Vulkan loader must be used (§13.6.2)"

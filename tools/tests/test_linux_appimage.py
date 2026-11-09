@@ -115,6 +115,7 @@ case "$1" in
     : > "$prefix/lib/ovt/plugins/libovt_plugin_aom.so"
     : > "$prefix/lib/ovt/plugins/libovt_plugin_ffmpeg.so"
     : > "$prefix/lib/ovt/plugins/libovt_plugin_de265.so"
+    : > "$prefix/lib/ovt/plugins/libovt_plugin_ffmpeg_hevc.so"
     exit 0 ;;
 esac
 exit 1
@@ -240,6 +241,7 @@ def test_script_keeps_patent_codec_plugins_out_of_the_image(fake_tools) -> None:
     assert sorted(p.name for p in plugins.iterdir()) == ["libovt_plugin_aom.so"]
     assert (out / "codec-pack-plugins/libovt_plugin_ffmpeg.so").exists()
     assert (out / "codec-pack-plugins/libovt_plugin_de265.so").exists()
+    assert (out / "codec-pack-plugins/libovt_plugin_ffmpeg_hevc.so").exists()
     args = log.read_text()
     assert "ffmpeg" not in args and "de265" not in args
 
