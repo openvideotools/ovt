@@ -105,23 +105,33 @@ struct ColorConfig {
 
 /// §7.3.6 row 2: sequence_header_obu().
 struct SequenceHeader {
+  // Members are grouped by size, largest first, so the struct carries no padding (clang-analyzer
+  // optin.performance.Padding); the comments give the syntax order of AV1 §5.5.1.
+  std::vector<OperatingPoint> operating_points;  // operating_points_cnt_minus_1 + 1 entries
+  TimingInfo timing_info;                        // valid when timing_info_present_flag
+  DecoderModelInfo decoder_model_info;           // valid when decoder_model_info_present_flag
+  ColorConfig color_config;
+  std::string_view profile_name;  // derived: "Main", "High", "Professional"
+  BitSpan span{0, 0};
+  uint32_t max_frame_width_minus_1 = 0;
+  uint32_t max_frame_height_minus_1 = 0;
+  uint32_t max_frame_width = 0;   // derived
+  uint32_t max_frame_height = 0;  // derived
+  // seq_profile … initial_display_delay_present_flag, then operating_points[]
   uint8_t seq_profile = 0;
   bool still_picture = false;
   bool reduced_still_picture_header = false;
   bool timing_info_present_flag = false;
-  TimingInfo timing_info;  // valid when timing_info_present_flag
   bool decoder_model_info_present_flag = false;
-  DecoderModelInfo decoder_model_info;  // valid when decoder_model_info_present_flag
   bool initial_display_delay_present_flag = false;
   uint8_t operating_points_cnt_minus_1 = 0;
-  std::vector<OperatingPoint> operating_points;  // operating_points_cnt_minus_1 + 1 entries
+  // frame size fields (max_frame_*_minus_1 above), frame ids
   uint8_t frame_width_bits_minus_1 = 0;
   uint8_t frame_height_bits_minus_1 = 0;
-  uint32_t max_frame_width_minus_1 = 0;
-  uint32_t max_frame_height_minus_1 = 0;
   bool frame_id_numbers_present_flag = false;
   uint8_t delta_frame_id_length_minus_2 = 0;
   uint8_t additional_frame_id_length_minus_1 = 0;
+  // coding tools
   bool use_128x128_superblock = false;
   bool enable_filter_intra = false;
   bool enable_intra_edge_filter = false;
@@ -140,14 +150,9 @@ struct SequenceHeader {
   bool enable_superres = false;
   bool enable_cdef = false;
   bool enable_restoration = false;
-  ColorConfig color_config;
+  // color_config above, then film_grain_params_present
   bool film_grain_params_present = false;
-  // Derived
-  uint8_t OrderHintBits = 0;  // order_hint_bits_minus_1 + 1, or 0 without enable_order_hint
-  uint32_t max_frame_width = 0;
-  uint32_t max_frame_height = 0;
-  std::string_view profile_name;  // "Main", "High", "Professional"
-  BitSpan span{0, 0};
+  uint8_t OrderHintBits = 0;  // derived: order_hint_bits_minus_1 + 1, or 0 without enable_order_hint
 
   /// operating_point_idc of operating point `index`, or 0 (every layer) when out of range.
   [[nodiscard]] uint16_t operating_point_idc(size_t index) const noexcept;
