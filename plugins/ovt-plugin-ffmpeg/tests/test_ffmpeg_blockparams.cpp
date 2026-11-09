@@ -142,6 +142,7 @@ struct Picture {
   bool bottom = false;
   bool mbaff = false;
   bool constrained_intra = false;
+  bool cabac = false;
   std::vector<Slice> slices;
 
   [[nodiscard]] int slice_type(int addr) const {
@@ -173,12 +174,14 @@ std::vector<Picture> header_pictures(const json& elements) {
   std::vector<Picture> pictures;
   int sps_mbaff = 0;
   std::map<int, bool> pps_constrained;
+  std::map<int, bool> pps_cabac;
   for (const auto& u : units) {
     const int type = get(u, "nal_unit_type");
     if (type == 7) {
       sps_mbaff = get(u, "mb_adaptive_frame_field_flag");
     } else if (type == 8) {
       pps_constrained[get(u, "pic_parameter_set_id")] = get(u, "constrained_intra_pred_flag") != 0;
+      pps_cabac[get(u, "pic_parameter_set_id")] = get(u, "entropy_coding_mode_flag") != 0;
     } else if (type == 1 || type == 5) {
       const bool field = get(u, "field_pic_flag") != 0;
       const bool mbaff = sps_mbaff != 0 && !field;
@@ -189,6 +192,7 @@ std::vector<Picture> header_pictures(const json& elements) {
         p.bottom = get(u, "bottom_field_flag") != 0;
         p.mbaff = mbaff;
         p.constrained_intra = pps_constrained[get(u, "pic_parameter_set_id")];
+        p.cabac = pps_cabac[get(u, "pic_parameter_set_id")];
         pictures.push_back(p);
       }
       pictures.back().slices.push_back(Slice{first, get(u, "slice_type") % 5});
@@ -427,6 +431,21 @@ void expect_eq(Counts& c, const std::string& where, const char* what, const json
   }
 }
 
+// The mb_type JM traces for `m`, given JM's value `jm` (needed to tell P_8x8ref0 from P_8x8).
+json expected_jm_mb_type(const Mb& m, const Picture& pic, int slice_type, const json& jm) {
+  json want_type = expected_mb_type(m, slice_type);
+  const bool p_slice = slice_type == kSliceP || slice_type == kSliceSP;
+  if (pic.cabac && p_slice && want_type.is_number_integer()) {
+    // JM 19.0 traces the mb_type of CABAC P/SP slices as the syntax value + 1 (its reader counts P_Skip as 0):
+    // every macroblock of the CABAC P pictures of jvt_HCAFF1_HHI_B and jvt_MR9_BT_B. CAVLC and I slices trace
+    // the syntax value.
+    want_type = want_type.get<int>() + 1;
+  } else if (m.cls == 6 && jm == 4) {  // P_8x8ref0: every partition uses reference index 0
+    want_type = std::all_of(m.ref[0].begin(), m.ref[0].end(), [](int r) { return r == 0; }) ? json(4) : json(-4);
+  }
+  return want_type;
+}
+
 // The macroblock of `f` that JM's address `addr` in picture `pic` names, or nullptr.
 const Mb* mb_at(const Frame& f, const Picture& pic, int addr) {
   if (pic.mbaff) {
@@ -445,12 +464,7 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
   ++c.mbs;
   const int slice_type = pic.slice_type(addr);
   if (g.contains("mb_type") && slice_type != 4) {
-    json want_type = expected_mb_type(*m, slice_type);
-    const json& jm = g.at("mb_type");
-    if (m->cls == 6 && jm == 4) {  // P_8x8ref0: every partition uses reference index 0
-      want_type = std::all_of(m->ref[0].begin(), m->ref[0].end(), [](int r) { return r == 0; }) ? json(4) : json(-4);
-    }
-    expect_eq(c, where, "mb_type", want_type, jm);
+    expect_eq(c, where, "mb_type", expected_jm_mb_type(*m, pic, slice_type, g.at("mb_type")), g.at("mb_type"));
   }
   if (g.contains("sub_mb_type") && (m->cls == 6 || m->cls == 12)) {
     ++c.sub_mb_types;

@@ -22,6 +22,8 @@ every macroblock the golden holds: `mb_type`, `sub_mb_type`, `ref_idx_l0/l1` (wh
 `mb_field_decoding_flag`, `mvd_l0/l1` in read order, and the signalled intra 4x4/8x8 modes (prev flag or rem,
 derived from the exported modes with the H.264 8.3.1.1 neighbour rule; not for MBAFF pictures). The slice types,
 field parity, MBAFF and `constrained_intra_pred_flag` come from the stream's `trace_headers` golden.
+JM 19.0 traces the `mb_type` of CABAC P/SP slices as the syntax value + 1 (CI run of 2026-11-09: every macroblock of
+the CABAC P pictures of HCAFF1_HHI_B and MR9_BT_B, the only ones among the goldens); the test applies that offset.
 
 The test streams are not reachable from the container, so this test first runs in CI. The test's conversion from
 the export to JM's signalled values was checked locally against FFmpeg's own parse instead: a throwaway build of
