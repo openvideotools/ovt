@@ -62,6 +62,11 @@ TEST_CASE("JobSpec: max_frames and frames combine into [begin, end)", "[metrics]
   REQUIRE(r.has_value());
   CHECK(r.value().frame_begin == 10);
   CHECK(r.value().frame_end == 30);
+  // Regression (#378 review): begin + max_frames must not overflow int; the end clamps to INT_MAX.
+  const auto huge = parse_job_spec(R"({"distorted":"d","frames":"999999999-999999999","max_frames":2147483647})");
+  REQUIRE(huge.has_value());
+  CHECK(huge.value().frame_begin == 999999999);
+  CHECK(huge.value().frame_end == 1000000000);  // min(frames end, clamped begin + max_frames)
   const auto only_max = parse_job_spec(R"({"distorted":"d.mp4","max_frames":5})");
   REQUIRE(only_max.has_value());
   CHECK(only_max.value().frame_begin == 0);
@@ -75,7 +80,7 @@ TEST_CASE("JobSpec: errors name the field", "[metrics][jobspec][fast]") {
     const char* field;
     ovt_status status;
   };
-  const std::array<Case, 16> cases = {{
+  const std::array<Case, 18> cases = {{
       {R"({"distorted":"d.mp4","bogus":1})", "bogus", OVT_E_INVALID_ARG},
       {R"({"reference":"r.y4m"})", "distorted", OVT_E_INVALID_ARG},
       {R"({"distorted":["a.mp4","b.mp4"]})", "distorted", OVT_E_UNSUPPORTED},
@@ -91,6 +96,9 @@ TEST_CASE("JobSpec: errors name the field", "[metrics][jobspec][fast]") {
       {R"({"distorted":"d.mp4","threads":-1})", "threads", OVT_E_INVALID_ARG},
       {R"({"distorted":"d.mp4","maps":"yes"})", "maps", OVT_E_INVALID_ARG},
       {R"({"distorted":"d.mp4","normalize":[]})", "normalize", OVT_E_INVALID_ARG},
+      // Regression (#378 review): "align" must not write into a non-object normalize.temporal.
+      {R"({"distorted":"d","normalize":{"temporal":5},"align":3})", "normalize.temporal", OVT_E_INVALID_ARG},
+      {R"({"distorted":"d","normalize":{"temporal":"x"},"align":"none"})", "normalize.temporal", OVT_E_INVALID_ARG},
       {R"([])", "<root>", OVT_E_INVALID_ARG},
   }};
   for (const Case& c : cases) {

@@ -7,6 +7,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cstdlib>
 #include <limits>
 #include <optional>
@@ -180,11 +181,19 @@ R parse_job_spec(std::string_view text) {
   }
   if (max_frames > 0) {
     const int begin = spec.frame_begin.value_or(0);
-    const int end = begin + max_frames;
+    // begin + max_frames can exceed INT_MAX (fuzz finding on #378): add in 64 bits and clamp.
+    const long long wide_end = static_cast<long long>(begin) + max_frames;
+    const int end = static_cast<int>(std::min<long long>(wide_end, std::numeric_limits<int>::max()));
     spec.frame_begin = begin;
     spec.frame_end = spec.frame_end ? std::min(*spec.frame_end, end) : end;
   }
   if (fixed_offset) {
+    // "align" writes into normalize.temporal, so that key must be an object (or absent) before the write;
+    // nlohmann's operator[] on a non-object throws type_error (fuzz finding on #378).
+    const auto temporal = normalize.find("temporal");
+    if (temporal != normalize.end() && !temporal->is_object()) {
+      return field_error("normalize.temporal", "must be an object");
+    }
     normalize["temporal"]["mode"] = "fixed";
     normalize["temporal"]["offset_frames"] = *fixed_offset;
   }

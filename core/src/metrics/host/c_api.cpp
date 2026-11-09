@@ -61,8 +61,12 @@ void deliver_event(const ovt_MetricsJob& handle, const ovt::metrics::JobEvent& e
   if (handle.on_event == nullptr) {
     return;
   }
-  const std::string json = ovt::metrics::job_event_json(e);
-  handle.on_event(json.c_str(), handle.user);
+  try {
+    const std::string json = ovt::metrics::job_event_json(e);
+    handle.on_event(json.c_str(), handle.user);
+  } catch (...) {
+    // Building the event text allocates; an event that cannot be built is dropped rather than terminating the job.
+  }
 }
 
 std::string basename_of(const std::string& path) {
