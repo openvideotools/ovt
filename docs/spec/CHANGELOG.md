@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc17 — 2026-11-09
+
+PATCH-level: WI-0.060 implementation detail. No requirement sentence or acceptance line changes.
+
+- 13 §13.5.2 — the bundle script installs into `Contents/` and then moves the install tree to the bundle layout (`GNUInstallDirs` names are configure-time cache variables), passes every plugin to `macdeployqt` as `-executable`, and runs `fix_rpaths.py --fix` before the verification — WI-0.060
+
 ## 1.0.0-rc16 — 2026-11-08
 
 PATCH-level: owner decision (Karl, 2026-11-08) on the golden size cap. No requirement sentence or WI scope changes.
