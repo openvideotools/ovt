@@ -1,0 +1,13 @@
+{
+ "frames": [],
+ "pooled": {
+  "bd_psnr_y": {
+   "akima": 0.218365,
+   "pchip": 0.216807
+  },
+  "bd_rate": {
+   "akima": -5.109392,
+   "pchip": -5.080876
+  }
+ }
+}
