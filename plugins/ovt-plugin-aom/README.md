@@ -12,5 +12,9 @@ The AV1 analysis plugin (`libovt_plugin_aom`): libaom's inspection API behind th
 - **Licence:** plugin code BSD-2-Clause; the binary also carries libaom (BSD-2-Clause, the ISC `x86inc.asm` on
   x86_64) and the Alliance for Open Media Patent License 1.0 (`PATENTS`, kept with this code).
 - **Status:** WI-2.155 skeleton: frame-level `FrameAnalysis` (frame type, shown, `base_q_idx`, sizes) and the
-  `Reconstruction` planes of shown frames. Block data (WI-2.156), symbol accounting (WI-2.157) and the extension
-  patches (WI-2.159, `patches/`) follow.
+  `Reconstruction` planes of shown frames. WI-2.156a adds the superblock partition-tree reconstruction from the
+  per-MI block sizes (`src/partition_reconstruct.cpp`, not wired into the plugin yet); the rest of the block data
+  (WI-2.156b), symbol accounting (WI-2.157) and the extension patches (WI-2.159, `patches/`) follow.
+- **Tests:** `tests/test_aom_map_mi.cpp` checks the reconstruction against libaom `inspect` layers recorded in
+  `tests/data/inspect_reference.json`; regenerate it with `tests/data/make_inspect_reference.py` (usage in the
+  script) when the libaom pin moves.
