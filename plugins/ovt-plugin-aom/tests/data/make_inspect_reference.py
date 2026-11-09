@@ -76,8 +76,21 @@ def inspect_frames(inspect: str, ivf: Path, limit: int) -> list[dict[str, Any]]:
 
 def ref_frame_idx(ffmpeg: str, ivf: Path) -> list[list[int]]:
     """ref_frame_idx[0..6] of every frame header with show_existing_frame = 0, in decode order ([] for intra)."""
-    args = [ffmpeg, "-hide_banner", "-loglevel", "trace", "-i", str(ivf), "-c", "copy", "-bsf:v", "trace_headers",
-            "-f", "null", "-"]
+    args = [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "trace",
+        "-i",
+        str(ivf),
+        "-c",
+        "copy",
+        "-bsf:v",
+        "trace_headers",
+        "-f",
+        "null",
+        "-",
+    ]
     log = subprocess.run(args, check=True, capture_output=True, text=True).stderr
     headers: list[list[int]] = []
     current: list[int] | None = None
@@ -98,7 +111,9 @@ def ref_frame_idx(ffmpeg: str, ivf: Path) -> list[list[int]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--inspect", required=True)
     ap.add_argument("--ffmpeg", required=True)
     ap.add_argument("--out", required=True, type=Path)
