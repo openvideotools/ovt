@@ -6,7 +6,8 @@
 // only. It scores nothing useful: score() returns a FrameScore whose single value is the decode index, finish()
 // returns no sequence score. Knobs for the broken variants: OVT_EXAMPLE_ID (descriptor id), OVT_EXAMPLE_ABI_VERSION,
 // OVT_EXAMPLE_API_SIZE (struct_size), OVT_EXAMPLE_NULL_SCORE (a NULL score entry), OVT_EXAMPLE_BAD_DESCRIPTOR
-// (descriptor() returns garbage bytes), OVT_EXAMPLE_BOTH_ENTRY_POINTS (also exports ovt_analysis_decoder_v1).
+// (descriptor() returns garbage bytes), OVT_EXAMPLE_BAD_UTF8 (a display_name that is not valid UTF-8),
+// OVT_EXAMPLE_BOTH_ENTRY_POINTS (also exports ovt_analysis_decoder_v1).
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -43,7 +44,11 @@ namespace {
   static const std::vector<uint8_t> bytes = [] {
     flatbuffers::FlatBufferBuilder fbb(512);
     const auto id = fbb.CreateString(OVT_EXAMPLE_ID);
+#ifdef OVT_EXAMPLE_BAD_UTF8
+    const auto name = fbb.CreateString("Example metric \xff\xfe");  // a valid FlatBuffer, not valid UTF-8
+#else
     const auto name = fbb.CreateString("Example metric (test plugin)");
+#endif
     const auto outputs = fbb.CreateVectorOfStrings(std::vector<std::string>{"score"});
     const auto license = fbb.CreateString("LGPL-2.1-or-later");
     const auto version = fbb.CreateString("1.0.0");

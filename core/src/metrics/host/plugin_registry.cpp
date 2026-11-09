@@ -149,6 +149,18 @@ nlohmann::ordered_json descriptor_json(const ovt::fb::MetricDescriptor& d) {
   return j;
 }
 
+// nlohmann::json::dump() throws on a string that is not valid UTF-8, which would fail
+// ovt_metrics_list_descriptors() for every metric because of one bad plugin. The FlatBuffers verifier does not
+// check encodings, so a descriptor whose strings do not dump is rejected at registration instead.
+bool descriptor_dumps_as_json(const ovt::fb::MetricDescriptor& d) noexcept {
+  try {
+    (void)descriptor_json(d).dump();
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 }  // namespace
 
 const ovt::fb::MetricDescriptor* MetricPlugin::descriptor() const noexcept {
@@ -214,6 +226,10 @@ std::optional<std::vector<uint8_t>> validate_metric_api(const ovt_MetricApi* api
   }
   if (d->kind() > ovt::fb::MetricKind::MAX || d->domain() > ovt::fb::WorkingDomain::MAX) {
     error = "descriptor kind or domain out of range";
+    return std::nullopt;
+  }
+  if (!descriptor_dumps_as_json(*d)) {
+    error = "descriptor strings are not valid UTF-8";
     return std::nullopt;
   }
   // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): copying a verified buffer

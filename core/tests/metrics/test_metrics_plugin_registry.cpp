@@ -150,7 +150,7 @@ TEST_CASE("the registry rejects broken plugins with VQ-PLUG-0001 and keeps going
   LogCapture log;
   const std::string path = plugin_dir("bad_abi") + ":" + plugin_dir("bad_id") + ":" + plugin_dir("bad_size") + ":" +
                            plugin_dir("bad_null") + ":" + plugin_dir("bad_desc") + ":" + plugin_dir("bad_both") + ":" +
-                           plugin_dir("example");
+                           plugin_dir("bad_utf8") + ":" + plugin_dir("example");
   PluginRegistry reg(only(path));
   const auto plugins = reg.plugins();
   REQUIRE(plugins.size() == 1);
@@ -161,11 +161,17 @@ TEST_CASE("the registry rejects broken plugins with VQ-PLUG-0001 and keeps going
   CHECK(rejected(reg, "libovt_metric_nullscore", "VQ-PLUG-0001"));
   CHECK(rejected(reg, "libovt_metric_baddesc", "VQ-PLUG-0001"));
   CHECK(rejected(reg, "libovt_metric_both", "VQ-PLUG-0001"));
-  CHECK(reg.rejections().size() == 6);
+  CHECK(rejected(reg, "libovt_metric_badutf8", "VQ-PLUG-0001"));
+  CHECK(reg.rejections().size() == 7);
+  // One bad plugin must not take the listing down with it (nlohmann::json::dump() throws on invalid UTF-8).
+  const std::string listed = reg.descriptors_json();
+  CHECK(listed.find("\"example\"") != std::string::npos);
+  CHECK(listed.find("badutf8") == std::string::npos);
   CHECK(log.contains("VQ-PLUG-0001|metric plugin"));
   CHECK(log.contains("abi_version 2, host expects 1"));
   CHECK(log.contains("differs from the file name id"));
   CHECK(log.contains("exports both"));
+  CHECK(log.contains("not valid UTF-8"));
 }
 
 TEST_CASE("the first directory holding an id wins", "[metrics][plugin][fast]") {

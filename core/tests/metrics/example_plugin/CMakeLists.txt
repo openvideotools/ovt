@@ -44,3 +44,5 @@ ovt_add_example_metric(ovt_metric_example_bad_desc DIR bad_desc ID baddesc DEFIN
                        OVT_EXAMPLE_BAD_DESCRIPTOR)
 ovt_add_example_metric(ovt_metric_example_both DIR bad_both ID both DEFINES "OVT_EXAMPLE_ID=\"both\""
                        OVT_EXAMPLE_BOTH_ENTRY_POINTS)
+ovt_add_example_metric(ovt_metric_example_bad_utf8 DIR bad_utf8 ID badutf8 DEFINES "OVT_EXAMPLE_ID=\"badutf8\""
+                       OVT_EXAMPLE_BAD_UTF8)
