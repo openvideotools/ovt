@@ -14,7 +14,6 @@
 #if defined(__APPLE__) || defined(__linux__)
 #include <dlfcn.h>
 #include <execinfo.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #include <array>
@@ -44,12 +43,29 @@ inline void emit(const char* text, int n, size_t capacity) {
   }
 }
 
+// strsignal() is not thread-safe; the handled signals are few enough to name here.
+inline const char* signal_name(int sig) {
+  switch (sig) {
+    case SIGSEGV:
+      return "SIGSEGV";
+    case SIGBUS:
+      return "SIGBUS";
+    case SIGILL:
+      return "SIGILL";
+    case SIGFPE:
+      return "SIGFPE";
+    case SIGABRT:
+      return "SIGABRT";
+    default:
+      return "signal";
+  }
+}
+
 inline void handler(int sig, siginfo_t* info, void* ucontext) {
   // Diagnostics on the way to a crash: snprintf/dladdr are not async-signal-safe, which is acceptable here.
   std::array<char, 256> line{};
-  int n = std::snprintf(line.data(), line.size(), "\n==ovt-crash== signal %d (%s) at address %p on thread %p\n", sig,
-                        strsignal(sig), info != nullptr ? info->si_addr : nullptr,
-                        reinterpret_cast<void*>(pthread_self()));  // NOLINT(*-reinterpret-cast)
+  int n = std::snprintf(line.data(), line.size(), "\n==ovt-crash== signal %d (%s) at address %p\n", sig,
+                        signal_name(sig), info != nullptr ? info->si_addr : nullptr);
   if (n > 0) {
     emit(line.data(), n, line.size());
   }
