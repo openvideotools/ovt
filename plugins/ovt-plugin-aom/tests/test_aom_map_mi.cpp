@@ -26,6 +26,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <regex>
 #include <set>
 #include <span>
 #include <string>
@@ -337,14 +338,31 @@ const fb::FrameAnalysis* analysis_of(const BlockData& d, int32_t w, int32_t h,
 
 // Validator rules a plugin buffer breaks until the host's post-processing (§7.5.3 A6) fills FrameInfo timing and
 // the tiles' unit indices.
-const std::set<std::string> kHostFilled = {"V-002", "V-017"};
+// Findings the plugin's output is expected to have, each waived only at its exact path:
+// - V-002 frame.timebase_den and V-017 partitions[n].unit_index are filled by the host (§7.5.3 A6);
+// - V-006 on the root rect when the coded size is not a multiple of 4: V-004 wants the root rect to equal
+//   coded_size, V-006 wants every rect 4-aligned (spec question #360).
+// Every other finding of those rules (coded_size, tile rects, partition_id range, ...) still fails the test.
+bool expected_finding(const ovt::model::Violation& v, const fb::FrameAnalysis& fa) {
+  static const std::regex kUnitIndex(R"(partitions\[[0-9]+\]\.unit_index)");
+  if (v.rule == "V-002") {
+    return v.path == "frame.timebase_den";
+  }
+  if (v.rule == "V-017") {
+    return std::regex_match(v.path, kUnitIndex);
+  }
+  if (v.rule == "V-006" && v.path == "blocks[0].rect") {
+    const fb::Rect* cs = fa.frame() != nullptr ? fa.frame()->coded_size() : nullptr;
+    return cs != nullptr && (cs->w() % 4 != 0 || cs->h() % 4 != 0);
+  }
+  return false;
+}
 
-// Validates one buffer. Besides kHostFilled, V-006 on the root is expected for frame sizes that are not multiples
-// of 4: V-004 wants the root rect to equal coded_size, V-006 wants every rect 4-aligned (spec question #360).
 void check_valid(std::span<const uint8_t> buf) {
+  const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(buf.data());
   for (const auto& v : ovt::model::validate_frame_analysis(buf, fb::Codec::AV1)) {
     INFO(v.rule << " " << v.path << ": " << v.message);
-    CHECK((kHostFilled.count(v.rule) == 1 || (v.rule == "V-006" && v.path == "blocks[0].rect")));
+    CHECK(expected_finding(v, fa));
   }
 }
 
