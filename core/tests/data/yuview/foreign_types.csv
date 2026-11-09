@@ -1,0 +1,21 @@
+%;syntax-version;v1.22
+%;seq-specs;foreign;0;32;16;30
+%;type;0;Pred Mode;map
+%;mapColor;0;255;0;0
+%;mapColor;1;0;0;255
+%;type;1;QP Y;range
+%;defaultRange;0;51;jet
+%;type;2;Motion Vector L0;vector
+%;vectorColor;0;255;0;255
+%;scaleFactor;4
+%;type;5;OVT_QP;range
+%;defaultRange;0;51;jet
+0;0;0;16;16;0;0
+0;16;0;16;16;0;1
+0;0;0;16;16;1;30
+0;16;0;16;16;1;31
+0;16;0;16;16;2;-4;8
+0;0;0;16;16;5;30
+0;16;0;16;16;5;31
+1;0;0;32;16;0;1
+1;0;0;32;16;5;35

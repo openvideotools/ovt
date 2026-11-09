@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Patches to the pristine FFmpeg tarball (third_party/VERSIONS.md row "FFmpeg"), in this order, in the format
+# tools/apply_patches.py reads (chapter 13 §13.3.6). One path per line, relative to this file.
+#
+# 0001 is the MB-params side data patch of chapter 07 §7.6.3. WI-4.100 wrote its libavutil part; WI-4.101 adds
+# the h264 decoder hunks to the same file. SPEC-ASSUMPTION(#332): the per-4x4 arrays of AVH264MacroblockParams are
+# in luma4x4BlkIdx (decoding) order. SPEC-ASSUMPTION(#331): the FFmpeg build does not apply this series yet (a later
+# WI wires it into the plugin flavour); the ctest ffmpeg_patches_apply checks that it applies to the pinned tarball.
+0001-h264-export-mb-params.patch

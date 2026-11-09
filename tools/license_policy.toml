@@ -86,6 +86,9 @@ ovt_tests_render = "LGPL-2.1-or-later"
 "plugins/ovt-plugin-ffmpeg" = "LGPL-2.1-or-later"
 "plugins/ovt-plugin-hm" = "BSD-3-Clause"
 "tools" = "LGPL-2.1-or-later"
+# WI-0.565: x264's SSIM kernel, vendored unmodified for the ssim_x264 oracle (chapter 14 §14.4.12). Built only into the
+# oracle image executable, never linked into OVT or released.
+"tests/oracles/x264_ssim" = "GPL-2.0-or-later"
 "tests" = "LGPL-2.1-or-later"
 "cmake" = "LGPL-2.1-or-later"
 "third_party" = "LGPL-2.1-or-later"

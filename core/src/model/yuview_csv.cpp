@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// YUView statistics CSV exporter (chapter 06 §6.8.2, WI-0.089a; the importer follows in WI-0.089b). Clean-room: written
-// from the grammar of §6.8.2 and the "Statistics Extension Syntax" description of appendix F.5, not from YUView code.
+// YUView statistics CSV exporter and importer (chapter 06 §6.8.2, WI-0.089). Clean-room: written from the
+// grammar of §6.8.2 and the "Statistics Extension Syntax" description of appendix F.5, not from YUView code.
 
 #include "ovt/cxx/model/yuview_csv.hpp"
 
@@ -14,13 +14,17 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <istream>
 #include <limits>
+#include <map>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <set>
 #include <span>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
@@ -764,6 +768,351 @@ void write_yuview_csv(std::ostream& out, const fb::StreamIndex& index,
     }
     i = end;
   }
+}
+
+// ---- importer ------------------------------------------------------------------------------------------------
+
+namespace {
+
+// SPEC-ASSUMPTION(#233): the importer's diagnostic codes MDL-CSV-0001..0004 are not yet in the §6.9.1
+// registry, and it refuses seq-specs sizes above 16384 per side or 8192 x 4320 luma samples in total.
+constexpr std::int64_t kMaxSide = 16384;
+constexpr std::int64_t kMaxArea = std::int64_t{8192} * 4320;
+constexpr std::size_t kMaxNameDiagnostics = 64;
+
+std::vector<std::string_view> split(std::string_view line) {
+  std::vector<std::string_view> fields;
+  std::size_t start = 0;
+  while (true) {
+    const std::size_t pos = line.find(';', start);
+    if (pos == std::string_view::npos) {
+      fields.push_back(line.substr(start));
+      return fields;
+    }
+    fields.push_back(line.substr(start, pos - start));
+    start = pos + 1;
+  }
+}
+
+std::optional<std::int64_t> parse_int(std::string_view text) {
+  while (!text.empty() && text.front() == ' ') {
+    text.remove_prefix(1);
+  }
+  while (!text.empty() && text.back() == ' ') {
+    text.remove_suffix(1);
+  }
+  std::int64_t value = 0;
+  const auto* end = text.data() + text.size();
+  const auto res = std::from_chars(text.data(), end, value);
+  if (text.empty() || res.ec != std::errc{} || res.ptr != end) {
+    return std::nullopt;
+  }
+  return value;
+}
+
+// One CellGrid field the importer fills: value range and sentinel, plus where it lands in CellGridT.
+struct GridTarget {
+  std::int64_t min;
+  std::int64_t max;
+  std::int64_t fill;  // sentinel (or 0 for motion vectors)
+};
+
+std::optional<GridTarget> grid_target(std::string_view name) {
+  constexpr GridTarget kU8{0, 254, 255};
+  constexpr GridTarget kS16{-32768, 32767, -1};
+  if (name == "OVT_PredMode" || name == "OVT_TxLog2W" || name == "OVT_TxLog2H" || name == "OVT_TxType" ||
+      name == "OVT_Cbf" || name == "OVT_DeblockBsV" || name == "OVT_DeblockBsH" || name == "OVT_FilterIdx") {
+    return kU8;
+  }
+  if (name == "OVT_QP" || name == "OVT_IntraModeY" || name == "OVT_IntraModeC") {
+    return kS16;
+  }
+  if (name == "OVT_Ref0" || name == "OVT_Ref1") {
+    return GridTarget{-128, 127, -1};
+  }
+  if (name == "OVT_PartitionId") {
+    return GridTarget{0, 65534, 65535};
+  }
+  if (name == "OVT_MV0" || name == "OVT_MV1") {
+    return GridTarget{-32768, 32767, 0};
+  }
+  return std::nullopt;
+}
+
+bool is_ovt_name(std::string_view name) {
+  if (name.starts_with(kBlockGridPrefix)) {
+    return true;
+  }
+  return std::find(kTypeNames.begin(), kTypeNames.end(), name) != kTypeNames.end();
+}
+
+template <typename T>
+std::vector<T> narrow(const std::vector<std::int32_t>& in) {
+  std::vector<T> out;
+  out.reserve(in.size());
+  for (const std::int32_t v : in) {
+    out.push_back(static_cast<T>(v));
+  }
+  return out;
+}
+
+class Importer {
+ public:
+  explicit Importer(int poc) : poc_(poc) {}
+
+  void line(std::string_view text, std::uint64_t number) {
+    if (!text.empty() && text.back() == '\r') {
+      text.remove_suffix(1);
+    }
+    if (text.empty()) {
+      return;
+    }
+    const auto fields = split(text);
+    if (text.front() == '%') {
+      header(fields, number);
+    } else {
+      row(fields, number);
+    }
+  }
+
+  // Every declared type with a grid field gets its vector, even when no row of this POC covers it.
+  void declare_vectors() {
+    for (const auto& entry : types_) {
+      const std::string& name = entry.second;
+      const auto target = grid_target(name);
+      if (!target) {
+        continue;
+      }
+      const bool is_vector = name == "OVT_MV0" || name == "OVT_MV1";
+      for (const std::string& key : {name, name + ".y"}) {
+        auto& values = grids_[key];
+        if (values.empty()) {
+          values.assign(std::size_t{cells_w_} * cells_h_, static_cast<std::int32_t>(target->fill));
+        }
+        if (!is_vector) {
+          break;
+        }
+      }
+    }
+  }
+
+  std::vector<std::uint8_t> finish() {
+    fb::FrameAnalysisT fa;
+    fa.schema_version = 1;
+    fa.plugin_id = "yuview-csv-import";
+    fa.plugin_version = "1";
+    if (cells_w_ == 0) {
+      diagnostic(fb::Severity::Error, "MDL-CSV-0004",
+                 "no usable seq-specs line (missing, malformed or larger than the importer accepts); no grid");
+    } else {
+      auto grid = std::make_unique<fb::CellGridT>();
+      grid->cells_w = cells_w_;
+      grid->cells_h = cells_h_;
+      declare_vectors();
+      for (auto& [name, values] : grids_) {
+        assign(*grid, name, values);
+      }
+      fa.grid = std::move(grid);
+    }
+    if (malformed_ != 0) {
+      std::string msg = std::to_string(malformed_) + " malformed, out-of-range or undeclared line(s) skipped";
+      msg += " (first at line " + std::to_string(first_malformed_) + ")";
+      diagnostic(fb::Severity::Warning, "MDL-CSV-0001", msg);
+    }
+    for (auto& d : diagnostics_) {
+      fa.diagnostics.push_back(std::move(d));
+    }
+    flatbuffers::FlatBufferBuilder builder;
+    fb::FinishFrameAnalysisBuffer(builder, fb::FrameAnalysis::Pack(builder, &fa));
+    const std::span<const std::uint8_t> bytes(builder.GetBufferPointer(), builder.GetSize());
+    return {bytes.begin(), bytes.end()};
+  }
+
+ private:
+  void header(const std::vector<std::string_view>& f, std::uint64_t number) {
+    if (f.size() < 2 || f[0] != "%") {
+      return;  // comment or unknown header form: ignored
+    }
+    if (f[1] == "seq-specs") {
+      if (seq_seen_) {
+        return;
+      }
+      seq_seen_ = true;
+      const auto w = f.size() > 4 ? parse_int(f[4]) : std::nullopt;
+      const auto h = f.size() > 5 ? parse_int(f[5]) : std::nullopt;
+      if (!w || !h || *w <= 0 || *h <= 0 || *w > kMaxSide || *h > kMaxSide || *w * *h > kMaxArea) {
+        bad(number);
+        return;
+      }
+      cells_w_ = static_cast<std::uint32_t>((*w + 3) / 4);
+      cells_h_ = static_cast<std::uint32_t>((*h + 3) / 4);
+      budget_ = std::uint64_t{cells_w_} * cells_h_ * 32;
+    } else if (f[1] == "type") {
+      const auto id = f.size() > 3 ? parse_int(f[2]) : std::nullopt;
+      if (!id || *id < 0 || *id > 65535 || f[3].empty()) {
+        bad(number);
+        return;
+      }
+      types_[*id] = std::string(f[3]);
+    }
+  }
+
+  void row(const std::vector<std::string_view>& f, std::uint64_t number) {
+    if (f.size() < 7 || f.size() > 8) {
+      bad(number);
+      return;
+    }
+    std::array<std::int64_t, 8> v{};
+    for (std::size_t i = 0; i < f.size(); ++i) {
+      const auto parsed = parse_int(f[i]);
+      if (!parsed) {
+        bad(number);
+        return;
+      }
+      v[i] = *parsed;
+    }
+    const auto type = types_.find(v[5]);
+    if (type == types_.end() || cells_w_ == 0) {
+      bad(number);
+      return;
+    }
+    if (v[0] != poc_) {
+      return;
+    }
+    const std::string& name = type->second;
+    const auto target = grid_target(name);
+    if (!target) {
+      note_name(name);
+      return;
+    }
+    const bool is_vector = name == "OVT_MV0" || name == "OVT_MV1";
+    constexpr std::int64_t kMaxCoord = std::int64_t{1} << 31;
+    if (v[3] <= 0 || v[4] <= 0 || v[3] > kMaxCoord || v[4] > kMaxCoord || v[1] < -kMaxCoord || v[1] > kMaxCoord ||
+        v[2] < -kMaxCoord || v[2] > kMaxCoord || v[6] < target->min || v[6] > target->max ||
+        (is_vector != (f.size() == 8)) || (is_vector && (v[7] < target->min || v[7] > target->max))) {
+      bad(number);
+      return;
+    }
+    paint(name, *target, v[1], v[2], v[3], v[4], v[6]);
+    if (is_vector) {
+      paint(name + ".y", *target, v[1], v[2], v[3], v[4], v[7]);
+    }
+  }
+
+  void paint(const std::string& key, const GridTarget& target, std::int64_t x, std::int64_t y, std::int64_t w,
+             std::int64_t h, std::int64_t value) {
+    // row() bounds x, y, w, h to ±2^31, so none of this overflows.
+    const std::int64_t width = std::int64_t{cells_w_} * 4;
+    const std::int64_t height = std::int64_t{cells_h_} * 4;
+    const std::int64_t x0 = std::clamp<std::int64_t>(x, 0, width);
+    const std::int64_t y0 = std::clamp<std::int64_t>(y, 0, height);
+    const std::int64_t x1 = std::clamp<std::int64_t>(x + w, 0, width);
+    const std::int64_t y1 = std::clamp<std::int64_t>(y + h, 0, height);
+    auto& values = grids_[key];
+    if (values.empty()) {
+      values.assign(std::size_t{cells_w_} * cells_h_, static_cast<std::int32_t>(target.fill));
+    }
+    for (std::int64_t cy = y0 / 4; cy < (y1 + 3) / 4; ++cy) {
+      for (std::int64_t cx = x0 / 4; cx < (x1 + 3) / 4; ++cx) {
+        if (budget_ == 0) {
+          return;  // pathological input: stop painting, the grid stays partial
+        }
+        --budget_;
+        values[(static_cast<std::size_t>(cy) * cells_w_) + static_cast<std::size_t>(cx)] =
+            static_cast<std::int32_t>(value);
+      }
+    }
+  }
+
+  static void assign(fb::CellGridT& grid, const std::string& name, const std::vector<std::int32_t>& v) {
+    if (name == "OVT_PredMode") {
+      grid.pred = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_QP") {
+      grid.qp = narrow<std::int16_t>(v);
+    } else if (name == "OVT_IntraModeY") {
+      grid.intra_mode_y = narrow<std::int16_t>(v);
+    } else if (name == "OVT_IntraModeC") {
+      grid.intra_mode_c = narrow<std::int16_t>(v);
+    } else if (name == "OVT_MV0") {
+      grid.mv0_x = narrow<std::int16_t>(v);
+    } else if (name == "OVT_MV0.y") {
+      grid.mv0_y = narrow<std::int16_t>(v);
+    } else if (name == "OVT_MV1") {
+      grid.mv1_x = narrow<std::int16_t>(v);
+    } else if (name == "OVT_MV1.y") {
+      grid.mv1_y = narrow<std::int16_t>(v);
+    } else if (name == "OVT_Ref0") {
+      grid.ref0 = narrow<std::int8_t>(v);
+    } else if (name == "OVT_Ref1") {
+      grid.ref1 = narrow<std::int8_t>(v);
+    } else if (name == "OVT_TxLog2W") {
+      grid.tx_log2_w = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_TxLog2H") {
+      grid.tx_log2_h = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_TxType") {
+      grid.tx_type = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_Cbf") {
+      grid.cbf = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_PartitionId") {
+      grid.partition_id = narrow<std::uint16_t>(v);
+    } else if (name == "OVT_DeblockBsV") {
+      grid.deblock_bs_v = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_DeblockBsH") {
+      grid.deblock_bs_h = narrow<std::uint8_t>(v);
+    } else if (name == "OVT_FilterIdx") {
+      grid.filter_idx = narrow<std::uint8_t>(v);
+    }
+  }
+
+  void note_name(const std::string& name) {
+    if (noted_.size() >= kMaxNameDiagnostics || !noted_.insert(name).second) {
+      return;
+    }
+    if (is_ovt_name(name)) {
+      diagnostic(fb::Severity::Info, "MDL-CSV-0003", "OVT type '" + name + "' has no CellGrid field; not imported");
+    } else {
+      diagnostic(fb::Severity::Info, "MDL-CSV-0002", "type '" + name + "' is not an OVT type; not imported");
+    }
+  }
+
+  void diagnostic(fb::Severity severity, std::string code, std::string message) {
+    auto d = std::make_unique<fb::DiagnosticT>();
+    d->severity = severity;
+    d->code = std::move(code);
+    d->message = std::move(message);
+    d->spec_ref = "06 §6.8.2";
+    diagnostics_.push_back(std::move(d));
+  }
+
+  void bad(std::uint64_t number) {
+    if (malformed_++ == 0) {
+      first_malformed_ = number;
+    }
+  }
+
+  int poc_;
+  bool seq_seen_ = false;
+  std::uint32_t cells_w_ = 0;
+  std::uint32_t cells_h_ = 0;
+  std::uint64_t budget_ = 0;
+  std::map<std::int64_t, std::string> types_;
+  std::map<std::string, std::vector<std::int32_t>> grids_;
+  std::set<std::string> noted_;
+  std::vector<std::unique_ptr<fb::DiagnosticT>> diagnostics_;
+  std::uint64_t malformed_ = 0;
+  std::uint64_t first_malformed_ = 0;
+};
+
+}  // namespace
+
+std::vector<std::uint8_t> read_yuview_csv(std::istream& in, int poc) {
+  Importer importer(poc);
+  std::string text;
+  std::uint64_t number = 0;
+  while (std::getline(in, text)) {
+    importer.line(text, ++number);
+  }
+  return importer.finish();
 }
 
 }  // namespace ovt::model

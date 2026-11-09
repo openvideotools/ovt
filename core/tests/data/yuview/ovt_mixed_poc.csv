@@ -1,0 +1,16 @@
+%;syntax-version;v1.2
+%;seq-specs;mixed;0;16;8;25
+%;type;4;OVT_MV0;vector
+%;vectorColor;0;255;0;255
+%;scaleFactor;16
+%;type;6;OVT_Ref0;map
+%;mapColor;-1;0;0;0
+%;type;15;OVT_PartitionId;range
+%;defaultRange;0;1;lines
+2;8;0;8;8;4;-16;4
+1;0;0;8;8;4;32;0
+2;0;0;8;8;6;0
+2;8;0;8;8;6;1
+2;0;0;8;8;15;0
+2;8;0;8;8;15;1
+2;0;0;8;8;4;0;-8

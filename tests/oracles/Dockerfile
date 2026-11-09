@@ -94,6 +94,15 @@ RUN bash -c 'source /src/gst/lib.sh \
  && cmake --build /tmp/gst-build && cmake --install /tmp/gst-build \
  && ovt_stamp gst_parse_oracle "gst_parse_oracle (OVT tests/oracles) on gstreamer-codecparsers $(pkg-config --modversion gstreamer-codecparsers-1.0)"'
 
+# The vendored x264 SSIM kernel (WI-0.565, chapter 14 §14.4.12): tests/oracles/x264_ssim, GPL-2.0-or-later, oracle-only.
+FROM toolchain AS x264_ssim
+COPY lib.sh /src/lib.sh
+COPY x264_ssim/ /src/x264_ssim/
+RUN bash -c 'source /src/lib.sh \
+ && cmake -S /src/x264_ssim -B /tmp/x264_ssim-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${OVT_ORACLES_PREFIX}" \
+ && cmake --build /tmp/x264_ssim-build && cmake --install /tmp/x264_ssim-build \
+ && ovt_stamp x264_ssim "x264_ssim (OVT tests/oracles) on x264 r3191"'
+
 FROM toolchain AS oracles
 COPY --from=mpv /opt/ovt-oracles/ /opt/ovt-oracles/
 COPY --from=gpac /opt/ovt-oracles/ /opt/ovt-oracles/
@@ -103,6 +112,7 @@ COPY --from=jm /opt/ovt-oracles/ /opt/ovt-oracles/
 COPY --from=hm /opt/ovt-oracles/ /opt/ovt-oracles/
 COPY --from=mp4ff /opt/ovt-oracles/ /opt/ovt-oracles/
 COPY --from=gst_oracle /opt/ovt-oracles/ /opt/ovt-oracles/
+COPY --from=x264_ssim /opt/ovt-oracles/ /opt/ovt-oracles/
 RUN ldconfig
 
 COPY lib.sh install_tsduck.sh /src/

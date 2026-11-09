@@ -40,6 +40,7 @@ function(ovt_add_fuzz_target name source)
   endif()
 endfunction()
 
+ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
@@ -50,5 +51,6 @@ ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
 ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
+ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
