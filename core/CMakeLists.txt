@@ -101,10 +101,19 @@ unset(_ovt_zstd_targets)
 ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
 ovt_find_package(hwy SPDX "Apache-2.0" TARGETS hwy::hwy)
 ovt_find_package(xxHash SPDX "BSD-2-Clause" TARGETS xxHash::xxhash PKG_CONFIG libxxhash)
+# XML reader of the DASH MPD parser (WI-4.208, chapter 8 §8.10). The vcpkg triplets build it as a PIC static
+# library; a distribution's static libpugixml.a is usually not PIC, so a system build links the shared one.
+if(OVT_USE_VCPKG)
+  set(_ovt_pugixml_targets pugixml::static pugixml::pugixml)
+else()
+  set(_ovt_pugixml_targets pugixml::shared pugixml::pugixml pugixml::static)
+endif()
+ovt_find_package(pugixml SPDX "MIT" TARGETS ${_ovt_pugixml_targets})
+unset(_ovt_pugixml_targets)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
 foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET} ${hwy_TARGET}
-             ${xxHash_TARGET})
+             ${xxHash_TARGET} ${pugixml_TARGET})
   target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
 endforeach()
 unset(_dep)

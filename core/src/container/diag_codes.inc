@@ -46,3 +46,22 @@ X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
 X(CNT_OBU_0004, "CNT-OBU-0004", Error,
   "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
   "AV1 §4.10.5, §5.3.2")
+
+// WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
+// proposed rows.
+X(CNT_DASH_0001, "CNT-DASH-0001", Info,
+  "dynamic MPD (`type=\"dynamic\"`) snapshotted: expanded as written, live edge not tracked", "23009-1 §5.3.1.2")
+X(CNT_DASH_0002, "CNT-DASH-0002", Info, "`xlink:href` on `element` ignored (remote elements are not resolved)",
+  "23009-1 §5.5")
+X(CNT_DASH_0003, "CNT-DASH-0003", Info,
+  "SegmentBase `indexRange` not resolved (no sidx available): the representation is one segment", "23009-1 §5.3.9.2")
+X(CNT_DASH_0004, "CNT-DASH-0004", Warning,
+  "open-ended or oversized segment sequence cannot be fully expanded (`reason`)", "23009-1 §5.3.9.6")
+X(CNT_DASH_0005, "CNT-DASH-0005", Warning,
+  "invalid template identifier or format tag in `template`; the string is used as written", "23009-1 §5.3.9.4.4")
+X(CNT_DASH_0006, "CNT-DASH-0006", Warning, "Representation or SegmentTemplate has no usable segment information",
+  "23009-1 §5.3.9")
+X(CNT_DASH_0007, "CNT-DASH-0007", Warning, "invalid attribute value `v` ignored", "23009-1 §5.3")
+X(CNT_DASH_0008, "CNT-DASH-0008", Warning, "SegmentList `SegmentURL` count differs from its SegmentTimeline",
+  "23009-1 §5.3.9.3")
+X(CNT_DASH_0009, "CNT-DASH-0009", Fatal, "not a well-formed MPD (XML error or no `MPD` root element)", "23009-1 §5.3.1")

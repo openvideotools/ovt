@@ -24,7 +24,7 @@ function(ovt_add_fuzz_target name source)
   set(corpus_dir "${CMAKE_CURRENT_SOURCE_DIR}/corpus/${name}")
 
   add_executable(ovt_fuzz_${name}_regress "${source}" test_fuzz_regressions.cpp)
-  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ovt::flags)
+  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ${pugixml_TARGET} ovt::flags)
   target_include_directories(ovt_fuzz_${name}_regress PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   ovt_set_license(ovt_fuzz_${name}_regress "LGPL-2.1-or-later")
   add_test(NAME fuzz_${name}_regress COMMAND ovt_fuzz_${name}_regress "${regress_dir}" "${corpus_dir}")
@@ -32,8 +32,8 @@ function(ovt_add_fuzz_target name source)
 
   if(OVT_ENABLE_FUZZ AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_executable(ovt_fuzz_${name} "${source}")
-    target_link_libraries(ovt_fuzz_${name} PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ovt::flags
-                                                   ${OVT_FUZZ_ENGINE})
+    target_link_libraries(ovt_fuzz_${name} PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ${pugixml_TARGET}
+                                                   ovt::flags ${OVT_FUZZ_ENGINE})
     target_include_directories(ovt_fuzz_${name} PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
     set_target_properties(ovt_fuzz_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/fuzz")
     ovt_set_license(ovt_fuzz_${name} "LGPL-2.1-or-later")
@@ -44,6 +44,7 @@ ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
+ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
