@@ -208,8 +208,9 @@ def extract(path: Path, track: int, selection: str | None, out_dir: Path) -> dic
     moov = next((b for b in top if b.type == b"moov"), None)
     if moov is None:
         raise InputError("no moov")
-    trak = next((t for t in boxes(data, moov.payload, moov.end) if t.type == b"trak" and track_id(data, t) == track),
-                None)
+    trak = next(
+        (t for t in boxes(data, moov.payload, moov.end) if t.type == b"trak" and track_id(data, t) == track), None
+    )
     if trak is None:
         raise InputError(f"no trak with track_ID {track}")
     stbl = None
@@ -233,8 +234,13 @@ def extract(path: Path, track: int, selection: str | None, out_dir: Path) -> dic
         if length_size:
             record["nal_count"] = count_nals(sample, length_size)
         records.append(record)
-    summary = {"file": path.name, "track": track, "sample_entry": entry, "nal_length_size": length_size,
-               "samples": records}
+    summary = {
+        "file": path.name,
+        "track": track,
+        "sample_entry": entry,
+        "nal_length_size": length_size,
+        "samples": records,
+    }
     (out_dir / "samples.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     return summary
 
@@ -259,8 +265,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("file", nargs="?", type=Path)
     parser.add_argument("--corpus-id")
-    parser.add_argument("--corpora-dir", type=Path, default=Path("build/corpora"),
-                        help="corpus cache used when $OVT_CORPORA_DIR is unset (default build/corpora)")
+    parser.add_argument(
+        "--corpora-dir",
+        type=Path,
+        default=Path("build/corpora"),
+        help="corpus cache used when $OVT_CORPORA_DIR is unset (default build/corpora)",
+    )
     parser.add_argument("--track", type=int, required=True)
     parser.add_argument("--samples")
     parser.add_argument("-o", "--output", type=Path, required=True)

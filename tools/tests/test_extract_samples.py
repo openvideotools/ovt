@@ -37,8 +37,10 @@ def build_mp4(samples: list[bytes], length_size: int = 4, chunks: list[int] | No
     ftyp = box(b"ftyp", b"isom" + struct.pack(">I", 512) + b"isomavc1")
     stsd = full(b"stsd", struct.pack(">I", 1) + avc1_entry(length_size))
     stsz = full(b"stsz", struct.pack(">II", 0, len(samples)) + b"".join(struct.pack(">I", len(s)) for s in samples))
-    stsc = full(b"stsc", struct.pack(">I", len(chunks)) +
-                b"".join(struct.pack(">III", i + 1, n, 1) for i, n in enumerate(chunks)))
+    stsc = full(
+        b"stsc",
+        struct.pack(">I", len(chunks)) + b"".join(struct.pack(">III", i + 1, n, 1) for i, n in enumerate(chunks)),
+    )
 
     def moov_with(offsets: list[int]) -> bytes:
         stco = full(b"stco", struct.pack(">I", len(offsets)) + b"".join(struct.pack(">I", o) for o in offsets))
