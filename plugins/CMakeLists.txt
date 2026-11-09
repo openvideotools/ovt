@@ -14,3 +14,10 @@ endif()
 if(OVT_BUILD_PLUGIN_DE265 AND OVT_BUILD_TESTS AND TARGET tp::de265)
   add_subdirectory(ovt-plugin-de265/tests)
 endif()
+
+# ---- HM oracle (WI-4.104) -------------------------------------------------------------------------------------------
+# WI-4.104 builds HM's decoder libraries (tp::hm) and their smoke test; the plugin itself (WI-4.105) adds
+# ovt-plugin-hm/ here and moves the test under it.
+if(OVT_BUILD_PLUGIN_HM AND OVT_BUILD_TESTS AND TARGET tp::hm)
+  add_subdirectory(ovt-plugin-hm/tests)
+endif()
