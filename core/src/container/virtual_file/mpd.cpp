@@ -112,6 +112,33 @@ bool from_chars_exact(std::string_view s, T& value) {
          !s.empty();  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
 
+// Unsigned decimal "123" or "12.345" without std::from_chars(double), which Apple's libc++ marks unavailable
+// before macOS 26 (and which would be locale-proof anyway). Digits past the 9th fractional one are dropped.
+std::optional<long double> parse_decimal(std::string_view s) {
+  const size_t dot = s.find('.');
+  const std::string_view whole = s.substr(0, dot);
+  const std::string_view frac = dot == std::string_view::npos ? std::string_view() : s.substr(dot + 1);
+  uint64_t integer = 0;
+  if (!whole.empty() && !from_chars_exact(whole, integer)) {
+    return std::nullopt;
+  }
+  if (whole.empty() && frac.empty()) {
+    return std::nullopt;
+  }
+  auto value = static_cast<long double>(integer);
+  long double place = 0.1L;
+  for (size_t i = 0; i < frac.size(); ++i) {
+    if (frac[i] < '0' || frac[i] > '9') {
+      return std::nullopt;
+    }
+    if (i < 9) {
+      value += static_cast<long double>(frac[i] - '0') * place;
+      place /= 10.0L;
+    }
+  }
+  return value;
+}
+
 std::optional<uint64_t> parse_uint(std::string_view s) {
   const std::string t = trim(s);
   uint64_t v = 0;
@@ -159,12 +186,12 @@ std::optional<int64_t> parse_duration_ms(std::string_view text) {
     if (digits == 0 || digits == std::string_view::npos) {
       return std::nullopt;
     }
-    double value = 0.0;
     const double scale = duration_unit_seconds(in_time, s[digits]);
-    if (scale == 0.0 || !from_chars_exact(s.substr(0, digits), value)) {
+    const auto value = parse_decimal(s.substr(0, digits));
+    if (scale == 0.0 || !value) {
       return std::nullopt;
     }
-    total_s += value * scale;
+    total_s += static_cast<double>(*value) * scale;
     any = true;
     s.remove_prefix(digits + 1);
   }
