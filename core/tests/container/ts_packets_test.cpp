@@ -29,6 +29,14 @@
 namespace {
 
 using Bytes = std::vector<uint8_t>;
+constexpr size_t kP188 = 188;
+constexpr size_t kP192 = 192;
+constexpr size_t kP204 = 204;
+
+Bytes::iterator at_offset(Bytes& b, size_t off) {
+  return b.begin() + static_cast<std::ptrdiff_t>(off);
+}
+
 namespace ts = ovt::container::mpegts;
 using ovt::container::DiagCode;
 
@@ -240,7 +248,7 @@ TEST_CASE("parse: clean 188-byte stream", "[container][mpegts][fast]") {
     CHECK(s.continuity_errors == 0);
   }
   CHECK(f->pids[1].first_packet == 1);
-  CHECK(f->packet_offset(7) == 7 * 188);
+  CHECK(f->packet_offset(7) == 7 * kP188);
 }
 
 TEST_CASE("parse: not a transport stream", "[container][mpegts][fast]") {
@@ -253,7 +261,7 @@ TEST_CASE("parse: not a transport stream", "[container][mpegts][fast]") {
 
 TEST_CASE("parse: a 1-byte cut resyncs and reports CNT-TS-1001 once", "[container][mpegts][fast]") {
   Bytes data = concat(clean_packets(100));
-  data.erase(data.begin() + 50 * 188 + 80);  // one byte inside packet 50
+  data.erase(at_offset(data, 50 * kP188 + 80));  // one byte inside packet 50
   const auto f = parse_bytes(data);
   REQUIRE(f);
   CHECK(f->sync_loss_events == 1);
@@ -261,16 +269,16 @@ TEST_CASE("parse: a 1-byte cut resyncs and reports CNT-TS-1001 once", "[containe
   CHECK(count_code(*f, DiagCode::CNT_TS_1002) == 0);
   CHECK(f->packet_count == 100);  // packet 50 (damaged) and every packet after the resync are still walked
   CHECK(f->runs.size() == 2);
-  CHECK(f->runs[1].sync_offset == 50 * 188 + 187);
+  CHECK(f->runs[1].sync_offset == 50 * kP188 + 187);
   const auto& d = f->diagnostics.front();
   CHECK(d.message.find("TS_sync_loss") == 0);
   CHECK(d.message.find("`1` consecutive packets") != std::string::npos);
-  CHECK(d.offset == 51 * 188);
+  CHECK(d.offset == 51 * kP188);
 }
 
 TEST_CASE("parse: an isolated bad sync byte is CNT-TS-1002, not a sync loss", "[container][mpegts][fast]") {
   Bytes data = concat(clean_packets(60));
-  data[20 * 188] = 0x00;
+  data[20 * kP188] = 0x00;
   const auto f = parse_bytes(data);
   REQUIRE(f);
   CHECK(f->sync_byte_errors == 1);
@@ -279,18 +287,18 @@ TEST_CASE("parse: an isolated bad sync byte is CNT-TS-1002, not a sync loss", "[
   CHECK(count_code(*f, DiagCode::CNT_TS_1001) == 0);
   CHECK(f->packet_count == 59);
   CHECK(f->diagnostics.front().message == "Sync_byte_error at packet `20`");
-  CHECK(f->packet_offset(20) == 21 * 188);  // the bad slot is skipped, the index list stays contiguous
+  CHECK(f->packet_offset(20) == 21 * kP188);  // the bad slot is skipped, the index list stays contiguous
 }
 
 TEST_CASE("parse: garbage in the middle and at the start", "[container][mpegts][fast]") {
   Bytes data = concat(clean_packets(40));
-  data.insert(data.begin() + 10 * 188, 500, 0x00);  // 500 junk bytes between packets 9 and 10
+  data.insert(at_offset(data, 10 * kP188), 500, 0x00);  // 500 junk bytes between packets 9 and 10
   const auto f = parse_bytes(data);
   REQUIRE(f);
   CHECK(f->sync_loss_events == 1);
   CHECK(f->packet_count == 40);
   CHECK(f->runs.size() == 2);
-  CHECK(f->runs[1].sync_offset == 10 * 188 + 500);
+  CHECK(f->runs[1].sync_offset == 10 * kP188 + 500);
 
   Bytes lead(7, 0x00);
   const Bytes body = concat(clean_packets(10));
@@ -321,6 +329,7 @@ TEST_CASE("parse: garbage in the middle and at the start", "[container][mpegts][
 TEST_CASE("parse: continuity counter rules", "[container][mpegts][fast]") {
   const auto run = [](const std::vector<Pkt>& pkts) {
     std::vector<Bytes> v;
+    v.reserve(pkts.size());
     uint32_t seed = 0;
     for (const Pkt& p : pkts) {
       v.push_back(make_packet(p, seed++));
@@ -350,6 +359,7 @@ TEST_CASE("parse: continuity counter rules", "[container][mpegts][fast]") {
   }
   SECTION("wraparound 15 to 0 is fine") {
     std::vector<Pkt> v;
+    v.reserve(40);
     for (unsigned i = 0; i < 40; ++i) {
       v.push_back(mk(static_cast<uint8_t>(i & 15U)));
     }
@@ -437,8 +447,8 @@ TEST_CASE("parse: 192-byte M2TS, 192-byte trailer and 204-byte packets", "[conta
     CHECK(f->geometry.first_sync == 4);
     CHECK(f->packet_count == 20);
     CHECK(f->diagnostics.empty());
-    CHECK(f->packet_offset(3) == 3 * 192);
-    CHECK(f->sync_offset(3) == 3 * 192 + 4);
+    CHECK(f->packet_offset(3) == 3 * kP192);
+    CHECK(f->sync_offset(3) == 3 * kP192 + 4);
   }
   SECTION("192 bytes with the 4 extra bytes behind the packet") {
     const auto f = parse_bytes(concat(pk, 4, 0));
@@ -454,7 +464,7 @@ TEST_CASE("parse: 192-byte M2TS, 192-byte trailer and 204-byte packets", "[conta
     CHECK(f->geometry.stride == 204);
     CHECK(f->packet_count == 20);
     CHECK(f->diagnostics.empty());
-    CHECK(f->packet_offset(5) == 5 * 204);
+    CHECK(f->packet_offset(5) == 5 * kP204);
   }
 }
 
@@ -469,8 +479,8 @@ TEST_CASE("detect_geometry: needs at least two packets", "[container][mpegts][fa
 
 TEST_CASE("parse: determinism", "[container][mpegts][fast]") {
   Bytes data = concat(clean_packets(80));
-  data.erase(data.begin() + 30 * 188 + 3);
-  data[60 * 188] = 0;
+  data.erase(at_offset(data, 30 * kP188 + 3));
+  data[60 * kP188] = 0;
   const auto a = parse_bytes(data);
   const auto b = parse_bytes(data);
   REQUIRE(a);
@@ -506,7 +516,7 @@ TEST_CASE("reader: packet tree, fields and spans", "[container][mpegts][fast]") 
   REQUIRE(root->children()->size() == 5);
   const auto* pk = root->children()->Get(2);
   CHECK(std::string(pk->fourcc()->c_str()) == "TSPK");
-  CHECK(pk->file_span()->offset() == 2 * 188);
+  CHECK(pk->file_span()->offset() == 2 * kP188);
   CHECK(pk->file_span()->length() == 188);
   CHECK(pk->header_length() == 4);
   const auto field = [](const ovt::fb::BoxNode* n, const char* name) -> const ovt::fb::Field* {
@@ -526,7 +536,7 @@ TEST_CASE("reader: packet tree, fields and spans", "[container][mpegts][fast]") 
   REQUIRE(pk->children()->size() == 1);
   const auto* adpt = pk->children()->Get(0);
   CHECK(std::string(adpt->fourcc()->c_str()) == "ADPT");
-  CHECK(adpt->file_span()->offset() == 2 * 188 + 4);
+  CHECK(adpt->file_span()->offset() == 2 * kP188 + 4);
   CHECK(adpt->file_span()->length() == 8);
   CHECK(field(adpt, "program_clock_reference_base")->uvalue() == 1000);
   CHECK(field(adpt, "program_clock_reference_base")->span()->bit_offset() == 16);
@@ -535,7 +545,7 @@ TEST_CASE("reader: packet tree, fields and spans", "[container][mpegts][fast]") 
   CHECK(field(adpt, "program_clock_reference_extension")->span()->bit_offset() == 55);
   CHECK(field(adpt, "PCR_27MHz")->uvalue() == 1000 * 300 + 5);
   REQUIRE(pk->payload_span() != nullptr);
-  CHECK(pk->payload_span()->offset() == 2 * 188 + 12);
+  CHECK(pk->payload_span()->offset() == 2 * kP188 + 12);
   CHECK(pk->payload_span()->length() == 176);
 
   // The root carries the derived statistics.
@@ -590,19 +600,19 @@ TEST_CASE("reader: children are materialised in windows of 65536 packets", "[con
   auto reader = ts::make_reader(file);
   REQUIRE(reader != nullptr);
   auto buf = reader->tree();
-  auto* tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
+  const auto* tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
   CHECK(tree->root()->Get(0)->children()->size() == ts::kChildWindow);
   REQUIRE(tree->root()->Get(0)->diagnostics()->size() == 1);
   CHECK(std::string(tree->root()->Get(0)->diagnostics()->Get(0)->code()->c_str()) == "CNT-0007");
 
   CHECK(reader->expand(1) == OVT_E_INVALID_ARG);  // not a packet start
-  CHECK(reader->expand(5 * 188) == OVT_OK);       // a packet start: nothing lazy below it
+  CHECK(reader->expand(5 * kP188) == OVT_OK);     // a packet start: nothing lazy below it
   CHECK(reader->expand(n * 188) == OVT_E_INVALID_ARG);
   REQUIRE(reader->expand(0) == OVT_OK);
   buf = reader->tree();
   tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
   CHECK(tree->root()->Get(0)->children()->size() == n);
-  CHECK(tree->root()->Get(0)->diagnostics()->size() == 0);
+  CHECK(tree->root()->Get(0)->diagnostics()->size() < 1U);
   CHECK(tree->diagnostics()->size() == ts::kMaxDiagnostics);
 }
 
