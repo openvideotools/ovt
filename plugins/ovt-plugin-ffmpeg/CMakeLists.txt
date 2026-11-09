@@ -5,7 +5,7 @@
 # the playback decoders. It links no part of libovt-core (chapter 0 §0.6.2), only the static FFmpeg plugin flavour
 # (tp::ffmpeg_plugin; the system FFmpeg with OVT_SYSTEM_FFMPEG=ON), whose symbols stay inside (§13.3.3).
 
-add_library(ovt_plugin_ffmpeg MODULE src/plugin.cpp src/h264_analysis.cpp)
+add_library(ovt_plugin_ffmpeg MODULE src/plugin.cpp src/h264_analysis.cpp src/map_h264_sidedata.cpp)
 target_include_directories(ovt_plugin_ffmpeg PRIVATE "${PROJECT_SOURCE_DIR}/core/include")
 target_link_libraries(ovt_plugin_ffmpeg PRIVATE tp::ffmpeg_plugin ovt_schemas ovt::flags)
 set_target_properties(

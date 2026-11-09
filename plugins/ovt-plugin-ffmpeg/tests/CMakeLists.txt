@@ -11,15 +11,29 @@ add_executable(ovt_plugin_ffmpeg_framemd5 ffmpeg_framemd5.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_framemd5 PRIVATE tp::ffmpeg_plugin ovt::flags)
 ovt_set_license(ovt_plugin_ffmpeg_framemd5 "LGPL-2.1-or-later")
 
-add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp)
+add_executable(ovt_plugin_ffmpeg_sidedata ffmpeg_sidedata_csv.cpp)
+target_link_libraries(ovt_plugin_ffmpeg_sidedata PRIVATE tp::ffmpeg_plugin ovt::flags)
+ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
+
+# The side-data mapping (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
+add_executable(ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp ../src/map_h264_sidedata.cpp)
+target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
+target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_ffmpeg_internal_tests)
+
+add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp test_ffmpeg_map_sidedata.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
                                                             ovt_test_support ovt::flags ${Catch2_TARGET})
 target_compile_definitions(ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_SYSTEM=$<BOOL:${OVT_SYSTEM_FFMPEG}>"
                                                                  "OVT_FFMPEG_HW_DECODE=$<BOOL:${OVT_ENABLE_HW_DECODE}>")
 target_compile_definitions(
-  ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
-                                        "OVT_FFMPEG_FRAMEMD5=\"$<TARGET_FILE:ovt_plugin_ffmpeg_framemd5>\"")
-add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmpeg_framemd5)
+  ovt_plugin_ffmpeg_smoke_tests
+  PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
+          "OVT_FFMPEG_FRAMEMD5=\"$<TARGET_FILE:ovt_plugin_ffmpeg_framemd5>\""
+          "OVT_FFMPEG_SIDEDATA=\"$<TARGET_FILE:ovt_plugin_ffmpeg_sidedata>\""
+          "OVT_JM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h264\"")
+add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmpeg_framemd5 ovt_plugin_ffmpeg_sidedata)
 ovt_set_license(ovt_plugin_ffmpeg_smoke_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_smoke_tests)
 

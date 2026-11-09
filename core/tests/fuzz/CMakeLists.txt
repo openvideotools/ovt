@@ -40,6 +40,7 @@ function(ovt_add_fuzz_target name source)
   endif()
 endfunction()
 
+ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
@@ -52,3 +53,4 @@ ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
+ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer

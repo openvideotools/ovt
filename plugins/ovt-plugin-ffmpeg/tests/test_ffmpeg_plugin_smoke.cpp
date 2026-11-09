@@ -3,7 +3,7 @@
 //
 // Smoke and acceptance tests of ovt-plugin-ffmpeg (WI-2.169, chapter 07 §7.6.3), loaded through the host's
 // PluginRegistry (WI-2.150) and driven through its ABI only. Synthetic I_PCM streams have known samples, so planes,
-// decode_index and frame threading are checked without a corpus. AT1: the 10 `h264-analysis-smoke` JVT streams
+// decode_index and slice threading are checked without a corpus. AT1: the 10 `h264-analysis-smoke` JVT streams
 // against `ffmpeg -f framemd5` (the in-tree oracle). AT2: ovt_plugin_describe() carries avcodec_configuration().
 
 #include <catch2/catch_test_macros.hpp>
@@ -403,7 +403,8 @@ TEST_CASE("ffmpeg plugin: caps and ABI table", "[fast][third_party]") {
   CHECK((lic == "LGPL-2.1-or-later" || lic == "GPL-2.0-or-later" || lic == "LGPL-3.0-or-later" ||
          lic == "GPL-3.0-or-later"));
   CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == 0U);  // WI-2.170 announces the grid vectors it fills
+  CHECK(caps->grid_fields == (OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 |
+                              OVT_GRID_REF0 | OVT_GRID_REF1));  // WI-2.170, §7.6.3 caps row
   CHECK(caps->has_symbol_accounting == 0);
   CHECK(caps->bit_exact == 1);
   CHECK(caps->supports_threads == 1);
@@ -430,7 +431,7 @@ TEST_CASE("ffmpeg plugin: ovt_plugin_describe carries avcodec_configuration", "[
 }
 
 TEST_CASE("ffmpeg plugin: I_PCM pictures come out with their decode index and exact samples", "[fast][third_party]") {
-  const int threads = GENERATE(1, 4);  // 4: frame threading must keep frame->opaque (§7.6.3 pitfall)
+  const int threads = GENERATE(1, 4);  // 4: slice threads must keep the decode index (§7.6.3 pitfall)
   CAPTURE(threads);
   const ovt_AnalysisDecoderApi& api = plugin_api();
   Instance in(api, threads);
@@ -459,7 +460,7 @@ TEST_CASE("ffmpeg plugin: I_PCM pictures come out with their decode index and ex
     CHECK(f.pts == 5000 + (pic * 40));
     CHECK(f.type == ovt::fb::FrameType::I);
     CHECK(f.is_rap);
-    CHECK(f.diagnostics == 0);
+    CHECK(f.diagnostics == 1);  // ANA-H264-0002: intra inferred (the decoder reports no error)
     for (int c = 0; c < 3; ++c) {
       CHECK(f.planes[static_cast<size_t>(c)] == pcm_plane(pic, c));
     }
