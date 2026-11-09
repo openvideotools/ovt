@@ -113,6 +113,8 @@ case "$1" in
     printf '#!/bin/sh\\n' > "$prefix/bin/ovt"; printf '#!/bin/sh\\n' > "$prefix/bin/ovt-studio"
     chmod +x "$prefix/bin/ovt" "$prefix/bin/ovt-studio"
     : > "$prefix/lib/ovt/plugins/libovt_plugin_aom.so"
+    : > "$prefix/lib/ovt/plugins/libovt_plugin_ffmpeg.so"
+    : > "$prefix/lib/ovt/plugins/libovt_plugin_de265.so"
     exit 0 ;;
 esac
 exit 1
@@ -222,3 +224,30 @@ def test_script_requires_qt_root_dir(fake_tools) -> None:
     )
     assert r.returncode == 1
     assert "QT_ROOT_DIR" in r.stderr
+
+
+def test_script_keeps_patent_codec_plugins_out_of_the_image(fake_tools) -> None:
+    env, out, log, preset = fake_tools
+    r = subprocess.run(
+        [str(SCRIPT), preset, "--out", str(out), "--skip-notices-build"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r.returncode == 0, r.stderr
+    plugins = out / "AppDir/usr/lib/ovt/plugins"
+    assert sorted(p.name for p in plugins.iterdir()) == ["libovt_plugin_aom.so"]
+    assert (out / "codec-pack-plugins/libovt_plugin_ffmpeg.so").exists()
+    assert (out / "codec-pack-plugins/libovt_plugin_de265.so").exists()
+    args = log.read_text()
+    assert "ffmpeg" not in args and "de265" not in args
+
+
+def test_apprun_survives_a_hook_that_reads_an_unset_variable(appdir: Path) -> None:
+    # linuxdeploy-plugin-qt's platform-theme hook does `case "${XDG_CURRENT_DESKTOP}"` (unset in xvfb containers).
+    (appdir / "apprun-hooks").mkdir()
+    (appdir / "apprun-hooks" / "theme.sh").write_text('case "${XDG_CURRENT_DESKTOP}" in *GNOME*) X=1 ;; esac\n')
+    r = _run_apprun(appdir, "--self-test")
+    assert r.returncode == 0, r.stderr
+    assert "ovt-studio --self-test" in r.stdout

@@ -17,15 +17,24 @@
 #   OVT_APPIMAGE_UPDATE_INFO  override of the zsync update information (default as §13.6.2, per architecture)
 #   OVT_APPIMAGE_VERSION      override of the version in the file name (default: VERSION file)
 #
+# Using the result: the AppImage starts the GUI; `<AppImage> --ovt-cli <args>` (or a symlink named `ovt`) runs the CLI
+# in the same environment, e.g. `<AppImage> --ovt-cli plugins`. The codec plugins are not in it (codec pack only).
+#
 # Steps: (1) cmake --install into AppDir/usr; (2) notices, licences and PATENTS beside the binaries; (3) desktop
 # file, icon and the custom AppRun; (4) linuxdeploy with the Qt plugin (libvulkan.so.1 stays excluded: the host
 # ICDs must load); (5) check that the plugin directory and the AppRun made it into the image. The AppImage is
 # not signed and nothing is uploaded: release signing and publishing belong to WI-0.036.
+#
+# The patent-codec plugins (ovt_plugin_ffmpeg, ovt_plugin_de265) never go into the AppImage: §13.6.2 ships them only
+# in the separate codec pack. They are moved to <out>/codec-pack-plugins/ and the script fails if any is left.
+#
+# Inside the image, the CLI is `OVT_Studio-<ver>-<arch>.AppImage --ovt-cli <args>` (or a symlink named `ovt` to it).
+# SPEC-ASSUMPTION(#374): §13.6.2 does not say how the CLI is reached.
 
 set -euo pipefail
 
 die() { echo "appimage.sh: $*" >&2; exit 1; }
-usage() { sed -n "5,12p" "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n "5,21p" "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 preset=""
 out=""
@@ -79,6 +88,15 @@ if [ -d "$appdir/usr/lib64" ]; then
   cp -a "$appdir/usr/lib64/." "$appdir/usr/lib/"
   rm -rf "${appdir:?}/usr/lib64"
 fi
+
+# ---- (1b) patent-codec plugins stay out (§13.6.2: separate codec pack) -------------------------------------------
+codec_plugins="libovt_plugin_ffmpeg.so libovt_plugin_de265.so"
+for name in $codec_plugins; do
+  if [ -e "$appdir/usr/lib/ovt/plugins/$name" ]; then
+    mkdir -p "$out/codec-pack-plugins"
+    mv "$appdir/usr/lib/ovt/plugins/$name" "$out/codec-pack-plugins/"
+  fi
+done
 
 # ---- (2) notices, licences, PATENTS --------------------------------------------------------------------------------
 doc="$appdir/usr/share/doc/ovt"
@@ -141,6 +159,9 @@ image="$out/OVT_Studio-$version-$arch.AppImage"
 [ -f "$image" ] || die "linuxdeploy did not produce $image"
 [ -x "$appdir/AppRun" ] || die "AppRun is missing or not executable in $appdir"
 cmp -s "$appdir/AppRun" "$repo/packaging/appimage/AppRun" || die "AppDir/AppRun is not packaging/appimage/AppRun"
+for name in $codec_plugins; do
+  [ ! -e "$appdir/usr/lib/ovt/plugins/$name" ] || die "$name is in the AppImage: it belongs to the codec pack only (§13.6.2)"
+done
 if [ -e "$appdir/usr/lib/libvulkan.so.1" ]; then
   die "libvulkan.so.1 was bundled: the host Vulkan loader must be used (§13.6.2)"
 fi

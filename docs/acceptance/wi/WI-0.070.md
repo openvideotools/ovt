@@ -6,7 +6,7 @@ Spec version: 1.0-rc17. Written 2026-11-09 in a Linux cloud container without Qt
 
 ## Automated part (run here)
 
-`tools/tests/test_linux_appimage.py`, 10 tests, run by `ctest --preset pr` through the `tools_pytest` registration.
+`tools/tests/test_linux_appimage.py`, 12 tests, run by `ctest --preset pr` through the `tools_pytest` registration.
 It tests `packaging/appimage/AppRun` for real (plugin path, hooks, CLI mode) and `tools/linux/appimage.sh` against a
 fake `cmake` and a fake `linuxdeploy` (arguments, environment, update information, notices and PATENTS placement).
 
