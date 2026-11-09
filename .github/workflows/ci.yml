@@ -348,3 +348,101 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - uses: ./.github/actions/coverage
+
+  # Android APKs and AAB (chapter 13 §13.7.1 row android-build, WI-0.034): both ABIs through the Qt Gradle plugin of
+  # android/app/build.gradle.kts (WI-0.050). GitHub's ubuntu-22.04 image carries the Android SDK, JDK 17, CMake and
+  # ninja; tools/bootstrap_android.sh adds the pinned SDK packages and writes android/local.properties.
+  android-build:
+    if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
+    runs-on: ubuntu-22.04
+    timeout-minutes: 150 # cold caches: vcpkg and third_party for two ABIs plus the Qt kits
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # The x86_64 prefix is the preset cache of setup-ovt; the arm64-v8a one has its own step below. The vcpkg cache
+      # key names one triplet but the archive directory holds both.
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: android-x86_64
+          triplet: android-ovt
+
+      - name: third_party install prefix cache (arm64-v8a)
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/third_party/android-arm64-v8a
+          key: tp-${{ runner.os }}-${{ runner.name }}-android-arm64-v8a-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
+
+      - name: Qt for Android cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: ${{ runner.temp }}/Qt
+          key: qt-android-${{ runner.os }}-6.8.3-${{ hashFiles('tools/install_qt.py') }}
+
+      - name: Qt for Android kits
+        run: |
+          # android_arm64_v8a, android_x86_64 and the host kit gcc_64 (QT_HOST_PATH); last stdout line QT_ROOT_DIR=...
+          out="$(python -I tools/install_qt.py --target android --dest "${RUNNER_TEMP}/Qt")"
+          printf '%s\n' "$out"
+          root="$(printf '%s\n' "$out" | sed -n 's/^QT_ROOT_DIR=//p' | tail -n 1)"
+          if [ -z "$root" ] || [ ! -d "$root/android_x86_64" ]; then
+            echo "::error::tools/install_qt.py printed no usable QT_ROOT_DIR"
+            exit 1
+          fi
+          echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
+
+      - name: Gradle cache
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/gradle/libs.versions.toml', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: SDK packages and local.properties
+        run: |
+          # JDK 17 (§13.1); the image's default java is older. bootstrap_android.sh finds QT_ROOT_DIR in the environment.
+          echo "JAVA_HOME=$JAVA_HOME_17_X64" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME_17_X64/bin" >> "$GITHUB_PATH"
+          export JAVA_HOME="$JAVA_HOME_17_X64" PATH="$JAVA_HOME_17_X64/bin:$PATH"
+          tools/bootstrap_android.sh
+          cat android/local.properties
+
+      # One native build (QtBuildTask) serves every variant. bundlePlayRelease runs on every build rather than on tags
+      # only, so that WI-0.050 acceptance test 3 (an unsigned AAB) is checked on each pull request.
+      - name: Gradle build
+        working-directory: android
+        run: ./gradlew --no-daemon --stacktrace :app:assembleFossDebug :app:assembleFossRelease :app:bundlePlayRelease
+
+      - name: Check outputs
+        run: |
+          # WI-0.050 acceptance tests 1 and 3, WI-0.034 acceptance test 1: one APK per ABI, each <= 120 MB, and the AAB.
+          out=android/app/build/outputs
+          status=0
+          for variant in debug release; do
+            for abi in arm64-v8a x86_64; do
+              apk="$(find "$out/apk/foss/$variant" -name "*-$abi-*.apk" | head -n 1)"
+              if [ -z "$apk" ]; then
+                echo "::error::no foss $variant APK for $abi"; status=1; continue
+              fi
+              size="$(stat -c %s "$apk")"
+              echo "$apk: $size bytes" | tee -a "$GITHUB_STEP_SUMMARY"
+              if [ "$size" -gt 125829120 ]; then echo "::error::$apk is larger than 120 MB"; status=1; fi
+            done
+          done
+          aab="$(find "$out/bundle/playRelease" -name '*.aab' | head -n 1)"
+          if [ -z "$aab" ]; then echo "::error::no play release AAB"; status=1; else echo "$aab: $(stat -c %s "$aab") bytes" | tee -a "$GITHUB_STEP_SUMMARY"; fi
+          exit "$status"
+
+      # Build artefacts only while the repository is private (see build-linux-x64): public artefacts are binary
+      # distribution without THIRD_PARTY_NOTICES.
+      - name: Upload APKs
+        if: github.event.repository.private
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ovt-studio-android
+          path: |
+            android/app/build/outputs/apk/foss/**/*.apk
+            android/app/build/outputs/bundle/playRelease/*.aab
