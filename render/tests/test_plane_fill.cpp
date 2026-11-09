@@ -255,11 +255,10 @@ TEST_CASE("render_test_plane_fill: format matrix renders limited black and white
   }
 }
 
-// Regression test for the intermittent teardown SIGSEGV on MoltenVK (#304, #330): surfaces destroyed right after
-// upload, render and download must not crash. Each surface used to own its Vulkan device, and Metal's completion
-// processing could still be using the MTLCommandQueue when vkDestroyDevice released it; surfaces now share one device
-// for the life of the process (SharedVulkan in video_surface_impl.cpp). Many short-lived surfaces make any remaining
-// race window recur.
+// Regression test for the intermittent teardown SIGSEGV on MoltenVK (#304, #330): a surface destroyed right after
+// upload, render and download must not free anything the driver still uses while it finishes that work (timer query
+// pools, see render/src/surface/vk_no_timestamps.cpp; the device itself, see VideoSurfaceImpl::wait_device_idle).
+// Many short-lived surfaces make the race window recur.
 TEST_CASE("render_test_plane_fill: surfaces torn down right after a download stay stable", "[fast][render][vulkan]") {
   constexpr uint32_t kW = 16;
   constexpr uint32_t kH = 4;
