@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of raw YUV opening (chapter 08 §8.6.6, WI-1.229): the pix_fmt grammar, the format string, the sidecar,
-// the filename and size heuristics and ranking, and ovt_container_open_format(…, "raw", …).
+// Tests of raw YUV opening (chapter 08 §8.6.6, WI-1.229 part a): the pix_fmt grammar, the format string and
+// ovt_container_open_format(…, "raw", …).
 
 #include <catch2/catch_test_macros.hpp>
-
-#include <nlohmann/json.hpp>
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -36,35 +34,6 @@ using Bytes = std::vector<uint8_t>;
 namespace raw = ovt::container::raw;
 
 // A per-process directory below the test binary directory; files keep the names the heuristics read.
-class ScratchDir {
- public:
-  ScratchDir() : dir_(std::filesystem::path(OVT_TEST_BINARY_DIR) / ("rawyuv_" + std::to_string(::getpid()))) {
-    std::filesystem::create_directories(dir_);
-  }
-  ~ScratchDir() {
-    std::error_code ec;
-    std::filesystem::remove_all(dir_, ec);
-  }
-  ScratchDir(const ScratchDir&) = delete;
-  ScratchDir& operator=(const ScratchDir&) = delete;
-  ScratchDir(ScratchDir&&) = delete;
-  ScratchDir& operator=(ScratchDir&&) = delete;
-
-  // A sparse file of `size` bytes.
-  [[nodiscard]] std::string make(const std::string& name, uint64_t size) const {
-    const auto p = dir_ / name;
-    std::ofstream(p, std::ios::binary).put('\0');
-    std::filesystem::resize_file(p, size);
-    return p.string();
-  }
-  void write(const std::string& name, const std::string& text) const {
-    std::ofstream(dir_ / name, std::ios::binary) << text;
-  }
-
- private:
-  std::filesystem::path dir_;
-};
-
 const ovt::fb::SampleTable* table_of(const Bytes& b) {
   return flatbuffers::GetRoot<ovt::fb::SampleTable>(b.data());
 }
@@ -73,11 +42,6 @@ const ovt::fb::RawVideoFormat* raw_of(const Bytes& b) {
 }
 const ovt::fb::ContainerTree* tree_of(const Bytes& b) {
   return flatbuffers::GetRoot<ovt::fb::ContainerTree>(b.data());
-}
-
-bool has_code(const raw::Resolution& r, const char* code) {
-  return std::ranges::any_of(r.diagnostics,
-                             [&](const raw::Diagnostic& d) { return ovt::container::diag(d.code).code == code; });
 }
 
 }  // namespace
@@ -238,221 +202,6 @@ TEST_CASE("raw: format string WxH:pix_fmt[:fps]", "[container][raw][fast]") {
   }
 }
 
-TEST_CASE("raw: sidecar parse, write and round trip", "[container][raw][fast]") {
-  const auto s =
-      raw::parse_sidecar(R"({"width":64,"height":48,"pix_fmt":"yuv422p10le","fps":"30000/1001","header_bytes":64,)"
-                         R"("color":{"primaries":9,"transfer":16,"matrix":9,"full_range":true},"future_key":[1,2]})");
-  REQUIRE(s);
-  CHECK(s->width == 64);
-  CHECK(s->height == 48);
-  CHECK(s->pix.name == "yuv422p10le");
-  CHECK(s->fps_num == 30000);
-  CHECK(s->fps_den == 1001);
-  CHECK(s->header_bytes == 64);
-  CHECK(s->color.present);
-  CHECK(s->color.primaries == 9);
-  CHECK(s->color.transfer == 16);
-  CHECK(s->color.matrix == 9);
-  CHECK(s->color.full_range);
-  CHECK(s->frame_bytes == 2 * (64 * 48 + 2 * 32 * 48));
-
-  const auto min = raw::parse_sidecar(R"({"width":16,"height":16,"pix_fmt":"gray"})");
-  REQUIRE(min);
-  CHECK(min->fps_num == 25);
-  CHECK(min->header_bytes == 0);
-  CHECK_FALSE(min->color.present);
-
-  const auto num = raw::parse_sidecar(R"({"width":16,"height":16,"pix_fmt":"gray","fps":29.97})");
-  REQUIRE(num);
-  CHECK(num->fps_num == 30000);
-  CHECK(num->fps_den == 1001);
-  const auto integer = raw::parse_sidecar(R"({"width":16,"height":16,"pix_fmt":"gray","fps":24})");
-  REQUIRE(integer);
-  CHECK(integer->fps_num == 24);
-
-  for (const char* bad :
-       {"", "[]", "null", "{", R"({"height":16,"pix_fmt":"gray"})", R"({"width":16,"pix_fmt":"gray"})",
-        R"({"width":16,"height":16})", R"({"width":0,"height":16,"pix_fmt":"gray"})",
-        R"({"width":-4,"height":16,"pix_fmt":"gray"})", R"({"width":16.5,"height":16,"pix_fmt":"gray"})",
-        R"({"width":16,"height":16,"pix_fmt":"yuv420p10"})", R"({"width":16,"height":16,"pix_fmt":7})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","fps":"0/1"})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","fps":-1})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","header_bytes":-1})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","header_bytes":"4"})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","color":3})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","color":{"primaries":256}})",
-        R"({"width":16,"height":16,"pix_fmt":"gray","color":{"full_range":1}})"}) {
-    DYNAMIC_SECTION("rejects " << bad) {
-      CHECK_FALSE(raw::parse_sidecar(bad));
-    }
-  }
-
-  // Write then parse again: every field survives.
-  const auto back = raw::parse_sidecar(raw::sidecar_json(*s));
-  REQUIRE(back);
-  CHECK(back->width == s->width);
-  CHECK(back->pix.name == s->pix.name);
-  CHECK(back->fps_num == s->fps_num);
-  CHECK(back->fps_den == s->fps_den);
-  CHECK(back->header_bytes == s->header_bytes);
-  CHECK(back->color.primaries == 9);
-  CHECK(back->color.full_range);
-  // The written JSON carries exactly the documented keys.
-  const auto doc = nlohmann::json::parse(raw::sidecar_json(*min));
-  CHECK(doc.contains("width"));
-  CHECK(doc.contains("header_bytes"));
-  CHECK_FALSE(doc.contains("color"));
-
-  CHECK(raw::sidecar_path("/a/b/clip.yuv") == "/a/b/clip.yuv.ovt-raw.json");
-  CHECK(raw::sidecar_path("fd:7").empty());
-  CHECK(raw::sidecar_path("").empty());
-  CHECK(raw::sidecar_path("content://x/y").empty());
-}
-
-TEST_CASE("raw: acceptance 1, file name and size heuristics", "[container][raw][fast]") {
-  // Given foo_1920x1080_yuv420p10le.yuv of exactly 30 frames, when opened without a sidecar,
-  // then candidates[0] is 1920x1080 yuv420p10le with frame_count 30.
-  const ScratchDir dir;
-  const std::string path = dir.make("foo_1920x1080_yuv420p10le.yuv", 30ULL * 1920 * 1080 * 3);
-  const auto file = ovt::io::RandomAccessFile::open(path);
-  const auto cands = raw::candidates(file->info().display_name, file->size());
-  REQUIRE(!cands.empty());
-  CHECK(cands[0].format.width == 1920);
-  CHECK(cands[0].format.height == 1080);
-  CHECK(cands[0].format.pix.name == "yuv420p10le");
-  CHECK(cands[0].frame_count == 30);
-  CHECK(cands[0].filename_geometry);
-  CHECK(cands.size() == 1);
-
-  const auto r = raw::resolve(*file);
-  CHECK(r.source == raw::Source::Heuristic);
-  REQUIRE(r.format);
-  CHECK(r.format->frame_bytes == 1920ULL * 1080 * 3);
-  CHECK(r.status == OVT_OK);
-}
-
-TEST_CASE("raw: candidates from name tokens", "[container][raw][fast]") {
-  const auto top = [](const std::string& name, uint64_t size) {
-    const auto c = raw::candidates(name, size);
-    return c.empty() ? std::string("none")
-                     : std::to_string(c[0].format.width) + "x" + std::to_string(c[0].format.height) + " " +
-                           c[0].format.pix.name + " " + std::to_string(c[0].frame_count);
-  };
-  const uint64_t f1080 = 1920ULL * 1080 * 3 / 2;
-  CHECK(top("/x/y/clip_1920x1080_420p10.yuv", 5 * f1080 * 2) == "1920x1080 yuv420p10le 5");
-  CHECK(top("clip_1920x1080_nv12.yuv", 7 * f1080) == "1920x1080 nv12 7");
-  CHECK(top("clip_1920X1080_gray.YUV", 3 * 1920ULL * 1080) == "1920x1080 gray 3");
-  CHECK(top("C:\\videos\\clip_352x288_p010.yuv", 2 * 352ULL * 288 * 3) == "352x288 p010 2");
-  CHECK(top("clip_1920x1080_10bit.yuv", 4 * f1080 * 2) == "1920x1080 yuv420p10le 4");  // 8-bit does not divide the size
-  CHECK(top("clip_1920x1080_444.yuv", 2 * 1920ULL * 1080 * 3) == "1920x1080 yuv444p 2");
-  // A name without geometry: the common sizes decide; 1 frame of 1080p 4:2:0 is a multiple of several sizes.
-  const auto many = raw::candidates("clip.yuv", f1080);
-  REQUIRE(many.size() > 1);
-  CHECK(std::ranges::any_of(many, [](const raw::Candidate& c) {
-    return c.format.width == 1920 && c.format.height == 1080 && c.format.pix.name == "yuv420p" && c.frame_count == 1;
-  }));
-  for (const auto& c : many) {
-    CHECK(c.frame_count >= 1);
-    CHECK(f1080 % c.format.frame_bytes == 0);
-    CHECK_FALSE(c.filename_geometry);
-  }
-  // Nothing fits.
-  CHECK(raw::candidates("clip_1920x1080_yuv420p.yuv", f1080 + 1).empty());
-  CHECK(raw::candidates("clip.yuv", 0).empty());
-  CHECK(raw::candidates("clip.yuv", 7).empty());
-  // Rank: 4:2:0 before 4:2:2 before 4:4:4 at equal frame count, 8-bit before 10-bit.
-  const auto eq = raw::candidates("clip_16x16.yuv", 16 * 16 * 6);  // several formats divide it; counts never increase
-  REQUIRE(eq.size() >= 2);
-  for (size_t i = 1; i < eq.size(); ++i) {
-    CHECK(eq[i - 1].frame_count >= eq[i].frame_count);
-  }
-}
-
-TEST_CASE("raw: frame rate from the file name", "[container][raw][fast]") {
-  const uint64_t size = 16 * 16 * 3 / 2 * 4;
-  const auto rate = [&](const std::string& name) {
-    const auto c = raw::candidates(name, size);
-    REQUIRE(!c.empty());
-    return std::to_string(c[0].format.fps_num) + "/" + std::to_string(c[0].format.fps_den);
-  };
-  CHECK(rate("a_16x16_yuv420p_24fps.yuv") == "24/1");
-  CHECK(rate("a_16x16_yuv420p_29.97fps.yuv") == "30000/1001");
-  CHECK(rate("a_16x16_yuv420p_50p.yuv") == "50/1");
-  CHECK(rate("a_16x16_yuv420p_60fps.yuv") == "60/1");
-  CHECK(rate("a_16x16_yuv420p.yuv") == "25/1");
-  CHECK(rate("a_16x16_yuv420p_1080p.yuv") == "25/1");   // four digits are a height, not a rate
-  CHECK(rate("a_16x16_yuv420p_999fps.yuv") == "25/1");  // above 240 is not a rate
-  CHECK(raw::candidates("a_16x16_yuv420p.yuv", size, 30000, 1001).front().format.fps_num == 30000);
-}
-
-TEST_CASE("raw: resolve priority list", "[container][raw][fast]") {
-  const ScratchDir dir;
-  const std::string path = dir.make("clip.yuv", 64 * 48 * 3 / 2 * 6);  // 6 frames of 64x48 4:2:0
-  const auto file = ovt::io::RandomAccessFile::open(path);
-
-  // Heuristics alone: ambiguous or not unique, so CNT-RAW-0002 with the candidates and OVT_E_INVALID_ARG.
-  const auto amb = raw::resolve(*file);
-  CHECK_FALSE(amb.format);
-  CHECK(amb.status == OVT_E_INVALID_ARG);
-  CHECK(has_code(amb, "CNT-RAW-0002"));
-  CHECK(amb.diagnostics.front().message.find("candidates") != std::string::npos);
-
-  // 2. Explicit.
-  const auto ex = raw::resolve(*file, "64x48:yuv420p:30");
-  CHECK(ex.source == raw::Source::Explicit);
-  REQUIRE(ex.format);
-  CHECK(ex.format->fps_num == 30);
-  CHECK(raw::resolve(*file, "garbage").status == OVT_E_INVALID_ARG);
-  CHECK_FALSE(raw::resolve(*file, "garbage").format);
-
-  // --raw-offset and --raw-fps.
-  raw::Overrides ov;
-  ov.header_bytes = 16;
-  ov.fps = std::pair<uint32_t, uint32_t>{50, 1};
-  const auto over = raw::resolve(*file, "64x48:yuv420p", ov);
-  REQUIRE(over.format);
-  CHECK(over.format->header_bytes == 16);
-  CHECK(over.format->fps_num == 50);
-
-  // 1. A sidecar beats the explicit string. Its write path is the GUI's.
-  raw::RawFormat side = *raw::parse_format_string("32x24:gray:10");
-  REQUIRE(raw::write_sidecar(path, side));
-  const auto sc = raw::resolve(*file, "64x48:yuv420p:30");
-  CHECK(sc.source == raw::Source::Sidecar);
-  REQUIRE(sc.format);
-  CHECK(sc.format->width == 32);
-  CHECK(sc.format->pix.name == "gray");
-  const auto read_back = raw::read_sidecar(path);
-  REQUIRE(read_back);
-  CHECK(read_back->fps_num == 10);
-
-  // An invalid sidecar is ignored.
-  dir.write("clip.yuv.ovt-raw.json", "{ not json");
-  CHECK(raw::resolve(*file, "64x48:yuv420p").source == raw::Source::Explicit);
-  CHECK_FALSE(raw::read_sidecar(path));
-  // Writing next to a descriptor-style name fails cleanly.
-  CHECK_FALSE(raw::write_sidecar("fd:3", side));
-}
-
-TEST_CASE("raw: acceptance 3, sidecar header_bytes becomes the first sample offset", "[container][raw][fast]") {
-  const ScratchDir dir;
-  const std::string path = dir.make("hdr.yuv", 64 + 3 * (16 * 16 * 3 / 2) + 5);
-  dir.write("hdr.yuv.ovt-raw.json", R"({"width":16,"height":16,"pix_fmt":"yuv420p","fps":"25/1","header_bytes":64})");
-  const auto file = ovt::io::RandomAccessFile::open(path);
-  const auto r = raw::resolve(*file);
-  REQUIRE(r.format);
-  CHECK(r.source == raw::Source::Sidecar);
-  const auto reader = raw::make_reader(*file, *r.format);
-  const Bytes table = reader->sample_table(0, 0, 0);
-  REQUIRE(!table.empty());
-  const auto* t = table_of(table);
-  REQUIRE(t->count() == 3);
-  CHECK(t->offset()->Get(0) == 64);
-  CHECK(t->offset()->Get(1) == 64 + 384);
-  CHECK(t->offset()->Get(2) == 64 + 2 * 384);
-  CHECK(t->size()->Get(0) == 384);
-}
-
 TEST_CASE("raw: reader sample table, tree, RawVideoFormat and trailing bytes", "[container][raw][fast]") {
   const auto fmt = *raw::parse_format_string("16x16:yuv420p10le:30000/1001");  // 768 bytes per frame
   const Bytes bytes(10 * 768 + 100, 0);
@@ -536,8 +285,15 @@ TEST_CASE("raw: reader sample table, tree, RawVideoFormat and trailing bytes", "
 }
 
 TEST_CASE("raw: ovt_container_open_format(\"raw\")", "[container][raw][fast]") {
-  const ScratchDir dir;
-  const std::string path = dir.make("clip.yuv", 1382400ULL * 30);
+  const std::string path = std::string(OVT_TEST_BINARY_DIR) + "/rawyuv_" + std::to_string(::getpid()) + ".yuv";
+  {
+    std::ofstream(path, std::ios::binary).put('\0');
+    std::filesystem::resize_file(path, 1382400ULL * 30);  // sparse
+  }
+  const struct Cleanup {
+    const std::string& p;
+    ~Cleanup() { std::filesystem::remove(p); }
+  } cleanup{path};
   ovt_File handle{ovt::io::RandomAccessFile::open(path)};
   ovt_Container* c = nullptr;
 

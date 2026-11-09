@@ -55,5 +55,3 @@ X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (fra
 
 // WI-1.229 (raw YUV opening, §8.6.6).
 X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole frame (ignored)", "")
-X(CNT_RAW_0002, "CNT-RAW-0002", Error,
-  "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")

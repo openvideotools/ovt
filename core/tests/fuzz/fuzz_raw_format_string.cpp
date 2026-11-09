@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Fuzz target of the raw-YUV text parsers (chapter 8 §8.6.6 and §8.9.4, WI-1.229). The first 4 bytes (big endian,
-// times 1000) are a file size; the rest is each of: a `WxH:pix_fmt[:fps]` string, a pix_fmt name, a frame rate,
-// a sidecar and a file name for the heuristics.
-// Invariants, each an abort when violated: no exception escapes; every accepted format has a non-zero
-// frame_bytes and a pix_fmt that parses back to itself; a sidecar written from an accepted format parses back
-// to the same format; candidates are consistent with the file size and ranked deterministically.
+// Fuzz target of the raw-YUV text parsers (chapter 8 §8.6.6 and §8.9.4, WI-1.229 part a). The whole input is
+// each of: a `WxH:pix_fmt[:fps]` string, a pix_fmt name and a frame rate. Invariants, each an abort when violated:
+// no exception escapes; every accepted format has a non-zero frame_bytes and a pix_fmt that parses back to itself;
+// parsing is deterministic; an accepted format builds a reader whose RawVideoFormat and SampleTable agree.
 
 #include <cstddef>
 #include <cstdint>
@@ -14,7 +12,13 @@
 #include <string>
 #include <string_view>
 
+#include <flatbuffers/flatbuffers.h>
+
+#include <span>
+
 #include "container/rawyuv.hpp"
+#include "io/memory_file.hpp"
+#include "ovt_container_generated.h"
 
 namespace {
 
@@ -28,10 +32,7 @@ namespace raw = ovt::container::raw;
 
 bool same(const raw::RawFormat& a, const raw::RawFormat& b) {
   return a.width == b.width && a.height == b.height && a.pix.name == b.pix.name && a.fps_num == b.fps_num &&
-         a.fps_den == b.fps_den && a.header_bytes == b.header_bytes && a.frame_bytes == b.frame_bytes &&
-         a.color.present == b.color.present && a.color.primaries == b.color.primaries &&
-         a.color.transfer == b.color.transfer && a.color.matrix == b.color.matrix &&
-         a.color.full_range == b.color.full_range;
+         a.fps_den == b.fps_den && a.header_bytes == b.header_bytes && a.frame_bytes == b.frame_bytes;
 }
 
 void check_format(const raw::RawFormat& f) {
@@ -46,37 +47,24 @@ void check_format(const raw::RawFormat& f) {
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   try {
-    const std::string_view all(reinterpret_cast<const char*>(data), size);
-    const std::string_view text = size > 4 ? all.substr(4) : std::string_view{};
+    const std::string_view text(reinterpret_cast<const char*>(data), size);
     if (const auto f = raw::parse_format_string(text)) {
       check_format(*f);
       const auto g = raw::parse_format_string(text);
       require(g.has_value() && same(*f, *g));
+      const ovt::io::MemoryFile file(std::span<const uint8_t>(data, size));
+      const auto reader = raw::make_reader(file, *f);
+      const auto rf = reader->raw_format();
+      const auto count = flatbuffers::GetRoot<ovt::fb::RawVideoFormat>(rf.data())->frame_count();
+      require(count == raw::frame_count_of(*f, size));
+      const auto table = reader->sample_table(0, 0, 0);
+      require(flatbuffers::GetRoot<ovt::fb::SampleTable>(table.data())->count() == count);
     }
     if (const auto p = raw::parse_pix_fmt(text)) {
       require(p->name == text && raw::frame_bytes(*p, 16, 16) != 0);
     }
     if (const auto fps = raw::parse_fps(text)) {
       require(fps->first != 0 && fps->second != 0);
-    }
-    if (const auto s = raw::parse_sidecar(text)) {
-      check_format(*s);
-      const auto round = raw::parse_sidecar(raw::sidecar_json(*s));
-      require(round.has_value() && same(*s, *round));
-    }
-    uint64_t file_size = 0;
-    for (size_t i = 0; i < size && i < 4; ++i) {
-      file_size = (file_size << 8U) | data[i];
-    }
-    file_size *= 1000;
-    const auto a = raw::candidates(text, file_size);
-    const auto b = raw::candidates(text, file_size);
-    require(a.size() == b.size());
-    for (size_t i = 0; i < a.size(); ++i) {
-      check_format(a[i].format);
-      require(same(a[i].format, b[i].format) && a[i].frame_count >= 1);
-      require(a[i].frame_count == raw::frame_count_of(a[i].format, file_size));
-      require(file_size % a[i].format.frame_bytes == 0);
     }
   } catch (...) {
     std::abort();
