@@ -9,4 +9,6 @@
 # because apply_patches.py --check dry-runs each file against the pristine tree. SPEC-ASSUMPTION(#332): the per-4x4
 # arrays of AVH264MacroblockParams are in luma4x4BlkIdx (decoding) order. SPEC-ASSUMPTION(#331):
 # third_party/ffmpeg.cmake applies this series to the plugin flavour only; the core flavour stays unpatched.
+# SPEC-ASSUMPTION(#351): the h264 part keeps one per-picture table recorded while parsing, exports from output_frame()
+# and has FATE tests through tools/vblock_data_dump, instead of the four tables and ffprobe test of §7.6.3.
 0001-h264-export-mb-params.patch
