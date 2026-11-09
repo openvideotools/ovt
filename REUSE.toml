@@ -206,3 +206,10 @@ SPDX-License-Identifier = "ISC"
 path = ["core/share/models/uvq/labels_yt8m.txt"]
 SPDX-FileCopyrightText = "2025 Google LLC"
 SPDX-License-Identifier = "Apache-2.0"
+
+# The Gradle wrapper jar of the Android project (WI-0.050), copied unmodified from the Gradle distribution that
+# `gradle wrapper` writes (gradlew and gradlew.bat carry their own Apache-2.0 headers).
+[[annotations]]
+path = "android/gradle/wrapper/gradle-wrapper.jar"
+SPDX-FileCopyrightText = "2015-2021 the original authors of Gradle"
+SPDX-License-Identifier = "Apache-2.0"
