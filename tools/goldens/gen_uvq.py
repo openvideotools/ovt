@@ -40,11 +40,7 @@ VERSIONS = ("1.5", "1.0")
 
 def uvq_script() -> Path:
     prefix = os.environ.get("OVT_ORACLES_PREFIX", "/opt/ovt-oracles")
-    path = Path(
-        os.environ.get(
-            "OVT_ORACLE_UVQ_INFERENCE", Path(prefix) / "uvq" / "uvq_inference.py"
-        )
-    )
+    path = Path(os.environ.get("OVT_ORACLE_UVQ_INFERENCE", Path(prefix) / "uvq" / "uvq_inference.py"))
     if not path.is_file():
         raise gm.MissingTool(f"uvq_inference.py ({path})")
     return path
@@ -101,18 +97,14 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=Path(os.environ.get("OVT_CORPORA_DIR", "corpora")),
     )
     p.add_argument("--only", help="comma-separated clip ids")
-    p.add_argument(
-        "--versions", default=",".join(VERSIONS), help="subset of " + ",".join(VERSIONS)
-    )
+    p.add_argument("--versions", default=",".join(VERSIONS), help="subset of " + ",".join(VERSIONS))
     p.add_argument("--fps", type=int, default=1)
     p.add_argument("--work-dir", type=Path)
     p.add_argument("--list", action="store_true", help="print the plan and exit")
     args = p.parse_args(argv)
     args.versions = [v for v in args.versions.split(",") if v]
     if set(args.versions) - set(VERSIONS):
-        p.error(
-            "unknown version: " + ",".join(sorted(set(args.versions) - set(VERSIONS)))
-        )
+        p.error("unknown version: " + ",".join(sorted(set(args.versions) - set(VERSIONS))))
     args.only = [i for i in args.only.split(",") if i] if args.only else list(CLIPS)
     if set(args.only) - set(CLIPS):
         p.error("unknown clip: " + ",".join(sorted(set(args.only) - set(CLIPS))))
@@ -135,27 +127,19 @@ def main(argv: list[str] | None = None) -> int:
         script = uvq_script()
         stamps = os.environ.get("OVT_ORACLES_STAMPS")
         stamp = Path(stamps) / "uvq.version" if stamps else None
-        index["uvq"] = (
-            stamp.read_text(encoding="utf-8").strip()
-            if stamp and stamp.is_file()
-            else "unknown"
-        )
+        index["uvq"] = stamp.read_text(encoding="utf-8").strip() if stamp and stamp.is_file() else "unknown"
         for cid in args.only:
             index["clips"][cid] = process(cid, args, script)
             e = index["clips"][cid]
             print(f"{cid}: {'FAILED ' + ','.join(e['failed']) if e['failed'] else 'ok'} ({len(e['goldens'])} goldens)",
                   file=sys.stderr)  # fmt: skip
     except gm.MissingTool as exc:
-        print(
-            f"error: not found (run this in the oracle image): {exc}", file=sys.stderr
-        )
+        print(f"error: not found (run this in the oracle image): {exc}", file=sys.stderr)
         return gm.EXIT_MISSING
     finally:
         if args.work_dir is None:
             shutil.rmtree(args.work_root, ignore_errors=True)
-    (args.out / "uvq-index.json").write_text(
-        json.dumps(index, indent=1, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    (args.out / "uvq-index.json").write_text(json.dumps(index, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     bad = {cid: e["failed"] for cid, e in index["clips"].items() if e["failed"]}
     for cid, failed in bad.items():
         for ver, why in failed.items():

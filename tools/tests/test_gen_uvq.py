@@ -66,29 +66,20 @@ def test_goldens_are_valid_and_reproducible(setup: Path, tmp_path: Path) -> None
         assert gen.main(["--out", str(out), "--corpora-dir", str(setup)]) == 0
         outs.append(out)
     names = sorted(p.name for p in outs[0].iterdir())
-    assert names == sorted(
-        [f"{c}.uvq-{v}.json.gz" for c in gen.CLIPS for v in gen.VERSIONS]
-        + ["uvq-index.json"]
-    )
+    assert names == sorted([f"{c}.uvq-{v}.json.gz" for c in gen.CLIPS for v in gen.VERSIONS] + ["uvq-index.json"])
     for name in names:
         assert (outs[0] / name).read_bytes() == (outs[1] / name).read_bytes()
-    doc = json.loads(
-        gzip.decompress((outs[0] / "ytugc_clip01.uvq-1.5.json.gz").read_bytes())
-    )
+    doc = json.loads(gzip.decompress((outs[0] / "ytugc_clip01.uvq-1.5.json.gz").read_bytes()))
     assert canon.validate(doc, "scores") == []
     assert doc["pooled"]["uvq"]["mean"] == 3.5 and [f["i"] for f in doc["frames"]] == [
         0,
         25,
     ]
-    doc10 = json.loads(
-        gzip.decompress((outs[0] / "ytugc_clip01.uvq-1.0.json.gz").read_bytes())
-    )
+    doc10 = json.loads(gzip.decompress((outs[0] / "ytugc_clip01.uvq-1.0.json.gz").read_bytes()))
     assert doc10["pooled"]["uvq"]["compression_content_distortion"] == 3.125
 
 
-def test_a_failing_oracle_is_exit_1(
-    setup: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_failing_oracle_is_exit_1(setup: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     bad = tmp_path / "bad.py"
     bad.write_text("import sys; sys.exit(3)\n", encoding="utf-8")
     monkeypatch.setenv("OVT_ORACLE_UVQ_INFERENCE", str(bad))
@@ -107,17 +98,10 @@ def test_a_failing_oracle_is_exit_1(
     )
 
 
-def test_a_missing_oracle_is_exit_4(
-    setup: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_a_missing_oracle_is_exit_4(setup: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("OVT_ORACLE_UVQ_INFERENCE", str(tmp_path / "nope.py"))
     assert gen.main(["--out", str(tmp_path / "o"), "--corpora-dir", str(setup)]) == 4
 
 
 def test_a_missing_corpus_is_exit_4(tmp_path: Path, setup: Path) -> None:
-    assert (
-        gen.main(
-            ["--out", str(tmp_path / "o"), "--corpora-dir", str(tmp_path / "empty")]
-        )
-        == 4
-    )
+    assert gen.main(["--out", str(tmp_path / "o"), "--corpora-dir", str(tmp_path / "empty")]) == 4
