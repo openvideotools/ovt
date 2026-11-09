@@ -14,6 +14,7 @@
 #include <span>
 
 #include "container/ivf.hpp"
+#include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt_container_generated.h"
@@ -34,12 +35,16 @@ bool has_reader(Format f) noexcept {
   }
 }
 
-std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file) {
+std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, ovt_status* why) {
+  if (why != nullptr) {
+    *why = has_reader(f) ? OVT_E_CORRUPT : OVT_E_UNSUPPORTED;  // refined by the format readers
+  }
   switch (f) {
     case Format::Ivf:
       return ivf::make_reader(file);
-    case Format::Isobmff:
     case Format::Y4m:
+      return y4m::make_reader(file, why);
+    case Format::Isobmff:
     case Format::AnnexB:
     case Format::Obu:
     case Format::Raw:
@@ -62,9 +67,10 @@ std::vector<uint8_t> empty_tree(Format f) {
 
 ovt_status make_container(ovt_File* file, Format f, ovt_Container** out) {
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive, the reader moves into the handle
-  auto reader = make_reader(f, *file->file);
+  ovt_status why = OVT_E_UNSUPPORTED;
+  auto reader = make_reader(f, *file->file, &why);
   if (!reader) {
-    return has_reader(f) ? OVT_E_CORRUPT : OVT_E_UNSUPPORTED;  // a reader exists, the bytes are not that format
+    return why;  // OVT_E_CORRUPT: a reader exists, the bytes are not that format
   }
   auto tree = reader->tree();
   if (tree.empty()) {

@@ -75,8 +75,8 @@ endif()
 #   plugins/ovt-plugin-ffmpeg/tests): hidden visibility for its own code, and the linker options of §13.3.3 that keep
 #   every symbol of the static FFmpeg archives inside it. Linux/Android: --exclude-libs,ALL, plus -Bsymbolic so
 #   FFmpeg's references bind inside the plugin, and the version script cmake/ovt_plugin_exports.map. macOS: an
-#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
-#   the plugin links the system FFmpeg dynamically.
+#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with
+#   default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where the plugin links the system FFmpeg dynamically.
 function(ovt_ffmpeg_hide_symbols target)
   set_target_properties(${target} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden
                                              VISIBILITY_INLINES_HIDDEN ON)
@@ -150,6 +150,13 @@ if(OVT_BUILD_PLUGIN_DE265)
   else()
     include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libde265.cmake")
   endif()
+endif()
+
+# ---- HM (WI-4.104) -----------------------------------------------------------------------------------------------
+# tp::hm, HM's unpatched decoder libraries (third_party/hm.cmake), for the optional HM oracle plugin only
+# (BSD-3-Clause, chapter 07 §7.6.4). Slow to build, so OFF by default.
+if(OVT_BUILD_PLUGIN_HM)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/hm.cmake")
 endif()
 
 # ---- libvmaf (WI-0.015) -------------------------------------------------------------------------------

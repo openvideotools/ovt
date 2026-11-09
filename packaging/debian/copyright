@@ -1,0 +1,55 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: ovt
+Source: https://github.com/openvideotools/ovt
+Comment: SKELETON (WI-0.072). Regenerate from `reuse spdx` before upload; the
+ licence split below follows tools/license_policy.toml ([directories]).
+
+Files: *
+Copyright: 2026 The Open Video Tools contributors
+License: LGPL-2.1+
+
+Files: core/* render/* tools/* cmake/*
+Copyright: 2026 The Open Video Tools contributors
+License: LGPL-2.1+
+
+Files: cli/* app/* python/*
+Copyright: 2026 The Open Video Tools contributors
+License: GPL-3+
+
+Files: plugins/ovt-plugin-aom/*
+Copyright: 2026 The Open Video Tools contributors
+License: BSD-2-clause
+
+Files: plugins/ovt-plugin-de265/*
+Copyright: 2026 The Open Video Tools contributors
+License: LGPL-3+
+
+Files: docs/spec/*
+Copyright: 2026 The Open Video Tools contributors
+License: CC-BY-4.0
+
+Files: docs/* *.md
+Copyright: 2026 The Open Video Tools contributors
+License: CC-BY-SA-4.0
+
+Files: debian/*
+Copyright: 2026 The Open Video Tools contributors
+License: LGPL-2.1+
+
+License: LGPL-2.1+
+ See /usr/share/common-licenses/LGPL-2.1 (or any later version).
+
+License: LGPL-3+
+ See /usr/share/common-licenses/LGPL-3 (or any later version).
+
+License: GPL-3+
+ See /usr/share/common-licenses/GPL-3 (or any later version).
+
+License: BSD-2-clause
+ Full text: LICENSES/BSD-2-Clause.txt in the source tree.
+
+License: CC-BY-4.0
+ Full text: LICENSES/CC-BY-4.0.txt in the source tree.
+
+License: CC-BY-SA-4.0
+ Full text: LICENSES/CC-BY-SA-4.0.txt in the source tree.

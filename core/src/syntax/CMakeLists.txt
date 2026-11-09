@@ -18,6 +18,23 @@ target_sources(ovt_core_objects PRIVATE common/syntax_builder.cpp common/syntax_
 # (core-objects rule 1, #62).
 target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
 
+# WI-1.116a: AV1 OBU header, temporal delimiter, padding, metadata and tile list parsers (chapter 7 §7.3.6
+# rows 1, 7, 8, 9 and 30). WI-1.116b adds the sequence header (rows 2–6).
+target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/metadata.cpp av1/tile_list.cpp)
+# WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
+# st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
+# rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).
+target_sources(
+  ovt_core_objects
+  PRIVATE h265/nal_header.cpp
+          h265/profile_tier_level.cpp
+          h265/hrd_parameters.cpp
+          h265/vui.cpp
+          h265/scaling_list.cpp
+          h265/st_ref_pic_set.cpp
+          h265/vps.cpp
+          h265/sps.cpp
+          h265/pps.cpp)
 # WI-1.108a: H.264 NAL header and SPS (VUI, HRD, scaling lists) parsers; H.273 code-point names shared with the
 # H.265 and AV1 parsers. WI-1.108b adds h264/pps.cpp.
 target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp

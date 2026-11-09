@@ -12,7 +12,9 @@ per row, OVT_TP_<dep>_{VERSION,URL,SHA256}, where <dep> is the row Name lower-ca
 characters outside [a-z0-9] replaced by one underscore ("libaom", "ffmpeg", "vcpkg_baseline",
 "android_ndk"). No other spelling is emitted. OVT_TP_<dep>_LICENSE (Licence column), OVT_TP_<dep>_PATCHES
 (;-list of the Patches column) and OVT_TP_<dep>_ROW (the row, for error messages) come with it, and
-OVT_TP_DEPS lists every <dep>.
+OVT_TP_DEPS lists every <dep>. OVT_TP_<dep>_COMMIT is the full 40-hex commit id written in backticks in the
+Version column (HM's row), or "" when there is none: a git row is pinned by that commit instead of
+an archive hash.
 
 Validation (every mode): duplicate <dep> ids, a SHA-256 cell holding a hex string that is not 64
 lower-case hex digits, and a URL that embeds a version different from the Version column (WI-0.010 pitfall) are errors
@@ -25,7 +27,7 @@ way hashes enter the file; never type one by hand.
 
 --check is the VERSIONS.md <-> script consistency check (hooked into pre-commit by WI-0.007): for every row
 whose Build column names an existing third_party/*.cmake script, the script must read OVT_TP_<dep>_URL and
-OVT_TP_<dep>_SHA256 and must not spell the version literally.
+OVT_TP_<dep>_SHA256 (OVT_TP_<dep>_COMMIT for a git row) and must not spell the version or the commit literally.
 
 Run with `python -I`; the standard library only.
 """
@@ -52,6 +54,7 @@ ARCHIVE_SUFFIXES = (".tar.gz", ".tgz", ".tar.xz", ".txz", ".tar.bz2", ".tbz2", "
 COLUMNS = ("Name", "Version", "Licence", "URL", "Patches", "SHA-256", "Build", "Notes")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+_COMMIT_RE = re.compile(r"`([0-9a-f]{40})`")
 _URL_RE = re.compile(r"(?:https?|file)://[^\s`|)<>]+")  # file:// for local mirrors and tests
 _VERSION_TOKEN_RE = re.compile(r"(?<![0-9.])\d+(?:\.\d+)+(?![0-9])")
 
@@ -85,6 +88,12 @@ class Row:
         cell = _strip_code(self.sha_cell).split()[0] if self.sha_cell.strip() else ""
         cell = _strip_code(cell)
         return cell if _SHA_RE.match(cell) else ""
+
+    @property
+    def commit(self) -> str:
+        """The full commit id in backticks in the Version column (a git row), or ""."""
+        m = _COMMIT_RE.search(self.version)
+        return m.group(1) if m else ""
 
     @property
     def sha_placeholder(self) -> bool:
@@ -203,6 +212,7 @@ def to_cmake(rows: list[Row], source: Path) -> str:
         out.append(f"set(OVT_TP_{row.dep}_VERSION {_cmake_quote(_version_value(row.version))})")
         out.append(f"set(OVT_TP_{row.dep}_URL {_cmake_quote(row.url)})")
         out.append(f"set(OVT_TP_{row.dep}_SHA256 {_cmake_quote(row.sha256)})")
+        out.append(f"set(OVT_TP_{row.dep}_COMMIT {_cmake_quote(row.commit)})")
         out.append(f"set(OVT_TP_{row.dep}_LICENSE {_cmake_quote(row.licence)})")
         out.append(f"set(OVT_TP_{row.dep}_PATCHES {_cmake_quote(';'.join(row.patch_list), keep_list=True)})")
         out.append(f"set(OVT_TP_{row.dep}_ROW {_cmake_quote(row.where())})")
@@ -334,7 +344,8 @@ def check_scripts(rows: list[Row], source_dir: Path) -> list[str]:
         if not script.exists():
             continue  # the script arrives with its own work item
         body = script.read_text(encoding="utf-8")
-        for var in (f"OVT_TP_{row.dep}_URL", f"OVT_TP_{row.dep}_SHA256"):
+        pin = "COMMIT" if row.commit else "SHA256"
+        for var in (f"OVT_TP_{row.dep}_URL", f"OVT_TP_{row.dep}_{pin}"):
             if var not in body:
                 problems.append(f"{row.where()}: {m.group(0)} does not use {var}")
         version = _version_value(row.version)
@@ -342,7 +353,9 @@ def check_scripts(rows: list[Row], source_dir: Path) -> list[str]:
             problems.append(
                 f"{row.where()}: {m.group(0)} spells the version {version} literally; " f"use OVT_TP_{row.dep}_VERSION"
             )
-        if re.search(r"\bOVT_[A-Z0-9]+_(VERSION|URL|SHA256)\b", body.replace("OVT_TP_", "")):
+        if row.commit and row.commit in body:
+            problems.append(f"{row.where()}: {m.group(0)} spells the commit literally; use OVT_TP_{row.dep}_COMMIT")
+        if re.search(r"\bOVT_[A-Z0-9]+_(VERSION|URL|SHA256|COMMIT)\b", body.replace("OVT_TP_", "")):
             problems.append(f"{m.group(0)}: uses an OVT_<DEP>_* spelling; only OVT_TP_<dep>_* exists")
     return problems
 
