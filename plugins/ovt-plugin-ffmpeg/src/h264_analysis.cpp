@@ -176,7 +176,9 @@ ovt_status H264Analysis::create(const uint8_t* codec_private, size_t len, int th
   AVCodecContext* ctx = dec->ctx_;
   ctx->export_side_data = AV_CODEC_EXPORT_DATA_MVS | AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS;
   ctx->thread_count = std::max(threads, 1);
-  ctx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+  // SPEC-ASSUMPTION(#302): slice threads only. With FF_THREAD_FRAME the exported motion vectors and QPs differ from a
+  // single-threaded decode and from run to run (libavcodec 6.1.1), so §7.6.3's "frame threading is fine" does not hold.
+  ctx->thread_type = FF_THREAD_SLICE;
   ctx->flags |= AV_CODEC_FLAG_COPY_OPAQUE;
   ctx->flags2 |= AV_CODEC_FLAG2_SHOW_ALL;
   ctx->apply_cropping = 0;  // planes in coded-picture coordinates, like the grid; the crop rect goes to FrameInfo
@@ -302,6 +304,7 @@ ovt_status H264Analysis::receive_all() {
                "libavcodec concealed errors in this frame (decode_error_flags " +
                    std::to_string(frame_->decode_error_flags) + ")");
     }
+    p.info.side = map_h264_sidedata(frame_, p.info.bit_depth_luma, &pending_diags_);
     p.info.diagnostics = std::move(pending_diags_);
     pending_diags_.clear();
     p.frame.reset(av_frame_alloc());
