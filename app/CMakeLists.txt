@@ -206,7 +206,7 @@ if(APPLE)
     ovt_studio
     PROPERTIES OUTPUT_NAME "${OVT_PRODUCT_NAME}"
                MACOSX_BUNDLE TRUE
-               MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist.in"
+               MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/mac/Info.plist.in"
                MACOSX_BUNDLE_BUNDLE_NAME "${OVT_PRODUCT_NAME}"
                MACOSX_BUNDLE_GUI_IDENTIFIER "org.openvideotools.studio"
                MACOSX_BUNDLE_BUNDLE_VERSION "${OVT_VERSION}"

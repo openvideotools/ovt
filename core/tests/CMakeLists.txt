@@ -59,6 +59,7 @@ add_subdirectory(analysis)
 add_subdirectory(bitreader)
 add_subdirectory(cache)
 add_subdirectory(container)
+add_subdirectory(demux) # WI-1.230: the libavformat Demuxer
 add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(golden) # WI-0.093: hand-built FrameAnalysis fixtures and their generator
 add_subdirectory(jobs)

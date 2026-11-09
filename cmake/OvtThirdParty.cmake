@@ -152,6 +152,13 @@ if(OVT_BUILD_PLUGIN_DE265)
   endif()
 endif()
 
+# ---- HM (WI-4.104) -----------------------------------------------------------------------------------------------
+# tp::hm, HM's unpatched decoder libraries (third_party/hm.cmake), for the optional HM oracle plugin only
+# (BSD-3-Clause, chapter 07 §7.6.4). Slow to build, so OFF by default.
+if(OVT_BUILD_PLUGIN_HM)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/hm.cmake")
+endif()
+
 # ---- libvmaf (WI-0.015) -------------------------------------------------------------------------------
 # tp::vmaf from third_party/libvmaf.cmake, or from the system library with OVT_SYSTEM_LIBVMAF=ON (the distro
 # preset). The system library must have been built with its built-in models.

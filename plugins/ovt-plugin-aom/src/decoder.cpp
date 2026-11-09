@@ -306,6 +306,14 @@ ovt_status Decoder::decode_temporal_unit() {
     }
     const auto consumed = static_cast<size_t>(ret.buf - rest.data());
     if (ret.buf == nullptr || consumed == 0 || consumed > rest.size()) {
+      // libaom stopped without an error. Only trailing non-frame OBUs left: nothing is lost. Frame OBUs left:
+      // say so here, rather than leave the next temporal unit to report a bare frame-count mismatch.
+      if (next_frame_obu < tu_frames_.size()) {
+        add_diag(kSeverityError, "",
+                 "libaom stopped inside the temporal unit starting at decode index " + std::to_string(tu_first_hint_) +
+                     "; " + std::to_string(tu_frames_.size() - next_frame_obu) + " frame(s) not decoded");
+        st = OVT_E_CORRUPT;
+      }
       break;
     }
     off += consumed;

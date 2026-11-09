@@ -207,6 +207,14 @@ path = ["core/share/models/uvq/labels_yt8m.txt"]
 SPDX-FileCopyrightText = "2025 Google LLC"
 SPDX-License-Identifier = "Apache-2.0"
 
+# Debian packaging files that cannot carry a header (WI-0.072): the install lists, changelog, copyright and format
+# files. packaging/debian/README.source is prose and falls under the Markdown rule's licence only by suffix, so it is listed.
+[[annotations]]
+path = ["packaging/debian/*.install", "packaging/debian/changelog", "packaging/debian/copyright",
+        "packaging/debian/README.source", "packaging/debian/source/format"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
 # The Gradle wrapper jar of the Android project (WI-0.050): the published Gradle 8.10 wrapper jar (SHA-256
 # 2db75c40...8046 on gradle.org/release-checksums), unmodified, as in the v8.10.0 tag of gradle/gradle. gradlew and
 # gradlew.bat come from the same tag and carry their own Apache-2.0 headers.

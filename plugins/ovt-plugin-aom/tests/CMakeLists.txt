@@ -27,3 +27,14 @@ target_link_libraries(ovt_plugin_aom_no_inspection_tests PRIVATE ovt::flags ${Ca
 add_dependencies(ovt_plugin_aom_no_inspection_tests tp_libaom) # the headers come from the ExternalProject
 ovt_set_license(ovt_plugin_aom_no_inspection_tests "BSD-2-Clause")
 ovt_catch_discover_tests(ovt_plugin_aom_no_inspection_tests)
+
+# ---- WI-2.156: partition-tree reconstruction (partition_reconstruct.cpp, no libaom) --------------------------------
+# Hand-made MI grids, and libaom inspect's blockSize layers from data/inspect_reference.json.
+ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+add_executable(ovt_plugin_aom_map_mi_tests test_aom_map_mi.cpp ../src/partition_reconstruct.cpp)
+target_include_directories(ovt_plugin_aom_map_mi_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+target_link_libraries(ovt_plugin_aom_map_mi_tests PRIVATE ovt::flags nlohmann_json::nlohmann_json ${Catch2_TARGET})
+target_compile_definitions(ovt_plugin_aom_map_mi_tests
+                           PRIVATE "OVT_AOM_TEST_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+ovt_set_license(ovt_plugin_aom_map_mi_tests "BSD-2-Clause")
+ovt_catch_discover_tests(ovt_plugin_aom_map_mi_tests)
