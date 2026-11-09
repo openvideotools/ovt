@@ -92,10 +92,28 @@ void read_sub_layer(BitReader& br, SyntaxBuilder& b, HrdParameters& h, unsigned 
   }
 }
 
+// §7.4.3.1: with cprms_present_flag[i] == 0 the common information equals that of the (i-1)-th hrd_parameters().
+void inherit_common_inf(HrdParameters& h, const HrdParameters& from) {
+  h.nal_hrd_parameters_present_flag = from.nal_hrd_parameters_present_flag;
+  h.vcl_hrd_parameters_present_flag = from.vcl_hrd_parameters_present_flag;
+  h.sub_pic_hrd_params_present_flag = from.sub_pic_hrd_params_present_flag;
+  h.tick_divisor_minus2 = from.tick_divisor_minus2;
+  h.du_cpb_removal_delay_increment_length_minus1 = from.du_cpb_removal_delay_increment_length_minus1;
+  h.sub_pic_cpb_params_in_pic_timing_sei_flag = from.sub_pic_cpb_params_in_pic_timing_sei_flag;
+  h.dpb_output_delay_du_length_minus1 = from.dpb_output_delay_du_length_minus1;
+  h.bit_rate_scale = from.bit_rate_scale;
+  h.cpb_size_scale = from.cpb_size_scale;
+  h.cpb_size_du_scale = from.cpb_size_du_scale;
+  h.initial_cpb_removal_delay_length_minus1 = from.initial_cpb_removal_delay_length_minus1;
+  h.au_cpb_removal_delay_length_minus1 = from.au_cpb_removal_delay_length_minus1;
+  h.dpb_output_delay_length_minus1 = from.dpb_output_delay_length_minus1;
+}
+
 }  // namespace
 
 HrdParameters parse_hrd_parameters(BitReader& br, SyntaxBuilder& b, bool common_inf_present_flag,
-                                   unsigned max_num_sub_layers_minus1) {
+                                   unsigned max_num_sub_layers_minus1, const HrdParameters* inherited) {
+  detail::require_range(br, "maxNumSubLayersMinus1", max_num_sub_layers_minus1, 0, 6);
   HrdParameters h;
   h.common_inf_present_flag = common_inf_present_flag;
   h.max_num_sub_layers_minus1 = static_cast<uint8_t>(max_num_sub_layers_minus1);
@@ -103,6 +121,9 @@ HrdParameters parse_hrd_parameters(BitReader& br, SyntaxBuilder& b, bool common_
   auto s = b.scoped("hrd_parameters", "H.265 E.2.2");
   if (common_inf_present_flag) {
     read_common_inf(b, h);
+  } else if (inherited != nullptr) {
+    inherit_common_inf(h, *inherited);
+    b.derived("common_inf", std::string_view{"inherited from the previous hrd_parameters() (7.4.3.1)"});
   }
   for (unsigned i = 0; i <= max_num_sub_layers_minus1; ++i) {
     read_sub_layer(br, b, h, i);

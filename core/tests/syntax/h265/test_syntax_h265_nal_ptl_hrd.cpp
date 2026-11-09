@@ -6,6 +6,7 @@
 // H.265 text; the corpus acceptance tests live in test_syntax_h265_parameter_sets.cpp.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_predicate.hpp>
 
 #include <array>
 #include <cstdint>
@@ -251,4 +252,87 @@ TEST_CASE("h265_hrd_parameters: common info, sub-picture params and two CPBs wit
   REQUIRE(nal != nullptr);
   CHECK(nal->array_index == 0);
   CHECK(nal->spec_ref == "H.265 E.2.3");
+}
+
+TEST_CASE(
+    "h265_hrd_parameters: commonInfPresentFlag = 0 inherits the common information from the previous "
+    "hrd_parameters() (7.4.3.1)",
+    "[syntax][h265][fast]") {
+  // Two hrd_parameters() back to back as in a VPS with vps_num_hrd_parameters == 2 and cprms_present_flag[1] == 0.
+  BitWriter w;
+  w.flag(true);   // nal_hrd_parameters_present_flag
+  w.flag(true);   // vcl_hrd_parameters_present_flag
+  w.flag(false);  // sub_pic_hrd_params_present_flag
+  w.u(4, 1);      // bit_rate_scale
+  w.u(4, 2);      // cpb_size_scale
+  w.u(5, 23);     // initial_cpb_removal_delay_length_minus1
+  w.u(5, 15);     // au_cpb_removal_delay_length_minus1
+  w.u(5, 5);      // dpb_output_delay_length_minus1
+  w.flag(true);   // sub-layer 0: fixed_pic_rate_general_flag
+  w.ue(0);        // elemental_duration_in_tc_minus1
+  w.ue(0);        // cpb_cnt_minus1
+  w.ue(10);       // nal: bit_rate_value_minus1[0]
+  w.ue(20);       // cpb_size_value_minus1[0]
+  w.flag(false);  // cbr_flag
+  w.ue(30);       // vcl: bit_rate_value_minus1[0]
+  w.ue(40);
+  w.flag(true);
+  const size_t first_end = w.size_bits();
+  // second hrd_parameters(0, 0): no common information, straight into sub-layer 0
+  w.flag(false);  // fixed_pic_rate_general_flag
+  w.flag(false);  // fixed_pic_rate_within_cvs_flag
+  w.flag(true);   // low_delay_hrd_flag (cpb_cnt_minus1 absent => 0)
+  w.ue(11);       // nal: bit_rate_value_minus1[0]
+  w.ue(21);
+  w.flag(true);
+  w.ue(31);  // vcl
+  w.ue(41);
+  w.flag(false);
+  w.u(3, 0b101);  // bits that follow in the enclosing structure
+  const std::vector<uint8_t> data = w.bytes();
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  const h265::HrdParameters first = h265::parse_hrd_parameters(br, b, true, 0);
+  CHECK(br.bit_pos() == first_end);
+  const h265::HrdParameters second = h265::parse_hrd_parameters(br, b, false, 0, &first);
+  CHECK_FALSE(second.common_inf_present_flag);
+  CHECK(second.nal_hrd_parameters_present_flag);
+  CHECK(second.vcl_hrd_parameters_present_flag);
+  CHECK(second.bit_rate_scale == 1);
+  CHECK(second.cpb_size_scale == 2);
+  CHECK(second.au_cpb_removal_delay_length_minus1 == 15);
+  CHECK(second.dpb_output_delay_length_minus1 == 5);
+  const h265::SubLayerHrdInfo& sl = second.sub_layer[0];
+  CHECK(sl.low_delay_hrd_flag);
+  CHECK(sl.cpb_cnt_minus1 == 0);
+  REQUIRE(sl.nal.cpb.size() == 1);
+  REQUIRE(sl.vcl.cpb.size() == 1);
+  CHECK(sl.nal.cpb[0].bit_rate_value_minus1 == 11);
+  CHECK(sl.nal.cpb[0].BitRate == 12U << 7U);  // (11 + 1) << (6 + 1), scale inherited
+  CHECK(sl.nal.cpb[0].cbr_flag);
+  CHECK(sl.vcl.cpb[0].cpb_size_value_minus1 == 41);
+  CHECK_FALSE(sl.vcl.cpb[0].cbr_flag);
+  CHECK(br.u(3) == 0b101);  // the second structure consumed exactly its own bits
+
+  // Without a predecessor (cprms_present_flag[0] is always 1, so this only happens for malformed callers) the
+  // E.3.2 defaults apply: no NAL/VCL sub-layer parameters.
+  BitReader br2(data);
+  SyntaxBuilder b2(br2);
+  const h265::HrdParameters lone = h265::parse_hrd_parameters(br2, b2, false, 0);
+  CHECK_FALSE(lone.nal_hrd_parameters_present_flag);
+  CHECK(lone.sub_layer[0].nal.cpb.empty());
+}
+
+TEST_CASE("h265_hrd_parameters / profile_tier_level: maxNumSubLayersMinus1 > 6 throws SYN-H265-0007",
+          "[syntax][h265][fast]") {
+  const std::vector<uint8_t> data(64, 0xFF);
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  CHECK_THROWS_MATCHES(
+      h265::parse_hrd_parameters(br, b, true, 7), ParseError,
+      Catch::Matchers::Predicate<ParseError>([](const ParseError& e) { return e.code == "SYN-H265-0007"; }));
+  CHECK_THROWS_MATCHES(
+      h265::parse_profile_tier_level(br, b, true, 7), ParseError,
+      Catch::Matchers::Predicate<ParseError>([](const ParseError& e) { return e.code == "SYN-H265-0007"; }));
+  CHECK(br.bit_pos() == 0);
 }

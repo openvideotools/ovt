@@ -188,6 +188,7 @@ std::string profile_name(const ProfileInfo& p) {
 
 ProfileTierLevel parse_profile_tier_level(BitReader& br, SyntaxBuilder& b, bool profile_present_flag,
                                           unsigned max_num_sub_layers_minus1) {
+  detail::require_range(br, "maxNumSubLayersMinus1", max_num_sub_layers_minus1, 0, 6);
   ProfileTierLevel ptl;
   ptl.profile_present_flag = profile_present_flag;
   ptl.max_num_sub_layers_minus1 = static_cast<uint8_t>(max_num_sub_layers_minus1);

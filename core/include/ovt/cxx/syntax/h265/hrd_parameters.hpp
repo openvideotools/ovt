@@ -67,9 +67,13 @@ struct HrdParameters {
 };
 
 /// Parses hrd_parameters(commonInfPresentFlag, maxNumSubLayersMinus1) into the node `hrd_parameters`.
-/// cpb_cnt_minus1 > 31 throws ParseError SYN-H265-0007. maxNumSubLayersMinus1 must be <= 6.
+/// When commonInfPresentFlag is 0 the common information (nal/vcl present flags, sub-picture parameters, scales
+/// and lengths) is not in the bitstream; §7.4.3.1 derives it from the previous hrd_parameters() of the VPS, which
+/// the caller passes as `inherited` (vps_hrd[i-1]; nullptr keeps the E.3.2 inferred defaults, i.e. no NAL/VCL
+/// sub-layer parameters, as for cprms_present_flag[0] which is always 1). cpb_cnt_minus1 > 31 or
+/// maxNumSubLayersMinus1 > 6 throw ParseError SYN-H265-0007.
 HrdParameters parse_hrd_parameters(BitReader& br, SyntaxBuilder& b, bool common_inf_present_flag,
-                                   unsigned max_num_sub_layers_minus1);
+                                   unsigned max_num_sub_layers_minus1, const HrdParameters* inherited = nullptr);
 
 }  // namespace ovt::syntax::h265
 
