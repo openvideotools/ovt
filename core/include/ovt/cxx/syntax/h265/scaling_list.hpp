@@ -29,7 +29,7 @@ struct ScalingListData {
   std::array<uint8_t, kMatrices * 64> ScalingFactor8x8{};
   std::array<uint8_t, kMatrices * 256> ScalingFactor16x16{};
   std::array<uint8_t, kMatrices * 1024>
-      ScalingFactor32x32{};   // chroma matrixIds filled from the 16x16 lists (4:4:4 rule)
+      ScalingFactor32x32{};   // chroma matrixIds (and ScalingList[3][1,2,4,5]) copied from 16x16 (4:4:4 rule)
   bool from_default = false;  // Table 7-5 / 7-6 (scaling_list_enabled_flag without scaling_list_data)
   bool flat = false;          // all 16 (scaling_list_enabled_flag == 0)
   BitSpan span{0, 0};

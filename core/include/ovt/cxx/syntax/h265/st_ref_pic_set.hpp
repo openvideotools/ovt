@@ -55,6 +55,8 @@ struct StRefPicSet {
 /// delta-POC lists. `sps_sets` are the sets 0..num_short_term_ref_pic_sets-1 already parsed from the SPS (the
 /// prediction source; only the first stRpsIdx entries are read). `max_dec_pic_buffering_minus1` bounds
 /// num_negative_pics / num_positive_pics (Diagnostic Error SYN-H265-0007 beyond it; ParseError beyond 16).
+/// abs_delta_rps_minus1 and delta_poc_s0/s1_minus1 beyond 2^15 - 1 (§7.4.8) are ParseErrors too, so the derived
+/// DeltaPoc arithmetic cannot overflow; a predicted set that would exceed 16 entries is truncated with a Diagnostic.
 StRefPicSet parse_st_ref_pic_set(BitReader& br, SyntaxBuilder& b, uint32_t st_rps_idx,
                                  uint32_t num_short_term_ref_pic_sets, std::span<const StRefPicSet> sps_sets,
                                  uint32_t max_dec_pic_buffering_minus1);

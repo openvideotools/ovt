@@ -17,29 +17,39 @@ namespace ovt::syntax::h265 {
 
 namespace {
 
-// Equations 7-61 and 7-62 as written in §7.3.10.3.
-void derive_predicted(StRefPicSet& s, const StRefPicSet& ref) {
+// Equations 7-61 and 7-62 as written in §7.3.10.3. Every operand is bounded by the hard se/ue ranges below
+// (|deltaRps| <= 2^15, |DeltaPoc| <= 16 * 2^15), so the int32_t sums cannot overflow. A predicted set that would
+// exceed 16 entries (non-conformant, §7.4.8) is truncated with a Diagnostic.
+void derive_predicted(SyntaxBuilder& b, StRefPicSet& s, const StRefPicSet& ref) {
   const auto nn = static_cast<int>(ref.NumNegativePics);
   const auto np = static_cast<int>(ref.NumPositivePics);
   const auto nd = static_cast<int>(ref.NumDeltaPocs);
   auto used = [&s](int j) { return s.used_by_curr_pic_flag[static_cast<size_t>(j)]; };
   auto use_delta = [&s](int j) { return s.use_delta_flag[static_cast<size_t>(j)]; };
+  bool truncated = false;
+  auto fits = [&truncated](uint32_t i) {
+    if (i < StRefPicSet::kMaxPics) {
+      return true;
+    }
+    truncated = true;
+    return false;
+  };
   // 7-61: S0
   uint32_t i = 0;
   for (int j = np - 1; j >= 0; --j) {
     const int32_t d_poc = ref.DeltaPocS1[static_cast<size_t>(j)] + s.deltaRps;
-    if (d_poc < 0 && use_delta(nn + j) && i < StRefPicSet::kMaxPics) {
+    if (d_poc < 0 && use_delta(nn + j) && fits(i)) {
       s.DeltaPocS0[i] = d_poc;
       s.UsedByCurrPicS0[i++] = used(nn + j);
     }
   }
-  if (s.deltaRps < 0 && use_delta(nd) && i < StRefPicSet::kMaxPics) {
+  if (s.deltaRps < 0 && use_delta(nd) && fits(i)) {
     s.DeltaPocS0[i] = s.deltaRps;
     s.UsedByCurrPicS0[i++] = used(nd);
   }
   for (int j = 0; j < nn; ++j) {
     const int32_t d_poc = ref.DeltaPocS0[static_cast<size_t>(j)] + s.deltaRps;
-    if (d_poc < 0 && use_delta(j) && i < StRefPicSet::kMaxPics) {
+    if (d_poc < 0 && use_delta(j) && fits(i)) {
       s.DeltaPocS0[i] = d_poc;
       s.UsedByCurrPicS0[i++] = used(j);
     }
@@ -49,23 +59,27 @@ void derive_predicted(StRefPicSet& s, const StRefPicSet& ref) {
   i = 0;
   for (int j = nn - 1; j >= 0; --j) {
     const int32_t d_poc = ref.DeltaPocS0[static_cast<size_t>(j)] + s.deltaRps;
-    if (d_poc > 0 && use_delta(j) && i < StRefPicSet::kMaxPics) {
+    if (d_poc > 0 && use_delta(j) && fits(i)) {
       s.DeltaPocS1[i] = d_poc;
       s.UsedByCurrPicS1[i++] = used(j);
     }
   }
-  if (s.deltaRps > 0 && use_delta(nd) && i < StRefPicSet::kMaxPics) {
+  if (s.deltaRps > 0 && use_delta(nd) && fits(i)) {
     s.DeltaPocS1[i] = s.deltaRps;
     s.UsedByCurrPicS1[i++] = used(nd);
   }
   for (int j = 0; j < np; ++j) {
     const int32_t d_poc = ref.DeltaPocS1[static_cast<size_t>(j)] + s.deltaRps;
-    if (d_poc > 0 && use_delta(nn + j) && i < StRefPicSet::kMaxPics) {
+    if (d_poc > 0 && use_delta(nn + j) && fits(i)) {
       s.DeltaPocS1[i] = d_poc;
       s.UsedByCurrPicS1[i++] = used(nn + j);
     }
   }
   s.NumPositivePics = i;
+  if (truncated) {
+    b.diag(Severity::Error, "SYN-H265-0007", "predicted st_ref_pic_set exceeds 16 delta POCs; extra entries dropped",
+           "H.265 7.4.8", true);
+  }
 }
 
 void parse_predicted(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t num_short_term_ref_pic_sets,
@@ -76,7 +90,7 @@ void parse_predicted(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t n
   }
   s.delta_rps_sign = b.read_flag("delta_rps_sign");
   s.abs_delta_rps_minus1 = b.read_ue("abs_delta_rps_minus1");
-  detail::check_range(b, "abs_delta_rps_minus1", s.abs_delta_rps_minus1, 0, (1 << 15) - 1, "H.265 7.4.8");
+  detail::require_range(br, "abs_delta_rps_minus1", s.abs_delta_rps_minus1, 0, (1 << 15) - 1);
   s.RefRpsIdx = s.stRpsIdx - (s.delta_idx_minus1 + 1);
   s.deltaRps = (1 - 2 * static_cast<int32_t>(s.delta_rps_sign)) * static_cast<int32_t>(s.abs_delta_rps_minus1 + 1);
   if (s.RefRpsIdx >= sps_sets.size()) {
@@ -95,7 +109,7 @@ void parse_predicted(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t n
       s.use_delta_flag[j] = detail::read_flag_at(b, "use_delta_flag", static_cast<int>(j));
     }
   }
-  derive_predicted(s, ref);
+  derive_predicted(b, s, ref);
 }
 
 void parse_explicit(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t max_dec_pic_buffering_minus1) {
@@ -106,10 +120,12 @@ void parse_explicit(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t ma
   detail::require_range(br, "num_positive_pics", s.num_positive_pics, 0, StRefPicSet::kMaxPics - s.num_negative_pics);
   detail::check_range(b, "num_positive_pics", s.num_positive_pics, 0,
                       int64_t{max_dec_pic_buffering_minus1} - s.num_negative_pics, "H.265 7.4.8");
+  // delta_poc_sX_minus1 in [0, 2^15 - 1] is a hard bound: 16 steps of 2^15 keep the 7-59/7-60 sums far from
+  // int32_t overflow on crafted input.
   int32_t poc = 0;
   for (uint32_t i = 0; i < s.num_negative_pics; ++i) {
     s.delta_poc_s0_minus1[i] = detail::read_ue_at(b, "delta_poc_s0_minus1", static_cast<int>(i));
-    detail::check_range(b, "delta_poc_s0_minus1", s.delta_poc_s0_minus1[i], 0, (1 << 15) - 1, "H.265 7.4.8");
+    detail::require_range(br, "delta_poc_s0_minus1", s.delta_poc_s0_minus1[i], 0, (1 << 15) - 1);
     s.used_by_curr_pic_s0_flag[i] = detail::read_flag_at(b, "used_by_curr_pic_s0_flag", static_cast<int>(i));
     poc -= static_cast<int32_t>(s.delta_poc_s0_minus1[i] + 1);  // 7-59
     s.DeltaPocS0[i] = poc;
@@ -118,7 +134,7 @@ void parse_explicit(BitReader& br, SyntaxBuilder& b, StRefPicSet& s, uint32_t ma
   poc = 0;
   for (uint32_t i = 0; i < s.num_positive_pics; ++i) {
     s.delta_poc_s1_minus1[i] = detail::read_ue_at(b, "delta_poc_s1_minus1", static_cast<int>(i));
-    detail::check_range(b, "delta_poc_s1_minus1", s.delta_poc_s1_minus1[i], 0, (1 << 15) - 1, "H.265 7.4.8");
+    detail::require_range(br, "delta_poc_s1_minus1", s.delta_poc_s1_minus1[i], 0, (1 << 15) - 1);
     s.used_by_curr_pic_s1_flag[i] = detail::read_flag_at(b, "used_by_curr_pic_s1_flag", static_cast<int>(i));
     poc += static_cast<int32_t>(s.delta_poc_s1_minus1[i] + 1);  // 7-60
     s.DeltaPocS1[i] = poc;

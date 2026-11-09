@@ -118,21 +118,19 @@ void parse_one_list(BitReader& br, SyntaxBuilder& b, ScalingListData& s, unsigne
     }
     return;
   }
+  // The se(v) bounds of §7.4.5 are hard (ParseError): a 32-bit extreme would overflow the nextCoef arithmetic.
   int32_t next_coef = 8;
   if (size_id > 1) {
     const int32_t dc = b.read_se("scaling_list_dc_coef_minus8");
-    detail::check_range(b, "scaling_list_dc_coef_minus8", dc, -7, 247, "H.265 7.4.5");
+    detail::require_range(br, "scaling_list_dc_coef_minus8", dc, -7, 247);
     s.scaling_list_dc_coef_minus8[size_id - 2][matrix_id] = dc;
     next_coef = dc + 8;
   }
   const unsigned n = coef_num(size_id);
   for (unsigned i = 0; i < n; ++i) {
     const int32_t delta = detail::read_se_at(b, "scaling_list_delta_coef", static_cast<int>(i));
-    detail::check_range(b, "scaling_list_delta_coef", delta, -128, 127, "H.265 7.4.5");
-    next_coef = (next_coef + delta + 256) % 256;
-    if (next_coef < 0) {  // a delta outside [-128, 127] on a corrupt stream; keep the value representable
-      next_coef += 256;
-    }
+    detail::require_range(br, "scaling_list_delta_coef", delta, -128, 127);
+    next_coef = (next_coef + delta + 256) % 256;  // 7-39; nextCoef stays in [0, 255]
     s.ScalingList[size_id][matrix_id][i] = static_cast<uint8_t>(next_coef);
   }
 }
@@ -167,12 +165,15 @@ void derive_scaling_factors(ScalingListData& s) {
     // 7-42, 7-43: 16x16 from the 8x8 scan replicated 2x2, DC from scaling_list_dc_coef_minus8[0]
     expand(std::span<uint8_t>(s.ScalingFactor16x16).subspan(size_t{m} * 256, 256), 16, 2, s.ScalingList[2][m],
            static_cast<uint8_t>(s.scaling_list_dc_coef_minus8[0][m] + 8));
-    // 7-44, 7-45: 32x32 replicated 4x4; matrixId 0 and 3 from the 32x32 lists, the chroma matrixIds (used only when
-    // ChromaArrayType == 3) from the 16x16 lists and their DC coefficients
-    const bool signalled = (m % 3) == 0;
-    expand(std::span<uint8_t>(s.ScalingFactor32x32).subspan(size_t{m} * 1024, 1024), 32, 4,
-           signalled ? s.ScalingList[3][m] : s.ScalingList[2][m],
-           static_cast<uint8_t>(s.scaling_list_dc_coef_minus8[signalled ? 1 : 0][m] + 8));
+    // 7-44, 7-45: 32x32 replicated 4x4; matrixId 0 and 3 from the 32x32 lists. The chroma matrixIds (used only when
+    // ChromaArrayType == 3) are not signalled: copy the 16x16 list and DC coefficient in, as HM does, so that
+    // ScalingList[3][m] and ScalingFactor32x32 agree for every matrixId.
+    if ((m % 3) != 0) {
+      s.ScalingList[3][m] = s.ScalingList[2][m];
+      s.scaling_list_dc_coef_minus8[1][m] = s.scaling_list_dc_coef_minus8[0][m];
+    }
+    expand(std::span<uint8_t>(s.ScalingFactor32x32).subspan(size_t{m} * 1024, 1024), 32, 4, s.ScalingList[3][m],
+           static_cast<uint8_t>(s.scaling_list_dc_coef_minus8[1][m] + 8));
   }
 }
 

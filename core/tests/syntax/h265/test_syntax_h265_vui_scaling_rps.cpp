@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -293,6 +294,45 @@ TEST_CASE("h265_st_ref_pic_set: explicit set then an inter-predicted set (equati
   const SyntaxNodeData* summary = find_child(tree.root()->child(1), "DeltaPoc");
   REQUIRE(summary != nullptr);
   CHECK(summary->derived == "S0: -1(used) -2(used) -4 | S1:");
+}
+
+TEST_CASE("h265_scaling_list: scaling_list_delta_coef outside [-128, 127] throws SYN-H265-0007",
+          "[syntax][h265][fast]") {
+  BitWriter w;
+  w.flag(true);  // sizeId 0, matrixId 0 explicit
+  w.se(128);
+  const std::vector<uint8_t> data = w.bytes();
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  bool threw = false;
+  try {
+    (void)h265::parse_scaling_list_data(br, b);
+  } catch (const ParseError& e) {
+    threw = true;
+    CHECK(e.code == "SYN-H265-0007");
+    CHECK(std::string_view{e.what()}.find("scaling_list_delta_coef") != std::string_view::npos);
+  }
+  CHECK(threw);
+}
+
+TEST_CASE("h265_st_ref_pic_set: delta_poc_s0_minus1 beyond 2^15 - 1 throws SYN-H265-0007", "[syntax][h265][fast]") {
+  BitWriter w;
+  w.ue(1);
+  w.ue(0);
+  w.ue(1U << 15);
+  const std::vector<uint8_t> data = w.bytes();
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  std::vector<h265::StRefPicSet> none;
+  bool threw = false;
+  try {
+    (void)h265::parse_st_ref_pic_set(br, b, 0, 1, none, 15);
+  } catch (const ParseError& e) {
+    threw = true;
+    CHECK(e.code == "SYN-H265-0007");
+    CHECK(std::string_view{e.what()}.find("delta_poc_s0_minus1") != std::string_view::npos);
+  }
+  CHECK(threw);
 }
 
 TEST_CASE("h265_st_ref_pic_set: num_negative_pics beyond 16 throws SYN-H265-0007", "[syntax][h265][fast]") {
