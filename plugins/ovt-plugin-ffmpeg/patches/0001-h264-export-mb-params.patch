@@ -1,0 +1,681 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Sun, 8 Nov 2026 00:00:00 +0000
+Subject: [PATCH] avutil: add AV_FRAME_DATA_VIDEO_BLOCK_PARAMS side data
+
+AV_FRAME_DATA_VIDEO_ENC_PARAMS exports only the final quantiser of each
+block. Analysis tools also need the per-block syntax as signalled in the
+bitstream: block partitioning, prediction modes and directions, reference
+indices, coded block pattern, transform size, field decoding and motion
+vector differences.
+
+Add a new frame side data type carrying that syntax, modelled on
+AVVideoEncParams: a self-describing header (AVVideoBlockParamsHeader)
+followed by an array of fixed-size, type-specific block records reached
+through blocks_offset/block_size with an inline accessor, so new fields can
+be appended to a record without breaking the ABI. The first type is
+AV_VIDEO_BLOCK_PARAMS_H264 with one AVH264MacroblockParams per macroblock.
+
+A following patch exports it from the h264 decoder behind a new
+export_side_data flag. This one adds the libavutil API, the side data name,
+the minor version bump, the APIchanges entry and a FATE test
+(fate-video_block_params) that round-trips 8160 macroblocks (1920x1088)
+through frame side data.
+
+Upstream-Status: Pending [to be submitted to ffmpeg-devel by OVT WI-4.103]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: FFmpeg's h264 decoder exports MVs and per-MB QP only; Open Video
+  Tools needs mb_type, sub_mb_type, ref_idx, intra modes, cbp, mb_qp_delta
+  and mvd (OVT spec chapter 07 section 7.6.3). Part 1 of 2 (OVT WI-4.100);
+  part 2 (h264 decoder export) is OVT WI-4.101.
+---
+ doc/APIchanges                       |   6 +
+ libavutil/Makefile                   |   3 +
+ libavutil/frame.c                    |   1 +
+ libavutil/frame.h                    |   8 +
+ libavutil/tests/video_block_params.c | 171 +++++++++++++++++++
+ libavutil/version.h                  |   2 +-
+ libavutil/video_block_params.c       |  91 +++++++++++
+ libavutil/video_block_params.h       | 235 +++++++++++++++++++++++++++
+ tests/fate/libavutil.mak             |   4 +
+ tests/ref/fate/video_block_params    |   8 +
+ 10 files changed, 528 insertions(+), 1 deletion(-)
+ create mode 100644 libavutil/tests/video_block_params.c
+ create mode 100644 libavutil/video_block_params.c
+ create mode 100644 libavutil/video_block_params.h
+ create mode 100644 tests/ref/fate/video_block_params
+
+diff --git a/doc/APIchanges b/doc/APIchanges
+index 924a2b2..e5fb4ea 100644
+--- a/doc/APIchanges
++++ b/doc/APIchanges
+@@ -2,6 +2,12 @@ The last version increases of all libraries were on 2024-03-07
+ 
+ API changes, most recent first:
+ 
++2026-11-08 - xxxxxxxxxx - lavu 59.40.100 - frame.h video_block_params.h
++  Add AV_FRAME_DATA_VIDEO_BLOCK_PARAMS, AVVideoBlockParamsHeader,
++  enum AVVideoBlockParamsType, AVH264MacroblockParams,
++  av_video_block_params_alloc(), av_video_block_params_create_side_data()
++  and av_video_block_params_block().
++
+ 2024-09-23 - 6940a6de2f0 - lavu 59.38.100 - frame.h
+   Add AV_FRAME_DATA_VIEW_ID.
+ 
+diff --git a/libavutil/Makefile b/libavutil/Makefile
+index 6e6fa8d..c699727 100644
+--- a/libavutil/Makefile
++++ b/libavutil/Makefile
+@@ -89,6 +89,7 @@ HEADERS = adler32.h                                                     \
+           twofish.h                                                     \
+           uuid.h                                                        \
+           version.h                                                     \
++          video_block_params.h                                          \
+           video_enc_params.h                                            \
+           xtea.h                                                        \
+           tea.h                                                         \
+@@ -187,6 +188,7 @@ OBJS = adler32.o                                                        \
+        tx_int32.o                                                       \
+        uuid.o                                                           \
+        version.o                                                        \
++       video_block_params.o                                             \
+        video_enc_params.o                                               \
+        video_hint.o                                                     \
+        film_grain_params.o                                              \
+@@ -277,6 +279,7 @@ TESTPROGS = adler32                                                     \
+             tree                                                        \
+             twofish                                                     \
+             utf8                                                        \
++            video_block_params                                          \
+             uuid                                                        \
+             xtea                                                        \
+             tea                                                         \
+diff --git a/libavutil/frame.c b/libavutil/frame.c
+index f0a0dba..2ede3f7 100644
+--- a/libavutil/frame.c
++++ b/libavutil/frame.c
+@@ -48,6 +48,7 @@ static const AVSideDataDescriptor sd_props[] = {
+     [AV_FRAME_DATA_DOVI_METADATA]               = { "Dolby Vision Metadata" },
+     [AV_FRAME_DATA_LCEVC]                       = { "LCEVC NAL data" },
+     [AV_FRAME_DATA_VIEW_ID]                     = { "View ID" },
++    [AV_FRAME_DATA_VIDEO_BLOCK_PARAMS]          = { "Video block parameters" },
+     [AV_FRAME_DATA_STEREO3D]                    = { "Stereo 3D",                                    AV_SIDE_DATA_PROP_GLOBAL },
+     [AV_FRAME_DATA_REPLAYGAIN]                  = { "AVReplayGain",                                 AV_SIDE_DATA_PROP_GLOBAL },
+     [AV_FRAME_DATA_DISPLAYMATRIX]               = { "3x3 displaymatrix",                            AV_SIDE_DATA_PROP_GLOBAL },
+diff --git a/libavutil/frame.h b/libavutil/frame.h
+index f780656..0dc9b07 100644
+--- a/libavutil/frame.h
++++ b/libavutil/frame.h
+@@ -243,6 +243,14 @@ enum AVFrameSideDataType {
+      * The data is an int storing the view ID.
+      */
+     AV_FRAME_DATA_VIEW_ID,
++
++    /**
++     * Per-block syntax elements of the frame as signalled in the bitstream
++     * (block partitioning, prediction modes, reference indices, ...).
++     * The data is the AVVideoBlockParamsHeader structure defined in
++     * libavutil/video_block_params.h.
++     */
++    AV_FRAME_DATA_VIDEO_BLOCK_PARAMS,
+ };
+ 
+ enum AVActiveFormatDescription {
+diff --git a/libavutil/tests/video_block_params.c b/libavutil/tests/video_block_params.c
+new file mode 100644
+index 0000000..e15370f
+--- /dev/null
++++ b/libavutil/tests/video_block_params.c
+@@ -0,0 +1,171 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "libavutil/frame.h"
++#include "libavutil/mem.h"
++#include "libavutil/pixfmt.h"
++#include "libavutil/video_block_params.h"
++
++/* 1920x1088 in macroblocks */
++#define MB_W 120
++#define MB_H  68
++
++/* Deterministic, index-dependent values covering the full range of each field. */
++static void fill_mb(AVH264MacroblockParams *mb, unsigned idx)
++{
++    mb->src_x                  = (idx % MB_W) * 16;
++    mb->src_y                  = (idx / MB_W) * 16;
++    mb->slice_id               = idx / 255;
++    mb->mb_type_class          = idx % 14;
++    mb->intra16x16_pred_mode   = (int8_t)(idx % 5) - 1;
++    mb->intra_chroma_pred_mode = (int8_t)(idx % 5) - 1;
++    mb->cbp                    = idx % 48;
++    mb->transform_8x8          = idx & 1;
++    mb->mb_field_decoding_flag = (idx >> 1) & 1;
++    mb->qp_delta               = (int8_t)(idx % 52) - 26;
++    for (int i = 0; i < 4; i++) {
++        mb->sub_mb_type[i]       = (idx + i) % 4 | (((idx >> i) & 1) << 4);
++        mb->pred_dir[i]          = (idx + i) % 4;
++        mb->ref_idx[0][i]        = (int8_t)((idx + i) % 33) - 1;
++        mb->ref_idx[1][i]        = (int8_t)((idx + 7 * i) % 33) - 1;
++        mb->intra8x8_pred_mode[i] = (int8_t)((idx + i) % 10) - 1;
++    }
++    for (int i = 0; i < 16; i++) {
++        mb->intra4x4_pred_mode[i] = (int8_t)((idx + i) % 10) - 1;
++        for (int list = 0; list < 2; list++) {
++            mb->mvd[list][i][0] = (int16_t)((idx * 31 + i * 7 + list) % 65536 - 32768);
++            mb->mvd[list][i][1] = (int16_t)((idx * 17 + i * 3 + list) % 65536 - 32768);
++        }
++    }
++}
++
++static int check_mb(const AVH264MacroblockParams *mb, unsigned idx)
++{
++    AVH264MacroblockParams ref;
++
++    memset(&ref, 0, sizeof(ref));
++    fill_mb(&ref, idx);
++#define CHECK(field) if (memcmp(&mb->field, &ref.field, sizeof(ref.field))) { \
++        printf("block %u: " #field " mismatch\n", idx);                       \
++        return 1;                                                             \
++    }
++    CHECK(src_x);
++    CHECK(src_y);
++    CHECK(slice_id);
++    CHECK(mb_type_class);
++    CHECK(sub_mb_type);
++    CHECK(pred_dir);
++    CHECK(ref_idx);
++    CHECK(intra4x4_pred_mode);
++    CHECK(intra8x8_pred_mode);
++    CHECK(intra16x16_pred_mode);
++    CHECK(intra_chroma_pred_mode);
++    CHECK(cbp);
++    CHECK(transform_8x8);
++    CHECK(mb_field_decoding_flag);
++    CHECK(qp_delta);
++    CHECK(mvd);
++#undef CHECK
++    return 0;
++}
++
++int main(void)
++{
++    const unsigned nb_blocks = MB_W * MB_H;
++    AVVideoBlockParamsHeader *par;
++    const AVFrameSideData *sd;
++    AVFrame *frame, *clone;
++    size_t size;
++    int errors = 0;
++
++    /* plain allocation */
++    par = av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_H264, nb_blocks, &size);
++    if (!par)
++        return 1;
++    printf("alloc: type %d, nb_blocks %u, block_size ok %d, size ok %d\n",
++           par->type, par->nb_blocks,
++           par->block_size == sizeof(AVH264MacroblockParams),
++           size == par->blocks_offset + (size_t)nb_blocks * par->block_size);
++    printf("alloc: blocks zeroed %d\n",
++           ((AVH264MacroblockParams *)av_video_block_params_block(par, nb_blocks - 1))->src_x == 0);
++    av_free(par);
++
++    par = av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_H264, 0, &size);
++    if (!par)
++        return 1;
++    printf("alloc: empty, nb_blocks %u, size ok %d\n", par->nb_blocks,
++           size == par->blocks_offset);
++    av_free(par);
++
++    printf("alloc: unknown type NULL %d\n",
++           !av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_NONE, 16, NULL));
++
++    /* side data round trip */
++    frame = av_frame_alloc();
++    if (!frame)
++        return 1;
++    /* av_frame_clone() needs refcounted data */
++    frame->format = AV_PIX_FMT_GRAY8;
++    frame->width  = 16;
++    frame->height = 16;
++    if (av_frame_get_buffer(frame, 0) < 0) {
++        av_frame_free(&frame);
++        return 1;
++    }
++    printf("side data: unknown type NULL %d, nb_side_data %d\n",
++           !av_video_block_params_create_side_data(frame, AV_VIDEO_BLOCK_PARAMS_NONE, 16),
++           frame->nb_side_data);
++
++    par = av_video_block_params_create_side_data(frame, AV_VIDEO_BLOCK_PARAMS_H264,
++                                                 nb_blocks);
++    if (!par) {
++        av_frame_free(&frame);
++        return 1;
++    }
++    par->plane_w = MB_W;
++    par->plane_h = MB_H;
++    for (unsigned i = 0; i < nb_blocks; i++)
++        fill_mb(av_video_block_params_block(par, i), i);
++
++    clone = av_frame_clone(frame);
++    av_frame_free(&frame);
++    if (!clone)
++        return 1;
++
++    sd = av_frame_get_side_data(clone, AV_FRAME_DATA_VIDEO_BLOCK_PARAMS);
++    if (!sd) {
++        printf("side data: not found\n");
++        av_frame_free(&clone);
++        return 1;
++    }
++    par = (AVVideoBlockParamsHeader *)sd->data;
++    printf("side data: %s, size ok %d\n", av_frame_side_data_name(sd->type),
++           sd->size == par->blocks_offset + (size_t)par->nb_blocks * par->block_size);
++    printf("side data: type %d, nb_blocks %u, plane %dx%d\n",
++           par->type, par->nb_blocks, par->plane_w, par->plane_h);
++    for (unsigned i = 0; i < par->nb_blocks && !errors; i++)
++        errors += check_mb(av_video_block_params_block(par, i), i);
++    printf("side data: %u blocks round-tripped, errors %d\n", par->nb_blocks, errors);
++
++    av_frame_free(&clone);
++    return errors;
++}
+diff --git a/libavutil/version.h b/libavutil/version.h
+index 753f85b..1ae3f4e 100644
+--- a/libavutil/version.h
++++ b/libavutil/version.h
+@@ -79,7 +79,7 @@
+  */
+ 
+ #define LIBAVUTIL_VERSION_MAJOR  59
+-#define LIBAVUTIL_VERSION_MINOR  39
++#define LIBAVUTIL_VERSION_MINOR  40
+ #define LIBAVUTIL_VERSION_MICRO 100
+ 
+ #define LIBAVUTIL_VERSION_INT   AV_VERSION_INT(LIBAVUTIL_VERSION_MAJOR, \
+diff --git a/libavutil/video_block_params.c b/libavutil/video_block_params.c
+new file mode 100644
+index 0000000..f6b7ff4
+--- /dev/null
++++ b/libavutil/video_block_params.c
+@@ -0,0 +1,91 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stddef.h>
++#include <stdint.h>
++
++#include "buffer.h"
++#include "frame.h"
++#include "mem.h"
++#include "video_block_params.h"
++
++AVVideoBlockParamsHeader *
++av_video_block_params_alloc(enum AVVideoBlockParamsType type,
++                            unsigned int nb_blocks, size_t *out_size)
++{
++    struct TestStructH264 {
++        AVVideoBlockParamsHeader p;
++        AVH264MacroblockParams   b;
++    };
++    size_t blocks_offset, block_size, size;
++    AVVideoBlockParamsHeader *par;
++
++    switch (type) {
++    case AV_VIDEO_BLOCK_PARAMS_H264:
++        blocks_offset = offsetof(struct TestStructH264, b);
++        block_size    = sizeof(AVH264MacroblockParams);
++        break;
++    default:
++        return NULL;
++    }
++
++    size = blocks_offset;
++    if (nb_blocks > (SIZE_MAX - size) / block_size)
++        return NULL;
++    size += block_size * nb_blocks;
++
++    par = av_mallocz(size);
++    if (!par)
++        return NULL;
++
++    par->type          = type;
++    par->nb_blocks     = nb_blocks;
++    par->block_size    = block_size;
++    par->blocks_offset = blocks_offset;
++
++    if (out_size)
++        *out_size = size;
++
++    return par;
++}
++
++AVVideoBlockParamsHeader *
++av_video_block_params_create_side_data(AVFrame *frame,
++                                       enum AVVideoBlockParamsType type,
++                                       unsigned int nb_blocks)
++{
++    AVBufferRef              *buf;
++    AVVideoBlockParamsHeader *par;
++    size_t size;
++
++    par = av_video_block_params_alloc(type, nb_blocks, &size);
++    if (!par)
++        return NULL;
++    buf = av_buffer_create((uint8_t *)par, size, NULL, NULL, 0);
++    if (!buf) {
++        av_freep(&par);
++        return NULL;
++    }
++
++    if (!av_frame_new_side_data_from_buf(frame, AV_FRAME_DATA_VIDEO_BLOCK_PARAMS, buf)) {
++        av_buffer_unref(&buf);
++        return NULL;
++    }
++
++    return par;
++}
+diff --git a/libavutil/video_block_params.h b/libavutil/video_block_params.h
+new file mode 100644
+index 0000000..ba66740
+--- /dev/null
++++ b/libavutil/video_block_params.h
+@@ -0,0 +1,235 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#ifndef AVUTIL_VIDEO_BLOCK_PARAMS_H
++#define AVUTIL_VIDEO_BLOCK_PARAMS_H
++
++#include <stddef.h>
++#include <stdint.h>
++
++#include "libavutil/avassert.h"
++#include "libavutil/frame.h"
++
++/**
++ * @file
++ * Per-block syntax of a decoded video frame, exported by decoders as
++ * AV_FRAME_DATA_VIDEO_BLOCK_PARAMS side data.
++ *
++ * Where AV_FRAME_DATA_VIDEO_ENC_PARAMS carries only the final quantiser of
++ * each block, this side data carries the codec-specific syntax elements of
++ * each block (partitioning, prediction modes, reference indices, coded block
++ * pattern, motion vector differences) as signalled in the bitstream. The
++ * layout of each block record depends on the type.
++ */
++
++enum AVVideoBlockParamsType {
++    AV_VIDEO_BLOCK_PARAMS_NONE = -1,
++    /**
++     * H.264 macroblocks. Each block is an AVH264MacroblockParams describing
++     * one macroblock (or, in MBAFF frames, one macroblock of a macroblock
++     * pair), in raster order of the coded picture.
++     */
++    AV_VIDEO_BLOCK_PARAMS_H264 = 0,
++};
++
++/**
++ * Per-block parameters of a given frame. This struct is allocated along with
++ * an array of per-block records whose layout depends on the type.
++ * Must be allocated with av_video_block_params_alloc().
++ */
++typedef struct AVVideoBlockParamsHeader {
++    /**
++     * Number of blocks in the array.
++     *
++     * May be 0, in which case no per-block information is present. In this case
++     * the values of blocks_offset / block_size are unspecified and should not
++     * be accessed.
++     */
++    unsigned int nb_blocks;
++    /**
++     * Offset in bytes from the beginning of this structure at which the array
++     * of blocks starts.
++     */
++    size_t blocks_offset;
++    /**
++     * Size of each block in bytes. May not match the sizeof() of the record
++     * type as known to the caller.
++     */
++    size_t block_size;
++
++    /**
++     * Type of the parameters (the codec they are used with). It determines
++     * the type of each block record.
++     */
++    enum AVVideoBlockParamsType type;
++
++    /**
++     * Width and height of the block grid, in blocks. For H.264 these are the
++     * picture width and height in macroblocks. nb_blocks is normally
++     * plane_w * plane_h.
++     */
++    int plane_w, plane_h;
++} AVVideoBlockParamsHeader;
++
++/**
++ * Syntax of one H.264 macroblock, as signalled in the bitstream.
++ * It is allocated as a part of AVVideoBlockParamsHeader and should be
++ * retrieved with av_video_block_params_block().
++ *
++ * sizeof(AVH264MacroblockParams) is not a part of the ABI and new fields may
++ * be added to it.
++ *
++ * Unless stated otherwise, a value of -1 in a signed field means that the
++ * element is not present in this macroblock.
++ */
++typedef struct AVH264MacroblockParams {
++    /**
++     * Position of the top-left luma sample of the macroblock in the coded
++     * picture.
++     */
++    int32_t src_x, src_y;
++
++    /**
++     * Index of the slice this macroblock belongs to, counted from 0 in
++     * decoding order within the picture, modulo 256.
++     */
++    uint8_t slice_id;
++
++    /**
++     * Macroblock type class:
++     * 0 I_NxN, 1 I_16x16, 2 I_PCM, 3 P_16x16 (P_L0_16x16), 4 P_16x8,
++     * 5 P_8x16, 6 P_8x8 (including P_8x8ref0), 7 P_Skip, 8 B_Direct_16x16,
++     * 9 B_16x16, 10 B_16x8, 11 B_8x16, 12 B_8x8, 13 B_Skip.
++     * SI and SP macroblocks are reported as their I and P equivalents.
++     */
++    uint8_t mb_type_class;
++
++    /**
++     * Sub-macroblock partitioning of each 8x8 partition, for mb_type_class
++     * P_8x8 and B_8x8: bits 0-3 are 0 for 8x8, 1 for 8x4, 2 for 4x8,
++     * 3 for 4x4; bit 4 is set for B_Direct_8x8. 0 for other macroblock types.
++     */
++    uint8_t sub_mb_type[4];
++
++    /**
++     * Prediction direction of each 8x8 partition: bit 0 set when list 0 is
++     * used, bit 1 set when list 1 is used. 0 for intra macroblocks.
++     */
++    uint8_t pred_dir[4];
++
++    /**
++     * Reference index of each 8x8 partition for list 0 and list 1, or -1 when
++     * the list is not used by that partition.
++     */
++    int8_t ref_idx[2][4];
++
++    /**
++     * Intra 4x4 prediction mode of each 4x4 block, in the decoding order of
++     * the 4x4 luma blocks (H.264 6.4.3), for mb_type_class I_NxN without
++     * transform_8x8; -1 otherwise.
++     */
++    int8_t intra4x4_pred_mode[16];
++
++    /**
++     * Intra 8x8 prediction mode of each 8x8 block, for mb_type_class I_NxN
++     * with transform_8x8; -1 otherwise.
++     */
++    int8_t intra8x8_pred_mode[4];
++
++    /**
++     * Intra 16x16 prediction mode (0-3), for mb_type_class I_16x16;
++     * -1 otherwise.
++     */
++    int8_t intra16x16_pred_mode;
++
++    /**
++     * intra_chroma_pred_mode (0-3) of intra macroblocks with chroma; -1 for
++     * inter macroblocks, I_PCM and monochrome pictures.
++     */
++    int8_t intra_chroma_pred_mode;
++
++    /**
++     * coded_block_pattern: bits 0-3 luma, bits 4-5 chroma (CodedBlockPatternLuma
++     * + 16 * CodedBlockPatternChroma).
++     */
++    uint8_t cbp;
++
++    /**
++     * transform_size_8x8_flag.
++     */
++    uint8_t transform_8x8;
++
++    /**
++     * mb_field_decoding_flag; 1 also for every macroblock of a field picture.
++     */
++    uint8_t mb_field_decoding_flag;
++
++    /**
++     * mb_qp_delta as signalled, 0 when not present.
++     */
++    int8_t qp_delta;
++
++    /**
++     * Motion vector difference as signalled (mvd_l0 / mvd_l1), per list, per
++     * 4x4 block in the decoding order of the 4x4 luma blocks, horizontal then
++     * vertical component, in quarter luma sample units. 0 where no mvd is
++     * signalled.
++     */
++    int16_t mvd[2][16][2];
++} AVH264MacroblockParams;
++
++/**
++ * Get the block at the specified {@code idx}. Must be between 0 and
++ * nb_blocks - 1. The returned pointer is to a record of the type determined by
++ * par->type, e.g. AVH264MacroblockParams for AV_VIDEO_BLOCK_PARAMS_H264.
++ */
++static av_always_inline void*
++av_video_block_params_block(AVVideoBlockParamsHeader *par, unsigned int idx)
++{
++    av_assert0(idx < par->nb_blocks);
++    return (uint8_t *)par + par->blocks_offset + idx * par->block_size;
++}
++
++/**
++ * Allocates memory for AVVideoBlockParamsHeader of the given type, plus an
++ * array of {@code nb_blocks} records of the type's block structure, and
++ * initializes the variables. The blocks are zeroed. Can be freed with a normal
++ * av_free() call.
++ *
++ * @param out_size if non-NULL, the size in bytes of the resulting data array is
++ * written here.
++ * @return the allocated structure, or NULL on failure or for an unknown type
++ */
++AVVideoBlockParamsHeader *
++av_video_block_params_alloc(enum AVVideoBlockParamsType type,
++                            unsigned int nb_blocks, size_t *out_size);
++
++/**
++ * Allocates memory for AVVideoBlockParamsHeader plus an array of
++ * {@code nb_blocks} block records in the given AVFrame {@code frame}
++ * as AVFrameSideData of type AV_FRAME_DATA_VIDEO_BLOCK_PARAMS
++ * and initializes the variables.
++ *
++ * @return the allocated structure, or NULL on failure or for an unknown type
++ */
++AVVideoBlockParamsHeader *
++av_video_block_params_create_side_data(AVFrame *frame,
++                                       enum AVVideoBlockParamsType type,
++                                       unsigned int nb_blocks);
++
++#endif /* AVUTIL_VIDEO_BLOCK_PARAMS_H */
+diff --git a/tests/fate/libavutil.mak b/tests/fate/libavutil.mak
+index 6bf03b2..3b2e7aa 100644
+--- a/tests/fate/libavutil.mak
++++ b/tests/fate/libavutil.mak
+@@ -179,6 +179,10 @@ fate-uuid: libavutil/tests/uuid$(EXESUF)
+ fate-uuid: CMD = run libavutil/tests/uuid$(EXESUF)
+ fate-uuid: CMP = null
+ 
++FATE_LIBAVUTIL += fate-video_block_params
++fate-video_block_params: libavutil/tests/video_block_params$(EXESUF)
++fate-video_block_params: CMD = run libavutil/tests/video_block_params$(EXESUF)
++
+ FATE_LIBAVUTIL += $(FATE_LIBAVUTIL-yes)
+ FATE-$(CONFIG_AVUTIL) += $(FATE_LIBAVUTIL)
+ fate-libavutil: $(FATE_LIBAVUTIL)
+diff --git a/tests/ref/fate/video_block_params b/tests/ref/fate/video_block_params
+new file mode 100644
+index 0000000..66f6da4
+--- /dev/null
++++ b/tests/ref/fate/video_block_params
+@@ -0,0 +1,8 @@
++alloc: type 0, nb_blocks 8160, block_size ok 1, size ok 1
++alloc: blocks zeroed 1
++alloc: empty, nb_blocks 0, size ok 1
++alloc: unknown type NULL 1
++side data: unknown type NULL 1, nb_side_data 0
++side data: Video block parameters, size ok 1
++side data: type 0, nb_blocks 8160, plane 120x68
++side data: 8160 blocks round-tripped, errors 0
