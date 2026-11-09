@@ -14,6 +14,7 @@
 #include <span>
 
 #include "container/ivf.hpp"
+#include "container/rawyuv.hpp"
 #include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -47,8 +48,12 @@ std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, 
     case Format::Isobmff:
     case Format::AnnexB:
     case Format::Obu:
-    case Format::Raw:
       return std::make_unique<Reader>();  // stub until the format's reader lands
+    case Format::Raw:
+      if (why != nullptr) {
+        *why = OVT_E_INVALID_ARG;  // headerless: the reader needs a format description (rawyuv.hpp)
+      }
+      return nullptr;
     default:
       return nullptr;
   }
@@ -65,6 +70,15 @@ std::vector<uint8_t> empty_tree(Format f) {
   return {bytes.begin(), bytes.end()};
 }
 
+ovt_status finish_container(ovt_File* file, Format f, std::unique_ptr<Reader> reader, ovt_Container** out) {
+  auto tree = reader->tree();
+  if (tree.empty()) {
+    tree = empty_tree(f);
+  }
+  *out = new ovt_Container{file, f, std::move(reader), std::move(tree)};
+  return OVT_OK;
+}
+
 ovt_status make_container(ovt_File* file, Format f, ovt_Container** out) {
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive, the reader moves into the handle
   ovt_status why = OVT_E_UNSUPPORTED;
@@ -72,12 +86,7 @@ ovt_status make_container(ovt_File* file, Format f, ovt_Container** out) {
   if (!reader) {
     return why;  // OVT_E_CORRUPT: a reader exists, the bytes are not that format
   }
-  auto tree = reader->tree();
-  if (tree.empty()) {
-    tree = empty_tree(f);
-  }
-  *out = new ovt_Container{file, f, std::move(reader), std::move(tree)};
-  return OVT_OK;
+  return finish_container(file, f, std::move(reader), out);
 }
 
 ovt_status status_of_current_exception() noexcept {
@@ -132,6 +141,15 @@ OVT_API ovt_status ovt_container_open_format(ovt_File* file, const char* format,
     return OVT_E_INVALID_ARG;
   }
   try {
+    if (*f == ovt::container::Format::Raw) {
+      // §8.6.6 step 2: the explicit `WxH:pix_fmt[:fps]` string. The sidecar and the heuristics are
+      // ovt::container::raw::resolve(), which the CLI and the GUI run before they call this function.
+      const auto fmt = ovt::container::raw::parse_format_string(raw_format);
+      if (!fmt) {
+        return OVT_E_INVALID_ARG;
+      }
+      return ovt::container::finish_container(file, *f, ovt::container::raw::make_reader(*file->file, *fmt), out);
+    }
     return ovt::container::make_container(file, *f, out);
   } catch (...) {
     return ovt::container::status_of_current_exception();
