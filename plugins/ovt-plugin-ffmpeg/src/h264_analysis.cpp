@@ -102,11 +102,21 @@ bool is_key_frame(const AVFrame* f) {
 #endif
 }
 
+// packet->opaque carries decode_index + 1, so that a null pointer can only mean "no packet" (decode index 0 is a
+// legal hint). Frames libavcodec produced without a packet read as decode index -1.
+void* encode_opaque(int32_t decode_index) {
+  return reinterpret_cast<void*>(static_cast<intptr_t>(decode_index) + 1);  // NOLINT(performance-no-int-to-ptr)
+}
+
+int32_t decode_opaque(const void* opaque) {
+  return static_cast<int32_t>(reinterpret_cast<intptr_t>(opaque) - 1);
+}
+
 // FrameInfo fields of an output frame. With apply_cropping = 0 the frame keeps the coded size and states the
 // conformance window in crop_*.
 Frame describe(const AVFrame* f) {
   Frame out;
-  out.decode_index = static_cast<int32_t>(reinterpret_cast<intptr_t>(f->opaque));
+  out.decode_index = decode_opaque(f->opaque);
   out.frame_type = frame_type(f->pict_type);
   out.is_rap = is_key_frame(f);
   out.coded_w = f->width;
@@ -201,6 +211,9 @@ H264Analysis::~H264Analysis() {
 }
 
 void H264Analysis::add_diag(uint8_t severity, std::string code, std::string message) {
+  if (pending_diags_.size() >= kMaxPendingDiags) {
+    return;  // a stream of undecodable access units must not grow the list without limit
+  }
   pending_diags_.push_back(Diag{severity, std::move(code), std::move(message)});
 }
 
@@ -221,6 +234,11 @@ ovt_status H264Analysis::push(const uint8_t* unit, size_t len, int32_t decode_in
     has_au_ = true;
     au_hint_ = decode_index_hint;
     pts_[decode_index_hint] = pts;
+    pts_order_.push_back(decode_index_hint);
+    while (pts_order_.size() > kMaxPendingPts) {
+      pts_.erase(pts_order_.front());  // access units libavcodec dropped never produce a frame to claim their entry
+      pts_order_.pop_front();
+    }
   }
   append_annexb(&au_, std::span<const uint8_t>(unit, len));
   return st;
@@ -236,6 +254,8 @@ ovt_status H264Analysis::flush() {
   }
   flushed_ = true;
   const ovt_status drained = send(nullptr);  // enter draining mode: delayed frames come out until AVERROR_EOF
+  pts_.clear();
+  pts_order_.clear();  // every frame is out: what is left belongs to access units that produced none
   return st != OVT_OK ? st : drained;
 }
 
@@ -249,32 +269,36 @@ ovt_status H264Analysis::send_access_unit() {
   pkt_->pts = au_hint_;
   // The decode index travels in opaque (AV_CODEC_FLAG_COPY_OPAQUE); libavcodec copies it to the frame that this
   // packet starts, also across frame threads.
-  pkt_->opaque = reinterpret_cast<void*>(static_cast<intptr_t>(au_hint_));  // NOLINT(performance-no-int-to-ptr)
+  pkt_->opaque = encode_opaque(au_hint_);
   const ovt_status st = send(pkt_);
   av_packet_unref(pkt_);
   return st;
 }
 
 ovt_status H264Analysis::send(const AVPacket* pkt) {
-  ovt_status st = OVT_OK;
-  for (;;) {
-    const int err = avcodec_send_packet(ctx_, pkt);
-    if (err == AVERROR(EAGAIN)) {
-      // The decoder wants its output read first; receive_all() empties it, so the next send succeeds.
-      st = receive_all();
-      continue;
+  ovt_status st = OVT_OK;  // the first error wins
+  int err = 0;
+  for (int attempt = 0; attempt < kMaxSendAttempts; ++attempt) {
+    err = avcodec_send_packet(ctx_, pkt);
+    if (err != AVERROR(EAGAIN)) {
+      break;
     }
-    if (err == AVERROR(ENOMEM)) {
-      throw std::bad_alloc();
-    }
-    if (err < 0 && err != AVERROR_EOF) {
-      // SPEC-ASSUMPTION(#261): no chapter 07 §7.9.5 code exists for a libavcodec decode error; the message names it.
-      add_diag(kSeverityError, "",
-               "libavcodec rejected the access unit of decode index " + std::to_string(au_hint_) + ": " +
-                   av_error_text(err));
-      st = OVT_E_CORRUPT;
-    }
-    break;
+    // The decoder wants its output read first; receive_all() empties it, so the next attempt should succeed.
+    const ovt_status received = receive_all();
+    st = st != OVT_OK ? st : received;
+  }
+  if (err == AVERROR(ENOMEM)) {
+    throw std::bad_alloc();
+  }
+  if (err < 0 && err != AVERROR_EOF) {
+    // SPEC-ASSUMPTION(#261): no chapter 07 §7.9.5 code exists for a libavcodec decode error; the message names it.
+    add_diag(
+        kSeverityError, "",
+        (err == AVERROR(EAGAIN) ? "libavcodec kept refusing input after its output was read, access unit of decode "
+                                  "index "
+                                : "libavcodec rejected the access unit of decode index ") +
+            std::to_string(au_hint_) + ": " + av_error_text(err));
+    st = st != OVT_OK ? st : (err == AVERROR(EAGAIN) ? OVT_E_PLUGIN : OVT_E_CORRUPT);
   }
   const ovt_status received = receive_all();
   return st != OVT_OK ? st : received;
@@ -295,6 +319,12 @@ ovt_status H264Analysis::receive_all() {
     }
     Pending p;
     p.info = describe(frame_);
+    if (p.info.decode_index < 0) {
+      // No packet started this frame (libavcodec made it up): without a decode index it cannot be reported.
+      add_diag(kSeverityWarning, "", "libavcodec output a frame that no access unit started; it was dropped");
+      av_frame_unref(frame_);
+      continue;
+    }
     if (const auto it = pts_.find(p.info.decode_index); it != pts_.end()) {
       p.info.pts = it->second;
       pts_.erase(it);

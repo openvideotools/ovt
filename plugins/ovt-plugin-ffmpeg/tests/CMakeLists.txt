@@ -15,8 +15,9 @@ add_executable(ovt_plugin_ffmpeg_sidedata ffmpeg_sidedata_csv.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_sidedata PRIVATE tp::ffmpeg_plugin ovt::flags)
 ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
 
-# The side-data mapping (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
-add_executable(ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp ../src/map_h264_sidedata.cpp)
+# The internals of the plugin (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
+add_executable(ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp ../src/h264_analysis.cpp
+                                                ../src/map_h264_sidedata.cpp)
 target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
 target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")

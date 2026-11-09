@@ -24,6 +24,7 @@
 #include <link.h>
 #endif
 
+#include "crash_backtrace.h"
 #include "ovt/render/picture.h"
 #include "ovt/render/video_surface.h"
 #include "surface/output_download.h"
@@ -127,6 +128,7 @@ void pin_vulkan_icds() {}
 #endif
 
 std::unique_ptr<VideoSurface> surface_or_skip(int w, int h) {
+  ovt::render::test::install_crash_backtrace();  // a crash anywhere below prints the faulting thread's stack
   auto surface = VideoSurface::create("plane-fill-test");
   REQUIRE(surface != nullptr);
   DisplayTarget t;
@@ -253,9 +255,10 @@ TEST_CASE("render_test_plane_fill: format matrix renders limited black and white
   }
 }
 
-// Regression test for the teardown race behind the intermittent SIGSEGV of the format matrix on MoltenVK: a surface
-// destroyed right after upload, render and download must not free the Vulkan device while the driver still finishes
-// that work (VideoSurfaceImpl::wait_device_idle). Many short-lived surfaces make the race window recur.
+// Regression test for the intermittent teardown SIGSEGV on MoltenVK (#304, #330): a surface destroyed right after
+// upload, render and download must not free anything the driver still uses while it finishes that work (timer query
+// pools, see render/src/surface/vk_no_timestamps.cpp; the device itself, see VideoSurfaceImpl::wait_device_idle).
+// Many short-lived surfaces make the race window recur.
 TEST_CASE("render_test_plane_fill: surfaces torn down right after a download stay stable", "[fast][render][vulkan]") {
   constexpr uint32_t kW = 16;
   constexpr uint32_t kH = 4;
