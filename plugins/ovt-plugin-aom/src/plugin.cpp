@@ -3,9 +3,9 @@
 //
 // libovt_plugin_aom: the ABI glue of the AV1 analysis plugin (chapter 0 §0.6.2, chapter 07 §7.6.1, WI-2.155).
 // It exports ovt_analysis_decoder_v1() and nothing else; every entry point is noexcept and turns an exception into
-// an error status. This skeleton produces frame-level FrameAnalysis buffers (FrameInfo, the empty 4x4 cell grid
-// size, diagnostics) and the Reconstruction planes of shown frames. The inspection callback already runs
-// ifd_inspect() on every frame; WI-2.156 maps insp_mi_data into the grid and WI-2.157 maps the accounting.
+// an error status. It produces FrameAnalysis buffers with FrameInfo, the cell grid, block tree, motion vectors,
+// reference slots and tiles mapped from libaom's insp_mi_data (WI-2.156), diagnostics, and the Reconstruction
+// planes of shown frames. WI-2.157 adds the accounting.
 
 #include <aom/aom_codec.h>
 
@@ -19,6 +19,7 @@
 
 #include "decoder.hpp"
 #include "fb_builder.hpp"
+#include "map_mi.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 namespace {
@@ -44,17 +45,18 @@ namespace {
 // Strings and caps are built once from the linked libaom (static locals: thread-safe initialisation).
 struct Info {
   std::string version = std::string("0.1.0+libaom.") + aom_codec_version_str();
-  std::string notes = std::string("AV1 analysis via libaom ") + aom_codec_version_str() +
-                      " inspection (frame level and reconstruction; block data arrives with WI-2.156/2.157)";
+  std::string notes =
+      std::string("AV1 analysis via libaom ") + aom_codec_version_str() +
+      " inspection (blocks, motion vectors, reference slots, tiles and reconstruction; no symbol accounting yet)";
   ovt_AnalysisCaps caps{};
   Info() {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
     caps.codec = kCodecAv1;
-    caps.plane_stages = 1U << kStageRecon;  // stock libaom: Reconstruction only (§7.6.1 Caps row)
-    caps.grid_fields = 0U;                  // none yet: WI-2.156 maps insp_mi_data and announces the §7.6.1 bits
-    caps.has_symbol_accounting = 0;         // WI-2.157
+    caps.plane_stages = 1U << kStageRecon;     // stock libaom: Reconstruction only (§7.6.1 Caps row)
+    caps.grid_fields = ovt::aom::kGridFields;  // §7.6.1 Caps row with stock libaom, before accounting (WI-2.157)
+    caps.has_symbol_accounting = 0;            // WI-2.157
     caps.bit_exact = 1;
-    caps.supports_threads = 1;  // libaom worker threads with row-MT
+    caps.supports_threads = 1;  // safe; libaom runs on one thread while accounting is on (decoder.cpp)
     caps.id = "aom";
     caps.version = version.c_str();
     caps.license = "BSD-2-Clause AND ISC AND LicenseRef-AOM-Patent-License-1.0";  // plugin + static libaom
