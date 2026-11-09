@@ -159,7 +159,7 @@ def compiler_of(build_dir: Path) -> str:
 
 
 def commit_of(root: Path) -> str:
-    return _capture(["git", "-C", str(root), "rev-parse", "HEAD"]) or os.environ.get("GITHUB_SHA", "unknown")
+    return str(_capture(["git", "-C", str(root), "rev-parse", "HEAD"]) or os.environ.get("GITHUB_SHA", "unknown"))
 
 
 def host_os() -> str:
