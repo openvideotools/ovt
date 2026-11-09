@@ -40,8 +40,16 @@ set(OVT_NOTICES_OUT "${CMAKE_BINARY_DIR}/THIRD_PARTY_NOTICES.md" CACHE FILEPATH 
 # The targets whose licences the notices cover: what the install rules ship (cmake/OvtInstall.cmake, app/). Test, fuzz
 # and fixture targets of the same build tree are not distributed, so they are neither gated nor listed here; the
 # gate in CI still checks every target. A target named here is checked in full, so this list cannot hide a shipped one.
-set(OVT_NOTICES_TARGETS ovt_core ovt_render ovt_cli_lib ovt_cli ovt_studio ovt_plugin_aom ovt_plugin_ffmpeg
-                        ovt_plugin_de265 ovt_plugin_hm
+set(OVT_NOTICES_TARGETS
+    ovt_core
+    ovt_render
+    ovt_cli_lib
+    ovt_cli
+    ovt_studio
+    ovt_plugin_aom
+    ovt_plugin_ffmpeg
+    ovt_plugin_de265
+    ovt_plugin_hm
     CACHE STRING "Targets covered by THIRD_PARTY_NOTICES.md")
 get_filename_component(_ovt_notices_dir "${OVT_NOTICES_OUT}" DIRECTORY)
 
