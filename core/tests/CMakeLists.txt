@@ -64,6 +64,7 @@ add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(golden) # WI-0.093: hand-built FrameAnalysis fixtures and their generator
 add_subdirectory(jobs)
 add_subdirectory(log)
+add_subdirectory(metrics)
 add_subdirectory(model)
 add_subdirectory(syntax)
 
