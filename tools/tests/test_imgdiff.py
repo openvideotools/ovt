@@ -18,8 +18,8 @@ sys.path.insert(0, str(TOOLS))
 
 pytest.importorskip("numpy")  # NumPy is a pytest-lane requirement (tools/requirements-test.txt)
 
-import imgdiff
-import numpy as np
+import imgdiff  # noqa: E402
+import numpy as np  # noqa: E402
 
 IMGDIFF = TOOLS / "imgdiff.py"
 

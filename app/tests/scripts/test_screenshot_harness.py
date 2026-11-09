@@ -12,7 +12,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO / "tools"))
-import imgdiff
+import imgdiff  # noqa: E402
 
 
 @pytest.fixture(scope="module")
