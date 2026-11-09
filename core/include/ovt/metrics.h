@@ -4,12 +4,14 @@
  * @file ovt/metrics.h
  * @brief Video quality metrics: descriptor listing and the metrics job (chapter 9 §9.10, chapter 12 §12.3.13).
  *
- * WI-3.300 skeleton: the declarations below are final; the job runs its state machine (§9.2.3) and validates
- * its inputs, but no metric is scored before the normalisation (WI-3.301) and kernel (WI-3.306) work items
- * land. The remaining §9.10 entry points arrive with their work items and are not declared yet:
- * ovt_metrics_job_set_alignment (WI-4.309); ovt_MapView, ovt_PlanePair, ovt_metrics_job_planes and
- * ovt_metrics_map (WI-3.316); ovt_metrics_push / ovt_metrics_finish (WI-3.533); the ovt_metrics_export_*
- * functions (WI-3.312); ovt_metrics_bd and ovt_BdResult (WI-3.313, WI-3.531).
+ * WI-3.300 skeleton: the declarations below are final. Their definitions land with the split parts of the
+ * work item (§16.2.6): ovt_metrics_list_descriptors with WI-3.300b (the plugin registry) and the
+ * ovt_metrics_job_* functions with WI-3.300c (the job state machine). The job runs its state machine
+ * (§9.2.3) and validates its inputs, but no metric is scored before the normalisation (WI-3.301) and
+ * kernel (WI-3.306) work items land. The remaining §9.10 entry points arrive with their work items and are not declared
+ * yet: ovt_metrics_job_set_alignment (WI-4.309); ovt_MapView, ovt_PlanePair, ovt_metrics_job_planes and ovt_metrics_map
+ * (WI-3.316); ovt_metrics_push / ovt_metrics_finish (WI-3.533); the ovt_metrics_export_* functions (WI-3.312);
+ * ovt_metrics_bd and ovt_BdResult (WI-3.313, WI-3.531).
  *
  * Threading (§12.3.1 rule 4): an ovt_MetricsJob handle is not thread-safe; ovt_metrics_job_run blocks and is
  * called from a worker thread; the event callback runs on that thread.
