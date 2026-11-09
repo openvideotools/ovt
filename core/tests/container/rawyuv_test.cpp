@@ -54,7 +54,7 @@ TEST_CASE("raw: pix_fmt grammar accepts exactly the names of §8.6.6", "[contain
     uint8_t depth;
     bool le;
     bool uv;
-    uint64_t bytes_6x5;  // odd height and width-rounded chroma
+    int bytes_6x5;  // odd height and width-rounded chroma
   };
   using L = raw::PixLayout;
   const std::vector<Row> rows = {
@@ -102,7 +102,7 @@ TEST_CASE("raw: pix_fmt grammar accepts exactly the names of §8.6.6", "[contain
       CHECK(p->bit_depth == r.depth);
       CHECK(p->little_endian == r.le);
       CHECK(p->interleaved_uv == r.uv);
-      CHECK(raw::frame_bytes(*p, 6, 5) == r.bytes_6x5);
+      CHECK(raw::frame_bytes(*p, 6, 5) == static_cast<uint64_t>(r.bytes_6x5));
     }
   }
   for (const char* bad : {"",
@@ -277,11 +277,11 @@ TEST_CASE("raw: reader sample table, tree, RawVideoFormat and trailing bytes", "
   CHECK(raw_of(empty->raw_format())->frame_count() == 0);
   const Bytes empty_table = empty->sample_table(0, 0, 0);
   CHECK(table_of(empty_table)->count() == 0);
-  const Bytes exact(768 * 2, 0);
+  const Bytes exact(1536, 0);
   const ovt::io::MemoryFile exact_file(exact);
   const Bytes exact_tree = raw::make_reader(exact_file, fmt)->tree();
   const auto* exact_diags = tree_of(exact_tree)->diagnostics();
-  CHECK((exact_diags == nullptr || exact_diags->size() == 0));
+  CHECK((exact_diags == nullptr || exact_diags->begin() == exact_diags->end()));
 }
 
 TEST_CASE("raw: ovt_container_open_format(\"raw\")", "[container][raw][fast]") {
