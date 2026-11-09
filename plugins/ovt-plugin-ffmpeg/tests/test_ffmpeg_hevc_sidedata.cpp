@@ -12,6 +12,7 @@
 
 #include <flatbuffers/flatbuffers.h>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -100,7 +101,14 @@ std::vector<uint8_t> read_file(const std::filesystem::path& path) {
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
-/// The pictures of the oracle's dump, in output order.
+/// A quarter-sample vector component as the CellGrid can hold it: int16 in 1/16 samples, clamped to +-32767
+/// (map_hevc_sidedata.cpp, MDL-GEN-0003), read back in quarter samples. MVCLIP_A has vectors past that range.
+int in_cell_grid_range(int quarter) {
+  constexpr int kMax = 32767;
+  return std::clamp(quarter * 4, -kMax, kMax) / 4;
+}
+
+/// The pictures of the oracle's dump, in output order, with the vectors in the CellGrid's range.
 std::vector<Grid> de265_grids(const std::filesystem::path& stream) {
   const std::string cmd = std::string("\"") + kDe265GridDump + "\" \"" + stream.string() + "\"";
   FILE* p = popen(cmd.c_str(), "r");  // NOLINT(cert-env33-c): the oracle executable of this build
@@ -124,6 +132,10 @@ std::vector<Grid> de265_grids(const std::filesystem::path& stream) {
     g.cells.resize(static_cast<size_t>(g.cells_w) * static_cast<size_t>(g.cells_h));
     for (Cell& c : g.cells) {
       in >> c.pred >> c.qp >> c.pf[0] >> c.mv_x[0] >> c.mv_y[0] >> c.pf[1] >> c.mv_x[1] >> c.mv_y[1];
+      for (size_t l = 0; l < 2; ++l) {
+        c.mv_x.at(l) = in_cell_grid_range(c.mv_x.at(l));
+        c.mv_y.at(l) = in_cell_grid_range(c.mv_y.at(l));
+      }
     }
     REQUIRE(in.good());
     out.push_back(std::move(g));
@@ -237,6 +249,10 @@ std::vector<Grid> plugin_grids(const std::vector<uint8_t>& bytes, int threads) {
   return out;
 }
 
+bool same_grid(const Grid& a, const Grid& b) {
+  return a.cells_w == b.cells_w && a.cells_h == b.cells_h && a.cells == b.cells;
+}
+
 void compare_with_de265(const std::string& id) {
   if (kDe265GridDump == nullptr) {
     SKIP("this build has no patched libde265 for the oracle");
@@ -247,18 +263,26 @@ void compare_with_de265(const std::string& id) {
   const std::vector<uint8_t> bytes = read_file(path);
   const std::vector<Grid> got = plugin_grids(bytes, 1);
   REQUIRE(!got.empty());
-  // libde265 1.0.15 can withhold the last pictures of a stream (WI-2.162 note, #251); compare those it outputs.
-  if (ref.size() < got.size()) {
-    WARN(id << ": libde265 output " << ref.size() << " of the " << got.size() << " pictures");
-  }
+  // libde265 1.0.15 never outputs the last picture it decodes in some streams (WI-2.162 note, #251). In a
+  // hierarchical-B stream that picture is not the last in output order, so the pictures are matched in order: every
+  // libde265 picture must equal the next unmatched ffmpeg_hevc picture or, while fewer pictures were withheld than
+  // the difference in counts, one of the pictures after it.
   REQUIRE(ref.size() <= got.size());
   REQUIRE(ref.size() + 2 >= got.size());
-  for (size_t pic = 0; pic < ref.size(); ++pic) {
-    INFO("picture " << pic << " (output order)");
-    REQUIRE(got[pic].cells_w == ref[pic].cells_w);
-    REQUIRE(got[pic].cells_h == ref[pic].cells_h);
+  size_t skips = got.size() - ref.size();
+  size_t g = 0;
+  for (size_t pic = 0; pic < ref.size(); ++pic, ++g) {
+    while (skips > 0 && g + 1 < got.size() && !same_grid(got[g], ref[pic])) {
+      WARN(id << ": libde265 did not output the picture at ffmpeg_hevc output index " << g);
+      --skips;
+      ++g;
+    }
+    INFO("libde265 picture " << pic << ", ffmpeg_hevc picture " << g << " (output order)");
+    REQUIRE(g < got.size());
+    REQUIRE(got[g].cells_w == ref[pic].cells_w);
+    REQUIRE(got[g].cells_h == ref[pic].cells_h);
     for (size_t i = 0; i < ref[pic].cells.size(); ++i) {
-      const Cell& a = got[pic].cells[i];
+      const Cell& a = got[g].cells[i];
       const Cell& b = ref[pic].cells[i];
       if (!(a == b)) {
         const auto w = static_cast<size_t>(ref[pic].cells_w);
@@ -266,6 +290,9 @@ void compare_with_de265(const std::string& id) {
                       << describe(b));
       }
     }
+  }
+  if (skips > 0) {
+    WARN(id << ": libde265 did not output the last " << skips << " ffmpeg_hevc picture(s)");
   }
   // The plugin's grid does not depend on libavcodec slice threads.
   const std::vector<Grid> threaded = plugin_grids(bytes, 4);

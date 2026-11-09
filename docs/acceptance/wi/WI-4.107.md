@@ -21,8 +21,11 @@ Automated: `ffmpeg_hevc plugin: MV and QP grids equal libde265 on HEVC_v1`
 temporal scalability, weighted prediction, MV clipping and edges, IPCM, WPP Main 10), it decodes the stream through
 `libovt_plugin_ffmpeg_hevc` and compares every 4x4 cell of the CellGrid (prediction, QP, list 0 and list 1 vectors)
 with `ovt_plugin_de265_grid_dump`, which prints the same values from patched libde265's internals API (patch 0001 of
-the de265 plugin). It also checks that 4 slice threads give the same grids as 1 thread. libde265 1.0.15 withholds the
-last picture of some streams; the test accepts up to two missing trailing pictures and warns (#251).
+the de265 plugin). It also checks that 4 slice threads give the same grids as 1 thread. libde265 1.0.15 never
+outputs the last picture it decodes in some streams (#251), which in hierarchical-B streams is not the last in output
+order: the test matches the pictures in order and lets at most two ffmpeg_hevc pictures go unmatched, with a warning.
+The oracle's vectors are clamped to the CellGrid range (int16 in 1/16 samples) before the comparison, as the plugin
+clamps them with MDL-GEN-0003 (MVCLIP_A_qualcomm_3 points far outside the picture).
 
 The conformance streams are not reachable from the container, so this test first runs in CI. Locally the same
 comparison ran through the plugin ABI (a static driver around the plugin objects, since the local FFmpeg build is not
