@@ -53,3 +53,5 @@ ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
+# WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
+ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)

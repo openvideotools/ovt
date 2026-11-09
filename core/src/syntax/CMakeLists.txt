@@ -17,3 +17,7 @@ target_sources(ovt_core_objects PRIVATE common/syntax_builder.cpp common/syntax_
 # header, so the generated include directory and flatbuffers are PUBLIC on the objects, inside BUILD_INTERFACE
 # (core-objects rule 1, #62).
 target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
+
+# WI-1.116a: AV1 OBU header, temporal delimiter, padding, metadata and tile list parsers (chapter 7 §7.3.6
+# rows 1, 7, 8, 9 and 30). WI-1.116b adds the sequence header (rows 2–6).
+target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/metadata.cpp av1/tile_list.cpp)
