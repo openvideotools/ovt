@@ -28,14 +28,13 @@ void opaque_tail(SyntaxBuilder& b, Sps& sps, std::string_view node, std::string_
   sps.opaque_tail = true;
 }
 
-void read_sub_layer_ordering_info(SyntaxBuilder& b, Sps& sps) {
+void read_sub_layer_ordering_info(BitReader& br, SyntaxBuilder& b, Sps& sps) {
   const unsigned first = sps.sps_sub_layer_ordering_info_present_flag ? 0U : sps.sps_max_sub_layers_minus1;
   for (unsigned i = first; i <= sps.sps_max_sub_layers_minus1; ++i) {
     SubLayerOrderingInfo& o = sps.sub_layer_ordering_info[i];
     const int idx = static_cast<int>(i);
     o.max_dec_pic_buffering_minus1 = detail::read_ue_at(b, "sps_max_dec_pic_buffering_minus1", idx);
-    detail::check_range(b, "sps_max_dec_pic_buffering_minus1", o.max_dec_pic_buffering_minus1, 0, 15,
-                        "H.265 7.4.3.2.1");
+    detail::require_range(br, "sps_max_dec_pic_buffering_minus1", o.max_dec_pic_buffering_minus1, 0, 15);  // DPB size
     o.max_num_reorder_pics = detail::read_ue_at(b, "sps_max_num_reorder_pics", idx);
     detail::check_range(b, "sps_max_num_reorder_pics", o.max_num_reorder_pics, 0, o.max_dec_pic_buffering_minus1,
                         "H.265 7.4.3.2.1");
@@ -46,6 +45,8 @@ void read_sub_layer_ordering_info(SyntaxBuilder& b, Sps& sps) {
   }
 }
 
+constexpr uint32_t kMaxLumaDimension = 16888;  // Sqrt(MaxLumaPs * 8), A.4.1 level 6.2
+
 void read_picture_format(BitReader& br, SyntaxBuilder& b, Sps& sps) {
   sps.chroma_format_idc = static_cast<uint8_t>(b.read_ue("chroma_format_idc"));
   detail::require_range(br, "chroma_format_idc", sps.chroma_format_idc, 0, 3);
@@ -55,9 +56,11 @@ void read_picture_format(BitReader& br, SyntaxBuilder& b, Sps& sps) {
     sps.separate_colour_plane_flag = b.read_flag("separate_colour_plane_flag");
   }
   sps.pic_width_in_luma_samples = b.read_ue("pic_width_in_luma_samples");
-  detail::check_range(b, "pic_width_in_luma_samples", sps.pic_width_in_luma_samples, 1, 65535, "H.265 7.4.3.2.1");
+  // Hard bound: A.4.1 caps the dimensions at Sqrt(MaxLumaPs * 8) = 16888 for level 6.2 (MaxLumaPs = 35 651 584);
+  // every Ctb- and MinCb-indexed derivation and table below is sized from these two values.
+  detail::require_range(br, "pic_width_in_luma_samples", sps.pic_width_in_luma_samples, 1, kMaxLumaDimension);
   sps.pic_height_in_luma_samples = b.read_ue("pic_height_in_luma_samples");
-  detail::check_range(b, "pic_height_in_luma_samples", sps.pic_height_in_luma_samples, 1, 65535, "H.265 7.4.3.2.1");
+  detail::require_range(br, "pic_height_in_luma_samples", sps.pic_height_in_luma_samples, 1, kMaxLumaDimension);
   sps.conformance_window_flag = b.read_flag("conformance_window_flag");
   if (sps.conformance_window_flag) {
     sps.conf_win_left_offset = b.read_ue("conf_win_left_offset");
@@ -76,25 +79,24 @@ void read_picture_format(BitReader& br, SyntaxBuilder& b, Sps& sps) {
   sps.log2_max_pic_order_cnt_lsb_minus4 = static_cast<uint8_t>(poc);
 }
 
-void read_block_sizes(SyntaxBuilder& b, Sps& sps) {
+void read_block_sizes(BitReader& br, SyntaxBuilder& b, Sps& sps) {
+  // Hard bounds on every log2 size and depth: they become shift counts and loop depths here, in the PPS
+  // activation and in the slice/CU parsers (WI-1.113), so an unbounded value must not leave this function.
   sps.log2_min_luma_coding_block_size_minus3 = b.read_ue("log2_min_luma_coding_block_size_minus3");
-  detail::check_range(b, "log2_min_luma_coding_block_size_minus3", sps.log2_min_luma_coding_block_size_minus3, 0, 3,
-                      "H.265 7.4.3.2.1");
+  detail::require_range(br, "log2_min_luma_coding_block_size_minus3", sps.log2_min_luma_coding_block_size_minus3, 0, 3);
   sps.log2_diff_max_min_luma_coding_block_size = b.read_ue("log2_diff_max_min_luma_coding_block_size");
-  detail::check_range(b, "log2_diff_max_min_luma_coding_block_size", sps.log2_diff_max_min_luma_coding_block_size, 0, 3,
-                      "H.265 7.4.3.2.1");
+  detail::require_range(br, "log2_diff_max_min_luma_coding_block_size", sps.log2_diff_max_min_luma_coding_block_size, 0,
+                        3);
   sps.log2_min_luma_transform_block_size_minus2 = b.read_ue("log2_min_luma_transform_block_size_minus2");
-  detail::check_range(b, "log2_min_luma_transform_block_size_minus2", sps.log2_min_luma_transform_block_size_minus2, 0,
-                      3, "H.265 7.4.3.2.1");
+  detail::require_range(br, "log2_min_luma_transform_block_size_minus2", sps.log2_min_luma_transform_block_size_minus2,
+                        0, 3);
   sps.log2_diff_max_min_luma_transform_block_size = b.read_ue("log2_diff_max_min_luma_transform_block_size");
-  detail::check_range(b, "log2_diff_max_min_luma_transform_block_size", sps.log2_diff_max_min_luma_transform_block_size,
-                      0, 3, "H.265 7.4.3.2.1");
+  detail::require_range(br, "log2_diff_max_min_luma_transform_block_size",
+                        sps.log2_diff_max_min_luma_transform_block_size, 0, 3);
   sps.max_transform_hierarchy_depth_inter = b.read_ue("max_transform_hierarchy_depth_inter");
-  detail::check_range(b, "max_transform_hierarchy_depth_inter", sps.max_transform_hierarchy_depth_inter, 0, 4,
-                      "H.265 7.4.3.2.1");
+  detail::require_range(br, "max_transform_hierarchy_depth_inter", sps.max_transform_hierarchy_depth_inter, 0, 4);
   sps.max_transform_hierarchy_depth_intra = b.read_ue("max_transform_hierarchy_depth_intra");
-  detail::check_range(b, "max_transform_hierarchy_depth_intra", sps.max_transform_hierarchy_depth_intra, 0, 4,
-                      "H.265 7.4.3.2.1");
+  detail::require_range(br, "max_transform_hierarchy_depth_intra", sps.max_transform_hierarchy_depth_intra, 0, 4);
 }
 
 void read_scaling_and_tools(BitReader& br, SyntaxBuilder& b, Sps& sps) {
@@ -113,11 +115,11 @@ void read_scaling_and_tools(BitReader& br, SyntaxBuilder& b, Sps& sps) {
     sps.pcm_sample_bit_depth_luma_minus1 = static_cast<uint8_t>(b.read_u("pcm_sample_bit_depth_luma_minus1", 4));
     sps.pcm_sample_bit_depth_chroma_minus1 = static_cast<uint8_t>(b.read_u("pcm_sample_bit_depth_chroma_minus1", 4));
     sps.log2_min_pcm_luma_coding_block_size_minus3 = b.read_ue("log2_min_pcm_luma_coding_block_size_minus3");
-    detail::check_range(b, "log2_min_pcm_luma_coding_block_size_minus3", sps.log2_min_pcm_luma_coding_block_size_minus3,
-                        0, 2, "H.265 7.4.3.2.1");
+    detail::require_range(br, "log2_min_pcm_luma_coding_block_size_minus3",
+                          sps.log2_min_pcm_luma_coding_block_size_minus3, 0, 2);
     sps.log2_diff_max_min_pcm_luma_coding_block_size = b.read_ue("log2_diff_max_min_pcm_luma_coding_block_size");
-    detail::check_range(b, "log2_diff_max_min_pcm_luma_coding_block_size",
-                        sps.log2_diff_max_min_pcm_luma_coding_block_size, 0, 2, "H.265 7.4.3.2.1");
+    detail::require_range(br, "log2_diff_max_min_pcm_luma_coding_block_size",
+                          sps.log2_diff_max_min_pcm_luma_coding_block_size, 0, 2);
     sps.pcm_loop_filter_disabled_flag = b.read_flag("pcm_loop_filter_disabled_flag");
   }
 }
@@ -166,10 +168,9 @@ void read_scc_extension(BitReader& br, SyntaxBuilder& b, const Sps& sps, SpsSccE
   e.palette_mode_enabled_flag = b.read_flag("palette_mode_enabled_flag");
   if (e.palette_mode_enabled_flag) {
     e.palette_max_size = b.read_ue("palette_max_size");
-    detail::check_range(b, "palette_max_size", e.palette_max_size, 0, 64, "H.265 7.4.3.2.3");
+    detail::require_range(br, "palette_max_size", e.palette_max_size, 0, 64);  // sizes the palette tables
     e.delta_palette_max_predictor_size = b.read_ue("delta_palette_max_predictor_size");
-    detail::check_range(b, "delta_palette_max_predictor_size", e.delta_palette_max_predictor_size, 0, 128,
-                        "H.265 7.4.3.2.3");
+    detail::require_range(br, "delta_palette_max_predictor_size", e.delta_palette_max_predictor_size, 0, 128);
     e.PaletteMaxPredictorSize = e.palette_max_size + e.delta_palette_max_predictor_size;
     b.derived("PaletteMaxPredictorSize", e.PaletteMaxPredictorSize);
     e.sps_palette_predictor_initializers_present_flag = b.read_flag("sps_palette_predictor_initializers_present_flag");
@@ -237,12 +238,10 @@ void derive_format(Sps& sps) {
   sps.MaxPicOrderCntLsb = 1U << (sps.log2_max_pic_order_cnt_lsb_minus4 + 4U);
 }
 
-void derive_sizes(SyntaxBuilder& b, Sps& sps) {
-  sps.MinCbLog2SizeY = sps.log2_min_luma_coding_block_size_minus3 + 3;
-  sps.CtbLog2SizeY = sps.MinCbLog2SizeY + sps.log2_diff_max_min_luma_coding_block_size;
-  if (!detail::check_range(b, "CtbLog2SizeY", sps.CtbLog2SizeY, 4, 6, "H.265 7.4.3.2.1")) {
-    sps.CtbLog2SizeY = std::clamp<uint32_t>(sps.CtbLog2SizeY, 4, 6);
-  }
+void derive_sizes(BitReader& br, SyntaxBuilder& b, Sps& sps) {
+  sps.MinCbLog2SizeY = sps.log2_min_luma_coding_block_size_minus3 + 3;                   // in [3, 6] (hard bound above)
+  sps.CtbLog2SizeY = sps.MinCbLog2SizeY + sps.log2_diff_max_min_luma_coding_block_size;  // in [3, 9]
+  detail::require_range(br, "CtbLog2SizeY", sps.CtbLog2SizeY, 4, 6);  // 7.4.3.2.1; sizes the Ctb tables
   sps.MinCbSizeY = 1U << sps.MinCbLog2SizeY;
   sps.CtbSizeY = 1U << sps.CtbLog2SizeY;
   sps.PicWidthInMinCbsY = sps.pic_width_in_luma_samples / sps.MinCbSizeY;
@@ -364,6 +363,12 @@ Sps parse_sps(BitReader& br, SyntaxBuilder& b, uint8_t nuh_layer_id) {
   sps.sps_max_sub_layers_minus1 = static_cast<uint8_t>(b.read_u("sps_max_sub_layers_minus1", 3));
   detail::require_range(br, "sps_max_sub_layers_minus1", sps.sps_max_sub_layers_minus1, 0, 6);
   sps.sps_temporal_id_nesting_flag = b.read_flag("sps_temporal_id_nesting_flag");
+  if (sps.sps_max_sub_layers_minus1 == 0 && !sps.sps_temporal_id_nesting_flag) {
+    b.diag(Severity::Error, "SYN-H265-0007",
+           "sps_temporal_id_nesting_flag out of range (sps_temporal_id_nesting_flag = 0, allowed 1 when "
+           "sps_max_sub_layers_minus1 == 0)",
+           "H.265 7.4.3.2.1", true);
+  }
   sps.profile_tier_level = parse_profile_tier_level(br, b, true, sps.sps_max_sub_layers_minus1);
   const uint32_t sps_id = b.read_ue("sps_seq_parameter_set_id");
   detail::require_range(br, "sps_seq_parameter_set_id", sps_id, 0, 15);
@@ -371,9 +376,9 @@ Sps parse_sps(BitReader& br, SyntaxBuilder& b, uint8_t nuh_layer_id) {
   read_picture_format(br, b, sps);
   derive_format(sps);
   sps.sps_sub_layer_ordering_info_present_flag = b.read_flag("sps_sub_layer_ordering_info_present_flag");
-  read_sub_layer_ordering_info(b, sps);
+  read_sub_layer_ordering_info(br, b, sps);
   sps.MaxDpbSizeMinus1 = sps.sub_layer_ordering_info[sps.sps_max_sub_layers_minus1].max_dec_pic_buffering_minus1;
-  read_block_sizes(b, sps);
+  read_block_sizes(br, b, sps);
   read_scaling_and_tools(br, b, sps);
   read_reference_sets(br, b, sps);
   sps.vui_parameters_present_flag = b.read_flag("vui_parameters_present_flag");
@@ -387,7 +392,7 @@ Sps parse_sps(BitReader& br, SyntaxBuilder& b, uint8_t nuh_layer_id) {
   if (sps.sps_extension_present_flag) {
     complete = read_extensions(br, b, sps);
   }
-  derive_sizes(b, sps);
+  derive_sizes(br, b, sps);
   derive_precision(sps);
   derive_crop(b, sps);
   emit_derived(b, sps);

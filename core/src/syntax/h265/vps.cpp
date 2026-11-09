@@ -14,13 +14,13 @@ namespace ovt::syntax::h265 {
 
 namespace {
 
-void read_sub_layer_ordering_info(SyntaxBuilder& b, Vps& v) {
+void read_sub_layer_ordering_info(BitReader& br, SyntaxBuilder& b, Vps& v) {
   const unsigned first = v.vps_sub_layer_ordering_info_present_flag ? 0U : v.vps_max_sub_layers_minus1;
   for (unsigned i = first; i <= v.vps_max_sub_layers_minus1; ++i) {
     SubLayerOrderingInfo& o = v.sub_layer_ordering_info[i];
     const int idx = static_cast<int>(i);
     o.max_dec_pic_buffering_minus1 = detail::read_ue_at(b, "vps_max_dec_pic_buffering_minus1", idx);
-    detail::check_range(b, "vps_max_dec_pic_buffering_minus1", o.max_dec_pic_buffering_minus1, 0, 15, "H.265 7.4.3.1");
+    detail::require_range(br, "vps_max_dec_pic_buffering_minus1", o.max_dec_pic_buffering_minus1, 0, 15);  // DPB size
     o.max_num_reorder_pics = detail::read_ue_at(b, "vps_max_num_reorder_pics", idx);
     detail::check_range(b, "vps_max_num_reorder_pics", o.max_num_reorder_pics, 0, o.max_dec_pic_buffering_minus1,
                         "H.265 7.4.3.1");
@@ -33,6 +33,7 @@ void read_sub_layer_ordering_info(SyntaxBuilder& b, Vps& v) {
 
 void read_layer_sets(BitReader& br, SyntaxBuilder& b, Vps& v) {
   v.vps_max_layer_id = static_cast<uint8_t>(b.read_u("vps_max_layer_id", 6));
+  detail::check_range(b, "vps_max_layer_id", v.vps_max_layer_id, 0, 62, "H.265 7.4.3.1");
   v.vps_num_layer_sets_minus1 = b.read_ue("vps_num_layer_sets_minus1");
   detail::require_range(br, "vps_num_layer_sets_minus1", v.vps_num_layer_sets_minus1, 0, 1023);
   v.layer_id_included_flag.assign(static_cast<size_t>(v.vps_num_layer_sets_minus1) + 1, 0);
@@ -91,6 +92,7 @@ Vps parse_vps(BitReader& br, SyntaxBuilder& b) {
   v.vps_base_layer_internal_flag = b.read_flag("vps_base_layer_internal_flag");
   v.vps_base_layer_available_flag = b.read_flag("vps_base_layer_available_flag");
   v.vps_max_layers_minus1 = static_cast<uint8_t>(b.read_u("vps_max_layers_minus1", 6));
+  detail::check_range(b, "vps_max_layers_minus1", v.vps_max_layers_minus1, 0, 62, "H.265 7.4.3.1");
   v.vps_max_sub_layers_minus1 = static_cast<uint8_t>(b.read_u("vps_max_sub_layers_minus1", 3));
   detail::require_range(br, "vps_max_sub_layers_minus1", v.vps_max_sub_layers_minus1, 0, 6);
   v.vps_temporal_id_nesting_flag = b.read_flag("vps_temporal_id_nesting_flag");
@@ -103,7 +105,7 @@ Vps parse_vps(BitReader& br, SyntaxBuilder& b) {
   v.vps_reserved_0xffff_16bits = static_cast<uint16_t>(b.read_f("vps_reserved_0xffff_16bits", 16, 0xFFFF));
   v.profile_tier_level = parse_profile_tier_level(br, b, true, v.vps_max_sub_layers_minus1);
   v.vps_sub_layer_ordering_info_present_flag = b.read_flag("vps_sub_layer_ordering_info_present_flag");
-  read_sub_layer_ordering_info(b, v);
+  read_sub_layer_ordering_info(br, b, v);
   read_layer_sets(br, b, v);
   v.vps_timing_info_present_flag = b.read_flag("vps_timing_info_present_flag");
   if (v.vps_timing_info_present_flag) {

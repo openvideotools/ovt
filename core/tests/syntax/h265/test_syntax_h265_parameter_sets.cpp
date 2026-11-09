@@ -13,6 +13,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -50,7 +51,7 @@ h265::Vps parse_vps_nal(const std::vector<uint8_t>& nal, SyntaxNodeBuffer* tree 
 
 // ---- row 2: video_parameter_set_rbsp (hand-built) -------------------------------------------------------------
 
-TEST_CASE("h265_vps: two sub-layers, timing info, one hrd_parameters() entry and the derived frame rate",
+TEST_CASE("h265_vps: two sub-layers, timing info, two hrd_parameters() entries and the derived frame rate",
           "[syntax][h265][fast]") {
   BitWriter w;
   w.u(4, 3);        // vps_video_parameter_set_id
@@ -279,6 +280,73 @@ TEST_CASE("h265_sps: nuh_layer_id > 0 keeps the SPS opaque after sps_video_param
   CHECK(br.bit_pos() == data.size() * 8);
   const SyntaxNodeBuffer tree = b.finish();
   CHECK(tree.root()->child(0)->child_count() == 2);  // sps_video_parameter_set_id + the opaque node
+}
+
+TEST_CASE("h265_sps: log2_min_luma_coding_block_size_minus3 beyond 3 throws SYN-H265-0007 before any shift",
+          "[syntax][h265][fast]") {
+  BitWriter w;
+  w.u(4, 0);
+  w.u(3, 0);
+  w.flag(true);
+  write_general_profile(w, 1, {1, 2});
+  w.u(8, 90);
+  w.ue(0);        // sps_seq_parameter_set_id
+  w.ue(1);        // chroma_format_idc
+  w.ue(64);       // pic_width_in_luma_samples
+  w.ue(64);       // pic_height_in_luma_samples
+  w.flag(false);  // conformance_window_flag
+  w.ue(0);
+  w.ue(0);
+  w.ue(4);        // log2_max_pic_order_cnt_lsb_minus4
+  w.flag(false);  // sps_sub_layer_ordering_info_present_flag
+  w.ue(4);
+  w.ue(2);
+  w.ue(0);
+  w.ue(29);  // log2_min_luma_coding_block_size_minus3: would make MinCbLog2SizeY a 32-bit shift count
+  w.ue(0);
+  const std::vector<uint8_t> data = w.bytes();
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  bool threw = false;
+  try {
+    (void)h265::parse_sps(br, b);
+  } catch (const ParseError& e) {
+    threw = true;
+    CHECK(e.code == "SYN-H265-0007");
+    CHECK(std::string_view{e.what()}.find("log2_min_luma_coding_block_size_minus3") != std::string_view::npos);
+  }
+  CHECK(threw);
+}
+
+TEST_CASE("h265_sps: sps_max_dec_pic_buffering_minus1 beyond 15 throws SYN-H265-0007", "[syntax][h265][fast]") {
+  BitWriter w;
+  w.u(4, 0);
+  w.u(3, 0);
+  w.flag(true);
+  write_general_profile(w, 1, {1, 2});
+  w.u(8, 90);
+  w.ue(0);
+  w.ue(1);
+  w.ue(64);
+  w.ue(64);
+  w.flag(false);
+  w.ue(0);
+  w.ue(0);
+  w.ue(4);
+  w.flag(false);
+  w.ue(16);  // sps_max_dec_pic_buffering_minus1: sizes the DPB
+  const std::vector<uint8_t> data = w.bytes();
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  bool threw = false;
+  try {
+    (void)h265::parse_sps(br, b);
+  } catch (const ParseError& e) {
+    threw = true;
+    CHECK(e.code == "SYN-H265-0007");
+    CHECK(std::string_view{e.what()}.find("sps_max_dec_pic_buffering_minus1") != std::string_view::npos);
+  }
+  CHECK(threw);
 }
 
 TEST_CASE("h265_sps: out-of-range sps_seq_parameter_set_id and chroma_format_idc throw SYN-H265-0007",
