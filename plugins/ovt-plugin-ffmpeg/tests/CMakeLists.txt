@@ -37,9 +37,31 @@ add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmp
 ovt_set_license(ovt_plugin_ffmpeg_smoke_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_smoke_tests)
 
+# ---- WI-4.101: the block-params export of the patched plugin flavour against the JM goldens ------------------------
+# ovt_plugin_ffmpeg_blockparams prints AV_FRAME_DATA_VIDEO_BLOCK_PARAMS; ffmpeg_mbparams_vs_jm compares it with
+# tests/golden/h264/<id>.jm-trace.json.gz and checks frame threads against one thread. Only third_party/ffmpeg.cmake
+# applies the patch series (to the plugin flavour), so a system FFmpeg has no block params to test.
+if(NOT OVT_SYSTEM_FFMPEG)
+  add_executable(ovt_plugin_ffmpeg_blockparams ffmpeg_blockparams_dump.cpp)
+  target_link_libraries(ovt_plugin_ffmpeg_blockparams PRIVATE tp::ffmpeg_plugin ovt::flags)
+  ovt_set_license(ovt_plugin_ffmpeg_blockparams "LGPL-2.1-or-later")
+
+  ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+  add_executable(ovt_plugin_ffmpeg_blockparams_tests test_ffmpeg_blockparams.cpp)
+  target_link_libraries(ovt_plugin_ffmpeg_blockparams_tests PRIVATE ovt_test_support ovt::flags ${nlohmann_json_TARGET}
+                                                                    ${Catch2_TARGET})
+  target_compile_definitions(
+    ovt_plugin_ffmpeg_blockparams_tests
+    PRIVATE "OVT_FFMPEG_BLOCKPARAMS=\"$<TARGET_FILE:ovt_plugin_ffmpeg_blockparams>\""
+            "OVT_JM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h264\"")
+  add_dependencies(ovt_plugin_ffmpeg_blockparams_tests ovt_plugin_ffmpeg_blockparams)
+  ovt_set_license(ovt_plugin_ffmpeg_blockparams_tests "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(ovt_plugin_ffmpeg_blockparams_tests)
+endif()
+
 # ---- WI-4.100: the FFmpeg patch series applies to the pinned tarball (chapter 07 §7.6.3, chapter 13 §13.3.6) ---
 # Only the files the patches touch are extracted, so this stays in the fast lane. With OVT_SYSTEM_FFMPEG there is no
-# pinned tarball. SPEC-ASSUMPTION(#331): the FFmpeg build itself applies the series from a later WI.
+# pinned tarball. SPEC-ASSUMPTION(#331): third_party/ffmpeg.cmake applies the series to the plugin flavour (WI-4.101).
 if(NOT OVT_SYSTEM_FFMPEG AND DEFINED OVT_TP_ffmpeg_ARCHIVE)
   add_test(
     NAME ffmpeg_patches_apply
