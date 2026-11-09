@@ -6,6 +6,8 @@
 # libplacebo's Vulkan backend. Later chapter 10 work items add their sources to ovt_render.
 
 add_library(ovt_render SHARED src/color/h273_map.cpp src/surface/video_surface_impl.cpp)
+# WI-2.430: OverlayBuilder, CPU side (§10.5.1, §10.5.5).
+target_sources(ovt_render PRIVATE src/overlay/builder.cpp src/overlay/heatmap_source.cpp)
 add_library(ovt::render ALIAS ovt_render)
 # WI-1.401: Picture -> pl_frame upload (§10.3.1).
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
