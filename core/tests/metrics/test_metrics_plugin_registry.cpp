@@ -207,7 +207,7 @@ TEST_CASE("search path order: added, $OVT_METRIC_PATH, $OVT_PLUGIN_PATH, default
 
 namespace {
 
-ovt_Buffer builtin_descriptor() noexcept {
+const std::vector<uint8_t>& builtin_descriptor_bytes() {
   static const std::vector<uint8_t> bytes = [] {
     flatbuffers::FlatBufferBuilder fbb;
     const auto id = fbb.CreateString("builtin_test");
@@ -218,7 +218,16 @@ ovt_Buffer builtin_descriptor() noexcept {
     fbb.Finish(d.Finish());
     return std::vector<uint8_t>(fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize());
   }();
-  return ovt_Buffer{bytes.data(), bytes.size()};
+  return bytes;
+}
+
+ovt_Buffer builtin_descriptor() noexcept {
+  try {
+    const auto& b = builtin_descriptor_bytes();
+    return ovt_Buffer{b.data(), b.size()};
+  } catch (...) {
+    return ovt_Buffer{nullptr, 0};
+  }
 }
 ovt_status builtin_create(const char* /*options*/, ovt_Metric** out) noexcept {
   *out = nullptr;
