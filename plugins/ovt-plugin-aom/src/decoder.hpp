@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "block_data.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 namespace ovt::aom {
@@ -52,12 +53,14 @@ struct Frame {
   uint8_t chroma_format = 1;  // 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4
   uint8_t bit_depth = 8;
   std::array<Plane, 3> planes;  // Reconstruction of shown frames; empty for hidden frames and 4:0:0 chroma
+  BlockData blocks;             // libaom's MI grid and the frame-header values its mapping needs (WI-2.156)
   std::vector<Diag> diagnostics;
 };
 
 class Decoder {
  public:
-  /// Opens a libaom AV1 decoder with @p threads worker threads (one when < 1) and registers the inspection
+  /// Opens a libaom AV1 decoder with @p threads worker threads (one when < 1; always one when libaom is built with
+  /// CONFIG_ACCOUNTING, whose symbol recording is not thread-safe) and registers the inspection
   /// callback. OVT_E_PLUGIN with @p error = "libaom built without CONFIG_INSPECTION" when libaom refuses the
   /// callback; OVT_E_PLUGIN with libaom's message when the decoder cannot be opened.
   static ovt_status create(int threads, std::unique_ptr<Decoder>* out, std::string* error);

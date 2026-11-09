@@ -133,7 +133,7 @@ TEST_CASE("aom plugin: caps through the registry", "[fast][third_party]") {
   CHECK(caps->codec == 3);  // ovt.fb.Codec.AV1
   CHECK(caps->plane_stages == kReconMask);
   // §7.6.1 Caps row with stock libaom and no accounting yet: all but tx_type, bits_x8 and deblock_bs.
-  CHECK(caps->grid_fields == 0U);
+  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_TX_TYPE | OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
   CHECK(std::string(caps->id) == "aom");
   CHECK(std::string(caps->version).find("libaom") != std::string::npos);
   const Instance inst;

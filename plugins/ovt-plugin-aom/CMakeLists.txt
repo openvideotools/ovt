@@ -13,7 +13,8 @@ if(NOT TARGET tp::aom_inspection)
   return()
 endif()
 
-set(OVT_AOM_PLUGIN_SOURCES src/plugin.cpp src/decoder.cpp src/fb_builder.cpp)
+set(OVT_AOM_PLUGIN_SOURCES src/plugin.cpp src/decoder.cpp src/fb_builder.cpp src/map_mi.cpp
+                           src/partition_reconstruct.cpp)
 add_library(ovt_plugin_aom MODULE ${OVT_AOM_PLUGIN_SOURCES})
 target_include_directories(ovt_plugin_aom PRIVATE "${PROJECT_SOURCE_DIR}/core/include")
 target_link_libraries(ovt_plugin_aom PRIVATE tp::aom_inspection ovt_schemas ovt::flags)
