@@ -62,8 +62,9 @@ Common steps, as the owner (after the security measures above):
 
 1. Make the machine idle and on mains power, with the display asleep (overlay benchmarks excepted). Leave CPU
    frequency scaling at its default; it is recorded in `ovt_meta.cpu_scaling`.
-2. GitHub, repository **Settings, Actions, Runners, New self-hosted runner**: follow the page for the platform
-   and add the label named below. The runner is not shared with other jobs.
+2. GitHub, organisation **Settings, Actions, Runners, New runner, New self-hosted runner** (runner groups exist only
+   at organisation level, so register here and not under the repository): follow the page for the platform, choose
+   the runner group created above and add the label named below. The runner is not shared with other jobs.
 3. Set the repository variable `OVT_PERF_RUNNERS` to the comma-separated list of registered hardware ids, for
    example `m1-air-8gb,linux-x64-ref`. A job of `perf-nightly.yml` whose id is not listed is skipped.
 4. Run the workflow once with **Run workflow** (workflow_dispatch). The first run has no baseline: download the
