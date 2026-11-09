@@ -111,9 +111,7 @@ def ref_frame_idx(ffmpeg: str, ivf: Path) -> list[list[int]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--inspect", required=True)
     ap.add_argument("--ffmpeg", required=True)
     ap.add_argument("--out", required=True, type=Path)
