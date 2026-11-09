@@ -28,6 +28,7 @@
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "vk_no_timestamps.h"
 
 namespace ovt::render {
 namespace {
@@ -136,7 +137,9 @@ const SharedVulkan* shared_vulkan(std::string& stage, std::string& reason) {
   }
   struct pl_vulkan_params vk_params = pl_vulkan_default_params;
   vk_params.instance = s.inst->instance;
-  vk_params.get_proc_addr = s.inst->get_proc_addr;
+  // libplacebo loads its Vulkan functions through this wrapper, which hides timestamp support so libplacebo never
+  // writes timer queries (MoltenVK resolves them after libplacebo may have freed the query pool; vk_no_timestamps.cpp).
+  vk_params.get_proc_addr = detail::no_timestamps_get_proc_addr(s.inst->get_proc_addr);
   // Software rasterizers (lavapipe on GPU-less CI hosts) are accepted; libplacebo still prefers a hardware device.
   vk_params.allow_software = true;
   s.vk = pl_vulkan_create(s.log, &vk_params);
