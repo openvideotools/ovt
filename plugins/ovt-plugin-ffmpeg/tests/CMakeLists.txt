@@ -16,9 +16,13 @@ target_link_libraries(ovt_plugin_ffmpeg_sidedata PRIVATE tp::ffmpeg_plugin ovt::
 ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
 
 # The internals of the plugin (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
-add_executable(ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp ../src/h264_analysis.cpp
-                                                ../src/map_h264_sidedata.cpp)
+# test_ffmpeg_hevc_internals.cpp (WI-4.107) compiles to nothing without patch 0002 (OVT_SYSTEM_FFMPEG).
+add_executable(
+  ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp test_ffmpeg_hevc_internals.cpp
+                                   ../src/h264_analysis.cpp ../src/map_h264_sidedata.cpp ../src/map_hevc_sidedata.cpp)
 target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
+target_compile_definitions(ovt_plugin_ffmpeg_internal_tests
+                           PRIVATE "OVT_FFMPEG_HEVC_ENC_PARAMS=${OVT_FFMPEG_HEVC_ENC_PARAMS}")
 target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_internal_tests)
@@ -60,6 +64,25 @@ if(NOT OVT_SYSTEM_FFMPEG)
   ovt_catch_discover_tests(ovt_plugin_ffmpeg_blockparams_tests)
 endif()
 
+# ---- WI-4.107: the optional ffmpeg_hevc plugin against libde265 ----------------------------------------------------
+# Acceptance test 1 compares the plugin's MV/QP grid with ovt_plugin_de265_grid_dump (plugins/ovt-plugin-de265/tests,
+# patched libde265). That directory is added after this one, so the conditions are its own, not if(TARGET).
+if(NOT OVT_SYSTEM_FFMPEG)
+  add_executable(ovt_plugin_ffmpeg_hevc_tests test_ffmpeg_hevc_sidedata.cpp)
+  target_link_libraries(ovt_plugin_ffmpeg_hevc_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
+                                                             ovt_test_support ovt::flags ${Catch2_TARGET})
+  target_compile_definitions(ovt_plugin_ffmpeg_hevc_tests
+                             PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg_hevc>\"")
+  add_dependencies(ovt_plugin_ffmpeg_hevc_tests ovt_plugin_ffmpeg_hevc ovt_plugin_ffmpeg)
+  if(OVT_BUILD_PLUGIN_DE265 AND TARGET tp::de265 AND NOT OVT_SYSTEM_DE265)
+    target_compile_definitions(ovt_plugin_ffmpeg_hevc_tests
+                               PRIVATE "OVT_DE265_GRID_DUMP=\"$<TARGET_FILE:ovt_plugin_de265_grid_dump>\"")
+    add_dependencies(ovt_plugin_ffmpeg_hevc_tests ovt_plugin_de265_grid_dump)
+  endif()
+  ovt_set_license(ovt_plugin_ffmpeg_hevc_tests "LGPL-2.1-or-later")
+  ovt_catch_discover_tests(ovt_plugin_ffmpeg_hevc_tests)
+endif()
+
 # ---- WI-4.100: the FFmpeg patch series applies to the pinned tarball (chapter 07 §7.6.3, chapter 13 §13.3.6) ---
 # Only the files the patches touch are extracted, so this stays in the fast lane. With OVT_SYSTEM_FFMPEG there is no
 # pinned tarball. SPEC-ASSUMPTION(#331): third_party/ffmpeg.cmake applies the series to the plugin flavour (WI-4.101).
@@ -95,3 +118,6 @@ set_tests_properties(ffmpeg_plugin_symbol_leak PROPERTIES LABELS "fast;unit;thir
 add_test(NAME ffmpeg_plugin_symbol_leak_plugin COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/test_symbol_leak.sh"
                                                        $<TARGET_FILE:ovt_plugin_ffmpeg>)
 set_tests_properties(ffmpeg_plugin_symbol_leak_plugin PROPERTIES LABELS "fast;unit;third_party")
+add_test(NAME ffmpeg_plugin_symbol_leak_plugin_hevc COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/test_symbol_leak.sh"
+                                                            $<TARGET_FILE:ovt_plugin_ffmpeg_hevc>)
+set_tests_properties(ffmpeg_plugin_symbol_leak_plugin_hevc PROPERTIES LABELS "fast;unit;third_party")

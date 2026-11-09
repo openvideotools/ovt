@@ -11,4 +11,10 @@
 # third_party/ffmpeg.cmake applies this series to the plugin flavour only; the core flavour stays unpatched.
 # SPEC-ASSUMPTION(#351): the h264 part keeps one per-picture table recorded while parsing, exports from output_frame()
 # and has FATE tests through tools/vblock_data_dump, instead of the four tables and ffprobe test of §7.6.3.
+#
+# 0002 makes the hevc decoder honour export_side_data mvs and venc_params (WI-4.107, chapter 07 §7.8) for the optional
+# ffmpeg_hevc plugin. It touches doc/APIchanges and the version headers after 0001, so it applies on top of 0001 only;
+# tools/apply_patches.py --check dry-runs the series cumulatively. SPEC-ASSUMPTION(#371): side data is attached in
+# hevc_frame_end(), output waits for it, venc_params has one block per CU and mvs one vector per list per min PU.
 0001-h264-export-mb-params.patch
+0002-hevc-export-mvs-venc-params.patch

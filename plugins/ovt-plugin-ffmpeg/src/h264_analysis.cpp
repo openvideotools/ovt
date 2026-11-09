@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// libavcodec h264 decoder driving of the FFmpeg analysis plugin (chapter 07 §7.6.3, WI-2.169).
+// libavcodec h264 decoder driving of the FFmpeg analysis plugin (chapter 07 §7.6.3, WI-2.169); the same driving of
+// the hevc decoder for the ffmpeg_hevc plugin (WI-4.107).
 
 #include "h264_analysis.hpp"
 
@@ -73,6 +74,37 @@ bool avcc_parameter_sets(std::span<const uint8_t> avcc, std::vector<uint8_t>* ou
         return false;
       }
       append_annexb(out, avcc.subspan(pos, len));
+      pos += len;
+    }
+  }
+  return true;
+}
+
+// The parameter set arrays of an HEVCDecoderConfigurationRecord (ISO/IEC 14496-15 8.3.3.1) as Annex B units, in record
+// order. False when the record is truncated or malformed.
+bool hvcc_parameter_sets(std::span<const uint8_t> hvcc, std::vector<uint8_t>* out) {
+  constexpr size_t kHeader = 22;  // configurationVersion .. lengthSizeMinusOne
+  if (hvcc.size() < kHeader + 1 || hvcc[0] != 1) {
+    return false;
+  }
+  size_t pos = kHeader;
+  const unsigned arrays = hvcc[pos++];
+  for (unsigned a = 0; a < arrays; ++a) {
+    if (pos + 3 > hvcc.size()) {
+      return false;
+    }
+    const unsigned count = (unsigned{hvcc[pos + 1]} << 8) | hvcc[pos + 2];
+    pos += 3;
+    for (unsigned i = 0; i < count; ++i) {
+      if (pos + 2 > hvcc.size()) {
+        return false;
+      }
+      const size_t len = (size_t{hvcc[pos]} << 8) | hvcc[pos + 1];
+      pos += 2;
+      if (len == 0 || pos + len > hvcc.size()) {
+        return false;
+      }
+      append_annexb(out, hvcc.subspan(pos, len));
       pos += len;
     }
   }
@@ -166,16 +198,21 @@ void AVFrameDeleter::operator()(AVFrame* f) const noexcept {
   av_frame_free(&f);
 }
 
-ovt_status H264Analysis::create(const uint8_t* codec_private, size_t len, int threads,
+ovt_status H264Analysis::create(Codec codec_id, const uint8_t* codec_private, size_t len, int threads,
                                 std::unique_ptr<H264Analysis>* out) {
   auto dec = std::make_unique<H264Analysis>();
-  if (codec_private != nullptr && len > 0 &&
-      !avcc_parameter_sets(std::span<const uint8_t>(codec_private, len), &dec->parameter_sets_)) {
-    return OVT_E_CORRUPT;
+  dec->codec_ = codec_id;
+  const bool hevc = codec_id == Codec::H265;
+  if (codec_private != nullptr && len > 0) {
+    const std::span<const uint8_t> record(codec_private, len);
+    if (!(hevc ? hvcc_parameter_sets(record, &dec->parameter_sets_)
+               : avcc_parameter_sets(record, &dec->parameter_sets_))) {
+      return OVT_E_CORRUPT;
+    }
   }
-  const AVCodec* codec = avcodec_find_decoder(AV_CODEC_ID_H264);
+  const AVCodec* codec = avcodec_find_decoder(hevc ? AV_CODEC_ID_HEVC : AV_CODEC_ID_H264);
   if (codec == nullptr) {
-    return OVT_E_UNSUPPORTED;  // an FFmpeg build without the h264 decoder (pooled-codec-free variant, ADR-015)
+    return OVT_E_UNSUPPORTED;  // an FFmpeg build without the decoder (pooled-codec-free variant, ADR-015)
   }
   dec->ctx_ = avcodec_alloc_context3(codec);
   dec->pkt_ = av_packet_alloc();
@@ -334,7 +371,8 @@ ovt_status H264Analysis::receive_all() {
                "libavcodec concealed errors in this frame (decode_error_flags " +
                    std::to_string(frame_->decode_error_flags) + ")");
     }
-    p.info.side = map_h264_sidedata(frame_, p.info.bit_depth_luma, &pending_diags_);
+    p.info.side = codec_ == Codec::H265 ? map_hevc_sidedata(frame_, &pending_diags_)
+                                        : map_h264_sidedata(frame_, p.info.bit_depth_luma, &pending_diags_);
     p.info.diagnostics = std::move(pending_diags_);
     pending_diags_.clear();
     p.frame.reset(av_frame_alloc());
