@@ -100,14 +100,6 @@ jobs:
         if: always()
         run: cat "${RUNNER_TEMP}/out1/uvq-index.json" || true
 
-      - name: TEMPORARY dump of the goldens into the log (removed before merge)
-        if: always()
-        run: |
-          echo "BEGIN-GOLDENS-B64"
-          tar -C "${RUNNER_TEMP}/out1" -cf - . | base64 -w0
-          echo
-          echo "END-GOLDENS-B64"
-
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

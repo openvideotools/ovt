@@ -98,4 +98,14 @@ The pairs are `netflix_src01_576x324`, `syn_metrics_1080p` and `syn_metrics_pq_1
 the pooled `vmaf_v0.6.1` mean of the Netflix pair is not Netflix's published 76.6689 (acceptance test 1) or when
 `x264_ssim` on the x264 reconstruction of the Netflix reference differs from the `SSIM Mean Y` of `x264 --ssim` by more
 than 1e-4 (acceptance test 3). Acceptance test 2 (determinism) is the workflow's second run: both runs must be
-byte-identical. UVQ goldens (`<pair>.uvq-<ver>.json`) are a separate work item. Spec questions: #306.
+byte-identical. UVQ goldens are WI-0.565b (below). Spec questions: #306.
+
+## UVQ goldens (WI-0.565b)
+
+`metrics/<clip>.uvq-<ver>.json.gz` (`ver` is `1.5` or `1.0`) for the `ytugc` `fast` clips `ytugc_clip01` to `03`, written by
+`tools/goldens/gen_uvq.py` in the oracle image (workflow `goldens-uvq`), never by hand. The oracle is google/uvq (PyTorch,
+the revision pinned in `tests/oracles/Dockerfile`) as `uvq_inference.py --model_version <ver> --device cpu --threads 1
+--fps 1`, normalised by `tests/oracles/normalize/uvq.py` (`scores`, gzip like the other metric goldens). UVQ 1.5 has one
+`frames` entry per sampled frame (`i` is the source frame index) and `pooled.uvq.mean`; UVQ 1.0 has no per-frame values
+and keeps its sub-network scores in `pooled.uvq`. `uvq-index.json` records the clip hashes and the oracle revision. The
+workflow runs the generator twice and the outputs must be byte-identical (acceptance test 2). Spec questions: #306.

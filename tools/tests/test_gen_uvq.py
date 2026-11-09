@@ -105,3 +105,20 @@ def test_a_missing_oracle_is_exit_4(setup: Path, tmp_path: Path, monkeypatch: py
 
 def test_a_missing_corpus_is_exit_4(tmp_path: Path, setup: Path) -> None:
     assert gen.main(["--out", str(tmp_path / "o"), "--corpora-dir", str(tmp_path / "empty")]) == 4
+
+
+def test_committed_uvq_goldens_are_complete_and_valid() -> None:
+    d = REPO / "tests" / "golden" / "metrics"
+    index = json.loads((d / "uvq-index.json").read_text(encoding="utf-8"))
+    assert sorted(index["clips"]) == list(gen.CLIPS)
+    for cid in gen.CLIPS:
+        assert index["clips"][cid]["failed"] == {}
+        for ver in gen.VERSIONS:
+            path = d / f"{cid}.uvq-{ver}.json.gz"
+            assert 0 < path.stat().st_size <= 2_000_000
+            doc = json.loads(gzip.decompress(path.read_bytes()))
+            assert canon.validate(doc, "scores") == []
+            if ver == "1.5":
+                assert doc["frames"] and 1.0 <= doc["pooled"]["uvq"]["mean"] <= 5.0
+            else:
+                assert not doc["frames"] and 1.0 <= doc["pooled"]["uvq"]["compression_content_distortion"] <= 5.0
