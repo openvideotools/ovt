@@ -14,6 +14,7 @@ expand templates, so this script does the expansion with the stdlib instead.
 
 Usage: tools/ref_mpd.py <manifest.mpd> [--url <manifest url>]   (JSON on stdout)
 """
+
 import argparse
 import json
 import re
@@ -46,7 +47,7 @@ def duration_ms(text):
     y, mo, d, h, mi, s = m.groups()
     seconds = (Fraction(y or 0) * 365 + Fraction(mo or 0) * 30 + Fraction(d or 0)) * 86400
     seconds += Fraction(h or 0) * 3600 + Fraction(mi or 0) * 60 + Fraction(s or 0)
-    return int(round(seconds * 1000))
+    return round(seconds * 1000)
 
 
 def expand(template, rep_id, number, bandwidth, time):
@@ -135,8 +136,15 @@ def expand_mpd(path, url=""):
                     pto = int(st.get("presentationTimeOffset", "0"))
                     start_number = int(st.get("startNumber", "1"))
                     if st.get("initialization"):
-                        segs.append({"url": urljoin(rbase, expand(st.get("initialization"), rep_id, 0, bw, 0)),
-                                     "number": -1, "start_time": -1, "duration": -1, "init": True})
+                        segs.append(
+                            {
+                                "url": urljoin(rbase, expand(st.get("initialization"), rep_id, 0, bw, 0)),
+                                "number": -1,
+                                "start_time": -1,
+                                "duration": -1,
+                                "init": True,
+                            }
+                        )
                     tl = kid(st, "SegmentTimeline")
                     if tl is not None:
                         entries = timeline(tl, start_number, pto + dur * timescale // 1000)
@@ -145,8 +153,15 @@ def expand_mpd(path, url=""):
                         count = ceil_div(dur * timescale, d * 1000)
                         entries = [(pto + k * d, d, start_number + k) for k in range(count)]
                     for t, d, n in entries:
-                        segs.append({"url": urljoin(rbase, expand(st.get("media"), rep_id, n, bw, t)),
-                                     "number": n, "start_time": t, "duration": d, "init": False})
+                        segs.append(
+                            {
+                                "url": urljoin(rbase, expand(st.get("media"), rep_id, n, bw, t)),
+                                "number": n,
+                                "start_time": t,
+                                "duration": d,
+                                "init": False,
+                            }
+                        )
                 ao["representations"].append({"id": rep_id, "timescale": timescale, "segments": segs})
             po["adaptation_sets"].append(ao)
         out["periods"].append(po)
