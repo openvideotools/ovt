@@ -137,8 +137,14 @@ def check_series(patches: list[Path], source: Path) -> None:
 def record(path: Path, patches: list[Path], digest: str) -> None:
     data = {
         "series_sha256": digest,
-        "patches": [{"name": p.name, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
-                     "upstream_status": upstream_status(p)} for p in patches],
+        "patches": [
+            {
+                "name": p.name,
+                "sha256": hashlib.sha256(p.read_bytes()).hexdigest(),
+                "upstream_status": upstream_status(p),
+            }
+            for p in patches
+        ],
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -155,8 +161,10 @@ def run(args: argparse.Namespace) -> int:
     if marker.exists():
         previous = marker.read_text(encoding="utf-8").strip()
         if previous != digest:
-            raise PatchError(f"{source} was patched with another series (marker {previous}); "
-                             "remove the source tree and build again")
+            raise PatchError(
+                f"{source} was patched with another series (marker {previous}); "
+                "remove the source tree and build again"
+            )
         print(f"apply_patches: {source.name} already patched, nothing to do")
     elif patches:
         if args.check:
