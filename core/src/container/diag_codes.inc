@@ -19,3 +19,36 @@ X(CNT_IVF_0001, "CNT-IVF-0001", Info, "IVF `header_size` is `N` (≠ 32); first 
 X(CNT_IVF_0002, "CNT-IVF-0002", Info, "IVF header `frame_count` `N` differs from the walked count `M`", "libvpx ivfdec.c")
 X(CNT_IVF_0003, "CNT-IVF-0003", Warning,
   "last IVF frame truncated: `frame_size` `N` exceeds EOF by `M` bytes (clamped)", "")
+
+// WI-1.226 (Annex B splitter, §8.6.3).
+X(CNT_ESB_0001, "CNT-ESB-0001", Warning, "`N` bytes of garbage before the first start code / after the last NAL unit",
+  "H.264 clause B.1.1")
+X(CNT_ESB_0002, "CNT-ESB-0002", Info, "more than 8 `trailing_zero_8bits` after NAL unit `n`", "H.264 clause B.1.2")
+X(CNT_ESB_0003, "CNT-ESB-0003", Warning, "empty NAL unit after start code at offset `o`", "H.264 clause B.1.2")
+X(CNT_ESB_0004, "CNT-ESB-0004", Info,
+  "3-byte start code before SPS/PPS/VPS/AUD/first NAL of an access unit (`zero_byte` required)",
+  "H.264 clause B.1.2, H.265 clause B.1.2")
+X(CNT_ESB_0005, "CNT-ESB-0005", Error,
+  "`forbidden_zero_bit` set in NAL header at offset `o` (false start code or corruption)", "H.264 §7.4.1")
+
+// WI-1.227 (raw AV1 OBU reader, §8.6.4).
+X(CNT_OBU_0001, "CNT-OBU-0001", Error,
+  "OBU at offset `o` has `obu_has_size_field == 0` outside Annex B framing (undecodable); open fails with "
+  "`OVT_E_UNSUPPORTED`",
+  "AV1 §5.3.1")
+X(CNT_OBU_0002, "CNT-OBU-0002", Info,
+  "both Section 5 and Annex B framings parse; `framing` chosen by the first-byte rule", "AV1 §5.2, Annex B")
+// SPEC-ASSUMPTION(#279): §8.5 has no row for a length that overruns its enclosing unit or for a malformed OBU
+// header / leb128; CNT-OBU-0003 and CNT-OBU-0004 are the proposed rows.
+X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
+  "length at offset `o` exceeds the bytes left in the file or enclosing unit; unit clamped to `N` bytes",
+  "AV1 §5.3, Annex B")
+X(CNT_OBU_0004, "CNT-OBU-0004", Error,
+  "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
+  "AV1 §4.10.5, §5.3.2")
+
+// WI-1.228 (Y4M reader, §8.6.5).
+X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
+X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
+  "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
+X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")

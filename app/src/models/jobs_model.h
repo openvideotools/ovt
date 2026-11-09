@@ -85,6 +85,7 @@ class JobsModel : public QAbstractListModel {
   static constexpr int kTickMs = 50;                             // < 100 ms (acceptance test 1)
   static constexpr std::chrono::seconds kKeepFailed{5 * 60};     // §11.3.18
   static constexpr std::chrono::seconds kKeepDone{5};            // a finished job lingers briefly
+  static constexpr unsigned long kShutdownWaitMs = 2000;         // bounded wait for detached jobs at exit
   static constexpr std::chrono::milliseconds kCancelWait{2000};  // §11.7 close-file cancellation
 
   JobsModel();
@@ -128,7 +129,8 @@ class JobsModel : public QAbstractListModel {
   struct Entry;
   Entry* find(quint64 id);
   [[nodiscard]] int row_of(quint64 id) const;
-  void update_entry(Entry& entry);
+  // Returns true when the job has just finished (the caller emits jobFinished).
+  static bool update_entry(Entry& entry);
   [[nodiscard]] static QString text_of(const Entry& entry);
 
   QThreadPool pool_;

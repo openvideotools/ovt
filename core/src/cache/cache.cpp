@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -74,6 +75,16 @@ constexpr std::array<char, 4> kPlaneLetters = {'y', 'u', 'v', 'a'};
 
 std::string now_iso8601() {
   return format_iso8601_utc(now());
+}
+
+// The counters of lookup_counters().
+std::atomic<std::uint64_t> g_hits{0};    // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+std::atomic<std::uint64_t> g_misses{0};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+template <class T>
+std::optional<T> counted(std::optional<T> result) noexcept {
+  (result ? g_hits : g_misses).fetch_add(1, std::memory_order_relaxed);
+  return result;
 }
 
 // The clock override of set_now_for_testing().
@@ -238,6 +249,10 @@ std::chrono::system_clock::time_point now() {
   return clock_slot().value_or(std::chrono::system_clock::now());
 }
 
+LookupCounters lookup_counters() noexcept {
+  return {g_hits.load(std::memory_order_relaxed), g_misses.load(std::memory_order_relaxed)};
+}
+
 void set_now_for_testing(std::optional<std::chrono::system_clock::time_point> when) {
   const std::lock_guard<std::mutex> lock(clock_mutex());
   clock_slot() = when;
@@ -395,13 +410,19 @@ std::optional<CacheJson> parse_cache_json(std::span<const std::uint8_t> bytes) {
 struct Cache::Impl {
   using Record = CacheRecord;
 
+  // One Impl per root per process (registry below): every Cache handle on the root shares it, so eviction and
+  // clear see the entries open through any handle (§12.2.13: `ovt cache clear` is safe while the GUI runs).
+  // A live entry is keyed by its hash and whether it was opened read-only: read-only and writable handles get
+  // distinct Entry objects on the same directory, and either one keeps the directory open.
+  using LiveKey = std::pair<std::string, bool>;
+
   fs::path root;
-  Options options;
   std::mutex open_mu;  // entry creation, open_entry, eviction and clear (lock order: before mu)
   mutable std::mutex mu;
+  bool writable = false;  // a writable handle has opened the root: cache.json is saved, eviction runs (mu)
   std::uint64_t size_cap_bytes = kDefaultMaxBytes;
-  std::map<std::string, Record> records;             // hex source hash → cache.json entries[] (guarded by mu)
-  std::map<std::string, std::weak_ptr<Entry>> live;  // guarded by mu
+  std::map<std::string, Record> records;         // hex source hash → cache.json entries[] (guarded by mu)
+  std::map<LiveKey, std::weak_ptr<Entry>> live;  // guarded by mu
   bool dirty = false;
   bool warned_all_open = false;  // MDL-CCH-0002 is logged once per Cache (guarded by mu)
 
@@ -409,28 +430,30 @@ struct Cache::Impl {
   // destroyed (its destructor still flushes into the directory). Caller holds mu.
   [[nodiscard]] std::set<std::string> open_set_locked() const {
     std::set<std::string> out;
-    for (const auto& [hash, weak] : live) {
-      out.insert(hash);
+    for (const auto& [key, weak] : live) {
+      out.insert(key.first);
     }
     return out;
   }
 
   // §6.7.4 eviction. Takes open_mu and mu; the caller holds neither (nor any Entry lock).
   EvictionResult run_eviction() {
-    if (options.read_only) {
-      return {};
-    }
     const std::lock_guard<std::mutex> open_lock(open_mu);
     const std::lock_guard<std::mutex> lock(mu);
-    EvictionResult result = evict(root, records, open_set_locked(), size_cap_bytes);
-    if (!result.removed.empty() || !result.trimmed.empty()) {
-      dirty = true;
+    if (!writable) {
+      return {};
     }
+    EvictionResult result = evict(root, records, open_set_locked(), size_cap_bytes);
     if (result.all_open && !warned_all_open) {
       warned_all_open = true;
       OVT_LOG_CODE(log::Level::Warn, kModule, "MDL-CCH-0002", "disk cache cap exceeded: all entries are open");
     }
-    save_locked();
+    // Rewritten only when eviction changed a record: above the cap with every entry open, each write would
+    // otherwise rewrite cache.json; the byte account of writes is saved at flush (§6.7.4, incrementally).
+    if (!result.removed.empty() || !result.trimmed.empty()) {
+      dirty = true;
+      save_locked();
+    }
     return result;
   }
 
@@ -457,8 +480,8 @@ struct Cache::Impl {
   }
 
   // open_entry: deletes <root>/<hash> when it exists and fails I1–I4 (§6.7.3); the rule, or None. Caller holds
-  // open_mu and has checked that the entry is not open.
-  InvalidationReason discard_failing_dir(const std::string& hash, fb::Codec codec) {
+  // open_mu and has checked that the entry is not open; @p read_only is the handle's.
+  InvalidationReason discard_failing_dir(const std::string& hash, fb::Codec codec, bool read_only) {
     const fs::path dir = root / hash;
     std::error_code ec;
     if (!fs::is_directory(dir, ec)) {
@@ -468,7 +491,7 @@ struct Cache::Impl {
     if (r == InvalidationReason::None) {
       return r;
     }
-    if (options.read_only) {
+    if (read_only) {
       throw CacheError(OVT_E_CORRUPT,
                        "cache: entry '" + hash + "' fails " + std::string(to_string(r)) + " (read-only)");
     }
@@ -490,10 +513,17 @@ struct Cache::Impl {
     if (!fs::is_regular_file(path, ec) || !try_load_cache_json(path)) {
       rebuild();
     }
-    if (options.max_bytes && *options.max_bytes != size_cap_bytes) {
-      size_cap_bytes = *options.max_bytes;
+  }
+
+  // A writable handle opens the root: the cap of @p max_bytes applies, cache.json is saved. Caller holds mu.
+  void join_writable_locked(std::optional<std::uint64_t> max_bytes) {
+    writable = true;
+    if (max_bytes && *max_bytes != size_cap_bytes) {
+      size_cap_bytes = *max_bytes;
+      warned_all_open = false;
       dirty = true;
     }
+    save_locked();
   }
 
   bool try_load_cache_json(const fs::path& path) {
@@ -532,7 +562,7 @@ struct Cache::Impl {
 
   // Writes cache.json when it changed. Caller holds mu.
   void save_locked() {
-    if (!dirty || options.read_only) {
+    if (!dirty || !writable) {
       return;
     }
     nlohmann::ordered_json doc;
@@ -585,7 +615,9 @@ struct Entry::Impl {
   std::optional<SelectedPlugin> plugin;
   std::optional<std::chrono::system_clock::time_point> last_touch;  // last last_used update (guarded by mu)
 
-  [[nodiscard]] bool read_only() const noexcept { return cache->options.read_only; }
+  bool read_only_handle = false;  // opened through a read-only Cache handle (fixed at creation)
+
+  [[nodiscard]] bool read_only() const noexcept { return read_only_handle; }
 
   void require_writable() const {
     if (read_only()) {
@@ -835,7 +867,7 @@ Entry::~Entry() {
     OVT_LOG(log::Level::Error, kModule, "flush of entry {} failed: {}", impl_->hex_hash, e.what());
   }
   const std::lock_guard<std::mutex> lock(impl_->cache->mu);
-  if (const auto it = impl_->cache->live.find(impl_->hex_hash);
+  if (const auto it = impl_->cache->live.find({impl_->hex_hash, impl_->read_only_handle});
       it != impl_->cache->live.end() && it->second.expired()) {
     impl_->cache->live.erase(it);
   }
@@ -883,6 +915,10 @@ void Entry::put_index(std::span<const std::uint8_t> stream_index) {
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_index() const {
+  return counted(get_index_uncounted());
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_index_uncounted() const {
   const std::lock_guard<std::mutex> lock(impl_->mu);
   impl_->touch_locked();
   if (impl_->index_corrupt) {
@@ -932,6 +968,10 @@ void Entry::put_frame(std::uint32_t decode_index, std::span<const std::uint8_t> 
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_frame(std::uint32_t decode_index) const {
+  return counted(get_frame_uncounted(decode_index));
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_frame_uncounted(std::uint32_t decode_index) const {
   impl_->touch();
   const Impl::ReadPolicy policy = impl_->read_policy();
   const auto prefixed = policy.invalidating ? impl_->get_frame_invalidating(decode_index, policy.plugin)
@@ -981,6 +1021,11 @@ void Entry::put_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uin
 }
 
 std::optional<PlaneData> Entry::get_plane(std::uint32_t decode_index, fb::PlaneStage stage, std::uint8_t plane) const {
+  return counted(get_plane_uncounted(decode_index, stage, plane));
+}
+
+std::optional<PlaneData> Entry::get_plane_uncounted(std::uint32_t decode_index, fb::PlaneStage stage,
+                                                    std::uint8_t plane) const {
   if (model::stage_token(stage).empty() || plane >= kPlaneLetters.size()) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: plane stage or index outside the enum");
   }
@@ -1037,6 +1082,10 @@ void Entry::put_report(std::string_view kind, std::span<const std::uint8_t> fb) 
 }
 
 std::optional<std::vector<std::uint8_t>> Entry::get_report(std::string_view kind) const {
+  return counted(get_report_uncounted(kind));
+}
+
+std::optional<std::vector<std::uint8_t>> Entry::get_report_uncounted(std::string_view kind) const {
   if (!valid_report_kind(kind)) {
     throw CacheError(OVT_E_INVALID_ARG, "cache: report kind must match [A-Za-z0-9_-]{1,32}");
   }
@@ -1078,7 +1127,7 @@ void Entry::flush() {
 
 // ---- Cache ---------------------------------------------------------------------------------------
 
-Cache::Cache(std::shared_ptr<Impl> impl) : impl_(std::move(impl)) {}
+Cache::Cache(std::shared_ptr<Impl> impl, Options options) : impl_(std::move(impl)), options_(options) {}
 
 Cache::~Cache() {
   try {
@@ -1088,28 +1137,62 @@ Cache::~Cache() {
   }
 }
 
+namespace {
+
+// The Impl of every root open in this process, by canonical path (Cache::Impl, "One Impl per root").
+std::mutex& registry_mutex() {
+  static std::mutex m;
+  return m;
+}
+
+std::map<fs::path, std::weak_ptr<Cache::Impl>>& registry() {
+  static std::map<fs::path, std::weak_ptr<Cache::Impl>> r;
+  return r;
+}
+
+}  // namespace
+
 std::shared_ptr<Cache> Cache::open(std::optional<fs::path> root, Options options) {
-  auto impl = std::make_shared<Impl>();
-  impl->root = root ? *root : default_root();
-  impl->options = options;
+  const fs::path path = root ? *root : default_root();
   std::error_code ec;
-  if (!fs::exists(impl->root, ec)) {
+  if (!fs::exists(path, ec)) {
     if (options.read_only) {
-      throw CacheError(OVT_E_IO, "cache: root '" + impl->root.string() + "' does not exist (read-only)");
+      throw CacheError(OVT_E_IO, "cache: root '" + path.string() + "' does not exist (read-only)");
     }
-    ensure_directory(impl->root);
+    ensure_directory(path);
     // Created with mode 0700 on first write (§6.7.1).
-    fs::permissions(impl->root, fs::perms::owner_all, fs::perm_options::replace, ec);
-  } else if (!fs::is_directory(impl->root, ec)) {
-    throw CacheError(OVT_E_IO, "cache: root '" + impl->root.string() + "' is not a directory");
+    fs::permissions(path, fs::perms::owner_all, fs::perm_options::replace, ec);
+  } else if (!fs::is_directory(path, ec)) {
+    throw CacheError(OVT_E_IO, "cache: root '" + path.string() + "' is not a directory");
   }
-  impl->load();
-  {
-    const std::lock_guard<std::mutex> lock(impl->mu);
-    impl->save_locked();
+  fs::path key = fs::weakly_canonical(path, ec);
+  if (ec) {
+    key = fs::absolute(path).lexically_normal();
   }
-  (void)impl->run_eviction();  // §6.7.4: eviction also runs at startup
-  return std::shared_ptr<Cache>(new Cache(std::move(impl)));
+
+  // Lock order: registry, then Impl::open_mu, then Impl::mu. Opens of one root are serialised.
+  const std::lock_guard<std::mutex> registry_lock(registry_mutex());
+  auto& reg = registry();
+  std::erase_if(reg, [](const auto& slot) { return slot.second.expired(); });
+  std::shared_ptr<Impl> impl;
+  if (const auto it = reg.find(key); it != reg.end()) {
+    impl = it->second.lock();
+  }
+  if (!impl) {
+    impl = std::make_shared<Impl>();
+    impl->root = path;
+    impl->load();
+    reg[key] = impl;
+  }
+  if (!options.read_only) {
+    {
+      const std::lock_guard<std::mutex> open_lock(impl->open_mu);
+      const std::lock_guard<std::mutex> lock(impl->mu);
+      impl->join_writable_locked(options.max_bytes);
+    }
+    (void)impl->run_eviction();  // §6.7.4: eviction also runs at startup
+  }
+  return std::shared_ptr<Cache>(new Cache(std::move(impl), options));
 }
 
 const fs::path& Cache::root() const noexcept {
@@ -1117,7 +1200,7 @@ const fs::path& Cache::root() const noexcept {
 }
 
 const Options& Cache::options() const noexcept {
-  return impl_->options;
+  return options_;
 }
 
 std::uint64_t Cache::max_bytes() const noexcept {
@@ -1126,7 +1209,7 @@ std::uint64_t Cache::max_bytes() const noexcept {
 }
 
 void Cache::set_max_bytes(std::uint64_t max_bytes) {
-  if (impl_->options.read_only) {
+  if (options_.read_only) {
     throw CacheError(OVT_E_UNSUPPORTED, "cache: set_max_bytes on a read-only cache");
   }
   const std::lock_guard<std::mutex> lock(impl_->mu);
@@ -1190,7 +1273,7 @@ std::shared_ptr<Entry> Cache::entry_locked(const SourceHash& hash) {
   std::optional<std::uint64_t> known_bytes;
   {
     const std::lock_guard<std::mutex> lock(impl_->mu);
-    if (const auto it = impl_->live.find(hex_hash); it != impl_->live.end()) {
+    if (const auto it = impl_->live.find({hex_hash, options_.read_only}); it != impl_->live.end()) {
       if (auto alive = it->second.lock()) {
         return alive;
       }
@@ -1202,14 +1285,15 @@ std::shared_ptr<Entry> Cache::entry_locked(const SourceHash& hash) {
 
   auto eimpl = std::make_shared<Entry::Impl>();
   eimpl->cache = impl_;
+  eimpl->read_only_handle = options_.read_only;
   eimpl->hex_hash = hex_hash;
   eimpl->dir = impl_->root / hex_hash;
   std::error_code ec;
   const bool exists = fs::is_directory(eimpl->dir, ec);
-  if (!exists && impl_->options.read_only) {
+  if (!exists && options_.read_only) {
     throw CacheError(OVT_E_IO, "cache: entry '" + hex_hash + "' does not exist (read-only)");
   }
-  if (!impl_->options.read_only) {
+  if (!options_.read_only) {
     ensure_directory(eimpl->dir);
     if (remove_stale_tmp_files(eimpl->dir) > 0) {
       known_bytes.reset();  // the account no longer matches the directory
@@ -1226,7 +1310,8 @@ std::shared_ptr<Entry> Cache::entry_locked(const SourceHash& hash) {
   std::shared_ptr<Entry> entry(new Entry(eimpl, hash, eimpl->dir));
   {
     const std::lock_guard<std::mutex> lock(impl_->mu);
-    impl_->live[hex_hash] = entry;  // open_mu is held: no other thread created this entry meanwhile
+    impl_->live[{hex_hash, options_.read_only}] =
+        entry;  // open_mu is held: no other thread created this entry meanwhile
   }
   entry->flush();  // records the entry in cache.json
   return entry;
@@ -1244,11 +1329,11 @@ std::shared_ptr<Entry> Cache::open_entry(const SourceHash& hash, fb::Codec codec
     const std::lock_guard<std::mutex> lock(impl_->mu);
     // A key whose Entry is being destroyed still counts as open: its destructor may be flushing meta.json into
     // the directory, so a failing directory survives that one open rather than being deleted under it.
-    open = impl_->live.contains(hex_hash);
+    open = impl_->live.contains({hex_hash, false}) || impl_->live.contains({hex_hash, true});
   }
   // An open entry was checked when it was created; deleting it under its handles is not an option.
   if (!open) {
-    const InvalidationReason r = impl_->discard_failing_dir(hex_hash, codec);
+    const InvalidationReason r = impl_->discard_failing_dir(hex_hash, codec, options_.read_only);
     if (reason != nullptr) {
       *reason = r;
     }
@@ -1268,12 +1353,15 @@ std::uint64_t Cache::total_bytes() const {
 }
 
 EvictionResult Cache::enforce_cap() {
+  if (options_.read_only) {
+    return {};
+  }
   flush();  // the records of open entries carry their latest byte counts
   return impl_->run_eviction();
 }
 
 ClearResult Cache::clear(const ClearFilter& filter) {
-  if (impl_->options.read_only) {
+  if (options_.read_only) {
     throw CacheError(OVT_E_UNSUPPORTED, "cache: clear on a read-only cache");
   }
   const std::lock_guard<std::mutex> open_lock(impl_->open_mu);

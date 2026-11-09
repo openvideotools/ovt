@@ -11,17 +11,45 @@ add_executable(ovt_plugin_ffmpeg_framemd5 ffmpeg_framemd5.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_framemd5 PRIVATE tp::ffmpeg_plugin ovt::flags)
 ovt_set_license(ovt_plugin_ffmpeg_framemd5 "LGPL-2.1-or-later")
 
-add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp)
+add_executable(ovt_plugin_ffmpeg_sidedata ffmpeg_sidedata_csv.cpp)
+target_link_libraries(ovt_plugin_ffmpeg_sidedata PRIVATE tp::ffmpeg_plugin ovt::flags)
+ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
+
+# The internals of the plugin (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
+add_executable(ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp ../src/h264_analysis.cpp
+                                                ../src/map_h264_sidedata.cpp)
+target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
+target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_ffmpeg_internal_tests)
+
+add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp test_ffmpeg_map_sidedata.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
                                                             ovt_test_support ovt::flags ${Catch2_TARGET})
 target_compile_definitions(ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_SYSTEM=$<BOOL:${OVT_SYSTEM_FFMPEG}>"
                                                                  "OVT_FFMPEG_HW_DECODE=$<BOOL:${OVT_ENABLE_HW_DECODE}>")
 target_compile_definitions(
-  ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
-                                        "OVT_FFMPEG_FRAMEMD5=\"$<TARGET_FILE:ovt_plugin_ffmpeg_framemd5>\"")
-add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmpeg_framemd5)
+  ovt_plugin_ffmpeg_smoke_tests
+  PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
+          "OVT_FFMPEG_FRAMEMD5=\"$<TARGET_FILE:ovt_plugin_ffmpeg_framemd5>\""
+          "OVT_FFMPEG_SIDEDATA=\"$<TARGET_FILE:ovt_plugin_ffmpeg_sidedata>\""
+          "OVT_JM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h264\"")
+add_dependencies(ovt_plugin_ffmpeg_smoke_tests ovt_plugin_ffmpeg ovt_plugin_ffmpeg_framemd5 ovt_plugin_ffmpeg_sidedata)
 ovt_set_license(ovt_plugin_ffmpeg_smoke_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_smoke_tests)
+
+# ---- WI-4.100: the FFmpeg patch series applies to the pinned tarball (chapter 07 §7.6.3, chapter 13 §13.3.6) ---
+# Only the files the patches touch are extracted, so this stays in the fast lane. With OVT_SYSTEM_FFMPEG there is no
+# pinned tarball. SPEC-ASSUMPTION(#331): the FFmpeg build itself applies the series from a later WI.
+if(NOT OVT_SYSTEM_FFMPEG AND DEFINED OVT_TP_ffmpeg_ARCHIVE)
+  add_test(
+    NAME ffmpeg_patches_apply
+    COMMAND
+      "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/check_patches_apply.py" --archive
+      "${OVT_TP_ffmpeg_ARCHIVE}" --series "${CMAKE_CURRENT_SOURCE_DIR}/../patches/series" --apply-patches
+      "${CMAKE_SOURCE_DIR}/tools/apply_patches.py")
+  set_tests_properties(ffmpeg_patches_apply PROPERTIES LABELS "fast;unit;third_party")
+endif()
 
 # ---- WI-0.012: symbol-leak test of the plugin flavour (chapter 13 §13.3.3) ------------------------------------------
 # The plugin, and a fixture module linked like it (SPEC-ASSUMPTION(#129)), export the two entry points and nothing else.

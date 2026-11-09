@@ -1,0 +1,11 @@
+/* SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Linker version script of the AV1 analysis plugin (plugins/ovt-plugin-aom/CMakeLists.txt; chapter 07 section
+ * 7.6.1): only the plugin entry point stays global. */
+{
+  global:
+    ovt_analysis_decoder_v1;
+  local:
+    *;
+};

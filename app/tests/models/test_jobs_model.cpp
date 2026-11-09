@@ -147,3 +147,18 @@ TEST_CASE("JobsModel: closing a file waits, then detaches what did not stop", "[
   model.cancelAll();
   REQUIRE(spin_until([&] { return model.activeCount() == 0; }, 2000ms));
 }
+
+TEST_CASE("JobsModel: a jobFinished slot may erase entries", "[fast][gui][jobs]") {
+  ovt::app::testing::qt_app();
+  JobsModel model(2, nullptr);
+  int finished = 0;
+  QObject::connect(&model, &JobsModel::jobFinished, &model, [&](quint64 /*id*/, int /*status*/) {
+    ++finished;
+    model.clearFinished();  // erases entries while tick() is still iterating in the old design
+  });
+  for (int i = 0; i < 3; ++i) {
+    model.enqueue(QStringLiteral("Job"), [](JobContext& /*ctx*/) { return OVT_OK; });
+  }
+  REQUIRE(spin_until([&] { return finished == 3; }, 2000ms));
+  CHECK(model.rowCount() == 0);
+}
