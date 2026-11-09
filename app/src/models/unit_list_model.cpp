@@ -213,7 +213,7 @@ UnitClass UnitListModel::class_of(std::uint32_t unit_index) const {
 }
 
 QString UnitListModel::type_label(const fb::Unit& unit) {
-  if (unit.type_name() != nullptr && unit.type_name()->size() != 0) {
+  if (unit.type_name() != nullptr && !unit.type_name()->empty()) {
     return QString::fromUtf8(unit.type_name()->c_str(), static_cast<qsizetype>(unit.type_name()->size()));
   }
   return QStringLiteral("type %1").arg(unit.type());
@@ -242,7 +242,7 @@ bool UnitListModel::matches(std::uint32_t unit_index) const {
       }
       break;
     case KindErrors:
-      if (u->diagnostics() == nullptr || u->diagnostics()->size() == 0) {
+      if (u->diagnostics() == nullptr || u->diagnostics()->empty()) {
         return false;
       }
       break;
