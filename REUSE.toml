@@ -206,3 +206,11 @@ SPDX-License-Identifier = "ISC"
 path = ["core/share/models/uvq/labels_yt8m.txt"]
 SPDX-FileCopyrightText = "2025 Google LLC"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Debian packaging files that cannot carry a header (WI-0.072): the install lists, changelog, copyright and format
+# files. packaging/debian/README.source is prose and falls under the Markdown rule's licence only by suffix, so it is listed.
+[[annotations]]
+path = ["packaging/debian/*.install", "packaging/debian/changelog", "packaging/debian/copyright",
+        "packaging/debian/README.source", "packaging/debian/source/format"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"

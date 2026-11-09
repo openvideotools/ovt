@@ -1,0 +1,3 @@
+usr/lib/*/libovt_core.so.*
+usr/share/ovt/models
+usr/share/ovt/schema
