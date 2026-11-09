@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <exception>
 #include <fstream>
 #include <ios>
 #include <iostream>
@@ -240,10 +241,7 @@ class Decoder {
   Int poc_last_display_ = -MAX_INT;
 };
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  const std::span<char*> args(argv, static_cast<std::size_t>(argc));
+int run(std::span<char*> args) {
   if (args.size() != 2) {
     std::cerr << "usage: ovt_plugin_hm_smoke <stream>.bit\n";
     return 2;
@@ -259,4 +257,17 @@ int main(int argc, char** argv) {
     pictures = decoder.run();
   }
   return verdict(pictures);
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return run(std::span<char*>(argv, static_cast<std::size_t>(argc)));
+  } catch (const std::exception& e) {
+    std::cerr << "ovt_plugin_hm_smoke: " << e.what() << "\n";
+  } catch (...) {
+    std::cerr << "ovt_plugin_hm_smoke: unknown exception\n";
+  }
+  return 1;
 }
