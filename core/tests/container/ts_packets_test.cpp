@@ -612,7 +612,8 @@ TEST_CASE("reader: children are materialised in windows of 65536 packets", "[con
   buf = reader->tree();
   tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
   CHECK(tree->root()->Get(0)->children()->size() == n);
-  CHECK(tree->root()->Get(0)->diagnostics()->size() < 1U);
+  const size_t lazy_diagnostics = tree->root()->Get(0)->diagnostics()->size();
+  CHECK(lazy_diagnostics == 0U);
   CHECK(tree->diagnostics()->size() == ts::kMaxDiagnostics);
 }
 
