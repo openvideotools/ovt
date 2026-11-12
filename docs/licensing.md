@@ -121,7 +121,8 @@ only where the artefact contains the codec pack (chapter 15 §15.8). The listing
 `tools/release/listing_texts.toml`.
 
 **Google Play (`play`).** The Play build is the `play` flavour: the base module contains no AVC or HEVC
-decoder, and the codec pack is an optional on-demand module. Play App Signing means you cannot replace the
+decoder (it is the split build, `OVT_PATENT_CODECS_IN_CORE=OFF`, until the owner has had a store release with
+those decoders checked), and the codec pack is an optional on-demand module. Play App Signing means you cannot replace the
 Play-signed app with your own build under the same signature. GPL-3 §6 "Installation Information" covers
 products conveyed together with a device, not an app download, so this is compatible with the licence. The
 reproducible `foss` APK is published as well, so you can rebuild it and sideload your own build.
@@ -140,7 +141,8 @@ the `ovt` CLI. Notarisation puts no restriction on what you may do with the app,
 GPL. The codec pack is the separate cask `ovt-codec-pack`. OVT is never published on the Mac App Store,
 whose usage rules conflict with GPL §10 (chapter 15 §15.8).
 
-**PyPI (`pypi`).** The `ovt` wheels are GPL-3.0-or-later and contain no AVC or HEVC decoder.
+**PyPI (`pypi`).** The `ovt` wheels are GPL-3.0-or-later and, as the split build, contain no AVC or HEVC
+decoder until the owner has had a wheel with those decoders checked.
 `pip install "ovt[codecs]"` downloads the codec pack from the project's GitHub release on first use,
 checks its hash and shows the patent notice before loading it.
 
