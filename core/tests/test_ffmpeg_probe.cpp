@@ -156,9 +156,12 @@ TEST_CASE(OVT_PROBE "the core flavour decodes the pool-covered codecs unless OVT
   // Nothing is disabled by name in the default core: its configure line carries no --disable-decoder/--disable-hwaccel.
   CHECK_FALSE(contains(configuration(), "--disable-decoder"));
   CHECK_FALSE(contains(configuration(), "--disable-hwaccel"));
+  const std::set<std::string> names = decoder_names();
+  CHECK(names.contains("h264"));
+  CHECK(names.contains("hevc"));
 #if OVT_ENABLE_HW_DECODE && defined(__ANDROID__)
-  CHECK(avcodec_find_decoder_by_name("h264_mediacodec") != nullptr);
-  CHECK(avcodec_find_decoder_by_name("hevc_mediacodec") != nullptr);
+  CHECK(names.contains("h264_mediacodec"));
+  CHECK(names.contains("hevc_mediacodec"));
 #endif
 #else
   for (const AVCodecID id : pool_ids) {
