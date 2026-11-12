@@ -2,6 +2,50 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc19 — 2026-11-09
+
+MINOR-level: spec-amendment pass 1 folds in the accepted answers of 41 `spec-question` issues on chapters 13, 14 and 15 (plus the chapter 7, 9, 11 and glossary sentences they touch). Acceptance-line wording changes for WI-0.012, WI-0.019, WI-0.556, WI-0.557, WI-0.565 and WI-0.569 describe what their merged PRs already do, so no WI is re-opened. Issue numbers are cited in the text.
+
+- 13 §13.7.1, 14 §14.8.2, 14 WI-0.559 — the `clang-tidy` job lives in `static-analysis.yml` and is listed by job name; header filter leaves `core/include/` out; `core/tests/.clang-tidy` relaxes six checks; `check_ovt_flags.py` detects `ovt::flags` through the `OVT_FLAGS_APPLIED=1` marker — WI-0.559 (#29)
+- 15 §15.4.2 — gate reads non-SPDX `VERSIONS.md` cells through parenthesis stripping and `[versions_overrides]`/`[versions_skip]`; `--pip` reads pip-licenses JSON or requirements with `importlib.metadata`/`[pip_overrides]` (`W-PIP-UNRESOLVED`); `--require-all` semantics; `[allow.any]` ids in `permissiveness`; `E-TARGET` — WI-0.602 (#31)
+- 13 WI-0.003 — Python/Kotlin FlatBuffers code is generated in every configuration; the options gate only the consumers — WI-0.003 (#32)
+- 13 WI-0.018 — `install_qt.py` prints `QT_ROOT_DIR=<dest>/6.8.3` — WI-0.018 (#39)
+- 14 §14.2.4 — `unverified: true` manifest field, fetcher and licence-gate behaviour, member storage by basename, `.ok` record — WI-0.551, WI-0.552 (#41)
+- 14 §14.4.12, 9 §9.4.4 — x264 sanity check uses a lossy QP without B-frames against x264's own reconstruction; `x264_ssim` takes Y4M — WI-0.554, WI-0.565 (#49, #306)
+- 13 §13.2.4, 14 §14.8.1 — `asan-env-macos` test preset (`detect_leaks=0:detect_container_overflow=0`) for the macOS ASan presets — WI-0.558 (#55)
+- 15 §15.6, WI-0.603 — notices before `manifest.toml`: component set from gate inventory rows with targets, licence files staged by `ovt_notices`, output under `build/<preset>/`, `OVT_NOTICES_REQUIRED` — WI-0.603 (#57)
+- 14 §14.3.5, §14.3.2 — CENC fixtures are `mpegff_video_cenc_128iv` and `mpegff_video_cenc_roll_frag1s`; `gpac`/`bento4` ids point at files that exist — WI-0.551, WI-1.213 (#59)
+- 13 §13.2.1, 14 §14.2.1 — `ovt_core_objects` OBJECT library, how `ovt_core` and the module tests link it, third-party deps on the objects — WI-1.100 (#62)
+- 15 §15.5.5, WI-0.607 — `Date:` and `Issue:` header lines, `invalid <field>` message, ageing rule details — WI-0.607 (#66)
+- 13 §13.2.1, §13.4.3, WI-0.019 — Android library is `libovt_studio_<ABI>.so` — WI-0.019 (#71)
+- 14 WI-0.557 — regressions directory is `regressions/<name>/` — WI-0.557 (#90)
+- 14 §14.4.0, §14.4.3, §14.4.4 — per-stream `block-grid` shape (`frames[]` with `fields`, `mbs`, `slices`, `mvs`, `qp_blocks`, `symbols`), JM arrays in read order, `hm_cu_dump` prints raw getter values and `hm_grid.py` maps them (chroma DM mode resolved, CBF at TU depth) — WI-0.555, WI-0.563 (#93)
+- 14 §14.4.5 — oracle image patches `inspect` so the first accounting symbol of each block is printed — WI-0.554, WI-0.566 (#103)
+- 13 §13.2.2 — `OVT_SANITIZER` defaults to `fuzz` under `OVT_ENABLE_FUZZ`, else `asan-ubsan` — WI-0.035 (#106)
+- 14 WI-0.556, 2 glossary — golden comparison direction (golden = lower bound), `to_canonical` over `StreamIndex`/`SyntaxNode`, `SyntaxTree` defined, a/b split recorded — WI-0.556 (#111)
+- 13 §13.3.1 — `OVT_SYSTEM_DE265` semantics and the libde265 probe tests under `plugins/ovt-plugin-de265/tests/` — WI-0.014 (#114)
+- 13 §13.3.3 — plugin flavour passes `--disable-decoders --enable-decoder=h264,hevc` and `--disable-hwaccels …` — WI-0.012 (#128)
+- 13 WI-0.012 AT2 — symbol-leak test on a module linked like the plugin — WI-0.012, WI-2.169 (#129)
+- 14 §14.4.13 — `bjontegaard` 1.3.0 does not raise for cubic on 6 points; refusal tested against OVT alone — WI-0.555 (#142)
+- 13 §13.3.7 — dav1d pinned to the videolan release tarball with its hash (owner decision 2026-11-05); libplacebo stays on the GitLab archive — WI-0.011, WI-0.015 (#44)
+- 13 §13.3.7 — one `VERSIONS.md` row per ONNX Runtime prebuilt archive; MoltenVK and ONNX Runtime hashes filled — WI-0.017 (#150)
+- 13 §13.2.2 — `OVT_SYSTEM_LIBAOM` inspection probe builds and runs (`try_run`); not supported when cross-compiling — WI-0.013 (#152)
+- 14 §14.4.2, WI-0.562 — `gst_parse_oracle` prints JSON Lines folded by the WI-0.567 normaliser; struct-of-arrays, union, entry points, interim acceptance inputs — WI-0.562, WI-0.567 (#153)
+- 14 §14.3.1, §14.3.2 — fast-subset names absent upstream keep their ids with stand-ins or `unverified` entries; `post` steps not yet implemented; `ytugc` uses the 20 s H.264 re-encodes; per-corpus sizes are upper bounds; `h265-cu-golden` and `av1-grid-golden` member lists — WI-0.552 (#160, #161)
+- 14 §14.3.3 — pattern fixtures are `pat_*.y4m` from `gen_hdr_patterns.py`; no `--kind pattern` — WI-0.553, WI-1.413 (#173)
+- 14 §14.3.3 recipe 60 — `syn_raw_<ctag>` family = the 22 §8.6.5 tags with distinct layouts; siting-only tags `same_as` — WI-0.553 (#174)
+- 14 §14.3.1, §14.3.2, §14.12, 9 §9.6 — `fast` budget kept; 19 named streams moved to `slow`; golden tags defined by tag membership; Givens on moved streams run nightly; UVQ fast clips are `ytugc_clip01` and `03` — WI-0.552 (#179)
+- 14 §14.4.3a, WI-0.563 — `ffmpeg_mvs [--qp <qp.csv>] <in>`; MVs enabled through `export_side_data` — WI-0.563 (#181)
+- 14 WI-0.569 — OSS-Fuzz local test uses the `projects/ovt` flow, not `--external` — WI-0.569 (#267)
+- 13 §13.3.4 — libaom patches live in `plugins/ovt-plugin-aom/patches/` (`OVT_AOM_PATCH_DIR`) — WI-2.154 (#274)
+- 7 §7.6.1, WI-2.154 — patch series applied with `tools/apply_patches.py --check`, not `git apply --3way` — WI-2.154 (#275)
+- 7 §7.6.4, WI-4.104, 13 §13.3.7 — HM built from OVT's own CMake list without patches (TLibCommon, TLibDecoder, Utilities; no TLibVideoIO; `ENC_DEC_TRACE` untouched); HM row pins the commit, git rows verified through `_COMMIT`; BSD-3-Clause and the libmd5 note — WI-4.104 (#345)
+- 14 §14.10.3, 11 WI-1.465 — test IPC wire format (Unix socket, request/response JSON shape, `click` argument forms, `wait-idle [timeout_ms]`) — WI-0.568, WI-1.465 (#353)
+- 13 §13.4.1–§13.4.3, WI-0.050 — Qt Gradle plugin 1.2 is the only native build (no `externalNativeBuild`, no `ndk.abiFilters`); `src/main/cpp` holds only `ovt_jni`; `QtQuickView` loads `AndroidShell.qml` — WI-0.050 (#355, #356)
+- 15 §15.2, 13 §13.3.7 — Qt Gradle plugin licence is `LicenseRef-Qt-Commercial OR GPL-3.0-only WITH Qt-GPL-exception-1.0` (build-only tool) — WI-0.050 (#357)
+- 13 §13.6.2, WI-0.070 — the AppImage `AppRun` serves the CLI through `--ovt-cli` or an `ovt` symlink and appends the bundled plugin dir — WI-0.070 (#374)
+- 14 §14.2.3, WI-0.565 — metric golden naming (pair ids, `.json.gz`), Produces list, Netflix reference value `76.6689`, picture caps, Daala 10-bit skip, UVQ goldens split into part b — WI-0.565 (#306)
+
 ## 1.0.0-rc18 — 2026-11-09
 
 PATCH-level: WI-3.300 folds in the accepted answer of `spec-question` #156 and aligns chapter 9 with the backbone and chapter 13. No requirement sentence changes.
