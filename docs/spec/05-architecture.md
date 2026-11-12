@@ -204,7 +204,7 @@ The ADR table in the Backbone (§0.2) is normative; the titles below are an info
 | ADR-012 | CMake + presets + vcpkg + third_party scripts; Gradle for Android |
 | ADR-013 | In-process plugins in phase 1; IPC-ready data model |
 | ADR-014 | Android HDR via SurfaceView dataspace, not Vulkan colourspaces; ChromeOS HDR spike |
-| ADR-015 | Runtime-loaded decoder plugins; official builds may omit AVC/HEVC decoders |
+| ADR-015 | Runtime-loaded analysis decoder plugins; the default build keeps the pool-covered FFmpeg decoders in the core (owner decision 2026-11-12), a patent-pool-free split build stays supported |
 | ADR-016 | DCO governance; trademark; distribution channels (no Mac App Store) |
 
 ## 5.11 Deployment views

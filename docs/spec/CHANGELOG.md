@@ -2,6 +2,17 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc20 — 2026-11-12
+
+Owner decision (Karl, 2026-11-12, answering chapter 17 Q3 after PR #132): the default build keeps the pool-covered FFmpeg decoders in the core flavour, so the official default download plays AVC/HEVC without the codec pack. By §16.2.8 rule 1 this is MAJOR-level (ADR-015 wording changes); because the specification is still a 1.0 release candidate awaiting the owner's acceptance, the rc counter advances and the major number stays. The runtime-loaded plugin mechanism, the codec pack (now the analysis decoders) and the patent-pool-free split build (`OVT_PATENT_CODECS_IN_CORE=OFF`) are unchanged. No WI is re-opened: WI-0.012 is merged and the implementation PR of this entry flips the default and its tests.
+
+- 0 §0.2 ADR-015, 5 §5.10, 17 Q3 and R-14 — the default build keeps AVC/HEVC (and VVC, AAC, MPEG-4 Part 2, VC-1) playback decoders in the core; the analysis decoders stay runtime-loaded plugins; the split build stays supported; app-store, paid or commercial distribution of the default build needs the owner's legal check — WI-0.012
+- 13 §13.2.2 — `OVT_PATENT_CODECS_IN_CORE` defaults to ON (was OFF); the licence-manifest example records `true` — WI-0.012
+- 13 §13.3.3 — the core row lists the `--disable-decoder=`/`--disable-hwaccel=` lists under `OVT_PATENT_CODECS_IN_CORE=OFF` instead of as the default; rationale sentence updated (the plugin flavour is the instrumented *analysis* decoder) — WI-0.012
+- 13 §13.4 items 3 and 4 — the Android default download carries the core's playback decoders, including `h264_mediacodec`/`hevc_mediacodec` hardware playback without the codec pack; the Play base module (split build) keeps MediaCodec-via-plugin as its path — WI-0.012
+- 15 §15.5.2 POL-PAT-2, POL-PAT-3; 4 §4.15.8 NFR-033 (and its chapter 15 copy) — requirement sentences follow the new default; NFR-033 now binds the *analysis* decoder components, its acceptance line is unchanged — NFR-033, WI-0.602, WI-0.603
+- 13 §13.4 item 3, §13.4.8 Play bullet, 15 §15.5.2 POL-PAT-2, 15 §15.8 Google Play and PyPI rows, 12 §12.4.1 Python wheel table, `docs/licensing.md` — coordinator decision on the owner's behalf (2026-11-12, for the weekly check-in): the Google Play base module and the PyPI wheel are split builds (`OVT_PATENT_CODECS_IN_CORE=OFF`) until the owner's legal check; the F-Droid/GitHub APK and the other official artefacts carry the default — WI-0.012
+- 13 §13.6.2 AppImage paragraph, 13 §13.2.6 CPack components, 13 WI-0.012 Goal line, 90 appendix patent-risk note — wording follows the new default (the AppImage bundles the default core flavour; the `core` component excludes the analysis plugins; WI-0.012 is not re-opened) — WI-0.012
 ## 1.0.0-rc19 — 2026-11-12
 
 MINOR-level: spec-amendment pass 1 folds in the accepted answers of 41 `spec-question` issues on chapters 13, 14 and 15 (plus the chapter 7, 9, 11 and glossary sentences they touch). Acceptance-line wording changes for WI-0.012, WI-0.019, WI-0.556, WI-0.557, WI-0.565 and WI-0.569 describe what their merged PRs already do, so no WI is re-opened. Issue numbers are cited in the text.
