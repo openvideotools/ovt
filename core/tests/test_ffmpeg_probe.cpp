@@ -8,7 +8,8 @@
 // Both print avcodec_configuration() so a CI log or an acceptance record shows the configure line of the build.
 //
 // Compile definitions (core/tests/CMakeLists.txt): OVT_FFMPEG_PLUGIN_FLAVOUR, OVT_FFMPEG_SYSTEM
-// (OVT_SYSTEM_FFMPEG=ON: no flavour assertions), OVT_PATENT_CODECS_IN_CORE, OVT_ENABLE_HW_DECODE, OVT_FFMPEG_DAV1D.
+// (OVT_SYSTEM_FFMPEG=ON: no flavour assertions), OVT_PATENT_CODECS_IN_CORE (ON by default), OVT_ENABLE_HW_DECODE,
+// OVT_FFMPEG_DAV1D.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -138,18 +139,27 @@ TEST_CASE(OVT_PROBE "the plugin flavour decodes exactly AVC and HEVC", "[fast][t
 
 #else  // core flavour
 
-TEST_CASE(OVT_PROBE "the core flavour has no pool-covered decoder unless OVT_PATENT_CODECS_IN_CORE",
+TEST_CASE(OVT_PROBE "the core flavour decodes the pool-covered codecs unless OVT_PATENT_CODECS_IN_CORE=OFF",
           "[fast][third_party]") {
   // AVC and HEVC, plus the other pool-covered codecs of POL-PAT-2: VVC, AAC/HE-AAC, MPEG-4 Part 2 (with its
-  // Microsoft variants MS-MPEG4 v1-v3 and WMV7/8) and VC-1.
+  // Microsoft variants MS-MPEG4 v1-v3 and WMV7/8) and VC-1. ON (the default since the owner decision of 2026-11-12,
+  // ADR-015) keeps all of them in the core; OFF is the patent-pool-free split build.
   constexpr std::array pool_ids{AV_CODEC_ID_H264,      AV_CODEC_ID_HEVC,  AV_CODEC_ID_VVC,       AV_CODEC_ID_AAC,
                                 AV_CODEC_ID_AAC_LATM,  AV_CODEC_ID_MPEG4, AV_CODEC_ID_MSMPEG4V1, AV_CODEC_ID_MSMPEG4V2,
                                 AV_CODEC_ID_MSMPEG4V3, AV_CODEC_ID_WMV1,  AV_CODEC_ID_WMV2,      AV_CODEC_ID_VC1,
                                 AV_CODEC_ID_WMV3};
 #if OVT_PATENT_CODECS_IN_CORE
-  CHECK(avcodec_find_decoder(AV_CODEC_ID_H264) != nullptr);
-  CHECK(avcodec_find_decoder(AV_CODEC_ID_HEVC) != nullptr);
-  static_cast<void>(pool_ids);
+  for (const AVCodecID id : pool_ids) {
+    INFO("codec " << avcodec_get_name(id));
+    CHECK(avcodec_find_decoder(id) != nullptr);
+  }
+  // Nothing is disabled by name in the default core: its configure line carries no --disable-decoder/--disable-hwaccel.
+  CHECK_FALSE(contains(configuration(), "--disable-decoder"));
+  CHECK_FALSE(contains(configuration(), "--disable-hwaccel"));
+#if OVT_ENABLE_HW_DECODE && defined(__ANDROID__)
+  CHECK(avcodec_find_decoder_by_name("h264_mediacodec") != nullptr);
+  CHECK(avcodec_find_decoder_by_name("hevc_mediacodec") != nullptr);
+#endif
 #else
   for (const AVCodecID id : pool_ids) {
     INFO("codec " << avcodec_get_name(id));

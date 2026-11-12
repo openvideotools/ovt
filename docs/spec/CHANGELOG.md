@@ -2,6 +2,16 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc19 — 2026-11-12
+
+Owner decision (Karl, 2026-11-12, answering chapter 17 Q3 after PR #132): the default build keeps the pool-covered FFmpeg decoders in the core flavour, so the official default download plays AVC/HEVC without the codec pack. By §16.2.8 rule 1 this is MAJOR-level (ADR-015 wording changes); because the specification is still a 1.0 release candidate awaiting the owner's acceptance, the rc counter advances and the major number stays. The runtime-loaded plugin mechanism, the codec pack (now the analysis decoders) and the patent-pool-free split build (`OVT_PATENT_CODECS_IN_CORE=OFF`) are unchanged. No WI is re-opened: WI-0.012 is merged and the implementation PR of this entry flips the default and its tests.
+
+- 0 §0.2 ADR-015, 5 §5.10, 17 Q3 and R-14 — the default build keeps AVC/HEVC (and VVC, AAC, MPEG-4 Part 2, VC-1) playback decoders in the core; the analysis decoders stay runtime-loaded plugins; the split build stays supported; app-store, paid or commercial distribution of the default build needs the owner's legal check — WI-0.012
+- 13 §13.2.2 — `OVT_PATENT_CODECS_IN_CORE` defaults to ON (was OFF); the licence-manifest example records `true` — WI-0.012
+- 13 §13.3.3 — the core row lists the `--disable-decoder=`/`--disable-hwaccel=` lists under `OVT_PATENT_CODECS_IN_CORE=OFF` instead of as the default; rationale sentence updated (the plugin flavour is the instrumented *analysis* decoder) — WI-0.012
+- 13 §13.4 — the Android default download carries the core's playback decoders; publishing it on Google Play needs the owner's legal check — WI-0.012
+- 15 §15.5.2 POL-PAT-2, POL-PAT-3; 4 §4.15.8 NFR-033 (and its chapter 15 copy) — requirement sentences follow the new default; NFR-033 now binds the *analysis* decoder components, its acceptance line is unchanged — NFR-033, WI-0.602, WI-0.603
+
 ## 1.0.0-rc18 — 2026-11-09
 
 PATCH-level: WI-3.300 folds in the accepted answer of `spec-question` #156 and aligns chapter 9 with the backbone and chapter 13. No requirement sentence changes.
