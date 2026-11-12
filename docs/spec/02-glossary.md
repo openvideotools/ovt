@@ -593,6 +593,7 @@ Codec-neutral vocabulary: OVT uses **block** for any codec's coding unit (H.264 
 - **SyntaxBuilder** — the recorder that turns `BitReader` reads into `SyntaxNode` trees (or plain values in non-recording mode). [OVT: chapter 7 §7.3.2]
 - **Syntax element** — one named value read from the bitstream by the spec's syntax tables (e.g. `log2_max_pic_order_cnt_lsb_minus4`); `SyntaxNode` records its name, descriptor, value, bit span and spec clause. [OVT: chapter 7 §7.3]
 - **SyntaxNode** — the FlatBuffer table for one syntax element or structure: `name`, `descriptor`, `kind:SyntaxValueKind`, value fields, `enum_name`, `derived`, `span:BitSpan`, `spec_ref`, `children`, `array_index`. [OVT: chapter 6 §6.3]
+- **SyntaxTree** — the tree of `SyntaxNode` tables rooted at `Unit.header` (and `PartitionInfo.header`) in `ovt_model.fbs`; not a schema table of its own — chapters that name a `SyntaxTree` mean that rooted `SyntaxNode` tree (issue #111). [OVT: chapter 6 §6.2.7, chapter 14 WI-0.556]
 - **Syntax tree** — the GUI panel (and `SyntaxNode` hierarchy) showing a unit's parsed header fields with values, derived variables and bit positions; clicking highlights bytes in the hex view. [OVT: chapter 11 §11.3.4]
 - **Synthetic stream** — a test stream OVT generates from lavfi test patterns with pinned encoders (`syn_*`) to exercise a named codec feature. [OVT: chapter 14 §14.3.3]
 
