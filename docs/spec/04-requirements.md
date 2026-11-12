@@ -1002,7 +1002,7 @@
 **NFR-032** (Phase 0) — Each source file MUST carry an SPDX licence header matching its directory's licence per ADR-002 (`core/`, `render/` LGPL-2.1-or-later; `core/include/ovt/abi/` BSD-2-Clause; `app/`, `cli/`, `android/`, `python/` GPL-3.0-or-later; plugins per their own `LICENSE`).
 - Acceptance: Given the repository, when `reuse lint` runs, then it reports compliance with the REUSE specification.
 
-**NFR-033** (Phase 0) — Official builds MUST honour ADR-015: AVC/HEVC decoder components MUST be separate runtime-loaded libraries, and a build with `OVT_BUILD_PLUGIN_FFMPEG=OFF` (chapter 13 §13.2.2; the GPL flavour is selected by `OVT_FFMPEG_GPL`/`OVT_FFMPEG_GPL_PLUGIN_ONLY`) MUST still produce a fully functional AV1 product with the AOM PATENTS notice in the About dialog.
+**NFR-033** (Phase 0) — Official builds MUST honour ADR-015: AVC/HEVC *analysis* decoder components MUST be separate runtime-loaded libraries (the core FFmpeg flavour's playback decoders follow `OVT_PATENT_CODECS_IN_CORE`, ON by default since the owner decision of 2026-11-12), and a build with `OVT_BUILD_PLUGIN_FFMPEG=OFF` (chapter 13 §13.2.2; the GPL flavour is selected by `OVT_FFMPEG_GPL`/`OVT_FFMPEG_GPL_PLUGIN_ONLY`) MUST still produce a fully functional AV1 product with the AOM PATENTS notice in the About dialog.
 - Acceptance: Given a build with the option off, when `ovt plugins --format json` runs, then only `aom`, `dav1d` and `vmaf` components are listed and `ovt analyze corpus/syn_av1_gop60_1080p --frames 0` succeeds while `ovt dump corpus/syn_h264_gop60_1080p` exits 4 with `DEC-PLUGIN-0001 decoder plugin not installed (h264)` (chapter 7 §7.9.4).
 
 ### 4.15.9 Documentation
