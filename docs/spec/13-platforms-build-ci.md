@@ -254,7 +254,7 @@ Every target calls `ovt_set_license(target "<SPDX>")`; `tools/license_gate.py` r
   "testPresets": [
     { "name": "default", "hidden": true, "output": { "outputOnFailure": true, "outputJUnitFile": "${sourceDir}/build/${presetName}/junit.xml" }, "execution": { "jobs": 4, "timeout": 600 } },
     { "name": "asan-env", "hidden": true, "environment": { "ASAN_OPTIONS": "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1" } },
-    { "name": "asan-env-macos", "hidden": true, "inherits": "asan-env", "environment": { "ASAN_OPTIONS": "detect_leaks=0:detect_container_overflow=0:strict_string_checks=1:detect_stack_use_after_return=1:halt_on_error=1" } },
+    { "name": "asan-env-macos", "hidden": true, "environment": { "ASAN_OPTIONS": "detect_leaks=0:detect_container_overflow=0:strict_string_checks=1:detect_stack_use_after_return=1:halt_on_error=1", "UBSAN_OPTIONS": "print_stacktrace=1:halt_on_error=1" } },
     { "name": "tsan-env", "hidden": true, "environment": { "TSAN_OPTIONS": "halt_on_error=1 second_deadlock_stack=1" } },
 
     { "name": "macos-arm64-debug",   "inherits": "default", "configurePreset": "macos-arm64-debug" },

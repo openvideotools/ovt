@@ -2,7 +2,7 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc19 — 2026-11-09
+## 1.0.0-rc19 — 2026-11-12
 
 MINOR-level: spec-amendment pass 1 folds in the accepted answers of 41 `spec-question` issues on chapters 13, 14 and 15 (plus the chapter 7, 9, 11 and glossary sentences they touch). Acceptance-line wording changes for WI-0.012, WI-0.019, WI-0.556, WI-0.557, WI-0.565 and WI-0.569 describe what their merged PRs already do, so no WI is re-opened. Issue numbers are cited in the text.
 

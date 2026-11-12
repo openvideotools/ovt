@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc19 (2026-11-09) |
+| **Version** | 1.0-rc19 (2026-11-12) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -72,5 +72,5 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc15 (2026-11-07) | WI-0.605: protection of `main` is a repository ruleset managed by `tools/github/apply_protection.sh`; required checks, code-owner review and signed tags follow in later PRs; acceptance test 1 is pending until the CODEOWNERS teams exist (see `CHANGELOG.md`). |
 | 1.0-rc16 (2026-11-08) | Golden size cap is 2 MB gzip-compressed (chapter 16 §16.2.7, owner decision; see `CHANGELOG.md`). |
 | 1.0-rc17 (2026-11-09) | WI-0.060: §13.5.2 describes how `tools/mac/bundle.sh` builds the bundle layout from the install tree, (see `CHANGELOG.md`). |
-| 1.0-rc19 (2026-11-09) | Spec-amendment pass 1 (build, test infrastructure, licensing): accepted answers of 41 `spec-question` issues on chapters 13–15 (and the chapter 7, 9, 11 and glossary sentences they touch) folded in (see `CHANGELOG.md`). |
 | 1.0-rc18 (2026-11-09) | WI-3.300 / `spec-question` #156: the multi-plane view scored by metric plugins is `ovt_MetricPlanes` with `struct_size` (chapter 9 §9.2.2, backbone §0.6.3); `ovt_PlaneView` of `ovt/decode.h` stays single-plane; metric plugins are searched in `OVT_PLUGIN_DIR` and `$OVT_METRIC_PATH` (see `CHANGELOG.md`). |
+| 1.0-rc19 (2026-11-12) | Spec-amendment pass 1 (build, test infrastructure, licensing): accepted answers of 41 `spec-question` issues on chapters 13–15 (and the chapter 7, 9, 11 and glossary sentences they touch) folded in (see `CHANGELOG.md`). |
