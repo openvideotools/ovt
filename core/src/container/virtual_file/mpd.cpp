@@ -327,23 +327,17 @@ std::string recompose(const UriParts& p) {
 // ---------------------------------------------------------------------------------------------------------
 // Template identifiers
 
-bool append_padded(std::string& out, int64_t value, size_t width) {
-  std::array<char, 24> buf{};
+void append_padded(std::string& out, int64_t value, size_t width) {
   const bool negative = value < 0;
   const uint64_t magnitude = negative ? (~static_cast<uint64_t>(value) + 1U) : static_cast<uint64_t>(value);
-  const auto [ptr, ec] = std::to_chars(buf.data(), buf.data() + buf.size(), magnitude);
-  if (ec != std::errc()) {
-    return false;
-  }
-  const auto digits = static_cast<size_t>(ptr - buf.data());
+  const std::string digits = std::to_string(magnitude);
   if (negative) {
     out += '-';
   }
-  if (digits < width) {
-    out.append(width - digits, '0');
+  if (digits.size() < width) {
+    out.append(width - digits.size(), '0');
   }
-  out.append(buf.data(), digits);
-  return true;
+  out += digits;
 }
 
 // Width of a `%0Nd` format tag; nullopt when `fmt` is not one. An empty tag means width 1.
@@ -442,9 +436,10 @@ std::optional<std::string> expand_template(std::string_view tmpl, const Template
       return std::nullopt;
     }
     const auto width = parse_format_tag(fmt);
-    if (!width || !append_padded(out, value, *width)) {
+    if (!width) {
       return std::nullopt;
     }
+    append_padded(out, value, *width);
   }
   return out;
 }
