@@ -24,5 +24,5 @@ the check from the committed goldens and the counts in the index.
 ## Produces
 
 `tests/golden/av1/*.aom-inspect.json.gz`: 14 goldens (13 `aom`, 1 `syn_av1_444_422_profile2`), each 1 to 2 temporal
-units. 22 `aom` and `syn_av1_*` entries are left out because one temporal unit exceeds 1 900 000 bytes
+units. 23 `aom` and `syn_av1_*` entries are left out because one temporal unit exceeds 1 900 000 bytes
 (`skipped` in the index with the size of each); 6 `aom` entries have no recorded hash and 2 are `local_only`.
