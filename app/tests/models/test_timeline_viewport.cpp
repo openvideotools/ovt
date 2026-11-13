@@ -195,8 +195,8 @@ TEST_CASE("reference arcs are parabolas capped in height; ticks are 2 px bars", 
   for (std::size_t i = 32; i < lines.size(); ++i) {
     top_long = std::min(top_long, lines[i].y);
   }
-  CHECK_THAT(top_short, WithinAbs(100.0F - 20.0F, 1e-3));  // half the 40 px distance
-  CHECK_THAT(top_long, WithinAbs(100.0F - 50.0F, 1e-3));   // capped
+  CHECK_THAT(top_short, WithinAbs(80.0, 1e-3));  // half the 40 px distance
+  CHECK_THAT(top_long, WithinAbs(50.0, 1e-3));   // capped
   const std::vector<float> xs{10.0F, 20.0F};
   const auto ticks = ovt::app::build_ticks(xs, 100.0F, 6.0F, Rgba{9, 9, 9, 255});
   REQUIRE(ticks.size() == 12);
