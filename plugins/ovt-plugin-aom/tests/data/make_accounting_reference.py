@@ -25,9 +25,7 @@ from typing import Any
 
 
 def inspect_frames(inspect: str, ivf: Path, limit: int) -> list[dict[str, Any]]:
-    text = subprocess.run(
-        [inspect, str(ivf), "-a"], check=True, capture_output=True, text=True
-    ).stdout
+    text = subprocess.run([inspect, str(ivf), "-a"], check=True, capture_output=True, text=True).stdout
     frames = [f for f in json.loads(text) if f is not None]
     return [
         {
@@ -41,9 +39,7 @@ def inspect_frames(inspect: str, ivf: Path, limit: int) -> list[dict[str, Any]]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
-    )
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--inspect", required=True)
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("streams", nargs="+", help="<corpus id>=<ivf path>:<frames>")
