@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -61,7 +62,7 @@ const mpd::Representation& only_rep(const mpd::ParseResult& r) {
 
 TEST_CASE("mpd: segment URLs equal the reference expansion", "[container][dash][fast]") {
   const std::string url = "https://example.invalid/dash/bbb_30fps_like.mpd";
-  const auto result = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {url});
+  const auto result = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {url, {}});
   REQUIRE(result.ok);
   const auto expected =
       nlohmann::json::parse(read_file(data_path("bbb_30fps_like.expected.json")));  // tools/ref_mpd.py
@@ -97,8 +98,8 @@ TEST_CASE("mpd: segment URLs equal the reference expansion", "[container][dash][
   }
 }
 
-TEST_CASE("mpd: fixture attributes and content type", "[container][dash][fast]") {
-  const auto result = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {"https://example.invalid/m.mpd"});
+TEST_CASE("mpd: fixture attributes, content type and ContentProtection", "[container][dash][fast]") {
+  const auto result = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {"https://example.invalid/m.mpd", {}});
   REQUIRE(result.ok);
   const auto& sets = result.manifest.periods[0].adaptation_sets;
   CHECK(sets[0].content_type == "video");
@@ -108,6 +109,11 @@ TEST_CASE("mpd: fixture attributes and content type", "[container][dash][fast]")
   CHECK(v.codecs == "avc1.640028");
   CHECK(v.width == 1920);
   CHECK(v.frame_rate == "30");
+  REQUIRE(v.encryption.size() == 1);
+  CHECK(v.encryption[0].method == "cenc");
+  CHECK(v.encryption[0].default_kid == std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16});
+  CHECK(result.manifest.encryption.size() == 1);  // the same entry on both video representations
+  CHECK(sets[1].representations[0].encryption.empty());
 }
 
 TEST_CASE("mpd: r = -1 fills the period exactly", "[container][dash][fast]") {
@@ -116,7 +122,7 @@ TEST_CASE("mpd: r = -1 fills the period exactly", "[container][dash][fast]") {
       wrap("<Representation id=\"v\" bandwidth=\"1\"><SegmentTemplate timescale=\"1000\" media=\"$Time$.m4s\">"
            "<SegmentTimeline><S t=\"0\" d=\"2000\"/><S d=\"3000\" r=\"-1\"/></SegmentTimeline></SegmentTemplate>"
            "</Representation>"),
-      {"http://h/m.mpd"});
+      {"http://h/m.mpd", {}});
   const auto& rep = only_rep(r);
   // 2000 + 6 * 3000 = 20000: the last segment ends exactly at the period end.
   REQUIRE(rep.segments.size() == 7);
@@ -132,7 +138,7 @@ TEST_CASE("mpd: r = -1 stops at the next explicit S@t", "[container][dash][fast]
       wrap("<Representation id=\"v\"><SegmentTemplate timescale=\"10\" media=\"$Number$.m4s\" startNumber=\"5\">"
            "<SegmentTimeline><S t=\"0\" d=\"10\" r=\"-1\"/><S t=\"50\" d=\"10\" r=\"1\"/></SegmentTimeline>"
            "</SegmentTemplate></Representation>"),
-      {""});
+      {"", {}});
   const auto& rep = only_rep(r);
   REQUIRE(rep.segments.size() == 7);  // 5 up to t=50, then 2
   CHECK(rep.segments[0].number == 5);
@@ -146,7 +152,7 @@ TEST_CASE("mpd: r = -1 without a period duration warns and keeps one segment", "
       wrap("<Representation id=\"v\"><SegmentTemplate timescale=\"1\" media=\"$Number$.m4s\"><SegmentTimeline>"
            "<S t=\"0\" d=\"2\" r=\"-1\"/></SegmentTimeline></SegmentTemplate></Representation>",
            ""),
-      {""});
+      {"", {}});
   const auto& rep = only_rep(r);
   CHECK(rep.segments.size() == 1);
   CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
@@ -156,7 +162,7 @@ TEST_CASE("mpd: hostile repeat counts are capped", "[container][dash][fast]") {
   const auto r =
       mpd::parse(wrap("<Representation id=\"v\"><SegmentTemplate media=\"$Number$.m4s\"><SegmentTimeline>"
                       "<S t=\"0\" d=\"1\" r=\"4000000000\"/></SegmentTimeline></SegmentTemplate></Representation>"),
-                 {""});
+                 {"", {}});
   const auto& rep = only_rep(r);
   CHECK(rep.segments.size() == 1'000'000);
   CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
@@ -166,7 +172,7 @@ TEST_CASE("mpd: $Number$ starts at startNumber (default 1) and honours %0Nd", "[
   const auto def = mpd::parse(
       wrap("<Representation id=\"v\"><SegmentTemplate timescale=\"1\" duration=\"10\" media=\"s$Number%04d$\"/>"
            "</Representation>"),
-      {""});
+      {"", {}});
   const auto& rep = only_rep(def);
   REQUIRE(rep.segments.size() == 2);
   CHECK(rep.segments[0].url == "s0001");
@@ -175,7 +181,7 @@ TEST_CASE("mpd: $Number$ starts at startNumber (default 1) and honours %0Nd", "[
   const auto zero =
       mpd::parse(wrap("<Representation id=\"v\"><SegmentTemplate startNumber=\"0\" timescale=\"1\" duration=\"10\" "
                       "media=\"s$Number$\"/></Representation>"),
-                 {""});
+                 {"", {}});
   CHECK(only_rep(zero).segments[0].url == "s0");
 }
 
@@ -183,7 +189,7 @@ TEST_CASE("mpd: presentationTimeOffset shifts $Time$", "[container][dash][fast]"
   const auto r = mpd::parse(wrap("<Representation id=\"v\"><SegmentTemplate timescale=\"100\" duration=\"1000\" "
                                  "presentationTimeOffset=\"500\" "
                                  "media=\"$Time$\"/></Representation>"),
-                            {""});
+                            {"", {}});
   const auto& rep = only_rep(r);
   REQUIRE(rep.segments.size() == 2);
   CHECK(rep.segments[0].url == "500");
@@ -204,7 +210,7 @@ TEST_CASE("mpd: an invalid template is reported and used as written", "[containe
   const auto r =
       mpd::parse(wrap("<Representation id=\"v\"><SegmentTemplate timescale=\"1\" duration=\"20\" media=\"a$Nope$\"/>"
                       "</Representation>"),
-                 {""});
+                 {"", {}});
   CHECK(only_rep(r).segments[0].url == "a$Nope$");
   CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0005));
 }
@@ -238,7 +244,7 @@ TEST_CASE("mpd: BaseURL chain and namespace-prefixed documents", "[container][da
       "<d:BaseURL>a/</d:BaseURL><d:Representation id=\"r\" bandwidth=\"9\"><d:BaseURL>r/</d:BaseURL>"
       "<d:SegmentTemplate timescale=\"1\" duration=\"10\" media=\"$RepresentationID$.m4s\"/>"
       "</d:Representation></d:AdaptationSet></d:Period></d:MPD>";
-  const auto r = mpd::parse(xml, {"http://h/x/m.mpd"});
+  const auto r = mpd::parse(xml, {"http://h/x/m.mpd", {}});
   const auto& rep = only_rep(r);
   REQUIRE(rep.segments.size() == 1);
   CHECK(rep.segments[0].url == "http://h/x/p/a/r/r.m4s");
@@ -278,9 +284,127 @@ TEST_CASE("mpd: SegmentTemplate attributes inherit from AdaptationSet", "[contai
   CHECK(reps[1].segments[1].url == "y-1.m4s");
 }
 
+TEST_CASE("mpd: SegmentList", "[container][dash][fast]") {
+  const auto r = mpd::parse(
+      wrap("<BaseURL>media.mp4</BaseURL><Representation id=\"l\"><SegmentList timescale=\"1000\" duration=\"4000\">"
+           "<Initialization range=\"0-799\"/><SegmentURL mediaRange=\"800-1799\"/>"
+           "<SegmentURL media=\"seg2.m4s\"/></SegmentList></Representation>"),
+      {"http://h/d/m.mpd", {}});
+  const auto& rep = only_rep(r);
+  REQUIRE(rep.segments.size() == 3);
+  CHECK(rep.segments[0].is_init);
+  CHECK(rep.segments[0].url == "http://h/d/media.mp4");
+  CHECK(rep.segments[0].byte_range.offset == 0);
+  CHECK(rep.segments[0].byte_range.length == 800);
+  CHECK(rep.segments[1].byte_range.offset == 800);
+  CHECK(rep.segments[1].byte_range.length == 1000);
+  CHECK(rep.segments[1].start_time == 0);
+  CHECK(rep.segments[2].url == "http://h/d/seg2.m4s");
+  CHECK(rep.segments[2].start_time == 4000);
+  CHECK(rep.segments[2].duration == 4000);
+  CHECK(rep.segments[2].number == 2);
+}
+
+TEST_CASE("mpd: SegmentBase without and with a sidx resolver", "[container][dash][fast]") {
+  const std::string body =
+      "<BaseURL>v.mp4</BaseURL><Representation id=\"b\"><SegmentBase timescale=\"1000\" indexRange=\"1000-1099\">"
+      "<Initialization range=\"0-999\"/></SegmentBase></Representation>";
+
+  const auto plain = mpd::parse(wrap(body), {"http://h/m.mpd", {}});
+  const auto& unresolved = only_rep(plain);
+  REQUIRE(unresolved.segments.size() == 2);
+  CHECK(unresolved.segments[0].is_init);
+  CHECK(unresolved.segments[1].url == "http://h/v.mp4");
+  CHECK(unresolved.segments[1].duration == 20000);
+  CHECK(has_diag(plain.manifest, DiagCode::CNT_DASH_0003));
+
+  mpd::Options options{"http://h/m.mpd", {}};
+  mpd::ByteRange asked;
+  std::string asked_url;
+  options.sidx_resolver = [&](const std::string& url, mpd::ByteRange range) -> std::optional<mpd::SidxIndex> {
+    asked = range;
+    asked_url = url;
+    mpd::SidxIndex idx;
+    idx.timescale = 1000;
+    idx.earliest_presentation_time = 0;
+    idx.first_offset = 0;
+    idx.references = {{5000, 4000}, {6000, 4000}, {7000, 2000}};
+    return idx;
+  };
+  const auto resolved = mpd::parse(wrap(body), options);
+  const auto& rep = only_rep(resolved);
+  CHECK(asked_url == "http://h/v.mp4");
+  CHECK(asked.offset == 1000);
+  CHECK(asked.length == 100);
+  REQUIRE(rep.segments.size() == 4);
+  CHECK(rep.segments[1].byte_range.offset == 1100);  // right after the sidx box
+  CHECK(rep.segments[1].byte_range.length == 5000);
+  CHECK(rep.segments[2].byte_range.offset == 6100);
+  CHECK(rep.segments[3].start_time == 8000);
+  CHECK(rep.segments[3].duration == 2000);
+  CHECK_FALSE(has_diag(resolved.manifest, DiagCode::CNT_DASH_0003));
+}
+
+TEST_CASE("mpd: hostile sidx values truncate the list without overflow", "[container][dash][fast]") {
+  const std::string body =
+      "<BaseURL>v.mp4</BaseURL><Representation id=\"b\"><SegmentBase timescale=\"1000\" indexRange=\"1000-1099\"/>"
+      "</Representation>";
+  constexpr uint64_t kMaxU64 = std::numeric_limits<uint64_t>::max();
+  constexpr auto kMaxI64 = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+
+  const auto run = [&](uint64_t first_offset, uint64_t ept, std::vector<mpd::SidxIndex::Reference> refs) {
+    mpd::Options options{"http://h/m.mpd", {}};
+    options.sidx_resolver = [&](const std::string&, mpd::ByteRange) -> std::optional<mpd::SidxIndex> {
+      mpd::SidxIndex idx;
+      idx.timescale = 1000;
+      idx.earliest_presentation_time = ept;
+      idx.first_offset = first_offset;
+      idx.references = std::move(refs);
+      return idx;
+    };
+    return mpd::parse(wrap(body), options);
+  };
+
+  SECTION("first_offset wraps the byte offset") {
+    const auto r = run(kMaxU64 - 10, 0, {{100, 1000}, {100, 1000}});
+    CHECK(only_rep(r).segments.empty());
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("offsets accumulate past 2^64") {
+    const auto r = run(kMaxU64 - 1100 - 150, 0, {{100, 1000}, {100, 1000}, {100, 1000}});
+    CHECK(only_rep(r).segments.size() == 2);  // 100 + 100 fit, the third would wrap
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("earliest_presentation_time above INT64_MAX is not cast") {
+    const auto r = run(0, kMaxI64 + 1, {{100, 1000}});
+    CHECK(only_rep(r).segments.empty());
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("time accumulation crosses INT64_MAX") {
+    const auto r = run(0, kMaxI64 - 1500, {{100, 1000}, {100, 1000}, {100, 1000}});
+    const auto& segs = only_rep(r).segments;
+    REQUIRE(segs.size() == 2);
+    CHECK(segs[1].start_time == static_cast<int64_t>(kMaxI64 - 500));
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("a 32-bit maximum reference is fine") {
+    const auto r = run(0, 0, {{std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()}});
+    REQUIRE(only_rep(r).segments.size() == 1);
+    CHECK(only_rep(r).segments[0].byte_range.length == std::numeric_limits<uint32_t>::max());
+    CHECK_FALSE(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+}
+
+TEST_CASE("mpd: an indexRange ending at UINT64_MAX is invalid", "[container][dash][fast]") {
+  const auto r = mpd::parse(wrap("<BaseURL>v.mp4</BaseURL><Representation id=\"b\"><SegmentBase timescale=\"1\" "
+                                 "indexRange=\"0-18446744073709551615\"/></Representation>"),
+                            {"http://h/m.mpd", {}});
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0007));
+}
+
 TEST_CASE("mpd: a lone BaseURL is one segment; nothing at all is reported", "[container][dash][fast]") {
   const auto one =
-      mpd::parse(wrap("<Representation id=\"s\"><BaseURL>sub.vtt</BaseURL></Representation>"), {"http://h/m.mpd"});
+      mpd::parse(wrap("<Representation id=\"s\"><BaseURL>sub.vtt</BaseURL></Representation>"), {"http://h/m.mpd", {}});
   const auto& rep = only_rep(one);
   REQUIRE(rep.segments.size() == 1);
   CHECK(rep.segments[0].url == "http://h/sub.vtt");
@@ -325,7 +449,7 @@ TEST_CASE("mpd: invalid attribute values are skipped with a warning", "[containe
 }
 
 TEST_CASE("mpd: Manifest FlatBuffer round trip", "[container][dash][fast]") {
-  const auto r = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {"https://example.invalid/m.mpd"});
+  const auto r = mpd::parse(read_file(data_path("bbb_30fps_like.mpd")), {"https://example.invalid/m.mpd", {}});
   REQUIRE(r.ok);
   flatbuffers::FlatBufferBuilder fbb;
   fbb.Finish(mpd::write_manifest(fbb, r.manifest));
@@ -343,6 +467,8 @@ TEST_CASE("mpd: Manifest FlatBuffer round trip", "[container][dash][fast]") {
   CHECK(rep->segments()->Get(0)->is_init());
   CHECK(rep->segments()->Get(1)->url()->str() == "https://example.invalid/dash/pkg/v_1080/seg-00001.m4s");
   CHECK(rep->segments()->Get(2)->start_time() == 120000);
+  CHECK(rep->encryption()->Get(0)->default_kid()->size() == 16);
+  CHECK(m->encryption()->size() == 1);
 }
 
 TEST_CASE("mpd: template arithmetic near the 64-bit limits does not overflow", "[container][dash][fast]") {

@@ -10,6 +10,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <optional>
+#include <string>
 #include <string_view>
 
 #include "container/virtual_file/mpd.hpp"
@@ -41,7 +43,26 @@ size_t count_segments(const ovt::container::mpd::Manifest& m) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   try {
     const std::string_view xml(reinterpret_cast<const char*>(data), size);
-    const ovt::container::mpd::Options options{"http://example.invalid/dir/m.mpd"};
+    // A resolver derived from the input itself exercises the SegmentBase sidx path with hostile values.
+    ovt::container::mpd::Options options{"http://example.invalid/dir/m.mpd", {}};
+    options.sidx_resolver = [data, size](const std::string&, ovt::container::mpd::ByteRange) {
+      ovt::container::mpd::SidxIndex idx;
+      const auto word = [&](size_t at) {
+        uint64_t v = 0;
+        for (size_t i = 0; i < 8; ++i) {
+          v = (v << 8U) | (size != 0 ? data[(at + i) % size] : 0U);
+        }
+        return v;
+      };
+      idx.timescale = static_cast<uint32_t>(word(0) | 1U);
+      idx.earliest_presentation_time = word(8);
+      idx.first_offset = word(16);
+      for (size_t i = 0; i < 1 + (word(24) % 64U); ++i) {
+        const uint64_t w = word(32 + (i * 8));
+        idx.references.push_back({static_cast<uint32_t>(w), static_cast<uint32_t>(w >> 32U)});
+      }
+      return std::optional<ovt::container::mpd::SidxIndex>(std::move(idx));
+    };
     const auto a = ovt::container::mpd::parse(xml, options);
     const auto b = ovt::container::mpd::parse(xml, options);
     require(a.ok == b.ok);
