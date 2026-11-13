@@ -726,7 +726,8 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
   const MappedAccounting acct = map_accounting(d.accounting, parents, mp.block_id, cells_w, cells_h);
   if (acct.last_tile_group_only) {
     // SPEC-ASSUMPTION(#389): §7.6.1's derived note is an Info Diagnostic, like the film grain note.
-    out.notes.emplace_back("accounting covers last tile group only");
+    // SPEC-ASSUMPTION(#408): code DEC-AV1-0002 (V-029 needs a registered code; DEC-AV1-0001 is the film grain note).
+    out.notes.push_back({"DEC-AV1-0002", "accounting covers last tile group only"});
   }
   serialise_blocks(fbb, mp, acct.block_bits, &out);
   if (d.accounting.valid) {

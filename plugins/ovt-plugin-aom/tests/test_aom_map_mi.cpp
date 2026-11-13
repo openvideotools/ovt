@@ -692,6 +692,7 @@ TEST_CASE("aom map_mi: every frame of the fast libaom vectors passes the validat
       CHECK(d->severity() == fb::Severity::Info);
       if (id == "aom_av1_1_b8_22_svc_L1T2") {
         CHECK(d->message()->str() == "accounting covers last tile group only");
+        CHECK(d->code()->str() == "DEC-AV1-0002");
       } else {
         CHECK(id == "aom_av1_1_b8_23_film_grain_50");
         CHECK(d->code()->str() == "DEC-AV1-0001");

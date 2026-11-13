@@ -44,9 +44,9 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
     diags.push_back(
         ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
   }
-  for (const std::string& n : mapped.notes) {
-    diags.push_back(
-        ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), "", n.c_str()));
+  for (const MappedBlocks::Note& n : mapped.notes) {
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), n.code.c_str(),
+                                                    n.message.c_str()));
   }
   // Chapter 06 §6.6.1 rule 5: Reconstruction is the picture before film grain synthesis (AV1D_SET_SKIP_FILM_GRAIN).
   // SPEC-ASSUMPTION(#389): §7.6.1's derived note "film grain present (not applied)" has no field in

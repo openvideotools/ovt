@@ -348,7 +348,11 @@ TEST_CASE("aom accounting AT1: sum of grid.bits_x8 equals sum of leaf Block.bits
     const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(frames[f].data());
     size_t notes = 0;
     for (const fb::Diagnostic* d : *fa.diagnostics()) {
-      notes += d->message()->str() == "accounting covers last tile group only" ? 1U : 0U;
+      if (d->message()->str() == "accounting covers last tile group only") {
+        ++notes;
+        CHECK(d->severity() == fb::Severity::Info);
+        CHECK(d->code()->str() == "DEC-AV1-0002");
+      }
     }
     const bool several_tile_groups = id == "aom_av1_1_b8_22_svc_L1T2";  // 3 OBU_TILE_GROUPs per frame
     CHECK(notes == (several_tile_groups ? 1U : 0U));
