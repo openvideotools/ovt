@@ -232,9 +232,11 @@ QtBuild {
     sdkDir?.let { "$it/cmake/${libs.versions.cmake.get()}/bin" }?.takeIf { file("$it/ninja").exists() }?.let {
         ninjaPath = it
     }
-    extraCMakeArguments =
+    // Groovy also generates indexed accessors for the String[] property, so Kotlin sees no settable property here.
+    setExtraCMakeArguments(
         (qtCMakeArguments + "-DQT_ANDROID_MULTI_ABI_FORWARD_VARS=${qtForwardedVariables.joinToString(";")}")
-            .toTypedArray()
+            .toTypedArray(),
+    )
 }
 
 // Fails early, with the fix, when the machine is not set up (otherwise the plugin stops with a bare null path).
