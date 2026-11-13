@@ -191,7 +191,9 @@ def process(entry: dict[str, Any], args: argparse.Namespace, skips: dict[str, st
     src = common.corpus_file(args.corpora_dir, cid)
     record["input_sha256"] = common.sha256_file(src)
     try:
-        text, tus, (decoded, showed) = produce(to_ivf(src, work), work, args.max_bytes, args.max_raw_bytes, args.max_tus)
+        text, tus, (decoded, showed) = produce(
+            to_ivf(src, work), work, args.max_bytes, args.max_raw_bytes, args.max_tus
+        )
     except TooLarge as exc:
         record["skipped"]["aom-inspect"] = str(exc)
         return record
