@@ -9,6 +9,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace ovt::aom {
@@ -35,6 +36,25 @@ struct MiInfo {
   int16_t intrabc = 0;
   int16_t palette = 0;
   int16_t uv_palette = 0;
+};
+
+/// One libaom AccountingSymbol (av1/decoder/accounting.h, v3.12.1), same names and units: the accounting context
+/// (MI column x, MI row y; -1 before the first block of a tile group), the dictionary id, the cost in 1/8 bits
+/// (AOM_ACCT_BITRES = 3) and the number of reads libaom merged into the record.
+struct AcctSymbol {
+  int16_t x = -1;
+  int16_t y = -1;
+  uint32_t id = 0;
+  uint32_t bits = 0;
+  uint32_t samples = 0;
+};
+
+/// The frame's accounting as the inspection callback copied it (chapter 07 §7.6.1 accounting row, WI-2.157).
+struct AccountingData {
+  bool valid = false;               // false without CONFIG_ACCOUNTING or callback data
+  std::vector<std::string> names;   // libaom's dictionary at callback time: names[id]
+  std::vector<AcctSymbol> symbols;  // in libaom's recording order
+  int32_t tile_groups = 1;          // tile groups of the frame; > 1 means the symbols cover the last one only
 };
 
 /// Per-frame block data: libaom's MI grid plus the frame-header values that insp_frame_data lacks, read from the
@@ -66,6 +86,7 @@ struct BlockData {
   bool delta_q_present = false;
   int32_t delta_q_res = 1;                            // libaom's value (1 << delta_q_res syntax element)
   std::array<std::array<int16_t, 2>, 8> y_dequant{};  // [segment][DC, AC]
+  AccountingData accounting;                          // WI-2.157
 };
 
 }  // namespace ovt::aom

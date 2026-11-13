@@ -33,7 +33,7 @@ ovt_catch_discover_tests(ovt_plugin_aom_no_inspection_tests)
 # the plugin through the registry and compare with libaom inspect layers in data/inspect_reference.json.
 ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
 add_executable(ovt_plugin_aom_map_mi_tests test_aom_map_mi.cpp ../src/map_mi.cpp ../src/partition_reconstruct.cpp
-                                           ../src/fb_builder.cpp ../src/planes.cpp)
+                                           ../src/fb_builder.cpp ../src/planes.cpp ../src/map_accounting.cpp)
 target_include_directories(ovt_plugin_aom_map_mi_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 # planes.cpp reads aom_image_t fields: libaom's public headers only, no libaom.a.
 target_include_directories(ovt_plugin_aom_map_mi_tests SYSTEM
@@ -62,3 +62,19 @@ target_compile_definitions(ovt_plugin_aom_planes_tests
 add_dependencies(ovt_plugin_aom_planes_tests ovt_plugin_aom tp_libaom)
 ovt_set_license(ovt_plugin_aom_planes_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_aom_planes_tests)
+
+# ---- WI-2.157: accounting (map_accounting.cpp) --------------------------------------------------------------------
+# map_accounting() is compiled in for the hand-made trees; the stream tests load the plugin through the registry and
+# read libaom's accounting records themselves through the inspection API (the oracle decoder links libaom.a), checked
+# against inspect -a output in data/accounting_reference.json.
+add_executable(ovt_plugin_aom_accounting_tests test_aom_accounting.cpp ../src/map_accounting.cpp)
+target_include_directories(ovt_plugin_aom_accounting_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+target_link_libraries(
+  ovt_plugin_aom_accounting_tests PRIVATE tp::aom_inspection ovt_core_objects ovt_schemas ovt_test_support ovt::flags
+                                          nlohmann_json::nlohmann_json ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_plugin_aom_accounting_tests PRIVATE "OVT_AOM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_aom>\""
+                                          "OVT_AOM_TEST_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+add_dependencies(ovt_plugin_aom_accounting_tests ovt_plugin_aom)
+ovt_set_license(ovt_plugin_aom_accounting_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_aom_accounting_tests)

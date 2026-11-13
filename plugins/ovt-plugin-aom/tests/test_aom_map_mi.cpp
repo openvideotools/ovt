@@ -686,12 +686,17 @@ TEST_CASE("aom map_mi: every frame of the fast libaom vectors passes the validat
     const fb::FrameAnalysis* fa = fb::GetFrameAnalysis(run.buffers[f].data());
     REQUIRE(fa->blocks() != nullptr);
     CHECK(fa->blocks()->size() > 1);
-    // No partition ambiguity, no uncovered cell. The one diagnostic allowed is the film grain vector's Info note
-    // (WI-2.158).
+    // No partition ambiguity, no uncovered cell. The only diagnostics allowed are the film grain vector's Info note
+    // (WI-2.158) and the SVC vector's (three tile groups per frame) accounting note (WI-2.157), on those vectors.
     for (const fb::Diagnostic* d : *fa->diagnostics()) {
       CHECK(d->severity() == fb::Severity::Info);
-      CHECK(d->code()->str() == "DEC-AV1-0001");
-      CHECK(d->message()->str() == "film grain present (not applied)");
+      if (id == "aom_av1_1_b8_22_svc_L1T2") {
+        CHECK(d->message()->str() == "accounting covers last tile group only");
+      } else {
+        CHECK(id == "aom_av1_1_b8_23_film_grain_50");
+        CHECK(d->code()->str() == "DEC-AV1-0001");
+        CHECK(d->message()->str() == "film grain present (not applied)");
+      }
     }
   }
 }
