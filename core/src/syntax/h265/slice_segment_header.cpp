@@ -16,6 +16,7 @@
 #include <string_view>
 #include <vector>
 
+#include "ovt/cxx/rbsp.hpp"
 #include "syntax/h265/h265_internal.h"
 
 namespace ovt::syntax::h265 {
@@ -443,6 +444,29 @@ SliceSegmentHeader parse_slice_segment_header(BitReader& br, SyntaxBuilder& b, c
   sh.slice_segment_data_rbsp_byte = br.bit_pos() / 8;
   b.opaque_rest("slice_segment_data");
   return sh;
+}
+
+std::optional<std::vector<Substream>> entry_point_substreams(const SliceSegmentHeader& sh,
+                                                             std::span<const uint32_t> epb_positions,
+                                                             uint64_t nal_size) {
+  // The raw byte of the first slice_segment_data() byte: every EPB at or before it shifts it by one (§7.2.5).
+  const uint64_t data_first = rbsp_bit_to_raw_bit(sh.slice_segment_data_rbsp_byte * 8, epb_positions) / 8;
+  if (data_first > nal_size) {
+    return std::nullopt;
+  }
+  std::vector<Substream> out;
+  out.reserve(sh.entry_point_offset_minus1.size() + 1);
+  uint64_t first = data_first;
+  for (const uint32_t off : sh.entry_point_offset_minus1) {
+    const uint64_t size = uint64_t{off} + 1;
+    if (first + size >= nal_size) {  // the last substream needs at least one byte too
+      return std::nullopt;
+    }
+    out.push_back({first, size});
+    first += size;
+  }
+  out.push_back({first, nal_size - first});
+  return out;
 }
 
 }  // namespace ovt::syntax::h265
