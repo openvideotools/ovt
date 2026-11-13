@@ -43,7 +43,8 @@ struct MbBlock {
   uint8_t pred = kPredNone;
 };
 
-/// One FrameAnalysis.mvs entry; `ref` is the pseudo reference slot, equal to `list` (L0 / L1).
+/// One FrameAnalysis.mvs entry; `ref` is the pseudo reference slot, equal to `list` (L0 / L1), until
+/// map_h264_blockparams() sets the true slot.
 struct MbMotion {
   uint32_t block_id = 0;
   uint8_t list = 0;
@@ -51,6 +52,8 @@ struct MbMotion {
   Box rect;
   int16_t mv_x = 0;  // 1/16 luma sample
   int16_t mv_y = 0;
+  int16_t mvd_x = -32768;  // 1/16 luma sample; -32768 = n/a (phase 1 has no mvd; the block params fill it, WI-4.102)
+  int16_t mvd_y = -32768;
   uint16_t flags = 0;  // ovt.fb.MotionVector.flags: bit0 bi-pred, bit4 field
 };
 

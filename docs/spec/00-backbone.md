@@ -676,7 +676,7 @@ These rulings settle cross-chapter questions once; chapters cite them as `Dn`. W
 
 **D10.** ssim_x264 kernel: specify exactly the x264 `x264_pixel_ssim_wxh` algorithm (4×4 sums, 8×8 windows stepping 4, SSIM constants on 64 pixels, result averaged over (w/4−1)(h/4−1) windows); tiny_ssim (libvpx) differs and is NOT an oracle for it. Name the libvpx variant `ssim_tiny` only if kept, with its own definition; otherwise drop tiny_ssim from oracles.
 
-**D11.** UVQ: state that the published google/uvq models are TensorFlow SavedModels; export path is tf2onnx (fallback: keras2onnx/manual re-implementation); keep the ONNX Runtime host unchanged.
+**D11.** UVQ: google/uvq is pinned at `c204ecc0` (PyTorch; UVQ 1.5 default and 1.0); the reference CLI is `uvq_inference.py --model_version 1.0|1.5` with `torch == 2.8.0` CPU; the export path is `torch.onnx.export` (opset 17; fallback: manual re-implementation); TensorFlow and tf2onnx are dropped; keep the ONNX Runtime host unchanged (owner decision 2026-11-05, issue #47).
 
 **D12.** Pixel Tablet: SDR panel (no HDR). Android HDR acceptance uses an HDR-capable Android device or Chromebook; chapter 14 §14.9.2 hardware table is canonical.
 

@@ -2,6 +2,37 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc23 — 2026-11-13
+
+MINOR-level: spec-amendment pass 4 folds in the accepted answers of 28 `spec-question` issues on chapters 8, 9, 10 and 11 (plus the chapter 0, 4, 6 and 14 sentences they touch). New diagnostic codes are registered (D2: `CNT-OBU-0003`, `CNT-OBU-0004`, `CNT-DASH-0001`…`0009`); D11 and §9.6/§14.4.14 move the UVQ reference to the pinned PyTorch google/uvq (`c204ecc0`, UVQ 1.5 default) with a `torch.onnx.export` path; no schema or CLI grammar change; the public-header questions of #209 item 4 (`ovt_log_write`), #318 (`ovt::jobs::Pool` export) and #366 item 3 (raw header offset in the C API) stay open for the owner.
+
+- 8 §8.2.3, §8.2.5, §8.9.3, WI-1.201 — four-escape fourcc display form; a trailing-bytes node on every walk stop; box-relative spans on `BoxNode`, file-relative for tree-level findings, `CNT-0105` on the parent, `CNT-0003` on `moov`; 13 broken files committed under CC0, the truncation sweep in memory; registry stand-in until WI-1.203 — WI-1.201 (#323)
+- 8 §8.2.4, §8.9.2, 14 WI-0.564 — `header_length` excludes FullBox bytes, the sample-entry fixed part and `uuid` `usertype`; mp4box.js `hdr_size` normalised (−4/−8/−16) by `mp4boxjs.py`; WI-0.564 AT1 runs over every fetchable `fast` ISOBMFF entry; oracle limits listed in `KNOWN_DIFFS.md` — WI-0.555, WI-0.564 (#134, #226)
+- 8 §8.5, WI-1.200 — `diag_codes.inc` X-macro gains a fifth `spec_ref` column; `CNT-DASH-` family; `ovt_File` forward-declared and defined internally by WI-1.200; `ovt_container_list_diagnostics` unsupported until the `DiagnosticRegistry` table lands — WI-1.200 (#138, #349)
+- 8 §8.6.1 — Annex B sniff returns a heuristic codec guess (`H264`/`H265`/`Ambiguous`), resolved by the stream reader — WI-1.200 (#138)
+- 8 §8.6.2, WI-1.225 — `header_size < 32` ignored; partial frame header → `CNT-IVF-0003`; zero timebase → `timescale 0`; last-sample duration; `is_sync` by a minimal OBU/VP9/VP8 walk; AT1 `offset == pos + 12`; C entry points wait for WI-1.217 — WI-1.225 (#280)
+- 8 §8.6.3 — empty NAL not emitted; `CNT-ESB-0004` for SPS/PPS/VPS/AUD only; `CNT-ESB-0002` counting rule; `CNT-ESB-0001` for garbage after a boundary — WI-1.226 (#278)
+- 8 §8.5, §8.6.4 — `CNT-OBU-0003` (length overrun, clamped) and `CNT-OBU-0004` (malformed header/leb128/length, incl. `obu_length` 0) — WI-1.227 (#279)
+- 8 §8.6.6, 4 FR-CNT-014, WI-1.229 — ranking prefers the larger frame size among `frame_count ≥ 2`; packed 4:2:2 names deferred; C API parses the explicit string only, `resolve()` carries sidecar/heuristics/overrides; small defaults (chroma_format, LE `p0xx`, H.273 2, `dts = i × fps_den`); header offset in the C API left to the owner — WI-1.229 (#366)
+- 8 §8.6.7, WI-4.204 — MPEG-TS resync rule, 188/192/204 phase detection and the M2TS prefix, `MPTS`/`TSPK`/`ADPT` tree, continuity-counter rule, per-PID statistics internal until WI-4.207, 10 000-entry diagnostics cap — WI-4.204 (#337)
+- 8 §8.7.1 — `ovt::demux::Status = ovt::Result<void>`; `read_packet()` returns `Result<std::optional<Packet>>`, `nullopt` = end of stream — WI-1.230 (#316)
+- 8 §8.7.3, §8.7.4, WI-1.231 — `scratch` holds only the rewritten last OBU and `unit_bytes()` serves it; `temporal_delimiters_expected` parameter; LengthPrefixed edge cases → `CNT-9001`; `UnitSpan` defined in `demux/unit_split.h`; `tools/extract_samples.py` walks `stsz/stsc/stco/avcC/hvcC` itself (no MP4Box) — WI-1.231 (#338)
+- 8 WI-4.208, 6 §6.4 — injected `SidxResolver` callback, `CNT-DASH-0003` without one; `ManifestPeriod.start/duration` in milliseconds; template `start_time` rule — WI-4.208 (#349)
+- 6 §6.6.2 — each open stream owns its `PictureStore`; `blob_id`s of two streams never collide — WI-0.087, WI-2.151 (#157)
+- 9 FR-VQ-009, FR-VQ-010 (and the chapter 4 copy), §9.6.1–§9.6.5, WI-3.314, 0 D11, 14 §14.4.14 — map/label outputs qualified to model versions that produce them; google/uvq pinned at `c204ecc0` (PyTorch, UVQ 1.5 default: ContentNet/DistortionNet/AggregationNet, `values = [mos]`, no maps or labels; 1.0 keeps the seven values, grid maps and YouTube-8M labels); `torch.onnx.export` opset 17 replaces tf2onnx; `uvq_inference.py --model_version` oracle; swscale bicubic resize (1.5 stretches to 1920×1080, 1.0 letterboxes 1280×720 then bilinear 496×496), `fps=…:round=up` sampling, `F = 1`/`F = 5`, black-frame padding; additive manifest keys; release upload is the owner's — WI-3.314, WI-3.315, WI-0.554, WI-0.565 (#47, #246)
+- 9 §9.2.4 — resolved `NormalizationConfig` form: defaults/consts expanded, objects materialised, nullable → `null`, other default-less properties absent — WI-3.300 (#290)
+- 9 WI-3.3xx AT2 — x264 reconstruction encoded with `--bframes 0` — (#306)
+- 10 §10.1.3, §10.2.1, §10.2.5, §10.2.7, §10.4.5, §10.10, WI-1.400 — `render_api.h` with `OVT_RENDER_API`; `"ovt_model_generated.h"` include; `set_frame()` stays `void`, `RND-0001` via `last_error()`; `build(buf, size, …)` verifying overload; explicit heatmap ranges linear in natural units; log codes reach stderr/`last_error()` until an exported `ovt_log_write` exists (owner) — WI-1.400, WI-1.401, WI-2.430 (#209, #317)
+- 10 §10.3.3, §10.10, WI-1.402 — `RND-0020` only for codes outside the tables, transfer 11/12 and ICtCp with a non-PQ/HLG transfer (→ PQ); codes 0/2 silent; notices returned by the pure functions — WI-1.402 (#237)
+- 10 §10.5.1, WI-2.430 — only `Slice`/`Tile` rects are partition boundaries, shared edges once; 4 chunks on `std::thread` workers (`ovt::jobs::Pool` not exported; owner) — WI-2.430 (#317, #318)
+- 11 §11.2.2, WI-1.451 — 17 panel ids; `Layout.leftSize/rightSize/bottomSize`; preset slash = stacked groups with fractions; `layouts.json` `{"layouts_version": 1, "current": …}`; View ▸ Reset Layout — WI-1.451 (#229)
+- 11 §11.2.5, WI-1.450 — settings directory resolved from `GenericConfigLocation`/`GenericDataLocation`/`AppDataLocation` + `/ovt`, not `AppConfigLocation`; `recent_files.json` — WI-1.450, WI-1.454 (#117, #243)
+- 11 §11.3.1, WI-1.455 — range = inclusive positions in the current x order; Δpts includes the last frame's presentation distance; hatch and GOP labels in part c, 55 % opacity in part b — WI-1.455 (#240, #257)
+- 11 §11.4.3, WI-1.466 — action ids `action.<menu id>`; example `action.navigate.next` → `J`; whole-file, same-scope conflict rule — WI-1.466 (#222)
+- 11 §11.7, §11.8, WI-1.454 — `GUI-RAW-0001` expected size rule; Open-as roles; Welcome sample streams (≤ 5 `fast` entries, `OVT_CORPORA_MANIFEST`, consent dialog, `sampleConsented`); core hookup via `fileOpened`; file chooser follow-up — WI-1.454, WI-1.464 (#243, #309)
+- 11 WI-1.452 — `SelectionIndex` interface and app-side struct mirrors; sample span from the adapter; `setChainLength`; EPB test alternative until the golden exists — WI-1.452 (#219)
+- 11 WI-1.453 — `DiagnosticsModel::NavigationSink`; `DiagnosticLocation`; jobs over the C `ovt_Job` API with an own `QThreadPool` — WI-1.453 (#137)
+
 ## 1.0.0-rc22 — 2026-11-13
 
 MINOR-level: spec-amendment pass 3 folds in the accepted answers of 22 `spec-question` issues on chapters 6 and 12 (plus the chapter 0, 4, 7, 13 and 14 sentences they touch) and three review follow-ups. New diagnostic codes are registered (D2: `MDL-CSV-0001`…`0004`, `CLI-0010`, `CLI-0011`); the public-header text of §12.3.4 and §12.3.14 is aligned with the merged `ovt/log.h` and `ovt/cache.h`; no schema or CLI grammar change.

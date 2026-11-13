@@ -171,3 +171,24 @@ TEST_CASE("validator: size-prefixed buffers and the codec override", "[model][va
   const auto as_av1 = ovt::model::validate_frame_analysis(plain, fixture_hash(), fb::Codec::AV1);
   CHECK(rule_ids(as_av1).contains("V-008"));
 }
+
+TEST_CASE("validator V-031: a consistent StreamIndex is clean, each mutation fires its rule",
+          "[model][validator][fast]") {
+  const auto clean = ovt::model::validate_stream_index(ovt::test::pack_index(ovt::test::tiny_stream_index()));
+  INFO(describe(clean));
+  CHECK(clean.empty());
+  for (const auto& row : ovt::test::index_mutations()) {
+    INFO(std::string(row.rule) + ": " + std::string(row.what));
+    auto si = ovt::test::tiny_stream_index();
+    row.mutate(si);
+    const auto violations = ovt::model::validate_stream_index(ovt::test::pack_index(si));
+    INFO(describe(violations));
+    CHECK(rule_ids(violations) == std::set<std::string>{std::string(row.rule)});
+  }
+  const Bytes full = ovt::test::pack_index(ovt::test::tiny_stream_index());
+  for (std::size_t len = 0; len < full.size(); ++len) {
+    const auto violations = ovt::model::validate_stream_index(std::span<const std::uint8_t>(full.data(), len));
+    REQUIRE(violations.size() == 1);
+    CHECK(violations[0].rule == "V-001");
+  }
+}

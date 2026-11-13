@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Unit tests of the AV1 OBU header, temporal delimiter, metadata, padding and tile list parsers (chapter 7
-// §7.3.6 rows 1, 7, 8, 9 and 30, WI-1.116a; the sequence header, rows 2–6, is WI-1.116b).
+// Unit tests of the AV1 OBU header, sequence header, temporal delimiter, metadata, padding and tile list
+// parsers (chapter 7 §7.3.6 rows 1–9 and 30, WI-1.116).
 //
 // Expected values come from a recorded oracle run, cited at each fixture: FFmpeg 6.1.1 `-bsf:v trace_headers`
 // on the libaom test vectors (bit offsets are those the trace prints, counted from the first OBU header bit),
@@ -19,7 +19,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <initializer_list>
+#include <ios>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -27,9 +32,12 @@
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/av1/metadata.hpp"
 #include "ovt/cxx/syntax/av1/obu_header.hpp"
+#include "ovt/cxx/syntax/av1/sequence_header.hpp"
 #include "ovt/cxx/syntax/av1/tile_list.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
+#include "ovt/cxx/syntax/unit_scan.hpp"
 #include "syntax/common/syntax_node_buffer.h"
+#include "test_support/corpus.h"
 
 namespace {
 
@@ -49,6 +57,13 @@ using Bytes = std::vector<uint8_t>;
 // 16 seq_profile 000 = 0 … 53 max_frame_width_minus_1 1111 = 15, 57 max_frame_height_minus_1 1111 = 15,
 // 74 order_hint_bits_minus_1 110 = 6, 80 high_bitdepth 0, 88 trailing_one_bit 1, 89..95 trailing_zero_bit 0.
 const Bytes kSeq16x16{0x0a, 0x0a, 0x00, 0x00, 0x00, 0x01, 0x9f, 0xfb, 0xff, 0xf3, 0x00, 0x80};
+
+// av1-1-b8-22-svc-L2T2.ivf, first temporal unit, second OBU (obu_size 18). trace_headers: 23
+// operating_points_cnt_minus_1 00011 = 3, operating_point_idc[0..3] = 771, 769, 259, 257, seq_level_idx[i] = 1,
+// 104 max_frame_width_minus_1 = 1279, 115 max_frame_height_minus_1 = 719, 138 order_hint_bits_minus_1 = 6,
+// 152 trailing_one_bit.
+const Bytes kSeqL2T2{0x0a, 0x12, 0x00, 0x33, 0x03, 0x09, 0x80, 0x84, 0x40, 0xc2,
+                     0x20, 0x21, 0xa9, 0x9f, 0xf6, 0x7b, 0xff, 0xf3, 0x00, 0x80};
 
 class BitWriter {
  public:
@@ -198,6 +213,22 @@ SyntaxNodeBuffer parse_obu(const Bytes& bytes, Parse&& parse, bool recording = t
   return buf;
 }
 
+SequenceHeader parse_seq(const Bytes& bytes, SyntaxNodeBuffer* tree = nullptr, bool recording = true) {
+  SequenceHeader seq;
+  SyntaxNodeBuffer buf = parse_obu(
+      bytes,
+      [&](BitReader& br, SyntaxBuilder& b, const ObuHeader& h) {
+        REQUIRE(h.type() == ObuType::SequenceHeader);
+        seq = parse_sequence_header(br, b);
+        REQUIRE(br.bits_left() == 0);
+      },
+      recording);
+  if (tree != nullptr) {
+    *tree = std::move(buf);
+  }
+  return seq;
+}
+
 Metadata parse_meta(const Bytes& bytes, SyntaxNodeBuffer* tree = nullptr) {
   Metadata m;
   SyntaxNodeBuffer buf = parse_obu(bytes, [&](BitReader& br, SyntaxBuilder& b, const ObuHeader& h) {
@@ -209,6 +240,31 @@ Metadata parse_meta(const Bytes& bytes, SyntaxNodeBuffer* tree = nullptr) {
     *tree = std::move(buf);
   }
   return m;
+}
+
+// ---- IVF walking for the corpus tests -----------------------------------------------------------------------
+
+Bytes read_file(const std::filesystem::path& p) {
+  std::ifstream in(p, std::ios::binary);
+  REQUIRE(in.good());
+  return Bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
+// Calls `cb` with every OBU of every IVF frame (32-byte file header, 12-byte frame headers, little-endian).
+void for_each_ivf_obu(const Bytes& file, const std::function<void(std::span<const uint8_t>)>& cb) {
+  REQUIRE(file.size() >= 32);
+  const size_t header_size = file[6] | (static_cast<size_t>(file[7]) << 8U);
+  size_t pos = header_size;
+  while (pos + 12 <= file.size()) {
+    const size_t frame_size = file[pos] | (static_cast<size_t>(file[pos + 1]) << 8U) |
+                              (static_cast<size_t>(file[pos + 2]) << 16U) | (static_cast<size_t>(file[pos + 3]) << 24U);
+    pos += 12;
+    REQUIRE(pos + frame_size <= file.size());
+    const std::span<const uint8_t> tu(file.data() + pos, frame_size);
+    ovt::syntax::scan_obu_low_overhead(tu, pos, -1, ovt::syntax::ObuSpanKind::LengthDelimited,
+                                       [&](const ovt::syntax::ScannedUnit& u) { cb(u.bytes); });
+    pos += frame_size;
+  }
 }
 
 }  // namespace
@@ -299,11 +355,334 @@ TEST_CASE("av1_obu_header_forbidden_bit_is_syn_gen_0001", "[syntax][av1][fast]")
   CHECK(diags(buf.root(), "SYN-GEN-0001").size() == 1);
 }
 
-TEST_CASE("av1_obu_type_names", "[syntax][av1][fast]") {
-  CHECK(obu_type_name(1) == "OBU_SEQUENCE_HEADER");
+// ---- sequence_header_obu (rows 2–6) ---------------------------------------------------------------------------
+
+TEST_CASE("av1_seq_unit_size_16x16", "[syntax][av1][fast]") {
+  // Acceptance test 1 on the inline copy of the vector's sequence header (the corpus test below re-runs it).
+  SyntaxNodeBuffer tree;
+  const SequenceHeader seq = parse_seq(kSeq16x16, &tree);
+  CHECK(seq.seq_profile == 0);
+  CHECK(seq.profile_name == "Main");
+  CHECK(seq.max_frame_width_minus_1 == 15);
+  CHECK(seq.max_frame_height_minus_1 == 15);
+  CHECK(seq.color_config.BitDepth == 8);
+  CHECK(seq.OrderHintBits == 7);
+  CHECK(seq.operating_points.size() == 1);
+  CHECK(seq.operating_points[0].operating_point_idc == 0);
+  CHECK(seq.operating_points[0].seq_level_idx == 0);
+  CHECK(seq.operating_points[0].level_name == "2.0");
+  CHECK(seq.operating_points[0].tier_name == "Main");
+  CHECK(seq.frame_width_bits_minus_1 == 3);
+  CHECK(seq.use_128x128_superblock);
+  CHECK(seq.enable_order_hint);
+  CHECK(seq.enable_jnt_comp);
+  CHECK(seq.seq_force_screen_content_tools == kSelectScreenContentTools);
+  CHECK(seq.seq_force_integer_mv == kSelectIntegerMv);
+  CHECK_FALSE(seq.enable_superres);
+  CHECK(seq.enable_cdef);
+  CHECK_FALSE(seq.film_grain_params_present);
+  CHECK(seq.color_config.NumPlanes == 3);
+  CHECK(seq.color_config.chroma_format == 1);
+  CHECK_FALSE(seq.color_config.color_range);
+  CHECK(seq.color_config.chroma_sample_position == ChromaSamplePosition::Unknown);
+  CHECK(span_is(seq.span, 16, 80));
+  // trace_headers bit offsets
+  CHECK(span_is(node(tree, "seq_profile").span, 16, 3));
+  CHECK(span_is(node(tree, "operating_points_cnt_minus_1").span, 23, 5));
+  CHECK(span_is(node(tree, "operating_point_idc").span, 28, 12));
+  CHECK(span_is(node(tree, "seq_level_idx").span, 40, 5));
+  CHECK(span_is(node(tree, "max_frame_width_minus_1").span, 53, 4));
+  CHECK(node(tree, "max_frame_width_minus_1").descriptor == "f(n)");
+  CHECK(span_is(node(tree, "max_frame_height_minus_1").span, 57, 4));
+  CHECK(span_is(node(tree, "order_hint_bits_minus_1").span, 74, 3));
+  CHECK(span_is(node(tree, "high_bitdepth").span, 80, 1));
+  CHECK(span_is(node(tree, "film_grain_params_present").span, 87, 1));
+  CHECK(span_is(node(tree, "trailing_one_bit").span, 88, 1));
+  CHECK(span_is(node(tree, "trailing_zero_bits").span, 89, 7));
+  CHECK(node(tree, "sequence_header_obu").spec_ref == "AV1 5.5.1");
+  CHECK(node(tree, "color_config").spec_ref == "AV1 5.5.2");
+  CHECK(node(tree, "operating_point", 0).array_index == 0);
+  CHECK(node(tree, "seq_level_idx").enum_name == "2.0");
+  CHECK(diags(tree.root(), "SYN-GEN-0001").empty());
+
+  const ovt_ColorDescription cd = color_description(seq);
+  CHECK(cd.struct_size == sizeof(ovt_ColorDescription));
+  CHECK(cd.primaries == kCpUnspecified);
+  CHECK(cd.transfer == kTcUnspecified);
+  CHECK(cd.matrix == kMcUnspecified);
+  CHECK(cd.full_range == 0);
+  CHECK(cd.chroma_format == 1);
+  CHECK(cd.chroma_siting == 0);
+  CHECK(cd.bit_depth == 8);
+  CHECK(cd.mdcv_max_luminance == 0);
+}
+
+TEST_CASE("av1_seq_operating_points_svc_L2T2", "[syntax][av1][fast]") {
+  SyntaxNodeBuffer tree;
+  const SequenceHeader seq = parse_seq(kSeqL2T2, &tree);
+  REQUIRE(seq.operating_points.size() == 4);
+  CHECK(seq.operating_points_cnt_minus_1 == 3);
+  const std::array<uint16_t, 4> idc{771, 769, 259, 257};
+  for (size_t i = 0; i < 4; ++i) {
+    CHECK(seq.operating_points[i].operating_point_idc == idc[i]);
+    CHECK(seq.operating_points[i].seq_level_idx == 1);
+    CHECK(seq.operating_points[i].level_name == "2.1");
+    CHECK_FALSE(seq.operating_points[i].seq_tier);
+    CHECK(seq.operating_point_idc(i) == idc[i]);
+  }
+  CHECK(seq.operating_point_idc(4) == 0);
+  CHECK(seq.max_frame_width_minus_1 == 1279);
+  CHECK(seq.max_frame_height_minus_1 == 719);
+  CHECK(seq.max_frame_width == 1280);
+  CHECK(seq.OrderHintBits == 7);
+  CHECK(span_is(node(tree, "operating_point_idc", 1).span, 45, 12));
+  CHECK(span_is(node(tree, "seq_level_idx", 3).span, 91, 5));
+  CHECK(span_is(node(tree, "max_frame_width_minus_1").span, 104, 11));
+  CHECK(span_is(node(tree, "max_frame_height_minus_1").span, 115, 10));
+  CHECK(span_is(node(tree, "trailing_one_bit").span, 152, 1));
+}
+
+TEST_CASE("av1_seq_recording_off_returns_same_values", "[syntax][av1][fast]") {
+  SyntaxNodeBuffer tree;
+  const SequenceHeader on = parse_seq(kSeqL2T2, &tree);
+  SyntaxNodeBuffer off_tree;
+  const SequenceHeader off = parse_seq(kSeqL2T2, &off_tree, false);
+  CHECK(off_tree.empty());
+  CHECK(off.operating_points.size() == on.operating_points.size());
+  CHECK(off.max_frame_width_minus_1 == on.max_frame_width_minus_1);
+  CHECK(off.OrderHintBits == on.OrderHintBits);
+  CHECK(off.color_config.BitDepth == on.color_config.BitDepth);
+  CHECK(span_is(off.span, on.span.bit_offset, on.span.bit_length));
+  // Determinism (§0.7.5): the same bytes give the same FlatBuffer.
+  SyntaxNodeBuffer again;
+  (void)parse_seq(kSeqL2T2, &again);
+  CHECK(tree.to_flatbuffer() == again.to_flatbuffer());
+}
+
+TEST_CASE("av1_seq_profile_3_is_parse_error", "[syntax][av1][fast]") {
+  BitWriter w;
+  w.put(3, 3).put(0, 1).put(0, 1).trailing();
+  const Bytes bytes = obu(1, w.bytes());
+  BitReader br(bytes);
+  SyntaxBuilder b(br);
+  (void)parse_obu_header(br, b);
+  try {
+    (void)parse_sequence_header(br, b);
+    FAIL("expected ParseError");
+  } catch (const ParseError& e) {
+    CHECK(e.code == "SYN-GEN-0003");
+    CHECK(e.bit_offset == 19);
+  }
+  const SyntaxNodeBuffer buf = b.finish();  // partial tree: the header and seq_profile
+  CHECK(node(buf, "seq_profile").uvalue == 3);
+}
+
+TEST_CASE("av1_seq_reduced_still_picture_header", "[syntax][av1][fast]") {
+  // seq_profile 0, still_picture 1, reduced 1, seq_level_idx[0] 8 (level 4.0), frame bits 4+4 → 9 bits each,
+  // 511x511, use_128 0, filter_intra 0, intra_edge 0, superres 0, cdef 0, restoration 0, color_config:
+  // high_bitdepth 0, mono_chrome 0, no description, color_range 1, csp 2 (COLOCATED), separate_uv 0,
+  // film_grain 0.
+  BitWriter w;
+  w.put(0, 3).put(1, 1).put(1, 1).put(8, 5).put(8, 4).put(8, 4).put(511, 9).put(511, 9);
+  w.put(0, 1).put(0, 1).put(0, 1).put(0, 1).put(0, 1).put(0, 1);
+  w.put(0, 1).put(0, 1).put(0, 1).put(1, 1).put(2, 2).put(0, 1);
+  w.put(0, 1).trailing();
+  SyntaxNodeBuffer tree;
+  const SequenceHeader seq = parse_seq(obu(1, w.bytes()), &tree);
+  CHECK(seq.still_picture);
+  CHECK(seq.reduced_still_picture_header);
+  CHECK_FALSE(seq.timing_info_present_flag);
+  CHECK(seq.operating_points.size() == 1);
+  CHECK(seq.operating_points[0].seq_level_idx == 8);
+  CHECK(seq.operating_points[0].level_name == "4.0");
+  CHECK(seq.max_frame_width == 512);
+  CHECK_FALSE(seq.frame_id_numbers_present_flag);
+  CHECK_FALSE(seq.enable_order_hint);
+  CHECK(seq.OrderHintBits == 0);
+  CHECK(seq.seq_force_screen_content_tools == kSelectScreenContentTools);
+  CHECK(seq.color_config.color_range);
+  CHECK(seq.color_config.chroma_sample_position == ChromaSamplePosition::Colocated);
+  CHECK(seq.color_config.chroma_siting == 3);
+  CHECK(find(tree.root(), "timing_info_present_flag") == nullptr);
+  CHECK(find(tree.root(), "enable_order_hint") == nullptr);
+  CHECK(node(tree, "chroma_sample_position").enum_name == "CSP_COLOCATED");
+}
+
+TEST_CASE("av1_seq_timing_decoder_model_and_operating_parameters", "[syntax][av1][fast]") {
+  BitWriter w;
+  w.put(0, 3).put(0, 1).put(0, 1);  // profile 0, not still, not reduced
+  w.put(1, 1);                      // timing_info_present_flag
+  w.put(1001, 32).put(60000, 32).put(1, 1).put(1,
+                                               1);  // 59.94 fps: num_units 1001, time_scale 60000, equal, uvlc 0 ('1')
+  w.put(1, 1);                                      // decoder_model_info_present_flag
+  w.put(9, 5).put(1001, 32).put(4, 5).put(7, 5);    // buffer_delay_length_minus_1 9 → 10-bit delays
+  w.put(1, 1);                                      // initial_display_delay_present_flag
+  w.put(1, 5);                                      // operating_points_cnt_minus_1 → 2 points
+  // op 0: idc 0x101, level 13 (5.1) tier 1, decoder model present: delays 700/300, low_delay 1, idd present 3
+  w.put(0x101, 12).put(13, 5).put(1, 1).put(1, 1).put(700, 10).put(300, 10).put(1, 1).put(1, 1).put(3, 4);
+  // op 1: idc 0, level 31 (max params) tier 0, no decoder model, no idd
+  w.put(0, 12).put(31, 5).put(0, 1).put(0, 1).put(0, 1);
+  w.put(10, 4).put(10, 4).put(1919, 11).put(1079, 11);  // 1920x1080 (11 bits each)
+  w.put(1, 1).put(3, 4).put(2, 3);                      // frame_id_numbers_present, delta len, additional len
+  w.put(0, 1).put(1, 1).put(1, 1);                      // 64x64 sb, filter intra, intra edge
+  w.put(0, 1).put(0, 1).put(1, 1).put(1, 1);            // interintra 0, masked 0, warped 1, dual filter 1
+  w.put(1, 1).put(0, 1).put(1, 1);                      // enable_order_hint, jnt_comp 0, ref_frame_mvs 1
+  w.put(0, 1).put(1, 1).put(0, 1).put(1, 1);            // seq_choose_sct 0 → force_sct 1; choose_imv 0 → force_imv 1
+  w.put(7, 3);                                          // order_hint_bits_minus_1 → 8
+  w.put(1, 1).put(1, 1).put(1, 1);                      // superres, cdef, restoration
+  // color_config: high_bitdepth 1 (10-bit), mono 0, description present 9/16/9, range 0, csp 1 (VERTICAL), sep 1
+  w.put(1, 1).put(0, 1).put(1, 1).put(9, 8).put(16, 8).put(9, 8).put(0, 1).put(1, 2).put(1, 1);
+  w.put(1, 1).trailing();  // film_grain_params_present
+  SyntaxNodeBuffer tree;
+  const SequenceHeader seq = parse_seq(obu(1, w.bytes()), &tree);
+  CHECK(seq.timing_info_present_flag);
+  CHECK(seq.timing_info.num_units_in_display_tick == 1001);
+  CHECK(seq.timing_info.time_scale == 60000);
+  CHECK(seq.timing_info.equal_picture_interval);
+  CHECK(seq.timing_info.frame_rate > 59.9);
+  CHECK(seq.timing_info.frame_rate < 60.0);
+  CHECK(seq.decoder_model_info_present_flag);
+  CHECK(seq.decoder_model_info.buffer_delay_length_minus_1 == 9);
+  CHECK(seq.decoder_model_info.num_units_in_decoding_tick == 1001);
+  CHECK(seq.decoder_model_info.buffer_removal_time_length_minus_1 == 4);
+  CHECK(seq.decoder_model_info.frame_presentation_time_length_minus_1 == 7);
+  CHECK(seq.initial_display_delay_present_flag);
+  REQUIRE(seq.operating_points.size() == 2);
+  const OperatingPoint& op0 = seq.operating_points[0];
+  CHECK(op0.operating_point_idc == 0x101);
+  CHECK(op0.level_name == "5.1");
+  CHECK(op0.seq_tier);
+  CHECK(op0.tier_name == "High");
+  CHECK(op0.decoder_model_present_for_this_op);
+  CHECK(op0.operating_parameters_info.decoder_buffer_delay == 700);
+  CHECK(op0.operating_parameters_info.encoder_buffer_delay == 300);
+  CHECK(op0.operating_parameters_info.low_delay_mode_flag);
+  CHECK(op0.initial_display_delay_present_for_this_op);
+  CHECK(op0.initial_display_delay_minus_1 == 3);
+  const OperatingPoint& op1 = seq.operating_points[1];
+  CHECK(op1.level_name == "Maximum parameters");
+  CHECK_FALSE(op1.seq_tier);  // the tier bit is read for 31 too (pitfalls)
+  CHECK_FALSE(op1.decoder_model_present_for_this_op);
+  CHECK(seq.max_frame_width == 1920);
+  CHECK(seq.max_frame_height == 1080);
+  CHECK(seq.frame_id_numbers_present_flag);
+  CHECK(seq.delta_frame_id_length_minus_2 == 3);
+  CHECK(seq.additional_frame_id_length_minus_1 == 2);
+  CHECK(seq.enable_warped_motion);
+  CHECK(seq.enable_ref_frame_mvs);
+  CHECK(seq.seq_force_screen_content_tools == 1);
+  CHECK(seq.seq_force_integer_mv == 1);
+  CHECK(seq.OrderHintBits == 8);
+  CHECK(seq.color_config.BitDepth == 10);
+  CHECK(seq.color_config.color_primaries == 9);
+  CHECK(seq.color_config.transfer_characteristics == 16);
+  CHECK(seq.color_config.matrix_coefficients == 9);
+  CHECK(seq.color_config.chroma_sample_position == ChromaSamplePosition::Vertical);
+  CHECK(seq.color_config.chroma_siting == 1);
+  CHECK(seq.color_config.separate_uv_delta_q);
+  CHECK(seq.film_grain_params_present);
+  CHECK(node(tree, "timing_info").spec_ref == "AV1 5.5.3");
+  CHECK(node(tree, "decoder_model_info").spec_ref == "AV1 5.5.4");
+  CHECK(node(tree, "operating_parameters_info", 0).spec_ref == "AV1 5.5.5");
+  CHECK(node(tree, "decoder_buffer_delay").descriptor == "u(10)");
+  CHECK(node(tree, "num_ticks_per_picture_minus_1").descriptor == "uvlc()");
+  const ovt_ColorDescription cd = color_description(seq);
+  CHECK(cd.primaries == 9);
+  CHECK(cd.transfer == 16);
+  CHECK(cd.bit_depth == 10);
+  CHECK(cd.chroma_siting == 1);
+}
+
+TEST_CASE("av1_color_config_variants", "[syntax][av1][fast]") {
+  auto parse_cc = [](const BitWriter& w, uint8_t profile, SyntaxNodeBuffer* tree = nullptr) {
+    BitReader br(w.bytes());
+    SyntaxBuilder b(br);
+    const ColorConfig c = parse_color_config(br, b, profile);
+    if (tree != nullptr) {
+      *tree = b.finish();
+    }
+    return c;
+  };
+  SECTION("profile 2, 12-bit 4:4:4") {
+    BitWriter w;
+    w.put(1, 1).put(1, 1).put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1);  // hbd, twelve, mono 0, no desc,
+                                                                              // range 1, ssx 0, sep 0
+    const ColorConfig c = parse_cc(w, 2);
+    CHECK(c.BitDepth == 12);
+    CHECK_FALSE(c.subsampling_x);
+    CHECK_FALSE(c.subsampling_y);
+    CHECK(c.chroma_format == 3);
+    CHECK(c.color_range);
+  }
+  SECTION("profile 2, 12-bit 4:2:2") {
+    BitWriter w;
+    w.put(1, 1).put(1, 1).put(0, 1).put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1);  // ssx 1, ssy 0
+    const ColorConfig c = parse_cc(w, 2);
+    CHECK(c.subsampling_x);
+    CHECK_FALSE(c.subsampling_y);
+    CHECK(c.chroma_format == 2);
+  }
+  SECTION("profile 2, 10-bit is 4:2:2 without reading subsampling") {
+    BitWriter w;
+    w.put(1, 1).put(0, 1).put(0, 1).put(0, 1).put(0, 1).put(0, 1);  // hbd, twelve 0, mono 0, no desc, range, sep
+    const ColorConfig c = parse_cc(w, 2);
+    CHECK(c.BitDepth == 10);
+    CHECK(c.chroma_format == 2);
+  }
+  SECTION("profile 1 never reads mono_chrome and is 4:4:4") {
+    BitWriter w;
+    w.put(0, 1).put(0, 1).put(1, 1).put(0, 1);  // hbd 0, no desc, range 1, sep 0
+    SyntaxNodeBuffer tree;
+    const ColorConfig c = parse_cc(w, 1, &tree);
+    CHECK_FALSE(c.mono_chrome);
+    CHECK(c.chroma_format == 3);
+    CHECK(c.color_range);
+    CHECK(find(tree.root(), "mono_chrome") == nullptr);
+    CHECK(find(tree.root(), "chroma_sample_position") == nullptr);
+  }
+  SECTION("mono_chrome") {
+    BitWriter w;
+    w.put(0, 1).put(1, 1).put(0, 1).put(0, 1);  // hbd 0, mono 1, no desc, range 0
+    SyntaxNodeBuffer tree;
+    const ColorConfig c = parse_cc(w, 0, &tree);
+    CHECK(c.mono_chrome);
+    CHECK(c.NumPlanes == 1);
+    CHECK(c.chroma_format == 0);
+    CHECK_FALSE(c.separate_uv_delta_q);
+    CHECK(find(tree.root(), "separate_uv_delta_q") == nullptr);
+  }
+  SECTION("sRGB infers full range and 4:4:4") {
+    BitWriter w;
+    w.put(0, 1).put(1, 1).put(1, 8).put(13, 8).put(0, 8).put(0, 1);  // hbd 0, desc 1/13/0, sep 0
+    SyntaxNodeBuffer tree;
+    const ColorConfig c = parse_cc(w, 1, &tree);
+    CHECK(c.color_range);
+    CHECK(c.chroma_format == 3);
+    CHECK(find(tree.root(), "color_range") == nullptr);
+  }
+  SECTION("reserved chroma_sample_position is a warning") {
+    BitWriter w;
+    w.put(0, 1).put(0, 1).put(0, 1).put(0, 1).put(3, 2).put(0, 1);
+    SyntaxNodeBuffer tree;
+    const ColorConfig c = parse_cc(w, 0, &tree);
+    CHECK(c.chroma_sample_position == ChromaSamplePosition::Reserved);
+    CHECK(c.chroma_siting == 0);
+    CHECK(diags(tree.root(), "SYN-AV1-0004").size() == 1);
+  }
+}
+
+TEST_CASE("av1_level_names", "[syntax][av1][fast]") {
+  CHECK(level_name(0) == "2.0");
+  CHECK(level_name(1) == "2.1");
+  CHECK(level_name(8) == "4.0");
+  CHECK(level_name(13) == "5.1");
+  CHECK(level_name(23) == "7.3");
+  CHECK(level_name(24) == "Reserved");
+  CHECK(level_name(31) == "Maximum parameters");
+  CHECK(tier_name(false) == "Main");
+  CHECK(tier_name(true) == "High");
   CHECK(obu_type_name(15) == "OBU_PADDING");
   CHECK(obu_type_name(0) == "Reserved");
-  CHECK(obu_type_name(9) == "Reserved");
 }
 
 // ---- temporal delimiter and padding (rows 7, 8) -----------------------------------------------------------------
@@ -581,4 +960,113 @@ TEST_CASE("av1_tile_list_entries", "[syntax][av1][fast]") {
   } catch (const ParseError& e) {
     CHECK(e.code == "BR-0001");
   }
+}
+
+// ---- corpus (acceptance tests 1 and 3, fixture of 2) -------------------------------------------------------------
+
+TEST_CASE("av1_seq_unit_corpus_size_16x16", "[syntax][av1][fast][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("aom_av1_1_b8_01_size_16x16");
+  const Bytes file = read_file(path);
+  int sequence_headers = 0;
+  for_each_ivf_obu(file, [&](std::span<const uint8_t> unit) {
+    BitReader br(unit);
+    SyntaxBuilder b(br);
+    const ObuHeader h = parse_obu_header(br, b);
+    if (h.type() != ObuType::SequenceHeader) {
+      return;
+    }
+    ++sequence_headers;
+    CHECK(Bytes(unit.begin(), unit.end()) == kSeq16x16);
+    const SequenceHeader seq = parse_sequence_header(br, b);
+    CHECK(seq.seq_profile == 0);
+    CHECK(seq.max_frame_width_minus_1 == 15);
+    CHECK(seq.max_frame_height_minus_1 == 15);
+    CHECK(seq.color_config.BitDepth == 8);
+    CHECK(seq.OrderHintBits == 7);
+    CHECK(br.bits_left() == 0);
+    const SyntaxNodeBuffer buf = b.finish();
+    CHECK(diags(buf.root(), "SYN-GEN-0001").empty());
+  });
+  CHECK(sequence_headers == 1);
+}
+
+TEST_CASE("av1_operating_point_svc_L2T2", "[syntax][av1][fast][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("aom_av1_1_b8_22_svc_L2T2");
+  const Bytes file = read_file(path);
+  SequenceHeader seq;
+  bool have_seq = false;
+  struct Count {
+    int obus = 0;
+    int flagged = 0;
+    int layered = 0;  // temporal_id == 1 || spatial_id == 1
+  };
+  std::array<Count, 4> counts{};
+  for_each_ivf_obu(file, [&](std::span<const uint8_t> unit) {
+    BitReader br(unit);
+    SyntaxBuilder b(br);
+    const ObuHeader h = parse_obu_header(br, b);
+    if (h.type() == ObuType::SequenceHeader) {
+      seq = parse_sequence_header(br, b);
+      have_seq = true;
+      CHECK(Bytes(unit.begin(), unit.end()) == kSeqL2T2);
+    }
+    if (!have_seq) {
+      REQUIRE(h.type() == ObuType::TemporalDelimiter);  // only the leading delimiter precedes the header
+      return;
+    }
+    for (size_t op = 0; op < counts.size(); ++op) {
+      BitReader br2(unit);
+      SyntaxBuilder b2(br2);
+      const ObuHeader h2 = parse_obu_header(br2, b2);
+      const bool in = check_operating_point(b2, h2, seq.operating_point_idc(op));
+      const SyntaxNodeBuffer buf = b2.finish();
+      const auto flagged = diags(buf.root(), "SYN-AV1-0002");
+      CHECK(flagged.size() == (in ? 0U : 1U));
+      ++counts[op].obus;
+      counts[op].flagged += in ? 0 : 1;
+      if (h2.obu_extension_flag && (h2.temporal_id == 1 || h2.spatial_id == 1)) {
+        ++counts[op].layered;
+      }
+    }
+  });
+  REQUIRE(have_seq);
+  CHECK(seq.operating_point_idc(0) == 0x303);
+  CHECK(seq.operating_point_idc(3) == 0x101);
+  CHECK(counts[0].obus > 0);
+  CHECK(counts[0].flagged == 0);  // point 0 holds every layer (#322)
+  CHECK(counts[3].layered > 0);
+  CHECK(counts[3].flagged == counts[3].layered);  // point 3 (L0T0): every T1 or S1 OBU is flagged
+  CHECK(counts[1].flagged > 0);
+  CHECK(counts[1].flagged < counts[3].flagged);
+}
+
+TEST_CASE("av1_metadata_corpus_pq_hdr_obu", "[syntax][av1][fast][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("syn_av1_pq_hdr_obu");
+  const Bytes file = read_file(path);
+  int mdcv = 0;
+  int cll = 0;
+  for_each_ivf_obu(file, [&](std::span<const uint8_t> unit) {
+    BitReader br(unit);
+    SyntaxBuilder b(br);
+    const ObuHeader h = parse_obu_header(br, b);
+    if (h.type() != ObuType::Metadata) {
+      return;
+    }
+    const Metadata m = parse_metadata(br, b);
+    if (m.hdr_mdcv) {
+      ++mdcv;
+      CHECK(m.hdr_mdcv->mdcv_primaries[0][0] == 34000);
+      CHECK(m.hdr_mdcv->mdcv_primaries[1][1] == 34500);
+      CHECK(m.hdr_mdcv->mdcv_white_point[0] == 15635);
+      CHECK(m.hdr_mdcv->mdcv_max_luminance == 10000000);
+      CHECK(m.hdr_mdcv->mdcv_min_luminance == 1);
+    }
+    if (m.hdr_cll) {
+      ++cll;
+      CHECK(m.hdr_cll->max_cll == 1000);
+      CHECK(m.hdr_cll->max_fall == 400);
+    }
+  });
+  CHECK(mdcv > 0);
+  CHECK(cll == mdcv);
 }
