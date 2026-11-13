@@ -478,40 +478,15 @@ std::string base_url_of(const pugi::xml_node& element, const std::string& parent
 
 struct SegmentInfo {
   Chain template_chain;
-  Chain list_chain;
-  Chain base_chain;
 };
 
-// Most specific level that carries any segment-information element decides the kind; every level supplies
-// attributes the more specific ones lack (23009-1 §5.3.9.1).
+// The most specific level with a SegmentTemplate supplies it; every level supplies attributes the more specific
+// ones lack (23009-1 §5.3.9.1). SegmentList and SegmentBase arrive with WI-4.208 part b.
 SegmentInfo collect_segment_info(const std::array<pugi::xml_node, 3>& levels /* rep, set, period */) {
   SegmentInfo info;
-  enum class Kind : uint8_t { None, Template, List, Base } kind = Kind::None;
   for (const pugi::xml_node& level : levels) {
-    if (!first_child(level, "SegmentTemplate").empty()) {
-      kind = Kind::Template;
-    } else if (!first_child(level, "SegmentList").empty()) {
-      kind = Kind::List;
-    } else if (!first_child(level, "SegmentBase").empty()) {
-      kind = Kind::Base;
-    }
-    if (kind != Kind::None) {
-      break;
-    }
-  }
-  for (const pugi::xml_node& level : levels) {
-    if (kind == Kind::Template) {
-      if (auto n = first_child(level, "SegmentTemplate")) {
-        info.template_chain.push_back(n);
-      }
-    } else if (kind == Kind::List) {
-      if (auto n = first_child(level, "SegmentList")) {
-        info.list_chain.push_back(n);
-      }
-    } else if (kind == Kind::Base) {
-      if (auto n = first_child(level, "SegmentBase")) {
-        info.base_chain.push_back(n);
-      }
+    if (auto n = first_child(level, "SegmentTemplate"); !n.empty()) {
+      info.template_chain.push_back(n);
     }
   }
   return info;
@@ -670,13 +645,7 @@ Segment init_from_element(Context& ctx, const pugi::xml_node& init, const std::s
   seg.is_init = true;
   const char* src = attr(init, "sourceURL");
   seg.url = src != nullptr ? resolve_url(rep_base, trim(src)) : rep_base;
-  if (const char* range = attr(init, "range")) {
-    if (const auto r = parse_range(range)) {
-      seg.byte_range = *r;
-    } else {
-      diag(ctx, DiagCode::CNT_DASH_0007, std::string("invalid Initialization range `") + range + "`", init);
-    }
-  }
+  read_range_attr(ctx, init, "range", seg.byte_range);
   return seg;
 }
 
@@ -748,184 +717,6 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
   }
 }
 
-void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
-                          int64_t period_duration_ms) {
-  const Chain& chain = info.list_chain;
-  const Timing t = read_timing(ctx, chain, period_duration_ms);
-  rep.timescale = t.timescale;
-  if (const pugi::xml_node init = chain_child(chain, "Initialization")) {
-    rep.segments.push_back(init_from_element(ctx, init, rep_base));
-  }
-  std::vector<pugi::xml_node> urls;
-  for (const pugi::xml_node& level : chain) {
-    urls = children(level, "SegmentURL");
-    if (!urls.empty()) {
-      break;
-    }
-  }
-  std::vector<TimelineEntry> entries;
-  if (const pugi::xml_node timeline = chain_child(chain, "SegmentTimeline")) {
-    entries = expand_timeline(ctx, timeline, t);
-    if (entries.size() != urls.size()) {
-      diag(ctx, DiagCode::CNT_DASH_0008,
-           "SegmentList has " + std::to_string(urls.size()) + " SegmentURL elements but its SegmentTimeline has " +
-               std::to_string(entries.size()) + " segments",
-           chain.front());
-    }
-  }
-  const auto d = parse_int(chain_attr(chain, "duration") != nullptr ? chain_attr(chain, "duration") : "");
-  if (urls.size() > ctx.segments_left) {
-    diag(ctx, DiagCode::CNT_DASH_0004, "SegmentList truncated (segment budget exhausted)", chain.front());
-    urls.resize(ctx.segments_left);
-  }
-  spend(ctx, urls.size());
-  for (size_t k = 0; k < urls.size(); ++k) {
-    const pugi::xml_node u = urls[k];
-    Segment seg;
-    const char* media = attr(u, "media");
-    seg.url = media != nullptr ? resolve_url(rep_base, trim(media)) : rep_base;
-    read_range_attr(ctx, u, "mediaRange", seg.byte_range);
-    if (k < entries.size()) {
-      seg.start_time = entries[k].time;
-      seg.duration = entries[k].duration;
-      seg.number = entries[k].number;
-    } else if (entries.empty()) {
-      int64_t number = 0;
-      if (!checked_madd(t.start_number, static_cast<int64_t>(k), 1, number)) {
-        number = std::numeric_limits<int64_t>::max();
-      }
-      seg.number = number;
-      int64_t time = 0;
-      if (d && *d > 0 && checked_madd(t.presentation_time_offset, static_cast<int64_t>(k), *d, time)) {
-        seg.start_time = time;
-        seg.duration = *d;
-      }
-    }
-    rep.segments.push_back(std::move(seg));
-  }
-}
-
-void expand_base_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
-                          int64_t period_duration_ms) {
-  const Chain& chain = info.base_chain;
-  const Timing t = read_timing(ctx, chain, period_duration_ms);
-  rep.timescale = t.timescale;
-  if (const pugi::xml_node init = chain_child(chain, "Initialization")) {
-    rep.segments.push_back(init_from_element(ctx, init, rep_base));
-  }
-  std::optional<ByteRange> index_range;
-  if (const char* v = chain_attr(chain, "indexRange")) {
-    index_range = parse_range(v);
-    if (!index_range) {
-      diag(ctx, DiagCode::CNT_DASH_0007, std::string("invalid indexRange `") + v + "`", chain.front());
-    }
-  }
-  if (index_range && ctx.options.sidx_resolver) {
-    if (const auto sidx = ctx.options.sidx_resolver(rep_base, *index_range); sidx && sidx->timescale > 0) {
-      rep.timescale = sidx->timescale;
-      uint64_t offset = index_range->offset + index_range->length + sidx->first_offset;
-      uint64_t time = sidx->earliest_presentation_time;
-      int64_t number = 1;
-      for (const SidxIndex::Reference& ref : sidx->references) {
-        if (ctx.segments_left == 0) {
-          diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted)", chain.front());
-          break;
-        }
-        spend(ctx, 1);
-        Segment seg;
-        seg.url = rep_base;
-        seg.byte_range = {offset, ref.referenced_size};
-        seg.start_time = static_cast<int64_t>(time);
-        seg.duration = ref.subsegment_duration;
-        seg.number = number++;
-        rep.segments.push_back(std::move(seg));
-        offset += ref.referenced_size;
-        time += ref.subsegment_duration;
-      }
-      return;
-    }
-  }
-  if (index_range) {
-    diag(ctx, DiagCode::CNT_DASH_0003,
-         "sidx at bytes " + std::to_string(index_range->offset) + "+" + std::to_string(index_range->length) + " of `" +
-             rep_base + "` not resolved; the representation is one segment",
-         chain.front());
-  }
-  Segment seg;
-  seg.url = rep_base;
-  seg.number = t.start_number;
-  int64_t span = 0;
-  if (const auto end = period_end_media(t); end && !__builtin_sub_overflow(*end, t.presentation_time_offset, &span)) {
-    seg.start_time = t.presentation_time_offset;
-    seg.duration = span;
-  }
-  spend(ctx, 1);
-  rep.segments.push_back(std::move(seg));
-}
-
-std::optional<std::vector<uint8_t>> parse_kid(std::string_view text) {
-  std::vector<uint8_t> out;
-  int high = -1;
-  for (const char c : text) {
-    if (c == '-' || c == '{' || c == '}') {
-      continue;
-    }
-    int v = 0;
-    if (c >= '0' && c <= '9') {
-      v = c - '0';
-    } else if (c >= 'a' && c <= 'f') {
-      v = c - 'a' + 10;
-    } else if (c >= 'A' && c <= 'F') {
-      v = c - 'A' + 10;
-    } else {
-      return std::nullopt;
-    }
-    if (high < 0) {
-      high = v;
-    } else {
-      out.push_back(static_cast<uint8_t>((high << 4) | v));
-      high = -1;
-    }
-  }
-  if (high >= 0 || out.size() != 16) {
-    return std::nullopt;
-  }
-  return out;
-}
-
-void add_unique(std::vector<Encryption>& list, Encryption e) {
-  if (std::find(list.begin(), list.end(), e) == list.end()) {
-    list.push_back(std::move(e));
-  }
-}
-
-void collect_protection(Context& ctx, const pugi::xml_node& element, std::vector<Encryption>& out) {
-  for (const pugi::xml_node& cp : children(element, "ContentProtection")) {
-    const char* scheme = attr(cp, "schemeIdUri");
-    if (scheme == nullptr) {
-      continue;
-    }
-    Encryption e;
-    std::string lowered(scheme);
-    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-    const char* value = attr(cp, "value");
-    e.method =
-        lowered == "urn:mpeg:dash:mp4protection:2011" && value != nullptr ? std::string(value) : std::string(scheme);
-    if (const char* kid = prefixed_attr(cp, "default_KID")) {
-      if (auto bytes = parse_kid(kid)) {
-        e.default_kid = std::move(*bytes);
-      } else {
-        diag(ctx, DiagCode::CNT_DASH_0007, std::string("invalid default_KID `") + kid + "`", cp);
-      }
-    }
-    if (const pugi::xml_node la = first_child(cp, "Laurl")) {
-      e.key_uri = trim(la.text().get());
-    }
-    add_unique(out, std::move(e));
-  }
-}
-
 uint32_t uint_attr(const char* v) {
   if (v == nullptr) {
     return 0;
@@ -961,20 +752,11 @@ Representation build_representation(Context& ctx, const pugi::xml_node& root, co
   rep.width = uint_attr(inherited(rep_el, set, "width").c_str());
   rep.height = uint_attr(inherited(rep_el, set, "height").c_str());
   rep.frame_rate = inherited(rep_el, set, "frameRate");
-  collect_protection(ctx, set, rep.encryption);
-  collect_protection(ctx, rep_el, rep.encryption);
-  for (const Encryption& e : rep.encryption) {
-    add_unique(ctx.manifest.encryption, e);
-  }
 
   const std::string rep_base = base_url_of(rep_el, set_base);
   const SegmentInfo info = collect_segment_info({rep_el, set, period});
   if (!info.template_chain.empty()) {
     expand_template_segments(ctx, rep, info, rep_base, period_duration_ms);
-  } else if (!info.list_chain.empty()) {
-    expand_list_segments(ctx, rep, info, rep_base, period_duration_ms);
-  } else if (!info.base_chain.empty()) {
-    expand_base_segments(ctx, rep, info, rep_base, period_duration_ms);
   } else if (has_any_base_url(root, period, set, rep_el)) {
     Segment seg;  // a lone BaseURL names the whole media resource
     seg.url = rep_base;
@@ -1108,16 +890,6 @@ ParseResult parse(std::string_view xml, const Options& options) {
 }
 
 flatbuffers::Offset<fb::Manifest> write_manifest(flatbuffers::FlatBufferBuilder& fbb, const Manifest& manifest) {
-  const auto write_enc = [&fbb](const std::vector<Encryption>& list) {
-    std::vector<flatbuffers::Offset<fb::ManifestEncryption>> out;
-    out.reserve(list.size());
-    for (const Encryption& e : list) {
-      out.push_back(fb::CreateManifestEncryption(fbb, fbb.CreateString(e.method), fbb.CreateString(e.key_uri), 0,
-                                                 e.default_kid.empty() ? 0 : fbb.CreateVector(e.default_kid)));
-    }
-    return fbb.CreateVector(out);
-  };
-
   std::vector<flatbuffers::Offset<fb::ManifestPeriod>> periods;
   for (const Period& p : manifest.periods) {
     std::vector<flatbuffers::Offset<fb::ManifestAdaptationSet>> sets;
@@ -1131,10 +903,9 @@ flatbuffers::Offset<fb::Manifest> write_manifest(flatbuffers::FlatBufferBuilder&
           segs.push_back(fb::CreateManifestSegment(fbb, fbb.CreateString(g.url), &range, g.start_time, g.duration,
                                                    g.number, g.is_init));
         }
-        const auto enc = write_enc(r.encryption);
         reps.push_back(fb::CreateManifestRepresentation(
             fbb, fbb.CreateString(r.id), r.bandwidth, fbb.CreateString(r.codecs), fbb.CreateString(r.mime_type),
-            r.width, r.height, fbb.CreateString(r.frame_rate), 0, r.timescale, fbb.CreateVector(segs), enc));
+            r.width, r.height, fbb.CreateString(r.frame_rate), 0, r.timescale, fbb.CreateVector(segs), 0));
       }
       sets.push_back(fb::CreateManifestAdaptationSet(fbb, fbb.CreateString(s.id), fbb.CreateString(s.content_type),
                                                      fbb.CreateString(s.lang), fbb.CreateVector(reps)));
@@ -1148,7 +919,7 @@ flatbuffers::Offset<fb::Manifest> write_manifest(flatbuffers::FlatBufferBuilder&
     diags.push_back(treefb::diagnostic(fbb, d.code, d.message, d.offset));
   }
   return fb::CreateManifest(fbb, fbb.CreateString("dash-mpd"), fbb.CreateString(manifest.url),
-                            fbb.CreateVector(periods), write_enc(manifest.encryption), fbb.CreateVector(diags));
+                            fbb.CreateVector(periods), 0, fbb.CreateVector(diags));
 }
 
 }  // namespace ovt::container::mpd

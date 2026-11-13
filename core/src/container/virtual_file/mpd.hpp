@@ -5,8 +5,8 @@
 // an MPD into periods -> adaptation sets -> representations with a fully expanded segment list (ISO/IEC 23009-1
 // §5.3), and write_manifest() serialises that into the `Manifest` table of ovt_container.fbs.
 // SPEC-ASSUMPTION(#349): Period start/duration are milliseconds (-1 unknown); SegmentTemplate segments carry the
-// media time presentationTimeOffset + k * duration in `start_time`; SegmentBase sidx data comes through the
-// injected SidxResolver (no dependency on WI-1.212 or on HTTP); the CNT-DASH-nnnn diagnostic family.
+// media time presentationTimeOffset + k * duration in `start_time`; the CNT-DASH-nnnn diagnostic family. SegmentList,
+// SegmentBase (sidx through an injected resolver) and ContentProtection arrive with WI-4.208 part b.
 
 #ifndef OVT_CONTAINER_VIRTUAL_FILE_MPD_HPP
 #define OVT_CONTAINER_VIRTUAL_FILE_MPD_HPP
@@ -39,13 +39,6 @@ struct Segment {
   bool is_init = false;
 };
 
-struct Encryption {
-  std::string method;  // "cenc", "cbcs", ... for urn:mpeg:dash:mp4protection:2011; otherwise the schemeIdUri
-  std::string key_uri;
-  std::vector<uint8_t> default_kid;  // 16 bytes or empty
-  bool operator==(const Encryption&) const = default;
-};
-
 struct Representation {
   std::string id;
   uint32_t bandwidth = 0;
@@ -56,7 +49,6 @@ struct Representation {
   std::string frame_rate;
   uint32_t timescale = 1;
   std::vector<Segment> segments;  // init segment first (is_init), then media segments in order
-  std::vector<Encryption> encryption;
 };
 
 struct AdaptationSet {
@@ -83,27 +75,11 @@ struct Manifest {
   std::string url;
   bool dynamic = false;
   std::vector<Period> periods;
-  std::vector<Encryption> encryption;
   std::vector<Diagnostic> diagnostics;
 };
 
-// The sidx of a SegmentBase representation, as decoded by the caller (WI-1.212 / WI-4.210).
-struct SidxIndex {
-  uint32_t timescale = 0;
-  uint64_t earliest_presentation_time = 0;
-  uint64_t first_offset = 0;  // from the first byte after the sidx box
-  struct Reference {
-    uint32_t referenced_size = 0;
-    uint32_t subsegment_duration = 0;
-  };
-  std::vector<Reference> references;
-};
-// Fetches and decodes the sidx at `index_range` of `url`; nullopt when it cannot be read.
-using SidxResolver = std::function<std::optional<SidxIndex>(const std::string& url, ByteRange index_range)>;
-
 struct Options {
   std::string manifest_url;  // base for relative BaseURLs / segment URLs; may be a path
-  SidxResolver sidx_resolver;
 };
 
 struct ParseResult {
