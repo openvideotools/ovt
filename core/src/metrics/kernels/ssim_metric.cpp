@@ -420,7 +420,7 @@ bool ssim_plane(SsimState& m, const ovt_MetricPlanes& r, const ovt_MetricPlanes&
   score = ssim_images(m, a, b, w, h, libvmaf ? kLibvmafTaps : exact_taps(), map ? &*map : nullptr);
   if (map) {
     sink->put(blob_id(p, decode_index, m.options.map_block),
-              encode_ovtmap(map->blocks_w, map->blocks_h, static_cast<uint16_t>(m.options.map_block), p, 0, 0.0F, 1.0F,
+              encode_ovtmap(map->blocks_w, map->blocks_h, static_cast<uint16_t>(m.options.map_block), p, 0, -1.0F, 1.0F,
                             map->means()));
   }
   return true;

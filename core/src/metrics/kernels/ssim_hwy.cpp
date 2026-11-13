@@ -29,6 +29,18 @@ namespace hn = hwy::HWY_NAMESPACE;
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic): the kernels walk strided rows with vector loads; the
 // caller (ssim_metric.cpp) validates the geometry and sizes the buffers (n + 10 floats per filtered row).
 
+// Loads one vector of T samples from a byte address of any alignment (a 16-bit row can sit at an odd address): the
+// bytes are loaded as uint8 and reinterpreted with BitCast, never through a misaligned const uint16_t* (as psnr, #411).
+template <class T, class D>
+auto load_samples(D dsrc, const uint8_t* bytes) {
+  if constexpr (sizeof(T) == 1) {
+    return hn::LoadU(dsrc, bytes);
+  } else {
+    const hn::Repartition<uint8_t, D> d8;
+    return hn::BitCast(dsrc, hn::LoadU(d8, bytes));
+  }
+}
+
 template <class T>
 void ToFloatRows(const uint8_t* src, ptrdiff_t src_stride, uint32_t width, uint32_t height, float scale, float* dst,
                  size_t dst_stride) {
@@ -42,8 +54,7 @@ void ToFloatRows(const uint8_t* src, ptrdiff_t src_stride, uint32_t width, uint3
     float* d = dst + (static_cast<size_t>(y) * dst_stride);
     size_t x = 0;
     for (; x + n <= width; x += n) {
-      const auto v =
-          hn::ConvertTo(df, hn::PromoteTo(di, hn::LoadU(dsrc, reinterpret_cast<const T*>(s + (x * sizeof(T))))));
+      const auto v = hn::ConvertTo(df, hn::PromoteTo(di, load_samples<T>(dsrc, s + (x * sizeof(T)))));
       hn::StoreU(hn::Mul(v, vscale), df, d + x);
     }
     for (; x < width; ++x) {

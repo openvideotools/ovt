@@ -454,6 +454,23 @@ TEST_CASE("ssim block map values are the mean of the window values centred in ea
   CHECK(ublob[18] == 1);
 }
 
+TEST_CASE("ssim 16-bit samples at odd strides are read without misaligned loads", "[metrics][ssim][ubsan][fast]") {
+  std::mt19937 rng(  // NOLINT(cert-msc32-c,cert-msc51-cpp): fixed seeds make the cases reproducible
+      88);
+  for (const uint32_t pad : {1U, 3U, 5U}) {
+    for (const uint32_t w : {1U, 7U, 8U, 33U, 64U, 130U}) {
+      Pic r(w, 9, 0, 10, pad);
+      std::vector<float> a(static_cast<size_t>(w) * 9);
+      std::vector<float> b(a.size());
+      r.fill_texture(rng, 1);
+      REQUIRE((static_cast<uint32_t>(r.planes.stride_bytes[0]) % 2U) == 1U);
+      ovt::metrics::ssim_to_float_scalar(r.planes.data[0], r.planes.stride_bytes[0], w, 9, 2, 0.25F, a.data(), w);
+      ovt::metrics::ssim_to_float_hwy(r.planes.data[0], r.planes.stride_bytes[0], w, 9, 2, 0.25F, b.data(), w);
+      CHECK(std::memcmp(a.data(), b.data(), a.size() * sizeof(float)) == 0);
+    }
+  }
+}
+
 TEST_CASE("ssim scalar and Highway kernels are bit-identical", "[metrics][ssim][fast]") {
   std::mt19937 rng(  // NOLINT(cert-msc32-c,cert-msc51-cpp): fixed seeds make the cases reproducible
       66);

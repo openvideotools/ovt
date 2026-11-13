@@ -27,6 +27,7 @@ read from the source:
 
 What this means in practice:
 
+* `f` is taken from the size of the plane being scored, so 4:2:0 chroma of a 1080p picture (960 × 540) uses `f = 2`.
 * A 1080p picture is scored at 480 × 270 (`f = 4`) with the default border. That is libvmaf's number, and the reason
   the default is cheap. For a full-resolution score use `border = "valid"`.
 * The six-decimal window sums to 1.000002 instead of 1. Because `E[x²] − μ²` cancels, a noise-like picture moves by up
