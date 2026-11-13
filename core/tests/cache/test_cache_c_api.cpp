@@ -3,7 +3,10 @@
 //
 // ovt/cache.h (chapter 12 §12.3.14, WI-0.091): acceptance test 4 (the cache-root rule through
 // ovt_cache_open(NULL, NULL, &c)), the C round trip of index, frames, planes and reports, caller-owned
-// buffers released with ovt_buffer_free, and the status codes of §12.3.14.
+// buffers released with ovt_buffer_free, and the status codes of §12.3.14. WI-0.092: ovt_cache_report,
+// ovt_cache_clear and the cap of a default open.
+
+#include <flatbuffers/flatbuffers.h>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -13,6 +16,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "ovt/cache.h"
@@ -246,4 +250,179 @@ TEST_CASE("test_cache_c_api: process-wide enabled flag and size cap", "[cache][f
   CHECK(ovt_cache_max_bytes() == 123);
   CHECK(ovt_cache_set_max_bytes(0) == OVT_OK);
   CHECK(ovt_cache_max_bytes() == ovt::cache::kDefaultMaxBytes);
+}
+
+namespace {
+
+std::string hex_of(const ovt::cache::SourceHash& h) {
+  constexpr std::string_view kDigits = "0123456789abcdef";
+  std::string out;
+  for (const std::uint8_t b : h) {
+    out.push_back(kDigits[b >> 4U]);
+    out.push_back(kDigits[b & 0x0FU]);
+  }
+  return out;
+}
+
+/// The default cache pointed at @p root for the test's lifetime (ovt_cache_set_dir, restored on destruction).
+class DefaultRoot {
+ public:
+  explicit DefaultRoot(const fs::path& root) { REQUIRE(ovt_cache_set_dir(root.c_str()) == OVT_OK); }
+  ~DefaultRoot() { (void)ovt_cache_set_dir(nullptr); }
+  DefaultRoot(const DefaultRoot&) = delete;
+  DefaultRoot& operator=(const DefaultRoot&) = delete;
+  DefaultRoot(DefaultRoot&&) = delete;
+  DefaultRoot& operator=(DefaultRoot&&) = delete;
+};
+
+// An entry of the default cache with an index and one frame.
+void put_entry(const ovt::cache::SourceHash& h) {
+  ovt_Cache* cache = nullptr;
+  REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);
+  ovt_CacheEntry* entry = nullptr;
+  REQUIRE(ovt_cache_entry(cache, h.data(), &entry) == OVT_OK);
+  const auto index = make_index(h, 1);
+  REQUIRE(ovt_cache_put_index(entry, index.data(), index.size()) == OVT_OK);
+  const auto frame = make_frame(FrameSpec{});
+  REQUIRE(ovt_cache_put_frame(entry, 0, frame.data(), frame.size()) == OVT_OK);
+  ovt_cache_entry_release(entry);
+  ovt_cache_close(cache);
+}
+
+struct Report {
+  std::vector<std::uint8_t> bytes;
+  const ovt::fb::CacheReport* root = nullptr;
+};
+
+Report report() {
+  ovt_Buffer buf{};
+  REQUIRE(ovt_cache_report(&buf) == OVT_OK);
+  Report r;
+  r.bytes = to_vector(buf);
+  ovt_buffer_free(&buf);
+  flatbuffers::Verifier verifier(r.bytes.data(), r.bytes.size());
+  REQUIRE(verifier.VerifyBuffer<ovt::fb::CacheReport>(nullptr));
+  r.root = flatbuffers::GetRoot<ovt::fb::CacheReport>(r.bytes.data());
+  return r;
+}
+
+}  // namespace
+
+TEST_CASE("test_cache_c_api: ovt_cache_report lists the default cache per entry and kind", "[cache][fast]") {
+  const TempRoot tmp("c_api_report");
+  const DefaultRoot root(tmp.path());
+  SECTION("a root that does not exist yet gives an empty report and is not created") {
+    const Report r = report();
+    CHECK(r.root->dir()->str() == tmp.path().string());
+    CHECK(r.root->entries()->begin() == r.root->entries()->end());
+    CHECK(r.root->total_bytes() == 0);
+    CHECK(r.root->max_bytes() == ovt_cache_max_bytes());
+    CHECK_FALSE(fs::exists(tmp.path()));
+  }
+  SECTION("entries, sizes and lookup counters") {
+    const ovt::cache::SourceHash a = hash_of(0x11);
+    const ovt::cache::SourceHash b = hash_of(0x22);
+    put_entry(a);
+    put_entry(b);
+    const Report before = report();
+    {
+      ovt_Cache* cache = nullptr;
+      REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);
+      ovt_CacheEntry* entry = nullptr;
+      REQUIRE(ovt_cache_entry(cache, a.data(), &entry) == OVT_OK);
+      ovt_Buffer buf{};
+      CHECK(ovt_cache_get_frame(entry, 0, &buf) == OVT_OK);  // hit
+      ovt_buffer_free(&buf);
+      CHECK(ovt_cache_get_frame(entry, 7, &buf) == OVT_E_IO);  // miss
+      ovt_cache_entry_release(entry);
+      ovt_cache_close(cache);
+    }
+    const Report r = report();
+    CHECK(r.root->hits() == before.root->hits() + 1);
+    CHECK(r.root->misses() == before.root->misses() + 1);
+    REQUIRE(r.root->entries()->size() == 4);  // (a, analysis), (a, index), (b, analysis), (b, index)
+    const auto* e0 = r.root->entries()->Get(0);
+    const auto* e1 = r.root->entries()->Get(1);
+    CHECK(e0->key()->str() == hex_of(a));
+    CHECK(e0->kind()->str() == "analysis");
+    CHECK(e1->kind()->str() == "index");
+    CHECK(e0->size_bytes() == fs::file_size(tmp.path() / hex_of(a) / "frames" / "00000000.fa.zst"));
+    CHECK(e1->size_bytes() == fs::file_size(tmp.path() / hex_of(a) / "index.fb"));
+    CHECK_FALSE(e0->created()->str().empty());
+    CHECK(r.root->entries()->Get(2)->key()->str() == hex_of(b));
+    CHECK(r.root->total_bytes() > 0);
+  }
+}
+
+TEST_CASE("test_cache_c_api: ovt_cache_clear deletes by kind or everything", "[cache][fast]") {
+  const TempRoot tmp("c_api_clear");
+  const DefaultRoot root(tmp.path());
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);  // nothing there: not created
+  CHECK_FALSE(fs::exists(tmp.path()));
+  const ovt::cache::SourceHash h = hash_of(0x33);
+  put_entry(h);
+  const fs::path dir = tmp.path() / hex_of(h);
+
+  CHECK(ovt_cache_clear("planes", nullptr, 0) == OVT_E_INVALID_ARG);
+  CHECK(ovt_cache_clear(nullptr, nullptr, -1) == OVT_E_INVALID_ARG);
+  CHECK(ovt_cache_clear(nullptr, "/videos/clip.mp4", 0) == OVT_E_UNSUPPORTED);
+  CHECK(ovt_cache_clear(nullptr, nullptr, 30) == OVT_OK);  // used just now: kept
+  CHECK(fs::exists(dir / "index.fb"));
+
+  CHECK(ovt_cache_clear("analysis", nullptr, 0) == OVT_OK);
+  CHECK_FALSE(fs::exists(dir / "frames"));
+  CHECK(fs::exists(dir / "index.fb"));
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);
+  CHECK_FALSE(fs::exists(dir));
+  {
+    const auto after = report();
+    CHECK(after.root->entries()->begin() == after.root->entries()->end());
+  }
+}
+
+TEST_CASE("test_cache_c_api: ovt_cache_clear skips an entry held open through another handle", "[cache][fast]") {
+  const TempRoot tmp("c_api_clear_open");
+  const DefaultRoot root(tmp.path());
+  const ovt::cache::SourceHash held = hash_of(0x34);
+  const ovt::cache::SourceHash closed = hash_of(0x35);
+  put_entry(closed);
+  ovt_Cache* cache = nullptr;
+  REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);
+  ovt_CacheEntry* entry = nullptr;
+  REQUIRE(ovt_cache_entry(cache, held.data(), &entry) == OVT_OK);
+  const std::vector<std::uint8_t> blob(64, 0x42);
+  REQUIRE(ovt_cache_put_report(entry, "verify", blob.data(), blob.size()) == OVT_OK);
+
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);
+  CHECK_FALSE(fs::exists(tmp.path() / hex_of(closed)));
+  CHECK(fs::exists(tmp.path() / hex_of(held) / "meta.json"));
+  ovt_Buffer buf{};
+  CHECK(ovt_cache_get_report(entry, "verify", &buf) == OVT_OK);  // the held handle still reads
+  ovt_buffer_free(&buf);
+  // A second default open shares the root's state: its startup eviction also sees the held entry.
+  ovt_Cache* second = nullptr;
+  REQUIRE(ovt_cache_open(nullptr, R"({"max_bytes": 1})", &second) == OVT_OK);
+  CHECK(fs::exists(tmp.path() / hex_of(held) / "meta.json"));
+  ovt_cache_close(second);
+
+  ovt_cache_entry_release(entry);
+  ovt_cache_close(cache);
+  CHECK(ovt_cache_clear(nullptr, nullptr, 0) == OVT_OK);  // released: now cleared
+  CHECK_FALSE(fs::exists(tmp.path() / hex_of(held)));
+}
+
+TEST_CASE("test_cache_c_api: a default open keeps the cap cache.json records unless one is set", "[cache][fast]") {
+  const TempRoot tmp("c_api_default_cap");
+  const DefaultRoot root(tmp.path());
+  ovt_Cache* cache = nullptr;
+  REQUIRE(ovt_cache_open(tmp.path().c_str(), "{\"max_bytes\": 5000000}", &cache) == OVT_OK);
+  ovt_cache_close(cache);
+  REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);  // no ovt_cache_set_max_bytes: kept
+  ovt_cache_close(cache);
+  CHECK(report().root->max_bytes() == 5000000);
+  REQUIRE(ovt_cache_set_max_bytes(7000000) == OVT_OK);
+  REQUIRE(ovt_cache_open(nullptr, nullptr, &cache) == OVT_OK);  // set: recorded
+  ovt_cache_close(cache);
+  CHECK(report().root->max_bytes() == 7000000);
+  REQUIRE(ovt_cache_set_max_bytes(0) == OVT_OK);
 }

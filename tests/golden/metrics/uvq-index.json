@@ -1,0 +1,30 @@
+{
+ "clips": {
+  "ytugc_clip01": {
+   "failed": {},
+   "goldens": {
+    "1.0": "ytugc_clip01.uvq-1.0.json.gz",
+    "1.5": "ytugc_clip01.uvq-1.5.json.gz"
+   },
+   "sha256": "950a1b1a9ac8ef9c0a202018a6261a07b1152bc665e7bba3bfc60cfc087425a9"
+  },
+  "ytugc_clip02": {
+   "failed": {},
+   "goldens": {
+    "1.0": "ytugc_clip02.uvq-1.0.json.gz",
+    "1.5": "ytugc_clip02.uvq-1.5.json.gz"
+   },
+   "sha256": "c4d3d17e19d6b434eae99300235028232145ea4b352999233d49d85d4c3c7c72"
+  },
+  "ytugc_clip03": {
+   "failed": {},
+   "goldens": {
+    "1.0": "ytugc_clip03.uvq-1.0.json.gz",
+    "1.5": "ytugc_clip03.uvq-1.5.json.gz"
+   },
+   "sha256": "5b84d248a44982d7813fd82d43f6bc870718b1d427814e645609fed5e93873bb"
+  }
+ },
+ "fps": 1,
+ "uvq": "google/uvq c204ecc04f093e90c941cb126c7ac3d5beca0414"
+}

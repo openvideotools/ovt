@@ -13,6 +13,8 @@
 #include <new>
 #include <span>
 
+#include "container/ivf.hpp"
+#include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt_container_generated.h"
@@ -33,8 +35,23 @@ bool has_reader(Format f) noexcept {
   }
 }
 
-std::unique_ptr<Reader> make_reader(Format f) {
-  return has_reader(f) ? std::make_unique<Reader>() : nullptr;
+std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, ovt_status* why) {
+  if (why != nullptr) {
+    *why = has_reader(f) ? OVT_E_CORRUPT : OVT_E_UNSUPPORTED;  // refined by the format readers
+  }
+  switch (f) {
+    case Format::Ivf:
+      return ivf::make_reader(file);
+    case Format::Y4m:
+      return y4m::make_reader(file, why);
+    case Format::Isobmff:
+    case Format::AnnexB:
+    case Format::Obu:
+    case Format::Raw:
+      return std::make_unique<Reader>();  // stub until the format's reader lands
+    default:
+      return nullptr;
+  }
 }
 
 namespace {
@@ -50,11 +67,15 @@ std::vector<uint8_t> empty_tree(Format f) {
 
 ovt_status make_container(ovt_File* file, Format f, ovt_Container** out) {
   // NOLINTNEXTLINE(clang-analyzer-cplusplus.NewDeleteLeaks): false positive, the reader moves into the handle
-  auto reader = make_reader(f);
+  ovt_status why = OVT_E_UNSUPPORTED;
+  auto reader = make_reader(f, *file->file, &why);
   if (!reader) {
-    return OVT_E_UNSUPPORTED;
+    return why;  // OVT_E_CORRUPT: a reader exists, the bytes are not that format
   }
-  auto tree = empty_tree(f);
+  auto tree = reader->tree();
+  if (tree.empty()) {
+    tree = empty_tree(f);
+  }
   *out = new ovt_Container{file, f, std::move(reader), std::move(tree)};
   return OVT_OK;
 }
@@ -140,8 +161,23 @@ OVT_API ovt_Buffer ovt_container_tree(ovt_Container* container) {
 }
 
 OVT_API ovt_status ovt_container_expand(ovt_Container* container, uint64_t box_offset) {
-  (void)box_offset;
-  return container == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.204
+  if (container == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  try {
+    const ovt_status st = container->reader->expand(box_offset);  // ISOBMFF: WI-1.204
+    if (st == OVT_OK) {
+      if (auto tree = container->reader->tree(); !tree.empty()) {
+        container->tree = std::move(tree);  // buffers are immutable: a new tree after every expand
+      }
+    }
+    return st;
+  } catch (...) {
+    return ovt::container::status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_container_expand_all(ovt_Container* container, ovt_Job* job) {

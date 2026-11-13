@@ -1,0 +1,111 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Debian binary package split (chapter 13 §13.6.3, WI-0.072). SKELETON: the Maintainer, Vcs-* and Homepage fields
+# and the dependency versions are placeholders until a Debian maintainer adopts the package. See docs/dev/packaging.md.
+Source: ovt
+Section: video
+Priority: optional
+Maintainer: Open Video Tools contributors <packaging@openvideotools.invalid>
+Rules-Requires-Root: no
+Standards-Version: 4.6.2
+Homepage: https://github.com/openvideotools/ovt
+Vcs-Git: https://github.com/openvideotools/ovt.git
+Build-Depends: debhelper-compat (= 13),
+               cmake (>= 3.28),
+               ninja-build,
+               pkg-config,
+               g++ (>= 4:11),
+               nasm,
+               python3,
+               python3-dev,
+               pybind11-dev,
+               libavcodec-dev,
+               libavformat-dev,
+               libavutil-dev,
+               libswscale-dev,
+               libswresample-dev,
+               libdav1d-dev,
+               libplacebo-dev,
+               libvmaf-dev,
+               libzimg-dev,
+               libde265-dev,
+               libvulkan-dev,
+               qt6-base-dev,
+               qt6-declarative-dev,
+               qt6-tools-dev,
+               libflatbuffers-dev,
+               flatbuffers-compiler,
+               libzstd-dev,
+               zlib1g-dev,
+               doxygen <!nodoc>
+
+Package: libovt-core1
+Architecture: any
+Multi-Arch: same
+Section: libs
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools core library (runtime)
+ Bitstream, container and metric analysis library behind the ovt command-line
+ tool and OVT Studio. Decoders live in the ovt-plugin-* packages.
+
+Package: libovt-render1
+Architecture: any
+Multi-Arch: same
+Section: libs
+Depends: libovt-core1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Recommends: mesa-vulkan-drivers
+Description: Open Video Tools rendering library (runtime)
+ libplacebo-based Vulkan renderer with HDR and tone-mapping support.
+
+Package: libovt-dev
+Architecture: any
+Multi-Arch: same
+Section: libdevel
+Depends: libovt-core1 (= ${binary:Version}), libovt-render1 (= ${binary:Version}), ${misc:Depends}
+Description: Open Video Tools C API (development files)
+ Headers, ovt-config.cmake and the ovt-core pkg-config file.
+
+Package: ovt-cli
+Architecture: any
+Depends: libovt-core1 (= ${binary:Version}), ovt-plugin-aom (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Recommends: ovt-plugin-ffmpeg (= ${binary:Version}), ovt-plugin-de265 (= ${binary:Version})
+Description: Open Video Tools command-line analyzer
+ The ovt command: probe, syntax dumps, metrics and reports for H.264, H.265 and
+ AV1 streams.
+
+Package: ovt-studio
+Architecture: any
+Depends: ovt-cli (= ${binary:Version}), libovt-render1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools graphical analyzer
+ OVT Studio: Qt Quick GUI for bitstream, motion vector and container
+ inspection.
+
+Package: ovt-plugin-aom
+Architecture: any
+Depends: libovt-core1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools AV1 analysis plugin (libaom)
+ AV1 decoding with inspection hooks. Contains a static copy of libaom built with
+ CONFIG_INSPECTION, because Debian's libaom is built without it (see
+ debian/README.source). Covered by the AOMedia patent licence (PATENTS).
+
+Package: ovt-plugin-ffmpeg
+Architecture: any
+Depends: libovt-core1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools FFmpeg decoder plugin
+ AVC/H.264 and other decoders through the system FFmpeg. Several of the codecs
+ it enables are patent-encumbered in some jurisdictions.
+
+Package: ovt-plugin-de265
+Architecture: any
+Depends: libovt-core1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools HEVC analysis plugin (libde265)
+ HEVC/H.265 decoding with inspection hooks. HEVC is patent-encumbered in some
+ jurisdictions.
+
+Package: python3-ovt
+Architecture: any
+Section: python
+Depends: libovt-core1 (= ${binary:Version}), ${python3:Depends}, ${shlibs:Depends}, ${misc:Depends}
+Description: Open Video Tools Python bindings
+ Python 3 module (ovt_py) exposing the OVT analysis API.

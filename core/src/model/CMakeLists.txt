@@ -34,7 +34,24 @@ unset(_ovt_hash_len)
 
 # WI-0.084: the model helpers of ovt/cxx/model/{grid,tree,units,labels}.hpp.
 # WI-0.087: the PictureStore and PlaneBlob of ovt/cxx/model/{picture_store,plane}.hpp.
-target_sources(ovt_core_objects PRIVATE bfbs_resources.cpp grid.cpp labels.cpp picture_store.cpp tree.cpp units.cpp)
+# WI-0.089: the YUView statistics CSV exporter and importer of ovt/cxx/model/yuview_csv.hpp.
+# WI-0.086: the §6.9 validator of ovt/cxx/model/validator.hpp.
+# WI-0.090: the libaom inspect-compatible JSON exporter of ovt/cxx/model/aom_inspect_json.hpp.
+target_sources(
+  ovt_core_objects
+  PRIVATE aom_inspect_json.cpp
+          bfbs_resources.cpp
+          grid.cpp
+          labels.cpp
+          picture_store.cpp
+          tree.cpp
+          units.cpp
+          validator.cpp
+          yuview_csv.cpp)
+# The exporter writes the product version into "configString" (§6.8.3); ovt_version_string() lives in ovt_core,
+# which the module objects do not link, so the same value is passed to that one source.
+set_property(SOURCE aom_inspect_json.cpp TARGET_DIRECTORY ovt_core_objects APPEND
+             PROPERTY COMPILE_DEFINITIONS "OVT_VERSION_STRING_VALUE=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\"")
 # ovt_schemas orders the build after flatc/embed_bfbs and adds ${OVT_GENERATED_DIR} (SYSTEM) to the
 # include path, which is where both .inc fragments and the generated headers live. PUBLIC since WI-0.084:
 # the helper headers include ovt_model_generated.h and the flatbuffers headers, so every target that links

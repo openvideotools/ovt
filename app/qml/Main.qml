@@ -157,6 +157,14 @@ ApplicationWindow {
         y: root.header.height + OvtStyle.spacing
     }
 
+    // GUI-JOB-0001 (§11.7): a job that did not stop in time is detached and reported.
+    Connections {
+        target: JobsModel
+        function onJobDetached(name) {
+            DiagnosticsModel.addGui(1, "GUI-JOB-0001", "job " + name + " did not stop within 2 s; detached")
+        }
+    }
+
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
     // The first-run banners (§11.8) sit above the dock areas; the Welcome page is the Picture panel's content while no
     // file is open (DockWorkspace).
@@ -168,10 +176,20 @@ ApplicationWindow {
             Layout.fillWidth: true
         }
         DockWorkspace {
+            id: dockWorkspace
+
             Layout.fillWidth: true
             Layout.fillHeight: true
             actions: actions
+            panelComponents: ({"diagnostics": diagnosticsComponent})
         }
+    }
+
+    // The Diagnostics / Log panel (§11.3.16) is a dock panel in the Bottom area; the status bar badge toggles it.
+    Component {
+        id: diagnosticsComponent
+
+        DiagnosticsPanel {}
     }
 
     footer: ToolBar {
@@ -211,6 +229,14 @@ ApplicationWindow {
                 value: Math.max(0, JobsModel.foregroundProgress)
                 indeterminate: JobsModel.foregroundActive && JobsModel.foregroundProgress < 0
                 Accessible.name: "Job progress"
+            }
+            // The Diagnostics badge: red when Errors > 0 (§11.3.16). Click opens or closes the Diagnostics panel.
+            ToolButton {
+                objectName: "statusDiagnostics"
+                text: DiagnosticsModel.errorCount > 0 ? DiagnosticsModel.errorCount + " errors" : "Diagnostics"
+                onClicked: DockModel.togglePanel("diagnostics")
+                Accessible.name: "Diagnostics"
+                palette.buttonText: DiagnosticsModel.errorCount > 0 ? "#ff6b6b" : OvtStyle.text
             }
         }
     }

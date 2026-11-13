@@ -13,6 +13,7 @@
 
 #include "container/format.hpp"
 #include "ovt/container.h"
+#include "ovt/cxx/io/random_access_file.hpp"
 
 namespace ovt::container {
 
@@ -26,11 +27,31 @@ class Reader {
   Reader& operator=(Reader&&) = delete;
   virtual ~Reader() = default;
   [[nodiscard]] virtual int track_count() const noexcept { return 0; }
+  // The serialised ContainerTree of the current state; empty when the reader builds none (the handle then
+  // keeps its empty tree).
+  [[nodiscard]] virtual std::vector<uint8_t> tree() const { return {}; }
+  // Materialises lazy children of the node at `box_offset`; the handle re-reads tree() after OVT_OK.
+  virtual ovt_status expand(uint64_t box_offset) {
+    (void)box_offset;
+    return OVT_E_UNSUPPORTED;
+  }
+  // RawVideoFormat FlatBuffer (Y4M and raw readers); empty otherwise.
+  [[nodiscard]] virtual std::vector<uint8_t> raw_format() const { return {}; }
+  // SampleTable FlatBuffer of `count` samples from `first` (count 0 = all); empty when unsupported.
+  [[nodiscard]] virtual std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const {
+    (void)track_index;
+    (void)first;
+    (void)count;
+    return {};
+  }
 };
 
 // True when a reader exists for `f` in this build (phase 1 formats only).
 [[nodiscard]] bool has_reader(Format f) noexcept;
-[[nodiscard]] std::unique_ptr<Reader> make_reader(Format f);
+// nullptr when there is no reader for `f` (has_reader false) or `file` is not a valid `f` stream; then *why (if
+// given) says OVT_E_UNSUPPORTED or OVT_E_CORRUPT.
+[[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file,
+                                                  ovt_status* why = nullptr);
 
 }  // namespace ovt::container
 

@@ -215,6 +215,18 @@ TEST_CASE("test_evict: with every entry open the cap is exceeded and MDL-CCH-000
   CHECK(after_close.trimmed == std::vector<SourceHash>{h[0]});
 }
 
+TEST_CASE("test_evict: above the cap with every entry open, writes leave cache.json to the flush", "[cache][fast]") {
+  const TempRoot tmp("evict_all_open_writes");
+  auto cache = Cache::open(tmp.path(), Options{.max_bytes = 1});
+  auto entry = cache->entry(hash_of(0x02));
+  entry->put_frame(0, make_frame(FrameSpec{}));  // above the cap, nothing closed: eviction removes nothing
+  const auto before = ovt::cache::read_file(tmp.path() / "cache.json", kBig);
+  entry->put_frame(1, make_frame(FrameSpec{.decode_index = 1}));
+  CHECK(ovt::cache::read_file(tmp.path() / "cache.json", kBig) == before);
+  cache->flush();
+  CHECK(read_cache_json(tmp.path()).records.at(ovt::cache::hex(hash_of(0x02))).bytes == cache->total_bytes());
+}
+
 TEST_CASE("test_evict: a write that pushes the total above the cap evicts closed entries", "[cache][fast]") {
   const TempRoot tmp("evict_on_write");
   const std::vector<SourceHash> h = make_entries(tmp.path(), 1, 2 * kMB, 2 * kMB - 100'000);
@@ -280,6 +292,12 @@ TEST_CASE("test_evict: clear filters by source, age and kind and skips open entr
     CHECK(read_cache_json(tmp.path()).records.at(ovt::cache::hex(a)).bytes ==
           fs::file_size(dir / "index.fb") + fs::file_size(dir / "meta.json"));
   }
+  SECTION("kind analysis with a stale .tmp left over") {
+    sized_file(tmp.path() / ovt::cache::hex(b) / "frames" / "00000001.fa.zst.tmp", 10);
+    const auto result = cache->clear(of_kind("analysis"));
+    CHECK(result.removed == std::vector<SourceHash>{b});  // only meta.json and a .tmp were left
+    CHECK_FALSE(fs::exists(tmp.path() / ovt::cache::hex(b)));
+  }
   SECTION("errors") {
     CHECK_THROWS_AS(cache->clear(of_kind("planes")), CacheError);
     Options ro;
@@ -287,6 +305,40 @@ TEST_CASE("test_evict: clear filters by source, age and kind and skips open entr
     CHECK_THROWS_AS(Cache::open(tmp.path(), ro)->clear({}), CacheError);
   }
   ovt::cache::set_now_for_testing(std::nullopt);
+}
+
+TEST_CASE("test_evict: handles on one root share its open entries", "[cache][fast]") {
+  const TempRoot tmp("evict_shared_root");
+  const SourceHash h = hash_of(0x66);
+  auto first = Cache::open(tmp.path());
+  auto held = first->entry(h);
+  held->put_frame(0, make_frame(FrameSpec{}));
+
+  SECTION("clear through another handle skips the held entry") {
+    auto second = Cache::open(tmp.path() / "." / "");  // another spelling of the same root
+    const auto result = second->clear({});
+    CHECK(result.removed.empty());
+    CHECK(result.skipped_open == std::vector<SourceHash>{h});
+    CHECK(fs::exists(tmp.path() / ovt::cache::hex(h) / "meta.json"));
+  }
+  SECTION("a second open with a tiny cap does not evict the held entry") {
+    auto second = Cache::open(tmp.path(), Options{.max_bytes = 1});
+    CHECK(fs::exists(tmp.path() / ovt::cache::hex(h) / "frames"));
+    CHECK(first->max_bytes() == 1);  // the cap is the root's
+  }
+  SECTION("read_only is per handle") {
+    Options ro;
+    ro.read_only = true;
+    auto reader = Cache::open(tmp.path(), ro);
+    CHECK_THROWS_AS(reader->clear({}), CacheError);
+    CHECK_THROWS_AS(reader->set_max_bytes(1), CacheError);
+    CHECK(reader->enforce_cap().removed.empty());
+    auto read_entry = reader->entry(h);
+    CHECK(read_entry != held);
+    CHECK(read_entry->get_frame(0).has_value());
+    CHECK_THROWS_AS(read_entry->put_frame(1, make_frame(FrameSpec{.decode_index = 1})), CacheError);
+    held->put_frame(1, make_frame(FrameSpec{.decode_index = 1}));  // the writable handle still writes
+  }
 }
 
 TEST_CASE("test_evict: list re-walks the entries and reports one row per kind", "[cache][fast]") {
@@ -320,6 +372,21 @@ TEST_CASE("test_evict: list re-walks the entries and reports one row per kind", 
   CHECK_FALSE(rows[0].created.empty());
   CHECK(cache->total_bytes() == before + 5000);  // the walk corrected cache.json
   CHECK(read_cache_json(tmp.path()).records.at(ovt::cache::hex(h)).bytes == before + 5000);
+}
+
+TEST_CASE("test_evict: list adopts a directory cache.json missed with its meta.json's last_used", "[cache][fast]") {
+  const TempRoot other("evict_list_adopt_src");
+  const TempRoot tmp("evict_list_adopt");
+  const SourceHash h = hash_of(0x55);
+  {
+    auto cache = Cache::open(other.path());
+    cache->entry(h)->put_frame(0, make_frame(FrameSpec{}));
+  }
+  set_last_used(other.path() / ovt::cache::hex(h), "2026-01-02T00:00:00Z");
+  auto cache = Cache::open(tmp.path());
+  fs::copy(other.path() / ovt::cache::hex(h), tmp.path() / ovt::cache::hex(h), fs::copy_options::recursive);
+  REQUIRE(cache->list().size() == 1);
+  CHECK(read_cache_json(tmp.path()).records.at(ovt::cache::hex(h)).last_used == "2026-01-02T00:00:00Z");
 }
 
 TEST_CASE("test_evict: kind_of maps entry files to index, analysis and metrics", "[cache][fast]") {

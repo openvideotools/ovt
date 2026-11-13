@@ -8,6 +8,8 @@
 // dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
 // and export arrive with their own work items; until then those entry points are inert.
 
+#include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -25,6 +27,7 @@
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "vk_no_timestamps.h"
 
 namespace ovt::render {
 namespace {
@@ -120,7 +123,10 @@ class VideoSurfaceImpl final : public VideoSurface {
 
     struct pl_vulkan_params vk_params = pl_vulkan_default_params;
     vk_params.instance = inst_->instance;
-    vk_params.get_proc_addr = inst_->get_proc_addr;
+    // libplacebo loads its Vulkan functions through this wrapper, which hides timestamp support so libplacebo never
+    // writes timer queries (MoltenVK resolves them after libplacebo may have freed the query pool;
+    // vk_no_timestamps.cpp).
+    vk_params.get_proc_addr = detail::no_timestamps_get_proc_addr(inst_->get_proc_addr);
     // Software rasterizers (lavapipe on GPU-less CI hosts) are accepted; libplacebo still prefers a hardware device.
     vk_params.allow_software = true;
     vk_ = pl_vulkan_create(log_, &vk_params);
@@ -348,6 +354,97 @@ class VideoSurfaceImpl final : public VideoSurface {
     return false;
   }
 
+  // Waits until the driver has finished with every submission, including its own completion callbacks, before
+  // pl_vulkan_destroy() frees the VkDevice.
+  //
+  // pl_vulkan_destroy() only waits on libplacebo's timeline semaphores. On MoltenVK those are MTLEvents that the GPU
+  // signals from inside the command buffer, before Metal runs the command buffer's completed handlers on its
+  // completion thread. MoltenVK registers several such handlers per submission (MVKQueueCommandBufferSubmission::
+  // commitActiveMTLCommandBuffer records performance stats through the MVKDevice and then calls finish(); command
+  // encoders return temporary MTLBuffer allocations to device-owned pools), and they dereference the MVKDevice
+  // without holding a reference to it. A surface destroyed right after a download could free the device under a
+  // handler that was still running: the intermittent SIGSEGV in teardown (#304, and again after it).
+  //
+  // vkDeviceWaitIdle alone does not close that window on MoltenVK 1.2.x: MVKQueue::waitIdle commits an empty command
+  // buffer and returns from -waitUntilCompleted, which wakes when the buffer's status becomes completed, not when the
+  // completion thread has run the earlier buffers' handlers. A fence does: a fence-only vkQueueSubmit becomes an
+  // MVKQueueCommandBufferSubmission whose fence is signalled by finish(), from inside that buffer's own completed
+  // handler. Metal runs a queue's completed handlers one after another in commit order, so once that fence is
+  // signalled every handler of every earlier submission on the queue has returned. What the signalling handler still
+  // does afterwards only releases objects it retained itself (the submission's fence and queue), never the device.
+  //
+  // On other drivers (lavapipe, desktop GPUs) this is a plain full wait: an empty submission with a fence is
+  // signalled once all work previously submitted to the queue has completed (Vulkan 1.0 vkQueueSubmit).
+  //
+  // Every queue is locked through libplacebo for the whole wait: vkDeviceWaitIdle and vkQueueSubmit need external
+  // synchronisation of the queues, and nothing may submit between the fence and the destruction.
+  void wait_device_idle() {
+    if (vk_ == nullptr || vk_->device == VK_NULL_HANDLE || vk_->get_proc_addr == nullptr) {
+      return;
+    }
+    pl_gpu_finish(vk_->gpu);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
+    const auto get_device_proc =
+        reinterpret_cast<PFN_vkGetDeviceProcAddr>(vk_->get_proc_addr(vk_->instance, "vkGetDeviceProcAddr"));
+    if (get_device_proc == nullptr) {
+      return;
+    }
+    VkDevice dev = vk_->device;
+    // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
+    const auto device_wait_idle = reinterpret_cast<PFN_vkDeviceWaitIdle>(get_device_proc(dev, "vkDeviceWaitIdle"));
+    const auto get_queue = reinterpret_cast<PFN_vkGetDeviceQueue>(get_device_proc(dev, "vkGetDeviceQueue"));
+    const auto queue_submit = reinterpret_cast<PFN_vkQueueSubmit>(get_device_proc(dev, "vkQueueSubmit"));
+    const auto create_fence = reinterpret_cast<PFN_vkCreateFence>(get_device_proc(dev, "vkCreateFence"));
+    const auto wait_fences = reinterpret_cast<PFN_vkWaitForFences>(get_device_proc(dev, "vkWaitForFences"));
+    const auto destroy_fence = reinterpret_cast<PFN_vkDestroyFence>(get_device_proc(dev, "vkDestroyFence"));
+    // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
+    if (device_wait_idle == nullptr || get_queue == nullptr || queue_submit == nullptr || create_fence == nullptr ||
+        wait_fences == nullptr || destroy_fence == nullptr) {
+      return;
+    }
+    // The graphics, compute and transfer families may coincide; lock each (family, index) once.
+    std::vector<std::pair<uint32_t, uint32_t>> queues;
+    for (const pl_vulkan_queue& q : {vk_->queue_graphics, vk_->queue_compute, vk_->queue_transfer}) {
+      for (uint32_t i = 0; i < q.count; ++i) {
+        const std::pair<uint32_t, uint32_t> key{q.index, i};
+        if (std::find(queues.begin(), queues.end(), key) == queues.end()) {
+          queues.push_back(key);
+        }
+      }
+    }
+    for (const auto& [qf, qi] : queues) {
+      vk_->lock_queue(vk_, qf, qi);
+    }
+    static_cast<void>(device_wait_idle(dev));
+    std::vector<VkFence> fences;
+    fences.reserve(queues.size());
+    for (const auto& [qf, qi] : queues) {
+      VkQueue queue = VK_NULL_HANDLE;
+      get_queue(dev, qf, qi, &queue);
+      VkFenceCreateInfo info = {};
+      info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+      VkFence fence = VK_NULL_HANDLE;
+      if (queue == VK_NULL_HANDLE || create_fence(dev, &info, nullptr, &fence) != VK_SUCCESS) {
+        continue;
+      }
+      // submitCount 0 with a fence: the fence alone goes into the queue, behind everything submitted before it.
+      if (queue_submit(queue, 0, nullptr, fence) != VK_SUCCESS) {
+        destroy_fence(dev, fence, nullptr);
+        continue;
+      }
+      fences.push_back(fence);
+    }
+    if (!fences.empty()) {
+      static_cast<void>(wait_fences(dev, static_cast<uint32_t>(fences.size()), fences.data(), VK_TRUE, UINT64_MAX));
+    }
+    for (VkFence fence : fences) {
+      destroy_fence(dev, fence, nullptr);
+    }
+    for (const auto& [qf, qi] : queues) {
+      vk_->unlock_queue(vk_, qf, qi);
+    }
+  }
+
   void destroy() {
     overlays_.reset();
     if (vk_ != nullptr) {
@@ -355,6 +452,7 @@ class VideoSurfaceImpl final : public VideoSurface {
       pl_tex_destroy(vk_->gpu, &tex_);
     }
     pl_renderer_destroy(&renderer_);
+    wait_device_idle();
     pl_vulkan_destroy(&vk_);
     pl_vk_inst_destroy(&inst_);
     pl_log_destroy(&log_);

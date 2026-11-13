@@ -25,6 +25,13 @@ ovt_set_license(ovt_plugin_de265_probe_tests "LGPL-3.0-or-later")
 ovt_catch_discover_tests(ovt_plugin_de265_probe_tests)
 
 if(NOT OVT_SYSTEM_DE265)
+  # WI-4.107: the libde265 MV/QP grid oracle that ovt_plugin_ffmpeg_hevc_tests compares the ffmpeg_hevc plugin with.
+  add_executable(ovt_plugin_de265_grid_dump de265_grid_dump.cpp)
+  target_link_libraries(ovt_plugin_de265_grid_dump PRIVATE tp::de265 ovt::flags)
+  ovt_set_license(ovt_plugin_de265_grid_dump "LGPL-3.0-or-later")
+endif()
+
+if(NOT OVT_SYSTEM_DE265)
   # Acceptance test 1 of WI-0.014: the build recorded the applied patches for tools/gen_notices.py.
   externalproject_get_property(tp_libde265 INSTALL_DIR)
   add_test(NAME ovt_plugin_de265_patches_recorded

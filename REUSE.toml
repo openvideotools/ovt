@@ -195,9 +195,22 @@ path = "third_party/licenses/libde265/md5-LicenseRef-Peslyak-md5-public-domain.t
 SPDX-FileCopyrightText = "2001 Alexander Peslyak"
 SPDX-License-Identifier = "LicenseRef-Peslyak-md5-public-domain"
 
+[[annotations]]
+path = "third_party/licenses/libaom/x86inc-ISC.txt"
+SPDX-FileCopyrightText = "2005-2019 x264 project"
+SPDX-License-Identifier = "ISC"
+
 # UVQ (WI-3.314): the YouTube-8M class names exported from google/uvq's contentnet_labels.csv (the "Name"
 # column, one per line) are upstream data, Apache-2.0 like the rest of that repository (chapter 9 §9.6.1).
 [[annotations]]
 path = ["core/share/models/uvq/labels_yt8m.txt"]
 SPDX-FileCopyrightText = "2025 Google LLC"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Debian packaging files that cannot carry a header (WI-0.072): the install lists, changelog, copyright and format
+# files. packaging/debian/README.source is prose and falls under the Markdown rule's licence only by suffix, so it is listed.
+[[annotations]]
+path = ["packaging/debian/*.install", "packaging/debian/changelog", "packaging/debian/copyright",
+        "packaging/debian/README.source", "packaging/debian/source/format"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"

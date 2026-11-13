@@ -129,15 +129,26 @@ std::uint64_t remove_kind(const fs::path& dir, std::string_view kind) {
   return freed;
 }
 
-// True when nothing but meta.json (and empty directories) is left in @p dir.
+// True when nothing but meta.json, stale *.tmp files (swept by the next entry()) and empty directories is left
+// in @p dir.
 bool only_meta_left(const fs::path& dir) {
   std::error_code ec;
   for (const fs::directory_entry& e : fs::recursive_directory_iterator(dir, ec)) {
-    if (!e.is_directory(ec) && e.path().lexically_relative(dir) != kMetaJson) {
+    if (!e.is_directory(ec) && e.path().lexically_relative(dir) != kMetaJson && e.path().extension() != ".tmp") {
       return false;
     }
   }
   return true;
+}
+
+// The last_used of a directory cache.json missed: its meta.json's, as Cache's rebuild takes it, else now.
+std::string adopted_last_used(const fs::path& dir) {
+  try {
+    const Meta meta = parse_meta(read_file(dir / kMetaJson, kMaxJsonBytes));
+    return meta.last_used.value_or(meta.created);
+  } catch (const CacheError&) {  // no readable meta.json: the entry counts as just used
+    return format_iso8601_utc(now());
+  }
 }
 
 std::optional<SourceHash> key_of(const std::string& hex_hash) {
@@ -316,7 +327,7 @@ std::vector<ListedRecord> list_entries(const fs::path& root, RecordTable& record
   for (const fs::directory_entry& e : fs::directory_iterator(root, ec)) {
     const std::string name = e.path().filename().string();
     if (e.is_directory(ec) && is_hex64(name) && !records.contains(name)) {
-      records[name].last_used = format_iso8601_utc(now());
+      records[name].last_used = adopted_last_used(e.path());
       changed = true;
     }
   }
