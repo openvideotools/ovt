@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ovt.dev/schema/normalization_config.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "crop": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "honour_container_crop": { "type": "boolean", "default": true },
+        "ref":  { "$ref": "#/$defs/rect", "description": "additional crop on the reference, in reference luma samples after container crop; null = none" },
+        "dist": { "$ref": "#/$defs/rect", "description": "additional crop on the distorted, in distorted luma samples after container crop; null = none" },
+        "auto_detect": { "type": "boolean", "default": false, "description": "letterbox/pillarbox detection, §9.3.2" },
+        "auto_apply": { "type": "boolean", "default": false, "description": "apply the detected letterbox crop (requires auto_detect)" }
+      }
+    },
+    "scale": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "target": { "type": "string", "enum": ["reference"], "default": "reference" },
+        "kernel": { "type": "string", "enum": ["bicubic", "lanczos", "area"], "default": "bicubic" },
+        "bicubic_b": { "type": "number", "default": 0.3333333333 },
+        "bicubic_c": { "type": "number", "default": 0.3333333333 },
+        "lanczos_taps": { "type": "integer", "minimum": 2, "maximum": 8, "default": 3 },
+        "chroma_kernel": { "type": "string", "enum": ["same", "bilinear"], "default": "same" }
+      }
+    },
+    "chroma_upsample": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "string", "enum": ["auto", "always", "never"], "default": "auto", "description": "auto = only when the domain or a mismatch of subsampling requires 4:4:4" },
+        "kernel": { "type": "string", "enum": ["bicubic", "bilinear", "lanczos", "point"], "default": "bicubic" },
+        "siting": { "type": "string", "enum": ["from_stream", "left", "center", "top_left"], "default": "from_stream", "description": "from_stream reads ovt_ColorDescription.chroma_siting; unknown → left for H.264/HEVC 4:2:0, top_left for AV1 when chroma_sample_position=colocated" }
+      }
+    },
+    "bit_depth": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "rule": { "type": "string", "enum": ["promote_lower", "fixed"], "default": "promote_lower", "description": "promote_lower: the stream with lower depth is left-shifted by (b_hi - b_lo); fixed: both converted to 'fixed_depth' (left shift up, right shift with rounding down)" },
+        "fixed_depth": { "type": "integer", "enum": [8, 10, 12, 16], "default": 10 }
+      }
+    },
+    "range": { "type": "string", "enum": ["reference", "limited", "full"], "default": "reference" },
+    "colour": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "target": { "type": "string", "enum": ["reference", "explicit"], "default": "reference" },
+        "primaries": { "type": "integer", "description": "H.273 code when target=explicit" },
+        "transfer":  { "type": "integer" },
+        "matrix":    { "type": "integer" },
+        "dither": { "type": "string", "enum": ["none", "ordered", "random", "error_diffusion"], "default": "error_diffusion" },
+        "assume_unknown_as": { "type": "object", "additionalProperties": false,
+          "properties": { "primaries": {"type":"integer","default":1}, "transfer": {"type":"integer","default":1}, "matrix": {"type":"integer","default":1}, "full_range": {"type":"integer","default":0} },
+          "description": "used when a stream signals 2 (unspecified); for >= 1280x720 BT.709 is the default, otherwise the caller MUST set these" }
+      }
+    },
+    "display_model": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "preset": { "type": "string", "enum": ["auto", "pq_1000", "pq_4000", "pq_10000", "hlg_1000", "bt1886_100", "custom"], "default": "auto" },
+        "peak_nits": { "type": "number", "exclusiveMinimum": 0 },
+        "black_nits": { "type": "number", "minimum": 0 },
+        "hlg_system_gamma": { "type": "number", "description": "if absent: 1.2 + 0.42*log10(peak_nits/1000)" },
+        "clip_to_peak": { "type": "boolean", "default": false }
+      }
+    },
+    "frame_rate": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "policy": { "type": "string", "enum": ["refuse", "resample_to_reference", "match_timestamps"], "default": "match_timestamps" },
+        "epsilon_seconds": { "type": "number", "default": 0.0005, "description": "for match_timestamps: |pts_dist - pts_ref| <= epsilon after offset" }
+      }
+    },
+    "temporal": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["auto", "fixed"], "default": "auto" },
+        "offset_frames": { "type": "integer", "default": 0, "description": "ref_index = dist_index + offset_frames (D9: distorted frame i corresponds to reference frame i + offset); written back by auto alignment" },
+        "search_frames": { "type": "integer", "minimum": 0, "maximum": 600, "default": 30 },
+        "probe_frames": { "type": "integer", "minimum": 8, "default": 60 },
+        "drift_search": { "type": "boolean", "default": false },
+        "min_confidence": { "type": "number", "default": 0.05 },
+        "realign_per_gop": { "type": "boolean", "default": false }
+      }
+    },
+    "spatial": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "search"], "default": "none" },
+        "max_shift_px": { "type": "integer", "minimum": 0, "maximum": 8, "default": 2 },
+        "shift_x": { "type": "integer", "default": 0 }, "shift_y": { "type": "integer", "default": 0 }
+      }
+    }
+  },
+  "$defs": { "rect": { "type": ["object", "null"], "additionalProperties": false, "required": ["x","y","w","h"],
+    "properties": { "x": {"type":"integer","minimum":0}, "y": {"type":"integer","minimum":0}, "w": {"type":"integer","minimum":1}, "h": {"type":"integer","minimum":1} } } }
+}

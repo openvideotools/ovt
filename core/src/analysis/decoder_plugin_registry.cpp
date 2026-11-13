@@ -87,6 +87,13 @@ std::vector<std::string_view> builtin_order(uint8_t codec) {
   }
 }
 
+// Plugins that are used only when asked for by id or by set_default(), never as the fallback of default_for(): the
+// optional ffmpeg_hevc motion vector / QP plugin must never be the default H.265 plugin (chapter 07 §7.8 WI-4.107).
+// SPEC-ASSUMPTION(#370): the registry enforces this by id, since §7.8 does not say where the rule lives.
+bool opt_in_only(std::string_view id) {
+  return id == "ffmpeg_hevc";
+}
+
 // The libovt_plugin_* files of one directory as (path, id), sorted so that registration order is deterministic.
 std::vector<std::pair<std::string, std::string>> list_plugin_files(const std::string& dir) {
   std::vector<std::pair<std::string, std::string>> files;
@@ -385,7 +392,7 @@ const LoadedPlugin* PluginRegistry::default_for(uint8_t codec) {
     }
   }
   for (const auto& p : plugins_) {
-    if (p->caps->codec == codec) {
+    if (p->caps->codec == codec && !opt_in_only(p->caps->id)) {
       return p.get();
     }
   }

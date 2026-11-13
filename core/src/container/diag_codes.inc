@@ -53,3 +53,9 @@ X(CNT_TS_1006, "CNT-TS-1006", Warning,
   "Continuity_count_error on PID `pid` at packet `k` (`expected`/`got`)", "TR 101 290 §5.2.1 (1.4)")
 X(CNT_TS_2001, "CNT-TS-2001", Warning,
   "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
+
+// WI-1.228 (Y4M reader, §8.6.5).
+X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
+X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
+  "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
+X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")
