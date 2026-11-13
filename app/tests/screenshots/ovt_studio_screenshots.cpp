@@ -61,8 +61,11 @@ struct Scene {
   std::string_view name;
   const char* url;
 };
-constexpr std::array<Scene, 1> kScenes{{
+// `welcome` (WI-1.464): a fresh profile (the harness uses an empty config directory), so the window shows the Welcome
+// page and the privacy banner.
+constexpr std::array<Scene, 2> kScenes{{
     {"main_window", "qrc:/qt/qml/OvtStudio/Main.qml"},
+    {"welcome", "qrc:/qt/qml/OvtStudio/Main.qml"},
 }};
 
 const Scene* find_scene(const QString& name) {

@@ -91,3 +91,11 @@ X(CNT_DASH_0007, "CNT-DASH-0007", Warning, "invalid attribute value `v` ignored"
 X(CNT_DASH_0008, "CNT-DASH-0008", Warning, "SegmentList `SegmentURL` count differs from its SegmentTimeline",
   "23009-1 §5.3.9.3")
 X(CNT_DASH_0009, "CNT-DASH-0009", Fatal, "not a well-formed MPD (XML error or no `MPD` root element)", "23009-1 §5.3.1")
+
+// WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
+X(CNT_9001, "CNT-9001", Error,
+  "sample bytes do not split into units cleanly (NAL length exceeds sample, OBU size overrun)",
+  "14496-15 §5.3.4.2 / AV1-ISOBMFF §2.4")
+X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
+  "14496-15 §4.3")
+X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")
