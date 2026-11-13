@@ -140,6 +140,29 @@ def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
     assert err.value.code == 4
 
 
+def test_corpus_reference_can_select_a_non_primary_file(tmp_path, monkeypatch):
+    cdir = tmp_path / "corpora" / "two_files"
+    cdir.mkdir(parents=True)
+    (cdir / "a.mp4").write_bytes(b"mp4")
+    (cdir / "a.265").write_bytes(b"annexb")
+    (cdir / ".ok").write_text(json.dumps({"primary": "a.mp4", "files": {"a.mp4": "x", "a.265": "y"}}))
+    monkeypatch.setenv("OVT_CORPORA_DIR", str(tmp_path / "corpora"))
+    out = tmp_path / "elsewhere"
+    assert generate.corpus_file(out, "two_files") == cdir / "a.mp4"
+    assert generate.corpus_file(out, "two_files", "a.265") == cdir / "a.265"
+    with pytest.raises(generate.GenError, match="has no file nope.bin"):
+        generate.corpus_file(out, "two_files", "nope.bin")
+    assert generate.CORPUS_REF.findall("{corpus:two_files:a.265}") == [("two_files", "a.265")]
+    assert generate.CORPUS_REF.findall("{corpus:two_files}") == [("two_files", "")]
+
+
+def test_hdr10plus_fixture_reads_the_annex_b_file():
+    doc = generate.load_recipes(generate.DEFAULT_RECIPES)
+    fixture = next(f for f in doc["fixtures"] if f["id"] == "fixture_hdr10plus_t35")
+    # sei_inject.py --extract reads Annex B only, and the corpus's primary file is the .mp4
+    assert "{corpus:syn_h265_hdr10plus:syn_h265_hdr10plus.265}" in fixture["cmd"]
+
+
 def test_missing_helpers_ignores_out_dir_arguments():
     out = "{repo}/tests/corpora/not_yet_created_dir"
     step = {"cmd": ["{python}", "{repo}/tools/sei_inject.py", "--out-dir", out, "in.265"]}

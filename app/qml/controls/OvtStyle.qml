@@ -33,6 +33,7 @@ QtObject {
     // Selection and focus. `highlight` carries white text (5.7:1), so it is #1565C0 in both themes; the translucent
     // row tints of §11.4.5 (#1E88E5 30 % in dark) are drawn by the panels over the panel colour.
     readonly property color accent: dark ? "#6aa9f5" : "#1565c0"
+    readonly property color error: dark ? "#ff8a80" : "#b3261e"
     readonly property color highlight: "#1565c0"
     readonly property color highlightedText: "#ffffff"
 

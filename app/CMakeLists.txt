@@ -23,8 +23,29 @@ find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 function(ovt_studio_add_qml_module target)
   # Absolute paths: the function is also called from app/tests/qml.
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
-  set(qml_files "${app_dir}/qml/Main.qml" "${app_dir}/qml/Actions.qml" "${app_dir}/qml/OvtMenu.qml"
-                "${app_dir}/qml/OvtMenuBar.qml" "${app_dir}/qml/controls/OvtStyle.qml" "${app_dir}/qml/JobsPopover.qml")
+  set(qml_files
+      "${app_dir}/qml/Main.qml"
+      "${app_dir}/qml/Actions.qml"
+      "${app_dir}/qml/OvtMenu.qml"
+      "${app_dir}/qml/OvtMenuBar.qml"
+      "${app_dir}/qml/controls/OvtStyle.qml"
+      "${app_dir}/qml/JobsPopover.qml"
+      "${app_dir}/qml/ShortcutLayer.qml"
+      "${app_dir}/qml/Dialogs.qml"
+      "${app_dir}/qml/dialogs/GotoDialog.qml"
+      "${app_dir}/qml/dialogs/PreferencesDialog.qml"
+      "${app_dir}/qml/dialogs/KeymapDialog.qml"
+      "${app_dir}/qml/dialogs/OpenAsDialog.qml"
+      "${app_dir}/qml/dialogs/RawFormatDialog.qml"
+      "${app_dir}/qml/panels/DiagnosticsPanel.qml"
+      "${app_dir}/qml/panels/UnitListPanel.qml")
+  # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
+  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
+    list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
+  endforeach()
+  if(NOT ANDROID)
+    list(APPEND qml_files "${app_dir}/qml/dock/DockFloatingWindow.qml")
+  endif()
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${alias}")
@@ -35,6 +56,8 @@ function(ovt_studio_add_qml_module target)
                                                                                      resources/icons/ovt-studio.svg)
   set(schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json")
   set_source_files_properties("${schema}" PROPERTIES QT_RESOURCE_ALIAS settings.schema.json)
+  set(project_schema "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
+  set_source_files_properties("${project_schema}" PROPERTIES QT_RESOURCE_ALIAS ovtproj.schema.json)
   # qt_add_qml_module generates the QML type registration from moc's metatypes.
   set_target_properties(${target} PROPERTIES AUTOMOC ON)
   qt_add_qml_module(
@@ -52,12 +75,18 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/platform/platform.cpp"
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
+    "${app_dir}/src/models/diagnostics_model.h"
+    "${app_dir}/src/models/diagnostics_model.cpp"
+    "${app_dir}/src/project.h"
+    "${app_dir}/src/project.cpp"
     "${app_dir}/src/keymap.h"
     "${app_dir}/src/keymap.cpp"
     "${app_dir}/src/goto_parser.h"
     "${app_dir}/src/goto_parser.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
+    "${app_dir}/src/models/log_sink.h"
+    "${app_dir}/src/models/log_sink.cpp"
     "${app_dir}/src/models/selection_model.h"
     "${app_dir}/src/models/selection_model.cpp"
     "${app_dir}/src/models/series_aggregator.h"
@@ -68,12 +97,18 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/stream_index_adapter.cpp"
     "${app_dir}/src/models/stream_index_model.h"
     "${app_dir}/src/models/stream_index_model.cpp"
+    "${app_dir}/src/models/unit_list_model.h"
+    "${app_dir}/src/models/unit_list_model.cpp"
+    "${app_dir}/src/dock/dock_model.h"
+    "${app_dir}/src/dock/dock_model.cpp"
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
-    "${schema}")
+    "${schema}"
+    "${project_schema}")
   # src/platform too: the generated type registration includes the headers by file name.
-  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models")
-  # ovt::core for ovt/jobs.h (the models use the exported C API only, see jobs_model.h).
+  target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
+                                               "${app_dir}/src/dock")
+  # ovt::core for ovt/jobs.h and ovt/log.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).
   target_link_libraries(${target} PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 ovt::core
@@ -167,7 +202,7 @@ if(APPLE)
     ovt_studio
     PROPERTIES OUTPUT_NAME "${OVT_PRODUCT_NAME}"
                MACOSX_BUNDLE TRUE
-               MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/Info.plist.in"
+               MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/resources/mac/Info.plist.in"
                MACOSX_BUNDLE_BUNDLE_NAME "${OVT_PRODUCT_NAME}"
                MACOSX_BUNDLE_GUI_IDENTIFIER "org.openvideotools.studio"
                MACOSX_BUNDLE_BUNDLE_VERSION "${OVT_VERSION}"

@@ -25,7 +25,10 @@ set(OVT_DE265_PATCH_SERIES "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-de26
     CACHE FILEPATH "Quilt-style series of the libde265 patches (chapter 13 §13.3.6)")
 cmake_path(NORMAL_PATH OVT_DE265_PATCH_SERIES)
 
-ovt_tp_declare(libde265 LICENSE_FILES COPYING)
+# libde265/md5.cc is public domain (Alexander Peslyak) with a fallback grant that COPYING does not carry:
+# third_party/licenses/libde265/.
+ovt_tp_declare(libde265 LICENSE_FILES COPYING
+               ${CMAKE_CURRENT_LIST_DIR}/licenses/libde265/md5-LicenseRef-Peslyak-md5-public-domain.txt)
 
 set(_ovt_de265_prefix "${OVT_THIRD_PARTY_PREFIX}/libde265")
 ovt_tp_apply_patches(_ovt_de265_patch SERIES "${OVT_DE265_PATCH_SERIES}" INSTALL_DIR "${_ovt_de265_prefix}")
