@@ -88,3 +88,9 @@ def test_selfcheck_finds_disagreements() -> None:
     assert any("shows only" in p for p in sc.check(doc, 2, 2, 1)["problems"])
     empty = {"frames": [frame(0, 1, bits=0)]}
     assert any("no accounting symbol" in p for p in sc.check(empty, 1, 1, 1)["problems"])
+
+
+def test_gz_bytes_matches_write_gz(tmp_path: Path) -> None:
+    text = '{"frames": []}\n' * 50
+    gen.common.write_gz(tmp_path / "a.gz", text)
+    assert (tmp_path / "a.gz").read_bytes() == gen.gz_bytes(text)

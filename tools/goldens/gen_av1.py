@@ -14,7 +14,8 @@ entry it writes ``av1/<id>.aom-inspect.json.gz`` and ``av1-index.json`` below ``
 1. the stream becomes an IVF file (an IVF file is used as it is; Matroska and OBU files are copied with
    ``ffmpeg -c copy -f ivf``, §14.4.5);
 2. the IVF is cut after ``K`` temporal units, starting with ``--max-tus`` and halving ``K`` until the normalised
-   golden is at most ``--max-bytes`` (CLAUDE.md: no golden over 2 MB uncompressed). A stream whose first temporal
+   golden is at most ``--max-bytes`` gzip-compressed (CLAUDE.md section 5: no golden over 2 MB as committed) and
+   ``--max-raw-bytes`` of JSON. A stream whose first temporal
    unit alone is larger is not a failure: it is left out and the reason is recorded in the index;
 3. ``inspect -A -a`` (``-x`` stays off) runs on the cut file and ``normalize/aom_inspect.py`` writes the
    ``block-grid`` + ``symbols`` document, stored gzip-compressed without name or time (reproducible bytes);
@@ -27,6 +28,8 @@ Exit status: 0 all done, 1 a step failed (unless listed in ``av1_skips.json`` or
 from __future__ import annotations
 
 import argparse
+import gzip
+import io
 import json
 import os
 import shutil
@@ -51,7 +54,8 @@ class TooLarge(StepError):
     """Even one temporal unit exceeds the size limit: not a failure, the golden is left out."""
 
 
-MAX_BYTES = 1_900_000  # normalised golden; CLAUDE.md forbids goldens over 2 MB uncompressed
+MAX_BYTES = 2_000_000  # gzip-compressed golden as committed: the CLAUDE.md rule (section 5)
+MAX_RAW_BYTES = 40_000_000  # normalised JSON: bounds the memory of the tests and tools that load a golden
 MAX_TUS = 8
 IVF_HEADER = 32
 EXIT_OK, EXIT_STEP, EXIT_USAGE, EXIT_MISSING = 0, 1, 2, 4
@@ -130,8 +134,16 @@ def ivf_prefix(data: bytes, frames: list[tuple[int, int]], count: int) -> bytes:
 # ------------------------------------------------------------------------------------------------ oracle
 
 
+def gz_bytes(text: str) -> bytes:
+    """What ``common.write_gz`` writes: gzip level 9 without name or time."""
+    buf = io.BytesIO()
+    with gzip.GzipFile(filename="", mode="wb", fileobj=buf, compresslevel=9, mtime=0) as f:
+        f.write(text.encode("utf-8"))
+    return buf.getvalue()
+
+
 def produce(
-    ivf: Path, work: Path, max_bytes: int, max_tus: int
+    ivf: Path, work: Path, max_bytes: int, max_raw_bytes: int, max_tus: int
 ) -> tuple[str, int, tuple[int, int]]:  # (golden text, temporal units, (decoded, showed))
     data = ivf.read_bytes()
     frames = ivf_frames(data)
@@ -146,16 +158,21 @@ def produce(
             common.run([common.tool("inspect"), "-A", "-a", str(cut)], work, "inspect", stdout=out)
         text = common.normalise("aom_inspect.py", raw, [], work)
         raw.unlink()
-        if len(text.encode()) <= max_bytes:
+        packed = len(gz_bytes(text))
+        if len(text.encode()) <= max_raw_bytes and packed <= max_bytes:
             return text, count, summary_of(cut, work)
         if count == 1:
-            raise TooLarge(f"the golden of one temporal unit is {len(text)} bytes (limit {max_bytes})")
+            raise TooLarge(
+                f"the golden of one temporal unit is {len(text.encode())} bytes, {packed} gzip-compressed "
+                f"(limits {max_raw_bytes} and {max_bytes})"
+            )
         count = max(1, count // 2)
 
 
 def summary_of(cut: Path, work: Path) -> tuple[int, int]:
+    """``aomdec --summary`` counts; ``--all-layers`` because ``inspect`` lists the frame of every spatial layer."""
     res = subprocess.run(  # noqa: S603
-        [common.tool("aomdec"), "--summary", "--rawvideo", "-o", os.devnull, str(cut)],
+        [common.tool("aomdec"), "--all-layers", "--summary", "--rawvideo", "-o", os.devnull, str(cut)],
         cwd=work, capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL,
     )  # fmt: skip
     if res.returncode != 0:
@@ -174,7 +191,7 @@ def process(entry: dict[str, Any], args: argparse.Namespace, skips: dict[str, st
     src = common.corpus_file(args.corpora_dir, cid)
     record["input_sha256"] = common.sha256_file(src)
     try:
-        text, tus, (decoded, showed) = produce(to_ivf(src, work), work, args.max_bytes, args.max_tus)
+        text, tus, (decoded, showed) = produce(to_ivf(src, work), work, args.max_bytes, args.max_raw_bytes, args.max_tus)
     except TooLarge as exc:
         record["skipped"]["aom-inspect"] = str(exc)
         return record
@@ -212,7 +229,8 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--generate-syn", action="store_true", help="run generate.py for missing syn_ ids")
     p.add_argument("--jobs", type=int, default=4)
     p.add_argument("--work-dir", type=Path)
-    p.add_argument("--max-bytes", type=int, default=MAX_BYTES, help="largest normalised golden (default %(default)s)")
+    p.add_argument("--max-bytes", type=int, default=MAX_BYTES, help="largest gzip-compressed golden (default %(default)s)")
+    p.add_argument("--max-raw-bytes", type=int, default=MAX_RAW_BYTES, help="largest normalised JSON (default %(default)s)")
     p.add_argument("--max-tus", type=int, default=MAX_TUS, help="most temporal units per golden (default %(default)s)")
     p.add_argument("--skips", type=Path, help="av1_skips.json (default: next to this script)")
     p.add_argument("--keep-going", action="store_true", help="exit 0 even when a step failed (CI report mode)")
@@ -276,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.only and index_path.is_file():
         index = json.loads(index_path.read_text(encoding="utf-8")).get("entries", {})
     index.update(results)
-    doc = {"max_bytes": args.max_bytes, "skipped_entries": skipped, "entries": dict(sorted(index.items()))}
+    doc = {"max_bytes": args.max_bytes, "max_raw_bytes": args.max_raw_bytes, "skipped_entries": skipped, "entries": dict(sorted(index.items()))}
     index_path.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     bad = {c: r for c, r in results.items() if r["failed"] or r.get("selfcheck_problems")}
     for cid, r in bad.items():

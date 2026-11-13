@@ -4,7 +4,8 @@
 """Self-check of the libaom ``inspect`` goldens against ``aomdec --summary`` (chapter 14 §14.4.5, WI-0.566 step 5).
 
 A golden covers the first ``K`` temporal units of a stream. ``aomdec --summary`` on the same ``K`` temporal units
-(the IVF prefix the golden was made from) prints ``D decoded frames/S showed frames``. ``inspect`` writes one object
+(the IVF prefix the golden was made from, with ``--all-layers``: ``inspect`` lists the frame of every spatial layer,
+aomdec shows only the highest one by default) prints ``D decoded frames/S showed frames``. ``inspect`` writes one object
 per decoded frame, hidden frames included and ``show_existing_frame = 1`` outputs absent (§14.4.5). So:
 
 * ``D == K``: aomdec decoded every temporal unit of the prefix;

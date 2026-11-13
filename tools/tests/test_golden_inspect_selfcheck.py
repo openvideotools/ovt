@@ -43,9 +43,11 @@ def test_frame_counts_match_aomdec(cid: str) -> None:
 
 
 @pytest.mark.parametrize("cid", sorted(ENTRIES))
-def test_golden_is_under_the_size_cap(cid: str) -> None:
-    with gzip.open(GOLDEN / ENTRIES[cid]["file"], "rb") as f:
-        assert len(f.read()) <= INDEX["max_bytes"]
+def test_golden_is_under_the_size_caps(cid: str) -> None:
+    path = GOLDEN / ENTRIES[cid]["file"]
+    assert path.stat().st_size <= INDEX["max_bytes"]  # CLAUDE.md: no golden over 2 MB as committed
+    with gzip.open(path, "rb") as f:
+        assert len(f.read()) <= INDEX["max_raw_bytes"]
 
 
 def test_hidden_altref_showexisting_has_hidden_frames() -> None:
