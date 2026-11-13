@@ -2,6 +2,19 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc24 — 2026-11-13
+
+MINOR-level: spec-amendment pass 5 folds in the accepted answers of five new `spec-question` issues (#385, #388, #389, #391 points 1–3, #395 points 1–5), the three public-header rulings pass 4 left open (#209 item 4 `ovt_log_write`, #366 item 3 `raw_format == NULL`, #318 no `Pool` export) and the WI-0.089 AT3 rewording. New diagnostic codes are registered (D2: `SYN-H265-0011`, `SYN-H265-0061`, `DEC-AV1-0001`, `DEC-AV1-0002`). Public-header text changes (listed for the owner's check-in): the additive `ovt_log_write` declaration in §12.3.4, the `raw_format` NULL semantics comment in §12.3.7, the `plane()` `*size` comment in `core/include/ovt/abi/analysis_decoder_v1.h`, and the `PpsTable` signature in §7.3.7 (`ovt/cxx`). No schema or CLI grammar change.
+
+- 7 §7.3.4 rows 2–3 — `pic_width_in_mbs_minus1`, `pic_height_in_map_units_minus1` ≤ 65535 (arithmetic-safety bound, `uint64` derived values); `delta_scale` se −128..127; violations `SYN-H264-0002` — WI-1.108 (#388)
+- 7 §7.3.7, §7.9.3 — H.265 `parse_slice_segment_header` takes `const PpsTable&` (declared in `ovt/cxx/syntax/h265/slice_segment_header.hpp`); `SYN-H265-0011` missing PPS; `SYN-H265-0061` dependent segment without a preceding independent one; `corrupt_conditions.json` `not_in_table` reasons — WI-1.113, WI-1.115 (#391 points 1–3; point 4 waits for the owner)
+- 7 §7.6.1, §7.9.5, WI-2.158 — film-grain note is the Info `Diagnostic` `DEC-AV1-0001` "film grain present (not applied)" (§7.6.1/§6.6.1 rule 5 win over the stale step text); accounting note is `DEC-AV1-0002`; in-place libaom strides with `plane()` `*size = stride_bytes × (height − 1) + width × sample_bytes` (comment in `analysis_decoder_v1.h`) — WI-2.157, WI-2.158 (#389)
+- 7 §7.6.3 — I_16x16 `tx_log2 = 2` (V-027 allows (2, 3, 255)); interim `mb_field_decoding_flag` 0/1 on interlaced frames until WI-4.110; `P_8x8ref0` reported as `P_8x8`; slice type inferred from MBs; per-picture ref slots until #253 — WI-4.102 (#395 points 1–5; point 6 waits for the owner)
+- 8 §8.6.6, 12 §12.3.7 — `ovt_container_open_format(…, "raw", NULL, …)` runs the sidecar/heuristics `resolve()`; no `@<header_bytes>` suffix — WI-1.229, WI-1.511 (#366 item 3, ruling 2026-11-13)
+- 9 §9.4.2, §9.4.7, WI-3.306 — fixed 8-entry `psnr` layout `[y, u, v, jvet, ffmpeg_avg, mse_y, mse_u, mse_v]` with NaN for absent/unselected planes, `finish` `[apsnr_y, apsnr_u, apsnr_v, apsnr_jvet]`; `min(…, psnr_max)` clipping on every frame incl. `ffmpeg_avg` (FFmpeg oracle may differ near-lossless); NaN → JSON `null` / empty CSV cell; `MapSink` seam until WI-3.316; `map_blob_id` names the first selected component — WI-3.306, WI-3.312, WI-3.316 (#385)
+- 10 §10.10, WI-2.430, 12 §12.3.4 — additive `ovt_log_write(level, module, code, msg)` in `ovt/log.h` as the emit entry point for separate libraries and plugins (#209 item 4, ruling 2026-11-13); `ovt::jobs::Pool` stays unexported, `std::thread` chunks final (#318 closed) — WI-1.400, WI-1.512, WI-2.430
+- 6 WI-0.089, `docs/acceptance/wi/WI-0.089.md` — AT3 reworded to the YUView 2.14 run on the Mac Mini (plain file arguments, `tiny16_16x16.yuv`, no exit code, screenshot); the manual record filled in — WI-0.089 (#233 item 5)
+
 ## 1.0.0-rc23 — 2026-11-13
 
 MINOR-level: spec-amendment pass 4 folds in the accepted answers of 28 `spec-question` issues on chapters 8, 9, 10 and 11 (plus the chapter 0, 4, 6 and 14 sentences they touch). New diagnostic codes are registered (D2: `CNT-OBU-0003`, `CNT-OBU-0004`, `CNT-DASH-0001`…`0009`); D11 and §9.6/§14.4.14 move the UVQ reference to the pinned PyTorch google/uvq (`c204ecc0`, UVQ 1.5 default) with a `torch.onnx.export` path; no schema or CLI grammar change; the public-header questions of #209 item 4 (`ovt_log_write`), #318 (`ovt::jobs::Pool` export) and #366 item 3 (raw header offset in the C API) stay open for the owner.

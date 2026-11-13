@@ -559,18 +559,20 @@ Per plane `p` with `N_p` samples, `d_i = ref_i − dist_i` (integers in the work
 ```
 SSE_p  = Σ d_i²                         (uint64 accumulator; exact)
 MSE_p  = SSE_p / N_p                    (double)
-PSNR_p = 10·log10( peak² / MSE_p )      if MSE_p > 0
-       = psnr_max                       if MSE_p == 0, with psnr_max = 60 + 6·(b − 8) dB (libvmaf psnr convention: 60 dB at 8-bit, 72 dB at 10-bit, 84 dB at 12-bit)
+PSNR_p = min( 10·log10( peak² / MSE_p ), psnr_max )   (clipped on every frame, as libvmaf's psnr feature does; MSE_p == 0 gives psnr_max)
+       with psnr_max = 60 + 6·(b − 8) dB (libvmaf psnr convention: 60 dB at 8-bit, 72 dB at 10-bit, 84 dB at 12-bit) unless `psnr_max_db` is set
 ```
 Combinations (all reported as separate `values` entries):
 
 | Name | Definition |
 |---|---|
 | `jvet` | `(6·PSNR_Y + PSNR_U + PSNR_V) / 8` (JVET CTC weighted PSNR, JVET-T2010) |
-| `ffmpeg_avg` | `10·log10( peak² / MSE_avg )`, `MSE_avg = (SSE_Y + SSE_U + SSE_V) / (N_Y + N_U + N_V)` (FFmpeg `psnr_avg`, MSE-weighted by sample count) |
+| `ffmpeg_avg` | `min(10·log10( peak² / MSE_avg ), psnr_max)`, `MSE_avg = (SSE_Y + SSE_U + SSE_V) / (N_Y + N_U + N_V)` (FFmpeg `psnr_avg`, MSE-weighted by sample count; clipped like the planes — FFmpeg itself does not clip, so its oracle can differ on near-lossless frames) |
 | `mse_y`, `mse_u`, `mse_v` | raw MSE per plane (so users can re-pool) |
 
-Sequence-level (emitted by `finish`): **APSNR** per plane `= 10·log10( peak² / mean_frames(MSE_p) )` — the AOM CTC "average PSNR from mean MSE" — in `values` named `apsnr_y/u/v`, plus `apsnr_jvet`. Note that `pooled_mean` of per-frame PSNR is *not* APSNR; both are reported.
+The per-frame `values` always have the fixed 8-entry layout `[y, u, v, jvet, ffmpeg_avg, mse_y, mse_u, mse_v]` (issue #385): entries for planes that do not exist (4:0:0) or are not selected by `planes` are NaN; `jvet` and `ffmpeg_avg` equal `y` for 4:0:0 and are NaN when `planes` leaves out an available plane. Exporters write NaN as JSON `null` and as an empty CSV cell (§9.9.1, §9.9.2; WI-3.312).
+
+Sequence-level (emitted by `finish`): **APSNR** per plane `= 10·log10( peak² / mean_frames(MSE_p) )` — the AOM CTC "average PSNR from mean MSE" — in `values = [apsnr_y, apsnr_u, apsnr_v, apsnr_jvet]` with the same NaN rule as the per-frame layout. Note that `pooled_mean` of per-frame PSNR is *not* APSNR; both are reported.
 
 Options JSON: `{"psnr_max_db": number|null, "planes": ["y","u","v"]}`.
 
@@ -647,7 +649,7 @@ struct ovt_MapBlobHeader {        /* little-endian, 32 bytes */
   uint32_t reserved;
 };                                 /* followed by blocks_w*blocks_h float32 */
 ```
-* `FrameScore.map_blob_id = "<metric_id>/<component>/<decode_index>/<B>"`, e.g. `"psnr/y/000123/16"`. In memory the blob lives in the job's `MapStore` (LRU, ≤ 256 MB); on disk at `<map_dir>/<metric_id>/<component>/f<decode_index:06>_b<B>.ovtmap`. Descriptors list `"map16"` (or `"map"` generally) in `outputs` when maps are supported.
+* `FrameScore.map_blob_id = "<metric_id>/<component>/<decode_index>/<B>"`, e.g. `"psnr/y/000123/16"`. `FrameScore` carries one `map_blob_id`, which names the first selected component; the other components' ids differ only in the `<component>` field. In memory the blob lives in the job's `MapStore` (LRU, ≤ 256 MB); until WI-3.316 lands, kernels write `.ovtmap` images to a `MapSink` (`core/src/metrics/kernels/map_sink.h`) installed by a process-wide hook (`ovt_MetricApi.create()` takes only `options_json`), and WI-3.316 implements the sink on the `MapStore` (issue #385); on disk at `<map_dir>/<metric_id>/<component>/f<decode_index:06>_b<B>.ovtmap`. Descriptors list `"map16"` (or `"map"` generally) in `outputs` when maps are supported.
 
 ### 9.4.8 `xpsnr` (phase 4; port of FFmpeg 7.1 `libavfilter/vf_xpsnr.c`, LGPL-2.1+)
 
@@ -1229,7 +1231,7 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 ### WI-3.306 — Implement the PSNR kernel with combinations, APSNR and maps
 **Goal:** §9.4.2 + §9.4.7 for PSNR.
 **Depends on:** WI-3.300; vcpkg `highway`.
-**Produces:** `core/src/metrics/kernels/{psnr_scalar.cpp,psnr_hwy.cpp,psnr_metric.cpp}`, `tests/oracles/run_ffmpeg_psnr.py` (the map store `core/src/metrics/host/map_store.{h,cpp}` is WI-3.316; this WI only writes into it).
+**Produces:** `core/src/metrics/kernels/{psnr_scalar.cpp,psnr_hwy.cpp,psnr_metric.cpp}`, `tests/oracles/run_ffmpeg_psnr.py` (the map store `core/src/metrics/host/map_store.{h,cpp}` is WI-3.316; this WI writes maps through the interim `MapSink` of §9.4.7, `core/src/metrics/kernels/map_sink.h`).
 **Interface:** `ovt_metric_v1` for id `psnr`; `ovt_MapBlobHeader`.
 **Steps:** 1. SSE per row band (uint64) scalar. 2. Highway version with `hwy::HWY_NAMESPACE::ReduceSum` on widened lanes. 3. Combinations + `psnr_max` rule. 4. APSNR in `finish`. 5. Block maps for B ∈ {8,16,32,64}. 6. Golden tests against libvmaf `psnr_y/cb/cr` (from the parity run) and FFmpeg stats.
 **Acceptance tests:** 1. Given the Netflix pair, When `psnr` runs, Then `values[0..2]` equal libvmaf's `psnr_y/cb/cr` within 1e-6 dB on every frame. 2. Given identical inputs at 10-bit, When `psnr` runs, Then `values == 72.0` and the map is all 72.0. 3. Given 100 random frames, When the scalar and the Highway kernels run, Then their SSE values are bit-identical. 4. Given `syn_metrics_1080p_pair` on `m1-air-8gb`, When `bench_metrics_psnr_1080p` runs, Then it meets its chapter 14 §14.9.3 budget.
