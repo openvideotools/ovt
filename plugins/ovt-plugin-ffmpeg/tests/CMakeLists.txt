@@ -20,13 +20,8 @@ ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
 # test_ffmpeg_blockparams_internals.cpp (WI-4.102) checks the block-params mapping; most of it needs patch 0001.
 add_executable(
   ovt_plugin_ffmpeg_internal_tests
-  test_ffmpeg_h264_internals.cpp
-  test_ffmpeg_hevc_internals.cpp
-  test_ffmpeg_blockparams_internals.cpp
-  ../src/h264_analysis.cpp
-  ../src/map_h264_blockparams.cpp
-  ../src/map_h264_sidedata.cpp
-  ../src/map_hevc_sidedata.cpp)
+  test_ffmpeg_h264_internals.cpp test_ffmpeg_hevc_internals.cpp test_ffmpeg_blockparams_internals.cpp
+  ../src/h264_analysis.cpp ../src/map_h264_blockparams.cpp ../src/map_h264_sidedata.cpp ../src/map_hevc_sidedata.cpp)
 target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
 target_compile_definitions(ovt_plugin_ffmpeg_internal_tests
                            PRIVATE "OVT_FFMPEG_HEVC_ENC_PARAMS=${OVT_FFMPEG_HEVC_ENC_PARAMS}")
