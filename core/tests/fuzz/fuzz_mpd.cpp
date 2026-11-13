@@ -41,7 +41,7 @@ size_t count_segments(const ovt::container::mpd::Manifest& m) {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   try {
     const std::string_view xml(reinterpret_cast<const char*>(data), size);
-    const ovt::container::mpd::Options options{"http://example.invalid/dir/m.mpd"};
+    const ovt::container::mpd::Options options{"http://example.invalid/dir/m.mpd", {}};
     const auto a = ovt::container::mpd::parse(xml, options);
     const auto b = ovt::container::mpd::parse(xml, options);
     require(a.ok == b.ok);
