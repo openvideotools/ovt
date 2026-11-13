@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -23,6 +24,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -461,21 +463,41 @@ TEST_CASE("de265 plugin: garbage units never crash the plugin", "[fast][third_pa
   CHECK((st == OVT_OK || st == OVT_E_CORRUPT));
 }
 
+// AT1. Main and Main 10 streams that carry a decoded picture hash SEI for every picture and output every picture
+// (no pic_output_flag = 0, no skipped RASL or no_output_of_prior_pics), covering PCM, merge, temporal layers, MV
+// clipping, SAO, RPS, HRD, CABAC init types, entry points, multiple PPS, transform skip, dependent slices, WPP and
+// 10-bit. RPS_A, RPS_F, POC_A, AMP_A, AMP_D, CONFWIN_A, MAXBINS_A, STRUCT_B and TILES_B carry no SEI at all, so they
+// cannot serve here (issue #255). SLIST_A_Sony_5 is left out: libde265 1.0.15 mis-decodes it (#254). Every id must
+// have a fetchable manifest entry (sha256, size, extract member).
+constexpr std::array<std::string_view, 20> kAt1Streams = {
+    "jctvc_ipcm_A_NEC_3",          "jctvc_PMERGE_A_TI_3",
+    "jctvc_MERGE_B_TI_3",          "jctvc_VPSID_A_VIDYO_2",
+    "jctvc_TSCL_A_VIDYO_5",        "jctvc_MVEDGE_A_qualcomm_3",
+    "jctvc_SAO_A_MediaTek_4",      "jctvc_RPS_C_ericsson_5",
+    "jctvc_RPS_D_ericsson_6",      "jctvc_RPS_E_qualcomm_5",
+    "jctvc_MVCLIP_A_qualcomm_3",   "jctvc_HRD_A_Fujitsu_3",
+    "jctvc_RPS_B_qualcomm_5",      "jctvc_CAINIT_A_SHARP_4",
+    "jctvc_ENTP_A_QUALCOMM_1",     "jctvc_PPS_A_qualcomm_7",
+    "jctvc_TSKIP_A_MS_3",          "jctvc_DSLICE_A_HHI_5",
+    "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_WPP_A_ericsson_MAIN10_2",
+};
+
 TEST_CASE("de265 plugin: de265_md5_vs_sei on 20 HEVC_v1 streams", "[fast][third_party][needs-corpus]") {
-  // AT1. Main and Main 10 streams that carry a decoded picture hash SEI for every picture and output every picture
-  // (no pic_output_flag = 0, no skipped RASL or no_output_of_prior_pics), covering PCM, merge, temporal layers, MV
-  // clipping, SAO, RPS, long-term refs, HRD, CABAC init types, multiple PPS, transform skip, dependent slices, WPP
-  // and 10-bit. RPS_A, RPS_F, POC_A, AMP_A, AMP_D, CONFWIN_A, MAXBINS_A, STRUCT_B and TILES_B carry no SEI at all,
-  // so they cannot serve here (issue #255). SLIST_A_Sony_5 is left out: libde265 1.0.15 mis-decodes it (#254).
-  const std::string id = GENERATE(
-      as<std::string>{}, "jctvc_ipcm_A_NEC_3", "jctvc_PMERGE_A_TI_3", "jctvc_MERGE_B_TI_3", "jctvc_VPSID_A_VIDYO_2",
-      "jctvc_TSCL_A_VIDYO_5", "jctvc_MVEDGE_A_qualcomm_3", "jctvc_SAO_A_MediaTek_4", "jctvc_RPS_C_ericsson_5",
-      "jctvc_RPS_D_ericsson_6", "jctvc_RPS_E_qualcomm_5", "jctvc_MVCLIP_A_qualcomm_3", "jctvc_HRD_A_Fujitsu_3",
-      "jctvc_RPS_B_qualcomm_5", "jctvc_CAINIT_A_SHARP_4", "jctvc_LTRPSPS_A_FJ_1", "jctvc_PPS_A_qualcomm_7",
-      "jctvc_TSKIP_A_MS_3", "jctvc_DSLICE_A_HHI_5", "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_WPP_A_ericsson_MAIN10_2");
+  // AT1 is all 20 streams or nothing: without any of them (no corpora fetched) the test skips; once one is present,
+  // a missing one fails, so a partial corpus can never report AT1 as passed or skipped.
+  std::size_t present = 0;
+  for (const std::string_view s : kAt1Streams) {
+    present += ovt::test::corpus_path(s).has_value() ? 1U : 0U;
+  }
+  if (present == 0) {
+    (void)ovt::test::corpus_or_skip(kAt1Streams.front());  // skips, or fails under OVT_REQUIRE_CORPORA=1
+  }
+  INFO(present << "/" << kAt1Streams.size() << " AT1 streams present");
+  const std::string_view id = GENERATE(from_range(kAt1Streams));
   CAPTURE(id);
-  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
-  check_stream(run_stream(read_file(path), 2));
+  const std::optional<std::filesystem::path> path = ovt::test::corpus_path(id);
+  REQUIRE(path.has_value());
+  check_stream(run_stream(read_file(*path), 2));
 }
 
 TEST_CASE("de265 plugin: decoding pauses at the outstanding-frame limit and resumes on pull",
