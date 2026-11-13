@@ -20,6 +20,7 @@ add_executable(
   models/test_project.cpp
   models/test_series_aggregator.cpp
   models/test_stream_index_model.cpp
+  models/test_unit_list_model.cpp
   ../src/project.cpp
   models/test_keymap.cpp
   models/test_goto_parser.cpp
@@ -36,6 +37,7 @@ add_executable(
   ../src/models/frame_table.cpp
   ../src/models/stream_index_adapter.cpp
   ../src/models/stream_index_model.cpp
+  ../src/models/unit_list_model.cpp
   ../src/dock/dock_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
 qt_add_resources(
@@ -76,3 +78,27 @@ ovt_studio_silence_generated(ovt_tests_app_qml)
 _ovt_studio_describe_qt(ovt_tests_app_qml)
 add_test(NAME ovt_tests_app_qml COMMAND ovt_tests_app_qml)
 set_tests_properties(ovt_tests_app_qml PROPERTIES LABELS "fast;gui" TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Screenshot harness (chapter 14 §14.10.2, WI-0.568): its own directory, because a QML module needs its own output
+# directory.
+add_subdirectory(screenshots)
+
+# ---- Interaction-script lane (chapter 14 §14.10.3): app/tests/scripts/test_*.py via pytest --------------------
+# The IPC client fixtures and the harness tests live here (WI-0.568); WI-1.576 adds the required scripts.
+find_package(Python3 3.11 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+  execute_process(COMMAND "${Python3_EXECUTABLE}" -c "import pytest, numpy, skimage" RESULT_VARIABLE _ovt_no_gui_py
+                  OUTPUT_QUIET ERROR_QUIET)
+  if(_ovt_no_gui_py EQUAL 0)
+    add_test(
+      NAME gui_scripts_pytest
+      COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
+              --ovt-studio-screenshots "$<TARGET_FILE:ovt_studio_screenshots>"
+      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
+    set_tests_properties(gui_scripts_pytest PROPERTIES LABELS "fast;gui" TIMEOUT 120)
+  else()
+    message(STATUS "pytest, numpy or scikit-image not found for ${Python3_EXECUTABLE}: app/tests/scripts not "
+                   "registered (pip install -r tools/requirements-test.txt)")
+  endif()
+  unset(_ovt_no_gui_py)
+endif()

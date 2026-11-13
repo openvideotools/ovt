@@ -22,7 +22,7 @@
 #
 # Install rules (component `notices`, OPTIONAL so a plain `cmake --install` works without building ovt_notices;
 # release jobs must build the target first): Linux, AppImage and Flatpak (and the macOS CLI) -> share/doc/ovt/; the macOS
-# bundle's Contents/Resources/ is left to the GUI packaging item; Android -> the Gradle assets
+# bundle's Contents/Resources/ copy is made by tools/mac/bundle.sh; Android -> the Gradle assets
 # directory android/app/src/main/assets/licenses/ (copied after the build, git-ignored); Python wheel ->
 # python/pyproject.toml sets scikit-build-core `wheel.license-files` to the generated file (that file is created
 # by the Python packaging work item, not here).
@@ -147,9 +147,8 @@ if(ANDROID)
     VERBATIM)
   unset(_ovt_notices_assets)
 else()
-  # macOS: the bundle's Contents/Resources/ copy belongs to that item (WI-0.060, macOS bundle script): it
-  # adds the file to ovt_studio's sources with MACOSX_PACKAGE_LOCATION Resources. A $<TARGET_BUNDLE_CONTENT_DIR>
-  # destination would point into the build tree, so it is not used here.
+  # macOS: tools/mac/bundle.sh copies the generated file into the bundle's Contents/Resources/ (WI-0.060) and fails
+  # when it is missing; this rule serves the CLI-only install.
   install(FILES ${_ovt_notices_files} DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/ovt" COMPONENT notices OPTIONAL)
   if(OVT_NOTICES_REQUIRED)
     # Release jobs: a missing notices file is a licence-obligation failure, not something to skip.

@@ -4,6 +4,7 @@
 // The Diagnostics / Log panel and the Jobs popover (WI-1.453): the Errors tab shows a diagnostic and its count badge,
 // the Log tab is reachable, and the popover opens from the toolbar button and lists "No jobs" when idle.
 
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtTest
@@ -68,5 +69,41 @@ TestCase {
         verify(!findChild(window, "statusJobs").visible)
         DiagnosticsModel.addGui(2, "GUI-SET-0001", "boom")
         compare(findChild(window, "statusDiagnostics").text, "1 errors")
+    }
+
+    function test_saveLogWritesTheFile() {
+        const panel = createTemporaryObject(panelComponent, testCase)
+        findChild(panel, "logTab").clicked()
+        findChild(panel, "saveLog").clicked()
+        const popup = findChild(panel, "saveLogPopup")
+        tryVerify(function () { return popup.opened })
+        const dir = StandardPaths.writableLocation(StandardPaths.TempLocation).toString()
+        const path = decodeURIComponent(dir.replace(/^file:\/\//, "")) + "/ovt-panel-log-test.txt"
+        findChild(panel, "savePath").text = path
+        findChild(panel, "saveConfirm").clicked()
+        compare(findChild(panel, "saveResult").text, "Saved " + path)
+        // An unwritable path reports the failure and writes nothing.
+        findChild(panel, "savePath").text = "/nonexistent-ovt-dir/log.txt"
+        findChild(panel, "saveConfirm").clicked()
+        compare(findChild(panel, "saveResult").text, "Could not write /nonexistent-ovt-dir/log.txt")
+        popup.close()
+    }
+
+    function test_diagnosticsIsADockPanelToggledByTheBadge() {
+        const window = createTemporaryObject(mainComponent, null)
+        verify(window !== null)
+        const wasOpen = DockModel.openPanels.indexOf("diagnostics") >= 0
+        const badge = findChild(window, "statusDiagnostics")
+        badge.clicked()
+        compare(DockModel.openPanels.indexOf("diagnostics") >= 0, !wasOpen)
+        if (!wasOpen)
+            tryVerify(function () { return findChild(window, "diagnosticsPanel") !== null })
+        badge.clicked()
+        compare(DockModel.openPanels.indexOf("diagnostics") >= 0, wasOpen)
+        // The panel is created by the dock workspace, not as the placeholder.
+        DockModel.openPanel("diagnostics")
+        tryVerify(function () { return findChild(window, "diagnosticsPanel") !== null })
+        if (!wasOpen)
+            DockModel.closePanel("diagnostics")
     }
 }
