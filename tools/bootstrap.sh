@@ -72,7 +72,9 @@ ubuntu_version() {
 # find_python: a python >= 3.11 on PATH, or nothing.
 find_python() {
   local p v
-  for p in python3 python3.13 python3.12 python3.11; do
+  # Versioned names first, like the lint job in ci.yml: a bare python3 may be newer than the pinned wheels support
+  # (macos-15 now ships Python 3.15, which scikit-image 0.25.0 has no wheel for).
+  for p in python3.13 python3.12 python3.11 python3; do
     if have "$p"; then
       v="$("$p" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
       if [ -n "$v" ] && version_ge "$v" 3.11 && "$p" -c 'import venv, ensurepip' >/dev/null 2>&1; then
