@@ -9,6 +9,8 @@
 
 #include "metrics/host/plugin_registry.h"
 
+#include "metrics/vmaf/vmaf_host.h"
+
 #include <dlfcn.h>
 
 #include <algorithm>
@@ -237,8 +239,13 @@ std::optional<std::vector<uint8_t>> validate_metric_api(const ovt_MetricApi* api
 }
 
 PluginRegistry& PluginRegistry::instance() {
-  static PluginRegistry registry;  // never destroyed before exit; plugins stay loaded (§12.3.11)
-  return registry;
+  // Never destroyed: plugins stay loaded (§12.3.11).
+  static PluginRegistry* const registry = [] {
+    auto* r = new PluginRegistry();         // NOLINT(cppcoreguidelines-owning-memory)
+    (void)vmaf::register_builtin_vmaf(*r);  // the libvmaf ids (WI-3.309)
+    return r;
+  }();
+  return *registry;
 }
 
 PluginRegistry::PluginRegistry() = default;

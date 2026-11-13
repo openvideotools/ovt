@@ -8,12 +8,15 @@ add_subdirectory(example_plugin)
 
 # ---- Module tests: ABI header (C11 + C++20), NormalizationConfig resolver, JobSpec parser, registry, job ----
 add_executable(ovt_tests_metrics abi_header_c.c test_metric_abi.cpp test_metric_job.cpp test_metrics_jobspec.cpp
-                                 test_metrics_plugin_registry.cpp test_normalization_config.cpp)
+                                 test_metrics_plugin_registry.cpp test_metrics_vmaf.cpp test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_metrics PRIVATE ovt_core_objects ovt_test_support ovt::flags ${flatbuffers_TARGET}
-                                                ${Catch2_TARGET})
-target_compile_definitions(ovt_tests_metrics PRIVATE "OVT_EXAMPLE_METRIC_ROOT=\"${OVT_EXAMPLE_METRIC_ROOT}\""
-                                                     "OVT_METRICS_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden\"")
+                                                ${nlohmann_json_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_tests_metrics
+  PRIVATE "OVT_EXAMPLE_METRIC_ROOT=\"${OVT_EXAMPLE_METRIC_ROOT}\""
+          "OVT_METRICS_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden\""
+          "OVT_GOLDEN_METRICS_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/metrics\"")
 set_source_files_properties(abi_header_c.c PROPERTIES LANGUAGE C)
 set_target_properties(ovt_tests_metrics PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 get_property(_ovt_example_metrics GLOBAL PROPERTY OVT_EXAMPLE_METRIC_TARGETS)
@@ -47,3 +50,16 @@ set_tests_properties(metrics_abi_status_copies_match metrics_abi_frame_id_copies
                      PROPERTIES LABELS "fast;unit;metrics")
 unset(_ovt_inc)
 unset(_ovt_copies)
+
+# ---- core/src/metrics/vmaf/vmaf_models.inc is what tools/gen_vmaf_ids.py makes of the pinned libvmaf tree --------
+# (WI-3.309 step 2). Needs the libvmaf sources, so only when third_party/libvmaf.cmake builds them (not with
+# OVT_SYSTEM_LIBVMAF=ON).
+if(TARGET tp_libvmaf)
+  include(ExternalProject)
+  externalproject_get_property(tp_libvmaf SOURCE_DIR)
+  add_test(NAME metrics_vmaf_models_inc_current
+           COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/gen_vmaf_ids.py" --libvmaf-src
+                   "${SOURCE_DIR}" --check "${PROJECT_SOURCE_DIR}/core/src/metrics/vmaf/vmaf_models.inc")
+  set_tests_properties(metrics_vmaf_models_inc_current PROPERTIES LABELS "fast;unit;metrics")
+  unset(SOURCE_DIR)
+endif()
