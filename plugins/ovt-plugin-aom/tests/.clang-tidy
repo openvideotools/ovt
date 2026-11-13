@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# AV1 plugin tests (WI-2.155), with the relaxations of plugins/ovt-plugin-ffmpeg/tests/.clang-tidy: Catch2's
+# CHECK/REQUIRE macros expand to branches, so only a test's own branches count for cognitive complexity, and test
+# buffers are walked with iterators. bugprone-*, cert-* and clang-analyzer-* still apply.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true

@@ -10,3 +10,6 @@ core/tests/golden/*.yuv binary
 
 # WI-1.201 broken-ISOBMFF corpus: raw bytes, never line-ending normalised.
 tests/corpora/synthetic/isobmff-broken/** binary
+
+# WI-0.089: YUView CSV importer samples; ovt_mixed_poc.csv keeps its CRLF line endings on purpose.
+core/tests/data/yuview/*.csv -text

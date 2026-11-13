@@ -59,3 +59,9 @@ X(CNT_0108, "CNT-0108", Error, "box exceeds parent/file end (truncated)", "14496
 X(CNT_0109, "CNT-0109", Warning, "non-printable box type", "")
 X(CNT_0110, "CNT-0110", Error, "FullBox shorter than 4 bytes", "14496-12 §4.2")
 X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "QTFF")
+
+// WI-1.228 (Y4M reader, §8.6.5).
+X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
+X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
+  "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
+X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")
