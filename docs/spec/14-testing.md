@@ -125,7 +125,7 @@ The backbone fixes `/core/tests/` and `/tests/corpora/`. This chapter adds the s
     mp4boxjs_dump.mjs              mp4box.js oracle script (§14.4.9)
     mpv_capture.py                 mpv/libplacebo render capture (§14.4.15)
     build_jm.sh, build_hm.sh, build_libaom_inspect.sh, build_ffmpeg_oracle.sh
-    requirements.txt               pinned Python oracle packages (bjontegaard, siti-tools, uvq, tf2onnx)
+    requirements.txt               pinned Python oracle packages (bjontegaard, siti-tools, uvq, torch CPU)
     normalize/*.py                 oracle-text → canonical JSON converters
   perf/                            Google Benchmark binaries + baselines + budgets.json (§14.9; WI-0.560 harness, names per §14.9.3; D14)
     CMakeLists.txt
@@ -688,8 +688,8 @@ Canonical JSON families used below:
 | Item | Value |
 |---|---|
 | Validates | the UVQ host (ONNX Runtime, chapter 9 §9.6) end to end: frame sampling, resize, normalisation, the sub-networks, aggregation. |
-| Obtain | `git clone https://github.com/google/uvq` at the commit pinned in `tests/oracles/ORACLE_VERSIONS.md`; `pip install -r uvq/requirements.txt` (**TensorFlow** CPU — the published UVQ models are TF SavedModels, D11); download the model directories per its README into `uvq/models/`. Apache-2.0. The oracle runs on CPU only, deterministic (`TF_DETERMINISTIC_OPS=1`, `tf.config.threading.set_inter_op_parallelism_threads(1)`, `OMP_NUM_THREADS=1`). The same SavedModels are the input of the tf2onnx export whose SHA-256 are pinned for OVT (chapter 9 §9.6). |
-| Command | `python uvq_main.py --input_files="<clip>,<length_s>,<clip>.mp4" --output_dir=out/ --model_dir=uvq/models --transcode=yes` (the reference CLI of the pinned commit; its argument names are re-checked at pin time) → `out/<clip>/<clip>_uvq.csv` (per-second chunk scores) and the aggregated `compression_content_distortion` MOS; the normaliser `normalize/uvq.py` → `scores`. Repeated for every model version the pinned repository ships. |
+| Obtain | `git clone https://github.com/google/uvq` at the commit pinned in `tests/oracles/ORACLE_VERSIONS.md` (`c204ecc0`, D11); `pip install -r uvq/requirements.txt` (**PyTorch** `torch == 2.8.0` CPU, `torchvision == 0.23.0`); download the model weights per its README. Apache-2.0. The oracle runs on CPU only, deterministic (`torch.use_deterministic_algorithms(True)`, `torch.set_num_threads(1)`, `OMP_NUM_THREADS=1`). The same weights are the input of the `torch.onnx.export` of chapter 9 §9.6 whose SHA-256 are pinned for OVT. |
+| Command | `python uvq_inference.py <clip>.mp4 --model_version 1.5` and `--model_version 1.0` (the reference CLI of the pinned commit; its argument names are re-checked at pin time) → per-chunk scores (per sampled frame for 1.5, per second for 1.0) and the aggregated MOS; the normaliser `normalize/uvq.py` → `scores`. Repeated for every model version the pinned repository ships. |
 | OVT side | `ovt metrics -d <clip>.mp4 -m uvq --opt uvq.version="<ver>" --opt uvq.fps=1 --format json -o <id>.ovt.json` (no-reference: no `-r`; chapter 12 §12.2.9). The ONNX export procedure is chapter 9 §9.6; the exported model files' SHA-256 are pinned in `third_party/VERSIONS.md`. |
 | Tolerance | per-chunk MOS \|Δ\| ≤ 0.01; sequence MOS \|Δ\| ≤ 0.01 (phase 3 exit criterion, §0.8); per-chunk compression-level / distortion-type argmax labels must match for ≥ 95 % of chunks. |
 | Corpora | `ytugc` `fast` subset (2 clips, `ytugc_clip01` and `ytugc_clip03`) on PRs; 20 clips nightly. |
@@ -1206,7 +1206,7 @@ All WIs follow the §0.1 template. Sizes: S ≤ 1 day, M ≤ 3 days, L ≤ 1 wee
 **Produces:** `tests/oracles/mp4boxjs_dump.mjs`, `tests/golden/isobmff/*.json`.
 **Interface:** `node mp4boxjs_dump.mjs <in>.mp4` → box-tree JSON (§14.4.9); golden ids per §14.2.3.
 **Steps:** 1. script per §14.4.9. 2. generation run in the image for all `fast` ISOBMFF files. 3. commit goldens with header comments of oracle versions.
-**Acceptance tests:** 1. Given `gpac_counter...frag.mp4`, When the five oracles run, Then their `box-tree` outputs agree with each other on `fourcc/offset/size` for every box (oracle self-consistency test; disagreements are documented in `tests/golden/isobmff/KNOWN_DIFFS.md` before OVT is compared).
+**Acceptance tests:** 1. Given every fetchable `fast` ISOBMFF manifest entry (the fragmented ones among them are `mpegff_10_fragments`, `mpegff_a4_tone_fragmented`, `mpegff_fragment_random_access_2` and `mpegff_video_cenc_roll_frag1s`), When the five oracles run, Then their `box-tree` outputs agree with each other on `fourcc/offset/size` for every box (oracle self-consistency test; disagreements — mp4box.js `hdr_size` for FullBoxes, sample entries and `uuid` (§8.9.2 rule 2), `mp4ff-info` refusing files with more than one non-empty `mdat`, `MP4Box -dts` needing a `moov` — are documented in `tests/golden/isobmff/KNOWN_DIFFS.md` before OVT is compared, and the goldens those oracle limits prevent are absent).
 **Size:** S.
 **Notes / pitfalls:** mp4box.js reports `hdr_size`; GPAC does not — compare offsets only where both report them.
 
@@ -1433,7 +1433,7 @@ All WIs follow the §0.1 template. Sizes: S ≤ 1 day, M ≤ 3 days, L ≤ 1 wee
 **Steps:** 1. UVQ parity (every pinned model version). 2. BD sets. 3. Error-path parity. 4. Bench row.
 **Acceptance tests:** 1. Given the `fast` `ytugc` clips (`ytugc_clip01`, `ytugc_clip03`), When UVQ runs via ONNX Runtime (CPU EP), Then \|Δ MOS\| ≤ 0.01 per chunk and per clip vs the reference CLI for every pinned model version. 2. Given the committed RD sets, When `ovt bdrate` runs each interpolator, Then BD-rate is within 1e-6 % of the `bjontegaard` package for PCHIP and Akima on all sets and for cubic on the 4-point sets (the package's cubic mode accepts exactly 4 points; OVT's cubic is the least-squares fit of chapter 9 §9.8.4 for ≥ 4 points, checked on the 6-point sets against `numpy.polyfit(D, log10 R, 3)` integration to 1e-9); a 3-point set with cubic fails with `VQ-BD-0002`. 3. Given a non-overlapping RD set, When `ovt bdrate` runs, Then it exits **8** (`MISMATCH`, chapter 12 §12.1.3) with diagnostic `VQ-BD-0001` and the Python package raises likewise (documented behaviour parity).
 **Size:** M.
-**Notes / pitfalls:** the reference CLI is TensorFlow, OVT is ONNX Runtime — a ≤ 0.01 MOS budget assumes the tf2onnx export of chapter 9 §9.6 with opset ≥ 13.
+**Notes / pitfalls:** the reference CLI is PyTorch, OVT is ONNX Runtime — a ≤ 0.01 MOS budget assumes the `torch.onnx.export` of chapter 9 §9.6 with opset 17.
 
 ### WI-3.594 — Metrics GUI tests and Android metric parity
 **Goal:** QML tests for metrics models, screenshot `metrics_panel_vmaf`, script 4, and an Android instrumentation test comparing PSNR/SSIM/VMAF results with desktop goldens.
