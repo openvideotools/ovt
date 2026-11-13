@@ -66,7 +66,7 @@ struct FrameOut {
   uint32_t frame_width = 0;  // Av1FilterParams.FrameWidth / UpscaledWidth
   uint32_t upscaled_width = 0;
   std::vector<PlaneOut> planes;
-  std::vector<std::string> info;     // Info diagnostics
+  std::vector<std::string> info;     // Info diagnostics: "<code> <message>"
   std::vector<std::string> invalid;  // validator findings other than the ones the host fixes (see check())
 };
 
@@ -112,7 +112,7 @@ FrameOut read_frame(const ovt_AnalysisDecoderApi& api, ovt_AnalysisDecoder* dec,
   }
   for (const fb::Diagnostic* d : *fa->diagnostics()) {
     if (d->severity() == fb::Severity::Info) {
-      out.info.push_back(d->message()->str());
+      out.info.push_back(d->code()->str() + " " + d->message()->str());
     }
   }
   for (const auto& v :
@@ -379,7 +379,7 @@ TEST_CASE("aom planes: film grain streams carry the film grain note", "[fast][th
   for (const FrameOut& f : frames) {
     INFO("decode index " << f.decode_index);
     CHECK(f.invalid.empty());
-    noted += std::count(f.info.begin(), f.info.end(), "film grain present (not applied)") > 0 ? 1U : 0U;
+    noted += std::count(f.info.begin(), f.info.end(), "DEC-AV1-0001 film grain present (not applied)") > 0 ? 1U : 0U;
     for (const PlaneOut& p : f.planes) {
       CHECK(p.sample_bytes == (p.bit_depth > 8 ? 2 : 1));
     }

@@ -690,6 +690,7 @@ TEST_CASE("aom map_mi: every frame of the fast libaom vectors passes the validat
     // (WI-2.158).
     for (const fb::Diagnostic* d : *fa->diagnostics()) {
       CHECK(d->severity() == fb::Severity::Info);
+      CHECK(d->code()->str() == "DEC-AV1-0001");
       CHECK(d->message()->str() == "film grain present (not applied)");
     }
   }

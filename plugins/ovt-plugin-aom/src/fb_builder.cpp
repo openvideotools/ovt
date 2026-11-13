@@ -45,9 +45,10 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   }
   // Chapter 06 §6.6.1 rule 5: Reconstruction is the picture before film grain synthesis (AV1D_SET_SKIP_FILM_GRAIN).
   // SPEC-ASSUMPTION(#389): §7.6.1's derived note "film grain present (not applied)" has no field in
-  // FrameAnalysis, so it is an Info Diagnostic on the frame.
+  // FrameAnalysis, so it is an Info Diagnostic on the frame, with the DEC-AV1 Info code the #389 triage asks the
+  // §7.9.4 registry to add (V-029 rejects an empty code).
   if (f.apply_grain) {
-    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), "",
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), "DEC-AV1-0001",
                                                     "film grain present (not applied)"));
   }
   const auto diags_v = fbb->CreateVector(diags);
