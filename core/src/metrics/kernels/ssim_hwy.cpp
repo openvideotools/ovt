@@ -118,19 +118,25 @@ void VWindow(const float* const* mom, size_t stride, size_t count, const float* 
   const auto zero = hn::Zero(df);
   size_t x = 0;
   for (; x + n <= count; x += n) {
-    std::array<hn::VFromD<decltype(df)>, 5> m;
-    for (size_t j = 0; j < 5; ++j) {
-      auto sum = hn::Mul(hn::LoadU(df, mom[j] + x), hn::Set(df, taps[0]));
+    // Not an array of vectors: std::array<Vec128, N> fails to compile on AppleClang in a multi-target TU (bf16
+    // feature).
+    const auto filter = [&](const float* base) {
+      auto sum = hn::Mul(hn::LoadU(df, base + x), hn::Set(df, taps[0]));
       for (uint32_t t = 1; t < kSsimTaps; ++t) {
-        sum = hn::Add(sum, hn::Mul(hn::LoadU(df, mom[j] + x + (t * stride)), hn::Set(df, taps[t])));
+        sum = hn::Add(sum, hn::Mul(hn::LoadU(df, base + x + (t * stride)), hn::Set(df, taps[t])));
       }
-      m[j] = sum;
-    }
-    const auto mu_x = m[0];
-    const auto mu_y = m[1];
-    const auto var_x = hn::Max(hn::Sub(m[2], hn::Mul(mu_x, mu_x)), zero);
-    const auto var_y = hn::Max(hn::Sub(m[3], hn::Mul(mu_y, mu_y)), zero);
-    const auto cov = hn::Sub(m[4], hn::Mul(mu_x, mu_y));
+      return sum;
+    };
+    const auto m0 = filter(mom[0]);
+    const auto m1 = filter(mom[1]);
+    const auto m2 = filter(mom[2]);
+    const auto m3 = filter(mom[3]);
+    const auto m4 = filter(mom[4]);
+    const auto mu_x = m0;
+    const auto mu_y = m1;
+    const auto var_x = hn::Max(hn::Sub(m2, hn::Mul(mu_x, mu_x)), zero);
+    const auto var_y = hn::Max(hn::Sub(m3, hn::Mul(mu_y, mu_y)), zero);
+    const auto cov = hn::Sub(m4, hn::Mul(mu_x, mu_y));
     const auto sigma = hn::Sqrt(hn::Mul(var_x, var_y));
     const auto l = hn::Div(hn::Add(hn::Mul(hn::Mul(two, mu_x), mu_y), c1),
                            hn::Add(hn::Add(hn::Mul(mu_x, mu_x), hn::Mul(mu_y, mu_y)), c1));
