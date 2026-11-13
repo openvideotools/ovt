@@ -250,6 +250,8 @@ elseif(ANDROID)
   qt_policy(SET QTP0002 NEW)
   set_property(TARGET ovt_studio APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "$<TARGET_FILE:ovt_core>"
                                                  "$<TARGET_FILE:ovt_jni>")
+  # Nothing links ovt_jni (the JVM loads it), so make sure it is built before androiddeployqt packages it.
+  add_dependencies(ovt_studio ovt_jni)
 else()
   set_target_properties(ovt_studio PROPERTIES OUTPUT_NAME "ovt-studio")
 endif()
