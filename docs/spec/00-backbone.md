@@ -79,7 +79,7 @@ Each ADR below is binding. Chapters elaborate the *how*; they MUST NOT reopen th
 | **ADR-012** | **Build system: CMake ≥ 3.25 with CMakePresets.json**, dependencies via **vcpkg manifest** where ports exist and `third_party/*.cmake` ExternalProject scripts for libaom (custom flags), libde265 (patched), libvmaf and libplacebo (Meson), FFmpeg (configure). Android via Gradle + `externalNativeBuild` + Qt's `androiddeployqt`. One `cmake --preset <name>` builds each platform. | Mixed upstream build systems; reproducibility for GPL "Corresponding Source"; a single documented entry point for agents. | Conan; Meson-only; Bazel (owner-confirmed 2026-11-03: rules_foreign_cc can wrap the C libraries, but Qt 6/QML and Android packaging stay on CMake/Gradle, so Bazel would mean two build systems; see chapter 13 §13.2.0 for the path to move the core later). |
 | **ADR-013** | **Process model (phase 1): in-process plugins**, one decoder instance per stream, never shared across threads; all plugin output is a FlatBuffer so an out-of-process mode (crash isolation for hostile streams) can be added later without changing consumers. CLI runs are naturally separate processes. | Simplicity for the implementation team; data model already IPC-ready. | Mandatory worker processes in phase 1. |
 | **ADR-014** | **Android HDR output uses `SurfaceView` + `ANativeWindow_setBuffersDataSpace` (BT2020_PQ / BT2020_HLG) via EGL or `AHardwareBuffer`,** not Vulkan swapchain colourspaces (OEM drivers often hide them). `TextureView` is forbidden (forces SDR on API ≥ 33). Android 15+: `setDesiredHdrHeadroom`. ChromeOS HDR pass-through is **unverified** and is a week-one hardware spike (WI-0.055). | Platform facts from Android docs and Arm driver reports. | Vulkan-only HDR. |
-| **ADR-015** | **Default download for AVC/HEVC decoding uses runtime-loaded decoder plugins** (`dlopen`/`QLibrary`), so official binaries can be built with or without pooled-patent codecs (Fedora-style split). AV1 (libaom, dav1d) and libvmaf ship in every official build with the AOM PATENTS notice. | Patent posture identical to VLC/HandBrake/YUView; lets companies substitute licensed decoders. | Always-bundled decoders. |
+| **ADR-015** | **AVC/HEVC analysis decoders are runtime-loaded plugins** (`dlopen`/`QLibrary`), and the build can produce official binaries with or without pooled-patent codecs (Fedora-style split, `OVT_PATENT_CODECS_IN_CORE`, chapter 13 §13.2.2). **Owner decision of 2026-11-12 (answers chapter 17 Q3): the default build, and so the official default download, keeps the pool-covered decoders (AVC, HEVC, VVC, AAC, MPEG-4 Part 2, VC-1) in the core FFmpeg flavour** for playback; the patent-pool-free split build (`OVT_PATENT_CODECS_IN_CORE=OFF`) stays a supported configuration for distributors who need it. The project is distributed free of charge under the GPL; any app-store, paid or commercial distribution of the default build needs the owner's legal check first (chapter 15 §15.5.2). AV1 (libaom, dav1d) and libvmaf ship in every official build with the AOM PATENTS notice. | Users get AVC/HEVC playback from the single download, like VLC, HandBrake and YUView; the plugin split still lets companies substitute licensed decoders and lets packagers build without pooled-patent codecs. The owner accepts the patent-pool exposure of a free, non-commercial GPL distribution (2026-11-07, 2026-11-12). | Patent-pool-free default download with a separate codec pack (the default until 2026-11-12); always-bundled decoders with no split. |
 | **ADR-016** | **Governance:** Developer Certificate of Origin (DCO), no CLA; no foundation initially; distinctive trademark registered early; distribution: macOS notarised DMG + Homebrew cask (never Mac App Store), Linux distro packages + Flathub, Android Google Play + F-Droid with reproducible builds. | From licensing research; GPL and Mac App Store are incompatible per FSF/VLC precedent. | CLA; LF hosting at start. |
 
 ---
@@ -506,8 +506,8 @@ ovt_status ovt_cache_report(ovt_Buffer* out /* CacheReport */);
 ovt_status ovt_cache_clear(const char* kind /*nullable*/, const char* source_path /*nullable*/, int older_than_days /*0 = any*/);
 
 /* Plane and picture views handed across the ABI */
-typedef struct ovt_PlaneView { uint32_t struct_size; const uint8_t* data; uint32_t width, height, stride_bytes; uint8_t bit_depth, sample_bytes, is_signed; } ovt_PlaneView;
-typedef struct ovt_Picture   { uint32_t struct_size; ovt_FrameId id; ovt_PlaneView planes[3]; ovt_ColorDescription color; /* refcount internal */ } ovt_Picture;
+typedef struct ovt_PlaneView { uint32_t struct_size; const uint8_t* data; uint32_t width, height, stride_bytes; uint8_t bit_depth, sample_bytes, is_signed, plane, stage, reserved[3]; } ovt_PlaneView;
+typedef struct ovt_Picture   { uint32_t struct_size; ovt_PlaneView planes[3]; uint8_t chroma_format; ovt_ColorDescription color; ovt_FrameId id; int64_t pts; int32_t timebase_num, timebase_den; int32_t crop_x, crop_y, crop_w, crop_h; uint8_t hw_decoded; void* opaque; /* refcount internal */ } ovt_Picture;   /* chapter 12 §12.3.9 is authoritative */
 ```
 
 ### 0.6.2 Analysis decoder plugin ABI (`core/include/ovt/abi/analysis_decoder_v1.h`, BSD-2-Clause)
@@ -531,13 +531,13 @@ typedef struct ovt_AnalysisDecoderApi {
   void       (*destroy)(ovt_AnalysisDecoder*);
   /* Push one Unit (Annex B NAL without start code / one OBU with size field). Returns OVT_OK; frames come out of pull. */
   ovt_status (*push)(ovt_AnalysisDecoder*, const uint8_t* unit, size_t len, int32_t decode_index_hint, int64_t pts);
-  /* Pull the next completed frame. out_fb is a FrameAnalysis FlatBuffer owned by the plugin until release(). Returns OVT_E_CANCELLED-like OVT_OK with out_fb.data == NULL when no frame is ready. */
+  /* Pull the next completed frame. out_fb is a FrameAnalysis FlatBuffer owned by the plugin until release(). Returns OVT_OK with out_fb.data == NULL when no frame is ready. */
   ovt_status (*pull)(ovt_AnalysisDecoder*, uint32_t plane_stage_mask, ovt_Buffer* out_fb);
   ovt_status (*plane)(ovt_AnalysisDecoder*, const char* blob_id, const uint8_t** data, size_t* size);
   void       (*release)(ovt_AnalysisDecoder*, ovt_Buffer fb);
   ovt_status (*flush)(ovt_AnalysisDecoder*);
 } ovt_AnalysisDecoderApi;
-/* The only exported symbol of a plugin shared library (declared here, not in chapter 12 §12.3 — plugins do not link libovt-core). All entry points are noexcept. */
+/* The only exported symbol of a plugin shared library (declared here, not in chapter 12 §12.3 — plugins do not link libovt-core; the FFmpeg plugin additionally exports the optional ovt_plugin_describe, chapter 7 §7.6.3). Declared with OVT_PLUGIN_EXPORT (default visibility; issue #211). All entry points are noexcept. */
 const ovt_AnalysisDecoderApi* ovt_analysis_decoder_v1(void);
 ```
 

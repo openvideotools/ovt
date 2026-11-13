@@ -90,13 +90,14 @@ is ✘ or the licence is not in the table, stop and open an issue labelled `lice
 ## Patents and the codec pack (chapter 15 §15.5.2)
 
 - OVT is free of charge (POL-PAT-1).
-- The official downloads contain **no AVC or HEVC decoder** (POL-PAT-2). They contain OVT's own parsers, the
-  LGPL FFmpeg build with the `h264`/`hevc` decoders disabled (and those of the other pool-covered codecs:
-  VVC, AAC/HE-AAC, MPEG-4 Part 2 with its Microsoft variants MS-MPEG4 v1–v3 and WMV7/8, and VC-1), libaom
-  with its `PATENTS` text, dav1d and libvmaf.
-- AVC and HEVC decoding comes from **runtime-loaded plugins** distributed as a separate codec pack, with its
-  own licence files and a patent notice (POL-PAT-3). Distributors may build a single package with
-  `OVT_PATENT_CODECS_IN_CORE=ON`; the project's own releases never do.
+- The official downloads contain the LGPL FFmpeg build **with** its `h264`/`hevc` playback decoders (and those of
+  the other pool-covered codecs: VVC, AAC/HE-AAC, MPEG-4 Part 2 with its Microsoft variants MS-MPEG4 v1–v3 and
+  WMV7/8, and VC-1), OVT's own parsers, libaom with its `PATENTS` text, dav1d and libvmaf (POL-PAT-2, owner
+  decision of 2026-11-12). A patent-pool-free build with those decoders disabled is one option away
+  (`OVT_PATENT_CODECS_IN_CORE=OFF`), for distributors such as Fedora.
+- AVC and HEVC **analysis** (block parameters, motion vectors) comes from **runtime-loaded plugins** distributed
+  as a separate codec pack, with its own licence files and a patent notice (POL-PAT-3). In the patent-pool-free
+  build the codec pack also provides AVC/HEVC playback.
 - Every artefact that contains libaom ships libaom's `LICENSE` and `PATENTS` texts (POL-PAT-6).
 - Companies that redistribute OVT with the AVC/HEVC plugins carry their own patent exposure. The plugin ABI
   lets them substitute a licensed decoder (POL-PAT-7).
@@ -120,7 +121,8 @@ only where the artefact contains the codec pack (chapter 15 §15.8). The listing
 `tools/release/listing_texts.toml`.
 
 **Google Play (`play`).** The Play build is the `play` flavour: the base module contains no AVC or HEVC
-decoder, and the codec pack is an optional on-demand module. Play App Signing means you cannot replace the
+decoder (it is the split build, `OVT_PATENT_CODECS_IN_CORE=OFF`, until the owner has had a store release with
+those decoders checked), and the codec pack is an optional on-demand module. Play App Signing means you cannot replace the
 Play-signed app with your own build under the same signature. GPL-3 §6 "Installation Information" covers
 products conveyed together with a device, not an app download, so this is compatible with the licence. The
 reproducible `foss` APK is published as well, so you can rebuild it and sideload your own build.
@@ -139,7 +141,8 @@ the `ovt` CLI. Notarisation puts no restriction on what you may do with the app,
 GPL. The codec pack is the separate cask `ovt-codec-pack`. OVT is never published on the Mac App Store,
 whose usage rules conflict with GPL §10 (chapter 15 §15.8).
 
-**PyPI (`pypi`).** The `ovt` wheels are GPL-3.0-or-later and contain no AVC or HEVC decoder.
+**PyPI (`pypi`).** The `ovt` wheels are GPL-3.0-or-later and, as the split build, contain no AVC or HEVC
+decoder until the owner has had a wheel with those decoders checked.
 `pip install "ovt[codecs]"` downloads the codec pack from the project's GitHub release on first use,
 checks its hash and shows the patent notice before loading it.
 
@@ -157,12 +160,13 @@ your own combination (POL-PAT-4). The project will not distribute or link to it 
 Whether the GPL then reaches your plugin is a question for your own counsel; the project's position covers
 only plugins that users install themselves.
 
-**Why is H.264/H.265 decoding a separate download?** Those formats are covered by patent pools. Keeping the
-decoders out of the default downloads lets the base app be distributed everywhere (POL-PAT-2, POL-PAT-3).
-Syntax parsing and visualisation work without the codec pack.
+**Why is H.264/H.265 analysis a separate download?** The analysis decoders are instrumented builds of FFmpeg
+and libde265 loaded as plugins (POL-PAT-3), so they can be replaced, and so that a distributor can ship a build
+without any pool-covered decoder (`OVT_PATENT_CODECS_IN_CORE=OFF`). Playback, syntax parsing and visualisation
+of H.264/H.265 work in the default download without the codec pack.
 
-**Can I get a single download with everything?** Build with `OVT_PATENT_CODECS_IN_CORE=ON`, or use a
-distribution package that does so. The project's own release artefacts never set it.
+**Can I get a build without the patent-pool codecs?** Build with `OVT_PATENT_CODECS_IN_CORE=OFF`, or use a
+distribution package that does so (the Fedora package). The project's own release artefacts keep the default.
 
 **Does the codec pack cover my patent licence?** No. Companies that redistribute OVT with the AVC/HEVC
 plugins carry their own patent exposure, and the plugin ABI lets them substitute a licensed decoder
