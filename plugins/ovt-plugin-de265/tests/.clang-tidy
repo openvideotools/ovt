@@ -3,7 +3,13 @@
 #
 # libde265 plugin tests (WI-0.014, WI-2.162). Catch2's CHECK/REQUIRE macros expand to branches, so a test that
 # walks every block of a picture trips readability-function-cognitive-complexity on code with little control flow
-# of its own. Count only the test's own branches (as core/tests/bitreader/.clang-tidy does).
+# of its own. Count only the test's own branches (as core/tests/bitreader/.clang-tidy does). The other relaxations
+# are those of core/tests/.clang-tidy for test idiom (fixture buffers indexed directly, unchecked optionals after a
+# REQUIRE, const-correctness of locals); bugprone-*, cert-* and clang-analyzer-* still apply.
 InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -bugprone-unchecked-optional-access,
+  -misc-const-correctness
 CheckOptions:
   readability-function-cognitive-complexity.IgnoreMacros: true

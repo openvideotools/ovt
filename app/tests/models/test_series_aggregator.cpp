@@ -63,7 +63,8 @@ bool same(double a, double b) {
 
 }  // namespace
 
-TEST_CASE("10^6 frames zoomed to fit: bars equal the per-pixel maxima within 16 ms", "[app][timeline][aggregator]") {
+TEST_CASE("10^6 frames zoomed to fit: bars equal the per-pixel maxima within 16 ms",
+          "[fast][gui][timeline][aggregator]") {
   constexpr std::size_t kFrames = 1'000'000;
   constexpr std::size_t kWidth = 1920;
   const std::vector<double> values = synthetic(kFrames, 0x9E3779B97F4A7C15ULL);
@@ -86,7 +87,7 @@ TEST_CASE("10^6 frames zoomed to fit: bars equal the per-pixel maxima within 16 
   CHECK(expected_first == kFrames);
 }
 
-TEST_CASE("max and mean of arbitrary ranges equal brute force", "[app][timeline][aggregator]") {
+TEST_CASE("max and mean of arbitrary ranges equal brute force", "[fast][gui][timeline][aggregator]") {
   for (const std::size_t n : {1U, 2U, 3U, 5U, 7U, 64U, 100U, 1023U, 1025U}) {
     const std::vector<double> values = synthetic(n, 12345U + n);
     const SeriesAggregator agg(values);
@@ -99,7 +100,7 @@ TEST_CASE("max and mean of arbitrary ranges equal brute force", "[app][timeline]
   }
 }
 
-TEST_CASE("gaps (NaN) never contribute and an all-gap column is NaN", "[app][timeline][aggregator]") {
+TEST_CASE("gaps (NaN) never contribute and an all-gap column is NaN", "[fast][gui][timeline][aggregator]") {
   const SeriesAggregator agg({kNaN, 4.0, kNaN, 2.0, kNaN, kNaN});
   CHECK(agg.max(0, 6) == 4.0);
   CHECK(agg.mean(0, 6) == 3.0);
@@ -115,7 +116,7 @@ TEST_CASE("gaps (NaN) never contribute and an all-gap column is NaN", "[app][tim
 }
 
 TEST_CASE("zoomed in beyond one pixel per frame, columns are one frame wide and share frames",
-          "[app][timeline][aggregator]") {
+          "[fast][gui][timeline][aggregator]") {
   const SeriesAggregator agg({1.0, 5.0, 3.0});
   const std::vector<SeriesColumn> cols = agg.columns(0, 3, 9);
   REQUIRE(cols.size() == 9);

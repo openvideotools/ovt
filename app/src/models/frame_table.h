@@ -76,6 +76,9 @@ class FrameTable {
   [[nodiscard]] std::int64_t pts(int decode_index) const { return pts_.at(static_cast<std::size_t>(decode_index)); }
   [[nodiscard]] fb::FrameType type(int decode_index) const { return type_.at(static_cast<std::size_t>(decode_index)); }
   [[nodiscard]] bool is_rap(int decode_index) const { return rap_.at(static_cast<std::size_t>(decode_index)) != 0; }
+  [[nodiscard]] std::int64_t poc(int decode_index) const { return poc_.at(static_cast<std::size_t>(decode_index)); }
+  // The display index of a frame (its slot in display order), or -1.
+  [[nodiscard]] int display_index_of(int decode_index) const;
   [[nodiscard]] bool shown(int decode_index) const { return shown_.at(static_cast<std::size_t>(decode_index)) != 0; }
 
   // The positions (in the current order) of the random access points, ascending: the GOP markers.
@@ -100,6 +103,8 @@ class FrameTable {
   std::vector<std::int16_t> qp_;
   std::vector<std::uint8_t> tid_;
   std::vector<std::int64_t> pts_;
+  std::vector<std::int64_t> poc_;
+  std::vector<int> display_of_;  // decode index -> display slot
   std::vector<fb::FrameType> type_;
   std::vector<std::uint8_t> rap_;
   std::vector<std::uint8_t> shown_;
