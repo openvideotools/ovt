@@ -453,6 +453,18 @@ flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params(flatbuffers::Fla
   fb::Av1FilterParamsBuilder p(f);
   p.add_enable_cdef(static_cast<uint8_t>(enable_cdef));
   p.add_cdef(cdef);
+  // Super-resolution (AV1 §5.9.8, WI-2.158): the Reconstruction planes are UpscaledWidth wide while the grid
+  // covers FrameWidth; the renderer stretches overlays by UpscaledWidth / FrameWidth (chapter 06 V-023).
+  constexpr int32_t kSuperresNum = 8;
+  constexpr int32_t kSuperresDenomMin = 9;
+  const bool use_superres = d.superres_denom != kSuperresNum;
+  p.add_use_superres(static_cast<uint8_t>(use_superres));
+  if (use_superres) {
+    p.add_coded_denom(static_cast<uint8_t>(d.superres_denom - kSuperresDenomMin));
+    p.add_SuperresDenom(static_cast<uint8_t>(d.superres_denom));
+  }
+  p.add_FrameWidth(static_cast<uint32_t>(d.frame_width));
+  p.add_UpscaledWidth(static_cast<uint32_t>(d.upscaled_width));
   p.add_base_q_idx(static_cast<uint8_t>(d.base_qindex));
   p.add_delta_q_present(static_cast<uint8_t>(d.delta_q_present));
   p.add_delta_q_res(d.delta_q_present ? res_log2 : uint8_t{0});

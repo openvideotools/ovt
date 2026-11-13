@@ -36,6 +36,15 @@ aom_codec_err_t aom_codec_control(aom_codec_ctx_t* ctx, int ctrl_id, ...) {
   return ctrl_id == AV1_SET_INSPECTION_CALLBACK ? AOM_CODEC_INCAPABLE : AOM_CODEC_OK;
 }
 
+aom_codec_err_t aom_codec_set_frame_buffer_functions(aom_codec_ctx_t* ctx, aom_get_frame_buffer_cb_fn_t cb_get,
+                                                     aom_release_frame_buffer_cb_fn_t cb_release, void* cb_priv) {
+  (void)ctx;
+  (void)cb_get;
+  (void)cb_release;
+  (void)cb_priv;
+  return AOM_CODEC_OK;
+}
+
 aom_codec_err_t aom_codec_destroy(aom_codec_ctx_t* ctx) {
   (void)ctx;
   return AOM_CODEC_OK;
