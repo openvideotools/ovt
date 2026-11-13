@@ -352,7 +352,7 @@ TEST_CASE("aom planes AT2: no planes when Reconstruction is not requested", "[fa
   }
   // The plane lookup knows no blob of an analysis pulled without planes.
   const auto tus = ovt::aom::test::read_ivf(path);
-  ovt::aom::test::Instance inst;
+  const ovt::aom::test::Instance inst;
   REQUIRE(inst.status == OVT_OK);
   int32_t next = 0;
   for (const auto& o : tus.at(0)) {
