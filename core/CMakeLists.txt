@@ -116,8 +116,17 @@ ovt_find_package(pugixml SPDX "MIT" TARGETS ${_ovt_pugixml_targets})
 unset(_ovt_pugixml_targets)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
-foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET} ${hwy_TARGET}
-             ${xxHash_TARGET} ${nlohmann_json_schema_validator_TARGET} ${pugixml_TARGET})
+foreach(
+  _dep
+  ${fmt_TARGET}
+  ${spdlog_TARGET}
+  ${flatbuffers_TARGET}
+  ${zstd_TARGET}
+  ${nlohmann_json_TARGET}
+  ${hwy_TARGET}
+  ${xxHash_TARGET}
+  ${nlohmann_json_schema_validator_TARGET}
+  ${pugixml_TARGET})
   target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
 endforeach()
 unset(_dep)

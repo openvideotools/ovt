@@ -24,7 +24,8 @@ function(ovt_add_fuzz_target name source)
   set(corpus_dir "${CMAKE_CURRENT_SOURCE_DIR}/corpus/${name}")
 
   add_executable(ovt_fuzz_${name}_regress "${source}" test_fuzz_regressions.cpp)
-  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ${pugixml_TARGET} ovt::flags)
+  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET}
+                                                         ${pugixml_TARGET} ovt::flags)
   target_include_directories(ovt_fuzz_${name}_regress PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   ovt_set_license(ovt_fuzz_${name}_regress "LGPL-2.1-or-later")
   add_test(NAME fuzz_${name}_regress COMMAND ovt_fuzz_${name}_regress "${regress_dir}" "${corpus_dir}")
