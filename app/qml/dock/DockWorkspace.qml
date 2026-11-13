@@ -92,15 +92,27 @@ Item {
         id: placeholder
 
         Rectangle {
+            id: panel
+
             required property string panelId
+            // Panel is the panel's title for the not-yet-built ones; the empty states are §11.8's sentences.
+            readonly property string emptyText: emptyState.textFor(panelId)
 
             color: OvtStyle.panel
             Accessible.name: DockModel.panelTitle(panelId)
-            Label {
-                anchors.centerIn: parent
-                // The Picture area shows the empty state until the Welcome page (§11.3.19) and the Picture panel land.
-                text: panelId === "picture" ? qsTr("No file open") : qsTr("%1 (not available yet)").arg(DockModel.panelTitle(panelId))
-                color: OvtStyle.textMuted
+
+            // The Picture area shows the Welcome page while no file is open (§11.8).
+            WelcomePage {
+                anchors.fill: parent
+                visible: panel.panelId === "picture" && Project.fileCount === 0
+                actions: workspace.actions
+            }
+            EmptyState {
+                id: emptyState
+
+                anchors.fill: parent
+                visible: !(panel.panelId === "picture" && Project.fileCount === 0)
+                text: panel.emptyText !== "" ? panel.emptyText : qsTr("%1 (not available yet)").arg(DockModel.panelTitle(panel.panelId))
             }
         }
     }
