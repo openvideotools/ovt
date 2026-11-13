@@ -159,6 +159,27 @@ TEST_CASE("render_test_plane_fill: format matrix renders limited black and white
   }
 }
 
+// Regression test for the intermittent teardown SIGSEGV on MoltenVK (#304, #330): a surface destroyed right after
+// upload, render and download must not free anything the driver still uses while it finishes that work (timer query
+// pools, see render/src/surface/vk_no_timestamps.cpp; the device itself, see VideoSurfaceImpl::wait_device_idle).
+// Many short-lived surfaces make the race window recur.
+TEST_CASE("render_test_plane_fill: surfaces torn down right after a download stay stable", "[fast][render][vulkan]") {
+  constexpr uint32_t kW = 16;
+  constexpr uint32_t kH = 4;
+  constexpr int kCycles = 24;
+  for (int cycle = 0; cycle < kCycles; ++cycle) {
+    INFO("cycle " << cycle);
+    auto surface = surface_or_skip(kW, kH);
+    OwnedPicture op = black_white(kW, kH, 10, 1, 2);
+    op.pic.generation = 1;
+    surface->set_frame(op.pic);
+    REQUIRE(std::string(surface->last_error()).empty());
+    const OutputPixels px = render_1to1(*surface, kW, kH);
+    REQUIRE(std::max({pixel(px, 1, 1).r, pixel(px, 1, 1).g, pixel(px, 1, 1).b}) <= 1);
+    REQUIRE(std::min({pixel(px, kW - 2, 1).r, pixel(px, kW - 2, 1).g, pixel(px, kW - 2, 1).b}) >= 254);
+  }
+}
+
 TEST_CASE("render_test_plane_fill: 4:4:4 8-bit full-range RGB (matrix 0) downloads identically",
           "[fast][render][vulkan]") {
   constexpr uint32_t kW = 64;

@@ -16,7 +16,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-added-large-files
-        args: [--maxkb=2048]          # corpora and large goldens are never committed (§14.4)
+        args: [--maxkb=2048]          # corpora are never committed; goldens over 2 MB are stored gzip-compressed (§14.4)
       # Patches stay byte-exact: a blank context line is a single space, and git apply needs it.
       - id: end-of-file-fixer
         exclude: (^|/)patches/.*\.patch$
@@ -29,6 +29,8 @@ repos:
     hooks:
       - id: clang-format
         types_or: [c, c++, objective-c]
+        # x264's SSIM kernel is vendored byte-exact (WI-0.565); its style is x264's.
+        exclude: ^tests/oracles/x264_ssim/pixel_ssim\.c$
 
   - repo: https://github.com/cheshirekow/cmake-format-precommit
     rev: v0.6.13

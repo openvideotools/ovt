@@ -6,11 +6,15 @@
 # libplacebo's Vulkan backend. Later chapter 10 work items add their sources to ovt_render.
 
 add_library(ovt_render SHARED src/color/h273_map.cpp src/surface/video_surface_impl.cpp)
+# WI-2.430: OverlayBuilder, CPU side (§10.5.1, §10.5.5).
+target_sources(ovt_render PRIVATE src/overlay/builder.cpp src/overlay/heatmap_source.cpp)
 add_library(ovt::render ALIAS ovt_render)
 # WI-1.401: Picture -> pl_frame upload (§10.3.1).
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 # WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
+# libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
+target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

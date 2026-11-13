@@ -13,7 +13,12 @@ include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
 include(OvtMeson)
 
-ovt_tp_declare(dav1d LICENSE_FILES COPYING)
+# COPYING is BSD-2-Clause only; the x86 and LoongArch assembly includes ISC-licensed files (x264's x86inc.asm and
+# Loongson's macros) whose texts sit only in their headers: third_party/licenses/dav1d/.
+set(_ovt_dav1d_licdir "${CMAKE_CURRENT_LIST_DIR}/licenses/dav1d")
+ovt_tp_declare(dav1d LICENSE_FILES COPYING ${_ovt_dav1d_licdir}/x86inc-ISC.txt
+               ${_ovt_dav1d_licdir}/loongson-asm-ISC.txt)
+unset(_ovt_dav1d_licdir)
 
 ovt_tp_meson(
   dav1d

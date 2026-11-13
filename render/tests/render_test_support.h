@@ -20,6 +20,7 @@
 #include <link.h>
 #endif
 
+#include "crash_backtrace.h"
 #include "ovt/render/picture.h"
 #include "ovt/render/video_surface.h"
 
@@ -103,6 +104,7 @@ inline void pin_vulkan_icds() {}
 // A VideoSurface on an offscreen target of w x h (Rgba8Srgb unless told otherwise). Hosts without a Vulkan device skip.
 inline std::unique_ptr<VideoSurface> surface_or_skip(
     int w, int h, DisplayTarget::OffscreenFormat format = DisplayTarget::OffscreenFormat::Rgba8Srgb) {
+  install_crash_backtrace();  // a crash anywhere below prints the faulting thread's stack
   auto surface = VideoSurface::create("render-test");
   REQUIRE(surface != nullptr);
   DisplayTarget t;

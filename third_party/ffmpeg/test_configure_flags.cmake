@@ -26,7 +26,7 @@ endfunction()
 
 foreach(platform linux macos android)
   foreach(hw ON OFF)
-    # ---- core, default options ----------------------------------------------------------------------------------
+    # ---- core, default options (OVT_PATENT_CODECS_IN_CORE=ON since the owner decision of 2026-11-12) ----------
     ovt_ffmpeg_configure_flags(
       f
       FLAVOUR
@@ -35,6 +35,8 @@ foreach(platform linux macos android)
       ${platform}
       HW_DECODE
       ${hw}
+      PATENT_CODECS_IN_CORE
+      ON
       DAV1D
       ON)
     set(ctx "core/${platform}/hw=${hw}")
@@ -50,19 +52,13 @@ foreach(platform linux macos android)
     expect_has("${f}" --build-suffix=_ovt "${ctx}")
     expect_has("${f}" --enable-libdav1d "${ctx}")
     expect_has("${f}" --disable-gpl "${ctx}")
-    expect_has(
-      "${f}"
-      --disable-decoder=h264,hevc,h264_mediacodec,hevc_mediacodec,vvc,aac,aac_fixed,aac_latm,aac_at,aac_mediacodec,mpeg4,mpeg4_mediacodec,msmpeg4v1,msmpeg4v2,msmpeg4v3,wmv1,wmv2,vc1,vc1image,wmv3,wmv3image
-      "${ctx}")
-    expect_has(
-      "${f}"
-      --disable-hwaccel=h264_videotoolbox,hevc_videotoolbox,h264_vaapi,hevc_vaapi,mpeg4_videotoolbox,mpeg4_vaapi,vc1_vaapi,wmv3_vaapi
-      "${ctx}")
-    # No encoder is ever enabled, no decoder is enabled by name in the core, parsers/bsfs are never touched.
+    # The default core keeps every decoder and hwaccel FFmpeg builds for the enabled APIs: nothing is disabled by
+    # name, no encoder is ever enabled, no decoder is enabled by name, parsers/bsfs are never touched.
+    expect_not("${f}" "^--disable-(decoder|hwaccel)=" "${ctx}")
     expect_not("${f}" "^--enable-(encoder|decoder|gpl)" "${ctx}")
     expect_not("${f}" "^--disable-(parser|bsf)" "${ctx}")
 
-    # ---- core with OVT_PATENT_CODECS_IN_CORE --------------------------------------------------------------------
+    # ---- core, patent-pool-free split build (OVT_PATENT_CODECS_IN_CORE=OFF, no dav1d) -------------------------
     ovt_ffmpeg_configure_flags(
       f
       FLAVOUR
@@ -72,9 +68,19 @@ foreach(platform linux macos android)
       HW_DECODE
       ${hw}
       PATENT_CODECS_IN_CORE
-      ON)
-    expect_not("${f}" "^--disable-(decoder|hwaccel)=" "core-patent/${platform}")
-    expect_not("${f}" "^--enable-libdav1d" "core/${platform} without DAV1D")
+      OFF)
+    set(ctx "core-patent-free/${platform}/hw=${hw}")
+    expect_has(
+      "${f}"
+      --disable-decoder=h264,hevc,h264_mediacodec,hevc_mediacodec,vvc,aac,aac_fixed,aac_latm,aac_at,aac_mediacodec,mpeg4,mpeg4_mediacodec,msmpeg4v1,msmpeg4v2,msmpeg4v3,wmv1,wmv2,vc1,vc1image,wmv3,wmv3image
+      "${ctx}")
+    expect_has(
+      "${f}"
+      --disable-hwaccel=h264_videotoolbox,hevc_videotoolbox,h264_vaapi,hevc_vaapi,mpeg4_videotoolbox,mpeg4_vaapi,vc1_vaapi,wmv3_vaapi
+      "${ctx}")
+    expect_not("${f}" "^--enable-(encoder|decoder|gpl)" "${ctx}")
+    expect_not("${f}" "^--disable-(parser|bsf)" "${ctx}")
+    expect_not("${f}" "^--enable-libdav1d" "${ctx} without DAV1D")
 
     # ---- plugin -------------------------------------------------------------------------------------------------
     ovt_ffmpeg_configure_flags(f FLAVOUR plugin PLATFORM ${platform} HW_DECODE ${hw})
