@@ -6,7 +6,8 @@
 # part of libovt-core (chapter 0 §0.6.2), only the static FFmpeg plugin flavour (tp::ffmpeg_plugin; the system FFmpeg
 # with OVT_SYSTEM_FFMPEG=ON), whose symbols stay inside (§13.3.3).
 
-set(OVT_FFMPEG_PLUGIN_SOURCES src/plugin.cpp src/h264_analysis.cpp src/map_h264_sidedata.cpp src/map_hevc_sidedata.cpp)
+set(OVT_FFMPEG_PLUGIN_SOURCES src/plugin.cpp src/h264_analysis.cpp src/map_h264_blockparams.cpp
+                              src/map_h264_sidedata.cpp src/map_hevc_sidedata.cpp)
 # Patch 0002 (WI-4.107) adds AV_VIDEO_ENC_PARAMS_HEVC to the plugin flavour; a system FFmpeg has no patches.
 if(OVT_SYSTEM_FFMPEG)
   set(OVT_FFMPEG_HEVC_ENC_PARAMS 0)
