@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Host of the two siblings of chapter 13 §13.4.4 item 1: HdrSurfaceView (bottom) and QtQuickView (top). Both are
+  added by MainActivity, in that order.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ovt_host"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent" />

@@ -396,3 +396,25 @@ TEST_CASE("psnr 1080p single-thread throughput", "[.][bench][metrics][psnr]") {
   std::printf("psnr 1080p: %.1f fps (1 thread)\n", kFrames / dt.count());
   SUCCEED();
 }
+
+// UBSan regression (#392 follow-up): a 16-bit row at an odd byte address must not be read through a misaligned
+// uint16_t pointer. Odd strides of 1, 3 and 5 padding bytes, widths around the vector length, both kernels.
+TEST_CASE("psnr 16-bit samples at odd strides are read without misaligned loads", "[metrics][psnr][ubsan][fast]") {
+  std::mt19937 rng(77);  // NOLINT(cert-msc32-c,cert-msc51-cpp): fixed seed
+  for (const uint32_t pad : {1U, 3U, 5U}) {
+    for (const uint32_t w : {1U, 7U, 8U, 33U, 64U, 130U}) {
+      Pic r(w, 9, 0, 10, pad);
+      Pic d(w, 9, 0, 10, pad);
+      r.randomize(rng);
+      d.randomize(rng);
+      REQUIRE((static_cast<uint32_t>(r.planes.stride_bytes[0]) % 2U) == 1U);
+      const auto a = ovt::metrics::psnr_sse_scalar(r.planes.data[0], r.planes.stride_bytes[0], d.planes.data[0],
+                                                   d.planes.stride_bytes[0], w, 9, 2, 10);
+      const auto b = ovt::metrics::psnr_sse_hwy(r.planes.data[0], r.planes.stride_bytes[0], d.planes.data[0],
+                                                d.planes.stride_bytes[0], w, 9, 2, 10);
+      CHECK(a == b);
+      Instance inst;  // the metric path as well
+      CHECK(inst.score(r, d).values[0] > 0.0);
+    }
+  }
+}
