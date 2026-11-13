@@ -15,6 +15,7 @@
 #include <cerrno>
 #include <cstring>
 #include <exception>
+#include <iterator>
 #include <memory>
 #include <new>
 #include <nlohmann/json.hpp>
@@ -454,7 +455,7 @@ ovt_Buffer descriptor_of() noexcept {
 
 template <size_t I>
 ovt_status create_of(const char* options_json, ovt_Metric** out) noexcept {
-  return create_instance(kModels.at(I), options_json, out);
+  return create_instance(std::get<I>(kModels), options_json, out);
 }
 
 template <size_t... I>
@@ -476,12 +477,11 @@ std::span<const ModelInfo> models() noexcept {
 }
 
 const ovt_MetricApi* metric_api(std::string_view id) noexcept {
-  for (size_t i = 0; i < kModels.size(); ++i) {
-    if (id == kModels.at(i).id) {
-      return &kApis.at(i);
-    }
+  const auto* it = std::find_if(kModels.begin(), kModels.end(), [id](const ModelInfo& m) { return id == m.id; });
+  if (it == kModels.end()) {
+    return nullptr;
   }
-  return nullptr;
+  return &*std::next(kApis.begin(), std::distance(kModels.begin(), it));
 }
 
 bool model_available(const ModelInfo& model) noexcept {
