@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Activity theme (chapter 11 §11.5.1: MainActivity is an AppCompatActivity). No action bar: the Qt Quick UI draws
+  its own chrome. The app name is a resValue from ovt.productName (app/build.gradle.kts).
+-->
+<resources>
+    <style name="Theme.OVT" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

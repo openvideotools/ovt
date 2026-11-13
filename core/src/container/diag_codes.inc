@@ -46,9 +46,36 @@ X(CNT_OBU_0003, "CNT-OBU-0003", Warning,
 X(CNT_OBU_0004, "CNT-OBU-0004", Error,
   "OBU header, `leb128` or length at offset `o` is malformed; the OBU or the rest of its enclosing unit is skipped",
   "AV1 §4.10.5, §5.3.2")
+X(CNT_TS_1001, "CNT-TS-1001", Error,
+  "TS_sync_loss: `N` consecutive packets without `0x47` at offset `o`", "TR 101 290 §5.2.1 (1.1)")
+X(CNT_TS_1002, "CNT-TS-1002", Error, "Sync_byte_error at packet `k`", "TR 101 290 §5.2.1 (1.2)")
+X(CNT_TS_1006, "CNT-TS-1006", Warning,
+  "Continuity_count_error on PID `pid` at packet `k` (`expected`/`got`)", "TR 101 290 §5.2.1 (1.4)")
+X(CNT_TS_2001, "CNT-TS-2001", Warning,
+  "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
+
+// WI-1.201 (ISOBMFF box header walk, §8.2.3).
+X(CNT_0101, "CNT-0101", Warning, "trailing bytes in a container that cannot hold a box header", "14496-12 §4.2")
+X(CNT_0102, "CNT-0102", Error, "truncated `largesize`", "14496-12 §4.2")
+X(CNT_0103, "CNT-0103", Error, "`largesize < 16`", "14496-12 §4.2")
+X(CNT_0104, "CNT-0104", Warning, "`size == 0` box not at top level", "14496-12 §4.2.2")
+X(CNT_0105, "CNT-0105", Error, "nesting deeper than 32", "")
+X(CNT_0106, "CNT-0106", Error, "`size < 8` (negative / tiny size)", "14496-12 §4.2")
+X(CNT_0107, "CNT-0107", Error, "`uuid` box too short for usertype", "14496-12 §4.2")
+X(CNT_0108, "CNT-0108", Error, "box exceeds parent/file end (truncated)", "14496-12 §4.2")
+X(CNT_0109, "CNT-0109", Warning, "non-printable box type", "")
+X(CNT_0110, "CNT-0110", Error, "FullBox shorter than 4 bytes", "14496-12 §4.2")
+X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "QTFF")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
   "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
 X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")
+// WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
+X(CNT_9001, "CNT-9001", Error,
+  "sample bytes do not split into units cleanly (NAL length exceeds sample, OBU size overrun)",
+  "14496-15 §5.3.4.2 / AV1-ISOBMFF §2.4")
+X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
+  "14496-15 §4.3")
+X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")

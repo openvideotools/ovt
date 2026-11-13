@@ -166,12 +166,23 @@ ApplicationWindow {
     }
 
     // The dock areas and panels (§11.2.2, WI-1.451). Focus panel N and tab cycling come in through actions.
-    DockWorkspace {
-        id: dockWorkspace
-
+    // The first-run banners (§11.8) sit above the dock areas; the Welcome page is the Picture panel's content while no
+    // file is open (DockWorkspace).
+    ColumnLayout {
         anchors.fill: parent
-        actions: actions
-        panelComponents: ({"diagnostics": diagnosticsComponent})
+        spacing: 0
+
+        FirstRunBanner {
+            Layout.fillWidth: true
+        }
+        DockWorkspace {
+            id: dockWorkspace
+
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            actions: actions
+            panelComponents: ({"diagnostics": diagnosticsComponent})
+        }
     }
 
     // The Diagnostics / Log panel (§11.3.16) is a dock panel in the Bottom area; the status bar badge toggles it.

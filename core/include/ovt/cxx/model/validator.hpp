@@ -59,6 +59,10 @@ inline constexpr std::size_t kMaxViolationsPerRule = 64;
 [[nodiscard]] std::vector<Violation> validate_frame_analysis(std::span<const std::uint8_t> buffer,
                                                              std::optional<fb::Codec> codec_override = std::nullopt);
 
+/// Validates one `StreamIndex` buffer (plain or size-prefixed, with or without the cache's `OVTI` identifier):
+/// V-001 (Verifier, `schema_version == 1`), V-029 (diagnostics of the index and its units) and V-031.
+[[nodiscard]] std::vector<Violation> validate_stream_index(std::span<const std::uint8_t> buffer);
+
 /// Rule table access (chapter 14 §14.6.1).
 class Validator {
  public:
