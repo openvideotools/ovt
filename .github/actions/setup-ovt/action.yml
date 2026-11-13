@@ -246,6 +246,7 @@ runs:
       shell: bash
       run: |
         # After the corpora fetch on purpose: the corpus post steps keep using the archive's ffmpeg.
+        docker pull -q ubuntu:24.04 > /dev/null # BuildKit does not keep the base locally; the digest is printed below
         docker build -t ovt-ffmpeg-container tools/ci/ffmpeg-container
         docker image inspect --format 'base image digest: {{index .RepoDigests 0}}' ubuntu:24.04 || true
         wrapper="${RUNNER_TEMP}/ffmpeg-container/ffmpeg"
