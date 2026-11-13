@@ -49,6 +49,7 @@ TestCase {
     }
 
     function init() {
+        Settings.setValue("privacy", "first_run_banner_dismissed", false)
         Project.closeAll()
         RecentFiles.clear()
     }
@@ -105,6 +106,10 @@ TestCase {
         verify(banner.Accessible.name.indexOf("no telemetry, no crash reporter") >= 0)
         findChild(window, "privacyBannerDismiss").clicked()
         verify(!banner.visible)
+        // The choice is stored, so a new window (a later launch) does not show the banner again.
+        compare(Settings.value("privacy", "first_run_banner_dismissed", false), true)
+        const again = createTemporaryObject(mainComponent, null)
+        verify(!findChild(again, "privacyBanner").visible)
     }
 
     function test_welcomeGoesAwayWhenAFileOpens() {
