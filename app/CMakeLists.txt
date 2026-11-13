@@ -244,6 +244,9 @@ elseif(ANDROID)
   # The JNI glue (chapter 13 §13.4.4) and the shared core it links: androiddeployqt packages only Qt's libraries
   # and the ones listed here.
   add_subdirectory("${PROJECT_SOURCE_DIR}/android/app/src/main/cpp" "${CMAKE_CURRENT_BINARY_DIR}/android_jni")
+  # The paths are generator expressions; under the OLD behaviour of QTP0002 Qt writes them into the deployment
+  # settings unevaluated and the generate step fails ("$<TARGET_FILE;ovt_core>").
+  qt_policy(SET QTP0002 NEW)
   set_property(TARGET ovt_studio APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "$<TARGET_FILE:ovt_core>"
                                                  "$<TARGET_FILE:ovt_jni>")
 else()
