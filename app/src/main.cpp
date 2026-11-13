@@ -100,6 +100,7 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   parser.process(app);  // exits on --help and unknown options; --version was handled above
   const bool self_testing = parser.isSet(self_test);
 
+  static_cast<void>(ovt::app::Platform::isFirstRun());  // decided before anything can create settings.json
   ovt::app::Platform::selectGraphicsApi();
   QQuickStyle::setStyle(QStringLiteral("Fusion"));  // OvtStyle.qml supplies the palette (§11.4.5)
 

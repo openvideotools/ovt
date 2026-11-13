@@ -5,6 +5,7 @@
 
 #include <QByteArray>
 #include <QDir>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QStandardPaths>
@@ -49,6 +50,11 @@ bool Platform::isLinux() {
 
 bool Platform::hasHover() {
   return !isAndroid();
+}
+
+bool Platform::isFirstRun() {
+  static const bool first_run = !QFileInfo::exists(settingsPath());
+  return first_run;
 }
 
 QString Platform::configDir() {
