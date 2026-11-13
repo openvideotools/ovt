@@ -3,7 +3,7 @@
 //
 // Smoke and acceptance tests of ovt-plugin-ffmpeg (WI-2.169, chapter 07 §7.6.3), loaded through the host's
 // PluginRegistry (WI-2.150) and driven through its ABI only. Synthetic I_PCM streams have known samples, so planes,
-// decode_index and frame threading are checked without a corpus. AT1: the 10 `h264-analysis-smoke` JVT streams
+// decode_index and slice threading are checked without a corpus. AT1: the 10 `h264-analysis-smoke` JVT streams
 // against `ffmpeg -f framemd5` (the in-tree oracle). AT2: ovt_plugin_describe() carries avcodec_configuration().
 
 #include <catch2/catch_test_macros.hpp>
@@ -34,49 +34,14 @@ extern "C" {
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
 #include "ovt_model_generated.h"
+#include "plugin_test_util.inc"
 #include "test_support/corpus.h"
 
 namespace {
 
+using namespace ovt_ffmpeg_test;  // NOLINT(google-build-using-namespace)
+
 constexpr uint32_t kReconMask = 1U << 0;  // ovt.fb.PlaneStage.Reconstruction
-
-const ovt::analysis::LoadedPlugin& plugin() {
-  static ovt::analysis::PluginRegistry registry(
-      ovt::analysis::PluginRegistry::Options{std::string(OVT_FFMPEG_PLUGIN_DIR), std::vector<std::string>{}});
-  const ovt::analysis::LoadedPlugin* p = registry.find("ffmpeg");
-  REQUIRE(p != nullptr);
-  return *p;
-}
-
-const ovt_AnalysisDecoderApi& plugin_api() {
-  return *plugin().api;
-}
-
-// One decoder instance, destroyed at scope exit.
-struct Instance {
-  explicit Instance(const ovt_AnalysisDecoderApi& a, int threads = 1, const uint8_t* cp = nullptr, size_t len = 0)
-      : api(a) {
-    status = api.create(cp, len, threads, &dec);
-  }
-  ~Instance() {
-    if (dec != nullptr) {
-      api.destroy(dec);
-    }
-  }
-  Instance(const Instance&) = delete;
-  Instance& operator=(const Instance&) = delete;
-  Instance(Instance&&) = delete;
-  Instance& operator=(Instance&&) = delete;
-  const ovt_AnalysisDecoderApi& api;
-  ovt_AnalysisDecoder* dec = nullptr;
-  ovt_status status = OVT_E_INTERNAL;
-};
-
-const ovt::fb::FrameAnalysis* as_fa(const ovt_Buffer& fb) {
-  flatbuffers::Verifier verifier(fb.data, fb.size);
-  REQUIRE(ovt::fb::VerifyFrameAnalysisBuffer(verifier));
-  return ovt::fb::GetFrameAnalysis(fb.data);
-}
 
 std::string md5_hex(const std::vector<uint8_t>& bytes) {
   std::array<uint8_t, 16> d{};
@@ -91,104 +56,6 @@ std::string md5_hex(const std::vector<uint8_t>& bytes) {
 }
 
 // ---- synthetic I_PCM streams ----------------------------------------------------------------------------------------
-
-class BitWriter {
- public:
-  BitWriter& bits(uint32_t value, int n) {
-    for (int i = n - 1; i >= 0; --i) {
-      bit((value >> i) & 1U);
-    }
-    return *this;
-  }
-  BitWriter& ue(uint32_t v) {  // Exp-Golomb, H.264 9.1
-    const uint32_t x = v + 1;
-    int len = 0;
-    while ((x >> len) > 1) {
-      ++len;
-    }
-    return bits(0, len).bits(x, len + 1);
-  }
-  BitWriter& align_zero() {
-    while (n_ != 0) {
-      bit(0);
-    }
-    return *this;
-  }
-  BitWriter& trailing() { return bits(1, 1).align_zero(); }  // rbsp_trailing_bits
-  void byte(uint8_t b) { bits(b, 8); }
-  std::vector<uint8_t> take() { return std::move(out_); }
-
- private:
-  void bit(uint32_t b) {
-    cur_ = static_cast<uint8_t>((static_cast<uint32_t>(cur_) << 1U) | b);
-    if (++n_ == 8) {
-      out_.push_back(cur_);
-      cur_ = 0;
-      n_ = 0;
-    }
-  }
-  std::vector<uint8_t> out_;
-  uint8_t cur_ = 0;
-  int n_ = 0;
-};
-
-// Constrained Baseline, level 1.0, 32x16 luma (two macroblocks), POC type 2, no VUI.
-std::vector<uint8_t> pcm_sps() {
-  BitWriter w;
-  w.bits(0x6742C00AU, 32);       // SPS NAL (nal_ref_idc 3), profile_idc 66, constraint_set0/1, level_idc 10
-  w.ue(0).ue(0).ue(2).ue(1);     // sps id, log2_max_frame_num_minus4, pic_order_cnt_type 2, max_num_ref_frames
-  w.bits(0, 1).ue(1).ue(0);      // no frame_num gaps; 2x1 macroblocks
-  w.bits(0b1100, 4).trailing();  // frame_mbs_only, direct_8x8_inference, no cropping, no VUI
-  return w.take();
-}
-
-std::vector<uint8_t> pcm_pps() {
-  BitWriter w;
-  w.bits(0x68, 8).ue(0).ue(0);  // PPS NAL, pps id, sps id
-  w.bits(0, 2).ue(0);           // CAVLC, no bottom_field_pic_order_in_frame_present, one slice group
-  w.ue(0).ue(0).bits(0, 3);     // one reference per list, no weighted prediction
-  w.ue(0).ue(0).ue(0);          // pic_init_qp_minus26, pic_init_qs_minus26, chroma_qp_index_offset: se(0)
-  w.bits(0b100, 3).trailing();  // deblocking_filter_control_present; no constrained intra, no redundant_pic_cnt
-  return w.take();
-}
-
-// The sample value of picture @p pic at (x, y) of plane @p c; never 0, so no emulation prevention is needed.
-uint8_t pcm_sample(int pic, int c, int x, int y) {
-  return static_cast<uint8_t>(16 + ((pic * 37 + c * 61 + x * 5 + y * 11) % 224));
-}
-
-// An IDR picture of two I_PCM macroblocks whose samples are pcm_sample(pic, ...).
-std::vector<uint8_t> pcm_idr(int pic) {
-  BitWriter w;
-  w.bits(0x65, 8).ue(0).ue(7).ue(0);  // IDR NAL (nal_ref_idc 3), first_mb_in_slice 0, slice_type I (all), pps id
-  w.bits(0, 4).ue(static_cast<uint32_t>(pic % 2));  // frame_num; idr_pic_id differs between consecutive IDRs
-  w.bits(0, 2).ue(0).ue(1);  // no_output_of_prior_pics, not long-term, slice_qp_delta se(0), deblocking off
-  for (int mb = 0; mb < 2; ++mb) {
-    w.ue(25).align_zero();  // mb_type I_PCM, pcm_alignment_zero_bit
-    for (int c = 0; c < 3; ++c) {
-      const int n = c == 0 ? 16 : 8;
-      for (int y = 0; y < n; ++y) {
-        for (int x = 0; x < n; ++x) {
-          w.byte(pcm_sample(pic, c, (mb * n) + x, y));
-        }
-      }
-    }
-  }
-  w.trailing();
-  return w.take();
-}
-
-std::vector<uint8_t> pcm_plane(int pic, int c) {
-  const int w = c == 0 ? 32 : 16;
-  const int h = c == 0 ? 16 : 8;
-  std::vector<uint8_t> out;
-  for (int y = 0; y < h; ++y) {
-    for (int x = 0; x < w; ++x) {
-      out.push_back(pcm_sample(pic, c, x, y));
-    }
-  }
-  return out;
-}
 
 // ---- driving the plugin -------------------------------------------------------------------------------------------
 
@@ -263,42 +130,6 @@ void drain(Instance& in, std::vector<OutFrame>* out) {
 }
 
 // ---- Annex B input --------------------------------------------------------------------------------------------
-
-struct Nal {
-  const uint8_t* data;
-  size_t size;
-};
-
-std::vector<Nal> split_annexb(const std::vector<uint8_t>& s) {
-  std::vector<Nal> nals;
-  size_t i = 0;
-  size_t start = SIZE_MAX;
-  while (i + 3 <= s.size()) {
-    if (s[i] == 0 && s[i + 1] == 0 && s[i + 2] == 1) {
-      if (start != SIZE_MAX) {
-        size_t end = i;
-        while (end > start && s[end - 1] == 0) {
-          --end;  // trailing_zero_8bits and the leading zero of a 4-byte start code
-        }
-        nals.push_back({s.data() + start, end - start});
-      }
-      i += 3;
-      start = i;
-    } else {
-      ++i;
-    }
-  }
-  if (start != SIZE_MAX && start < s.size()) {
-    nals.push_back({s.data() + start, s.size() - start});
-  }
-  return nals;
-}
-
-std::vector<uint8_t> read_file(const std::filesystem::path& path) {
-  std::ifstream in(path, std::ios::binary);
-  REQUIRE(in.good());
-  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
-}
 
 struct StreamResult {
   int access_units = 0;
@@ -403,7 +234,8 @@ TEST_CASE("ffmpeg plugin: caps and ABI table", "[fast][third_party]") {
   CHECK((lic == "LGPL-2.1-or-later" || lic == "GPL-2.0-or-later" || lic == "LGPL-3.0-or-later" ||
          lic == "GPL-3.0-or-later"));
   CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == 0U);  // WI-2.170 announces the grid vectors it fills
+  CHECK(caps->grid_fields == (OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 |
+                              OVT_GRID_REF0 | OVT_GRID_REF1));  // WI-2.170, §7.6.3 caps row
   CHECK(caps->has_symbol_accounting == 0);
   CHECK(caps->bit_exact == 1);
   CHECK(caps->supports_threads == 1);
@@ -430,7 +262,7 @@ TEST_CASE("ffmpeg plugin: ovt_plugin_describe carries avcodec_configuration", "[
 }
 
 TEST_CASE("ffmpeg plugin: I_PCM pictures come out with their decode index and exact samples", "[fast][third_party]") {
-  const int threads = GENERATE(1, 4);  // 4: frame threading must keep frame->opaque (§7.6.3 pitfall)
+  const int threads = GENERATE(1, 4);  // 4: slice threads must keep the decode index (§7.6.3 pitfall)
   CAPTURE(threads);
   const ovt_AnalysisDecoderApi& api = plugin_api();
   Instance in(api, threads);
@@ -459,7 +291,7 @@ TEST_CASE("ffmpeg plugin: I_PCM pictures come out with their decode index and ex
     CHECK(f.pts == 5000 + (pic * 40));
     CHECK(f.type == ovt::fb::FrameType::I);
     CHECK(f.is_rap);
-    CHECK(f.diagnostics == 0);
+    CHECK(f.diagnostics == 1);  // ANA-H264-0002: intra inferred (the decoder reports no error)
     for (int c = 0; c < 3; ++c) {
       CHECK(f.planes[static_cast<size_t>(c)] == pcm_plane(pic, c));
     }

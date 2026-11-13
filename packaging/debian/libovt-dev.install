@@ -1,0 +1,5 @@
+usr/include/ovt
+usr/lib/*/libovt_core.so
+usr/lib/*/libovt_render.so
+usr/lib/*/cmake/ovt
+usr/lib/*/pkgconfig/ovt-core.pc

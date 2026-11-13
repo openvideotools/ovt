@@ -57,6 +57,56 @@ jobs:
           path: build/linux-x64-tsan/junit.xml
           if-no-files-found: warn
 
+  # Distro packaging skeletons (chapter 13 §13.6.3, WI-0.072). Off until the skeletons can build end to end:
+  # set the repository variable OVT_PACKAGING_NIGHTLY to `on`. Why off: Ubuntu 22.04 does not ship the pinned
+  # libplacebo/libvmaf, and ovt-studio, the Python module and the packaging install rules are not in the tree yet
+  # (see docs/dev/packaging.md "Status"). The Fedora freeworld spec is never built here (RPM Fusion, patents).
+  # Container images are pinned by digest; the bump is a reviewed PR.
+  package-deb:
+    if: vars.OVT_HOSTED_RUNNERS != 'off' && vars.OVT_PACKAGING_NIGHTLY == 'on'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    container:
+      image: ubuntu:22.04@sha256:076e7bf82319619f28dd0aa9c02ab34b055ad37100395b4f49a2ffba04fb5e11
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential devscripts equivs lintian
+          cp -a packaging/debian debian
+          mk-build-deps --install --remove --tool 'apt-get -y --no-install-recommends' debian/control
+
+      - name: dpkg-buildpackage
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: lintian (errors fail the job)
+        run: lintian --fail-on error --display-info ../*.changes
+
+  package-rpm:
+    if: vars.OVT_HOSTED_RUNNERS != 'off' && vars.OVT_PACKAGING_NIGHTLY == 'on'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    container:
+      image: fedora:41@sha256:f1a3fab47bcb3c3ddf3135d5ee7ba8b7b25f2e809a47440936212a3a50957f3d
+    steps:
+      - name: Tools
+        run: dnf install -y rpm-build rpmdevtools dnf-plugins-core git tar gzip
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Source tarball and build dependencies
+        run: |
+          v=$(cat VERSION)
+          rpmdev-setuptree
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git archive --prefix="ovt-$v/" -o ~/rpmbuild/SOURCES/ovt-$v.tar.gz HEAD
+          dnf builddep -y packaging/rpm/ovt.spec
+
+      - name: rpmbuild (ovt only; the freeworld spec is not built in CI)
+        run: rpmbuild -ba packaging/rpm/ovt.spec
+
   macos-asan:
     runs-on: [self-hosted, macos-arm64]
     timeout-minutes: 90

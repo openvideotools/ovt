@@ -110,12 +110,13 @@ core/tests/metrics/                    Catch2 tests, golden files, oracle script
 
 ```c
 typedef struct ovt_MetricApi {
+  uint32_t struct_size;                       /* D4 */
   uint32_t abi_version;                       /* = 1 */
   ovt_Buffer (*descriptor)(void);             /* MetricDescriptor FlatBuffer */
   ovt_status (*create)(const char* options_json, ovt_Metric** out);
   void       (*destroy)(ovt_Metric*);
   /* Frames are delivered already normalised into descriptor.domain; ref == NULL for NoReference metrics. */
-  ovt_status (*score)(ovt_Metric*, const ovt_PlaneView* ref /* nullable */, const ovt_PlaneView* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
+  ovt_status (*score)(ovt_Metric*, const ovt_MetricPlanes* ref /* nullable */, const ovt_MetricPlanes* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
   ovt_status (*finish)(ovt_Metric*, ovt_Buffer* out /* optional sequence-level FrameScore */);
 } ovt_MetricApi;
 const ovt_MetricApi* ovt_metric_v1(void);
@@ -130,12 +131,13 @@ Rules (binding on all plugins, in-tree or third-party):
 5. Plugins MUST NOT write to `ref`/`dist` buffers.
 6. `options_json` is a JSON object; unknown keys MUST be rejected with `OVT_E_INVALID_ARG` (so typos are caught).
 
-Supporting types (owned by the Data Model chapter; reproduced here for implementers of this chapter — if Chapter 6 differs, Chapter 6 wins):
+Supporting types (`ovt_FrameId` is owned by the Data Model chapter and reproduced here; `ovt_MetricPlanes` is owned by this chapter and lives only in `metric_v1.h` — if Chapter 6 differs on `ovt_FrameId`, Chapter 6 wins):
 
 ```c
 typedef struct ovt_FrameId { int32_t decode_index; int32_t display_index; } ovt_FrameId;
 
-typedef struct ovt_PlaneView {
+typedef struct ovt_MetricPlanes {   /* the multi-plane view a metric scores; not ovt_PlaneView of ovt/decode.h, which is one plane (#156) */
+  uint32_t struct_size;            /* D4: sizeof(ovt_MetricPlanes) as compiled into the host */
   const uint8_t* data[3];          /* Y, U, V (or R,G,B / I,Ct,Cp for RGB-like domains); data[1],data[2] NULL for 4:0:0 */
   int32_t  stride_bytes[3];
   uint32_t width[3], height[3];    /* per plane, in samples */
@@ -144,9 +146,9 @@ typedef struct ovt_PlaneView {
   uint8_t  sample_bytes;           /* 1, 2 or 4 */
   uint8_t  sample_format;          /* 0 = unsigned integer, 1 = IEEE float32 */
   uint8_t  domain;                 /* ovt.fb.WorkingDomain */
-  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered */
+  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered; frozen, embedded by value */
   double   display_peak_nits;      /* display model peak used for linear/pu21/ictcp; 0 for code_value */
-} ovt_PlaneView;
+} ovt_MetricPlanes;
 ```
 
 Sample layout per domain (normative):
@@ -215,7 +217,7 @@ Created ──run()──▶ Probing ──▶ Aligning ──▶ Scoring ──
 
 ### 9.2.4 Normalisation stage
 
-The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_PlaneView` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
+The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_MetricPlanes` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
 
 ```
 crop → scale → chroma_upsample → bit_depth → range → colour(zimg) → domain → temporal(offset/pairing)
@@ -616,7 +618,7 @@ This is the SSIM printed by x264 and x265 (`--ssim`). Definition = exactly x264 
 
 `values = [y, u, v, ssim_db_y]`. Options: `{"planes":["y","u","v"]}` (x264 computes luma only; U/V use the same kernel on the chroma planes and are OVT additions).
 
-**Oracle:** a **vendored, unmodified copy of x264's C kernel** (`ssim_4x4x2_core`, `ssim_end1`, `ssim_end4`, `x264_pixel_ssim_wxh` from `common/pixel.c` of the pinned x264 tag) in `tests/oracles/x264_ssim/pixel_ssim.c` (GPL-2.0-or-later; built only as the oracle executable `x264_ssim_oracle <ref.yuv> <dist.yuv> <WxH> <bitdepth>`, never linked into OVT) driven over the same raw planes; tolerance `1e-6` per plane (x264 float vs OVT double) for 8-bit and 10-bit inputs. Secondary cross-check: the `SSIM Mean Y` line of an x264 encode log (`x264 --ssim --psnr --qp 20 ref.y4m -o /dev/null`) is reproduced by running OVT on the source and the x264 reconstruction (`--dump-yuv`), tolerance `1e-4` (the log prints 7 digits). libvpx's `tiny_ssim` is **not** an oracle for this id: it uses 8×8 windows stepping by 4 without the 2-sample offset, constants scaled by `64²` (`cc1 = 26634`, `cc2 = 239708` at 8-bit), and an "All" = `0.8·Y + 0.1·U + 0.1·V`; OVT does not ship that variant (`ssim_tiny` is reserved as an id, not implemented).
+**Oracle:** a **vendored, unmodified copy of x264's C kernel** (`ssim_4x4x2_core`, `ssim_end1`, `ssim_end4`, `x264_pixel_ssim_wxh` from `common/pixel.c` of the pinned x264 tag) in `tests/oracles/x264_ssim/pixel_ssim.c` (GPL-2.0-or-later; built only as the oracle executable `x264_ssim <ref>.y4m <dist>.y4m` — the Y4M header carries size and bit depth; one executable holds the 8-bit integer path and the 10-bit float path and picks by the header (chapter 14 §14.4.12, issue #306) — never linked into OVT) driven over the same raw planes; tolerance `1e-6` per plane (x264 float vs OVT double) for 8-bit and 10-bit inputs. Secondary cross-check: the `SSIM Mean Y` line of an x264 encode log (`x264 --ssim --psnr --qp 20 --bframes 0 ref.y4m -o out.264`; with B-frames x264 scores non-reference B pictures before deblocking, so the log would not match the decoded pictures, issue #306) is reproduced by running OVT on the source and the decoded x264 output, tolerance `1e-4` (the log prints 7 digits). libvpx's `tiny_ssim` is **not** an oracle for this id: it uses 8×8 windows stepping by 4 without the 2-sample offset, constants scaled by `64²` (`cc1 = 26634`, `cc2 = 239708` at 8-bit), and an "All" = `0.8·Y + 0.1·U + 0.1·V`; OVT does not ship that variant (`ssim_tiny` is reserved as an id, not implemented).
 
 ### 9.4.5 `ms_ssim`
 
@@ -755,7 +757,7 @@ All models are compiled in (`built_in_models=true`) and loaded with `vmaf_model_
 
 Each id is a separate `ovt_MetricApi` exported from `libovt-core` itself (`ovt_metric_vmaf_<id>()`), registered by the host at start-up; third-party plugins use the same ABI.
 
-### 9.5.4 Filling `VmafPicture` from `ovt_PlaneView`
+### 9.5.4 Filling `VmafPicture` from `ovt_MetricPlanes`
 
 ```cpp
 VmafPixelFormat fmt = (pv.planes == 1) ? VMAF_PIX_FMT_YUV400P
@@ -1052,7 +1054,7 @@ What Chapter 11 (GUI) and Chapter 10 (rendering) MAY assume from this module, vi
 /* core/include/ovt/metrics.h — metrics C API (WI-3.300 skeleton, WI-3.316 final) */
 typedef struct ovt_MetricsJob ovt_MetricsJob;                /* opaque */
 typedef struct ovt_MapView { uint32_t struct_size; /* D4 d: = sizeof(ovt_MapView) */ const struct ovt_MapBlobHeader* header; const float* values; } ovt_MapView;
-typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_PlaneView ref, dist; } ovt_PlanePair;
+typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_MetricPlanes ref, dist; } ovt_PlanePair;
 typedef void (*ovt_MetricsEventFn)(const char* event_json, void* user);   /* JobEvent as JSON, ≤ 10 Hz */
 
 ovt_status ovt_metrics_list_descriptors(ovt_Buffer* out_descriptors_json);               /* JSON array of MetricDescriptor */
@@ -1090,7 +1092,7 @@ ovt_status ovt_metrics_bd(const char* curves_json, const char* options_json, ovt
 | Corpus | Content | Used for |
 |---|---|---|
 | `netflix_src01_hrc00_576x324`, `netflix_src01_hrc01_576x324` (Netflix vmaf `python/test/resource/yuv/`) and the further `netflix` pairs of the pinned tree | 8-bit 4:2:0 576×324, 48 frames (wrapped to Y4M by the fetcher) | libvmaf parity, PSNR/SSIM oracles, pooling, scene detector |
-| `ytugc_clip01` … `ytugc_clip20` (YouTube-UGC, https://media.withyoutube.com; `ytugc_clip01`–`03` are `fast`; mixed 360p–1080p, landscape/portrait) | MP4 H.264 | UVQ parity |
+| `ytugc_clip01` … `ytugc_clip20` (YouTube-UGC, https://media.withyoutube.com; `ytugc_clip01` and `ytugc_clip03` are `fast` (chapter 14 §14.3.2, issue #179); mixed 360p–1080p, landscape/portrait) | MP4 H.264 | UVQ parity |
 | OVT synthetic `syn_metrics_*` (`syn_metrics_1080p_pair`, `syn_metrics_1080p_bitflip_f37`, `syn_metrics_10bit_8bit_pair`, `syn_metrics_444_420_pair`, `syn_metrics_fps_mismatch_pair`, `syn_metrics_scale_range_pair`, `syn_metrics_ladder_*`, `syn_metrics_pq_1080p_pair`), `syn_align_drop7`, `syn_scenes_5cuts` (chapter 14 §14.3.3 recipes 24, 25, 52–59); in-test frames from `tools/gen_metrics_synth.py` (gradient/noise/flat, 8/10-bit, 4:2:0/4:2:2/4:4:4, generated in memory by the unit tests, not corpus entries) | Y4M | kernel unit tests, HDR domain tests, alignment tests (frame drops, shifts, letterbox inserted programmatically) |
 | AWCY sample RD data (`bd/*.json`) | numbers | BD-rate |
 | HDR: `syn_metrics_pq_1080p_pair`, `syn_h265_main10_pq_hdr`, `syn_hlg_1080p` and the `patterns`-tagged ids (`syn_pat_pq_patches_1000`, …; chapter 14 §14.3.3 recipes 10, 38, 58, 73) | HEVC Main10 PQ/HLG | HDR domain, wPSNR, ΔE-ITP. Netflix "Sol Levante" is CC BY-NC-ND 4.0 (no derivatives, non-commercial) and therefore **not** used as a corpus. |
@@ -1164,15 +1166,15 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 ### WI-3.300 — Create the metrics schema, C API skeleton and plugin ABI header
 **Goal:** land `ovt_metrics.fbs`, `metric_v1.h`, `metrics.h` and an empty `MetricJob` so every later WI compiles against fixed interfaces.
 **Depends on:** WI-0.082 (`ovt_metrics.fbs`), WI-0.083 (generated headers), WI-1.512 (`jobs::Pool`).
-**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_PlaneView`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
+**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_MetricPlanes`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
 **Interface:** §9.2.2, §9.2.3, §9.2.4 schema.
-**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `share/ovt/metrics/` and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
+**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `OVT_PLUGIN_DIR` (chapter 13 §13.2.6, the same directories and `$OVT_PLUGIN_PATH` rule as decoder plugins, chapter 12 §12.3.11) and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
 **Acceptance tests:** 1. Given a `NormalizationConfig` of `{}`, When resolved, Then the output JSON equals `golden/norm_defaults.json` byte for byte. 2. Given `{"scale":{"kernel":"nearest"}}`, When parsed, Then `OVT_E_INVALID_ARG` with message naming `scale.kernel`. 3. Given a dummy plugin `libovt_metric_example`, When the registry loads, Then `ovt_metrics_list_descriptors()` contains id `example`.
 **Size:** M.
 **Notes / pitfalls:** `MetricsResult.normalization` uses chapter 06's canonical form (sorted keys, no whitespace — V-030); only the pretty export of §9.9.2 uses schema order. The ABI header must not include any C++ or FlatBuffers headers.
 
 ### WI-3.301 — Implement the normalisation pipeline (crop, bit depth, range, pairing) without zimg
-**Goal:** produce `ovt_PlaneView` pairs in `CodeValue` for equal-geometry inputs.
+**Goal:** produce `ovt_MetricPlanes` pairs in `CodeValue` for equal-geometry inputs.
 **Depends on:** WI-3.300, WI-2.171 (playback decoder for frame access).
 **Produces:** `core/src/metrics/normalize/{pipeline.h,.cpp,crop.cpp,bit_depth.cpp,frame_pairing.cpp}`.
 **Interface:** §9.2.4 steps 1, 4, 8; `AlignmentReport` fields `ref_frames,dist_frames,paired_frames,skipped_*`.

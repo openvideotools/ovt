@@ -434,7 +434,7 @@ Codec-neutral vocabulary: OVT uses **block** for any codec's coding unit (H.264 
 - **ovt_File / RandomAccessFile** — the C handle and C++ class (`ovt::io::RandomAccessFile`) for bounds-checked random byte access to an input (mmap or pread backend, fd-based for Android). [OVT: chapter 7 §7.1]
 - **ovt_Job** — the cancellation/progress token passed to long-running C API calls; cancellation is observed within 50 ms of work and progress is reported at least every 50 ms. [OVT: chapter 0 §0.7.2; chapter 12 §12.3.5]
 - **ovt / ovt-studio** — the command-line tool (`ovt info|probe|syntax|index|frames|dump|extract|analyze|metrics|bdrate|hdr|verify|cache|plugins|completion|doctor`) and the Qt Quick GUI. [OVT: chapter 12 §12.2; chapter 11]
-- **ovt_Picture / ovt_PlaneView** — the C structs describing a decoded picture (planes + `ovt_ColorDescription` + `FrameId`) and one plane's memory view (`data`, `stride`, `width`, `height`, `bit_depth`). [OVT: chapter 12 §12.3.9; chapter 9 §9.2.2]
+- **ovt_Picture / ovt_PlaneView** — the C structs describing a decoded picture (planes + `ovt_ColorDescription` + `FrameId`) and one plane's memory view (`data`, `stride`, `width`, `height`, `bit_depth`). The multi-plane view a metric plugin scores is `ovt_MetricPlanes` (chapter 9 §9.2.2). [OVT: chapter 12 §12.3.9; chapter 9 §9.2.2]
 - **`.ovtproj`** — the JSON project file (files, roles, layout, view, bookmarks, comments, metric jobs). [OVT: chapter 11 §11.2.6]
 - **OvtSession** — the Kotlin object owning the native handles of one open stream on Android across configuration changes (`ViewModel`-scoped). [OVT: chapter 11 §11.5; chapter 13 §13.4]
 - **ovt_status** — the C API result enum: `OVT_OK`, `OVT_E_INVALID_ARG`, `OVT_E_IO`, `OVT_E_UNSUPPORTED`, `OVT_E_CORRUPT`, `OVT_E_NOMEM`, `OVT_E_CANCELLED`, `OVT_E_PLUGIN`, `OVT_E_INTERNAL`. [OVT: chapter 0 §0.6.1; chapter 12 §12.3.3]
@@ -593,6 +593,7 @@ Codec-neutral vocabulary: OVT uses **block** for any codec's coding unit (H.264 
 - **SyntaxBuilder** — the recorder that turns `BitReader` reads into `SyntaxNode` trees (or plain values in non-recording mode). [OVT: chapter 7 §7.3.2]
 - **Syntax element** — one named value read from the bitstream by the spec's syntax tables (e.g. `log2_max_pic_order_cnt_lsb_minus4`); `SyntaxNode` records its name, descriptor, value, bit span and spec clause. [OVT: chapter 7 §7.3]
 - **SyntaxNode** — the FlatBuffer table for one syntax element or structure: `name`, `descriptor`, `kind:SyntaxValueKind`, value fields, `enum_name`, `derived`, `span:BitSpan`, `spec_ref`, `children`, `array_index`. [OVT: chapter 6 §6.3]
+- **SyntaxTree** — the tree of `SyntaxNode` tables rooted at `Unit.header` (and `PartitionInfo.header`) in `ovt_model.fbs`; not a schema table of its own — chapters that name a `SyntaxTree` mean that rooted `SyntaxNode` tree (issue #111). [OVT: chapter 6 §6.2.7, chapter 14 WI-0.556]
 - **Syntax tree** — the GUI panel (and `SyntaxNode` hierarchy) showing a unit's parsed header fields with values, derived variables and bit positions; clicking highlights bytes in the hex view. [OVT: chapter 11 §11.3.4]
 - **Synthetic stream** — a test stream OVT generates from lavfi test patterns with pinned encoders (`syn_*`) to exercise a named codec feature. [OVT: chapter 14 §14.3.3]
 

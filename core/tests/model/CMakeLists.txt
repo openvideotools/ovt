@@ -52,7 +52,7 @@ target_compile_definitions(test_model_roundtrip PRIVATE "OVT_GOLDEN_DIR=\"${PROJ
 ovt_set_license(test_model_roundtrip "LGPL-2.1-or-later")
 ovt_catch_discover_tests(test_model_roundtrip EXTRA_LABELS golden)
 
-# WI-0.089a: the YUView statistics CSV exporter; acceptance test 1 compares the export of
+# WI-0.089: the YUView statistics CSV exporter and importer; acceptance test 1 compares the export of
 # tiny16_hevc.fa with core/tests/golden/tiny16_hevc.csv (a mismatch writes tiny16_hevc.actual.csv here).
 add_executable(test_yuview_csv test_yuview_csv.cpp)
 target_link_libraries(test_yuview_csv PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
