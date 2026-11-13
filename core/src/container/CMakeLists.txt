@@ -9,6 +9,7 @@ target_sources(
   ovt_core_objects
   PRIVATE annexb.cpp
           container.cpp
+          isobmff/box_walk.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
