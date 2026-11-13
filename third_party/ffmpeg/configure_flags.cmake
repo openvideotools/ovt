@@ -89,7 +89,7 @@ set(OVT_FFMPEG_POOL_HWACCELS_macos mpeg4_videotoolbox)
 set(OVT_FFMPEG_POOL_HWACCELS_linux mpeg4_vaapi vc1_vaapi wmv3_vaapi)
 
 function(ovt_ffmpeg_configure_flags out_var)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "" "FLAVOUR;PLATFORM;HW_DECODE;PATENT_CODECS_IN_CORE;GPL;DAV1D" "")
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "FLAVOUR;PLATFORM;HW_DECODE;PATENT_CODECS_IN_CORE;GPL;DAV1D;STATIC" "")
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_ffmpeg_configure_flags: unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -124,7 +124,11 @@ function(ovt_ffmpeg_configure_flags out_var)
 
   # ---- flavour part ---------------------------------------------------------------------------------
   if(arg_FLAVOUR STREQUAL "core")
-    list(APPEND flags --enable-shared --disable-static --build-suffix=_ovt)
+    if(arg_STATIC) # OVT_FFMPEG_CORE_STATIC, fuzz builds only
+      list(APPEND flags --disable-shared --enable-static --build-suffix=_ovt)
+    else()
+      list(APPEND flags --enable-shared --disable-static --build-suffix=_ovt)
+    endif()
     if(arg_DAV1D)
       list(APPEND flags --enable-libdav1d)
     endif()

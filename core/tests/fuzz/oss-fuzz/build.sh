@@ -59,6 +59,7 @@ export VCPKG_FEATURE_FLAGS="manifests,versions"
 # OFF. OVT_FUZZ_ENGINE is $LIB_FUZZING_ENGINE: AFL++ and honggfuzz link their own driver. The tests stay ON only
 # because the fuzz targets live in core/tests/fuzz; the analysis plugins and everything with a GUI stay off.
 # OVT_ENABLE_HW_DECODE=OFF: the base-builder image has no libva, and the fuzz targets never reach a hwaccel.
+# OVT_FFMPEG_CORE_STATIC=ON: check_build runs each binary from $OUT alone, with no libavformat_ovt.so beside it.
 cmake -S . -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DCMAKE_C_COMPILER="$CC" -DCMAKE_CXX_COMPILER="$CXX" \
@@ -68,7 +69,7 @@ cmake -S . -B "$build_dir" -G Ninja \
   -DVCPKG_OVERLAY_TRIPLETS="$triplet_dir" -DVCPKG_TARGET_TRIPLET=x64-linux-ossfuzz \
   -DOVT_ENABLE_FUZZ=ON -DOVT_FUZZ_ENGINE="$LIB_FUZZING_ENGINE" \
   -DOVT_ENABLE_SANITIZERS=OFF -DOVT_WERROR=OFF -DOVT_ENABLE_LTO=OFF \
-  -DOVT_BUILD_TESTS=ON -DOVT_ENABLE_HW_DECODE=OFF \
+  -DOVT_BUILD_TESTS=ON -DOVT_ENABLE_HW_DECODE=OFF -DOVT_FFMPEG_CORE_STATIC=ON \
   -DOVT_BUILD_GUI=OFF -DOVT_BUILD_CLI=OFF -DOVT_BUILD_RENDER=OFF -DOVT_BUILD_PYTHON=OFF \
   -DOVT_BUILD_PLUGIN_AOM=OFF -DOVT_BUILD_PLUGIN_DE265=OFF -DOVT_BUILD_PLUGIN_FFMPEG=OFF \
   -DOVT_BUILD_PLUGIN_HM=OFF -DOVT_BUILD_METRIC_XPSNR=OFF
