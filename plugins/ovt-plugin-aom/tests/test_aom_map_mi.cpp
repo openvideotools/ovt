@@ -686,10 +686,11 @@ TEST_CASE("aom map_mi: every frame of the fast libaom vectors passes the validat
     const fb::FrameAnalysis* fa = fb::GetFrameAnalysis(run.buffers[f].data());
     REQUIRE(fa->blocks() != nullptr);
     CHECK(fa->blocks()->size() > 1);
-    // No partition ambiguity, no uncovered cell. Info notes are allowed: the film grain vector carries "film grain
-    // present (not applied)" (WI-2.158).
+    // No partition ambiguity, no uncovered cell. The one diagnostic allowed is the film grain vector's Info note
+    // (WI-2.158).
     for (const fb::Diagnostic* d : *fa->diagnostics()) {
       CHECK(d->severity() == fb::Severity::Info);
+      CHECK(d->message()->str() == "film grain present (not applied)");
     }
   }
 }
