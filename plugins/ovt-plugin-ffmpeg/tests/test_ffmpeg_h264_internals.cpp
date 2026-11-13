@@ -19,10 +19,13 @@ extern "C" {
 #include <utility>
 #include <vector>
 
+#include "h264_analysis.hpp"
+#include "h264_synth.hpp"
 #include "map_h264_sidedata.hpp"
 
 namespace {
 
+using namespace ovt_ffmpeg_test;  // NOLINT(google-build-using-namespace)
 using ovt::ffmpeg::Box;
 using ovt::ffmpeg::Diag;
 using ovt::ffmpeg::SideData;
@@ -185,4 +188,34 @@ TEST_CASE("map_h264_sidedata: interlaced frames, misplaced and oversized vectors
   CHECK(has_code(diags, "ANA-H264-0001"));
   CHECK(has_code(diags, "MDL-GEN-0003"));
   CHECK(std::any_of(diags.begin(), diags.end(), [](const Diag& d) { return d.code.empty() && d.severity == 1; }));
+}
+
+TEST_CASE("H264Analysis: decode index 0 and the pts table", "[fast][third_party]") {
+  using ovt::ffmpeg::Frame;
+  using ovt::ffmpeg::H264Analysis;
+  std::unique_ptr<H264Analysis> dec;
+  REQUIRE(H264Analysis::create(nullptr, 0, 1, &dec) == OVT_OK);
+  const std::vector<uint8_t> sps = pcm_sps();
+  const std::vector<uint8_t> pps = pcm_pps();
+  const std::vector<uint8_t> idr = pcm_idr(0);
+  // Access units that never produce a frame (an access unit delimiter each) must not pile up in the table.
+  const std::vector<uint8_t> aud = {0x09, 0xF0};
+  for (int hint = 1; hint <= 3000; ++hint) {
+    const ovt_status st = dec->push(aud.data(), aud.size(), hint, hint);  // libavcodec: "no frame!" for the one before
+    REQUIRE((st == OVT_OK || st == OVT_E_CORRUPT));
+  }
+  CHECK(dec->pending_pts() <= H264Analysis::kMaxPendingPts);
+  // Decode index 0 is a real index: packet->opaque holds index + 1, so it can be told from "no packet".
+  (void)dec->push(sps.data(), sps.size(), 0, 77);  // reports on the AUD access unit before it
+  REQUIRE(dec->push(pps.data(), pps.size(), 0, 77) == OVT_OK);
+  REQUIRE(dec->push(idr.data(), idr.size(), 0, 77) == OVT_OK);
+  REQUIRE(dec->flush() == OVT_OK);
+  Frame out;
+  REQUIRE(dec->pop(&out, false));
+  CHECK(out.diagnostics.size() <=
+        H264Analysis::kMaxPendingDiags + 1);  // the AUD errors do not pile up either; +1: ANA-H264-0002
+  CHECK(out.decode_index == 0);
+  CHECK(out.pts == 77);
+  CHECK_FALSE(dec->pop(&out, false));
+  CHECK(dec->pending_pts() == 0);  // emptied at the end of the input
 }

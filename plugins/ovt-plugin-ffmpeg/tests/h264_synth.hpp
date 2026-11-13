@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Hand-made H.264 units for the plugin tests (no host dependency): a bit writer and a 32x16 Baseline SPS / PPS.
+// Hand-made H.264 units for the tests of ovt-plugin-ffmpeg (no host dependency): a bit writer, a 32x16 Constrained
+// Baseline SPS / PPS and IDR pictures of two I_PCM macroblocks whose samples are known.
 #ifndef OVT_PLUGIN_FFMPEG_TESTS_H264_SYNTH_HPP
 #define OVT_PLUGIN_FFMPEG_TESTS_H264_SYNTH_HPP
 
@@ -70,6 +71,44 @@ inline std::vector<uint8_t> pcm_pps() {
   w.ue(0).ue(0).ue(0);          // pic_init_qp_minus26, pic_init_qs_minus26, chroma_qp_index_offset: se(0)
   w.bits(0b100, 3).trailing();  // deblocking_filter_control_present; no constrained intra, no redundant_pic_cnt
   return w.take();
+}
+
+// The sample value of picture @p pic at (x, y) of plane @p c; never 0, so no emulation prevention is needed.
+inline uint8_t pcm_sample(int pic, int c, int x, int y) {
+  return static_cast<uint8_t>(16 + ((pic * 37 + c * 61 + x * 5 + y * 11) % 224));
+}
+
+// An IDR picture of two I_PCM macroblocks whose samples are pcm_sample(pic, ...).
+inline std::vector<uint8_t> pcm_idr(int pic) {
+  BitWriter w;
+  w.bits(0x65, 8).ue(0).ue(7).ue(0);  // IDR NAL (nal_ref_idc 3), first_mb_in_slice 0, slice_type I (all), pps id
+  w.bits(0, 4).ue(static_cast<uint32_t>(pic % 2));  // frame_num; idr_pic_id differs between consecutive IDRs
+  w.bits(0, 2).ue(0).ue(1);  // no_output_of_prior_pics, not long-term, slice_qp_delta se(0), deblocking off
+  for (int mb = 0; mb < 2; ++mb) {
+    w.ue(25).align_zero();  // mb_type I_PCM, pcm_alignment_zero_bit
+    for (int c = 0; c < 3; ++c) {
+      const int n = c == 0 ? 16 : 8;
+      for (int y = 0; y < n; ++y) {
+        for (int x = 0; x < n; ++x) {
+          w.byte(pcm_sample(pic, c, (mb * n) + x, y));
+        }
+      }
+    }
+  }
+  w.trailing();
+  return w.take();
+}
+
+inline std::vector<uint8_t> pcm_plane(int pic, int c) {
+  const int w = c == 0 ? 32 : 16;
+  const int h = c == 0 ? 16 : 8;
+  std::vector<uint8_t> out;
+  for (int y = 0; y < h; ++y) {
+    for (int x = 0; x < w; ++x) {
+      out.push_back(pcm_sample(pic, c, x, y));
+    }
+  }
+  return out;
 }
 
 }  // namespace ovt_ffmpeg_test

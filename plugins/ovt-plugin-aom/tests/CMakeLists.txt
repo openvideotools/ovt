@@ -27,3 +27,19 @@ target_link_libraries(ovt_plugin_aom_no_inspection_tests PRIVATE ovt::flags ${Ca
 add_dependencies(ovt_plugin_aom_no_inspection_tests tp_libaom) # the headers come from the ExternalProject
 ovt_set_license(ovt_plugin_aom_no_inspection_tests "BSD-2-Clause")
 ovt_catch_discover_tests(ovt_plugin_aom_no_inspection_tests)
+
+# ---- WI-2.156: insp_mi_data mapping (map_mi.cpp, partition_reconstruct.cpp) --------------------------------------
+# The mapping sources are compiled in directly (they need no libaom) for the hand-made frames; the stream tests load
+# the plugin through the registry and compare with libaom inspect layers in data/inspect_reference.json.
+ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+add_executable(ovt_plugin_aom_map_mi_tests test_aom_map_mi.cpp ../src/map_mi.cpp ../src/partition_reconstruct.cpp
+                                           ../src/fb_builder.cpp)
+target_include_directories(ovt_plugin_aom_map_mi_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+target_link_libraries(ovt_plugin_aom_map_mi_tests PRIVATE ovt_core_objects ovt_schemas ovt_test_support ovt::flags
+                                                          nlohmann_json::nlohmann_json ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_plugin_aom_map_mi_tests PRIVATE "OVT_AOM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_aom>\""
+                                      "OVT_AOM_TEST_DATA_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
+add_dependencies(ovt_plugin_aom_map_mi_tests ovt_plugin_aom)
+ovt_set_license(ovt_plugin_aom_map_mi_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_aom_map_mi_tests)

@@ -6,6 +6,12 @@
 // point is noexcept and turns an exception into an error status. It produces FrameAnalysis buffers with FrameInfo,
 // the Reconstruction planes and, from AV_FRAME_DATA_MOTION_VECTORS and AV_FRAME_DATA_VIDEO_ENC_PARAMS (WI-2.170,
 // map_h264_sidedata.cpp), the macroblock tree, the cell grid, the motion vectors and the pseudo references L0 / L1.
+//
+// Compiled with OVT_FFMPEG_PLUGIN_HEVC=1 it is libovt_plugin_ffmpeg_hevc instead (WI-4.107): the ABI carries one codec
+// per plugin (caps.codec), so the optional H.265 "fast" path is a second library of the same sources. It drives
+// libavcodec's hevc decoder and maps the motion vectors and per-CU QP that patch 0002 exports (map_hevc_sidedata.cpp).
+// Its id is not in the registry's H.265 default chain, so it is never the default H.265 plugin (chapter 07 §7.8).
+// SPEC-ASSUMPTION(#370): a separate library with its own id, rather than a second codec in libovt_plugin_ffmpeg.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -31,7 +37,13 @@ extern "C" {
 
 namespace {
 
-constexpr uint8_t kCodecH264 = 1;    // ovt.fb.Codec.H264
+#ifndef OVT_FFMPEG_PLUGIN_HEVC
+#define OVT_FFMPEG_PLUGIN_HEVC 0
+#endif
+constexpr bool kHevc = OVT_FFMPEG_PLUGIN_HEVC != 0;
+constexpr uint8_t kCodec = kHevc ? 2 : 1;  // ovt.fb.Codec.H265 / H264
+constexpr ovt::ffmpeg::Codec kDecoder = kHevc ? ovt::ffmpeg::Codec::H265 : ovt::ffmpeg::Codec::H264;
+constexpr ovt::fb::BlockKind kBlockKind = kHevc ? ovt::fb::BlockKind::CU : ovt::fb::BlockKind::MB;
 constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
 constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
 constexpr int16_t kMvdNotAvailable = -32768;     // MotionVector.mvd_x/y: the side data has no mvd (§7.6.3)
@@ -66,22 +78,26 @@ const char* ffmpeg_spdx() {
 // Strings and caps are built once from the linked FFmpeg (static locals: thread-safe initialisation).
 struct Info {
   std::string version = std::string("0.1.0+ffmpeg.") + av_version_info();
-  std::string notes = std::string("H.264 analysis via libavcodec ") + av_version_info() +
-                      " (motion vectors and QP side data; sub-8x8 MVs, ref_idx and intra modes need the phase-4 "
-                      "MB-params patch)";
-  std::string describe = std::string("ovt-plugin-ffmpeg ") + version + "; licence " + ffmpeg_spdx() +
-                         "; avcodec_configuration(): " + avcodec_configuration();
+  std::string notes =
+      kHevc ? std::string("H.265 motion vectors and per-CU QP via libavcodec ") + av_version_info() +
+                  " (needs the OVT patch 0002; no partitions, intra modes, transform tree or ref_idx; optional, never "
+                  "the default H.265 plugin)"
+            : std::string("H.264 analysis via libavcodec ") + av_version_info() +
+                  " (motion vectors and QP side data; sub-8x8 MVs, ref_idx and intra modes need the phase-4 "
+                  "MB-params patch)";
+  std::string describe = std::string(kHevc ? "ovt-plugin-ffmpeg_hevc " : "ovt-plugin-ffmpeg ") + version +
+                         "; licence " + ffmpeg_spdx() + "; avcodec_configuration(): " + avcodec_configuration();
   ovt_AnalysisCaps caps{};
   Info() {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
-    caps.codec = kCodecH264;
+    caps.codec = kCodec;
     caps.plane_stages = 1U << kStageRecon;
     caps.grid_fields =
         OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 | OVT_GRID_REF0 | OVT_GRID_REF1;
     caps.has_symbol_accounting = 0;
     caps.bit_exact = 1;
     caps.supports_threads = 1;  // libavcodec slice threads (SPEC-ASSUMPTION(#302))
-    caps.id = "ffmpeg";
+    caps.id = kHevc ? "ffmpeg_hevc" : "ffmpeg";
     caps.version = version.c_str();
     caps.license = ffmpeg_spdx();
     caps.notes = notes.c_str();
@@ -130,7 +146,8 @@ flatbuffers::Offset<ovt::fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder
   return g.Finish();
 }
 
-// blocks[0] is the virtual root (chapter 06 §6.3.2); blocks[1 + n] is macroblock n in raster order.
+// blocks[0] is the virtual root (chapter 06 §6.3.2); blocks[1 + n] is macroblock n in raster order (H.265: coding unit
+// n in the order of the side data).
 void build_blocks(flatbuffers::FlatBufferBuilder& fbb, const ovt::ffmpeg::Frame& f,
                   std::vector<flatbuffers::Offset<ovt::fb::Block>>* out) {
   const ovt::ffmpeg::SideData& sd = f.side;
@@ -153,7 +170,7 @@ void build_blocks(flatbuffers::FlatBufferBuilder& fbb, const ovt::ffmpeg::Frame&
     ovt::fb::BlockBuilder b(fbb);
     b.add_id(1U + static_cast<uint32_t>(i));
     b.add_parent(0);
-    b.add_kind(ovt::fb::BlockKind::MB);
+    b.add_kind(kBlockKind);
     b.add_rect(&rect);
     b.add_level(1);
     b.add_partition_type(kPartitionNotAvailable);
@@ -294,7 +311,7 @@ ovt_status ff_create(const uint8_t* codec_private, size_t len, int threads, ovt_
   *out = nullptr;
   return guarded([&] {
     auto dec = std::make_unique<ovt_AnalysisDecoder>();
-    const ovt_status st = ovt::ffmpeg::H264Analysis::create(codec_private, len, threads, &dec->decoder);
+    const ovt_status st = ovt::ffmpeg::H264Analysis::create(kDecoder, codec_private, len, threads, &dec->decoder);
     if (st == OVT_OK) {
       *out = dec.release();
     }

@@ -8,6 +8,7 @@
 #ifndef OVT_RENDER_OVERLAY_SET_H
 #define OVT_RENDER_OVERLAY_SET_H
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -80,6 +81,15 @@ class OVT_RENDER_API OverlayBuilder {
   // grid before calling). Thread-safe for the CPU part; GPU upload happens inside set_overlays().
   std::unique_ptr<OverlaySet> build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
                                     const uint16_t* custom_cells = nullptr);
+  // WI-2.430 addition: the same for a FlatBuffer given as bytes, which is verified (flatbuffers::Verifier) first.
+  // Returns nullptr when the buffer does not verify. Use this whenever the buffer is not already trusted: a root
+  // pointer alone carries no length, so build(const FrameAnalysis*) can only check vector lengths against the grid.
+  // SPEC-ASSUMPTION(#317): §10.2.5 says "verified FlatBuffer" but WI-2.430 step 1 verifies inside build().
+  std::unique_ptr<OverlaySet> build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                    const uint16_t* custom_cells = nullptr);
+
+ private:
+  VideoSurface* owner_;
 };
 
 }  // namespace ovt::render
