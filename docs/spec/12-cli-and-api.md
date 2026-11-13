@@ -928,11 +928,11 @@ A job is passed to one blocking call at a time; passing the same job to two conc
 
 ```c
 typedef struct ovt_File ovt_File;
-ovt_status ovt_file_open(const char* path, ovt_File** out);                   /* UTF-8 path; read-only; pread()-based with a 64 KiB-page read cache (chapter 08 §8.1 rule 5: no mmap, so bytes_read statistics stay exact) */
+ovt_status ovt_file_open(const char* path, ovt_File** out);                   /* UTF-8 path; read-only; pread()-based with a 64 KiB-page read cache (chapter 08 §8.1 rule 5: no mmap, so bytes_read statistics stay exact); returns IoError::code (chapter 07 §7.1.3), not a flat OVT_E_IO */
 /* Opt-in mmap for bulk readers (metrics, Python): disables bytes_read accounting; never used by the container module. */
 ovt_status ovt_file_open_mapped(const char* path, ovt_File** out);
-/* take_ownership=1: the ovt_File owns fd and closes it (Android: pass the result of ParcelFileDescriptor.detachFd()); take_ownership=0: the library dup()s fd. display_name (nullable) is what ovt_file_display_name returns, else "fd:<n>". Mirrors chapter 07 §7.1.2 open_fd(). */
-ovt_status ovt_file_open_fd(int fd, uint64_t size /*0 = fstat*/, int take_ownership, const char* display_name, ovt_File** out);
+/* take_ownership=1: the ovt_File owns fd and closes it, on failure too (except EBADF) — Android: pass the result of ParcelFileDescriptor.detachFd(), never getFd(); take_ownership=0: the library dup()s fd (F_DUPFD_CLOEXEC) and adopts the copy. display_name (nullable) is what ovt_file_display_name returns, else "fd:<n>" with the caller's fd number. FIFOs and sockets are rejected (OVT_E_INVALID_ARG). Mirrors chapter 07 §7.1.2 open_fd() (issue #110). */
+ovt_status ovt_file_open_fd(int fd, uint64_t size /*0 or UINT64_MAX = unknown, fstat()*/, int take_ownership, const char* display_name, ovt_File** out);
 ovt_status ovt_file_open_memory(const uint8_t* data, size_t size, int copy, ovt_File** out);   /* copy=0: caller keeps data alive */
 uint64_t   ovt_file_size(const ovt_File*);
 ovt_status ovt_file_read(ovt_File*, uint64_t offset, uint8_t* dst, size_t len, size_t* out_read);
@@ -1090,9 +1090,10 @@ void       ovt_analysis_close(ovt_Analysis*);
 ### 12.3.11 `ovt/plugins.h`
 
 ```c
-/* Search paths, in order: (1) paths added here, (2) $OVT_PLUGIN_PATH, (3) platform defaults:
-   macOS   <bundle>/Contents/PlugIns, ~/Library/Application Support/ovt/plugins, /usr/local/lib/ovt/plugins, <homebrew prefix>/lib/ovt/plugins
-   Linux   $XDG_DATA_HOME/ovt/plugins, /usr/lib/ovt/plugins, /usr/lib64/ovt/plugins, /app/lib/ovt/plugins (Flatpak), $APPDIR/usr/lib/ovt/plugins (AppImage)
+/* Search paths, in order (the one list of chapter 07 §7.5.1, issue #212): (1) paths added here, (2) $OVT_PLUGIN_PATH
+   (if set and not ending in ':' it replaces the platform defaults; a trailing ':' appends them), (3) platform defaults:
+   macOS   <bundle>/Contents/PlugIns/ovt, <bundle>/Contents/PlugIns, <exe>/../lib/ovt/plugins, ~/Library/Application Support/ovt/plugins, /usr/local/lib/ovt/plugins, /opt/homebrew/lib/ovt/plugins
+   Linux   <exe>/../lib/ovt/plugins, $XDG_DATA_HOME/ovt/plugins, /usr/local/lib/ovt/plugins, /usr/lib/ovt/plugins, /usr/lib64/ovt/plugins, /usr/lib/<multiarch>/ovt/plugins, /app/lib/ovt/plugins (Flatpak), $APPDIR/usr/lib/ovt/plugins (AppImage)
    Android <nativeLibraryDir>, <filesDir>/plugins  (chapter 13 §13.4.6 rules) */
 ovt_status ovt_plugins_add_search_path(const char* dir);
 ovt_status ovt_plugins_scan(void);                                       /* dlopen()s every libovt_plugin_*.{so,dylib}; idempotent; thread-safe */
@@ -1102,11 +1103,11 @@ ovt_status ovt_plugins_load_file(const char* path, ovt_Buffer* out /* PluginInfo
 ovt_status ovt_plugins_register_analysis_decoder(const ovt_AnalysisDecoderApi* api, const char* origin /*"(built-in)"*/);
 ovt_status ovt_plugins_register_metric(const ovt_MetricApi* api, const char* origin);
 ovt_status ovt_plugins_list(ovt_Buffer* out /* PluginList */);
-ovt_status ovt_plugins_set_default(uint8_t codec, const char* analysis_plugin_id);   /* default order otherwise: AV1 aom; H265 de265 > hm > ffmpeg; H264 ffmpeg */
+ovt_status ovt_plugins_set_default(uint8_t codec, const char* analysis_plugin_id);   /* default order otherwise: AV1 aom; H265 de265 > hm > ffmpeg; H264 ffmpeg; then the first registered plugin for the codec, never ffmpeg_hevc (opt-in only, chapter 07 §7.5.1; issues #212, #370) */
 const char* ovt_plugins_default(uint8_t codec);
 ```
 
-Loading rules: the file MUST export exactly one of `ovt_analysis_decoder_v1` / `ovt_metric_v1` (checked with `dlsym`); `abi_version` MUST equal the host's constant or the plugin is rejected with `OVT_E_PLUGIN` and Diagnostic `ANA-PLG-0001`; a plugin whose `caps()->codec` duplicates a registered id loses to the earlier one (first path wins) with Diagnostic `ANA-PLG-0002`. The plugin-host diagnostics `ANA-PLG-0001` (ABI version mismatch), `ANA-PLG-0002` (duplicate plugin id), `ANA-PLG-0003` (Android: codec-pack signature mismatch, chapter 13 §13.4.6) and `ANA-PLG-0004` (macOS/Linux: plugin file world-writable or not owned by the user, chapter 13 §13.5.3) are registered in chapter 07 §7.9 (D2 family `ANA`); a missing decoder plugin for a codec is `DEC-PLUGIN-0001` (chapter 07 §7.9). Plugins are never unloaded before process exit (decoders may keep static state).
+Loading rules: the file MUST export exactly one of `ovt_analysis_decoder_v1` / `ovt_metric_v1` (checked with `dlsym`); `abi_version` MUST equal the host's constant or the plugin is rejected with `OVT_E_PLUGIN` and Diagnostic `ANA-PLG-0001`; a second file with the same `<id>` (checked by file name before `dlopen`) loses to the earlier one (first path wins) with Diagnostic `ANA-PLG-0002`; several plugins for one codec may coexist (issue #212). The FFmpeg plugin may additionally export `const char* ovt_plugin_describe(void)` (chapter 07 §7.6.3), which the host may `dlsym` for `ovt plugins` and logs (issue #261). The plugin-host diagnostics `ANA-PLG-0001` (ABI version mismatch), `ANA-PLG-0002` (duplicate plugin id), `ANA-PLG-0003` (Android: codec-pack signature mismatch, chapter 13 §13.4.6) and `ANA-PLG-0004` (macOS/Linux: plugin file world-writable or not owned by the user, chapter 13 §13.5.3) are registered in chapter 07 §7.9 (D2 family `ANA`); a missing decoder plugin for a codec is `DEC-PLUGIN-0001` (chapter 07 §7.9). Plugins are never unloaded before process exit (decoders may keep static state).
 
 ### 12.3.12 `ovt/color.h`
 

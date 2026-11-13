@@ -2,6 +2,41 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc21 — 2026-11-12
+
+MINOR-level: spec-amendment pass 2 folds in the accepted answers of 32 `spec-question` issues on chapter 7 (plus the chapter 0, 4, 6 and 12 sentences they touch). New diagnostic codes are registered (D2); no public C header, schema or CLI grammar changes — the §0.6.2 comments are aligned with the merged ABI header.
+
+- 7 §7.2.4 — `BR-0011` for `me(v)` codeNum outside Table 9-4; `BR-0006` also for `trailing_bits(0)` and `me(v)` with `chroma_array_type > 3`; `nb_bits > bits_left()` is `BR-0001` — WI-1.102, WI-1.103 (#67, #85)
+- 7 §7.2.2 — `unread_bytes_after_trailing()` returns `bits_left() / 8` — WI-1.102 (#68)
+- 7 §7.2.5, §7.9.3 — `SYN-GEN-0002` is raised by the unit parser from `epb_positions`; `rbsp_from_nal` throws `std::length_error` over 4 GiB — WI-1.104 (#76)
+- 7 §7.3.11 — Dolby oriented code is `0x00000800` u(32); provider code read for every country with a table row; HDR10+ `application_version > 1` falls through; HDR Vivid oriented code `0x0005` (owner, 2026-11-05) — WI-1.120 (#89)
+- 7 §7.7.1 — CBS AV1 positions count from the OBU header; `trace_diff.py` subtracts the header as §14.4.1 does — WI-1.126, WI-0.555 (#94)
+- 7 §7.3.2, WI-1.106 — `ovt::syntax::Severity` declared in `syntax_builder.hpp`; `SyntaxNodeBuffer` defined in `core/src/syntax/common/`; root node `unit`, builder behaviour details — WI-1.106 (#96, #97)
+- 7 §7.9.3, WI-1.107 — `SYN-GEN-0004` forbidden byte pattern; `SYN-GEN-0105` also for AV1 length overruns — WI-1.107 (#109)
+- 7 §7.1.2, §7.1.3, 12 §12.3.6 — `open_fd` size sentinel 0 or `UINT64_MAX`; fd closed on failure with ownership; C wrapper `dup()`s; C opens use `Pread`; `IoError::code` returned; FIFOs/sockets rejected — WI-1.101 (#110)
+- 0 §0.6.2, 7 §7.5.1, §7.6 — ABI header self-contained (`OVT_STATUS_TYPES_DEFINED`), `OVT_GRID_*` names, `OVT_PLUGIN_EXPORT`, `pull()` comment — WI-2.150 (#211)
+- 7 §7.5.1, §7.9.5, 12 §12.3.11 — one plugin search order (add_search_path, `OVT_PLUGIN_PATH` replaces unless trailing `:`, platform defaults merged; macOS `Contents/PlugIns/ovt/` per FR-MAC-006); ownership check allows root; duplicate id detected by file name before `dlopen`; `default_for()` rule — WI-2.150 (#212)
+- 7 WI-2.162 — AT2 checks AMP modes over all pictures (frame 0 is intra) — WI-2.162 (#215)
+- 7 §7.6.2 — `deblk_bS_v` getter semantics and PB-edge gating of the bS mapping — WI-2.162, WI-2.164 (#216)
+- 7 §7.5.3, §7.6, §7.9.4 — plugin diagnostics ride on the next `FrameAnalysis`; diagnostics-only `FrameAnalysis` on `OVT_E_UNSUPPORTED`; `DEC-H265-0002` for libde265 warnings — WI-2.151, WI-2.163 (#249)
+- 7 §7.5.3, §7.9.5, WI-2.163 — `ANA-0011` for frames the decoder does not output; AT1 streams chosen accordingly — WI-2.151, WI-2.163 (#251)
+- 7 §7.5.2, §7.5.3, §7.9.5 — Session takes `StreamIndex` bytes and the file; ActiveSets snapshot derived from `StreamIndex.parameter_sets`; `SessionCache` seam; `ANA-0002`…`ANA-0010` registered; A6 RefSlot fill AV1-only until WI-1.121 — WI-2.151 (#253)
+- 4 FR-SYN-019, 7 §7.7.6 — not every HEVC_v1 stream carries a hash SEI; the nine without verify through `*_yuv.md5` — WI-2.163 (#255)
+- 7 §7.6.3, §7.9.4, 12 §12.3.11, 0 §0.6.2 — `ovt_plugin_describe` defined; `DEC-H264-0001`; which frame carries a decode-error diagnostic — WI-2.169 (#261)
+- 7 §7.6.3 — analysis decoder uses `FF_THREAD_SLICE` only (frame threading makes side data nondeterministic) — WI-2.170 (#302)
+- 7 §7.6.3, §7.9.5, 6 V-018 — `ANA-H264-0002` registry text and trigger; field flag follows `AV_FRAME_FLAG_INTERLACED`, validator exempts the FFmpeg plugin — WI-2.170 (#303)
+- 7 §7.3.4, §7.9.3 — `SYN-H264-0002` (range), `SYN-H264-0003` (reserved value); `SYN-H264-0020` only when the assumed count was used; MVC `layer_id` = `view_id` at parse time; SPS node nesting — WI-1.108 (#320)
+- 7 §7.3.6, §7.9.3 — `SYN-AV1-0004`…`0006` for reserved values, unknown metadata and tile lists — WI-1.116 (#321)
+- 7 WI-1.116 — AT3 uses operating point 3 of `av1-1-b8-22-svc-L2T2` — WI-1.116 (#322)
+- 7 §7.3.5, §7.9.3 — `SYN-H265-0004` for extensions kept opaque in phase 1 — WI-1.112 (#327)
+- 7 §7.6.3, WI-4.102, 4 FR-BLK-010 — WI-4.102 applies the FFmpeg patch series to the plugin flavour regardless of `OVT_FFMPEG_GPL` — WI-4.100, WI-4.102 (#331)
+- 7 §7.6.3 — `AVH264MacroblockParams` arrays in luma4x4BlkIdx order, mvd in quarter samples, coded-picture origin, `AV_VIDEO_BLOCK_PARAMS_NONE` — WI-4.100 (#332)
+- 7 §7.6.1, WI-2.155 — `create()` has no message channel until ABI v2; AT2 reworded — WI-2.155 (#335)
+- 7 §7.6.3 — h264 patch internals at n7.1.1 (one `H264MBParams` table, recorded while parsing, export from `output_frame()`, `vblock_data_dump` FATE tests) — WI-4.101 (#351)
+- 7 §7.6.1, 6 §6.2.2, §6.3.1, V-006 — aom plugin reads header values from `AV1_COMMON`; accounting forces one thread; `mi_rows/mi_cols` from `mi_params`; no `MotionVector` for IntraBC; CDEF index per 64×64 unit; `blocks[0]` exempt from V-006; frame Diagnostics replace `derived` — WI-2.156 (#360)
+- 7 §7.5.1, WI-4.107, 12 §12.3.11 — H.265 fast path is `libovt_plugin_ffmpeg_hevc` (id `ffmpeg_hevc`), opt-in only — WI-4.107 (#370)
+- 7 WI-4.107 — export in `hevc_frame_end()` with output waiting; per-PU vectors and per-CU params; libde265 internals oracle for AT1 — WI-4.107 (#371)
+
 ## 1.0.0-rc20 — 2026-11-12
 
 Owner decision (Karl, 2026-11-12, answering chapter 17 Q3 after PR #132): the default build keeps the pool-covered FFmpeg decoders in the core flavour, so the official default download plays AVC/HEVC without the codec pack. By §16.2.8 rule 1 this is MAJOR-level (ADR-015 wording changes); because the specification is still a 1.0 release candidate awaiting the owner's acceptance, the rc counter advances and the major number stays. The runtime-loaded plugin mechanism, the codec pack (now the analysis decoders) and the patent-pool-free split build (`OVT_PATENT_CODECS_IN_CORE=OFF`) are unchanged. No WI is re-opened: WI-0.012 is merged and the implementation PR of this entry flips the default and its tests.

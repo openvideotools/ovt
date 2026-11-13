@@ -531,13 +531,13 @@ typedef struct ovt_AnalysisDecoderApi {
   void       (*destroy)(ovt_AnalysisDecoder*);
   /* Push one Unit (Annex B NAL without start code / one OBU with size field). Returns OVT_OK; frames come out of pull. */
   ovt_status (*push)(ovt_AnalysisDecoder*, const uint8_t* unit, size_t len, int32_t decode_index_hint, int64_t pts);
-  /* Pull the next completed frame. out_fb is a FrameAnalysis FlatBuffer owned by the plugin until release(). Returns OVT_E_CANCELLED-like OVT_OK with out_fb.data == NULL when no frame is ready. */
+  /* Pull the next completed frame. out_fb is a FrameAnalysis FlatBuffer owned by the plugin until release(). Returns OVT_OK with out_fb.data == NULL when no frame is ready. */
   ovt_status (*pull)(ovt_AnalysisDecoder*, uint32_t plane_stage_mask, ovt_Buffer* out_fb);
   ovt_status (*plane)(ovt_AnalysisDecoder*, const char* blob_id, const uint8_t** data, size_t* size);
   void       (*release)(ovt_AnalysisDecoder*, ovt_Buffer fb);
   ovt_status (*flush)(ovt_AnalysisDecoder*);
 } ovt_AnalysisDecoderApi;
-/* The only exported symbol of a plugin shared library (declared here, not in chapter 12 §12.3 — plugins do not link libovt-core). All entry points are noexcept. */
+/* The only exported symbol of a plugin shared library (declared here, not in chapter 12 §12.3 — plugins do not link libovt-core; the FFmpeg plugin additionally exports the optional ovt_plugin_describe, chapter 7 §7.6.3). Declared with OVT_PLUGIN_EXPORT (default visibility; issue #211). All entry points are noexcept. */
 const ovt_AnalysisDecoderApi* ovt_analysis_decoder_v1(void);
 ```
 

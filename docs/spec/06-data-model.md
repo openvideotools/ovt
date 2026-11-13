@@ -892,7 +892,7 @@ The neutral vectors are "codec-numbered": the consumer needs `FrameInfo`-level c
 |---|---|---|---|
 | `Intra` | I_NxN, I_16x16_* | `CuPredMode = MODE_INTRA`, not PCM/palette | `is_inter = 0`, not intrabc/palette |
 | `Inter` | P_*/B_* not skip | `MODE_INTER`, `cu_skip_flag = 0` | `is_inter = 1`, `skip_mode = 0` |
-| `Skip` | P_Skip / B_Skip | `cu_skip_flag = 1` | `skip_mode = 1` (note: AV1 `skip` = "no residual" is **not** PredKind.Skip; it is `Block.skip`). Stock libaom inspection does not expose `skip_mode` (chapter 7 §7.6.1), so without the OVT extension patch `ovt-plugin-aom` reports such blocks as `Inter` and sets `derived "skip_mode not available"` on the frame root; the GUI legend says so |
+| `Skip` | P_Skip / B_Skip | `cu_skip_flag = 1` | `skip_mode = 1` (note: AV1 `skip` = "no residual" is **not** PredKind.Skip; it is `Block.skip`). Stock libaom inspection does not expose `skip_mode` (chapter 7 §7.6.1), so without the OVT extension patch `ovt-plugin-aom` reports such blocks as `Inter` and raises a Warning Diagnostic (empty code) `"skip_mode not available"` on the frame (`Block` has no `derived` field, issue #360); the GUI legend says so |
 | `IntraBC` | — | `pps_curr_pic_ref_enabled_flag` CU predicting from the current picture | `use_intrabc = 1` |
 | `PCM` | I_PCM | `pcm_flag = 1` | — |
 | `Palette` | — | `palette_mode_flag = 1` | `PaletteSizeY > 0` or `PaletteSizeUV > 0` |
@@ -911,7 +911,7 @@ The neutral vectors are "codec-numbered": the consumer needs `FrameInfo`-level c
 
 **`CellGrid.qp`**: H.264 `QPY` (0..51; may be negative for high bit depth); HEVC `QpY` (−QpBdOffsetY..51); AV1 `CurrentQIndex` (0..255). `FrameAnalysis.qp_hist` bins are `qp + 128` clamped to 0..255 for H.26x so negatives fit, and `qindex` directly for AV1.
 
-**`CellGrid.tx_log2_w/h`**: log2 of the transform block covering the cell (H.264: 2 or 3; HEVC: 2..5; AV1: luma `TxSize` width/height log2, 2..6). `0xFF` when no transform (skip / PCM / `all_zero` with no TXB).
+**`CellGrid.tx_log2_w/h`**: log2 of the transform block covering the cell (H.264: 2 or 3; HEVC: 2..5; AV1: luma `TxSize` width/height log2, 2..6). `0xFF` when no transform (skip / PCM / `all_zero` with no TXB); AV1 keeps the signalled `TxSize` for skip blocks (chapter 7 §7.6.1, issue #360).
 
 **`CellGrid.tx_type` (`ubyte`)**
 
@@ -1785,7 +1785,7 @@ Comparison rule (WI-0.090, chapter 14 §14.4.5): an OVT export and an `inspect -
 | **V-003** | `grid.cells_w == ceil(coded_size.w / 4)` and `grid.cells_h == ceil(coded_size.h / 4)`. Every non-empty `CellGrid` vector has exactly `cells_w * cells_h` elements. `qp_hist` is empty or has exactly 256 elements. |
 | **V-004** | `blocks` is non-empty; `blocks[i].id == i` for all `i`; `blocks[0]` has `parent == -1`, `kind == Other`, `rect == {0, 0, coded_size.w, coded_size.h}`, `level == 0`, `ext_type == ""`, `ext` empty. No other block has `parent == -1`. |
 | **V-005** | For every block `b` with `b.id > 0`: `0 <= b.parent < b.id` (pre-order numbering ⇒ acyclic), `blocks[b.parent].children` contains `b.id` exactly once, and every id in any `children` vector names a block whose `parent` is that block. Each block appears in exactly one `children` vector. |
-| **V-006** | Every `rect` has `w > 0`, `h > 0`, `x >= 0`, `y >= 0`, and `x, y, w, h` are multiples of 4. For `level >= 2`, the child's rect lies within its parent's rect. For `level == 1`, `rect.x < coded_size.w` and `rect.y < coded_size.h` (top-level blocks may extend past the coded picture). |
+| **V-006** | Every `rect` has `w > 0`, `h > 0`, `x >= 0`, `y >= 0`, and `x, y, w, h` are multiples of 4 — except `blocks[0]`, whose rect is the coded size (V-004), which is arbitrary for AV1 (issue #360). For `level >= 2`, the child's rect lies within its parent's rect. For `level == 1`, `rect.x < coded_size.w` and `rect.y < coded_size.h` (top-level blocks may extend past the coded picture). |
 | **V-007** | Children of one parent that have the same `kind` do not overlap (intersection area 0). Exception: `structure == Mbaff` field MB pairs (`AvcMb.mb_field_decoding_flag == 1`) whose two MBs have identical rects. |
 | **V-008** | `BlockKind` set is codec-consistent: H264 ⊆ {Other, MB, SubMB}; H265 ⊆ {Other, CTU, CU, PU, TU}; AV1 ⊆ {Other, SB, Block, TXB}. Parent→child kind pairs are limited to: Other→MB, MB→SubMB, Other→CTU, CTU→CU, CU→PU, CU→TU, TU→TU, Other→SB, SB→Block, Block→Block, Block→TXB, SB→TXB (a 128×128 or 64×64 leaf SB). |
 | **V-009** | `level` equals the number of parent hops to the root. |
@@ -1797,7 +1797,7 @@ Comparison rule (WI-0.090, chapter 14 §14.4.5): an OVT export and an `inspect -
 | **V-015** | For every `MotionVector m`: `m.block_id < blocks.size()`; `m.list <= 1`; `0 <= m.ref < refs.size()`; `m.rect` lies within `blocks[m.block_id].rect`; if `grid.mv{list}_x` is non-empty then for every cell inside `m.rect`, `grid.mv{list}_x[i] == m.mv_x`, `grid.mv{list}_y[i] == m.mv_y` and `grid.ref{list}[i] == m.ref`. |
 | **V-016** | `refs[k].usage_cells` equals the number of cells `i` with `grid.ref0[i] == k` plus those with `grid.ref1[i] == k` (0 when both vectors are empty). |
 | **V-017** | `partitions[p].index == p`; every `grid.partition_id[i] < partitions.size()`; `PartitionInfo.parent` is `-1` or `< p`; `kind` is codec-consistent (H264: Slice only; H265: Slice, SliceSegment, Tile, Substream; AV1: TileGroup, Tile); for every Tile `rect` lies within `coded_size` and tiles do not overlap; `unit_index` is a valid `Unit.index` of the frame (`frame.units` contains it); `bit_count <= file_span.length * 8`. |
-| **V-018** | `MotionVector.flags` bit 4 (field) is set **iff** `frame.structure ∈ {TopField, BottomField}` or the owning MB has `AvcMb.mb_field_decoding_flag == 1`. Non-H.264 frames never set bit 4. |
+| **V-018** | `MotionVector.flags` bit 4 (field) is set **iff** `frame.structure ∈ {TopField, BottomField}` or the owning MB has `AvcMb.mb_field_decoding_flag == 1`. Non-H.264 frames never set bit 4. FFmpeg plugin without the block-params patch: bit 4 follows `AV_FRAME_FLAG_INTERLACED` (chapter 7 §7.6.3, `ANA-H264-0001`); the validator exempts it (issue #303). |
 | **V-019** | For every block with children: `bits_x8 >= Σ children.bits_x8` when `bits_x8 != 0` and all children have `bits_x8 != 0` (zero means unknown and exempts the comparison). |
 | **V-020** | If `grid.bits_x8` is non-empty: for every leaf block `b` of the V-011 kinds, `Σ_{cells of b} grid.bits_x8[i] == b.bits_x8`, and the per-cell values follow the floor + remainder distribution of §6.3.4 (first `remainder` cells in raster order carry `+1`). |
 | **V-021** | `ext_type` matches `kind` per §6.3.3 (`MB→"AvcMb"`, `SubMB→"AvcSubMb"`, `CTU→"HevcCtu"`, `CU→"HevcCu"`, `PU→"HevcPu"`, `TU→"HevcTu"`, `SB|Block→"Av1Block"`, `TXB→"Av1Txb"`) or is `""` with `ext` empty. `filter_params_type` ∈ {"", "AvcFilterParams", "HevcFilterParams", "Av1FilterParams"} and codec-consistent; `frame.ref_state_type` likewise. |
