@@ -6,8 +6,9 @@
 #
 #   tp::ffmpeg_core     INTERFACE IMPORTED: the shared `core` flavour, linked by ovt_core. LGPL (never --enable-gpl
 #                       unless OVT_FFMPEG_GPL_CORE_ACK), libraries renamed by --build-suffix=_ovt (libavcodec_ovt.so,
-#                       libavcodec_ovt.pc) so a system FFmpeg in the same process does not clash. No h264/hevc
-#                       decoders or hwaccels unless OVT_PATENT_CODECS_IN_CORE=ON. Per library:
+#                       libavcodec_ovt.pc) so a system FFmpeg in the same process does not clash. Keeps the h264/hevc
+#                       decoders, their hwaccels and the other pool-covered decoders unless
+#                       OVT_PATENT_CODECS_IN_CORE=OFF (the split build; ON is the default). Per library:
 #                       tp::ffmpeg_core_<lib> (SHARED IMPORTED) for <lib> in avformat avcodec swscale swresample avutil.
 #   tp::ffmpeg_plugin   STATIC-archive INTERFACE IMPORTED: the `plugin` flavour, linked only by ovt_plugin_ffmpeg.
 #                       h264/hevc decoders and the platform h264/hevc hwaccels, nothing else decodes. The shared

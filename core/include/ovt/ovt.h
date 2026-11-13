@@ -9,6 +9,7 @@
 #define OVT_OVT_H
 
 #include "ovt/abi/analysis_decoder_v1.h"
+#include "ovt/abi/metric_v1.h"
 #include "ovt/cache.h"      // IWYU pragma: export
 #include "ovt/color.h"      // IWYU pragma: export
 #include "ovt/container.h"  // IWYU pragma: export
@@ -16,6 +17,7 @@
 #include "ovt/io.h"         // IWYU pragma: export
 #include "ovt/jobs.h"
 #include "ovt/log.h"
+#include "ovt/metrics.h"
 #include "ovt/status.h"
 #include "ovt/version.h"
 

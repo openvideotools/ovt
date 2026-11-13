@@ -59,3 +59,6 @@ ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV i
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
+# WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
+ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
+ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)

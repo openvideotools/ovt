@@ -38,3 +38,6 @@ aqtinstall.log
 /android/app/build/
 /android/app/.cxx/
 /android/keystore/
+
+# tools/perf_run.py writes results/<hardware-id>/ here (chapter 14 §14.9.1)
+/results/
