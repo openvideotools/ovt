@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Version catalog of the Android project (chapter 13 §13.4.1). The first block holds the keys the spec names;
+# tools/bootstrap_android.sh reads ndk, compileSdk, cmake and buildTools from here to install the SDK packages.
+# Renovate proposes the AndroidX/Kotlin/AGP bumps (§13.3.7); qt, ndk and compileSdk move only by maintainer PR.
+
+[versions]
+agp = "8.6.0"
+kotlin = "2.0.21"
+qt = "6.8.3"
+qtGradlePlugin = "1.2"
+ndk = "27.2.12479018"
+cmake = "3.30.5"
+compileSdk = "36"
+minSdk = "28"
+buildTools = "36.0.0"
+androidxCore = "1.15.0"
+androidxAppcompat = "1.7.0"
+androidxActivity = "1.9.3"
+licenseReport = "2.9"
+
+[libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppcompat" }
+androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "androidxActivity" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+qt = { id = "org.qtproject.qt.gradleplugin", version.ref = "qtGradlePlugin" }
+license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "licenseReport" }

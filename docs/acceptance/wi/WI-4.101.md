@@ -9,7 +9,7 @@ tree is a `git clone --depth 1 --branch n7.1.1` of github.com/FFmpeg/FFmpeg with
 The ctest `ffmpeg_patches_apply` checks the file against the pinned tarball in CI. Since this WI,
 `third_party/ffmpeg.cmake` applies the series to the plugin flavour, so CI builds and tests the patched decoder.
 
-The parts that need the FATE samples or JM run on the Mac Mini: see "Owed: runs on the Mac Mini" at the end.
+The parts that need the FATE samples or JM ran on the Mac Mini: see "Mac Mini runs" at the end.
 
 ## Test 1: the exported syntax equals JM's trace
 
@@ -43,10 +43,17 @@ test cases: 5 | 3 passed | 2 skipped     # 0 mismatches
 
 With one mvd, one `sub_mb_type` and one intra mode changed in a golden, the test fails on exactly those three.
 
-**CAMA1_Sony_C (the stream the WI names, ref_idx).** There is no committed JM golden for this `slow` stream, and
-the 17 goldens hold no `ref_idx` (their first P picture has one reference). The test case
-`ffmpeg_mbparams_vs_jm on CAMA1_Sony_C` (`slow`) runs as soon as `tests/golden/h264/jvt_CAMA1_Sony_C.*` exist;
-the Mini commands below make them with the oracle image and run it. Owed.
+**CAMA1_Sony_C (the stream the WI names).** Its JM golden is committed (made on the Mac Mini with the oracle image,
+2026-11-13), and `ffmpeg_mbparams_vs_jm on CAMA1_Sony_C` (`slow`) passes: 2,700 macroblocks at 1 and 4 threads.
+CAMA1_Sony_C is intra-only (5 MBAFF frames, all I), so it checks the macroblock-level fields (`mb_type`, `cbp`,
+`mb_qp_delta`, chroma mode, transform size, `mb_field_decoding_flag`) and **no `ref_idx`**. An earlier version of
+this record said CAMA1 covered `ref_idx`; that was wrong.
+
+**ref_idx.** The 17 fast goldens hold no `ref_idx` either: their traced P picture has one reference, and MR9_BT_B's
+has no field macroblock pairs. `ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F` (`slow`) covers it: an MBAFF + PAFF
+CABAC stream with P and B pictures and several references. The test requires the golden to contain `ref_idx` values.
+On the Mac Mini (2026-11-13, branch head 6ed9c46) it compared 594 macroblocks: intra modes 336, mvds 320,
+sub_mb_types 41, `ref_idx` 320; all tests passed (39,717 assertions). The goldens are committed.
 
 ## Test 2: flag unset: no tables, same speed
 
@@ -66,8 +73,8 @@ hd_cavlc base    [1.296, 1.286, 1.235, 1.317, 1.314, 1.262, 1.181]
          patched [1.292, 1.262, 1.331, 1.163, 1.344, 1.314, 1.215]   median +0.47 %
 ```
 
-Both medians are inside ±1 %. The container is shared, and the spread between runs (about 10 %) is larger than the
-difference, so a quieter run on the Mini is listed below.
+Both medians are inside ±1 %. The container is shared and noisy, so the Mac Mini repeated it with asm (Mac Mini
+runs, step 6): 0.743 s unpatched against 0.737 s patched (median user time, 7 interleaved runs), a 0.8 % difference.
 
 ## Test 3: frame threads give the single-threaded output
 
@@ -87,7 +94,21 @@ $ grep -c '^TEST' fate.log
 1569
 ```
 
-## Owed: runs on the Mac Mini
+## Mac Mini runs
+
+Mac Mini (macOS arm64), 2026-11-13, the patch from main applied to n7.1.1 and built with asm, using the commands below.
+
+- Step 4: the three reference files were generated (`h264-block-params-cavlc` 27,932 bytes, `-cabac` 37,858,
+  `-mbaff` 129,646). They are now in the h264 commit of `0001-h264-export-mb-params.patch`. All four
+  `fate-h264-block-params-*` tests pass at the default thread count and with `THREADS=4`; the frame-threads test
+  matches the single-threaded reference.
+- Step 5: `make -k fate-h264` exits 0 (221 tests).
+- Step 6: median user time 0.743 s unpatched, 0.737 s patched (0.8 %, inside ±1 %).
+- CAMA1_Sony_C: both goldens generated twice with identical bytes; the test passes (see test 1).
+- CAPAMA3_Sand_F: goldens generated twice with identical bytes (`jm-trace` 8,392 bytes, `trace_headers` 1,340), with
+  the CAMA1 commands below, `jvt_CAMA1_Sony_C` replaced by `jvt_CAPAMA3_Sand_F`; the `ref_idx` test passes (see test 1).
+
+### Commands
 
 The h264 decoder changed, so FFmpeg's h264 conformance tests must pass with the FATE samples, and the new FATE
 tests need their reference files. From a checkout of branch `claude/project-thread-vmhjoo` in `~/ovt`:
@@ -148,6 +169,5 @@ OVT_CORPORA_DIR=~/wi4101/corpora build/macos-arm64-release/plugins/ovt-plugin-ff
   "ffmpeg plugin: ffmpeg_mbparams_vs_jm on CAMA1_Sony_C"
 ```
 
-Expected: step 4 prints no diff for the frame-threads test, steps 4 and 5 end without a failed test, step 6 medians
-are within ±1 %, and the CAMA1 test passes. The three reference files and the two CAMA1 goldens (if each is under
-the 2 MB gzip cap) come back to this branch, and the results are recorded here.
+For CAPAMA3_Sand_F, replace `jvt_CAMA1_Sony_C` with `jvt_CAPAMA3_Sand_F` in the commands above and run the test
+`ffmpeg plugin: ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F`; it must report `ref_idx` greater than 0.

@@ -23,6 +23,8 @@ class Platform : public QObject {
   Q_PROPERTY(bool isMacOS READ isMacOS CONSTANT)
   Q_PROPERTY(bool isLinux READ isLinux CONSTANT)
   Q_PROPERTY(bool hasHover READ hasHover CONSTANT)
+  // True when this process started without a settings.json: the first run of a fresh profile (§11.8).
+  Q_PROPERTY(bool isFirstRun READ isFirstRun CONSTANT)
   Q_PROPERTY(QString configDir READ configDir CONSTANT)
   Q_PROPERTY(QString settingsPath READ settingsPath CONSTANT)
   Q_PROPERTY(QString layoutsPath READ layoutsPath CONSTANT)
@@ -37,6 +39,8 @@ class Platform : public QObject {
   static bool isLinux();
   // Touch devices have no hover (§11.4.4).
   static bool hasHover();
+  // Decided on the first call (main.cpp makes it before anything can write settings.json) and constant after.
+  static bool isFirstRun();
 
   // OVT_CONFIG_DIR if set and non-empty, else the per-platform directory of §11.2.5 (".../ovt").
   static QString configDir();

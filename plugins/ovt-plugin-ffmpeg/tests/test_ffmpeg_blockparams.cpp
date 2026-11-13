@@ -500,8 +500,9 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
   }
 }
 
-// AT1 (mb_type class, sub_mb_type and the other signalled fields against JM) and AT3 (frame threads).
-void compare_with_jm(const std::string& id) {
+// AT1 (mb_type class, sub_mb_type, ref_idx and the other signalled fields against JM) and AT3 (frame threads).
+// `needs_ref_idx`: the golden must hold signalled ref_idx values, so that they are compared at all.
+void compare_with_jm(const std::string& id, bool needs_ref_idx = false) {
   CAPTURE(id);
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
   const std::string cmd = std::string("\"") + OVT_FFMPEG_BLOCKPARAMS + "\" \"" + path.string() + "\" ";
@@ -559,6 +560,9 @@ void compare_with_jm(const std::string& id) {
   }
   CHECK(c.bad.empty());
   CHECK(c.mbs > 0);
+  if (needs_ref_idx) {
+    CHECK(c.ref_idx > 0);
+  }
 }
 
 }  // namespace
@@ -663,11 +667,17 @@ TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm", "[fast][third_party][needs-cor
 }
 
 TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm on CAMA1_Sony_C", "[slow][third_party][needs-corpus]") {
-  // Acceptance test 1 names this MBAFF stream; its JM golden is not committed yet (docs/acceptance/wi/WI-4.101.md has
-  // the oracle-image commands that make it).
-  const std::string id = "jvt_CAMA1_Sony_C";
+  // The MBAFF stream acceptance test 1 names. Its 5 frames are all intra, so this compares the macroblock-level
+  // fields (mb_type, cbp, mb_qp_delta, chroma mode, transform size, field flag) only; ref_idx is the next case.
+  compare_with_jm("jvt_CAMA1_Sony_C");
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F", "[slow][third_party][needs-corpus]") {
+  // Acceptance test 1's ref_idx: an MBAFF + PAFF CABAC stream with P and B pictures and several references, whose
+  // traced pictures signal ref_idx. Its JM golden comes from the oracle image (docs/acceptance/wi/WI-4.101.md).
+  const std::string id = "jvt_CAPAMA3_Sand_F";
   if (!std::filesystem::exists(std::filesystem::path(OVT_JM_GOLDEN_DIR) / (id + ".jm-trace.json.gz"))) {
     SKIP("no JM golden for " << id);
   }
-  compare_with_jm(id);
+  compare_with_jm(id, true);
 }

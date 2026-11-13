@@ -17,7 +17,20 @@ a real H.264 (or H.265) parameter set in its sample entry. Modes, one per file:
 * ``--cmfc-two-tracks``: a fragmented file branded ``cmfc`` with two video tracks (``CNT-7010``);
 * ``--msix-no-sidx``: a fragmented file branded ``msix`` without a ``sidx`` (``CNT-7031``).
 
-WI-1.201 extends this script with the rest of the §8.9.3 broken corpus. Exit 0 ok, 2 usage.
+WI-1.201 adds the box-header modes the walk of §8.2.3 is tested with (each file is the base file with one change):
+
+* ``--box-size N --in moov`` with N in 0, 1, 7, 0xFFFFFFFF: a ``free`` box header with that size word inside
+  ``moov`` before ``trak`` (``CNT-0104``, ``CNT-0102``, ``CNT-0106``, ``CNT-0108``); ``--in top`` puts it before ``moov``;
+* ``--truncate N``: the base file cut after N bytes (``CNT-0108`` / ``CNT-0101``);
+* ``--moov-oversize N``: the ``moov`` size field set so that it exceeds the end of the file by N bytes (``CNT-0108``);
+* ``--moov-after-mdat``: ``ftyp``, ``mdat``, ``moov`` (``CNT-0003``);
+* ``--overlap``: a ``trak`` whose size field runs past the end of its ``moov`` (``CNT-0108``);
+* ``--nest N``: N nested ``udta`` boxes inside ``moov`` (``CNT-0105`` for N above 32);
+* ``--uuid-short``: a ``uuid`` box of 20 bytes inside ``moov`` (``CNT-0107``);
+* ``--nonprintable``: a box with type ``00 00 00 01`` inside ``moov`` (``CNT-0109``);
+* ``--trailing N``: N stray bytes after the last top-level box (``CNT-0101``).
+
+Exit 0 ok, 2 usage.
 """
 
 from __future__ import annotations
@@ -109,8 +122,11 @@ def mvhd(next_id: int) -> bytes:
     )
 
 
-def progressive(mode: str) -> bytes:
-    """The base file with one mutation applied to its sample table or moov."""
+def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> bytes:
+    """The base file with one mutation applied to its sample table or moov.
+
+    ``inject`` is put into ``moov`` between ``mvhd`` and ``trak``; ``moov_first=False`` moves ``moov`` after ``mdat``.
+    """
     ftyp = box(b"ftyp", b"isom", struct.pack(">I", 0x200), b"isomiso2avc1mp41")
     chunks = [10, 10, 10]  # samples per chunk
     stts = full(b"stts", 0, 0, struct.pack(">III", 1, SAMPLES, 1000))
@@ -133,15 +149,54 @@ def progressive(mode: str) -> bytes:
         body = [mvhd(2)]
         if mode == "box-size-7":
             body.append(struct.pack(">I", 7) + b"free")  # size 7 < 8: an impossible box header
+        if inject:
+            body.append(inject)
         body.append(trak(1, [stts, *extra, stsc, stsz, stco], hevc=mode == "hvc1-strip-ps", strip_ps=True))
         return box(b"moov", *body)
 
-    data_start = len(ftyp) + len(moov([0] * len(chunks))) + 8
+    data_start = len(ftyp) + (len(moov([0] * len(chunks))) if moov_first else 0) + 8
     offsets = [data_start + sum(chunks[:i]) * SAMPLE_SIZE for i in range(len(chunks))]
     mdat = box(b"mdat", bytes((i * 7) & 0xFF for i in range(SAMPLES * SAMPLE_SIZE)))
     if mode == "stco-beyond-eof":
         offsets[-1] = data_start + len(mdat) + 4096
-    return ftyp + moov(offsets) + mdat
+    return ftyp + moov(offsets) + mdat if moov_first else ftyp + mdat + moov(offsets)
+
+
+def walk_variant(args: argparse.Namespace) -> bytes:
+    """The §8.2.3 walk modes: the base file with one header-level change."""
+    if args.moov_after_mdat:
+        return progressive("none", moov_first=False)
+    inject = b""
+    if args.box_size is not None:
+        word = struct.pack(">I", args.box_size)
+        if args.box_size == 1:
+            inject = word + b"free" + struct.pack(">Q", 8)  # largesize 8 < 16
+        else:
+            inject = word + b"free"
+    elif args.nest is not None:
+        inner = box(b"free")
+        for _ in range(args.nest):
+            inner = box(b"udta", inner)
+        inject = inner
+    elif args.uuid_short:
+        inject = struct.pack(">I", 20) + b"uuid" + bytes(12)
+    elif args.nonprintable:
+        inject = struct.pack(">I", 12) + b"\x00\x00\x00\x01" + bytes(4)
+    elif args.overlap:
+        inject = struct.pack(">I", 4096) + b"udta" + bytes(8)  # runs past the end of moov
+    base = progressive("none", inject=inject if args.parent != "top" else b"")
+    if args.box_size is not None and args.parent == "top":
+        ftyp_len = struct.unpack(">I", base[:4])[0]
+        word = struct.pack(">I", args.box_size) + b"free"
+        base = base[:ftyp_len] + word + base[ftyp_len:]
+    if args.moov_oversize is not None:
+        at = struct.unpack(">I", base[:4])[0]
+        base = base[:at] + struct.pack(">I", len(base) - at + args.moov_oversize) + base[at + 4 :]
+    if args.truncate is not None:
+        base = base[: args.truncate]
+    if args.trailing is not None:
+        base += bytes(range(1, args.trailing + 1))
+    return base
 
 
 def fragmented(brand: bytes, tracks: int) -> bytes:
@@ -187,18 +242,41 @@ def main(argv: list[str] | None = None) -> int:
         "msix-no-sidx",
     ):
         mode.add_argument(f"--{flag}", action="store_true")
-    mode.add_argument("--box-size", type=int, choices=(7,))
-    ap.add_argument("--in", dest="parent", choices=("moov",), help="parent of the --box-size box")
+    mode.add_argument("--box-size", type=lambda v: int(v, 0), choices=(0, 1, 7, 0xFFFFFFFF))
+    mode.add_argument("--truncate", type=int, metavar="N")
+    mode.add_argument("--moov-oversize", type=int, metavar="N")
+    mode.add_argument("--moov-after-mdat", action="store_true")
+    mode.add_argument("--overlap", action="store_true")
+    mode.add_argument("--nest", type=int, metavar="N")
+    mode.add_argument("--uuid-short", action="store_true")
+    mode.add_argument("--nonprintable", action="store_true")
+    mode.add_argument("--trailing", type=int, metavar="N")
+    ap.add_argument("--in", dest="parent", choices=("moov", "top"), help="parent of the --box-size box")
     ap.add_argument("-o", "--output", type=Path, required=True)
     args = ap.parse_args(argv)
-    if args.box_size and args.parent != "moov":
-        ap.error("--box-size 7 needs --in moov")
-    if args.cmfc_two_tracks:
+    if args.box_size is not None and args.parent is None:
+        ap.error("--box-size needs --in moov or --in top")
+    if args.box_size == 7 and args.parent == "moov":
+        data = progressive("box-size-7")
+    elif any(
+        v is not None and v is not False
+        for v in (
+            args.box_size,
+            args.truncate,
+            args.moov_oversize,
+            args.moov_after_mdat,
+            args.overlap,
+            args.nest,
+            args.uuid_short,
+            args.nonprintable,
+            args.trailing,
+        )
+    ):
+        data = walk_variant(args)
+    elif args.cmfc_two_tracks:
         data = fragmented(b"cmfc", 2)
     elif args.msix_no_sidx:
         data = fragmented(b"msix", 1)
-    elif args.box_size:
-        data = progressive("box-size-7")
     else:
         flag = next(
             f for f in ("stco_beyond_eof", "stsc_descending", "ctts_v0_negative", "hvc1_strip_ps") if getattr(args, f)
