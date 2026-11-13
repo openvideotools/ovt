@@ -232,9 +232,10 @@ QtBuild {
     sdkDir?.let { "$it/cmake/${libs.versions.cmake.get()}/bin" }?.takeIf { file("$it/ninja").exists() }?.let {
         ninjaPath = it
     }
-    // Groovy also generates indexed accessors for the String[] property, so Kotlin sees no settable property here.
+    // Groovy compiles the String[] property's setter as varargs (setExtraCMakeArguments(String...)), which Kotlin does
+    // not treat as a property setter: call it with the spread operator.
     setExtraCMakeArguments(
-        (qtCMakeArguments + "-DQT_ANDROID_MULTI_ABI_FORWARD_VARS=${qtForwardedVariables.joinToString(";")}")
+        *(qtCMakeArguments + "-DQT_ANDROID_MULTI_ABI_FORWARD_VARS=${qtForwardedVariables.joinToString(";")}")
             .toTypedArray(),
     )
 }
