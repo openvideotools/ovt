@@ -214,3 +214,11 @@ path = ["packaging/debian/*.install", "packaging/debian/changelog", "packaging/d
         "packaging/debian/README.source", "packaging/debian/source/format"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "LGPL-2.1-or-later"
+
+# The Gradle wrapper jar of the Android project (WI-0.050): the published Gradle 8.10 wrapper jar (SHA-256
+# 2db75c40...8046 on gradle.org/release-checksums), unmodified, as in the v8.10.0 tag of gradle/gradle. gradlew and
+# gradlew.bat come from the same tag and carry their own Apache-2.0 headers.
+[[annotations]]
+path = "android/gradle/wrapper/gradle-wrapper.jar"
+SPDX-FileCopyrightText = "2015-2021 the original authors of Gradle"
+SPDX-License-Identifier = "Apache-2.0"
