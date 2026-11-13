@@ -27,7 +27,15 @@ namespace ovt::container::mpd {
 namespace {
 
 // A representation never expands past this many segments (a hostile `r="1000000000"` must not exhaust memory).
+// manifest-wide: the budget is shared by all representations, so a hostile MPD with many representations cannot
+// allocate more than this in total.
 constexpr size_t kMaxSegments = 1'000'000;
+
+// base + k * step without signed overflow; false when the result does not fit.
+bool checked_madd(int64_t base, int64_t k, int64_t step, int64_t& out) {
+  int64_t product = 0;
+  return !__builtin_mul_overflow(k, step, &product) && !__builtin_add_overflow(base, product, &out);
+}
 
 using Chain = std::vector<pugi::xml_node>;  // most specific element first
 
@@ -446,7 +454,13 @@ namespace {
 struct Context {
   const Options& options;
   Manifest& manifest;
+  size_t segments_left = kMaxSegments;  // manifest-wide segment budget
 };
+
+// Records `n` segments as produced; the budget saturates at 0 (init segments are not capped).
+void spend(Context& ctx, size_t n) {
+  ctx.segments_left -= std::min(n, ctx.segments_left);
+}
 
 void diag(Context& ctx, DiagCode code, std::string message, const pugi::xml_node& at = {}) {
   const std::ptrdiff_t off = at.empty() ? -1 : at.offset_debug();
@@ -561,8 +575,10 @@ std::optional<int64_t> period_end_media(const Timing& t) {
   if (t.period_duration_ms < 0) {
     return std::nullopt;
   }
-  return t.presentation_time_offset + saturate(std::floor(static_cast<long double>(t.period_duration_ms) *
-                                                          static_cast<long double>(t.timescale) / 1000.0L));
+  int64_t end = 0;
+  const int64_t span = saturate(
+      std::floor(static_cast<long double>(t.period_duration_ms) * static_cast<long double>(t.timescale) / 1000.0L));
+  return __builtin_add_overflow(t.presentation_time_offset, span, &end) ? std::numeric_limits<int64_t>::max() : end;
 }
 
 std::optional<int64_t> int_attr(const pugi::xml_node& n, const char* name) {
@@ -576,7 +592,8 @@ int64_t repeat_count(Context& ctx, const pugi::xml_node& s, const pugi::xml_node
                      const Timing& t) {
   const int64_t repeat = int_attr(s, "r").value_or(0);
   if (repeat >= 0) {
-    return repeat >= static_cast<int64_t>(kMaxSegments) ? static_cast<int64_t>(kMaxSegments) + 1 : repeat + 1;
+    const auto cap = static_cast<int64_t>(ctx.segments_left);
+    return repeat >= cap ? cap + 1 : repeat + 1;
   }
   std::optional<int64_t> end;
   if (!next.empty()) {
@@ -613,8 +630,8 @@ std::vector<TimelineEntry> expand_timeline(Context& ctx, const pugi::xml_node& t
     for (int64_t k = 0; k < count; ++k) {
       const bool overflow =
           cursor > std::numeric_limits<int64_t>::max() - d || number == std::numeric_limits<int64_t>::max();
-      if (out.size() >= kMaxSegments || overflow) {
-        diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (1000000 entries or the 64-bit range)", s);
+      if (out.size() >= ctx.segments_left || overflow) {
+        diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted or 64-bit range)", s);
         return out;
       }
       out.push_back({cursor, d, number});
@@ -633,6 +650,19 @@ std::string segment_url(Context& ctx, const std::string& base, std::string_view 
     return resolve_url(base, tmpl);
   }
   return resolve_url(base, *expanded);
+}
+
+// Reads an optional byte-range attribute into `out`; a malformed one is reported and leaves `out` alone.
+void read_range_attr(Context& ctx, const pugi::xml_node& n, const char* name, ByteRange& out) {
+  const char* range = attr(n, name);
+  if (range == nullptr) {
+    return;
+  }
+  if (const auto r = parse_range(range)) {
+    out = *r;
+  } else {
+    diag(ctx, DiagCode::CNT_DASH_0007, std::string("invalid ") + name + " `" + range + "`", n);
+  }
 }
 
 Segment init_from_element(Context& ctx, const pugi::xml_node& init, const std::string& rep_base) {
@@ -689,15 +719,22 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
     }
     int64_t count = ceil_div(static_cast<long double>(t.period_duration_ms) * static_cast<long double>(t.timescale),
                              static_cast<long double>(*d) * 1000.0L);
-    if (static_cast<size_t>(std::max<int64_t>(count, 0)) > kMaxSegments) {
-      diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated at 1000000 entries", chain.front());
-      count = static_cast<int64_t>(kMaxSegments);
+    if (static_cast<size_t>(std::max<int64_t>(count, 0)) > ctx.segments_left) {
+      diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted)", chain.front());
+      count = static_cast<int64_t>(ctx.segments_left);
     }
     for (int64_t k = 0; k < count; ++k) {
-      entries.push_back({t.presentation_time_offset + k * *d, *d, t.start_number + k});
+      TimelineEntry e{0, *d, 0};
+      if (!checked_madd(t.presentation_time_offset, k, *d, e.time) || !checked_madd(t.start_number, k, 1, e.number)) {
+        diag(ctx, DiagCode::CNT_DASH_0004, "segment time or number leaves the 64-bit range; list truncated",
+             chain.front());
+        break;
+      }
+      entries.push_back(e);
     }
   }
 
+  spend(ctx, entries.size());
   rep.segments.reserve(rep.segments.size() + entries.size());
   for (const TimelineEntry& e : entries) {
     values.number = e.number;
@@ -737,26 +774,30 @@ void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& 
     }
   }
   const auto d = parse_int(chain_attr(chain, "duration") != nullptr ? chain_attr(chain, "duration") : "");
-  for (size_t k = 0; k < urls.size() && k < kMaxSegments; ++k) {
+  if (urls.size() > ctx.segments_left) {
+    diag(ctx, DiagCode::CNT_DASH_0004, "SegmentList truncated (segment budget exhausted)", chain.front());
+    urls.resize(ctx.segments_left);
+  }
+  spend(ctx, urls.size());
+  for (size_t k = 0; k < urls.size(); ++k) {
     const pugi::xml_node u = urls[k];
     Segment seg;
     const char* media = attr(u, "media");
     seg.url = media != nullptr ? resolve_url(rep_base, trim(media)) : rep_base;
-    if (const char* range = attr(u, "mediaRange")) {
-      if (const auto r = parse_range(range)) {
-        seg.byte_range = *r;
-      } else {
-        diag(ctx, DiagCode::CNT_DASH_0007, std::string("invalid mediaRange `") + range + "`", u);
-      }
-    }
+    read_range_attr(ctx, u, "mediaRange", seg.byte_range);
     if (k < entries.size()) {
       seg.start_time = entries[k].time;
       seg.duration = entries[k].duration;
       seg.number = entries[k].number;
     } else if (entries.empty()) {
-      seg.number = t.start_number + static_cast<int64_t>(k);
-      if (d && *d > 0) {
-        seg.start_time = t.presentation_time_offset + static_cast<int64_t>(k) * *d;
+      int64_t number = 0;
+      if (!checked_madd(t.start_number, static_cast<int64_t>(k), 1, number)) {
+        number = std::numeric_limits<int64_t>::max();
+      }
+      seg.number = number;
+      int64_t time = 0;
+      if (d && *d > 0 && checked_madd(t.presentation_time_offset, static_cast<int64_t>(k), *d, time)) {
+        seg.start_time = time;
         seg.duration = *d;
       }
     }
@@ -786,10 +827,11 @@ void expand_base_segments(Context& ctx, Representation& rep, const SegmentInfo& 
       uint64_t time = sidx->earliest_presentation_time;
       int64_t number = 1;
       for (const SidxIndex::Reference& ref : sidx->references) {
-        if (rep.segments.size() >= kMaxSegments) {
-          diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated at 1000000 entries", chain.front());
+        if (ctx.segments_left == 0) {
+          diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted)", chain.front());
           break;
         }
+        spend(ctx, 1);
         Segment seg;
         seg.url = rep_base;
         seg.byte_range = {offset, ref.referenced_size};
@@ -812,10 +854,12 @@ void expand_base_segments(Context& ctx, Representation& rep, const SegmentInfo& 
   Segment seg;
   seg.url = rep_base;
   seg.number = t.start_number;
-  if (const auto end = period_end_media(t)) {
+  int64_t span = 0;
+  if (const auto end = period_end_media(t); end && !__builtin_sub_overflow(*end, t.presentation_time_offset, &span)) {
     seg.start_time = t.presentation_time_offset;
-    seg.duration = *end - t.presentation_time_offset;
+    seg.duration = span;
   }
+  spend(ctx, 1);
   rep.segments.push_back(std::move(seg));
 }
 

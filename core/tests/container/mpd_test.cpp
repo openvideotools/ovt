@@ -412,3 +412,32 @@ TEST_CASE("mpd: Manifest FlatBuffer round trip", "[container][dash][fast]") {
   CHECK(rep->encryption()->Get(0)->default_kid()->size() == 16);
   CHECK(m->encryption()->size() == 1);
 }
+
+TEST_CASE("mpd: template arithmetic near the 64-bit limits does not overflow", "[container][dash][fast]") {
+  const auto r = mpd::parse(
+      wrap(R"(<Representation id="v"><SegmentTemplate timescale="1" duration="4611686018427387904" )"
+           R"(startNumber="9223372036854775806" presentationTimeOffset="9223372036854775000" media="$Number$-$Time$"/>)"
+           R"(</Representation>)",
+           R"(duration="P10000000000D")"),
+      {});
+  const auto& rep = only_rep(r);
+  CHECK(rep.segments.size() < 4);  // stops at the first value that does not fit
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+}
+
+TEST_CASE("mpd: the segment budget is shared by all representations", "[container][dash][fast]") {
+  // 3 representations of 600000 segments each would be 1.8 million; the manifest-wide budget is 1 million.
+  std::string reps;
+  for (int i = 0; i < 3; ++i) {
+    reps += R"(<Representation id="r)" + std::to_string(i) +
+            R"("><SegmentTemplate timescale="1" duration="1" media="$Number$"/></Representation>)";
+  }
+  const auto r = mpd::parse(wrap(reps, R"(duration="PT600000S")"), {});
+  REQUIRE(r.ok);
+  size_t total = 0;
+  for (const auto& rep : r.manifest.periods[0].adaptation_sets[0].representations) {
+    total += rep.segments.size();
+  }
+  CHECK(total == 1'000'000);
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+}
