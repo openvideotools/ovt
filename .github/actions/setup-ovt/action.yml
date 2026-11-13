@@ -85,6 +85,9 @@ runs:
         for py in python3.13 python3.12 python3.11 python3; do
           if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
             dirname "$(command -v "$py")" >> "$GITHUB_PATH" # FindPython3 searches PATH
+            # The venv below must use this interpreter: a bare `python3` can resolve to another one (a 3.15 pre-release
+            # on one Mini runner), for which the pinned test packages (scikit-image) have no wheels.
+            echo "OVT_PYTHON=$(command -v "$py")" >> "$GITHUB_ENV"
             "$py" --version
             exit 0
           fi
@@ -100,7 +103,7 @@ runs:
         # tools/requirements-test.txt pins pytest, numpy and the flatbuffers runtime. Without them the CTest suites
         # tools_pytest, cli_schema_validate, schema_python_import and test_fb_python_import are not registered or
         # skip, and CI would pass without running them. The venv is first on PATH, so FindPython3 picks it.
-        python3 -m venv "${RUNNER_TEMP}/ovt-venv"
+        "${OVT_PYTHON:-python3}" -m venv "${RUNNER_TEMP}/ovt-venv"
         "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt -r tools/requirements-test.txt
         echo "${RUNNER_TEMP}/ovt-venv/bin" >> "$GITHUB_PATH"
         # setup-python exports Python3_ROOT_DIR, which FindPython3 prefers over PATH, so the hosted jobs would
