@@ -185,9 +185,9 @@ val qtCMakeArguments =
         "-DQT_ANDROID_ABIS=${ovtAbis.joinToString(";")}",
         // The QML root is loaded by URL in MainActivity, so no generated QtQuickViewContent classes are needed.
         "-DQT_ANDROID_GENERATE_JAVA_QTQUICKVIEW_CONTENTS=OFF",
-        // Toolchain chain of every ABI build: Qt's qt.toolchain.cmake -> vcpkg (the -ovt triplet is derived from
-        // ANDROID_ABI in the top-level CMakeLists.txt) -> the pinned NDK's android.toolchain.cmake.
-        "-DQT_CHAINLOAD_TOOLCHAIN_FILE=$ovtRoot/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        // Toolchain chain of every ABI build: Qt's qt.toolchain.cmake -> cmake/toolchains/android-vcpkg.cmake (the
+        // -ovt triplet from ANDROID_ABI) -> vcpkg -> the pinned NDK's android.toolchain.cmake.
+        "-DQT_CHAINLOAD_TOOLCHAIN_FILE=$ovtRoot/cmake/toolchains/android-vcpkg.cmake",
         "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ndkDir/build/cmake/android.toolchain.cmake",
         // §13.4.2: GUI shell on, CLI off. The renderer (WI-A.401), the aom plugin and the codec-pack plugins
         // (WI-0.053) join with the work items that put them in the APK; WI-0.050 ships the empty window only.
