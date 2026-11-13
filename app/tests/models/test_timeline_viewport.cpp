@@ -148,15 +148,58 @@ TEST_CASE("the mean line joins neighbouring non-gap columns", "[fast][gui][timel
 TEST_CASE("frame type colours follow section 11.4.5", "[fast][gui][timeline][geometry]") {
   using ovt::app::frame_type_color;
   namespace fb = ovt::fb;
-  CHECK(frame_type_color(fb::FrameType::I, true) == Rgba{0xE5, 0x39, 0x35, 255});
-  CHECK(frame_type_color(fb::FrameType::Key, true) == frame_type_color(fb::FrameType::I, true));
-  CHECK(frame_type_color(fb::FrameType::P, true) == Rgba{0x1E, 0x88, 0xE5, 255});
-  CHECK(frame_type_color(fb::FrameType::B, true) == Rgba{0x43, 0xA0, 0x47, 255});
-  CHECK(frame_type_color(fb::FrameType::Switch, true) == Rgba{0x9E, 0x9E, 0x9E, 255});
-  CHECK(frame_type_color(fb::FrameType::P, false).a < 255);  // hidden frame
+  CHECK(frame_type_color(fb::FrameType::I) == Rgba{0xE5, 0x39, 0x35, 255});
+  CHECK(frame_type_color(fb::FrameType::Key) == frame_type_color(fb::FrameType::I));
+  CHECK(frame_type_color(fb::FrameType::P) == Rgba{0x1E, 0x88, 0xE5, 255});
+  CHECK(frame_type_color(fb::FrameType::B) == Rgba{0x43, 0xA0, 0x47, 255});
+  CHECK(frame_type_color(fb::FrameType::Switch) == Rgba{0x9E, 0x9E, 0x9E, 255});
   const std::vector<SeriesColumn> columns{{0, 1, 3.0, 3.0}, {1, 2, 7.0, 7.0}};
   CHECK(ovt::app::max_of(columns) == 7.0);
   CHECK(ovt::app::max_of({}) == 0.0);
   const auto rect = ovt::app::build_rect(1.0F, 2.0F, 3.0F, 4.0F, Rgba{1, 1, 1, 1});
   CHECK(rect.size() == 6);
+}
+
+TEST_CASE("the hatch of a hidden frame is clipped to its bar", "[fast][gui][timeline][geometry]") {
+  const auto lines = ovt::app::build_hatch(10.0F, 0.0F, 30.0F, 10.0F, Rgba{0, 0, 0, 255}, 4.0F);
+  REQUIRE(!lines.empty());
+  CHECK(lines.size() % 2 == 0);
+  for (const ovt::app::ColorVertex& v : lines) {
+    CHECK(v.x >= 10.0F);
+    CHECK(v.x <= 30.0F);
+    CHECK(v.y >= 0.0F);
+    CHECK(v.y <= 10.0F);
+  }
+  // Every line rises one pixel per pixel to the right.
+  for (std::size_t i = 0; i + 1 < lines.size(); i += 2) {
+    CHECK(lines[i + 1].x - lines[i].x == lines[i].y - lines[i + 1].y);
+  }
+  CHECK(ovt::app::build_hatch(10.0F, 5.0F, 30.0F, 5.0F, Rgba{}).empty());  // no height
+  CHECK(ovt::app::build_hatch(30.0F, 0.0F, 10.0F, 5.0F, Rgba{}).empty());  // no width
+}
+
+TEST_CASE("reference arcs are parabolas capped in height; ticks are 2 px bars", "[fast][gui][timeline][geometry]") {
+  const std::vector<ovt::app::RefArc> arcs{{100.0F, 60.0F, Rgba{1, 2, 3, 4}}, {0.0F, 400.0F, Rgba{}}};
+  const auto lines = ovt::app::build_ref_arcs(arcs, 100.0F, 50.0F);
+  REQUIRE(lines.size() == 64U);  // 16 segments, two vertices each, two arcs
+  CHECK(lines.front().x == 100.0F);
+  CHECK(lines.front().y == 100.0F);
+  CHECK(lines[31].x == 60.0F);  // ends at the target, back on the baseline
+  CHECK(lines[31].y == 100.0F);
+  CHECK(lines[0].r == 1);
+  float top_short = 1e9F;
+  float top_long = 1e9F;
+  for (std::size_t i = 0; i < 32; ++i) {
+    top_short = std::min(top_short, lines[i].y);
+  }
+  for (std::size_t i = 32; i < lines.size(); ++i) {
+    top_long = std::min(top_long, lines[i].y);
+  }
+  CHECK_THAT(top_short, WithinAbs(80.0, 1e-3));  // half the 40 px distance
+  CHECK_THAT(top_long, WithinAbs(50.0, 1e-3));   // capped
+  const std::vector<float> xs{10.0F, 20.0F};
+  const auto ticks = ovt::app::build_ticks(xs, 100.0F, 6.0F, Rgba{9, 9, 9, 255});
+  REQUIRE(ticks.size() == 12);
+  CHECK(ticks[0].x == 9.0F);
+  CHECK(ticks[0].y == 94.0F);
 }

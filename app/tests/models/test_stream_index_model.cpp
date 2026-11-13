@@ -225,3 +225,18 @@ TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[fast]
   model.setIndex(nullptr);
   CHECK(model.frame_count() == 0);
 }
+
+TEST_CASE("declared references and the display index come from the index", "[fast][gui][timeline][refs]") {
+  // Decode order I P B B with pts 0 3 1 2; the synthetic index makes every inter frame refer to the frame before it.
+  const std::vector<SyntheticFrame> frames{
+      {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};
+  const FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 30))->index()};
+  CHECK(table.declared_refs(0).empty());
+  REQUIRE(table.declared_refs(2).size() == 1);
+  CHECK(table.declared_refs(2)[0] == 1);
+  CHECK(table.declared_refs(3)[0] == 2);
+  CHECK(table.declared_refs(-1).empty());
+  CHECK(table.declared_refs(4).empty());
+  CHECK(table.display_index_of(1) == 3);
+  CHECK(table.display_index_of(9) == -1);
+}

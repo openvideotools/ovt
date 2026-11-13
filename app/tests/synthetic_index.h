@@ -90,6 +90,9 @@ inline std::vector<std::uint8_t> build_index(const std::vector<SyntheticFrame>& 
     fi->shown = true;
     fi->temporal_id = static_cast<std::uint8_t>(frames[i].tid);
     fi->type = frames[i].rap ? ovt::fb::FrameType::I : ovt::fb::FrameType::P;
+    if (!frames[i].rap && i > 0) {
+      fi->declared_refs = {static_cast<int>(i) - 1};  // every inter frame refers to the previous frame
+    }
     add_units(index, *fi, i, offset, display_of[i], with_samples);
     index.frames.push_back(std::move(fi));
   }
