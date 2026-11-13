@@ -5,7 +5,7 @@
 # diagnostic registry and the ovt_container_* entry points. Sources go into ovt_core_objects, which
 # ovt_core absorbs. Per-format readers (WI-1.201 onwards) add their sources here.
 
-target_sources(ovt_core_objects PRIVATE annexb.cpp container.cpp diagnostics.cpp format_sniff.cpp ivf.cpp obu.cpp
-                                        y4m.cpp)
+target_sources(ovt_core_objects PRIVATE annexb.cpp container.cpp diagnostics.cpp format_sniff.cpp ivf.cpp
+                                        mpegts/ts_packets.cpp obu.cpp y4m.cpp)
 # ovt_schemas orders the build after flatc and puts ovt_container_generated.h on the include path.
 target_link_libraries(ovt_core_objects PRIVATE ovt_schemas)
