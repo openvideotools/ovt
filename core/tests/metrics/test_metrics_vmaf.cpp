@@ -430,10 +430,22 @@ TEST_CASE("metrics_vmaf_chunking_identity", "[metrics][vmaf][golden][needs-corpu
   CHECK(any_differs);
 }
 
+// The WI-0.565 goldens come from the x86_64 oracle image. libvmaf's float features differ by ~1e-5 between x86_64
+// builds and by up to ~3e-3 VMAF on arm64 (NEON paths, FMA contraction); even the integer models differ in the last
+// %.6f digit on arm64 (max seen 8e-6). Bit-exactness on arm64 is checked against a CLI built on the same machine
+// (WI-3.591, WI-3.317), not here.
+#if defined(__x86_64__) || defined(_M_X64)
+constexpr bool kGoldenArch = true;
+#else
+constexpr bool kGoldenArch = false;
+#endif
+constexpr double kIntegerTolerance = 5e-5;
+constexpr double kFloatTolerance = kGoldenArch ? 1e-4 : 1e-2;
+
 TEST_CASE("vmaf per-frame values equal the vmaf CLI on the Netflix pair", "[metrics][vmaf][golden][needs-corpus]") {
   // The vmaf CLI goldens of WI-0.565 (tests/golden/metrics/<pair>.<model>.vmaf.json.gz, same libvmaf tag and Meson
-  // options): every output of every model id that has a golden, at the CLI's %.6f (float models within 1e-4),
-  // over a 3-chunk run.
+  // options): every output of every model id that has a golden, over a 3-chunk run; at the CLI's %.6f for the
+  // integer models on x86_64, within the tolerances above otherwise.
   const Y4m ref(ovt::test::corpus_or_skip("netflix_src01_hrc00_576x324"));
   const Y4m dist(ovt::test::corpus_or_skip("netflix_src01_hrc01_576x324"));
   size_t compared = 0;
@@ -455,12 +467,10 @@ TEST_CASE("vmaf per-frame values equal the vmaf CLI on the Netflix pair", "[metr
         const std::string key = m.collection ? std::string("vmaf_") + m.outputs.at(k) : std::string(m.outputs.at(k));
         INFO("frame " << f << " " << key);
         const double want = frames[f].at(key).get<double>();
-        if (m.needs_float) {
-          // The float feature paths are not bit-exact across compilers and SIMD flavours (the goldens come from
-          // the oracle image); the integer path used by vmaf, vmaf_neg, vmaf_4k and vmaf_b is (§9.5.1).
-          CHECK(std::abs(got[f][k] - want) <= 1e-4);
+        if (kGoldenArch && !m.needs_float) {
+          CHECK(fmt6(got[f][k]) == fmt6(want));  // the integer path, on the goldens' architecture: bit-exact
         } else {
-          CHECK(fmt6(got[f][k]) == fmt6(want));
+          CHECK(std::abs(got[f][k] - want) <= (m.needs_float ? kFloatTolerance : kIntegerTolerance));
         }
       }
     }
