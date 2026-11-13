@@ -13,7 +13,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools"))
 
-import gen_vmaf_ids as gen
+import gen_vmaf_ids as gen  # noqa: E402
 
 FEATURES = [
     "VMAF_integer_feature_adm2_score",
