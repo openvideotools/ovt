@@ -34,7 +34,7 @@ unset(_ovt_hash_len)
 
 # WI-0.084: the model helpers of ovt/cxx/model/{grid,tree,units,labels}.hpp.
 # WI-0.087: the PictureStore and PlaneBlob of ovt/cxx/model/{picture_store,plane}.hpp.
-# WI-0.089a: the YUView statistics CSV exporter of ovt/cxx/model/yuview_csv.hpp.
+# WI-0.089: the YUView statistics CSV exporter and importer of ovt/cxx/model/yuview_csv.hpp.
 # WI-0.086: the §6.9 validator of ovt/cxx/model/validator.hpp.
 # WI-0.090: the libaom inspect-compatible JSON exporter of ovt/cxx/model/aom_inspect_json.hpp.
 target_sources(

@@ -1,16 +1,16 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Unit tests of the demux module (chapter 08 §8.7, §8.10). They link the module objects directly because ovt_core
-# exports only the C API.
+# Unit tests of the demux module (chapter 08 §8.7, WI-1.230, WI-1.231). They link the module objects directly
+# because ovt_core exports only the C API; the core FFmpeg flavour comes with ovt_core_objects.
 
-# WI-1.231: the unit splitter.
 set(_ovt_unit_split_samples "${CMAKE_CURRENT_BINARY_DIR}/unit_split_samples")
-add_executable(ovt_tests_demux unit_split_test.cpp)
+add_executable(ovt_tests_demux demuxer_test.cpp unit_split_test.cpp)
 target_include_directories(ovt_tests_demux PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_demux PRIVATE ovt_core_objects ovt_test_support ovt_schemas ovt::flags ${Catch2_TARGET}
                                               ${nlohmann_json_TARGET} ${flatbuffers_TARGET})
-target_compile_definitions(ovt_tests_demux PRIVATE "OVT_UNIT_SPLIT_SAMPLES_DIR=\"${_ovt_unit_split_samples}\"")
+target_compile_definitions(ovt_tests_demux PRIVATE "OVT_TEST_SOURCE_DIR=\"${PROJECT_SOURCE_DIR}\""
+                                                   "OVT_UNIT_SPLIT_SAMPLES_DIR=\"${_ovt_unit_split_samples}\"")
 ovt_set_license(ovt_tests_demux "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_demux)
 

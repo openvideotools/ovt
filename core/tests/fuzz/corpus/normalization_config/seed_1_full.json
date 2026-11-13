@@ -1,0 +1,1 @@
+{"scale":{"kernel":"lanczos","lanczos_taps":4},"crop":{"ref":{"x":0,"y":140,"w":1920,"h":800}},"temporal":{"mode":"fixed","offset_frames":-7},"display_model":{"preset":"pq_1000","peak_nits":1000}}

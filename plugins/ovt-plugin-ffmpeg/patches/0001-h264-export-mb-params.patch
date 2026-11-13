@@ -1,0 +1,1765 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Sun, 8 Nov 2026 00:00:00 +0000
+Subject: [PATCH 1/2] avutil: add AV_FRAME_DATA_VIDEO_BLOCK_PARAMS side data
+
+AV_FRAME_DATA_VIDEO_ENC_PARAMS exports only the final quantiser of each
+block. Analysis tools also need the per-block syntax as signalled in the
+bitstream: block partitioning, prediction modes and directions, reference
+indices, coded block pattern, transform size, field decoding and motion
+vector differences.
+
+Add a new frame side data type carrying that syntax, modelled on
+AVVideoEncParams: a self-describing header (AVVideoBlockParamsHeader)
+followed by an array of fixed-size, type-specific block records reached
+through blocks_offset/block_size with an inline accessor, so new fields can
+be appended to a record without breaking the ABI. The first type is
+AV_VIDEO_BLOCK_PARAMS_H264 with one AVH264MacroblockParams per macroblock.
+
+A following patch exports it from the h264 decoder behind a new
+export_side_data flag. This one adds the libavutil API, the side data name,
+the minor version bump, the APIchanges entry and a FATE test
+(fate-video_block_params) that round-trips 8160 macroblocks (1920x1088)
+through frame side data.
+
+Upstream-Status: Pending [to be submitted to ffmpeg-devel by OVT WI-4.103]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: FFmpeg's h264 decoder exports MVs and per-MB QP only; Open Video
+  Tools needs mb_type, sub_mb_type, ref_idx, intra modes, cbp, mb_qp_delta
+  and mvd (OVT spec chapter 07 section 7.6.3). Part 1 of 2 (OVT WI-4.100);
+  part 2 (h264 decoder export) is OVT WI-4.101.
+---
+ doc/APIchanges                       |   6 +
+ libavutil/Makefile                   |   3 +
+ libavutil/frame.c                    |   1 +
+ libavutil/frame.h                    |   8 +
+ libavutil/tests/video_block_params.c | 171 +++++++++++++++++++
+ libavutil/version.h                  |   2 +-
+ libavutil/video_block_params.c       |  91 +++++++++++
+ libavutil/video_block_params.h       | 235 +++++++++++++++++++++++++++
+ tests/fate/libavutil.mak             |   4 +
+ tests/ref/fate/video_block_params    |   8 +
+ 10 files changed, 528 insertions(+), 1 deletion(-)
+ create mode 100644 libavutil/tests/video_block_params.c
+ create mode 100644 libavutil/video_block_params.c
+ create mode 100644 libavutil/video_block_params.h
+ create mode 100644 tests/ref/fate/video_block_params
+
+diff --git a/doc/APIchanges b/doc/APIchanges
+index 924a2b2..e5fb4ea 100644
+--- a/doc/APIchanges
++++ b/doc/APIchanges
+@@ -2,6 +2,12 @@ The last version increases of all libraries were on 2024-03-07
+ 
+ API changes, most recent first:
+ 
++2026-11-08 - xxxxxxxxxx - lavu 59.40.100 - frame.h video_block_params.h
++  Add AV_FRAME_DATA_VIDEO_BLOCK_PARAMS, AVVideoBlockParamsHeader,
++  enum AVVideoBlockParamsType, AVH264MacroblockParams,
++  av_video_block_params_alloc(), av_video_block_params_create_side_data()
++  and av_video_block_params_block().
++
+ 2024-09-23 - 6940a6de2f0 - lavu 59.38.100 - frame.h
+   Add AV_FRAME_DATA_VIEW_ID.
+ 
+diff --git a/libavutil/Makefile b/libavutil/Makefile
+index 6e6fa8d..c699727 100644
+--- a/libavutil/Makefile
++++ b/libavutil/Makefile
+@@ -89,6 +89,7 @@ HEADERS = adler32.h                                                     \
+           twofish.h                                                     \
+           uuid.h                                                        \
+           version.h                                                     \
++          video_block_params.h                                          \
+           video_enc_params.h                                            \
+           xtea.h                                                        \
+           tea.h                                                         \
+@@ -187,6 +188,7 @@ OBJS = adler32.o                                                        \
+        tx_int32.o                                                       \
+        uuid.o                                                           \
+        version.o                                                        \
++       video_block_params.o                                             \
+        video_enc_params.o                                               \
+        video_hint.o                                                     \
+        film_grain_params.o                                              \
+@@ -277,6 +279,7 @@ TESTPROGS = adler32                                                     \
+             tree                                                        \
+             twofish                                                     \
+             utf8                                                        \
++            video_block_params                                          \
+             uuid                                                        \
+             xtea                                                        \
+             tea                                                         \
+diff --git a/libavutil/frame.c b/libavutil/frame.c
+index f0a0dba..2ede3f7 100644
+--- a/libavutil/frame.c
++++ b/libavutil/frame.c
+@@ -48,6 +48,7 @@ static const AVSideDataDescriptor sd_props[] = {
+     [AV_FRAME_DATA_DOVI_METADATA]               = { "Dolby Vision Metadata" },
+     [AV_FRAME_DATA_LCEVC]                       = { "LCEVC NAL data" },
+     [AV_FRAME_DATA_VIEW_ID]                     = { "View ID" },
++    [AV_FRAME_DATA_VIDEO_BLOCK_PARAMS]          = { "Video block parameters" },
+     [AV_FRAME_DATA_STEREO3D]                    = { "Stereo 3D",                                    AV_SIDE_DATA_PROP_GLOBAL },
+     [AV_FRAME_DATA_REPLAYGAIN]                  = { "AVReplayGain",                                 AV_SIDE_DATA_PROP_GLOBAL },
+     [AV_FRAME_DATA_DISPLAYMATRIX]               = { "3x3 displaymatrix",                            AV_SIDE_DATA_PROP_GLOBAL },
+diff --git a/libavutil/frame.h b/libavutil/frame.h
+index f780656..0dc9b07 100644
+--- a/libavutil/frame.h
++++ b/libavutil/frame.h
+@@ -243,6 +243,14 @@ enum AVFrameSideDataType {
+      * The data is an int storing the view ID.
+      */
+     AV_FRAME_DATA_VIEW_ID,
++
++    /**
++     * Per-block syntax elements of the frame as signalled in the bitstream
++     * (block partitioning, prediction modes, reference indices, ...).
++     * The data is the AVVideoBlockParamsHeader structure defined in
++     * libavutil/video_block_params.h.
++     */
++    AV_FRAME_DATA_VIDEO_BLOCK_PARAMS,
+ };
+ 
+ enum AVActiveFormatDescription {
+diff --git a/libavutil/tests/video_block_params.c b/libavutil/tests/video_block_params.c
+new file mode 100644
+index 0000000..e15370f
+--- /dev/null
++++ b/libavutil/tests/video_block_params.c
+@@ -0,0 +1,171 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "libavutil/frame.h"
++#include "libavutil/mem.h"
++#include "libavutil/pixfmt.h"
++#include "libavutil/video_block_params.h"
++
++/* 1920x1088 in macroblocks */
++#define MB_W 120
++#define MB_H  68
++
++/* Deterministic, index-dependent values covering the full range of each field. */
++static void fill_mb(AVH264MacroblockParams *mb, unsigned idx)
++{
++    mb->src_x                  = (idx % MB_W) * 16;
++    mb->src_y                  = (idx / MB_W) * 16;
++    mb->slice_id               = idx / 255;
++    mb->mb_type_class          = idx % 14;
++    mb->intra16x16_pred_mode   = (int8_t)(idx % 5) - 1;
++    mb->intra_chroma_pred_mode = (int8_t)(idx % 5) - 1;
++    mb->cbp                    = idx % 48;
++    mb->transform_8x8          = idx & 1;
++    mb->mb_field_decoding_flag = (idx >> 1) & 1;
++    mb->qp_delta               = (int8_t)(idx % 52) - 26;
++    for (int i = 0; i < 4; i++) {
++        mb->sub_mb_type[i]       = (idx + i) % 4 | (((idx >> i) & 1) << 4);
++        mb->pred_dir[i]          = (idx + i) % 4;
++        mb->ref_idx[0][i]        = (int8_t)((idx + i) % 33) - 1;
++        mb->ref_idx[1][i]        = (int8_t)((idx + 7 * i) % 33) - 1;
++        mb->intra8x8_pred_mode[i] = (int8_t)((idx + i) % 10) - 1;
++    }
++    for (int i = 0; i < 16; i++) {
++        mb->intra4x4_pred_mode[i] = (int8_t)((idx + i) % 10) - 1;
++        for (int list = 0; list < 2; list++) {
++            mb->mvd[list][i][0] = (int16_t)((idx * 31 + i * 7 + list) % 65536 - 32768);
++            mb->mvd[list][i][1] = (int16_t)((idx * 17 + i * 3 + list) % 65536 - 32768);
++        }
++    }
++}
++
++static int check_mb(const AVH264MacroblockParams *mb, unsigned idx)
++{
++    AVH264MacroblockParams ref;
++
++    memset(&ref, 0, sizeof(ref));
++    fill_mb(&ref, idx);
++#define CHECK(field) if (memcmp(&mb->field, &ref.field, sizeof(ref.field))) { \
++        printf("block %u: " #field " mismatch\n", idx);                       \
++        return 1;                                                             \
++    }
++    CHECK(src_x);
++    CHECK(src_y);
++    CHECK(slice_id);
++    CHECK(mb_type_class);
++    CHECK(sub_mb_type);
++    CHECK(pred_dir);
++    CHECK(ref_idx);
++    CHECK(intra4x4_pred_mode);
++    CHECK(intra8x8_pred_mode);
++    CHECK(intra16x16_pred_mode);
++    CHECK(intra_chroma_pred_mode);
++    CHECK(cbp);
++    CHECK(transform_8x8);
++    CHECK(mb_field_decoding_flag);
++    CHECK(qp_delta);
++    CHECK(mvd);
++#undef CHECK
++    return 0;
++}
++
++int main(void)
++{
++    const unsigned nb_blocks = MB_W * MB_H;
++    AVVideoBlockParamsHeader *par;
++    const AVFrameSideData *sd;
++    AVFrame *frame, *clone;
++    size_t size;
++    int errors = 0;
++
++    /* plain allocation */
++    par = av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_H264, nb_blocks, &size);
++    if (!par)
++        return 1;
++    printf("alloc: type %d, nb_blocks %u, block_size ok %d, size ok %d\n",
++           par->type, par->nb_blocks,
++           par->block_size == sizeof(AVH264MacroblockParams),
++           size == par->blocks_offset + (size_t)nb_blocks * par->block_size);
++    printf("alloc: blocks zeroed %d\n",
++           ((AVH264MacroblockParams *)av_video_block_params_block(par, nb_blocks - 1))->src_x == 0);
++    av_free(par);
++
++    par = av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_H264, 0, &size);
++    if (!par)
++        return 1;
++    printf("alloc: empty, nb_blocks %u, size ok %d\n", par->nb_blocks,
++           size == par->blocks_offset);
++    av_free(par);
++
++    printf("alloc: unknown type NULL %d\n",
++           !av_video_block_params_alloc(AV_VIDEO_BLOCK_PARAMS_NONE, 16, NULL));
++
++    /* side data round trip */
++    frame = av_frame_alloc();
++    if (!frame)
++        return 1;
++    /* av_frame_clone() needs refcounted data */
++    frame->format = AV_PIX_FMT_GRAY8;
++    frame->width  = 16;
++    frame->height = 16;
++    if (av_frame_get_buffer(frame, 0) < 0) {
++        av_frame_free(&frame);
++        return 1;
++    }
++    printf("side data: unknown type NULL %d, nb_side_data %d\n",
++           !av_video_block_params_create_side_data(frame, AV_VIDEO_BLOCK_PARAMS_NONE, 16),
++           frame->nb_side_data);
++
++    par = av_video_block_params_create_side_data(frame, AV_VIDEO_BLOCK_PARAMS_H264,
++                                                 nb_blocks);
++    if (!par) {
++        av_frame_free(&frame);
++        return 1;
++    }
++    par->plane_w = MB_W;
++    par->plane_h = MB_H;
++    for (unsigned i = 0; i < nb_blocks; i++)
++        fill_mb(av_video_block_params_block(par, i), i);
++
++    clone = av_frame_clone(frame);
++    av_frame_free(&frame);
++    if (!clone)
++        return 1;
++
++    sd = av_frame_get_side_data(clone, AV_FRAME_DATA_VIDEO_BLOCK_PARAMS);
++    if (!sd) {
++        printf("side data: not found\n");
++        av_frame_free(&clone);
++        return 1;
++    }
++    par = (AVVideoBlockParamsHeader *)sd->data;
++    printf("side data: %s, size ok %d\n", av_frame_side_data_name(sd->type),
++           sd->size == par->blocks_offset + (size_t)par->nb_blocks * par->block_size);
++    printf("side data: type %d, nb_blocks %u, plane %dx%d\n",
++           par->type, par->nb_blocks, par->plane_w, par->plane_h);
++    for (unsigned i = 0; i < par->nb_blocks && !errors; i++)
++        errors += check_mb(av_video_block_params_block(par, i), i);
++    printf("side data: %u blocks round-tripped, errors %d\n", par->nb_blocks, errors);
++
++    av_frame_free(&clone);
++    return errors;
++}
+diff --git a/libavutil/version.h b/libavutil/version.h
+index 753f85b..1ae3f4e 100644
+--- a/libavutil/version.h
++++ b/libavutil/version.h
+@@ -79,7 +79,7 @@
+  */
+ 
+ #define LIBAVUTIL_VERSION_MAJOR  59
+-#define LIBAVUTIL_VERSION_MINOR  39
++#define LIBAVUTIL_VERSION_MINOR  40
+ #define LIBAVUTIL_VERSION_MICRO 100
+ 
+ #define LIBAVUTIL_VERSION_INT   AV_VERSION_INT(LIBAVUTIL_VERSION_MAJOR, \
+diff --git a/libavutil/video_block_params.c b/libavutil/video_block_params.c
+new file mode 100644
+index 0000000..f6b7ff4
+--- /dev/null
++++ b/libavutil/video_block_params.c
+@@ -0,0 +1,91 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stddef.h>
++#include <stdint.h>
++
++#include "buffer.h"
++#include "frame.h"
++#include "mem.h"
++#include "video_block_params.h"
++
++AVVideoBlockParamsHeader *
++av_video_block_params_alloc(enum AVVideoBlockParamsType type,
++                            unsigned int nb_blocks, size_t *out_size)
++{
++    struct TestStructH264 {
++        AVVideoBlockParamsHeader p;
++        AVH264MacroblockParams   b;
++    };
++    size_t blocks_offset, block_size, size;
++    AVVideoBlockParamsHeader *par;
++
++    switch (type) {
++    case AV_VIDEO_BLOCK_PARAMS_H264:
++        blocks_offset = offsetof(struct TestStructH264, b);
++        block_size    = sizeof(AVH264MacroblockParams);
++        break;
++    default:
++        return NULL;
++    }
++
++    size = blocks_offset;
++    if (nb_blocks > (SIZE_MAX - size) / block_size)
++        return NULL;
++    size += block_size * nb_blocks;
++
++    par = av_mallocz(size);
++    if (!par)
++        return NULL;
++
++    par->type          = type;
++    par->nb_blocks     = nb_blocks;
++    par->block_size    = block_size;
++    par->blocks_offset = blocks_offset;
++
++    if (out_size)
++        *out_size = size;
++
++    return par;
++}
++
++AVVideoBlockParamsHeader *
++av_video_block_params_create_side_data(AVFrame *frame,
++                                       enum AVVideoBlockParamsType type,
++                                       unsigned int nb_blocks)
++{
++    AVBufferRef              *buf;
++    AVVideoBlockParamsHeader *par;
++    size_t size;
++
++    par = av_video_block_params_alloc(type, nb_blocks, &size);
++    if (!par)
++        return NULL;
++    buf = av_buffer_create((uint8_t *)par, size, NULL, NULL, 0);
++    if (!buf) {
++        av_freep(&par);
++        return NULL;
++    }
++
++    if (!av_frame_new_side_data_from_buf(frame, AV_FRAME_DATA_VIDEO_BLOCK_PARAMS, buf)) {
++        av_buffer_unref(&buf);
++        return NULL;
++    }
++
++    return par;
++}
+diff --git a/libavutil/video_block_params.h b/libavutil/video_block_params.h
+new file mode 100644
+index 0000000..ba66740
+--- /dev/null
++++ b/libavutil/video_block_params.h
+@@ -0,0 +1,235 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#ifndef AVUTIL_VIDEO_BLOCK_PARAMS_H
++#define AVUTIL_VIDEO_BLOCK_PARAMS_H
++
++#include <stddef.h>
++#include <stdint.h>
++
++#include "libavutil/avassert.h"
++#include "libavutil/frame.h"
++
++/**
++ * @file
++ * Per-block syntax of a decoded video frame, exported by decoders as
++ * AV_FRAME_DATA_VIDEO_BLOCK_PARAMS side data.
++ *
++ * Where AV_FRAME_DATA_VIDEO_ENC_PARAMS carries only the final quantiser of
++ * each block, this side data carries the codec-specific syntax elements of
++ * each block (partitioning, prediction modes, reference indices, coded block
++ * pattern, motion vector differences) as signalled in the bitstream. The
++ * layout of each block record depends on the type.
++ */
++
++enum AVVideoBlockParamsType {
++    AV_VIDEO_BLOCK_PARAMS_NONE = -1,
++    /**
++     * H.264 macroblocks. Each block is an AVH264MacroblockParams describing
++     * one macroblock (or, in MBAFF frames, one macroblock of a macroblock
++     * pair), in raster order of the coded picture.
++     */
++    AV_VIDEO_BLOCK_PARAMS_H264 = 0,
++};
++
++/**
++ * Per-block parameters of a given frame. This struct is allocated along with
++ * an array of per-block records whose layout depends on the type.
++ * Must be allocated with av_video_block_params_alloc().
++ */
++typedef struct AVVideoBlockParamsHeader {
++    /**
++     * Number of blocks in the array.
++     *
++     * May be 0, in which case no per-block information is present. In this case
++     * the values of blocks_offset / block_size are unspecified and should not
++     * be accessed.
++     */
++    unsigned int nb_blocks;
++    /**
++     * Offset in bytes from the beginning of this structure at which the array
++     * of blocks starts.
++     */
++    size_t blocks_offset;
++    /**
++     * Size of each block in bytes. May not match the sizeof() of the record
++     * type as known to the caller.
++     */
++    size_t block_size;
++
++    /**
++     * Type of the parameters (the codec they are used with). It determines
++     * the type of each block record.
++     */
++    enum AVVideoBlockParamsType type;
++
++    /**
++     * Width and height of the block grid, in blocks. For H.264 these are the
++     * picture width and height in macroblocks. nb_blocks is normally
++     * plane_w * plane_h.
++     */
++    int plane_w, plane_h;
++} AVVideoBlockParamsHeader;
++
++/**
++ * Syntax of one H.264 macroblock, as signalled in the bitstream.
++ * It is allocated as a part of AVVideoBlockParamsHeader and should be
++ * retrieved with av_video_block_params_block().
++ *
++ * sizeof(AVH264MacroblockParams) is not a part of the ABI and new fields may
++ * be added to it.
++ *
++ * Unless stated otherwise, a value of -1 in a signed field means that the
++ * element is not present in this macroblock.
++ */
++typedef struct AVH264MacroblockParams {
++    /**
++     * Position of the top-left luma sample of the macroblock in the coded
++     * picture.
++     */
++    int32_t src_x, src_y;
++
++    /**
++     * Index of the slice this macroblock belongs to, counted from 0 in
++     * decoding order within the picture, modulo 256.
++     */
++    uint8_t slice_id;
++
++    /**
++     * Macroblock type class:
++     * 0 I_NxN, 1 I_16x16, 2 I_PCM, 3 P_16x16 (P_L0_16x16), 4 P_16x8,
++     * 5 P_8x16, 6 P_8x8 (including P_8x8ref0), 7 P_Skip, 8 B_Direct_16x16,
++     * 9 B_16x16, 10 B_16x8, 11 B_8x16, 12 B_8x8, 13 B_Skip.
++     * SI and SP macroblocks are reported as their I and P equivalents.
++     */
++    uint8_t mb_type_class;
++
++    /**
++     * Sub-macroblock partitioning of each 8x8 partition, for mb_type_class
++     * P_8x8 and B_8x8: bits 0-3 are 0 for 8x8, 1 for 8x4, 2 for 4x8,
++     * 3 for 4x4; bit 4 is set for B_Direct_8x8. 0 for other macroblock types.
++     */
++    uint8_t sub_mb_type[4];
++
++    /**
++     * Prediction direction of each 8x8 partition: bit 0 set when list 0 is
++     * used, bit 1 set when list 1 is used. 0 for intra macroblocks.
++     */
++    uint8_t pred_dir[4];
++
++    /**
++     * Reference index of each 8x8 partition for list 0 and list 1, or -1 when
++     * the list is not used by that partition.
++     */
++    int8_t ref_idx[2][4];
++
++    /**
++     * Intra 4x4 prediction mode of each 4x4 block, in the decoding order of
++     * the 4x4 luma blocks (H.264 6.4.3), for mb_type_class I_NxN without
++     * transform_8x8; -1 otherwise.
++     */
++    int8_t intra4x4_pred_mode[16];
++
++    /**
++     * Intra 8x8 prediction mode of each 8x8 block, for mb_type_class I_NxN
++     * with transform_8x8; -1 otherwise.
++     */
++    int8_t intra8x8_pred_mode[4];
++
++    /**
++     * Intra 16x16 prediction mode (0-3), for mb_type_class I_16x16;
++     * -1 otherwise.
++     */
++    int8_t intra16x16_pred_mode;
++
++    /**
++     * intra_chroma_pred_mode (0-3) of intra macroblocks with chroma; -1 for
++     * inter macroblocks, I_PCM and monochrome pictures.
++     */
++    int8_t intra_chroma_pred_mode;
++
++    /**
++     * coded_block_pattern: bits 0-3 luma, bits 4-5 chroma (CodedBlockPatternLuma
++     * + 16 * CodedBlockPatternChroma).
++     */
++    uint8_t cbp;
++
++    /**
++     * transform_size_8x8_flag.
++     */
++    uint8_t transform_8x8;
++
++    /**
++     * mb_field_decoding_flag; 1 also for every macroblock of a field picture.
++     */
++    uint8_t mb_field_decoding_flag;
++
++    /**
++     * mb_qp_delta as signalled, 0 when not present.
++     */
++    int8_t qp_delta;
++
++    /**
++     * Motion vector difference as signalled (mvd_l0 / mvd_l1), per list, per
++     * 4x4 block in the decoding order of the 4x4 luma blocks, horizontal then
++     * vertical component, in quarter luma sample units. 0 where no mvd is
++     * signalled.
++     */
++    int16_t mvd[2][16][2];
++} AVH264MacroblockParams;
++
++/**
++ * Get the block at the specified {@code idx}. Must be between 0 and
++ * nb_blocks - 1. The returned pointer is to a record of the type determined by
++ * par->type, e.g. AVH264MacroblockParams for AV_VIDEO_BLOCK_PARAMS_H264.
++ */
++static av_always_inline void*
++av_video_block_params_block(AVVideoBlockParamsHeader *par, unsigned int idx)
++{
++    av_assert0(idx < par->nb_blocks);
++    return (uint8_t *)par + par->blocks_offset + idx * par->block_size;
++}
++
++/**
++ * Allocates memory for AVVideoBlockParamsHeader of the given type, plus an
++ * array of {@code nb_blocks} records of the type's block structure, and
++ * initializes the variables. The blocks are zeroed. Can be freed with a normal
++ * av_free() call.
++ *
++ * @param out_size if non-NULL, the size in bytes of the resulting data array is
++ * written here.
++ * @return the allocated structure, or NULL on failure or for an unknown type
++ */
++AVVideoBlockParamsHeader *
++av_video_block_params_alloc(enum AVVideoBlockParamsType type,
++                            unsigned int nb_blocks, size_t *out_size);
++
++/**
++ * Allocates memory for AVVideoBlockParamsHeader plus an array of
++ * {@code nb_blocks} block records in the given AVFrame {@code frame}
++ * as AVFrameSideData of type AV_FRAME_DATA_VIDEO_BLOCK_PARAMS
++ * and initializes the variables.
++ *
++ * @return the allocated structure, or NULL on failure or for an unknown type
++ */
++AVVideoBlockParamsHeader *
++av_video_block_params_create_side_data(AVFrame *frame,
++                                       enum AVVideoBlockParamsType type,
++                                       unsigned int nb_blocks);
++
++#endif /* AVUTIL_VIDEO_BLOCK_PARAMS_H */
+diff --git a/tests/fate/libavutil.mak b/tests/fate/libavutil.mak
+index 6bf03b2..3b2e7aa 100644
+--- a/tests/fate/libavutil.mak
++++ b/tests/fate/libavutil.mak
+@@ -179,6 +179,10 @@ fate-uuid: libavutil/tests/uuid$(EXESUF)
+ fate-uuid: CMD = run libavutil/tests/uuid$(EXESUF)
+ fate-uuid: CMP = null
+ 
++FATE_LIBAVUTIL += fate-video_block_params
++fate-video_block_params: libavutil/tests/video_block_params$(EXESUF)
++fate-video_block_params: CMD = run libavutil/tests/video_block_params$(EXESUF)
++
+ FATE_LIBAVUTIL += $(FATE_LIBAVUTIL-yes)
+ FATE-$(CONFIG_AVUTIL) += $(FATE_LIBAVUTIL)
+ fate-libavutil: $(FATE_LIBAVUTIL)
+diff --git a/tests/ref/fate/video_block_params b/tests/ref/fate/video_block_params
+new file mode 100644
+index 0000000..66f6da4
+--- /dev/null
++++ b/tests/ref/fate/video_block_params
+@@ -0,0 +1,8 @@
++alloc: type 0, nb_blocks 8160, block_size ok 1, size ok 1
++alloc: blocks zeroed 1
++alloc: empty, nb_blocks 0, size ok 1
++alloc: unknown type NULL 1
++side data: unknown type NULL 1, nb_side_data 0
++side data: Video block parameters, size ok 1
++side data: type 0, nb_blocks 8160, plane 120x68
++side data: 8160 blocks round-tripped, errors 0
+
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH 2/2] avcodec/h264dec: export AV_FRAME_DATA_VIDEO_BLOCK_PARAMS
+
+Add AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS ("block_params" in
+export_side_data). When it is set, the h264 decoder records the
+macroblock-layer syntax of every decoded macroblock while parsing (CAVLC,
+CABAC and skipped macroblocks, MBAFF and field pictures included) into a
+per-picture pool table, and attaches one AVH264MacroblockParams per
+macroblock to each output frame: mb_type class, sub_mb_type, reference
+indices and prediction direction per 8x8 partition, intra 4x4/8x8/16x16 and
+chroma prediction modes as signalled, coded_block_pattern, mb_qp_delta,
+transform_size_8x8_flag, mb_field_decoding_flag, slice index and the motion
+vector differences of both lists.
+
+Nothing is recorded or allocated when the flag is unset, and hwaccel
+decoding never exports. With frame threading the export waits for the
+picture's decoding progress, so droppable pictures report progress while
+the flag is set. Decoded pixels are unchanged.
+
+tools/vblock_data_dump prints the side data, and the new
+fate-h264-block-params-* tests cover CAVLC, CABAC, MBAFF and CABAC with
+frame threads (which must match the single-threaded reference).
+
+Upstream-Status: Pending [to be submitted to ffmpeg-devel by OVT WI-4.103]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: FFmpeg's h264 decoder exports MVs and per-MB QP only; Open Video
+  Tools needs mb_type, sub_mb_type, ref_idx, intra modes, cbp, mb_qp_delta
+  and mvd (OVT spec chapter 07 section 7.6.3). Part 2 of 2 (OVT WI-4.101);
+  part 1 (libavutil side data) is OVT WI-4.100.
+---
+ doc/APIchanges                 |   3 +
+ libavcodec/avcodec.h           |   6 ++
+ libavcodec/h264_cabac.c        |  33 ++++++--
+ libavcodec/h264_cavlc.c        |  57 ++++++++++---
+ libavcodec/h264_mvpred.h       |   2 +
+ libavcodec/h264_picture.c      |   5 +-
+ libavcodec/h264_slice.c        |  24 +++++-
+ libavcodec/h264dec.c           | 100 ++++++++++++++++++++++-
+ libavcodec/h264dec.h           | 138 ++++++++++++++++++++++++++++++++
+ libavcodec/options_table.h     |   1 +
+ libavcodec/version.h           |   4 +-
+ libavformat/Makefile           |   1 +
+ libavutil/video_block_params.h |  14 +++-
+ tests/Makefile                 |   1 +
+ tests/fate-run.sh              |   7 ++
+ tests/fate/h264.mak            |  16 ++++
+ tools/Makefile                 |   1 +
+ tools/vblock_data_dump.c       | 142 +++++++++++++++++++++++++++++++++
+ 18 files changed, 532 insertions(+), 23 deletions(-)
+ create mode 100644 tools/vblock_data_dump.c
+
+diff --git a/doc/APIchanges b/doc/APIchanges
+index e5fb4ea..3dcf790 100644
+--- a/doc/APIchanges
++++ b/doc/APIchanges
+@@ -2,6 +2,9 @@ The last version increases of all libraries were on 2024-03-07
+ 
+ API changes, most recent first:
+ 
++2026-11-09 - xxxxxxxxxx - lavc 61.20.100 - avcodec.h
++  Add AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS for export_side_data.
++
+ 2026-11-08 - xxxxxxxxxx - lavu 59.40.100 - frame.h video_block_params.h
+   Add AV_FRAME_DATA_VIDEO_BLOCK_PARAMS, AVVideoBlockParamsHeader,
+   enum AVVideoBlockParamsType, AVH264MacroblockParams,
+diff --git a/libavcodec/avcodec.h b/libavcodec/avcodec.h
+index 77ca8de..d8b8436 100644
+--- a/libavcodec/avcodec.h
++++ b/libavcodec/avcodec.h
+@@ -424,6 +424,12 @@ typedef struct RcOverride{
+  * Do not apply picture enhancement layers, export them instead.
+  */
+ #define AV_CODEC_EXPORT_DATA_ENHANCEMENTS (1 << 4)
++/**
++ * Decoding only.
++ * Export the per-block syntax of each frame (AVVideoBlockParamsHeader)
++ * through frame side data of type AV_FRAME_DATA_VIDEO_BLOCK_PARAMS.
++ */
++#define AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS (1 << 5)
+ 
+ /**
+  * The decoder will keep a reference to the frame and may reuse it later.
+diff --git a/libavcodec/h264_cabac.c b/libavcodec/h264_cabac.c
+index 703b27a..1614704 100644
+--- a/libavcodec/h264_cabac.c
++++ b/libavcodec/h264_cabac.c
+@@ -1540,7 +1540,8 @@ static int decode_cabac_mb_mvd(H264SliceContext *sl, int ctxbase, int amvd, int
+     return get_cabac_bypass_sign( &sl->cabac, -mvd );
+ }
+ 
+-#define DECODE_CABAC_MB_MVD(sl, list,  n )\
++/* pw, ph: size of the partition in 4x4 blocks, for the block params export */
++#define DECODE_CABAC_MB_MVD(sl, list,  n, pw, ph)\
+ {\
+     int amvd0 = sl->mvd_cache[list][scan8[n] - 1][0] +\
+                 sl->mvd_cache[list][scan8[n] - 8][0];\
+@@ -1551,6 +1552,8 @@ static int decode_cabac_mb_mvd(H264SliceContext *sl, int ctxbase, int amvd, int
+     int myd = decode_cabac_mb_mvd(sl, 47, amvd1, &mpy);\
+     if (mxd == INT_MIN || myd == INT_MIN) \
+         return AVERROR_INVALIDDATA; \
++    if (sl->mbp) \
++        h264_bp_mvd(sl, list, n, pw, ph, mxd, myd); \
+     mx += mxd;\
+     my += myd;\
+ }
+@@ -1927,6 +1930,7 @@ int ff_h264_decode_mb_cabac(const H264Context *h, H264SliceContext *sl)
+     const int pixel_shift = h->pixel_shift;
+ 
+     mb_xy = sl->mb_xy = sl->mb_x + sl->mb_y*h->mb_stride;
++    h264_bp_mb_start(h, sl, mb_xy);
+ 
+     ff_tlog(h->avctx, "pic:%d mb:%d/%d\n", h->poc.frame_num, sl->mb_x, sl->mb_y);
+     if (sl->slice_type_nos != AV_PICTURE_TYPE_I) {
+@@ -2030,6 +2034,9 @@ decode_intra_mb:
+     if (MB_FIELD(sl))
+         mb_type |= MB_TYPE_INTERLACED;
+ 
++    if (sl->mbp)
++        sl->mbp->mb_type_class = h264_bp_mb_class(sl->slice_type_nos, mb_type);
++
+     h->slice_table[mb_xy] = sl->slice_num;
+ 
+     if(IS_INTRA_PCM(mb_type)) {
+@@ -2090,11 +2097,15 @@ decode_intra_mb:
+                             sl->intra4x4_pred_mode_cache[scan8[i]]);
+                 }
+             }
++            if (sl->mbp)
++                h264_bp_intra4x4(sl);
+             write_back_intra_pred_mode(h, sl);
+             if (ff_h264_check_intra4x4_pred_mode(sl->intra4x4_pred_mode_cache, h->avctx,
+                                                  sl->top_samples_available, sl->left_samples_available) < 0 )
+                 return -1;
+         } else {
++            if (sl->mbp)
++                h264_bp_intra16x16(sl, sl->intra16x16_pred_mode);
+             sl->intra16x16_pred_mode = ff_h264_check_intra_pred_mode(h->avctx, sl->top_samples_available,
+                                                                      sl->left_samples_available, sl->intra16x16_pred_mode, 0);
+             if (sl->intra16x16_pred_mode < 0) return -1;
+@@ -2102,6 +2113,8 @@ decode_intra_mb:
+         if(decode_chroma){
+             h->chroma_pred_mode_table[mb_xy] =
+             pred_mode                        = decode_cabac_mb_chroma_pre_mode(h, sl);
++            if (sl->mbp)
++                sl->mbp->intra_chroma_pred_mode = pred_mode;
+ 
+             pred_mode= ff_h264_check_intra_pred_mode(h->avctx, sl->top_samples_available,
+                                                      sl->left_samples_available, pred_mode, 1 );
+@@ -2119,6 +2132,8 @@ decode_intra_mb:
+                 sub_partition_count[i] = ff_h264_b_sub_mb_type_info[sl->sub_mb_type[i]].partition_count;
+                 sl->sub_mb_type[i]     = ff_h264_b_sub_mb_type_info[sl->sub_mb_type[i]].type;
+             }
++            if (sl->mbp)
++                h264_bp_sub_mb_types(sl);
+             if (IS_DIRECT(sl->sub_mb_type[0] | sl->sub_mb_type[1] |
+                           sl->sub_mb_type[2] | sl->sub_mb_type[3])) {
+                 ff_h264_pred_direct_motion(h, sl, &mb_type);
+@@ -2135,6 +2150,8 @@ decode_intra_mb:
+                 sub_partition_count[i] = ff_h264_p_sub_mb_type_info[sl->sub_mb_type[i]].partition_count;
+                 sl->sub_mb_type[i]     = ff_h264_p_sub_mb_type_info[sl->sub_mb_type[i]].type;
+             }
++            if (sl->mbp)
++                h264_bp_sub_mb_types(sl);
+         }
+ 
+         for( list = 0; list < sl->list_count; list++ ) {
+@@ -2179,7 +2196,9 @@ decode_intra_mb:
+                         int16_t (* mv_cache)[2] = &sl->mv_cache[list][ scan8[index] ];
+                         uint8_t (* mvd_cache)[2]= &sl->mvd_cache[list][ scan8[index] ];
+                         pred_motion(h, sl, index, block_width, list, sl->ref_cache[list][ scan8[index] ], &mx, &my);
+-                        DECODE_CABAC_MB_MVD(sl, list, index)
++                        DECODE_CABAC_MB_MVD(sl, list, index,
++                                            IS_SUB_8X8(sub_mb_type) || IS_SUB_8X4(sub_mb_type) ? 2 : 1,
++                                            IS_SUB_8X8(sub_mb_type) || IS_SUB_4X8(sub_mb_type) ? 2 : 1)
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                         if(IS_SUB_8X8(sub_mb_type)){
+@@ -2244,7 +2263,7 @@ decode_intra_mb:
+                 if(IS_DIR(mb_type, 0, list)){
+                     int mx,my,mpx,mpy;
+                     pred_motion(h, sl, 0, 4, list, sl->ref_cache[list][ scan8[0] ], &mx, &my);
+-                    DECODE_CABAC_MB_MVD(sl, list, 0)
++                    DECODE_CABAC_MB_MVD(sl, list, 0, 4, 4)
+                     ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                     fill_rectangle(sl->mvd_cache[list][ scan8[0] ], 4, 4, 8, pack8to16(mpx,mpy), 2);
+@@ -2276,7 +2295,7 @@ decode_intra_mb:
+                     if(IS_DIR(mb_type, i, list)){
+                         int mx,my,mpx,mpy;
+                         pred_16x8_motion(h, sl, 8*i, list, sl->ref_cache[list][scan8[0] + 16*i], &mx, &my);
+-                        DECODE_CABAC_MB_MVD(sl, list, 8*i)
++                        DECODE_CABAC_MB_MVD(sl, list, 8*i, 4, 2)
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                         fill_rectangle(sl->mvd_cache[list][ scan8[0] + 16*i ], 4, 2, 8, pack8to16(mpx,mpy), 2);
+@@ -2312,7 +2331,7 @@ decode_intra_mb:
+                     if(IS_DIR(mb_type, i, list)){
+                         int mx,my,mpx,mpy;
+                         pred_8x16_motion(h, sl, i*4, list, sl->ref_cache[list][ scan8[0] + 2*i ], &mx, &my);
+-                        DECODE_CABAC_MB_MVD(sl, list, 4*i)
++                        DECODE_CABAC_MB_MVD(sl, list, 4*i, 2, 4)
+ 
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+                         fill_rectangle(sl->mvd_cache[list][ scan8[0] + 2*i ], 2, 4, 8, pack8to16(mpx,mpy), 2);
+@@ -2343,6 +2362,8 @@ decode_intra_mb:
+     }
+ 
+     h->cbp_table[mb_xy] = sl->cbp = cbp;
++    if (sl->mbp)
++        sl->mbp->cbp = cbp;
+ 
+     if( dct8x8_allowed && (cbp&15) && !IS_INTRA( mb_type ) ) {
+         mb_type |= MB_TYPE_8x8DCT * get_cabac_noinline(&sl->cabac, &sl->cabac_state[399 + sl->neighbor_transform_size]);
+@@ -2415,6 +2436,8 @@ decode_intra_mb:
+             else
+                 val= -((val + 1)>>1);
+             sl->last_qscale_diff = val;
++            if (sl->mbp)
++                sl->mbp->qp_delta = val;
+             sl->qscale += val;
+             if (((unsigned)sl->qscale) > max_qp){
+                 if (sl->qscale < 0) sl->qscale += max_qp + 1;
+diff --git a/libavcodec/h264_cavlc.c b/libavcodec/h264_cavlc.c
+index 75e5fb7..f334073 100644
+--- a/libavcodec/h264_cavlc.c
++++ b/libavcodec/h264_cavlc.c
+@@ -672,6 +672,7 @@ int ff_h264_decode_mb_cavlc(const H264Context *h, H264SliceContext *sl)
+     const int pixel_shift = h->pixel_shift;
+ 
+     mb_xy = sl->mb_xy = sl->mb_x + sl->mb_y*h->mb_stride;
++    h264_bp_mb_start(h, sl, mb_xy);
+ 
+     ff_tlog(h->avctx, "pic:%d mb:%d/%d\n", h->poc.frame_num, sl->mb_x, sl->mb_y);
+     cbp = 0; /* avoid warning. FIXME: find a solution without slowing
+@@ -737,6 +738,9 @@ decode_intra_mb:
+     if (MB_FIELD(sl))
+         mb_type |= MB_TYPE_INTERLACED;
+ 
++    if (sl->mbp)
++        sl->mbp->mb_type_class = h264_bp_mb_class(sl->slice_type_nos, mb_type);
++
+     h->slice_table[mb_xy] = sl->slice_num;
+ 
+     if(IS_INTRA_PCM(mb_type)){
+@@ -789,19 +793,26 @@ decode_intra_mb:
+                 else
+                     sl->intra4x4_pred_mode_cache[scan8[i]] = mode;
+             }
++            if (sl->mbp)
++                h264_bp_intra4x4(sl);
+             write_back_intra_pred_mode(h, sl);
+             if (ff_h264_check_intra4x4_pred_mode(sl->intra4x4_pred_mode_cache, h->avctx,
+                                                  sl->top_samples_available, sl->left_samples_available) < 0)
+                 return -1;
+         }else{
++            if (sl->mbp)
++                h264_bp_intra16x16(sl, sl->intra16x16_pred_mode);
+             sl->intra16x16_pred_mode = ff_h264_check_intra_pred_mode(h->avctx, sl->top_samples_available,
+                                                                      sl->left_samples_available, sl->intra16x16_pred_mode, 0);
+             if (sl->intra16x16_pred_mode < 0)
+                 return -1;
+         }
+         if(decode_chroma){
++            pred_mode = get_ue_golomb_31(&sl->gb);
++            if (sl->mbp)
++                sl->mbp->intra_chroma_pred_mode = pred_mode;
+             pred_mode= ff_h264_check_intra_pred_mode(h->avctx, sl->top_samples_available,
+-                                                     sl->left_samples_available, get_ue_golomb_31(&sl->gb), 1);
++                                                     sl->left_samples_available, pred_mode, 1);
+             if(pred_mode < 0)
+                 return -1;
+             sl->chroma_pred_mode = pred_mode;
+@@ -821,6 +832,8 @@ decode_intra_mb:
+                 sub_partition_count[i] = ff_h264_b_sub_mb_type_info[sl->sub_mb_type[i]].partition_count;
+                 sl->sub_mb_type[i]     = ff_h264_b_sub_mb_type_info[sl->sub_mb_type[i]].type;
+             }
++            if (sl->mbp)
++                h264_bp_sub_mb_types(sl);
+             if( IS_DIRECT(sl->sub_mb_type[0]|sl->sub_mb_type[1]|sl->sub_mb_type[2]|sl->sub_mb_type[3])) {
+                 ff_h264_pred_direct_motion(h, sl, &mb_type);
+                 sl->ref_cache[0][scan8[4]] =
+@@ -839,6 +852,8 @@ decode_intra_mb:
+                 sub_partition_count[i] = ff_h264_p_sub_mb_type_info[sl->sub_mb_type[i]].partition_count;
+                 sl->sub_mb_type[i]     = ff_h264_p_sub_mb_type_info[sl->sub_mb_type[i]].type;
+             }
++            if (sl->mbp)
++                h264_bp_sub_mb_types(sl);
+         }
+ 
+         for (list = 0; list < sl->list_count; list++) {
+@@ -885,9 +900,14 @@ decode_intra_mb:
+                         int mx, my;
+                         const int index= 4*i + block_width*j;
+                         int16_t (* mv_cache)[2]= &sl->mv_cache[list][ scan8[index] ];
++                        int mvdx, mvdy;
+                         pred_motion(h, sl, index, block_width, list, sl->ref_cache[list][ scan8[index] ], &mx, &my);
+-                        mx += (unsigned)get_se_golomb(&sl->gb);
+-                        my += (unsigned)get_se_golomb(&sl->gb);
++                        mvdx = get_se_golomb(&sl->gb);
++                        mvdy = get_se_golomb(&sl->gb);
++                        if (sl->mbp)
++                            h264_bp_sub_mvd(sl, list, index, sub_mb_type, mvdx, mvdy);
++                        mx += (unsigned)mvdx;
++                        my += (unsigned)mvdy;
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                         if(IS_SUB_8X8(sub_mb_type)){
+@@ -939,9 +959,14 @@ decode_intra_mb:
+             }
+             for (list = 0; list < sl->list_count; list++) {
+                 if(IS_DIR(mb_type, 0, list)){
++                    int mvdx, mvdy;
+                     pred_motion(h, sl, 0, 4, list, sl->ref_cache[list][ scan8[0] ], &mx, &my);
+-                    mx += (unsigned)get_se_golomb(&sl->gb);
+-                    my += (unsigned)get_se_golomb(&sl->gb);
++                    mvdx = get_se_golomb(&sl->gb);
++                    mvdy = get_se_golomb(&sl->gb);
++                    if (sl->mbp)
++                        h264_bp_mvd(sl, list, 0, 4, 4, mvdx, mvdy);
++                    mx += (unsigned)mvdx;
++                    my += (unsigned)mvdy;
+                     ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                     fill_rectangle(sl->mv_cache[list][ scan8[0] ], 4, 4, 8, pack16to32(mx,my), 4);
+@@ -974,9 +999,14 @@ decode_intra_mb:
+                 for(i=0; i<2; i++){
+                     unsigned int val;
+                     if(IS_DIR(mb_type, i, list)){
++                        int mvdx, mvdy;
+                         pred_16x8_motion(h, sl, 8*i, list, sl->ref_cache[list][scan8[0] + 16*i], &mx, &my);
+-                        mx += (unsigned)get_se_golomb(&sl->gb);
+-                        my += (unsigned)get_se_golomb(&sl->gb);
++                        mvdx = get_se_golomb(&sl->gb);
++                        mvdy = get_se_golomb(&sl->gb);
++                        if (sl->mbp)
++                            h264_bp_mvd(sl, list, 8 * i, 4, 2, mvdx, mvdy);
++                        mx += (unsigned)mvdx;
++                        my += (unsigned)mvdy;
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                         val= pack16to32(mx,my);
+@@ -1012,9 +1042,14 @@ decode_intra_mb:
+                 for(i=0; i<2; i++){
+                     unsigned int val;
+                     if(IS_DIR(mb_type, i, list)){
++                        int mvdx, mvdy;
+                         pred_8x16_motion(h, sl, i*4, list, sl->ref_cache[list][ scan8[0] + 2*i ], &mx, &my);
+-                        mx += (unsigned)get_se_golomb(&sl->gb);
+-                        my += (unsigned)get_se_golomb(&sl->gb);
++                        mvdx = get_se_golomb(&sl->gb);
++                        mvdy = get_se_golomb(&sl->gb);
++                        if (sl->mbp)
++                            h264_bp_mvd(sl, list, 4 * i, 2, 4, mvdx, mvdy);
++                        mx += (unsigned)mvdx;
++                        my += (unsigned)mvdy;
+                         ff_tlog(h->avctx, "final mv:%d %d\n", mx, my);
+ 
+                         val= pack16to32(mx,my);
+@@ -1062,6 +1097,8 @@ decode_intra_mb:
+     sl->cbp=
+     h->cbp_table[mb_xy]= cbp;
+     h->cur_pic.mb_type[mb_xy] = mb_type;
++    if (sl->mbp)
++        sl->mbp->cbp = cbp;
+ 
+     if(cbp || IS_INTRA16x16(mb_type)){
+         int i4x4, i8x8, chroma_idx;
+@@ -1072,6 +1109,8 @@ decode_intra_mb:
+         const int max_qp = 51 + 6 * (h->ps.sps->bit_depth_luma - 8);
+ 
+         dquant= get_se_golomb(&sl->gb);
++        if (sl->mbp)
++            sl->mbp->qp_delta = dquant;
+ 
+         sl->qscale += (unsigned)dquant;
+ 
+diff --git a/libavcodec/h264_mvpred.h b/libavcodec/h264_mvpred.h
+index bc9fef5..2a501d3 100644
+--- a/libavcodec/h264_mvpred.h
++++ b/libavcodec/h264_mvpred.h
+@@ -958,6 +958,8 @@ static void av_unused decode_mb_skip(const H264Context *h, H264SliceContext *sl)
+     }
+ 
+     write_back_motion(h, sl, mb_type);
++    if (sl->mbp)
++        sl->mbp->mb_type_class = sl->slice_type_nos == AV_PICTURE_TYPE_B ? 13 : 7;
+     h->cur_pic.mb_type[mb_xy]      = mb_type;
+     h->cur_pic.qscale_table[mb_xy] = sl->qscale;
+     h->slice_table[mb_xy]          = sl->slice_num;
+diff --git a/libavcodec/h264_picture.c b/libavcodec/h264_picture.c
+index 3234141..a6a8001 100644
+--- a/libavcodec/h264_picture.c
++++ b/libavcodec/h264_picture.c
+@@ -50,6 +50,7 @@ void ff_h264_unref_picture(H264Picture *pic)
+ 
+     ff_refstruct_unref(&pic->qscale_table_base);
+     ff_refstruct_unref(&pic->mb_type_base);
++    ff_refstruct_unref(&pic->mb_params);
+     ff_refstruct_unref(&pic->pps);
+     for (i = 0; i < 2; i++) {
+         ff_refstruct_unref(&pic->motion_val_base[i]);
+@@ -64,6 +65,7 @@ static void h264_copy_picture_params(H264Picture *dst, const H264Picture *src)
+ {
+     ff_refstruct_replace(&dst->qscale_table_base, src->qscale_table_base);
+     ff_refstruct_replace(&dst->mb_type_base,      src->mb_type_base);
++    ff_refstruct_replace(&dst->mb_params,         src->mb_params);
+     ff_refstruct_replace(&dst->pps, src->pps);
+ 
+     for (int i = 0; i < 2; i++) {
+@@ -223,7 +225,8 @@ int ff_h264_field_end(H264Context *h, H264SliceContext *sl, int in_setup)
+         }
+     }
+ 
+-    if (!in_setup && !h->droppable)
++    if (!in_setup && (!h->droppable ||
++                      (avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS)))
+         ff_thread_report_progress(&cur->tf, INT_MAX,
+                                   h->picture_structure == PICT_BOTTOM_FIELD);
+     emms_c();
+diff --git a/libavcodec/h264_slice.c b/libavcodec/h264_slice.c
+index 84595b1..631efb6 100644
+--- a/libavcodec/h264_slice.c
++++ b/libavcodec/h264_slice.c
+@@ -192,8 +192,12 @@ static int alloc_picture(H264Context *h, H264Picture *pic)
+     av_assert0(!pic->f->data[0]);
+ 
+     pic->tf.f = pic->f;
++    /* Exporting block params waits for the progress of non-reference
++     * pictures too (h264_export_block_params()). */
+     ret = ff_thread_get_ext_buffer(h->avctx, &pic->tf,
+-                                   pic->reference ? AV_GET_BUFFER_FLAG_REF : 0);
++                                   pic->reference ||
++                                   (h->avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS) ?
++                                   AV_GET_BUFFER_FLAG_REF : 0);
+     if (ret < 0)
+         goto fail;
+ 
+@@ -253,6 +257,21 @@ static int alloc_picture(H264Context *h, H264Picture *pic)
+         pic->motion_val[i] = pic->motion_val_base[i] + 4;
+     }
+ 
++    if ((h->avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS) &&
++        !h->avctx->hwaccel) {
++        if (!h->mb_params_pool) {
++            h->mb_params_pool = ff_refstruct_pool_alloc(h->mb_stride * h->mb_height *
++                                                        sizeof(*pic->mb_params), 0);
++            if (!h->mb_params_pool)
++                goto fail;
++        }
++        pic->mb_params = ff_refstruct_pool_get(h->mb_params_pool);
++        if (!pic->mb_params)
++            goto fail;
++        /* pool entries are reused; slice_num 0 marks undecoded macroblocks */
++        memset(pic->mb_params, 0, h->mb_stride * h->mb_height * sizeof(*pic->mb_params));
++    }
++
+     pic->pps = ff_refstruct_ref_c(h->ps.pps);
+ 
+     pic->mb_width  = h->mb_width;
+@@ -2111,7 +2130,8 @@ int ff_h264_queue_decode_slice(H264Context *h, const H2645NAL *nal)
+         }
+ 
+         if (!h->first_field) {
+-            if (h->cur_pic_ptr && !h->droppable) {
++            if (h->cur_pic_ptr && (!h->droppable ||
++                                   (h->avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS))) {
+                 ff_thread_report_progress(&h->cur_pic_ptr->tf, INT_MAX,
+                                           h->picture_structure == PICT_BOTTOM_FIELD);
+             }
+diff --git a/libavcodec/h264dec.c b/libavcodec/h264dec.c
+index 0154fe1..8f0654a 100644
+--- a/libavcodec/h264dec.c
++++ b/libavcodec/h264dec.c
+@@ -35,6 +35,7 @@
+ #include "libavutil/mem.h"
+ #include "libavutil/opt.h"
+ #include "libavutil/thread.h"
++#include "libavutil/video_block_params.h"
+ #include "libavutil/video_enc_params.h"
+ 
+ #include "codec_internal.h"
+@@ -160,6 +161,7 @@ void ff_h264_free_tables(H264Context *h)
+     ff_refstruct_pool_uninit(&h->mb_type_pool);
+     ff_refstruct_pool_uninit(&h->motion_val_pool);
+     ff_refstruct_pool_uninit(&h->ref_index_pool);
++    ff_refstruct_pool_uninit(&h->mb_params_pool);
+ 
+ #if CONFIG_ERROR_RESILIENCE
+     av_freep(&h->er.mb_index2xy);
+@@ -817,7 +819,8 @@ end:
+     }
+ #endif /* CONFIG_ERROR_RESILIENCE */
+     /* clean up */
+-    if (h->cur_pic_ptr && !h->droppable && h->has_slice) {
++    if (h->cur_pic_ptr && h->has_slice &&
++        (!h->droppable || (avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS))) {
+         ff_thread_report_progress(&h->cur_pic_ptr->tf, INT_MAX,
+                                   h->picture_structure == PICT_BOTTOM_FIELD);
+     }
+@@ -872,6 +875,95 @@ static int h264_export_enc_params(AVFrame *f, const H264Picture *p)
+     return 0;
+ }
+ 
++static int h264_export_block_params(const H264Context *h, AVFrame *f,
++                                    const H264Picture *p)
++{
++    AVVideoBlockParamsHeader *par;
++    const unsigned int nb_mb = p->mb_height * p->mb_width;
++
++    /* With frame threading, the picture may still be decoded by another
++     * thread; its progress is reported even when it is not a reference
++     * picture (see alloc_picture()). */
++    if (h->avctx->active_thread_type & FF_THREAD_FRAME) {
++        if (!p->field_picture) {
++            ff_thread_await_progress(&p->tf, INT_MAX, 0);
++        } else {
++            for (int i = 0; i < 2; i++)
++                if (p->field_poc[i] != INT_MAX)
++                    ff_thread_await_progress(&p->tf, INT_MAX, i);
++        }
++    }
++
++    par = av_video_block_params_create_side_data(f, AV_VIDEO_BLOCK_PARAMS_H264, nb_mb);
++    if (!par)
++        return AVERROR(ENOMEM);
++    par->plane_w = p->mb_width;
++    par->plane_h = p->mb_height;
++
++    for (int y = 0; y < p->mb_height; y++)
++        for (int x = 0; x < p->mb_width; x++) {
++            const int mb_xy        = y * p->mb_stride + x;
++            const H264MBParams *s  = &p->mb_params[mb_xy];
++            const uint32_t mb_type = p->mb_type[mb_xy];
++            AVH264MacroblockParams *b = av_video_block_params_block(par, y * p->mb_width + x);
++
++            b->src_x = x * 16;
++            b->src_y = y * 16;
++            memset(b->ref_idx,            -1, sizeof(b->ref_idx));
++            memset(b->intra4x4_pred_mode, -1, sizeof(b->intra4x4_pred_mode));
++            memset(b->intra8x8_pred_mode, -1, sizeof(b->intra8x8_pred_mode));
++            b->intra16x16_pred_mode   = -1;
++            b->intra_chroma_pred_mode = -1;
++
++            if (!s->slice_num) {
++                b->mb_type_class = 255;
++                continue;
++            }
++
++            b->slice_id               = s->slice_num - 1;
++            b->mb_type_class          = s->mb_type_class;
++            b->cbp                    = s->cbp;
++            b->transform_8x8          = !!IS_8x8DCT(mb_type);
++            b->mb_field_decoding_flag = !!IS_INTERLACED(mb_type);
++            b->qp_delta               = s->qp_delta;
++            memcpy(b->mvd, s->mvd, sizeof(b->mvd));
++
++            if (s->mb_type_class <= 2) {
++                if (s->mb_type_class == 0) {
++                    if (b->transform_8x8) {
++                        for (int i = 0; i < 4; i++)
++                            b->intra8x8_pred_mode[i] = s->intra4x4_pred_mode[4 * i];
++                    } else {
++                        memcpy(b->intra4x4_pred_mode, s->intra4x4_pred_mode,
++                               sizeof(b->intra4x4_pred_mode));
++                    }
++                } else if (s->mb_type_class == 1) {
++                    b->intra16x16_pred_mode = s->intra16x16_pred_mode;
++                }
++                if (s->mb_type_class != 2)
++                    b->intra_chroma_pred_mode = s->intra_chroma_pred_mode;
++                continue;
++            }
++
++            if (s->mb_type_class == 6 || s->mb_type_class == 12)
++                memcpy(b->sub_mb_type, s->sub_mb_type, sizeof(b->sub_mb_type));
++
++            for (int list = 0; list < 2; list++) {
++                if (!USES_LIST(mb_type, list) || (list && s->mb_type_class < 8))
++                    continue;
++                for (int i = 0; i < 4; i++) {
++                    const int ref = p->ref_index[list][4 * mb_xy + i];
++                    if (ref >= 0) {
++                        b->ref_idx[list][i] = ref;
++                        b->pred_dir[i]     |= 1 << list;
++                    }
++                }
++            }
++        }
++
++    return 0;
++}
++
+ static int output_frame(H264Context *h, AVFrame *dst, H264Picture *srcp)
+ {
+     int ret;
+@@ -902,6 +994,12 @@ static int output_frame(H264Context *h, AVFrame *dst, H264Picture *srcp)
+             goto fail;
+     }
+ 
++    if (srcp->mb_params) {
++        ret = h264_export_block_params(h, dst, srcp);
++        if (ret < 0)
++            goto fail;
++    }
++
+     if (!(h->avctx->export_side_data & AV_CODEC_EXPORT_DATA_FILM_GRAIN))
+         av_frame_remove_side_data(dst, AV_FRAME_DATA_FILM_GRAIN_PARAMS);
+ 
+diff --git a/libavcodec/h264dec.h b/libavcodec/h264dec.h
+index ccd7583..ba10ce6 100644
+--- a/libavcodec/h264dec.h
++++ b/libavcodec/h264dec.h
+@@ -111,6 +111,23 @@ typedef struct MMCO {
+     int long_arg;       ///< index, pic_num, or num long refs depending on opcode
+ } MMCO;
+ 
++/**
++ * Syntax of one macroblock as signalled, recorded while parsing it when
++ * AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS is set. The rest of
++ * AVH264MacroblockParams comes from the other per-picture tables.
++ */
++typedef struct H264MBParams {
++    int16_t  mvd[2][16][2];           ///< mvd_l0/mvd_l1 per 4x4 block, luma4x4BlkIdx order
++    uint16_t slice_num;               ///< H264SliceContext.slice_num; 0: macroblock not decoded
++    uint8_t  mb_type_class;           ///< AVH264MacroblockParams.mb_type_class
++    uint8_t  sub_mb_type[4];          ///< AVH264MacroblockParams.sub_mb_type
++    uint8_t  cbp;                     ///< coded_block_pattern
++    int8_t   qp_delta;                ///< mb_qp_delta
++    int8_t   intra4x4_pred_mode[16];  ///< Intra4x4PredMode / Intra8x8PredMode, luma4x4BlkIdx order
++    int8_t   intra16x16_pred_mode;    ///< Intra16x16PredMode
++    int8_t   intra_chroma_pred_mode;  ///< as signalled, -1 when absent
++} H264MBParams;
++
+ typedef struct H264Picture {
+     AVFrame *f;
+     ThreadFrame tf;
+@@ -131,6 +148,9 @@ typedef struct H264Picture {
+ 
+     int8_t *ref_index[2];   ///< RefStruct reference
+ 
++    /// RefStruct reference; only with AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS
++    H264MBParams *mb_params;
++
+     int field_poc[2];       ///< top/bottom POC
+     int poc;                ///< frame POC
+     int frame_num;          ///< frame_num (raw frame_num from slice header)
+@@ -208,6 +228,9 @@ typedef struct H264SliceContext {
+     int8_t intra4x4_pred_mode_cache[5 * 8];
+     int8_t(*intra4x4_pred_mode);
+ 
++    /// record of the current macroblock in cur_pic.mb_params, or NULL
++    H264MBParams *mbp;
++
+     int topleft_mb_xy;
+     int top_mb_xy;
+     int topright_mb_xy;
+@@ -574,6 +597,7 @@ typedef struct H264Context {
+     struct FFRefStructPool *mb_type_pool;
+     struct FFRefStructPool *motion_val_pool;
+     struct FFRefStructPool *ref_index_pool;
++    struct FFRefStructPool *mb_params_pool;
+     struct FFRefStructPool *decode_error_flags_pool;
+     int ref2frm[MAX_SLICES][2][64];     ///< reference to frame number lists, used in the loop filter, the first 2 are for -2,-1
+ 
+@@ -672,6 +696,120 @@ void ff_h264_filter_mb(const H264Context *h, H264SliceContext *sl, int mb_x, int
+ /**
+  * Get the chroma qp.
+  */
++/**
++ * Start recording the syntax of the macroblock at mb_xy (block params export).
++ */
++static av_always_inline void h264_bp_mb_start(const H264Context *h,
++                                              H264SliceContext *sl, int mb_xy)
++{
++    H264MBParams *p;
++
++    sl->mbp = NULL;
++    if (!h->cur_pic.mb_params)
++        return;
++    p = &h->cur_pic.mb_params[mb_xy];
++    memset(p, 0, sizeof(*p));
++    p->slice_num              = sl->slice_num;
++    p->intra16x16_pred_mode   = -1;
++    p->intra_chroma_pred_mode = -1;
++    sl->mbp = p;
++}
++
++/**
++ * AVH264MacroblockParams.mb_type_class of a parsed mb_type (before direct
++ * prediction modifies it).
++ */
++static av_always_inline uint8_t h264_bp_mb_class(int slice_type_nos, int mb_type)
++{
++    int base;
++
++    if (IS_INTRA4x4(mb_type))
++        return 0;
++    if (IS_INTRA16x16(mb_type))
++        return 1;
++    if (IS_INTRA_PCM(mb_type))
++        return 2;
++    if (slice_type_nos == AV_PICTURE_TYPE_B) {
++        if (IS_SKIP(mb_type))
++            return 13;
++        if (IS_DIRECT(mb_type))
++            return 8;
++        base = 9;
++    } else {
++        if (IS_SKIP(mb_type))
++            return 7;
++        base = 3;
++    }
++    return base + (IS_16X8(mb_type) ? 1 : IS_8X16(mb_type) ? 2 :
++                   IS_8X8(mb_type)  ? 3 : 0);
++}
++
++/**
++ * Record the parsed sub_mb_type of the four 8x8 partitions (before direct
++ * prediction modifies them).
++ */
++static av_always_inline void h264_bp_sub_mb_types(H264SliceContext *sl)
++{
++    for (int i = 0; i < 4; i++) {
++        const int t = sl->sub_mb_type[i];
++        sl->mbp->sub_mb_type[i] = IS_DIRECT(t)  ? 0x10 :
++                                  IS_SUB_8X8(t) ? 0    :
++                                  IS_SUB_8X4(t) ? 1    :
++                                  IS_SUB_4X8(t) ? 2    : 3;
++    }
++}
++
++/**
++ * Record a signalled motion vector difference for the w x h 4x4 blocks of a
++ * partition whose top-left 4x4 block is n (luma4x4BlkIdx).
++ */
++static av_always_inline void h264_bp_mvd(H264SliceContext *sl, int list, int n,
++                                         int w, int h, int mvdx, int mvdy)
++{
++    const int x0 = (n & 1)        | (n >> 1 & 2);
++    const int y0 = (n >> 1 & 1)   | (n >> 2 & 2);
++
++    for (int y = y0; y < y0 + h; y++)
++        for (int x = x0; x < x0 + w; x++) {
++            const int i = (x & 1) | (y & 1) << 1 | (x & 2) << 1 | (y & 2) << 2;
++            sl->mbp->mvd[list][i][0] = mvdx;
++            sl->mbp->mvd[list][i][1] = mvdy;
++        }
++}
++
++/**
++ * Record a sub-macroblock partition's mvd; n is its first 4x4 block.
++ */
++static av_always_inline void h264_bp_sub_mvd(H264SliceContext *sl, int list, int n,
++                                             int sub_mb_type, int mvdx, int mvdy)
++{
++    h264_bp_mvd(sl, list, n,
++                IS_SUB_8X8(sub_mb_type) || IS_SUB_8X4(sub_mb_type) ? 2 : 1,
++                IS_SUB_8X8(sub_mb_type) || IS_SUB_4X8(sub_mb_type) ? 2 : 1,
++                mvdx, mvdy);
++}
++
++/**
++ * Record the Intra4x4PredMode / Intra8x8PredMode values of the current
++ * macroblock, before ff_h264_check_intra4x4_pred_mode() remaps them.
++ */
++static av_always_inline void h264_bp_intra4x4(H264SliceContext *sl)
++{
++    for (int i = 0; i < 16; i++)
++        sl->mbp->intra4x4_pred_mode[i] = sl->intra4x4_pred_mode_cache[scan8[i]];
++}
++
++/**
++ * Record Intra16x16PredMode from the decoder's 8x8 prediction mode numbering,
++ * before ff_h264_check_intra_pred_mode() remaps it.
++ */
++static av_always_inline void h264_bp_intra16x16(H264SliceContext *sl, int mode)
++{
++    /* DC_PRED8x8, HOR_PRED8x8, VERT_PRED8x8, PLANE_PRED8x8 -> 2, 1, 0, 3 */
++    static const int8_t to_spec[4] = { 2, 1, 0, 3 };
++    sl->mbp->intra16x16_pred_mode = to_spec[mode & 3];
++}
++
+ static av_always_inline int get_chroma_qp(const PPS *pps, int t, int qscale)
+ {
+     return pps->chroma_qp_table[t][qscale];
+diff --git a/libavcodec/options_table.h b/libavcodec/options_table.h
+index 47da41b..968f231 100644
+--- a/libavcodec/options_table.h
++++ b/libavcodec/options_table.h
+@@ -94,6 +94,7 @@ static const AVOption avcodec_options[] = {
+ {"venc_params", "export video encoding parameters through frame side data", 0, AV_OPT_TYPE_CONST, {.i64 = AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS}, INT_MIN, INT_MAX, V|D, .unit = "export_side_data"},
+ {"film_grain", "export film grain parameters through frame side data", 0, AV_OPT_TYPE_CONST, {.i64 = AV_CODEC_EXPORT_DATA_FILM_GRAIN}, INT_MIN, INT_MAX, V|D, .unit = "export_side_data"},
+ {"enhancements", "export picture enhancement metadata through frame side data", 0, AV_OPT_TYPE_CONST, {.i64 = AV_CODEC_EXPORT_DATA_ENHANCEMENTS}, INT_MIN, INT_MAX, V|D, .unit = "export_side_data"},
++{"block_params", "export per-block syntax (macroblock types, prediction modes, ...) through frame side data", 0, AV_OPT_TYPE_CONST, {.i64 = AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS}, INT_MIN, INT_MAX, V|D, .unit = "export_side_data"},
+ {"time_base", NULL, OFFSET(time_base), AV_OPT_TYPE_RATIONAL, {.dbl = 0}, 0, INT_MAX},
+ {"g", "set the group of picture (GOP) size", OFFSET(gop_size), AV_OPT_TYPE_INT, {.i64 = 12 }, INT_MIN, INT_MAX, V|E},
+ {"ar", "set audio sampling rate (in Hz)", OFFSET(sample_rate), AV_OPT_TYPE_INT, {.i64 = DEFAULT }, 0, INT_MAX, A|D|E},
+diff --git a/libavcodec/version.h b/libavcodec/version.h
+index b6ca025..d0980e2 100644
+--- a/libavcodec/version.h
++++ b/libavcodec/version.h
+@@ -29,8 +29,8 @@
+ 
+ #include "version_major.h"
+ 
+-#define LIBAVCODEC_VERSION_MINOR  19
+-#define LIBAVCODEC_VERSION_MICRO 101
++#define LIBAVCODEC_VERSION_MINOR  20
++#define LIBAVCODEC_VERSION_MICRO 100
+ 
+ #define LIBAVCODEC_VERSION_INT  AV_VERSION_INT(LIBAVCODEC_VERSION_MAJOR, \
+                                                LIBAVCODEC_VERSION_MINOR, \
+diff --git a/libavformat/Makefile b/libavformat/Makefile
+index 7ca68a7..5356322 100644
+--- a/libavformat/Makefile
++++ b/libavformat/Makefile
+@@ -772,4 +772,5 @@ TOOLS     = aviocat                                                     \
+             probetest                                                   \
+             seek_print                                                  \
+             sidxindex                                                   \
++            vblock_data_dump                                            \
+             venc_data_dump
+diff --git a/libavutil/video_block_params.h b/libavutil/video_block_params.h
+index ba66740..e338729 100644
+--- a/libavutil/video_block_params.h
++++ b/libavutil/video_block_params.h
+@@ -100,13 +100,18 @@ typedef struct AVVideoBlockParamsHeader {
+ typedef struct AVH264MacroblockParams {
+     /**
+      * Position of the top-left luma sample of the macroblock in the coded
+-     * picture.
++     * picture: 16 * the macroblock's column and row. A field macroblock
++     * (mb_field_decoding_flag) covers the lines of one field in the 32 lines
++     * of its macroblock pair starting at src_y & ~31: the top field for an
++     * even row, the bottom field for an odd row. This also applies to the
++     * macroblocks of field pictures, whose rows are interleaved this way.
+      */
+     int32_t src_x, src_y;
+ 
+     /**
+      * Index of the slice this macroblock belongs to, counted from 0 in
+-     * decoding order within the picture, modulo 256.
++     * decoding order within the picture (within each field for field
++     * pictures), modulo 256.
+      */
+     uint8_t slice_id;
+ 
+@@ -116,6 +121,8 @@ typedef struct AVH264MacroblockParams {
+      * 5 P_8x16, 6 P_8x8 (including P_8x8ref0), 7 P_Skip, 8 B_Direct_16x16,
+      * 9 B_16x16, 10 B_16x8, 11 B_8x16, 12 B_8x8, 13 B_Skip.
+      * SI and SP macroblocks are reported as their I and P equivalents.
++     * 255 when the macroblock was not decoded (missing slice, concealed
++     * error); all other fields are then unspecified.
+      */
+     uint8_t mb_type_class;
+ 
+@@ -165,7 +172,8 @@ typedef struct AVH264MacroblockParams {
+ 
+     /**
+      * coded_block_pattern: bits 0-3 luma, bits 4-5 chroma (CodedBlockPatternLuma
+-     * + 16 * CodedBlockPatternChroma).
++     * + 16 * CodedBlockPatternChroma), as derived from mb_type for I_16x16.
++     * 0 for I_PCM and skipped macroblocks.
+      */
+     uint8_t cbp;
+ 
+diff --git a/tests/Makefile b/tests/Makefile
+index 9b70145..80b4e6e 100644
+--- a/tests/Makefile
++++ b/tests/Makefile
+@@ -276,6 +276,7 @@ $(FATE_FFPROBE) $(FATE_FFMPEG_FFPROBE) $(FATE_SAMPLES_FFPROBE) $(FATE_SAMPLES_FF
+ 
+ $(FATE_SAMPLES_FASTSTART): tools/qt-faststart$(EXESUF)
+ $(FATE_SAMPLES_DUMP_DATA) $(FATE_SAMPLES_DUMP_DATA-yes): tools/venc_data_dump$(EXESUF)
++$(FATE_SAMPLES_BLOCK_DATA): tools/vblock_data_dump$(EXESUF)
+ $(FATE_SAMPLES_SCALE_SLICE): tools/scale_slice_test$(EXESUF)
+ 
+ ifdef SAMPLES
+diff --git a/tests/fate-run.sh b/tests/fate-run.sh
+index 309ab85..b2491a3 100755
+--- a/tests/fate-run.sh
++++ b/tests/fate-run.sh
+@@ -624,6 +624,13 @@ venc_data(){
+     run tools/venc_data_dump${EXECSUF} ${file} ${stream} ${frames} ${threads} ${thread_type}
+ }
+ 
++vblock_data(){
++    file=$1
++    stream=$2
++    frames=$3
++    run tools/vblock_data_dump${EXECSUF} ${file} ${stream} ${frames} ${4:-${threads}} ${5:-${thread_type}}
++}
++
+ null(){
+     :
+ }
+diff --git a/tests/fate/h264.mak b/tests/fate/h264.mak
+index e703838..0f14043 100644
+--- a/tests/fate/h264.mak
++++ b/tests/fate/h264.mak
+@@ -476,3 +476,19 @@ fate-h264-afd:                                    CMD = run ffprobe$(PROGSSUF)$(
+ 
+ fate-h264-encparams: CMD = venc_data $(TARGET_SAMPLES)/h264-conformance/FRext/FRExt_MMCO4_Sony_B.264 0 1
+ FATE_SAMPLES_DUMP_DATA += fate-h264-encparams
++
++# AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS: CAVLC P, CABAC with B slices, MBAFF.
++# The -frame-threads variants must match the single-threaded reference.
++fate-h264-block-params-cavlc: CMD = vblock_data $(TARGET_SAMPLES)/h264-conformance/BA1_Sony_D.jsv 0 3
++fate-h264-block-params-cabac: CMD = vblock_data $(TARGET_SAMPLES)/h264-conformance/CABA3_TOSHIBA_E.264 0 3
++fate-h264-block-params-mbaff: CMD = vblock_data $(TARGET_SAMPLES)/h264-conformance/CAMA1_Sony_C.jsv 0 1
++fate-h264-block-params-cabac-frame-threads: CMD = vblock_data $(TARGET_SAMPLES)/h264-conformance/CABA3_TOSHIBA_E.264 0 3 4 frame
++fate-h264-block-params-cabac-frame-threads: REF = $(SRC_PATH)/tests/ref/fate/h264-block-params-cabac
++FATE_H264_BLOCK_PARAMS = fate-h264-block-params-cavlc                    \
++                         fate-h264-block-params-cabac                    \
++                         fate-h264-block-params-mbaff                    \
++                         fate-h264-block-params-cabac-frame-threads
++FATE_SAMPLES_BLOCK_DATA += $(FATE_H264_BLOCK_PARAMS)
++FATE_H264_BLOCK_PARAMS-$(call DEMDEC, H264, H264, H264_PARSER) += $(FATE_H264_BLOCK_PARAMS)
++FATE_SAMPLES_AVCONV += $(FATE_H264_BLOCK_PARAMS-yes)
++fate-h264: $(FATE_H264_BLOCK_PARAMS-yes)
+diff --git a/tools/Makefile b/tools/Makefile
+index 7ae6e3c..ac4b84f 100644
+--- a/tools/Makefile
++++ b/tools/Makefile
+@@ -28,6 +28,7 @@ tools/target_swr_fuzzer.o: tools/target_swr_fuzzer.c
+ 
+ tools/enc_recon_frame_test$(EXESUF): tools/decode_simple.o
+ tools/venc_data_dump$(EXESUF): tools/decode_simple.o
++tools/vblock_data_dump$(EXESUF): tools/decode_simple.o
+ tools/scale_slice_test$(EXESUF): tools/decode_simple.o
+ 
+ tools/decode_simple.o: | tools
+diff --git a/tools/vblock_data_dump.c b/tools/vblock_data_dump.c
+new file mode 100644
+index 0000000..68f8495
+--- /dev/null
++++ b/tools/vblock_data_dump.c
+@@ -0,0 +1,142 @@
++/*
++ * This file is part of FFmpeg.
++ *
++ * FFmpeg is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU Lesser General Public
++ * License as published by the Free Software Foundation; either
++ * version 2.1 of the License, or (at your option) any later version.
++ *
++ * FFmpeg is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public
++ * License along with FFmpeg; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
++ */
++
++#include <stdio.h>
++#include <stdint.h>
++#include <stdlib.h>
++
++#include "decode_simple.h"
++
++#include "libavutil/common.h"
++#include "libavutil/dict.h"
++#include "libavutil/error.h"
++#include "libavutil/video_block_params.h"
++
++#include "libavformat/avformat.h"
++
++#include "libavcodec/avcodec.h"
++
++static void print_array(const char *name, const int8_t *a, int n)
++{
++    fprintf(stdout, " %s", name);
++    for (int i = 0; i < n; i++)
++        fprintf(stdout, "%c%d", i ? ',' : '=', a[i]);
++}
++
++static void print_h264_mb(int idx, const AVH264MacroblockParams *b)
++{
++    fprintf(stdout, "mb %d %d:%d", idx, b->src_x, b->src_y);
++    if (b->mb_type_class == 255) {
++        fprintf(stdout, " not_decoded\n");
++        return;
++    }
++    fprintf(stdout, " slice=%d class=%d cbp=%d t8x8=%d field=%d qpd=%d",
++            b->slice_id, b->mb_type_class, b->cbp, b->transform_8x8,
++            b->mb_field_decoding_flag, b->qp_delta);
++    if (b->mb_type_class <= 2) {
++        if (b->intra16x16_pred_mode >= 0)
++            fprintf(stdout, " i16=%d", b->intra16x16_pred_mode);
++        else if (b->intra8x8_pred_mode[0] >= 0)
++            print_array("i8", b->intra8x8_pred_mode, 4);
++        else if (b->intra4x4_pred_mode[0] >= 0)
++            print_array("i4", b->intra4x4_pred_mode, 16);
++        fprintf(stdout, " ic=%d\n", b->intra_chroma_pred_mode);
++        return;
++    }
++    fprintf(stdout, " sub=%d,%d,%d,%d dir=%d,%d,%d,%d",
++            b->sub_mb_type[0], b->sub_mb_type[1], b->sub_mb_type[2], b->sub_mb_type[3],
++            b->pred_dir[0], b->pred_dir[1], b->pred_dir[2], b->pred_dir[3]);
++    print_array("ref0", b->ref_idx[0], 4);
++    print_array("ref1", b->ref_idx[1], 4);
++    for (int list = 0; list < 2; list++) {
++        int nonzero = 0;
++        for (int i = 0; i < 16; i++)
++            nonzero |= b->mvd[list][i][0] | b->mvd[list][i][1];
++        if (!nonzero)
++            continue;
++        fprintf(stdout, " mvd%d", list);
++        for (int i = 0; i < 16; i++)
++            fprintf(stdout, "%c%d/%d", i ? ',' : '=', b->mvd[list][i][0], b->mvd[list][i][1]);
++    }
++    fputc('\n', stdout);
++}
++
++static int process_frame(DecodeContext *dc, AVFrame *frame)
++{
++    AVFrameSideData *sd;
++
++    if (!frame)
++        return 0;
++
++    fprintf(stdout, "frame %"PRId64"\n", dc->decoder->frame_num - 1);
++
++    sd = av_frame_get_side_data(frame, AV_FRAME_DATA_VIDEO_BLOCK_PARAMS);
++    if (sd) {
++        AVVideoBlockParamsHeader *par = (AVVideoBlockParamsHeader*)sd->data;
++
++        fprintf(stdout, "AVVideoBlockParams %d %dx%d nb_blocks %u\n",
++                par->type, par->plane_w, par->plane_h, par->nb_blocks);
++        if (par->type == AV_VIDEO_BLOCK_PARAMS_H264)
++            for (unsigned i = 0; i < par->nb_blocks; i++)
++                print_h264_mb(i, av_video_block_params_block(par, i));
++    }
++
++    return 0;
++}
++
++int main(int argc, char **argv)
++{
++    DecodeContext dc;
++
++    unsigned int stream_idx, max_frames;
++    const char *filename, *thread_type = NULL, *nb_threads = NULL;
++    int ret = 0;
++
++    if (argc <= 3) {
++        fprintf(stderr, "Usage: %s <input file> <stream index> <max frame count> [<thread count> <thread type>]\n", argv[0]);
++        return 0;
++    }
++
++    filename    = argv[1];
++    stream_idx  = strtol(argv[2], NULL, 0);
++    max_frames  = strtol(argv[3], NULL, 0);
++    if (argc > 5) {
++        nb_threads  = argv[4];
++        thread_type = argv[5];
++    }
++
++    ret = ds_open(&dc, filename, stream_idx);
++    if (ret < 0)
++        goto finish;
++
++    dc.process_frame = process_frame;
++    dc.max_frames    = max_frames;
++
++    ret  = av_dict_set(&dc.decoder_opts, "threads",          nb_threads,     0);
++    ret |= av_dict_set(&dc.decoder_opts, "thread_type",      thread_type,    0);
++    ret |= av_dict_set(&dc.decoder_opts, "export_side_data", "block_params", 0);
++
++    if (ret < 0)
++        goto finish;
++
++    ret = ds_run(&dc);
++
++finish:
++    ds_free(&dc);
++    return ret;
++}
