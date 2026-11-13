@@ -3,7 +3,7 @@
 Machine: GitHub-hosted ubuntu-24.04 runner, `ghcr.io/openvideotools/ovt-oracles:main` (libaom 3.12.1 `inspect`
 and `aomdec`). Workflow: `goldens-av1` (`.github/workflows/goldens-av1.yml`) runs `tools/goldens/gen_av1.py` twice,
 requires the two outputs to be byte-identical and requires every committed `tests/golden/av1/*.gz` and
-`tests/golden/av1-index.json` to be byte-identical to the generated one. Spec version: 1.0-rc15.
+`tests/golden/av1-index.json` to be byte-identical to the generated one. Spec version: 1.0-rc22.
 
 ## Test 1: hidden frames in `syn_av1_hidden_altref_showexisting` — NOT MET under the 2 MB cap
 
