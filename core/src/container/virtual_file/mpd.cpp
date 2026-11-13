@@ -219,7 +219,8 @@ std::optional<ByteRange> parse_range(std::string_view text) {
   }
   const auto first = parse_uint(std::string_view(s).substr(0, dash));
   const auto last = parse_uint(std::string_view(s).substr(dash + 1));
-  if (!first || !last || *last < *first || *last - *first == std::numeric_limits<uint64_t>::max()) {
+  // last = UINT64_MAX is rejected so that offset + length never wraps (it would equal 2^64).
+  if (!first || !last || *last < *first || *last == std::numeric_limits<uint64_t>::max()) {
     return std::nullopt;
   }
   return ByteRange{*first, *last - *first + 1};
@@ -800,6 +801,36 @@ void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& 
   }
 }
 
+// The sidx comes from untrusted bytes: every 64-bit sum is checked and an overflow truncates the list.
+void expand_sidx_segments(Context& ctx, Representation& rep, const std::string& rep_base, const ByteRange& index_range,
+                          const SidxIndex& sidx, const pugi::xml_node& at) {
+  uint64_t offset = 0;
+  uint64_t time = sidx.earliest_presentation_time;
+  bool overflow = __builtin_add_overflow(index_range.offset, index_range.length, &offset) ||
+                  __builtin_add_overflow(offset, sidx.first_offset, &offset);
+  int64_t number = 1;
+  for (const SidxIndex::Reference& ref : sidx.references) {
+    if (overflow || time > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
+      diag(ctx, DiagCode::CNT_DASH_0004, "sidx offsets or times overflow 64 bits; segment list truncated", at);
+      break;
+    }
+    if (ctx.segments_left == 0) {
+      diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted)", at);
+      break;
+    }
+    spend(ctx, 1);
+    Segment seg;
+    seg.url = rep_base;
+    seg.byte_range = {offset, ref.referenced_size};
+    seg.start_time = static_cast<int64_t>(time);
+    seg.duration = ref.subsegment_duration;
+    seg.number = number++;
+    rep.segments.push_back(std::move(seg));
+    overflow = __builtin_add_overflow(offset, static_cast<uint64_t>(ref.referenced_size), &offset) ||
+               __builtin_add_overflow(time, static_cast<uint64_t>(ref.subsegment_duration), &time);
+  }
+}
+
 void expand_base_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
                           int64_t period_duration_ms) {
   const Chain& chain = info.base_chain;
@@ -818,25 +849,7 @@ void expand_base_segments(Context& ctx, Representation& rep, const SegmentInfo& 
   if (index_range && ctx.options.sidx_resolver) {
     if (const auto sidx = ctx.options.sidx_resolver(rep_base, *index_range); sidx && sidx->timescale > 0) {
       rep.timescale = sidx->timescale;
-      uint64_t offset = index_range->offset + index_range->length + sidx->first_offset;
-      uint64_t time = sidx->earliest_presentation_time;
-      int64_t number = 1;
-      for (const SidxIndex::Reference& ref : sidx->references) {
-        if (ctx.segments_left == 0) {
-          diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted)", chain.front());
-          break;
-        }
-        spend(ctx, 1);
-        Segment seg;
-        seg.url = rep_base;
-        seg.byte_range = {offset, ref.referenced_size};
-        seg.start_time = static_cast<int64_t>(time);
-        seg.duration = ref.subsegment_duration;
-        seg.number = number++;
-        rep.segments.push_back(std::move(seg));
-        offset += ref.referenced_size;
-        time += ref.subsegment_duration;
-      }
+      expand_sidx_segments(ctx, rep, rep_base, *index_range, *sidx, chain.front());
       return;
     }
   }

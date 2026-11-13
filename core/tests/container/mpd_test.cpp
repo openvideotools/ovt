@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -342,6 +343,63 @@ TEST_CASE("mpd: SegmentBase without and with a sidx resolver", "[container][dash
   CHECK(rep.segments[3].start_time == 8000);
   CHECK(rep.segments[3].duration == 2000);
   CHECK_FALSE(has_diag(resolved.manifest, DiagCode::CNT_DASH_0003));
+}
+
+TEST_CASE("mpd: hostile sidx values truncate the list without overflow", "[container][dash][fast]") {
+  const std::string body =
+      "<BaseURL>v.mp4</BaseURL><Representation id=\"b\"><SegmentBase timescale=\"1000\" indexRange=\"1000-1099\"/>"
+      "</Representation>";
+  constexpr uint64_t kMaxU64 = std::numeric_limits<uint64_t>::max();
+  constexpr auto kMaxI64 = static_cast<uint64_t>(std::numeric_limits<int64_t>::max());
+
+  const auto run = [&](uint64_t first_offset, uint64_t ept, std::vector<mpd::SidxIndex::Reference> refs) {
+    mpd::Options options{"http://h/m.mpd", {}};
+    options.sidx_resolver = [&](const std::string&, mpd::ByteRange) -> std::optional<mpd::SidxIndex> {
+      mpd::SidxIndex idx;
+      idx.timescale = 1000;
+      idx.earliest_presentation_time = ept;
+      idx.first_offset = first_offset;
+      idx.references = std::move(refs);
+      return idx;
+    };
+    return mpd::parse(wrap(body), options);
+  };
+
+  SECTION("first_offset wraps the byte offset") {
+    const auto r = run(kMaxU64 - 10, 0, {{100, 1000}, {100, 1000}});
+    CHECK(only_rep(r).segments.empty());
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("offsets accumulate past 2^64") {
+    const auto r = run(kMaxU64 - 1100 - 150, 0, {{100, 1000}, {100, 1000}, {100, 1000}});
+    CHECK(only_rep(r).segments.size() == 2);  // 100 + 100 fit, the third would wrap
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("earliest_presentation_time above INT64_MAX is not cast") {
+    const auto r = run(0, kMaxI64 + 1, {{100, 1000}});
+    CHECK(only_rep(r).segments.empty());
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("time accumulation crosses INT64_MAX") {
+    const auto r = run(0, kMaxI64 - 1500, {{100, 1000}, {100, 1000}, {100, 1000}});
+    const auto& segs = only_rep(r).segments;
+    REQUIRE(segs.size() == 2);
+    CHECK(segs[1].start_time == static_cast<int64_t>(kMaxI64 - 500));
+    CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+  SECTION("a 32-bit maximum reference is fine") {
+    const auto r = run(0, 0, {{std::numeric_limits<uint32_t>::max(), std::numeric_limits<uint32_t>::max()}});
+    REQUIRE(only_rep(r).segments.size() == 1);
+    CHECK(only_rep(r).segments[0].byte_range.length == std::numeric_limits<uint32_t>::max());
+    CHECK_FALSE(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
+  }
+}
+
+TEST_CASE("mpd: an indexRange ending at UINT64_MAX is invalid", "[container][dash][fast]") {
+  const auto r = mpd::parse(wrap("<BaseURL>v.mp4</BaseURL><Representation id=\"b\"><SegmentBase timescale=\"1\" "
+                                 "indexRange=\"0-18446744073709551615\"/></Representation>"),
+                            {"http://h/m.mpd", {}});
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0007));
 }
 
 TEST_CASE("mpd: a lone BaseURL is one segment; nothing at all is reported", "[container][dash][fast]") {
