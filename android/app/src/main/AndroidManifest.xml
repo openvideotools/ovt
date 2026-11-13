@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Manifest of OVT Studio for Android and ChromeOS (chapter 13 §13.4.5; WI-0.050). extractNativeLibs=false is
+  not written here: AGP 8 sets it in the merged manifest from packaging.jniLibs.useLegacyPackaging = false
+  (app/build.gradle.kts) and warns when the source manifest carries it. WI-A.450 adds the §11.5.1 entries (ACTION_SEND, file extensions,
+  free-form window preferences), WI-0.053 the codec-pack declarations.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x401000" android:required="false" />
+    <!-- Chromebooks without a touch screen. -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+
+    <!-- No INTERNET permission (§13.4.5: F-Droid anti-feature), even if a library manifest asks for it. The play
+         flavour's Feature Delivery needs it once WI-0.053 adds that library. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+
+    <application
+        android:label="@string/app_name"
+        android:theme="@style/Theme.OVT"
+        android:largeHeap="true"
+        android:supportsRtl="true"
+        android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33">
+
+        <!-- ChromeOS multi-window. -->
+        <meta-data android:name="android.allow_multiple_resumed_activities" android:value="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:colorMode="hdr"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode"
+            android:windowSoftInputMode="adjustResize">
+            <layout
+                android:defaultWidth="1280dp"
+                android:defaultHeight="800dp"
+                android:minWidth="800dp"
+                android:minHeight="600dp" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
