@@ -65,3 +65,5 @@ ovt_add_fuzz_target(h265_slice fuzz_h265_slice.cpp)
 # WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
 ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
+# WI-1.231: the unit splitter of §8.7.4 over every framing.
+ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
