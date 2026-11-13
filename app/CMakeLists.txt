@@ -229,13 +229,14 @@ elseif(ANDROID)
   # SPEC-ASSUMPTION(#71): this is the `libovt_studio.so` of §13.2.1 and WI-0.019 acceptance test 3.
   #
   # The Gradle build (android/app/build.gradle.kts, WI-0.050) runs this project through the Qt Gradle plugin, which
-  # finds the target by the name of android-<target>-deployment-settings.json at the top of the build tree; Qt writes
-  # it next to the target unless told otherwise. androiddeployqt then builds the AAR with Gradle inside
-  # android-build-ovt_studio/, which lies below android/ and would otherwise be taken for a subproject of
-  # android/settings.gradle.kts: an empty settings.gradle makes it a build of its own (the plugin does the same for
-  # the top-level directory). SPEC-ASSUMPTION(#355).
-  set_target_properties(ovt_studio PROPERTIES QT_ANDROID_DEPLOYMENT_SETTINGS_FILE
-                                              "${CMAKE_BINARY_DIR}/android-ovt_studio-deployment-settings.json")
+  # takes the target name from the name of an android-<target>-deployment-settings.json at the top of the build tree
+  # and reads nothing else from it. Qt 6.8 always writes the real file next to the target (it overrides
+  # QT_ANDROID_DEPLOYMENT_SETTINGS_FILE), so a marker with that name goes at the top. androiddeployqt then builds the
+  # AAR with Gradle inside android-build-ovt_studio/, which lies below android/ and would otherwise be taken for a
+  # subproject of android/settings.gradle.kts: an empty settings.gradle makes it a build of its own (the plugin does
+  # the same for the top-level directory). SPEC-ASSUMPTION(#355).
+  file(WRITE "${CMAKE_BINARY_DIR}/android-ovt_studio-deployment-settings.json"
+       "{\"comment\": \"Qt Gradle plugin target-name marker; Qt's file is in ${CMAKE_CURRENT_BINARY_DIR}\"}\n")
   set(_ovt_aar_settings "${CMAKE_CURRENT_BINARY_DIR}/android-build-ovt_studio/settings.gradle")
   if(NOT EXISTS "${_ovt_aar_settings}")
     file(WRITE "${_ovt_aar_settings}" "")
