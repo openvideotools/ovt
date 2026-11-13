@@ -14,8 +14,14 @@
 #include <QPointer>
 #include <QQuickItem>
 #include <QString>
+#include <QVariantList>
 
+#include <array>
+#include <vector>
+
+#include "models/series_aggregator.h"
 #include "models/stream_index_model.h"
+#include "models/timeline_geometry.h"
 #include "models/timeline_viewport.h"
 
 namespace ovt::app {
@@ -32,6 +38,11 @@ class TimelineChart : public QQuickItem {
   Q_PROPERTY(bool meanLine READ mean_line WRITE set_mean_line NOTIFY meanLineChanged)
   // The decode index of the frame to mark (the panel binds it to Selection.frameDecodeIndex); -1 none.
   Q_PROPERTY(int selectedFrame READ selected_frame WRITE set_selected_frame NOTIFY selectedFrameChanged)
+  // Reference arrows (arcs from each frame to its declared_refs) in the current order; drawn only when a frame is at
+  // least kMinArrowFramePixels wide.
+  Q_PROPERTY(bool refArrows READ ref_arrows WRITE set_ref_arrows NOTIFY refArrowsChanged)
+  // The random access points in view as [{x, label}] ("K" for a key frame, else "I"), for the label overlay.
+  Q_PROPERTY(QVariantList gopMarkers READ gop_markers NOTIFY viewChanged)
   Q_PROPERTY(double viewFirst READ view_first NOTIFY viewChanged)
   Q_PROPERTY(double viewCount READ view_count NOTIFY viewChanged)
   // Top of the y axis (the largest bar value in view), for the axis labels.
@@ -51,6 +62,9 @@ class TimelineChart : public QQuickItem {
   void set_plane(int plane);
   [[nodiscard]] bool mean_line() const noexcept { return mean_line_; }
   void set_mean_line(bool on);
+  [[nodiscard]] bool ref_arrows() const noexcept { return ref_arrows_; }
+  void set_ref_arrows(bool on);
+  [[nodiscard]] QVariantList gop_markers() const;
   [[nodiscard]] int selected_frame() const noexcept { return selected_frame_; }
   void set_selected_frame(int decode_index);
   [[nodiscard]] double view_first() const noexcept { return view_.first(); }
@@ -70,6 +84,7 @@ class TimelineChart : public QQuickItem {
   void modelChanged();
   void seriesChanged();
   void meanLineChanged();
+  void refArrowsChanged();
   void selectedFrameChanged();
   void viewChanged();
   // A click on a bar: the frame's decode and display indices.
@@ -92,12 +107,24 @@ class TimelineChart : public QQuickItem {
   void keyPressEvent(QKeyEvent* event) override;
 
  private:
+  // Arrows are drawn when a frame is at least this many device pixels wide.
+  static constexpr double kMinArrowFramePixels = 6.0;
+  // One vertex list per scene-graph layer, bottom to top: band, bars, hatch, mean line, arrows, ticks, marker.
+  static constexpr int LayerCount = 7;
+  using LayerVertices = std::array<std::vector<ColorVertex>, LayerCount>;
+  LayerVertices build_layers(float w, float h);
+  [[nodiscard]] float x_of_position(double position, float w) const;
+  [[nodiscard]] std::vector<ColorVertex> hatch_vertices(const std::vector<SeriesColumn>& columns, float w,
+                                                        float h) const;
+  [[nodiscard]] std::vector<ColorVertex> arc_vertices(float w, float h) const;
   void on_index_changed();
   void view_changed();
 
   QPointer<StreamIndexModel> model_;
   SeriesRef series_;
   bool mean_line_ = false;
+  bool ref_arrows_ = false;
+  int hover_position_ = -1;  // position (current order) under the pointer, for the arrow highlight
   int selected_frame_ = -1;
   TimelineViewport view_;
   double max_value_ = 0.0;
