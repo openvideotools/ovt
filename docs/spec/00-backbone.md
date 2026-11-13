@@ -506,8 +506,8 @@ ovt_status ovt_cache_report(ovt_Buffer* out /* CacheReport */);
 ovt_status ovt_cache_clear(const char* kind /*nullable*/, const char* source_path /*nullable*/, int older_than_days /*0 = any*/);
 
 /* Plane and picture views handed across the ABI */
-typedef struct ovt_PlaneView { uint32_t struct_size; const uint8_t* data; uint32_t width, height, stride_bytes; uint8_t bit_depth, sample_bytes, is_signed; } ovt_PlaneView;
-typedef struct ovt_Picture   { uint32_t struct_size; ovt_FrameId id; ovt_PlaneView planes[3]; ovt_ColorDescription color; /* refcount internal */ } ovt_Picture;
+typedef struct ovt_PlaneView { uint32_t struct_size; const uint8_t* data; uint32_t width, height, stride_bytes; uint8_t bit_depth, sample_bytes, is_signed, plane, stage, reserved[3]; } ovt_PlaneView;
+typedef struct ovt_Picture   { uint32_t struct_size; ovt_PlaneView planes[3]; uint8_t chroma_format; ovt_ColorDescription color; ovt_FrameId id; int64_t pts; int32_t timebase_num, timebase_den; int32_t crop_x, crop_y, crop_w, crop_h; uint8_t hw_decoded; void* opaque; /* refcount internal */ } ovt_Picture;   /* chapter 12 §12.3.9 is authoritative */
 ```
 
 ### 0.6.2 Analysis decoder plugin ABI (`core/include/ovt/abi/analysis_decoder_v1.h`, BSD-2-Clause)

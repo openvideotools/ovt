@@ -2,6 +2,32 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc22 — 2026-11-13
+
+MINOR-level: spec-amendment pass 3 folds in the accepted answers of 22 `spec-question` issues on chapters 6 and 12 (plus the chapter 0, 4, 7, 13 and 14 sentences they touch) and three review follow-ups. New diagnostic codes are registered (D2: `MDL-CSV-0001`…`0004`, `CLI-0010`, `CLI-0011`); the public-header text of §12.3.4 and §12.3.14 is aligned with the merged `ovt/log.h` and `ovt/cache.h`; no schema or CLI grammar change.
+
+- 6 §6.3.3 — nested buffers are built with `ForceVectorAlignment(size, 1, nested.GetBufferMinAlignment())`; `ext_as` verifies with nested-relative alignment — WI-0.084, WI-0.085 (#98)
+- 6 §6.6.2, §6.9 V-023 — plugins emit the plugin-local `decode-index/stage/plane` form; the host prefixes the source hash; V-023 applies to host-stored records; `tb-` ids have no leading zeros — WI-2.151, WI-2.155, WI-2.163 (#250, #98)
+- 6 §6.6.3, WI-0.087 — `PlaneBlob`; pin per frame; evictions count frames; `OVT_E_NOMEM` only under the byte cap; 0.6 × cap trim; `hard_cap_bytes` default 2 GiB; `adopt` keeps the stride; `ovt/color.h` created by WI-0.087 — WI-0.087 (#157, #156)
+- 6 §6.7.1, §6.7.3, §6.7.4, 12 §12.3.14 — `reports/<kind>.fb.zst`; I3 uses `ovt::model::kModelSchemaMajor`; `reports/` evicted after `maps/` — WI-0.091, WI-0.092 (#288, #80)
+- 6 §6.7.3, §6.7.4, WI-0.092 — `Cache::open_entry(hash, codec, SelectedPlugin)` applies I1–I7, `Cache::entry()` and the C object API stay raw; every eviction step targets 0.9 × cap; `MDL-CCH-0002` once per `Cache`; cache state shared per root per process; AT3 arithmetic — WI-0.092 (#295, #296; PR #301 review)
+- 6 §6.8.1, 12 §12.1.4, WI-1.501 — `[ubyte]` as arrays of numbers, hash-like fields (real `.fbs` names) as hex, the five nested fields replaced in place; schema generator rules; AT1 skip rule and permissive `result` for free-form commands — WI-0.088, WI-1.501 (#285, #286)
+- 6 §6.8.2, §6.9.1, WI-0.089, 14 WI-2.584 — example QP row 33; `MDL-CSV-0001`…`0004`; importer size limits; exporter choices (a)–(e); own CC0 sample CSVs; AT3 and the manual YUView step recorded as pending; `v1.2` in chapter 14 — WI-0.089 (#233)
+- 6 §6.8.3, WI-0.090 — luma TXBs only; `tileCols`/`tileRows` rounded up; `AomJsonOptions::ovt_version`; AT1 without accounting keys — WI-0.090 (#269)
+- 6 §6.9 — V-001 requires `OVTA` (plain or size-prefixed); V-002 HEVC multiple of 8; V-011 grid leaf has no child of any listed kind; 64 violations per rule cap; V-032 canonical form = object API `Pack` layout — WI-0.085, WI-0.086 (#311, #175, #271)
+- 6 §6.10, WI-0.093 — `edge_flags_v = [10]`, bin `128+33`, chroma QPs per Table 8-10, `data_bit_offset = 32` in the fixture; fixtures stored not size-prefixed; `Mv` is (row, col); inspect.json details; two-part delivery — WI-0.093 (#164)
+- 6 WI-0.080, WI-0.083, 13 WI-0.003 — secondary roots verify with `Verifier::VerifyBuffer<T>(id)`; `schema_version.hpp` plain header in `ovt::model`, `bfbs_resources.cpp` committed with generated `.inc` includes; `--gen-name-strings` in every flatc flag list — WI-0.080, WI-0.083 (#35, #80, #98)
+- 6 WI-0.084 — `BlobIdParts`, `mv_to_neutral_checked`, `mv_from_neutral` throws, `label_for` fields and golden key, `leaf_at` rule — WI-0.084 (#98)
+- 6 WI-0.085 — no `CopyTable`; structural diff reports every difference in field-id order; AT2 wording — WI-0.085 (#271)
+- 6 WI-0.086, 12 §12.2.4, §12.2.8, §12.3.8 — violations are `MDL-VAL-0nnn` with the message beginning `V-nnn`; hash-less overload; `validate_metrics_result` later — WI-0.086 (#311)
+- 12 §12.1.2, §12.1.3, §12.2.15, 4 FR-CLI-003 — `--time` footer on stderr for `fb`; `CLI-0010`, `CLI-0011`; CLI-0001 coverage and did-you-mean; usage errors always one human line; `--version` formats; `completion` ignores the TTY default; alias pairs; log-level precedence and JSON log names; `--progress` step; CSV number rules; `--plugin-dir` replaces `OVT_PLUGIN_PATH`; `$schema` at `ovt.dev` — WI-1.500 (#100, #101)
+- 12 §12.2.13, §12.3.14 — kinds of `cache list`/`clear --kind`; hits/misses are process-lifetime; `--source` unsupported until WI-1.121; `ovt_cache_enabled()`, `ovt_cache_max_bytes()`; `set_max_bytes(0)` keeps the stored cap — WI-0.091, WI-0.092, WI-1.509 (#297, #300; PR #294 review)
+- 12 §12.3.1, §12.3.9, 0 §0.6.1 — by-value embedded structs are frozen; §12.3.9 layouts authoritative, backbone aligned; `ovt_picture_ref/release` to the first decoder WI — WI-0.087 (#156)
+- 12 §12.3.4, 7 §7.1.6 — silent default logger; `Level::Fatal`/`Off`; `OVT_LOG_*` C macros; `OVT_LOG_CODE`; `format_line()`/`stderr_sink()` — WI-1.512 (#69)
+- 12 WI-1.500 — cancel hook, `JsonWriter` result callback, `ProgressReporter`; wiring by WI-1.502/WI-1.505 — WI-1.500 (#100)
+- 7 §7.3.2 — `set_enum` turns a `UInt` node into `Enum` — WI-1.106 (#97; PR #102 review)
+- 7 §7.6.1 — libaom built with `-DCONFIG_SVT_AV1=0` (owner, 2026-11-08) — WI-2.154
+
 ## 1.0.0-rc21 — 2026-11-12
 
 MINOR-level: spec-amendment pass 2 folds in the accepted answers of 32 `spec-question` issues on chapter 7 (plus the chapter 0, 4, 6 and 12 sentences they touch). New diagnostic codes are registered (D2); no public C header, schema or CLI grammar changes — the §0.6.2 comments are aligned with the merged ABI header.
