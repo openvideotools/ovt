@@ -570,3 +570,44 @@ TEST_CASE("syntax_dump: trace lines follow the trace_headers layout", "[syntax][
       "32 le_elem 0001001000110100 = 13330\n";
   CHECK(trace == expected);
 }
+
+TEST_CASE("syntax_dump: UTF-8 boundaries, \\r and \\t in JSON and trace strings", "[syntax][fast]") {
+  // RFC 3629 limits: the first valid and first invalid second byte after E0, ED, F0 and F4, a bad third byte, and a
+  // sequence cut off by the end of the string. Each byte of a rejected sequence becomes U+FFFD on its own.
+  const std::vector<uint8_t> data = {'x',  '\r', '\t',                                // escapes
+                                     0xE0, 0xA0, 0x80, 0xE0, 0x80, 0x80,              // E0: A0 ok, 80 overlong
+                                     0xED, 0x9F, 0xBF, 0xED, 0xA0, 0x80,              // ED: 9F ok, A0 surrogate
+                                     0xF0, 0x90, 0x80, 0x80, 0xF0, 0x8F, 0x80, 0x80,  // F0: 90 ok, 8F overlong
+                                     0xF4, 0x8F, 0xBF, 0xBF, 0xF4, 0x90, 0x80, 0x80,  // F4: 8F ok, 90 > U+10FFFF
+                                     0xE2, 0x82, 'A',                                 // bad third byte
+                                     0xE2, 0x82,                                      // truncated by the end
+                                     0};
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  (void)b.read_st("str");
+  const SyntaxNodeBuffer buf = b.finish();
+  const std::string ff = "\\ufffd";
+  const std::string expected = std::string(R"("x\r\t)") + "\xE0\xA0\x80" + ff + ff + ff + "\xED\x9F\xBF" + ff + ff +
+                               ff + "\xF0\x90\x80\x80" + ff + ff + ff + ff + "\xF4\x8F\xBF\xBF" + ff + ff + ff + ff +
+                               ff + ff + "A" + ff + ff + "\"";
+  CHECK(to_json(buf).find("\"svalue\": " + expected) != std::string::npos);
+  // The trace prints the same escaped string; bits beyond the unit bytes show as '?', and only the first 64 bits.
+  const std::string trace = to_trace(buf, std::span<const uint8_t>(data.data(), 4));
+  CHECK(trace.starts_with("0 str 01111000000011010000100111100000????????????????????????????????... = "));
+  CHECK(trace.ends_with(" = " + expected + "\n"));
+  CHECK(to_trace(SyntaxNodeBuffer{}, data).empty());
+}
+
+TEST_CASE("syntax_builder: read_te records te(v) with the cMax rule", "[syntax][fast]") {
+  // te(v) with cMax 1 is one inverted bit; with cMax > 1 it is ue(v) (H.264 §9.1.2). Bits: 0 | 011 | 1.
+  const std::vector<uint8_t> data = {0b0011'1000};
+  BitReader br(data);
+  SyntaxBuilder b(br);
+  CHECK(b.read_te("one_bit", 1) == 1);
+  CHECK(b.read_te("ue", 7) == 2);
+  CHECK(b.read_te("zero", 1) == 0);
+  const SyntaxNodeBuffer buf = b.finish();
+  const std::string json = to_json(buf);
+  CHECK(json.find("\"descriptor\": \"te(v)\"") != std::string::npos);
+  CHECK(to_trace(buf, data) == "0 one_bit 0 = 1\n1 ue 011 = 2\n4 zero 1 = 0\n");
+}
