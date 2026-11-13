@@ -1,0 +1,1 @@
+{"reference":"ref.y4m","distorted":["dist.mp4"],"metrics":[{"id":"vmaf","options":{"model":"version=vmaf_v0.6.1"}},"psnr"],"normalize":{"scale":{"kernel":"lanczos"}},"align":"auto","maps":true,"subsample":2,"max_frames":0,"frames":"0-299","threads":4}

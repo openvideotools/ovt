@@ -62,7 +62,13 @@ option(
   OVT_FFMPEG_GPL_CORE_ACK
   "Acknowledge that a GPL FFmpeg may be linked into ovt_core (whole build becomes GPL-3.0-or-later; never in official builds)"
   OFF)
-option(OVT_PATENT_CODECS_IN_CORE "Enable h264/hevc decoders in the core FFmpeg flavour (distro/user builds)" OFF)
+# ON by default (owner decision of 2026-11-12, ADR-015 / chapter 13 §13.3.3): the core FFmpeg flavour keeps the
+# h264/hevc decoders, their hwaccels and the other pool-covered decoders. OFF produces the patent-pool-free split
+# build (Fedora-style), where AVC/HEVC come only from the runtime-loaded plugins.
+option(
+  OVT_PATENT_CODECS_IN_CORE
+  "Keep the h264/hevc and other pool-covered decoders in the core FFmpeg flavour (OFF: patent-pool-free split build)"
+  ON)
 
 # ---- Dependencies ---------------------------------------------------------------------------------
 foreach(_dep FFMPEG LIBAOM DAV1D LIBPLACEBO LIBVMAF ZIMG DE265)

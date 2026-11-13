@@ -22,3 +22,5 @@ ovt_set_license(ovt_tests_syntax "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax)
 
 add_subdirectory(av1)
+# H.265 parameter-set parsers (WI-1.112).
+add_subdirectory(h265)

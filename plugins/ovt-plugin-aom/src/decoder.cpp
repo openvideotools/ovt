@@ -9,7 +9,9 @@
 #include <aom/aom_image.h>
 #include <aom/aomdx.h>
 
-// Semi-public: not installed by libaom, included from the pinned source tree (tp::aom_inspection).
+// Semi-public and internal: not installed by libaom, included from the pinned source tree (tp::aom_inspection).
+// decoder.h gives the AV1_COMMON frame state ifd_inspect() reads; the callback reads a few more of its fields.
+#include "av1/decoder/decoder.h"
 #include "av1/decoder/inspection.h"
 
 #include <algorithm>
@@ -112,6 +114,96 @@ Plane copy_plane(const aom_image_t& img, int p) {
   return out;
 }
 
+// Copies the inspection MI grid and the frame-header values the block mapping needs (chapter 07 §7.6.1). Runs inside
+// the inspection callback: it only reads the decoder's frame state, as ifd_inspect() does.
+// SPEC-ASSUMPTION(#360): superblock size, ref_frame_idx[], tile layout, CDEF strengths and global-motion types come
+// from libaom's AV1_COMMON, because the plugin ABI gives the plugin no parsed headers.
+void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* out) {
+  const AV1_COMMON& cm = pbi.common;
+  BlockData& d = *out;
+  // The grid's dimensions come from the decoder, not from fd: when ifd_inspect() reallocates the grid for a new frame
+  // size it stores mi_rows in fd.mi_cols and mi_cols in fd.mi_rows (libaom v3.12.1 inspection.c passes them to
+  // ifd_init_mi_rc() in the wrong order). The grid itself is laid out with the decoder's mi_cols.
+  const int mi_rows = cm.mi_params.mi_rows;
+  const int mi_cols = cm.mi_params.mi_cols;
+  d.valid = mi_rows > 0 && mi_cols > 0 && fd.mi_grid != nullptr && fd.mi_rows * fd.mi_cols == mi_rows * mi_cols;
+  if (!d.valid) {
+    return;
+  }
+  d.mi_rows = mi_rows;
+  d.mi_cols = mi_cols;
+  const size_t n = static_cast<size_t>(mi_rows) * static_cast<size_t>(mi_cols);
+  const std::span<const insp_mi_data> grid(fd.mi_grid, n);
+  d.mi.resize(n);
+  for (size_t i = 0; i < n; ++i) {
+    const insp_mi_data& s = grid[i];
+    MiInfo& m = d.mi[i];
+    for (size_t k = 0; k < 2; ++k) {
+      m.mv_row.at(k) = s.mv[k].row;
+      m.mv_col.at(k) = s.mv[k].col;
+      m.ref_frame.at(k) = s.ref_frame[k];
+      m.filter.at(k) = s.filter[k];
+    }
+    m.mode = s.mode;
+    m.uv_mode = s.uv_mode;
+    m.bsize = s.bsize;
+    m.skip = s.skip;
+    m.segment_id = s.segment_id;
+    m.tx_size = s.tx_size;
+    m.cdef_level = s.cdef_level;
+    m.cdef_strength = s.cdef_strength;
+    m.cfl_alpha_idx = s.cfl_alpha_idx;
+    m.cfl_alpha_sign = s.cfl_alpha_sign;
+    m.current_qindex = s.current_qindex;
+    m.compound_type = s.compound_type;
+    m.motion_mode = s.motion_mode;
+    m.intrabc = s.intrabc;
+    m.palette = s.palette;
+    m.uv_palette = s.uv_palette;
+  }
+  const SequenceHeader& seq = *cm.seq_params;
+  d.sb_mi = seq.sb_size == BLOCK_128X128 ? 32 : 16;
+  d.monochrome = seq.monochrome != 0;
+  d.intra_frame = frame_is_intra_only(&cm) != 0;
+  if (!d.intra_frame) {
+    for (size_t t = 0; t < d.ref_frame_idx.size(); ++t) {
+      d.ref_frame_idx.at(t) = static_cast<int8_t>(cm.remapped_ref_idx[t]);
+    }
+  }
+  for (size_t t = 0; t < d.gm_type.size(); ++t) {
+    d.gm_type.at(t) = cm.global_motion[t].wmtype;
+    for (size_t k = 0; k < 6; ++k) {
+      d.gm_params.at(t).at(k) = cm.global_motion[t].wmmat[k];
+    }
+  }
+  const CommonTileParams& tiles = cm.tiles;
+  d.tile_col_starts.assign(static_cast<size_t>(tiles.cols) + 1, 0);
+  d.tile_row_starts.assign(static_cast<size_t>(tiles.rows) + 1, 0);
+  for (size_t i = 0; i <= static_cast<size_t>(tiles.cols); ++i) {
+    d.tile_col_starts[i] = std::min(tiles.col_start_sb[i] << seq.mib_size_log2, mi_cols);
+  }
+  for (size_t i = 0; i <= static_cast<size_t>(tiles.rows); ++i) {
+    d.tile_row_starts[i] = std::min(tiles.row_start_sb[i] << seq.mib_size_log2, mi_rows);
+  }
+  const CdefInfo& cdef = cm.cdef_info;
+  d.cdef_damping = cdef.cdef_damping;
+  d.cdef_bits = cdef.cdef_bits;
+  // CDEF runs only when the sequence enables it outside coded-lossless and IntraBC frames (read_cdef()).
+  if (seq.enable_cdef != 0 && !cm.features.coded_lossless && !cm.features.allow_intrabc) {
+    const auto nb = static_cast<size_t>(std::clamp(cdef.nb_cdef_strengths, 0, CDEF_MAX_STRENGTHS));
+    const auto y = std::span(cdef.cdef_strengths).first(nb);
+    const auto uv = std::span(cdef.cdef_uv_strengths).first(nb);
+    d.cdef_strengths.assign(y.begin(), y.end());
+    d.cdef_uv_strengths.assign(uv.begin(), uv.end());
+  }
+  d.base_qindex = fd.base_qindex;
+  d.delta_q_present = fd.delta_q_present_flag != 0;
+  d.delta_q_res = fd.delta_q_res;
+  for (size_t s = 0; s < d.y_dequant.size(); ++s) {
+    d.y_dequant.at(s) = {fd.y_dequant[s][0], fd.y_dequant[s][1]};
+  }
+}
+
 }  // namespace
 
 struct Decoder::Impl {
@@ -125,6 +217,7 @@ struct Decoder::Impl {
   bool show_frame = false;
   int base_qindex = 0;
   bool monochrome = false;  // sequence-level, from the last output image
+  BlockData blocks;         // filled by the callback
 
   Impl() = default;
   ~Impl() {
@@ -177,6 +270,8 @@ struct Decoder::Impl {
       }
     }
     f.chroma_format = have_fmt ? chroma_format_of(fmt, monochrome) : 1;
+    f.blocks = std::move(blocks);
+    blocks = BlockData{};
     return f;
   }
 
@@ -195,6 +290,7 @@ struct Decoder::Impl {
     self->frame_type = self->fd.frame_type;
     self->show_frame = self->fd.show_frame != 0;
     self->base_qindex = self->fd.base_qindex;
+    copy_blocks(self->fd, *static_cast<const AV1Decoder*>(decoder), &self->blocks);
     self->fired = true;
   }
 };
@@ -206,7 +302,12 @@ ovt_status Decoder::create(int threads, std::unique_ptr<Decoder>* out, std::stri
   dec->impl_ = std::make_unique<Impl>();
   Impl& im = *dec->impl_;
   aom_codec_dec_cfg_t cfg{};
-  cfg.threads = static_cast<unsigned>(std::max(1, threads));
+  // The bundled libaom is always built with CONFIG_ACCOUNTING=1 (inspection needs it). Its tile workers record
+  // symbols into the one shared pbi->accounting without a lock (decodeframe.c, tile_worker_hook_init), which corrupts
+  // the heap on frames with several tiles: decode on one thread.
+  // SPEC-ASSUMPTION(#360): §7.6.1 expects row-MT worker threads; they are unusable with accounting on.
+  static_cast<void>(threads);
+  cfg.threads = 1;
   cfg.allow_lowbitdepth = 1;  // 8-bit streams give 8-bit planes, as aomdec and inspect do
   if (aom_codec_dec_init(&im.ctx, aom_codec_av1_dx(), &cfg, 0) != AOM_CODEC_OK) {
     *error = std::string("aom_codec_dec_init failed: ") + aom_codec_error(&im.ctx);
@@ -306,6 +407,14 @@ ovt_status Decoder::decode_temporal_unit() {
     }
     const auto consumed = static_cast<size_t>(ret.buf - rest.data());
     if (ret.buf == nullptr || consumed == 0 || consumed > rest.size()) {
+      // libaom stopped without an error. Only trailing non-frame OBUs left: nothing is lost. Frame OBUs left:
+      // say so here, rather than leave the next temporal unit to report a bare frame-count mismatch.
+      if (next_frame_obu < tu_frames_.size()) {
+        add_diag(kSeverityError, "",
+                 "libaom stopped inside the temporal unit starting at decode index " + std::to_string(tu_first_hint_) +
+                     "; " + std::to_string(tu_frames_.size() - next_frame_obu) + " frame(s) not decoded");
+        st = OVT_E_CORRUPT;
+      }
       break;
     }
     off += consumed;

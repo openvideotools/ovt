@@ -4,8 +4,17 @@
 # Patches to the pristine FFmpeg tarball (third_party/VERSIONS.md row "FFmpeg"), in this order, in the format
 # tools/apply_patches.py reads (chapter 13 §13.3.6). One path per line, relative to this file.
 #
-# 0001 is the MB-params side data patch of chapter 07 §7.6.3. WI-4.100 wrote its libavutil part; WI-4.101 adds
-# the h264 decoder hunks to the same file. SPEC-ASSUMPTION(#332): the per-4x4 arrays of AVH264MacroblockParams are
-# in luma4x4BlkIdx (decoding) order. SPEC-ASSUMPTION(#331): the FFmpeg build does not apply this series yet (a later
-# WI wires it into the plugin flavour); the ctest ffmpeg_patches_apply checks that it applies to the pinned tarball.
+# 0001 holds two commits: the libavutil side data AV_FRAME_DATA_VIDEO_BLOCK_PARAMS of chapter 07 §7.6.3 (WI-4.100)
+# and its export from the h264 decoder behind AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS (WI-4.101). They share one file
+# because apply_patches.py --check dry-runs each file against the pristine tree. SPEC-ASSUMPTION(#332): the per-4x4
+# arrays of AVH264MacroblockParams are in luma4x4BlkIdx (decoding) order. SPEC-ASSUMPTION(#331):
+# third_party/ffmpeg.cmake applies this series to the plugin flavour only; the core flavour stays unpatched.
+# SPEC-ASSUMPTION(#351): the h264 part keeps one per-picture table recorded while parsing, exports from output_frame()
+# and has FATE tests through tools/vblock_data_dump, instead of the four tables and ffprobe test of §7.6.3.
+#
+# 0002 makes the hevc decoder honour export_side_data mvs and venc_params (WI-4.107, chapter 07 §7.8) for the optional
+# ffmpeg_hevc plugin. It touches doc/APIchanges and the version headers after 0001, so it applies on top of 0001 only;
+# tools/apply_patches.py --check dry-runs the series cumulatively. SPEC-ASSUMPTION(#371): side data is attached in
+# hevc_frame_end(), output waits for it, venc_params has one block per CU and mvs one vector per list per min PU.
 0001-h264-export-mb-params.patch
+0002-hevc-export-mvs-venc-params.patch

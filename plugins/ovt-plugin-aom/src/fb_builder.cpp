@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: BSD-2-Clause
 //
-// FrameAnalysis FlatBuffer of one AV1 frame (chapter 07 §7.6.1, WI-2.155).
+// FrameAnalysis FlatBuffer of one AV1 frame (chapter 07 §7.6.1, WI-2.155; block data WI-2.156).
 
 #include "fb_builder.hpp"
 
@@ -14,13 +14,15 @@
 #include <utility>
 #include <vector>
 
+#include "map_mi.hpp"
 #include "ovt_model_generated.h"
 
 namespace ovt::aom {
 
 namespace {
 
-constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
+constexpr uint32_t kStageRecon = 0;      // ovt.fb.PlaneStage.Reconstruction
+constexpr uint8_t kSeverityWarning = 1;  // ovt.fb.Severity
 constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
 
 }  // namespace
@@ -34,11 +36,19 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
                                                                      std::map<std::string, const Plane*>* blobs) {
   auto fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(1024);
 
+  // Block tree, grid, MVs, refs and tiles first: the mapping may add warnings.
+  const MappedBlocks mapped = map_blocks(*fbb, f.blocks, f.coded_w, f.coded_h);
+
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size());
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size());
   for (const Diag& d : f.diagnostics) {
     diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
                                                     d.message.c_str()));
+  }
+  // SPEC-ASSUMPTION(#261): no Diagnostic code is registered for these yet; the code stays empty.
+  for (const std::string& w : mapped.warnings) {
+    diags.push_back(
+        ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
   }
   const auto diags_v = fbb->CreateVector(diags);
 
@@ -58,9 +68,8 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
     }
   }
   const auto planes_v = fbb->CreateVector(planes);
-  // cells_w/h from FrameWidth/FrameHeight; the MI padding columns and rows of libaom are not cells (§6.2.1 rule 4).
-  const auto grid_off = ovt::fb::CreateCellGrid(*fbb, static_cast<uint32_t>((f.coded_w + 3) / 4),
-                                                static_cast<uint32_t>((f.coded_h + 3) / 4));
+  const auto filter_type_off =
+      mapped.filter_params.IsNull() ? flatbuffers::Offset<flatbuffers::String>() : fbb->CreateString("Av1FilterParams");
 
   // insp_frame_data has no order_hint, frame id or tile-group count: the host index fills them (§7.5.3 A6).
   constexpr uint8_t kKey = 3;  // ovt.fb.FrameType.Key
@@ -88,7 +97,13 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   fa.add_plugin_id(plugin_id_off);
   fa.add_plugin_version(plugin_version_off);
   fa.add_frame(info_off);
-  fa.add_grid(grid_off);
+  fa.add_grid(mapped.grid);
+  fa.add_blocks(mapped.blocks);
+  fa.add_mvs(mapped.mvs);
+  fa.add_refs(mapped.refs);
+  fa.add_partitions(mapped.partitions);
+  fa.add_filter_params(mapped.filter_params);
+  fa.add_filter_params_type(filter_type_off);
   fa.add_planes(planes_v);
   fa.add_diagnostics(diags_v);
   ovt::fb::FinishFrameAnalysisBuffer(*fbb, fa.Finish());

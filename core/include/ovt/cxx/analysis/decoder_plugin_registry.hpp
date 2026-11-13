@@ -108,7 +108,8 @@ class PluginRegistry {
   // The plugin used for `codec` (an ovt.fb.Codec value) when ovt_analysis_open gets no id: the override set
   // with set_default() if it is registered for that codec; else the first registered id of the built-in order
   // (AV1: aom; H265: de265, hm, ffmpeg; H264: ffmpeg) whose caps report that codec; else the first registered
-  // plugin for that codec; else nullptr (DEC-PLUGIN-0001 is the caller's diagnostic). Scans first if needed.
+  // plugin for that codec, leaving out the opt-in plugin ffmpeg_hevc (WI-4.107: never the default H.265 plugin);
+  // else nullptr (DEC-PLUGIN-0001 is the caller's diagnostic). Scans first if needed.
   [[nodiscard]] const LoadedPlugin* default_for(uint8_t codec);
 
   // The user setting analysis.default_plugin.<codec> (ovt_plugins_set_default). An empty id clears it.

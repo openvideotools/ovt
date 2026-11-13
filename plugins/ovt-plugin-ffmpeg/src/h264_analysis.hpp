@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // ovt::ffmpeg::H264Analysis drives one libavcodec h264 decoder the way chapter 07 §7.6.3 "Analysis decoder
-// driving" describes (WI-2.169): raw NAL units are prefixed with a start code and batched into one Annex B packet
-// per decode_index_hint, the packet carries the hint in pts and opaque (AV_CODEC_FLAG_COPY_OPAQUE), and every frame
-// libavcodec returns keeps the decode index of the packet that started it. Internal to
-// the plugin; plugin.cpp wraps it in the ABI.
+// driving" describes (WI-2.169), or one hevc decoder for the optional ffmpeg_hevc plugin (WI-4.107): raw NAL units are
+// prefixed with a start code and batched into one Annex B packet per decode_index_hint, the packet carries the hint in
+// pts and opaque (AV_CODEC_FLAG_COPY_OPAQUE), and every frame libavcodec returns keeps the decode index of the packet
+// that started it. Internal to the plugin; plugin.cpp wraps it in the ABI.
 #ifndef OVT_PLUGIN_FFMPEG_H264_ANALYSIS_HPP
 #define OVT_PLUGIN_FFMPEG_H264_ANALYSIS_HPP
 
@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "map_h264_sidedata.hpp"
+#include "map_hevc_sidedata.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 struct AVCodecContext;
@@ -60,14 +61,23 @@ struct AVFrameDeleter {
   void operator()(AVFrame* f) const noexcept;
 };
 
+/// The libavcodec decoder an H264Analysis drives.
+enum class Codec : uint8_t { H264, H265 };
+
 class H264Analysis {
  public:
+  /// As create() below, for @p codec: H265 takes an hvcC record (ISO/IEC 14496-15 8.3.3.1) in @p codec_private, whose
+  /// VPS/SPS/PPS arrays are sent in front of the first access unit, and maps the side data with map_hevc_sidedata().
+  static ovt_status create(Codec codec, const uint8_t* codec_private, size_t len, int threads,
+                           std::unique_ptr<H264Analysis>* out);
   /// Opens a libavcodec h264 decoder with @p threads slice threads (one when < 1; no frame threads, see
   /// SPEC-ASSUMPTION(#302) in h264_analysis.cpp). An avcC record in
   /// @p codec_private is never given to libavcodec as extradata (that switches it to length-prefixed input);
   /// its SPS/PPS are sent as Annex B units in front of the first access unit instead. OVT_E_CORRUPT for a
   /// malformed avcC, OVT_E_UNSUPPORTED when the FFmpeg build has no h264 decoder.
-  static ovt_status create(const uint8_t* codec_private, size_t len, int threads, std::unique_ptr<H264Analysis>* out);
+  static ovt_status create(const uint8_t* codec_private, size_t len, int threads, std::unique_ptr<H264Analysis>* out) {
+    return create(Codec::H264, codec_private, len, threads, out);
+  }
 
   H264Analysis() = default;  // unusable until create() has set it up; public only for std::make_unique
   ~H264Analysis();
@@ -109,10 +119,11 @@ class H264Analysis {
   ovt_status receive_all();
   void add_diag(uint8_t severity, std::string code, std::string message);
 
+  Codec codec_ = Codec::H264;
   AVCodecContext* ctx_ = nullptr;
   AVPacket* pkt_ = nullptr;
   AVFrame* frame_ = nullptr;             // receive buffer
-  std::vector<uint8_t> parameter_sets_;  // Annex B SPS/PPS from avcC, sent with the first access unit
+  std::vector<uint8_t> parameter_sets_;  // Annex B parameter sets from avcC/hvcC, sent with the first access unit
   std::vector<uint8_t> au_;              // Annex B bytes of the access unit being collected
   int32_t au_hint_ = 0;
   bool has_au_ = false;

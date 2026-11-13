@@ -22,3 +22,17 @@ target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
 # metadata and tile list parsers (chapter 7 §7.3.6 rows 1–9 and 30).
 target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.cpp av1/color_config.cpp av1/timing.cpp
                                         av1/metadata.cpp av1/tile_list.cpp)
+# WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
+# st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
+# rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).
+target_sources(
+  ovt_core_objects
+  PRIVATE h265/nal_header.cpp
+          h265/profile_tier_level.cpp
+          h265/hrd_parameters.cpp
+          h265/vui.cpp
+          h265/scaling_list.cpp
+          h265/st_ref_pic_set.cpp
+          h265/vps.cpp
+          h265/sps.cpp
+          h265/pps.cpp)
