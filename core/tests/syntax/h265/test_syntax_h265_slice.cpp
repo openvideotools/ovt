@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.265 slice_segment_header(), ref_pic_lists_modification() and pred_weight_table() tests (chapter 7 §7.3.5
-// rows 10–12, WI-1.113a). WI-1.113b adds the bit-level edge cases, the entry-point substream mapping and acceptance
-// tests 2 (RPS_A..F) and 3 (ENTP_A).
+// H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry-point tests (chapter 7
+// §7.3.5 rows 10–12, WI-1.113a and WI-1.113b).
 //
 // Expected values of the corpus tests are hard-coded from the recorded oracle outputs committed as goldens:
 //   tests/golden/h265/jctvc_WP_A_Toshiba_3.trace_headers.json.gz    (FFmpeg trace_headers, acceptance test 1)
+//   tests/golden/h265/jctvc_RPS_{A..F}_*.gstparse.json.gz            (GStreamer gst_parse_oracle, acceptance test 2)
+//   tests/golden/h265/jctvc_ENTP_A_QUALCOMM_1.trace_headers.json.gz (FFmpeg trace_headers, acceptance test 3)
 //   tests/golden/h265/jctvc_DSLICE_A_HHI_5.trace_headers.json.gz    (FFmpeg trace_headers, acceptance test 4)
 // FFmpeg's trace calls delta_chroma_offset_lX "chroma_offset_lX". The streams are fetched by tools/fetch_corpora.py;
 // the [needs-corpus] cases skip when absent. Acceptance test 1 also runs on the first P slice rebuilt bit for bit
@@ -45,6 +46,7 @@
 namespace {
 
 using ovt::BitReader;
+using ovt::ParseError;
 using ovt::syntax::SyntaxBuilder;
 using ovt::syntax::SyntaxNodeBuffer;
 using ovt::syntax::SyntaxNodeData;
@@ -59,6 +61,21 @@ std::vector<uint8_t> from_hex(std::string_view hex) {
   std::vector<uint8_t> out;
   for (size_t i = 0; i + 1 < hex.size(); i += 2) {
     out.push_back(static_cast<uint8_t>(std::stoul(std::string(hex.substr(i, 2)), nullptr, 16)));
+  }
+  return out;
+}
+
+// H.265 §7.4.2 emulation prevention: a 0x03 after every 00 00 that is followed by a byte <= 0x03.
+std::vector<uint8_t> add_emulation_prevention(const std::vector<uint8_t>& rbsp) {
+  std::vector<uint8_t> out;
+  unsigned zeros = 0;
+  for (const uint8_t byte : rbsp) {
+    if (zeros >= 2 && byte <= 3) {
+      out.push_back(3);
+      zeros = 0;
+    }
+    out.push_back(byte);
+    zeros = byte == 0 ? zeros + 1 : 0;
   }
   return out;
 }
@@ -304,7 +321,291 @@ TEST_CASE("h265_slice: IDR I slice has no POC or RPS; byte_alignment and slice_s
   CHECK(type->enum_name == "I");
 }
 
-// ---- dependent slice segments (hand-built) -------------------------------------------------------------------------
+TEST_CASE("h265_slice: short_term_ref_pic_set_idx is u(v) with Ceil(Log2(n)) bits and absent when n == 1",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  auto write_p = [](BitWriter& w, bool with_idx, unsigned idx_bits, unsigned idx) {
+    write_nal_header(w, h265::kTrailR);
+    w.flag(true);  // first_slice_segment_in_pic_flag
+    w.ue(0);
+    w.ue(1);       // P
+    w.u(8, 7);     // slice_pic_order_cnt_lsb
+    w.flag(true);  // short_term_ref_pic_set_sps_flag
+    if (with_idx) {
+      w.u(idx_bits, idx);
+    }
+    w.flag(false);  // slice_temporal_mvp_enabled_flag
+    w.flag(false);  // slice_sao_luma_flag
+    w.flag(false);  // slice_sao_chroma_flag
+    w.flag(false);  // num_ref_idx_active_override_flag
+    w.ue(0);        // five_minus_max_num_merge_cand
+    w.se(0);        // slice_qp_delta
+    w.flag(true);   // slice_loop_filter_across_slices_enabled_flag
+  };
+  SECTION("two SPS sets: one bit selects set 1") {
+    BitWriter w;
+    write_p(w, true, 1, 1);
+    SyntaxNodeBuffer tree;
+    const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+    CHECK(sh.short_term_ref_pic_set_idx == 1);
+    CHECK(sh.CurrRpsIdx == 1);
+    CHECK(sh.NumPicTotalCurr == 2);               // -1(used), +2(used)
+    CHECK(sh.num_ref_idx_l0_active_minus1 == 1);  // PPS default
+    CHECK(h265::current_st_ref_pic_set(sh, f.sps) == &f.sps.st_ref_pic_set[1]);
+    CHECK(codes(tree).empty());
+  }
+  SECTION("one SPS set: the index is absent and inferred 0") {
+    f.sps.st_ref_pic_set.resize(1);
+    f.sps.num_short_term_ref_pic_sets = 1;
+    BitWriter w;
+    write_p(w, false, 0, 0);
+    SyntaxNodeBuffer tree;
+    const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+    CHECK(sh.short_term_ref_pic_set_idx == 0);
+    CHECK(sh.NumPicTotalCurr == 2);  // -1(used), -2(used)
+    CHECK(find_child(find_child(tree.root(), "slice_segment_header"), "short_term_ref_pic_set_idx") == nullptr);
+    CHECK(codes(tree).empty());
+  }
+  SECTION("three SPS sets: two bits, value 3 is out of range") {
+    f.sps.st_ref_pic_set.push_back(f.sps.st_ref_pic_set[0]);
+    f.sps.num_short_term_ref_pic_sets = 3;
+    BitWriter w;
+    write_p(w, true, 2, 3);
+    try {
+      (void)parse_slice(finish_slice(w), f);
+      FAIL("expected ParseError");
+    } catch (const ParseError& e) {
+      CHECK(e.code == "SYN-H265-0007");
+    }
+  }
+}
+
+TEST_CASE("h265_slice: slice-local RPS, long-term entries, list modification and collocated_ref_idx",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  f.sps.long_term_ref_pics_present_flag = true;
+  f.sps.num_long_term_ref_pics_sps = 3;
+  f.sps.lt_ref_pic_poc_lsb_sps[0] = 10;
+  f.sps.lt_ref_pic_poc_lsb_sps[2] = 30;
+  f.sps.used_by_curr_pic_lt_sps_flag[2] = true;
+  f.pps.lists_modification_present_flag = true;
+  f.pps.cabac_init_present_flag = true;
+  f.activate();
+  BitWriter w;
+  write_nal_header(w, h265::kTrailR);
+  w.flag(true);
+  w.ue(0);
+  w.ue(0);        // B
+  w.u(8, 40);     // slice_pic_order_cnt_lsb
+  w.flag(false);  // short_term_ref_pic_set_sps_flag -> st_ref_pic_set(2)
+  w.flag(true);   //   inter_ref_pic_set_prediction_flag
+  w.ue(1);        //   delta_idx_minus1 -> RefRpsIdx 0 (S0: -1 -2)
+  w.flag(true);   //   delta_rps_sign
+  w.ue(0);        //   abs_delta_rps_minus1 -> deltaRps = -1
+  for (int j = 0; j < 3; ++j) {
+    w.flag(true);  //   used_by_curr_pic_flag[j]
+  }
+  const size_t rps_bits = 1 + 3 + 1 + 1 + 3;
+  w.ue(1);        // num_long_term_sps
+  w.ue(1);        // num_long_term_pics
+  w.u(2, 2);      // lt_idx_sps[0] (Ceil(Log2(3)) = 2 bits) -> PocLsbLt 30, used
+  w.flag(true);   // delta_poc_msb_present_flag[0]
+  w.ue(2);        // delta_poc_msb_cycle_lt[0]
+  w.u(8, 200);    // poc_lsb_lt[1]
+  w.flag(false);  // used_by_curr_pic_lt_flag[1]
+  w.flag(true);   // delta_poc_msb_present_flag[1]
+  w.ue(5);        // delta_poc_msb_cycle_lt[1] -> DeltaPocMsbCycleLt[1] = 5 (i == num_long_term_sps restarts)
+  w.flag(true);   // slice_temporal_mvp_enabled_flag
+  w.flag(false);  // slice_sao_luma_flag
+  w.flag(false);  // slice_sao_chroma_flag
+  w.flag(true);   // num_ref_idx_active_override_flag
+  w.ue(2);        // num_ref_idx_l0_active_minus1
+  w.ue(1);        // num_ref_idx_l1_active_minus1
+  // NumPicTotalCurr = 3 short-term (all used) + 1 long-term -> list_entry_lX are Ceil(Log2(4)) = 2 bits
+  w.flag(true);  // ref_pic_list_modification_flag_l0
+  w.u(2, 3);
+  w.u(2, 0);
+  w.u(2, 1);
+  w.flag(false);  // ref_pic_list_modification_flag_l1
+  w.flag(true);   // mvd_l1_zero_flag
+  w.flag(true);   // cabac_init_flag
+  w.flag(false);  // collocated_from_l0_flag -> list 1 has 2 entries, so collocated_ref_idx follows
+  w.ue(1);        // collocated_ref_idx
+  w.ue(1);        // five_minus_max_num_merge_cand
+  w.se(2);        // slice_qp_delta
+  w.flag(true);   // slice_loop_filter_across_slices_enabled_flag
+  SyntaxNodeBuffer tree;
+  const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+  CHECK(codes(tree).empty());
+  // 7-61 with RefRpsIdx 0 (S0: -1, -2) and deltaRps -1: the reference's S1 (none), then deltaRps itself (-1),
+  // then each S0 entry + deltaRps (-2, -3).
+  REQUIRE(sh.st_ref_pic_set.NumNegativePics == 3);
+  CHECK(sh.st_ref_pic_set.DeltaPocS0[0] == -1);
+  CHECK(sh.st_ref_pic_set.DeltaPocS0[1] == -2);
+  CHECK(sh.st_ref_pic_set.DeltaPocS0[2] == -3);
+  CHECK(sh.st_ref_pic_set.NumPositivePics == 0);
+  CHECK(sh.CurrRpsIdx == 2);
+  CHECK(sh.NumBitsForShortTermRPSInSlice == rps_bits);
+  CHECK(sh.PocLsbLt[0] == 30);
+  CHECK(sh.UsedByCurrPicLt[0]);
+  CHECK(sh.PocLsbLt[1] == 200);
+  CHECK_FALSE(sh.UsedByCurrPicLt[1]);
+  CHECK(sh.DeltaPocMsbCycleLt[0] == 2);
+  CHECK(sh.DeltaPocMsbCycleLt[1] == 5);
+  CHECK(sh.NumPicTotalCurr == 4);
+  REQUIRE(sh.ref_pic_lists_modification.has_value());
+  CHECK(sh.ref_pic_lists_modification->list_entry_l0[0] == 3);
+  CHECK(sh.ref_pic_lists_modification->list_entry_l0[2] == 1);
+  CHECK_FALSE(sh.ref_pic_lists_modification->ref_pic_list_modification_flag_l1);
+  CHECK(sh.mvd_l1_zero_flag);
+  CHECK(sh.cabac_init_flag);
+  CHECK_FALSE(sh.collocated_from_l0_flag);
+  CHECK(sh.collocated_ref_idx == 1);
+  CHECK(sh.MaxNumMergeCand == 4);
+  CHECK(sh.SliceQpY == 32);
+}
+
+TEST_CASE("h265_slice: collocated_ref_idx is absent when the collocated list has one entry", "[syntax][h265][fast]") {
+  Fixture f;
+  BitWriter w;
+  write_nal_header(w, h265::kTrailR);
+  w.flag(true);
+  w.ue(0);
+  w.ue(1);  // P: collocated_from_l0_flag is not read and inferred 1
+  w.u(8, 3);
+  w.flag(true);
+  w.u(1, 0);
+  w.flag(true);   // slice_temporal_mvp_enabled_flag
+  w.flag(false);  // sao luma
+  w.flag(false);  // sao chroma
+  w.flag(true);   // num_ref_idx_active_override_flag
+  w.ue(0);        // num_ref_idx_l0_active_minus1 = 0 -> no collocated_ref_idx
+  w.ue(0);        // five_minus_max_num_merge_cand
+  w.se(0);
+  w.flag(true);
+  SyntaxNodeBuffer tree;
+  const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+  CHECK(sh.collocated_from_l0_flag);
+  CHECK(sh.collocated_ref_idx == 0);
+  CHECK(find_child(find_child(tree.root(), "slice_segment_header"), "collocated_ref_idx") == nullptr);
+  CHECK(codes(tree).empty());
+}
+
+// ---- row 12: pred_weight_table (hand-built) ----------------------------------------------------------------------
+
+TEST_CASE("h265_pred_weight_table: B slice with chroma weights; LumaWeight, ChromaWeight and 7-56 ChromaOffset",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  f.pps.weighted_bipred_flag = true;
+  f.activate();
+  BitWriter w;
+  write_nal_header(w, h265::kTrailR);
+  w.flag(true);
+  w.ue(0);
+  w.ue(0);  // B
+  w.u(8, 9);
+  w.flag(true);
+  w.u(1, 1);      // set 1: -1(used) +2(used)
+  w.flag(false);  // slice_temporal_mvp_enabled_flag
+  w.flag(false);
+  w.flag(false);
+  w.flag(true);   // override
+  w.ue(1);        // l0: 2 entries
+  w.ue(0);        // l1: 1 entry
+  w.flag(false);  // mvd_l1_zero_flag
+  // pred_weight_table()
+  w.ue(6);        // luma_log2_weight_denom
+  w.se(-2);       // delta_chroma_log2_weight_denom -> ChromaLog2WeightDenom 4
+  w.flag(true);   // luma_weight_l0_flag[0]
+  w.flag(false);  // luma_weight_l0_flag[1]
+  w.flag(false);  // chroma_weight_l0_flag[0]
+  w.flag(true);   // chroma_weight_l0_flag[1]
+  w.se(-5);       // delta_luma_weight_l0[0]
+  w.se(7);        // luma_offset_l0[0]
+  w.se(3);        // delta_chroma_weight_l0[1][0]
+  w.se(-20);      // delta_chroma_offset_l0[1][0]
+  w.se(-128);     // delta_chroma_weight_l0[1][1]
+  w.se(511);      // delta_chroma_offset_l0[1][1]
+  w.flag(false);  // luma_weight_l1_flag[0]
+  w.flag(false);  // chroma_weight_l1_flag[0]
+  w.ue(0);        // five_minus_max_num_merge_cand
+  w.se(0);
+  w.flag(true);
+  SyntaxNodeBuffer tree;
+  const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+  CHECK(codes(tree).empty());
+  REQUIRE(sh.pred_weight_table.has_value());
+  const h265::PredWeightTable& t = *sh.pred_weight_table;
+  CHECK(t.ChromaLog2WeightDenom == 4);
+  CHECK(t.l0.LumaWeight[0] == 64 - 5);
+  CHECK(t.l0.luma_offset[0] == 7);
+  CHECK(t.l0.LumaWeight[1] == 64);
+  CHECK(t.l0.ChromaWeight[0][0] == 16);
+  CHECK(t.l0.ChromaOffset[0][1] == 0);
+  CHECK(t.l0.ChromaWeight[1][0] == 19);
+  // 7-56: Clip3(-128, 127, (128 - ((128 * 19) >> 4) - 20)) = 128 - 152 - 20 = -44
+  CHECK(t.l0.ChromaOffset[1][0] == -44);
+  CHECK(t.l0.ChromaWeight[1][1] == 16 - 128);
+  // 128 - ((128 * -112) >> 4) + 511 = 128 + 896 + 511, clipped to 127
+  CHECK(t.l0.ChromaOffset[1][1] == 127);
+  CHECK(t.l1.LumaWeight[0] == 64);
+  CHECK(t.l1.ChromaWeight[0][1] == 16);
+}
+
+TEST_CASE("h265_pred_weight_table: out-of-range weights throw; SCC current-picture references raise SYN-H265-0040",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  f.pps.weighted_pred_flag = true;
+  auto write_p = [](BitWriter& w, uint32_t denom, int32_t delta_luma) {
+    write_nal_header(w, h265::kTrailR);
+    w.flag(true);
+    w.ue(0);
+    w.ue(1);  // P
+    w.u(8, 9);
+    w.flag(true);
+    w.u(1, 0);
+    w.flag(false);
+    w.flag(false);
+    w.flag(false);
+    w.flag(true);
+    w.ue(0);  // one L0 entry
+    w.ue(denom);
+    w.se(0);
+    w.flag(true);  // luma_weight_l0_flag[0]
+    w.flag(false);
+    w.se(delta_luma);
+    w.se(0);
+    w.ue(0);
+    w.se(0);
+    w.flag(true);
+  };
+  SECTION("luma_log2_weight_denom 8") {
+    f.activate();
+    BitWriter w;
+    write_p(w, 8, 0);
+    CHECK_THROWS_AS(parse_slice(finish_slice(w), f), ParseError);
+  }
+  SECTION("delta_luma_weight_l0 128") {
+    f.activate();
+    BitWriter w;
+    write_p(w, 3, 128);
+    CHECK_THROWS_AS(parse_slice(finish_slice(w), f), ParseError);
+  }
+  SECTION("pps_curr_pic_ref_enabled_flag") {
+    f.pps.pps_scc_extension_flag = true;
+    f.pps.scc_extension.pps_curr_pic_ref_enabled_flag = true;
+    f.activate();
+    BitWriter w;
+    write_p(w, 3, -2);
+    SyntaxNodeBuffer tree;
+    const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+    CHECK(has_code(tree, "SYN-H265-0040"));
+    CHECK(sh.NumPicTotalCurr == 3);  // -1, -2 and the current picture
+    CHECK(sh.pred_weight_table->l0.LumaWeight[0] == 8 - 2);
+  }
+}
+
+// ---- dependent slice segments and entry points (hand-built) -------------------------------------------------------
 
 TEST_CASE("h265_slice: a dependent slice segment copies the independent part from prev_independent",
           "[syntax][h265][fast]") {
@@ -365,6 +666,193 @@ TEST_CASE("h265_slice: a dependent slice segment copies the independent part fro
     CHECK(dep.SliceAddrRs == 9);
     CHECK(find_child(t2.root(), "slice_segment_data") != nullptr);
   }
+}
+
+TEST_CASE("h265_slice: entry points map to raw substreams that count emulation prevention bytes",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  f.pps.tiles_enabled_flag = true;
+  f.pps.num_tile_columns_minus1 = 1;
+  f.pps.num_tile_rows_minus1 = 1;
+  f.pps.uniform_spacing_flag = true;
+  f.activate();
+  BitWriter w;
+  write_nal_header(w, h265::kIdrNLp);
+  w.flag(true);
+  w.flag(false);
+  w.ue(0);
+  w.ue(2);  // I
+  w.flag(false);
+  w.flag(false);
+  w.se(0);
+  w.flag(true);
+  w.ue(3);     // num_entry_point_offsets (2x2 tiles allow 3)
+  w.ue(15);    // offset_len_minus1 -> 16 bits, so the zero offsets below put 00 00 0x into the header
+  w.u(16, 0);  // substream 0: 1 byte
+  w.u(16, 0);  // substream 1: 1 byte
+  w.u(16, 1);  // substream 2: 2 bytes
+  w.trailing();
+  const std::vector<uint8_t> header_rbsp = w.bytes();
+  const std::vector<uint8_t> header_raw = add_emulation_prevention(header_rbsp);
+  const uint64_t header_epbs = header_raw.size() - header_rbsp.size();
+  REQUIRE(header_epbs > 0);
+  // slice_segment_data in raw bytes, with an emulation-prevented 00 00 03 01 across substreams 2 and 3: the offsets
+  // count the EPB as a byte of substream 3.
+  const std::vector<uint8_t> raw_data = {0x11, 0x22, 0x00, 0x00, 0x03, 0x01, 0x55, 0x66};
+  std::vector<uint8_t> nal = header_raw;
+  nal.insert(nal.end(), raw_data.begin(), raw_data.end());
+  const ovt::Rbsp r = ovt::rbsp_from_nal(nal);
+  REQUIRE(r.epb_positions.size() == header_epbs + 1);
+  SyntaxNodeBuffer tree;
+  const h265::SliceSegmentHeader sh = parse_slice(nal, f, nullptr, &tree);
+  CHECK(codes(tree).empty());
+  CHECK(sh.num_entry_point_offsets == 3);
+  CHECK(sh.entry_point_offset_minus1 == std::vector<uint32_t>{0, 0, 1});
+  CHECK(sh.slice_segment_data_rbsp_byte == header_rbsp.size());
+  const auto subs = h265::entry_point_substreams(sh, r.epb_positions, nal.size());
+  REQUIRE(subs.has_value());
+  REQUIRE(subs->size() == 4);
+  const uint64_t data_raw = header_raw.size();  // the header's EPBs move slice_segment_data in raw bytes
+  CHECK((*subs)[0].first_byte == data_raw);
+  CHECK((*subs)[0].size == 1);
+  CHECK((*subs)[1].first_byte == data_raw + 1);
+  CHECK((*subs)[1].size == 1);
+  CHECK((*subs)[2].first_byte == data_raw + 2);
+  CHECK((*subs)[2].size == 2);
+  CHECK((*subs)[3].first_byte == data_raw + 4);  // 03 01 55 66: the EPB of 00 00 03 01 counts in substream 3
+  CHECK((*subs)[3].size == 4);
+  CHECK((*subs)[3].first_byte + (*subs)[3].size == nal.size());
+
+  SECTION("offsets that overrun the unit") {
+    CHECK_FALSE(h265::entry_point_substreams(sh, r.epb_positions, data_raw + 4).has_value());
+  }
+}
+
+TEST_CASE("h265_slice: entry point counts beyond the tile/row limit warn; impossible ones throw",
+          "[syntax][h265][fast]") {
+  Fixture f;
+  f.pps.entropy_coding_sync_enabled_flag = true;  // WPP: at most PicHeightInCtbsY - 1 = 3 offsets
+  f.activate();
+  auto write_i = [](BitWriter& w, uint32_t num, uint32_t len_minus1) {
+    write_nal_header(w, h265::kIdrNLp);
+    w.flag(true);
+    w.flag(false);
+    w.ue(0);
+    w.ue(2);
+    w.flag(false);
+    w.flag(false);
+    w.se(0);
+    w.flag(true);
+    w.ue(num);
+    if (num > 0) {
+      w.ue(len_minus1);
+      for (uint32_t i = 0; i < num; ++i) {
+        w.u(len_minus1 + 1, 0);
+      }
+    }
+  };
+  SECTION("5 offsets with WPP on a 4-row picture: SYN-H265-0031") {
+    BitWriter w;
+    write_i(w, 5, 0);
+    SyntaxNodeBuffer tree;
+    std::vector<uint8_t> nal = finish_slice(w, {1, 2, 3, 4, 5, 6, 7});
+    const h265::SliceSegmentHeader sh = parse_slice(nal, f, nullptr, &tree);
+    CHECK(has_code(tree, "SYN-H265-0031"));
+    CHECK(sh.entry_point_offset_minus1.size() == 5);
+  }
+  SECTION("16 offsets on a 16-CTB picture: ParseError") {
+    BitWriter w;
+    write_i(w, 16, 0);
+    CHECK_THROWS_AS(parse_slice(finish_slice(w), f), ParseError);
+  }
+  SECTION("offset_len_minus1 32: ParseError") {
+    BitWriter w;
+    write_i(w, 1, 32);
+    CHECK_THROWS_AS(parse_slice(finish_slice(w), f), ParseError);
+  }
+}
+
+TEST_CASE("h265_slice: missing PPS, bad slice_type and QP out of range are ParseErrors", "[syntax][h265][fast]") {
+  Fixture f;
+  auto expect_code = [&f](const std::vector<uint8_t>& nal, std::string_view code) {
+    try {
+      (void)parse_slice(nal, f);
+      FAIL("expected ParseError");
+    } catch (const ParseError& e) {
+      CHECK(e.code == code);
+    }
+  };
+  SECTION("PPS 5 was never received") {
+    BitWriter w;
+    write_nal_header(w, h265::kIdrNLp);
+    w.flag(true);
+    w.flag(false);
+    w.ue(5);
+    expect_code(finish_slice(w), "SYN-H265-0011");
+  }
+  SECTION("slice_pic_parameter_set_id 64") {
+    BitWriter w;
+    write_nal_header(w, h265::kIdrNLp);
+    w.flag(true);
+    w.flag(false);
+    w.ue(64);
+    expect_code(finish_slice(w), "SYN-H265-0007");
+  }
+  SECTION("slice_type 3") {
+    BitWriter w;
+    write_nal_header(w, h265::kIdrNLp);
+    w.flag(true);
+    w.flag(false);
+    w.ue(0);
+    w.ue(3);
+    expect_code(finish_slice(w), "SYN-H265-0007");
+  }
+  SECTION("SliceQpY 52") {
+    BitWriter w;
+    write_nal_header(w, h265::kIdrNLp);
+    w.flag(true);
+    w.flag(false);
+    w.ue(0);
+    w.ue(2);
+    w.flag(false);
+    w.flag(false);
+    w.se(22);  // 26 + 4 + 22
+    expect_code(finish_slice(w), "SYN-H265-0007");
+  }
+  SECTION("slice_segment_address beyond PicSizeInCtbsY") {
+    f.sps.PicSizeInCtbsY = 12;  // 4 bits, value 13 is out of range
+    f.activate();
+    BitWriter w;
+    write_nal_header(w, h265::kTrailR);
+    w.flag(false);
+    w.ue(0);
+    w.u(4, 13);
+    expect_code(finish_slice(w), "SYN-H265-0007");
+  }
+}
+
+TEST_CASE("h265_slice: a P slice in an IRAP picture is a Diagnostic, not an error", "[syntax][h265][fast]") {
+  Fixture f;
+  BitWriter w;
+  write_nal_header(w, h265::kCraNut);
+  w.flag(true);
+  w.flag(false);
+  w.ue(0);
+  w.ue(1);  // P in a CRA
+  w.u(8, 0);
+  w.flag(true);
+  w.u(1, 0);
+  w.flag(false);
+  w.flag(false);
+  w.flag(false);
+  w.flag(false);
+  w.ue(0);
+  w.se(0);
+  w.flag(true);
+  SyntaxNodeBuffer tree;
+  const h265::SliceSegmentHeader sh = parse_slice(finish_slice(w), f, nullptr, &tree);
+  CHECK(sh.slice_type == h265::kSliceP);
+  CHECK(codes(tree) == std::vector<std::string>{"SYN-H265-0007"});
 }
 
 // ---- acceptance test 1: WP_A_Toshiba_3, first P slice --------------------------------------------------------------
@@ -456,6 +944,135 @@ TEST_CASE("h265_slice_wp_a: pred_weight_table of the P slices equals trace_heade
     }
   }
   CHECK(t.l0.luma_offset[2] == -2);
+}
+
+// ---- acceptance test 2: RPS_A..F, st_ref_pic_set of the first pictures ---------------------------------------------
+
+namespace {
+
+struct ExpectedRps {
+  std::vector<int32_t> s0;
+  std::vector<bool> used0;
+  std::vector<int32_t> s1;
+  std::vector<bool> used1;
+};
+
+// SPEC-ASSUMPTION(#391): AT2 names HM's trace as the oracle and the first 8 pictures; the committed goldens are the
+// gstparse ones (GstH265ShortTermRefPicSet of the slice, or of the SPS set short_term_ref_pic_set_idx), which cover
+// the first 15 NAL units: pictures 1..5 after the IDR (picture 0, empty RPS).
+void check_rps_stream(std::string_view id, const std::vector<ExpectedRps>& expected) {
+  SliceWalker walk;
+  walk.add_file(ovt::test::corpus_or_skip(id));
+  const auto firsts = walk.first_slices(expected.size() + 1);
+  REQUIRE(firsts.size() == expected.size() + 1);
+  CHECK(firsts[0]->nal.is_irap);
+  for (size_t p = 0; p < expected.size(); ++p) {
+    CAPTURE(id, p + 1);
+    const SliceWalker::Slice& s = *firsts[p + 1];
+    const h265::StRefPicSet* rps = h265::current_st_ref_pic_set(s.sh, walk.sps_of(s));
+    REQUIRE(rps != nullptr);
+    const ExpectedRps& e = expected[p];
+    REQUIRE(rps->NumNegativePics == e.s0.size());
+    REQUIRE(rps->NumPositivePics == e.s1.size());
+    for (size_t i = 0; i < e.s0.size(); ++i) {
+      CHECK(rps->DeltaPocS0[i] == e.s0[i]);
+      CHECK(rps->UsedByCurrPicS0[i] == e.used0[i]);
+    }
+    for (size_t i = 0; i < e.s1.size(); ++i) {
+      CHECK(rps->DeltaPocS1[i] == e.s1[i]);
+      CHECK(rps->UsedByCurrPicS1[i] == e.used1[i]);
+    }
+  }
+}
+
+}  // namespace
+
+TEST_CASE("h265_slice_rps: DeltaPocS0/S1 and UsedByCurrPic of RPS_A..F equal the recorded RPS",
+          "[syntax][h265][fast][needs-corpus]") {
+  const bool T = true;
+  const bool F = false;
+  SECTION("RPS_A_docomo_5 (SPS sets)") {
+    check_rps_stream("jctvc_RPS_A_docomo_5", {{{-8}, {T}, {}, {}},
+                                              {{-4}, {T}, {4}, {T}},
+                                              {{-2}, {T}, {2, 6}, {T, T}},
+                                              {{-1}, {T}, {1, 3, 7}, {T, T, T}},
+                                              {{-1, -3}, {T, T}, {1, 5}, {T, T}}});
+  }
+  SECTION("RPS_B_qualcomm_5 (slice sets)") {
+    check_rps_stream("jctvc_RPS_B_qualcomm_5", {{{-5}, {T}, {}, {}},
+                                                {{-3, -8}, {T, T}, {}, {}},
+                                                {{-1, -6}, {T, T}, {}, {}},
+                                                {{-1}, {T}, {4, 5}, {T, T}},
+                                                {{-1, -2, -6, -7}, {T, T, T, T}, {}, {}}});
+  }
+  SECTION("RPS_C_ericsson_5 (inter-RPS prediction, unused entries)") {
+    check_rps_stream("jctvc_RPS_C_ericsson_5", {{{-16}, {T}, {}, {}},
+                                                {{-8}, {T}, {8}, {T}},
+                                                {{-4, -12}, {T, F}, {4}, {T}},
+                                                {{-3}, {T}, {5, 9, 13}, {T, F, T}},
+                                                {{-3, -7, -12, -15}, {F, F, F, T}, {1}, {T}}});
+  }
+  SECTION("RPS_D_ericsson_6") {
+    check_rps_stream("jctvc_RPS_D_ericsson_6", {{{-10}, {T}, {}, {}},
+                                                {{-10, -20}, {T, F}, {}, {}},
+                                                {{-10, -30}, {T, F}, {}, {}},
+                                                {{-10, -20, -40}, {T, T, T}, {}, {}},
+                                                {{-20}, {T}, {}, {}}});
+  }
+  SECTION("RPS_E_qualcomm_5") {
+    check_rps_stream("jctvc_RPS_E_qualcomm_5", {{{-5}, {T}, {}, {}},
+                                                {{-3, -8}, {T, T}, {}, {}},
+                                                {{-1, -6}, {T, T}, {2}, {F}},
+                                                {{-1}, {T}, {4, 5, 7}, {T, T, T}},
+                                                {{-1, -2, -6, -7}, {T, T, T, T}, {1}, {T}}});
+  }
+  SECTION("RPS_F_docomo_2") {
+    check_rps_stream("jctvc_RPS_F_docomo_2", {{{-8}, {T}, {}, {}},
+                                              {{-4}, {T}, {4}, {T}},
+                                              {{-2}, {T}, {2, 6}, {T, T}},
+                                              {{-1}, {T}, {1, 3, 7}, {T, T, T}},
+                                              {{-1, -3}, {F, T}, {1, 5}, {F, F}}});
+  }
+}
+
+// ---- acceptance test 3: ENTP_A_QUALCOMM_1, entry points
+// --------------------------------------------------------------
+
+TEST_CASE("h265_slice_entp_a: substream byte ranges tile slice_segment_data exactly in raw bytes",
+          "[syntax][h265][fast][needs-corpus]") {
+  SliceWalker walk;
+  walk.add_file(ovt::test::corpus_or_skip("jctvc_ENTP_A_QUALCOMM_1"));
+  // trace_headers: the first six pictures are single-slice I pictures on 2x2 tiles, offset_len_minus1 = 15.
+  const std::array<std::array<uint32_t, 3>, 6> expected = {{{16163, 15324, 43860},
+                                                            {16087, 15437, 43597},
+                                                            {16148, 15247, 43382},
+                                                            {16136, 15341, 43443},
+                                                            {16084, 15415, 43226},
+                                                            {16130, 15262, 43503}}};
+  REQUIRE(walk.slices.size() >= expected.size());
+  for (size_t p = 0; p < expected.size(); ++p) {
+    CAPTURE(p);
+    const SliceWalker::Slice& s = walk.slices[p];
+    CHECK(s.sh.num_entry_point_offsets == 3);
+    CHECK(s.sh.offset_len_minus1 == 15);
+    REQUIRE(s.sh.entry_point_offset_minus1.size() == 3);
+    for (size_t k = 0; k < 3; ++k) {
+      CHECK(s.sh.entry_point_offset_minus1[k] == expected[p][k]);
+    }
+    const auto subs = h265::entry_point_substreams(s.sh, s.epb_positions, s.nal_size);
+    REQUIRE(subs.has_value());
+    REQUIRE(subs->size() == 4);
+    // The first substream starts at the first raw byte of slice_segment_data(), each one starts where the previous
+    // ends, the sizes are entry_point_offset_minus1 + 1 and the last one ends with the unit.
+    const uint64_t data_first = ovt::rbsp_bit_to_raw_bit(s.sh.slice_segment_data_rbsp_byte * 8, s.epb_positions) / 8;
+    CHECK((*subs)[0].first_byte == data_first);
+    for (size_t k = 0; k < 3; ++k) {
+      CHECK((*subs)[k].size == uint64_t{expected[p][k]} + 1);
+      CHECK((*subs)[k + 1].first_byte == (*subs)[k].first_byte + (*subs)[k].size);
+    }
+    CHECK((*subs)[3].first_byte + (*subs)[3].size == s.nal_size);
+    CHECK((*subs)[3].size > 0);
+  }
 }
 
 // ---- acceptance test 4: DSLICE_A_HHI_5, dependent slice segments ---------------------------------------------------

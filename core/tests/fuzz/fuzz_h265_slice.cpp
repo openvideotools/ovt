@@ -8,7 +8,8 @@
 // a preceding independent segment and, when the first parse succeeded with an independent segment, once more with
 // that header as prev_independent (the dependent-segment copy path). Invariants, each an abort when violated: only
 // ovt::ParseError escapes; the builder always finishes into a tree; two parses of the same bytes give the same JSON
-// (determinism, §0.7.5).
+// (determinism, §0.7.5); entry_point_substreams() either fails or returns num_entry_point_offsets + 1 contiguous
+// substreams that end with the unit.
 
 #include <algorithm>
 #include <cstddef>
@@ -77,6 +78,18 @@ SliceResult parse_slice(const ovt::Rbsp& rbsp, const h265::PpsTable& table, cons
   return out;
 }
 
+void check_substreams(const h265::SliceSegmentHeader& sh, const ovt::Rbsp& rbsp, uint64_t nal_size) {
+  const auto subs = h265::entry_point_substreams(sh, rbsp.epb_positions, nal_size);
+  if (!subs) {
+    return;
+  }
+  require(subs->size() == sh.entry_point_offset_minus1.size() + 1);
+  for (size_t k = 0; k + 1 < subs->size(); ++k) {
+    require((*subs)[k].size > 0 && (*subs)[k + 1].first_byte == (*subs)[k].first_byte + (*subs)[k].size);
+  }
+  require(subs->back().first_byte + subs->back().size == nal_size);
+}
+
 }  // namespace
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -107,8 +120,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (!first.sh) {
     return 0;
   }
+  check_substreams(*first.sh, rbsp, nal.size());
   if (!first.sh->dependent_slice_segment_flag) {
-    (void)parse_slice(rbsp, table, &*first.sh);
+    const SliceResult dep = parse_slice(rbsp, table, &*first.sh);
+    if (dep.sh) {
+      check_substreams(*dep.sh, rbsp, nal.size());
+    }
   }
   return 0;
 }
