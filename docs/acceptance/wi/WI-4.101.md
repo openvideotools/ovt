@@ -52,7 +52,8 @@ this record said CAMA1 covered `ref_idx`; that was wrong.
 **ref_idx.** The 17 fast goldens hold no `ref_idx` either: their traced P picture has one reference, and MR9_BT_B's
 has no field macroblock pairs. `ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F` (`slow`) covers it: an MBAFF + PAFF
 CABAC stream with P and B pictures and several references. The test requires the golden to contain `ref_idx` values.
-Its golden is owed from the Mac Mini (commands at the end); until then the case skips.
+On the Mac Mini (2026-11-13, branch head 6ed9c46) it compared 594 macroblocks: intra modes 336, mvds 320,
+sub_mb_types 41, `ref_idx` 320; all tests passed (39,717 assertions). The goldens are committed.
 
 ## Test 2: flag unset: no tables, same speed
 
@@ -104,8 +105,8 @@ Mac Mini (macOS arm64), 2026-11-13, the patch from main applied to n7.1.1 and bu
 - Step 5: `make -k fate-h264` exits 0 (221 tests).
 - Step 6: median user time 0.743 s unpatched, 0.737 s patched (0.8 %, inside ±1 %).
 - CAMA1_Sony_C: both goldens generated twice with identical bytes; the test passes (see test 1).
-- Owed: the CAPAMA3_Sand_F golden and test run (the same CAMA1 commands with `jvt_CAMA1_Sony_C` replaced by
-  `jvt_CAPAMA3_Sand_F`, and the test name `ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F`).
+- CAPAMA3_Sand_F: goldens generated twice with identical bytes (`jm-trace` 8,392 bytes, `trace_headers` 1,340), with
+  the CAMA1 commands below, `jvt_CAMA1_Sony_C` replaced by `jvt_CAPAMA3_Sand_F`; the `ref_idx` test passes (see test 1).
 
 ### Commands
 
