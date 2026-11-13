@@ -155,7 +155,7 @@ struct Sps {
   uint32_t PicWidthInMbs = 1;
   uint32_t PicWidthInSamplesL = 16;
   uint32_t PicHeightInMapUnits = 1;
-  uint32_t PicSizeInMapUnits = 1;
+  uint64_t PicSizeInMapUnits = 1;  // PicWidthInMbs * PicHeightInMapUnits (up to 2^32 under the #388 caps)
   uint32_t FrameHeightInMbs = 1;
   uint32_t CropUnitX = 1;
   uint32_t CropUnitY = 1;

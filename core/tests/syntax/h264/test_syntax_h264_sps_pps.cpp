@@ -599,6 +599,54 @@ TEST_CASE("h264_sps_range_errors", "[syntax][h264][fast]") {
     const auto tree = b.finish();
     CHECK(find_node(tree.root(), "cpb_cnt_minus1") != nullptr);
   }
+  SECTION("delta_scale below -128 (fuzz regression ubsan_scaling_delta_max)") {
+    // High profile SPS whose first scaling list starts with delta_scale at the se(v) extreme; before the #388 bound
+    // the nextScale arithmetic overflowed int32.
+    const auto p = parse_nal(from_hex("6764001fad8000000300fffffffefffe02d0589c80"));
+    REQUIRE(p.error.has_value());
+    CHECK(p.error->code == "SYN-H264-0002");
+    CHECK_THAT(p.error->what(), Catch::Matchers::ContainsSubstring("delta_scale out of range"));
+  }
+  SECTION("pic_height_in_map_units_minus1 2^31-1 (fuzz regression ubsan_sps_frame_mbs_zero)") {
+    // frame_mbs_only_flag = 0 made FrameHeightInMbs wrap to 0 and MaxDpbFrames divide by zero.
+    const auto p = parse_nal(from_hex("6742001eda4000000300400000030012"));
+    REQUIRE(p.error.has_value());
+    CHECK(p.error->code == "SYN-H264-0002");
+    CHECK_THAT(p.error->what(), Catch::Matchers::ContainsSubstring("pic_height_in_map_units_minus1 out of range"));
+  }
+  SECTION("pic_width_in_mbs_minus1 65536 is rejected, 65535 is accepted") {
+    auto sps_with_width = [](uint32_t width_minus1) {
+      BitWriter w;
+      w.u(8, 0x67);
+      w.u(8, 66);
+      w.u(8, 0);
+      w.u(8, 30);
+      w.ue(0);    // seq_parameter_set_id
+      w.ue(0);    // log2_max_frame_num_minus4
+      w.ue(2);    // pic_order_cnt_type
+      w.ue(1);    // max_num_ref_frames
+      w.u(1, 0);  // gaps_in_frame_num_value_allowed_flag
+      w.ue(width_minus1);
+      w.ue(65535);  // pic_height_in_map_units_minus1
+      w.u(1, 0);    // frame_mbs_only_flag
+      w.u(1, 0);    // mb_adaptive_frame_field_flag
+      w.u(1, 1);    // direct_8x8_inference_flag
+      w.u(1, 0);    // frame_cropping_flag
+      w.u(1, 0);    // vui_parameters_present_flag
+      w.trailing();
+      return w.bytes();
+    };
+    const auto bad = parse_nal(sps_with_width(65536));
+    REQUIRE(bad.error.has_value());
+    CHECK(bad.error->code == "SYN-H264-0002");
+    const auto ok = parse_nal(sps_with_width(65535));
+    REQUIRE_FALSE(ok.error.has_value());
+    REQUIRE(ok.sps.has_value());
+    CHECK(ok.sps->PicWidthInMbs == 65536);
+    CHECK(ok.sps->FrameHeightInMbs == 131072);
+    CHECK(ok.sps->PicSizeInMapUnits == uint64_t{65536} * 65536);
+    CHECK(ok.sps->MaxDpbFrames == 0);
+  }
   SECTION("truncated SPS propagates the reader error") {
     const auto p = parse_nal(from_hex("6764"));
     REQUIRE(p.error.has_value());

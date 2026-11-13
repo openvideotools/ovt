@@ -20,6 +20,11 @@ namespace ovt::syntax::h264 {
 
 namespace {
 
+// SPEC-ASSUMPTION(#388): arithmetic-safety bound only, mirroring the H.265 kMaxLumaDimension cap. With 16-bit
+// macroblock dimensions FrameHeightInMbs stays in uint32 and PicSizeInMapUnits / PicWidthInMbs*FrameHeightInMbs
+// (uint64) are well defined; the level limit (Table A-1 MaxFS) is the conformance Warning of WI-4.109.
+constexpr uint32_t kMaxPicDimensionMinus1 = 65535;
+
 // profile_idc values whose SPS carries the chroma_format_idc … seq_scaling_matrix_present_flag block (§7.3.2.1.1).
 bool has_high_profile_syntax(uint32_t profile_idc) noexcept {
   switch (profile_idc) {
@@ -94,7 +99,7 @@ void derive(Sps& s) {
   s.PicWidthInMbs = s.pic_width_in_mbs_minus1 + 1;
   s.PicWidthInSamplesL = s.PicWidthInMbs * 16;
   s.PicHeightInMapUnits = s.pic_height_in_map_units_minus1 + 1;
-  s.PicSizeInMapUnits = s.PicWidthInMbs * s.PicHeightInMapUnits;
+  s.PicSizeInMapUnits = uint64_t{s.PicWidthInMbs} * s.PicHeightInMapUnits;
   s.FrameHeightInMbs = (2 - (s.frame_mbs_only_flag ? 1U : 0U)) * s.PicHeightInMapUnits;
   if (s.ChromaArrayType == 0) {  // §7.4.2.1.1 (7-19 … 7-22)
     s.CropUnitX = 1;
@@ -105,8 +110,10 @@ void derive(Sps& s) {
   }
   const auto width = int64_t{s.PicWidthInSamplesL};
   const int64_t height = int64_t{s.FrameHeightInMbs} * 16;
-  s.crop_x = static_cast<int32_t>(int64_t{s.CropUnitX} * s.frame_crop_left_offset);
-  s.crop_y = static_cast<int32_t>(int64_t{s.CropUnitY} * s.frame_crop_top_offset);
+  s.crop_x =
+      static_cast<int32_t>(std::clamp<int64_t>(int64_t{s.CropUnitX} * s.frame_crop_left_offset, INT32_MIN, INT32_MAX));
+  s.crop_y =
+      static_cast<int32_t>(std::clamp<int64_t>(int64_t{s.CropUnitY} * s.frame_crop_top_offset, INT32_MIN, INT32_MAX));
   s.crop_width = static_cast<int32_t>(std::clamp<int64_t>(
       width - int64_t{s.CropUnitX} * (int64_t{s.frame_crop_left_offset} + s.frame_crop_right_offset), INT32_MIN,
       INT32_MAX));
@@ -369,7 +376,10 @@ Sps parse_seq_parameter_set_data(BitReader& br, SyntaxBuilder& b) {
   detail::require_range(br, "max_num_ref_frames", s.max_num_ref_frames, 0, 16);
   s.gaps_in_frame_num_value_allowed_flag = b.read_flag("gaps_in_frame_num_value_allowed_flag");
   s.pic_width_in_mbs_minus1 = b.read_ue("pic_width_in_mbs_minus1");
+  detail::require_range(br, "pic_width_in_mbs_minus1", s.pic_width_in_mbs_minus1, 0, kMaxPicDimensionMinus1);
   s.pic_height_in_map_units_minus1 = b.read_ue("pic_height_in_map_units_minus1");
+  detail::require_range(br, "pic_height_in_map_units_minus1", s.pic_height_in_map_units_minus1, 0,
+                        kMaxPicDimensionMinus1);
   s.frame_mbs_only_flag = b.read_flag("frame_mbs_only_flag");
   if (!s.frame_mbs_only_flag) {
     s.mb_adaptive_frame_field_flag = b.read_flag("mb_adaptive_frame_field_flag");

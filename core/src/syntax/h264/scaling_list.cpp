@@ -9,6 +9,7 @@
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
+#include "syntax/h264/h264_internal.h"
 
 namespace ovt::syntax::h264 {
 
@@ -25,6 +26,9 @@ void parse_scaling_list(BitReader& br, SyntaxBuilder& b, ScalingList& out, uint3
       b.begin_array_element("delta_scale", static_cast<int>(j));
       const int32_t delta_scale = b.read_se("delta_scale");
       b.end_array_element();
+      // SPEC-ASSUMPTION(#388): §7.4.2.1.1.1 bounds delta_scale to -128..127; a value outside it is a ParseError
+      // (§7.3.1 rule 3) so that the nextScale arithmetic below cannot overflow.
+      detail::require_range(br, "delta_scale", delta_scale, -128, 127);
       out.delta_scale.at(j) = delta_scale;
       next_scale = (last_scale + delta_scale + 256) % 256;
       out.UseDefaultScalingMatrixFlag = (j == 0 && next_scale == 0);
