@@ -35,3 +35,7 @@ target_sources(
           h265/vps.cpp
           h265/sps.cpp
           h265/pps.cpp)
+# WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and the entry-point
+# substream mapping (chapter 7 §7.3.5 rows 10–12).
+target_sources(ovt_core_objects PRIVATE h265/slice_segment_header.cpp h265/ref_pic_lists_modification.cpp
+                                        h265/pred_weight_table.cpp)
