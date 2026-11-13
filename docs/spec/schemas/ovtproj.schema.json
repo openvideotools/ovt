@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openvideotools.org/schemas/ovtproj-1.json",
+  "title": "OVT Studio project",
+  "description": "The .ovtproj project file of chapter 11 section 11.2.6. Unknown keys are allowed and preserved on save.",
+  "type": "object",
+  "required": ["ovtproj_version", "files"],
+  "properties": {
+    "ovtproj_version": { "const": 1 },
+    "created": { "type": "string", "format": "date-time" },
+    "modified": { "type": "string", "format": "date-time" },
+    "app_version": { "type": "string" },
+    "files": {
+      "type": "array",
+      "minItems": 0,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "role"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^f[0-9]+$" },
+          "path": { "type": "string", "description": "relative to the project file when possible; Android: content:// URI" },
+          "role": { "enum": ["single", "reference", "distorted"] },
+          "track_index": { "type": "integer", "minimum": 0, "default": 0 },
+          "source_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "StreamIndex.source_hash, hex" },
+          "raw_format": { "type": "object", "description": "only for raw YUV: width, height, chroma_format, bit_depth, fps, color (H.273 codes)" }
+        }
+      }
+    },
+    "active_file": { "type": "string" },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "preset": { "type": "string" },
+        "groups": { "type": "array" },
+        "leftVisible": { "type": "boolean" },
+        "rightVisible": { "type": "boolean" },
+        "bottomVisible": { "type": "boolean" }
+      }
+    },
+    "panel_state": { "type": "object", "additionalProperties": { "type": "object" } },
+    "view": {
+      "type": "object",
+      "properties": {
+        "order": { "enum": ["decode", "display"] },
+        "frame": { "type": "object", "properties": { "decode_index": { "type": "integer" }, "display_index": { "type": "integer" } } },
+        "overlay_mode": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "overlay_toggles": { "type": "object" },
+        "plane_mode": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "zoom": { "type": "number" },
+        "pan": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "compare": { "type": "object" },
+        "tone_map": { "type": "string" },
+        "hdr_output": { "type": "boolean" }
+      }
+    },
+    "bookmarks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "decode_index"],
+        "properties": {
+          "id": { "type": "string" },
+          "file": { "type": "string" },
+          "decode_index": { "type": "integer" },
+          "name": { "type": "string" },
+          "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+          "created": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "file", "text", "created"],
+        "properties": {
+          "id": { "type": "string" },
+          "file": { "type": "string" },
+          "text": { "type": "string" },
+          "author": { "type": "string" },
+          "created": { "type": "string", "format": "date-time" },
+          "anchor": {
+            "type": "object",
+            "description": "exactly one of",
+            "properties": {
+              "frame": { "type": "object", "properties": { "decode_index": { "type": "integer" } } },
+              "block": { "type": "object", "properties": { "decode_index": { "type": "integer" }, "rect": { "type": "array", "items": { "type": "integer" }, "minItems": 4, "maxItems": 4 } } },
+              "bytes": { "type": "object", "properties": { "offset": { "type": "integer" }, "length": { "type": "integer" } } },
+              "field": { "type": "object", "properties": { "unit_index": { "type": "integer" }, "path": { "type": "string" } } },
+              "box": { "type": "object", "properties": { "path": { "type": "string", "description": "moov/trak[1]/mdia/minf/stbl/stsz" } } }
+            }
+          }
+        }
+      }
+    },
+    "metrics_jobs": {
+      "type": "array",
+      "items": { "type": "object", "description": "MetricsJobConfig JSON of Chapter 9 incl. reference/distorted file ids and NormalizationConfig" }
+    }
+  }
+}

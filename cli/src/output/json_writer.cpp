@@ -7,6 +7,8 @@
 
 #include <cmath>
 
+#include "ovt/version.h"
+
 namespace ovt::cli {
 
 namespace {
@@ -45,6 +47,15 @@ std::string json_quote(std::string_view s) {
     }
   }
   out.push_back('"');
+  return out;
+}
+
+std::string to_hex(const std::vector<std::uint8_t>& bytes) {
+  std::string out;
+  out.reserve(bytes.size() * 2);
+  for (const std::uint8_t b : bytes) {
+    out += fmt::format("{:02x}", b);
+  }
   return out;
 }
 
@@ -185,6 +196,61 @@ void write_diagnostic(JsonWriter& w, const Diagnostic& d) {
     w.string(d.spec_ref);
   }
   w.end_object();
+}
+
+bool write_json_envelope(std::FILE* out, bool pretty, const Envelope& env,
+                         const std::function<void(JsonWriter&)>& result) {
+  JsonWriter w(out, pretty);
+  w.begin_object();
+  w.key("$schema");
+  w.string(kEnvelopeSchemaUrl);
+  w.key("ovt_version");
+  w.string(ovt_version_string());
+  w.key("schema_version");
+  w.unsigned_integer(kEnvelopeSchemaVersion);
+  w.key("command");
+  w.string(env.command);
+  if (env.input) {
+    w.key("input");
+    w.begin_object();
+    w.key("path");
+    w.string(env.input->path);
+    w.key("size_bytes");
+    w.unsigned_integer(env.input->size_bytes);
+    w.key("source_hash");
+    w.string(to_hex(env.input->source_hash));
+    w.end_object();
+  }
+  w.key("result");
+  if (result) {
+    result(w);
+  } else {
+    w.begin_object();
+    w.end_object();
+  }
+  w.key("diagnostics");
+  w.begin_array();
+  for (const Diagnostic& d : env.diagnostics) {
+    write_diagnostic(w, d);
+  }
+  w.end_array();
+  w.key("status");
+  w.string(exit_code_name(env.status));
+  if (env.timing) {
+    w.key("timing");
+    w.begin_object();
+    for (const auto& [name, value] : env.timing->values) {
+      w.key(name);
+      w.number(value);
+    }
+    if (env.timing->cache_hit) {
+      w.key("cache_hit");
+      w.boolean(*env.timing->cache_hit);
+    }
+    w.end_object();
+  }
+  w.end_object();
+  return w.finish();
 }
 
 }  // namespace ovt::cli

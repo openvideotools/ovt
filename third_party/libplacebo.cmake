@@ -29,7 +29,15 @@ include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
 include(OvtMeson)
 
-ovt_tp_declare(libplacebo LICENSE_FILES LICENSE)
+# "./LICENSE", not LICENSE: a bare LICENSE is read as ovt_tp_declare()'s LICENSE keyword and records no file.
+# The archive compiles in SipHash (hash.h), ccSeqParseDouble (convert.cc) and filter code derived from Glumpy
+# (filters.c), whose licence text sits only in source-file headers or upstream; third_party/licenses/libplacebo/
+# holds those texts (tools/tests/test_bundled_licences.py checks the list). fast_float, lcms2, glslang and the
+# Vulkan headers come from vcpkg ports, whose copyright files tools/gen_notices.py reads separately.
+set(_ovt_pl_licdir "${CMAKE_CURRENT_LIST_DIR}/licenses/libplacebo")
+ovt_tp_declare(libplacebo LICENSE_FILES ./LICENSE ${_ovt_pl_licdir}/siphash-CC0-1.0.txt
+               ${_ovt_pl_licdir}/ccseqparse-naveros-Zlib.txt ${_ovt_pl_licdir}/glumpy-filters-BSD-3-Clause.txt)
+unset(_ovt_pl_licdir)
 
 # ---- where the vcpkg (or system) dependencies are -----------------------------------------------------
 set(_ovt_pl_extra_c "")

@@ -4,7 +4,7 @@
   "version-string": "1.0.0",
   "builtin-baseline": "9eec002df1cd109f8f104cd966a763daf9751489",
   "dependencies": [
-    "fmt", "spdlog", { "name": "flatbuffers", "host": true }, "flatbuffers", "zstd", "nlohmann-json", "highway", "cli11", "xxhash",
+    "fmt", "spdlog", { "name": "flatbuffers", "host": true }, "flatbuffers", "zstd", "nlohmann-json", "json-schema-validator", "highway", "cli11", "xxhash",
     { "name": "catch2", "platform": "!android" },
     "vulkan-headers", "glslang", "lcms", "fast-float",
     { "name": "vulkan-loader", "platform": "linux" }

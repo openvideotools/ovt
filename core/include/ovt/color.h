@@ -19,9 +19,12 @@ extern "C" {
 #endif
 
 /* NOLINTBEGIN(modernize-avoid-c-arrays): a C11 header */
+/* ovt/abi/metric_v1.h repeats this struct under the same guard (#156, #211). */
+#ifndef OVT_COLOR_DESCRIPTION_DEFINED
+#define OVT_COLOR_DESCRIPTION_DEFINED
 /**
  * Colour description of a picture or stream (backbone §0.5.6). Code points are ITU-T H.273 values; 0 in a
- * static HDR metadata field means "absent". Fields are only appended (chapter 12 §12.3.1 rule 7).
+ * static HDR metadata field means "absent". Frozen: ovt_Picture and ovt_MetricPlanes embed it by value (#156).
  */
 /* NOLINTNEXTLINE(modernize-use-using): a C11 header */
 typedef struct ovt_ColorDescription {
@@ -44,6 +47,7 @@ typedef struct ovt_ColorDescription {
   uint8_t dv_profile;            /**< Dolby Vision profile; 0 when has_dolby_vision is 0. */
   uint8_t dv_level;              /**< Dolby Vision level; 0 when has_dolby_vision is 0. */
 } ovt_ColorDescription;
+#endif /* OVT_COLOR_DESCRIPTION_DEFINED */
 
 /* NOLINTEND(modernize-avoid-c-arrays) */
 

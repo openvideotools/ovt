@@ -1,0 +1,71 @@
+[
+ {
+  "header_length": 8,
+  "offset": 0,
+  "path": "moof",
+  "size": 2396
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 119,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 8,
+  "path": "moof/mfhd",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 24,
+  "path": "moof/traf",
+  "size": 2372
+ },
+ {
+  "fields": {
+   "base_data_offset": 0,
+   "default_sample_duration": 4,
+   "default_sample_flags": 0,
+   "default_sample_size": 0,
+   "flags": 131080,
+   "sample_description_index": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 32,
+  "path": "moof/traf/tfhd",
+  "size": 20
+ },
+ {
+  "fields": {
+   "baseMediaDecodeTime": 90624,
+   "flags": 0,
+   "version": 1
+  },
+  "header_length": 8,
+  "offset": 52,
+  "path": "moof/traf/tfdt",
+  "size": 20
+ },
+ {
+  "fields": {
+   "data_offset": 2404,
+   "first_sample_flags": 0,
+   "flags": 3585,
+   "sample_count": 192,
+   "version": 1
+  },
+  "header_length": 8,
+  "offset": 72,
+  "path": "moof/traf/trun",
+  "size": 2324
+ },
+ {
+  "header_length": 8,
+  "offset": 2396,
+  "path": "mdat",
+  "size": 97001
+ }
+]

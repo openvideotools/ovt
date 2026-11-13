@@ -15,13 +15,14 @@
 #
 # Licence texts come from the dependencies' install prefixes, never from the network:
 #   * ExternalProject dependencies: the LICENSE_FILES of ovt_tp_declare() are staged from the dependency's source
-#     directory into ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
+#     directory (an absolute entry is a text kept in this repository, third_party/licenses/<dep>/) into
+#     ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
 #   * vcpkg ports: <vcpkg installed dir>/<triplet>/share/<port>/copyright;
 #   * Qt: ${QT_ROOT_DIR}/Licenses.
 #
 # Install rules (component `notices`, OPTIONAL so a plain `cmake --install` works without building ovt_notices;
 # release jobs must build the target first): Linux, AppImage and Flatpak (and the macOS CLI) -> share/doc/ovt/; the macOS
-# bundle's Contents/Resources/ is left to the GUI packaging item; Android -> the Gradle assets
+# bundle's Contents/Resources/ copy is made by tools/mac/bundle.sh; Android -> the Gradle assets
 # directory android/app/src/main/assets/licenses/ (copied after the build, git-ignored); Python wheel ->
 # python/pyproject.toml sets scikit-build-core `wheel.license-files` to the generated file (that file is created
 # by the Python packaging work item, not here).
@@ -50,13 +51,23 @@ foreach(_dep IN LISTS OVT_TP_DEPS)
   get_property(_ep_set GLOBAL PROPERTY OVT_TP_EP_${_dep} SET)
   if(_ep_set)
     get_property(_ep GLOBAL PROPERTY OVT_TP_EP_${_dep})
-    get_property(_key GLOBAL PROPERTY OVT_TP_NOTICE_KEY_${_dep})
+    get_property(_key_set GLOBAL PROPERTY OVT_TP_NOTICE_KEY_${_dep} SET)
+    if(_key_set)
+      get_property(_key GLOBAL PROPERTY OVT_TP_NOTICE_KEY_${_dep})
+    endif()
   endif()
   if(_files AND TARGET ${_ep})
     externalproject_get_property(${_ep} SOURCE_DIR)
     foreach(_f IN LISTS _files)
       get_filename_component(_name "${_f}" NAME) # staged by base name: gen_notices.py reads <dep>/* without recursion
-      list(APPEND _ovt_notices_stage_cmds COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SOURCE_DIR}/${_f}"
+      # An absolute path is a text kept in this repository (code the dependency compiles in besides its own, whose
+      # licence text sits only in source-file headers: third_party/licenses/<dep>/); a relative one is in the archive.
+      if(IS_ABSOLUTE "${_f}")
+        set(_src "${_f}")
+      else()
+        set(_src "${SOURCE_DIR}/${_f}")
+      endif()
+      list(APPEND _ovt_notices_stage_cmds COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_src}"
            "${_ovt_notices_staging}/${_key}/${_name}")
     endforeach()
   endif()
@@ -64,9 +75,11 @@ endforeach()
 unset(_dep)
 unset(_ep)
 unset(_ep_set)
+unset(_key_set)
 unset(_key)
 unset(_files)
 unset(_f)
+unset(_src)
 
 set(_ovt_notices_args
     --report
@@ -134,9 +147,8 @@ if(ANDROID)
     VERBATIM)
   unset(_ovt_notices_assets)
 else()
-  # macOS: the bundle's Contents/Resources/ copy belongs to that item (WI-0.060, macOS bundle script): it
-  # adds the file to ovt_studio's sources with MACOSX_PACKAGE_LOCATION Resources. A $<TARGET_BUNDLE_CONTENT_DIR>
-  # destination would point into the build tree, so it is not used here.
+  # macOS: tools/mac/bundle.sh copies the generated file into the bundle's Contents/Resources/ (WI-0.060) and fails
+  # when it is missing; this rule serves the CLI-only install.
   install(FILES ${_ovt_notices_files} DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/ovt" COMPONENT notices OPTIONAL)
   if(OVT_NOTICES_REQUIRED)
     # Release jobs: a missing notices file is a licence-obligation failure, not something to skip.
