@@ -47,25 +47,46 @@ uint64_t flush(D32 d32, hn::VFromD<D32> acc) {
   return total;
 }
 
+// Loads one vector of T samples from a byte address of any alignment and widens it to uint32 lanes. Rows start at
+// ref + y * stride with an arbitrary byte stride, so a uint16_t row can sit at an odd address: the bytes are loaded as
+// uint8 and reinterpreted with BitCast, never through a (misaligned) const uint16_t* (UBSan, #392 follow-up).
+template <class T, class D32>
+hn::VFromD<D32> load_widened(D32 d32, const uint8_t* bytes) {
+  if constexpr (sizeof(T) == 1) {
+    const hn::Rebind<uint8_t, D32> d8;
+    return hn::PromoteTo(d32, hn::LoadU(d8, bytes));
+  } else {
+    const hn::Rebind<uint16_t, D32> d16;
+    const hn::Repartition<uint8_t, decltype(d16)> d8;
+    return hn::PromoteTo(d32, hn::BitCast(d16, hn::LoadU(d8, bytes)));
+  }
+}
+
+template <class T>
+uint32_t load_tail(const uint8_t* bytes) {
+  T v = 0;
+  std::memcpy(&v, bytes, sizeof v);
+  return v;
+}
+
 // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic): the kernel walks strided picture rows with vector
 // loads; widths and heights are validated by the caller (psnr_metric.cpp).
 template <class T>
 uint64_t sse_rows(const uint8_t* ref, ptrdiff_t ref_stride, const uint8_t* dist, ptrdiff_t dist_stride, uint32_t width,
                   uint32_t height, uint32_t bit_depth) {
   const hn::ScalableTag<uint32_t> d32;
-  const hn::Rebind<T, decltype(d32)> dsrc;
   const size_t n = hn::Lanes(d32);
   const uint32_t interval = flush_interval(bit_depth);
   uint64_t total = 0;
   for (uint32_t y = 0; y < height; ++y) {
-    const T* r = reinterpret_cast<const T*>(ref + (static_cast<ptrdiff_t>(y) * ref_stride));
-    const T* d = reinterpret_cast<const T*>(dist + (static_cast<ptrdiff_t>(y) * dist_stride));
+    const uint8_t* r = ref + (static_cast<ptrdiff_t>(y) * ref_stride);
+    const uint8_t* d = dist + (static_cast<ptrdiff_t>(y) * dist_stride);
     auto acc = hn::Zero(d32);
     uint32_t pending = 0;
     size_t x = 0;
     for (; x + n <= width; x += n) {
-      const auto a = hn::PromoteTo(d32, hn::LoadU(dsrc, r + x));
-      const auto b = hn::PromoteTo(d32, hn::LoadU(dsrc, d + x));
+      const auto a = load_widened<T>(d32, r + (x * sizeof(T)));
+      const auto b = load_widened<T>(d32, d + (x * sizeof(T)));
       const auto diff = hn::Sub(hn::Max(a, b), hn::Min(a, b));
       acc = hn::Add(acc, hn::Mul(diff, diff));
       if (++pending == interval) {
@@ -76,7 +97,8 @@ uint64_t sse_rows(const uint8_t* ref, ptrdiff_t ref_stride, const uint8_t* dist,
     }
     total += flush(d32, acc);
     for (; x < width; ++x) {  // tail shorter than one vector
-      const int64_t diff = static_cast<int64_t>(r[x]) - static_cast<int64_t>(d[x]);
+      const int64_t diff = static_cast<int64_t>(load_tail<T>(r + (x * sizeof(T)))) -
+                           static_cast<int64_t>(load_tail<T>(d + (x * sizeof(T))));
       total += static_cast<uint64_t>(diff * diff);
     }
   }
