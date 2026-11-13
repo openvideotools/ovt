@@ -442,6 +442,7 @@ if(OVT_FFMPEG_CORE_STATIC)
 else()
   set(_ovt_ff_core_kind shared)
 endif()
-message(STATUS "OVT: FFmpeg ${OVT_TP_ffmpeg_VERSION} core (${_ovt_ff_core_kind}, _ovt) and plugin (static) flavours for "
-               "${_ovt_ff_platform}; patent codecs in core: ${OVT_PATENT_CODECS_IN_CORE}; hwaccels: "
-               "${OVT_ENABLE_HW_DECODE}; GPL core/plugin: ${_ovt_ff_core_gpl}/${_ovt_ff_plugin_gpl}")
+message(
+  STATUS "OVT: FFmpeg ${OVT_TP_ffmpeg_VERSION} core (${_ovt_ff_core_kind}, _ovt) and plugin (static) flavours for "
+         "${_ovt_ff_platform}; patent codecs in core: ${OVT_PATENT_CODECS_IN_CORE}; hwaccels: "
+         "${OVT_ENABLE_HW_DECODE}; GPL core/plugin: ${_ovt_ff_core_gpl}/${_ovt_ff_plugin_gpl}")
