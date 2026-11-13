@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the side-data mapping of ovt-plugin-ffmpeg (WI-2.170, chapter 07 §7.6.3), through the plugin ABI.
+// With the block params of the OVT FFmpeg patch (WI-4.102, has_block_params()) the same checks hold with true
+// reference slots, AvcMb extension tables and slice partitions; test_ffmpeg_map_blockparams.cpp checks those values.
 // Hand-made streams have vectors and QPs computed by hand (H.264 8.4.1.3, 7.4.5); AT1, AT2 and AT4 compare with the
 // in-tree `ffmpeg_mvs` (ovt_plugin_ffmpeg_sidedata) and the committed JM trace goldens.
 
@@ -88,7 +90,15 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
                          f.mv0_y.size(), mv1_x.size(), mv1_y.size()}) {
     REQUIRE(n == cells);
   }
-  CHECK(g->partition_id() == nullptr);  // n/a for this plugin
+  const bool bp = has_block_params();
+  if (bp) {  // partition_id = slice index (WI-4.102), naming one of the frame's partitions (V-017)
+    const auto pid = vec<uint16_t>(g->partition_id());
+    REQUIRE(pid.size() == cells);
+    const size_t n_parts = fa->partitions() != nullptr ? fa->partitions()->size() : 0;
+    CHECK(std::all_of(pid.begin(), pid.end(), [n_parts](uint16_t p) { return p < n_parts; }));
+  } else {
+    CHECK(g->partition_id() == nullptr);  // n/a in phase 1
+  }
 
   const auto* blocks = fa->blocks();
   REQUIRE(blocks != nullptr);
@@ -101,7 +111,19 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
   for (uint32_t i = 1; i < blocks->size(); ++i) {  // V-005, V-006, V-008, V-009, V-021
     const ovt::fb::Block* b = blocks->Get(i);
     CHECK((b->id() == i && b->parent() == 0 && b->kind() == ovt::fb::BlockKind::MB && b->level() == 1));
-    CHECK((b->ext_type() == nullptr || b->ext_type()->str().empty()));
+    if (bp) {  // V-021 / V-022: AvcMb, mb_addr = raster address of the rect
+      REQUIRE(b->ext_type() != nullptr);
+      CHECK(b->ext_type()->str() == "AvcMb");
+      REQUIRE(b->ext() != nullptr);
+      flatbuffers::Verifier ext_verifier(b->ext()->data(), b->ext()->size());
+      REQUIRE(ext_verifier.VerifyBuffer<ovt::fb::AvcMb>(nullptr));
+      const auto* mb = flatbuffers::GetRoot<ovt::fb::AvcMb>(b->ext()->data());
+      CHECK(mb->mb_addr() ==
+            static_cast<uint32_t>((b->rect()->y() / 16) * ((fa->frame()->coded_size()->w() + 15) / 16) +
+                                  (b->rect()->x() / 16)));
+    } else {
+      CHECK((b->ext_type() == nullptr || b->ext_type()->str().empty()));
+    }
     CHECK((b->rect()->w() == 16 && b->rect()->h() == 16 && b->rect()->x() % 16 == 0 && b->rect()->y() % 16 == 0));
     CHECK(root->children()->Get(i - 1) == i);
     f.mb_qp.push_back(b->qp());
@@ -141,7 +163,8 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
     const bool intra = f.pred[c] == static_cast<uint8_t>(ovt::fb::PredKind::Intra);
     const bool inter = f.pred[c] == static_cast<uint8_t>(ovt::fb::PredKind::Inter);
     bad_refs += (intra && (f.ref0[c] != -1 || f.ref1[c] != -1)) ? 1U : 0U;
-    bad_refs += (inter && f.ref0[c] < 0 && f.ref1[c] < 0) ? 1U : 0U;
+    const bool skip = f.pred[c] == static_cast<uint8_t>(ovt::fb::PredKind::Skip);
+    bad_refs += ((inter || skip) && f.ref0[c] < 0 && f.ref1[c] < 0) ? 1U : 0U;  // V-026
   }
   CHECK(bad_refs == 0);
   CHECK(counted == f.usage);
@@ -153,10 +176,17 @@ Frame read_frame(  // NOLINT(readability-function-cognitive-complexity): one val
       const ovt::fb::Rect* br = blocks->Get(m->block_id())->rect();
       const ovt::fb::Rect* r = m->rect();
       const int8_t ref = m->ref();
-      CHECK((m->list() <= 1 && ref == static_cast<int8_t>(m->list()) && static_cast<size_t>(ref) < n_refs));
+      REQUIRE((m->list() <= 1 && ref >= 0 && static_cast<size_t>(ref) < n_refs));
+      if (bp) {  // a slot of the vector's list: "L0[i]" / "L1[i]"
+        CHECK(f.ref_names[static_cast<size_t>(ref)].starts_with(m->list() == 0 ? "L0[" : "L1["));
+      } else {
+        CHECK(ref == static_cast<int8_t>(m->list()));  // the pseudo slot
+      }
       CHECK((r->x() >= br->x() && r->y() >= br->y() && r->x() + r->w() <= br->x() + br->w() &&
              r->y() + r->h() <= br->y() + br->h()));
-      CHECK((m->mvd_x() == -32768 && m->mvd_y() == -32768));
+      if (!bp) {
+        CHECK((m->mvd_x() == -32768 && m->mvd_y() == -32768));  // n/a in phase 1
+      }
       const std::tuple<uint32_t, int, int, int> key{m->block_id(), m->list(), r->y(), r->x()};
       CHECK(last < key);  // V-025: canonical order
       last = key;
@@ -321,7 +351,7 @@ TEST_CASE("ffmpeg plugin: intra macroblocks map to Intra with their QP", "[fast]
   }
   CHECK(f.mvs.empty());
   CHECK(f.ref_names.empty());
-  CHECK(has_code(f, "ANA-H264-0002"));
+  CHECK(has_code(f, "ANA-H264-0002") != has_block_params());  // inferred intra is phase 1 only
   CHECK_FALSE(has_code(f, "ANA-H264-0001"));
   REQUIRE(f.has_hist);
 }
@@ -336,8 +366,13 @@ TEST_CASE("ffmpeg plugin: P macroblocks map to Inter with the vectors of the str
   CHECK(a.mvs == std::vector<Mv>{{0, 0, 0, 16, 16, 20, -28, false}, {0, 16, 0, 16, 16, 8, -20, false}});
   CHECK(a.mb_pred == std::vector<uint8_t>{2, 2});
   CHECK(a.mb_qp == std::vector<int>{28, 28});  // slice QP 26 + 2; macroblocks without residual keep it
-  CHECK(a.ref_names == std::vector<std::string>{"L0", "L1"});
-  CHECK(a.usage == std::vector<uint32_t>{32, 0});
+  if (has_block_params()) {                    // the one reference index the stream uses
+    CHECK(a.ref_names == std::vector<std::string>{"L0[0]"});
+    CHECK(a.usage == std::vector<uint32_t>{32});
+  } else {
+    CHECK(a.ref_names == std::vector<std::string>{"L0", "L1"});
+    CHECK(a.usage == std::vector<uint32_t>{32, 0});
+  }
   CHECK_FALSE(has_code(a, "ANA-H264-0002"));  // no intra macroblock, nothing inferred
   for (size_t c = 0; c < 32; ++c) {
     CHECK((a.ref0[c] == 0 && a.ref1[c] == -1 && a.pred[c] == 2));

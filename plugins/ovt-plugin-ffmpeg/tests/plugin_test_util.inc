@@ -38,6 +38,12 @@ inline const ovt_AnalysisDecoderApi& plugin_api() {
   return *plugin().api;
 }
 
+// True when the plugin maps the block params of the OVT FFmpeg patch 0001 (WI-4.102): its caps then announce the
+// intra-mode grid. The phase-1 mapping (an unpatched or system FFmpeg) announces only MVs, QP and pseudo references.
+inline bool has_block_params() {
+  return (plugin_api().caps()->grid_fields & OVT_GRID_INTRA_MODE_Y) != 0;
+}
+
 // One decoder instance, destroyed at scope exit.
 struct Instance {
   explicit Instance(const ovt_AnalysisDecoderApi& a, int threads = 1, const uint8_t* cp = nullptr, size_t len = 0)
