@@ -1,0 +1,315 @@
+[
+ {
+  "fields": {
+   "major_brand": "mp42",
+   "minor_version": 0
+  },
+  "header_length": 8,
+  "offset": 0,
+  "path": "ftyp",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 24,
+  "path": "moov",
+  "size": 835
+ },
+ {
+  "fields": {
+   "creation_time": 3231875472,
+   "duration": 614,
+   "flags": 0,
+   "modification_time": 3231875472,
+   "next_track_ID": 2,
+   "rate": 65536,
+   "timescale": 600,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 32,
+  "path": "moov/mvhd",
+  "size": 108
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 140,
+  "path": "moov/iods",
+  "size": 33
+ },
+ {
+  "header_length": 8,
+  "offset": 173,
+  "path": "moov/trak",
+  "size": 646
+ },
+ {
+  "fields": {
+   "alternate_group": 0,
+   "creation_time": 3231875472,
+   "duration": 614,
+   "flags": 7,
+   "height": 0,
+   "layer": 0,
+   "modification_time": 3231875472,
+   "track_ID": 1,
+   "version": 0,
+   "width": 0
+  },
+  "header_length": 8,
+  "offset": 181,
+  "path": "moov/trak/tkhd",
+  "size": 92
+ },
+ {
+  "header_length": 8,
+  "offset": 273,
+  "path": "moov/trak/mdia",
+  "size": 546
+ },
+ {
+  "fields": {
+   "creation_time": 3231875472,
+   "duration": 49152,
+   "flags": 0,
+   "language": "und",
+   "modification_time": 3231875472,
+   "timescale": 48000,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 281,
+  "path": "moov/trak/mdia/mdhd",
+  "size": 32
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "handler_type": "soun",
+   "name": "soun",
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 313,
+  "path": "moov/trak/mdia/hdlr",
+  "size": 37
+ },
+ {
+  "header_length": 8,
+  "offset": 350,
+  "path": "moov/trak/mdia/minf",
+  "size": 469
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 358,
+  "path": "moov/trak/mdia/minf/smhd",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 374,
+  "path": "moov/trak/mdia/minf/dinf",
+  "size": 36
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 382,
+  "path": "moov/trak/mdia/minf/dinf/dref",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 398,
+  "path": "moov/trak/mdia/minf/dinf/dref/url ",
+  "size": 12
+ },
+ {
+  "header_length": 8,
+  "offset": 410,
+  "path": "moov/trak/mdia/minf/stbl",
+  "size": 409
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 418,
+  "path": "moov/trak/mdia/minf/stbl/stts",
+  "size": 24
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 442,
+  "path": "moov/trak/mdia/minf/stbl/stsd",
+  "size": 113
+ },
+ {
+  "header_length": 16,
+  "offset": 458,
+  "path": "moov/trak/mdia/minf/stbl/stsd/mp4a",
+  "size": 97
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 494,
+  "path": "moov/trak/mdia/minf/stbl/stsd/mp4a/esds",
+  "size": 61
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sample_count": 48,
+   "sample_size": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 555,
+  "path": "moov/trak/mdia/minf/stbl/stsz",
+  "size": 212
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 767,
+  "path": "moov/trak/mdia/minf/stbl/stsc",
+  "size": 28
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 795,
+  "path": "moov/trak/mdia/minf/stbl/stco",
+  "size": 24
+ },
+ {
+  "header_length": 8,
+  "offset": 819,
+  "path": "moov/mvex",
+  "size": 40
+ },
+ {
+  "fields": {
+   "default_sample_description_index": 1,
+   "default_sample_duration": 1024,
+   "default_sample_flags": 0,
+   "default_sample_size": 25,
+   "flags": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 827,
+  "path": "moov/mvex/trex",
+  "size": 32
+ },
+ {
+  "header_length": 8,
+  "offset": 859,
+  "path": "mdat[1]",
+  "size": 1208
+ },
+ {
+  "header_length": 8,
+  "offset": 2067,
+  "path": "moof",
+  "size": 92
+ },
+ {
+  "fields": {
+   "flags": 0,
+   "sequence_number": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 2075,
+  "path": "moof/mfhd",
+  "size": 16
+ },
+ {
+  "header_length": 8,
+  "offset": 2091,
+  "path": "moof/traf",
+  "size": 68
+ },
+ {
+  "fields": {
+   "base_data_offset": 2167,
+   "default_sample_duration": 0,
+   "default_sample_flags": 0,
+   "default_sample_size": 0,
+   "flags": 1,
+   "sample_description_index": 0,
+   "track_ID": 1,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 2099,
+  "path": "moof/traf/tfhd",
+  "size": 24
+ },
+ {
+  "fields": {
+   "data_offset": 0,
+   "first_sample_flags": 0,
+   "flags": 0,
+   "sample_count": 24,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 2123,
+  "path": "moof/traf/trun[1]",
+  "size": 16
+ },
+ {
+  "fields": {
+   "data_offset": 600,
+   "first_sample_flags": 0,
+   "flags": 1,
+   "sample_count": 24,
+   "version": 0
+  },
+  "header_length": 8,
+  "offset": 2139,
+  "path": "moof/traf/trun[2]",
+  "size": 20
+ },
+ {
+  "header_length": 8,
+  "offset": 2159,
+  "path": "mdat[2]",
+  "size": 1208
+ }
+]

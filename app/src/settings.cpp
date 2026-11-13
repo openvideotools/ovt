@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QJsonValue>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QStringList>
 
@@ -84,6 +85,19 @@ QString scalar_violation(const QJsonValue& value, const QJsonObject& schema) {
       return QStringLiteral("wrong type");
     }
   }
+  if (value.isString() && schema.contains(QStringLiteral("pattern")) &&
+      !QRegularExpression(schema.value(QStringLiteral("pattern")).toString()).match(value.toString()).hasMatch()) {
+    return QStringLiteral("does not match the pattern");
+  }
+  if (value.isArray()) {
+    const auto size = static_cast<double>(value.toArray().size());
+    if (schema.contains(QStringLiteral("minItems")) && size < schema.value(QStringLiteral("minItems")).toDouble()) {
+      return QStringLiteral("too few items");
+    }
+    if (schema.contains(QStringLiteral("maxItems")) && size > schema.value(QStringLiteral("maxItems")).toDouble()) {
+      return QStringLiteral("too many items");
+    }
+  }
   if (value.isDouble()) {
     if (schema.contains(QStringLiteral("minimum")) &&
         value.toDouble() < schema.value(QStringLiteral("minimum")).toDouble()) {
@@ -127,7 +141,8 @@ bool check_items(const QJsonArray& array, const QJsonObject& items, const QStrin
   return true;
 }
 
-// Validates the subset of JSON Schema 2020-12 that settings.schema.json uses. Returns false and sets `reason`
+// Validates the subset of JSON Schema 2020-12 that settings.schema.json and ovtproj.schema.json use. Returns false and
+// sets `reason`
 // ("/general/theme: not one of the allowed values") at the first violation. The schema is a tree, so the
 // recursion is as deep as the document.
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -183,6 +198,11 @@ bool Settings::validate(const QJsonObject& document, QString* reason) {
     return false;
   }
   return check(document, schema, QString(), out);
+}
+
+bool Settings::validateAgainst(const QJsonObject& document, const QJsonObject& schema, QString* reason) {
+  QString local_reason;
+  return check(document, schema, QString(), reason != nullptr ? reason : &local_reason);
 }
 
 Settings::Settings() : Settings(Platform::configDir()) {}
@@ -248,11 +268,46 @@ void Settings::setTheme(const QString& theme) {
     return;
   }
   document_ = candidate;
+  ++revision_;
   Q_EMIT themeChanged();
+  Q_EMIT valueChanged(QStringLiteral("general"), QStringLiteral("theme"));
   if (!save()) {
     // No diagnostics model yet (WI-1.453): say so on stderr instead of failing silently.
     static_cast<void>(std::fprintf(stderr, "settings: could not write %s\n", path_.toLocal8Bit().constData()));
   }
+}
+
+QVariant Settings::value(const QString& group, const QString& key, const QVariant& fallback) const {
+  const QJsonValue found = document_.value(group).toObject().value(key);
+  return found.isUndefined() || found.isNull() ? fallback : found.toVariant();
+}
+
+bool Settings::setValue(const QString& group, const QString& key, const QVariant& value) {
+  const QJsonValue json = QJsonValue::fromVariant(value);
+  QJsonObject candidate = document_;
+  QJsonObject section = candidate.value(group).toObject();
+  if (section.value(key) == json) {
+    return true;
+  }
+  section.insert(key, json);
+  candidate.insert(group, section);
+  QString reason;
+  if (!validate(candidate, &reason)) {
+    static_cast<void>(std::fprintf(stderr, "settings: %s/%s rejected (%s)\n", group.toLocal8Bit().constData(),
+                                   key.toLocal8Bit().constData(), reason.toLocal8Bit().constData()));
+    return false;
+  }
+  const bool theme_changed = group == QLatin1String("general") && key == QLatin1String("theme");
+  document_ = candidate;
+  ++revision_;
+  if (theme_changed) {
+    Q_EMIT themeChanged();
+  }
+  Q_EMIT valueChanged(group, key);
+  if (!save()) {
+    static_cast<void>(std::fprintf(stderr, "settings: could not write %s\n", path_.toLocal8Bit().constData()));
+  }
+  return true;
 }
 
 bool Settings::save() {

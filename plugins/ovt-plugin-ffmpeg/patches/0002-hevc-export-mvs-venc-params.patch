@@ -1,0 +1,482 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Mon, 9 Nov 2026 00:00:00 +0000
+Subject: [PATCH] avcodec/hevc: export motion vectors and encoding parameters
+
+The hevc decoder ignores AV_CODEC_EXPORT_DATA_MVS and
+AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS, which h264, vp9 and the mpegvideo
+decoders honour. Implement both for software decoding.
+
+With "mvs", every output frame carries AV_FRAME_DATA_MOTION_VECTORS: one
+AVMotionVector per reference list and per unit of the motion vector field
+(min_pu_size, the granularity of tab_mvf), in quarter samples
+(motion_scale 4), source -1 for list 0 and +1 for list 1, as the other
+decoders do. Intra units have none.
+
+With "venc_params", every output frame carries
+AV_FRAME_DATA_VIDEO_ENC_PARAMS of the new type AV_VIDEO_ENC_PARAMS_HEVC:
+the PPS initial QP and chroma offsets, and one block per coding unit whose
+delta_qp gives the CU's QP_Y.
+
+The side data is computed when the picture is decoded, from tab_mvf,
+qp_y_tab and tab_ct_depth. A picture is therefore not output before its
+own decoding has finished, and with frame threads the output waits for the
+picture's decoding progress. Undecoded areas read as intra and as CTB-sized
+CUs. Nothing changes when neither flag is set; decoded pixels are
+unchanged.
+
+New FATE tests: fate-hevc-encparams (tools/venc_data_dump) and
+fate-hevc-mvs (codecview), each with a frame-threads variant that must
+match the single-threaded reference.
+
+Upstream-Status: Pending [to be submitted to ffmpeg-devel by OVT WI-4.107]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: Open Video Tools uses the patched hevc decoder as an optional,
+  fast H.265 motion vector and QP source next to libde265 (OVT spec
+  chapter 07 section 7.8, WI-4.107; Appendix D.1). It applies on top of
+  0001 (block-params side data) in the OVT series; upstream it stands
+  alone apart from the version numbers.
+---
+ doc/APIchanges               |   3 +
+ libavcodec/hevc/hevcdec.c    | 159 ++++++++++++++++++++++++++++++++++-
+ libavcodec/hevc/hevcdec.h    |  15 ++++
+ libavcodec/hevc/refs.c       |  42 +++++++++
+ libavcodec/version.h         |   2 +-
+ libavutil/version.h          |   2 +-
+ libavutil/video_enc_params.h |  15 ++++
+ tests/fate/hevc.mak          |  14 +++
+ 8 files changed, 247 insertions(+), 5 deletions(-)
+
+diff --git a/doc/APIchanges b/doc/APIchanges
+index 3dcf790..8cfc8a5 100644
+--- a/doc/APIchanges
++++ b/doc/APIchanges
+@@ -2,6 +2,9 @@ The last version increases of all libraries were on 2024-03-07
+ 
+ API changes, most recent first:
+ 
++2026-11-09 - xxxxxxxxxx - lavu 59.41.100 - video_enc_params.h
++  Add AV_VIDEO_ENC_PARAMS_HEVC.
++
+ 2026-11-09 - xxxxxxxxxx - lavc 61.20.100 - avcodec.h
+   Add AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS for export_side_data.
+ 
+diff --git a/libavcodec/hevc/hevcdec.c b/libavcodec/hevc/hevcdec.c
+index 6f0ae12..9ae2ac4 100644
+--- a/libavcodec/hevc/hevcdec.c
++++ b/libavcodec/hevc/hevcdec.c
+@@ -32,10 +32,12 @@
+ #include "libavutil/internal.h"
+ #include "libavutil/md5.h"
+ #include "libavutil/mem.h"
++#include "libavutil/motion_vector.h"
+ #include "libavutil/opt.h"
+ #include "libavutil/pixdesc.h"
+ #include "libavutil/stereo3d.h"
+ #include "libavutil/timecode.h"
++#include "libavutil/video_enc_params.h"
+ 
+ #include "aom_film_grain.h"
+ #include "bswapdsp.h"
+@@ -97,7 +99,8 @@ static void pic_arrays_free(HEVCLayerContext *l)
+ }
+ 
+ /* allocate arrays that depend on frame dimensions */
+-static int pic_arrays_init(HEVCLayerContext *l, const HEVCSPS *sps)
++static int pic_arrays_init(HEVCLayerContext *l, const HEVCSPS *sps,
++                           int export_mvs)
+ {
+     int log2_min_cb_size = sps->log2_min_cb_size;
+     int width            = sps->width;
+@@ -139,7 +142,10 @@ static int pic_arrays_init(HEVCLayerContext *l, const HEVCSPS *sps)
+     if (!l->horizontal_bs || !l->vertical_bs)
+         goto fail;
+ 
+-    l->tab_mvf_pool = ff_refstruct_pool_alloc(min_pu_size * sizeof(MvField), 0);
++    // with motion vector export, parts of the picture that are not decoded
++    // must read as intra rather than as a vector field of an earlier picture
++    l->tab_mvf_pool = ff_refstruct_pool_alloc(min_pu_size * sizeof(MvField),
++                                              export_mvs ? FF_REFSTRUCT_POOL_FLAG_ZERO_EVERY_TIME : 0);
+     l->rpl_tab_pool = ff_refstruct_pool_alloc(ctb_count   * sizeof(RefPicListTab), 0);
+     if (!l->tab_mvf_pool || !l->rpl_tab_pool)
+         goto fail;
+@@ -683,7 +689,7 @@ static int set_sps(HEVCContext *s, HEVCLayerContext *l, const HEVCSPS *sps)
+     if (!sps)
+         return 0;
+ 
+-    ret = pic_arrays_init(l, sps);
++    ret = pic_arrays_init(l, sps, !!(s->avctx->export_side_data & AV_CODEC_EXPORT_DATA_MVS));
+     if (ret < 0)
+         goto fail;
+ 
+@@ -3256,6 +3262,13 @@ static int hevc_frame_start(HEVCContext *s, HEVCLayerContext *l,
+     if (ret < 0)
+         goto fail;
+ 
++    s->cur_frame->export_pending = (s->avctx->export_side_data & HEVC_EXPORT_BLOCK_DATA) &&
++                                   !s->avctx->hwaccel;
++    // the CU sizes of parts of the picture that are not decoded read as CTBs
++    if (s->cur_frame->export_pending &&
++        (s->avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS))
++        memset(l->tab_ct_depth, 0, sps->min_cb_width * sps->min_cb_height);
++
+     ret = ff_hevc_frame_rps(s, l);
+     if (ret < 0) {
+         av_log(s->avctx, AV_LOG_ERROR, "Error constructing the frame RPS.\n");
+@@ -3402,6 +3415,113 @@ static int verify_md5(HEVCContext *s, AVFrame *frame)
+     return err;
+     }
+ 
++/**
++ * Export the motion vectors of the decoded picture as
++ * AV_FRAME_DATA_MOTION_VECTORS: one AVMotionVector per list and per unit of
++ * the motion vector field (min_pu_size x min_pu_size luma samples, the
++ * granularity of tab_mvf), in raster order, list 0 before list 1. Intra units
++ * have no vectors. The vectors are in quarter samples (motion_scale 4);
++ * source is -1 for list 0 and +1 for list 1. Positions are in the coded
++ * picture, before cropping.
++ */
++static int export_mvs(const HEVCLayerContext *l, AVFrame *f)
++{
++    const HEVCSPS *sps   = l->sps;
++    const MvField *tab   = l->cur_frame->tab_mvf;
++    const int log2_unit  = sps->log2_min_pu_size;
++    const int unit       = 1 << log2_unit;
++    const int nb_units   = sps->min_pu_width * sps->min_pu_height;
++    AVFrameSideData *sd;
++    AVMotionVector *mv;
++    size_t nb_mvs = 0;
++
++    for (int i = 0; i < nb_units; i++)
++        nb_mvs += !!(tab[i].pred_flag & PF_L0) + !!(tab[i].pred_flag & PF_L1);
++    if (!nb_mvs)
++        return 0;
++
++    sd = av_frame_new_side_data(f, AV_FRAME_DATA_MOTION_VECTORS,
++                                nb_mvs * sizeof(*mv));
++    if (!sd)
++        return AVERROR(ENOMEM);
++    mv = (AVMotionVector *)sd->data;
++
++    for (int y = 0; y < sps->min_pu_height; y++) {
++        for (int x = 0; x < sps->min_pu_width; x++) {
++            const MvField *mvf = &tab[y * sps->min_pu_width + x];
++            for (int list = 0; list < 2; list++) {
++                if (!(mvf->pred_flag & (PF_L0 << list)))
++                    continue;
++                mv->source       = list ? 1 : -1;
++                mv->w            = unit;
++                mv->h            = unit;
++                mv->dst_x        = (x << log2_unit) + unit / 2;
++                mv->dst_y        = (y << log2_unit) + unit / 2;
++                mv->motion_x     = mvf->mv[list].x;
++                mv->motion_y     = mvf->mv[list].y;
++                mv->motion_scale = 4;
++                mv->src_x        = mv->dst_x + mv->motion_x / 4;
++                mv->src_y        = mv->dst_y + mv->motion_y / 4;
++                mv->flags        = 0;
++                mv++;
++            }
++        }
++    }
++    return 0;
++}
++
++/**
++ * Export the quantisation parameters of the decoded picture as
++ * AV_FRAME_DATA_VIDEO_ENC_PARAMS of type AV_VIDEO_ENC_PARAMS_HEVC: one block
++ * per coding unit, in raster order of the CU's top-left corner.
++ */
++static int export_enc_params(const HEVCLayerContext *l, AVFrame *f)
++{
++    const HEVCSPS *sps     = l->sps;
++    const HEVCPPS *pps     = l->cur_frame->pps;
++    const int log2_min_cb  = sps->log2_min_cb_size;
++    AVVideoEncParams *par;
++    unsigned nb_blocks = 0, i = 0;
++
++#define CU_LOG2_SIZE(idx) FFMAX(sps->log2_ctb_size - l->tab_ct_depth[idx], log2_min_cb)
++#define CU_ORIGIN(x_cb, y_cb, log2_cb) \
++    (!((x_cb) & ((1 << ((log2_cb) - log2_min_cb)) - 1)) && \
++     !((y_cb) & ((1 << ((log2_cb) - log2_min_cb)) - 1)))
++
++    for (int y_cb = 0; y_cb < sps->min_cb_height; y_cb++)
++        for (int x_cb = 0; x_cb < sps->min_cb_width; x_cb++) {
++            const int idx = y_cb * sps->min_cb_width + x_cb;
++            nb_blocks += CU_ORIGIN(x_cb, y_cb, CU_LOG2_SIZE(idx));
++        }
++
++    par = av_video_enc_params_create_side_data(f, AV_VIDEO_ENC_PARAMS_HEVC, nb_blocks);
++    if (!par)
++        return AVERROR(ENOMEM);
++
++    par->qp             = 26 + pps->pic_init_qp_minus26;
++    par->delta_qp[1][0] = pps->cb_qp_offset;
++    par->delta_qp[2][0] = pps->cr_qp_offset;
++
++    for (int y_cb = 0; y_cb < sps->min_cb_height; y_cb++)
++        for (int x_cb = 0; x_cb < sps->min_cb_width; x_cb++) {
++            const int idx     = y_cb * sps->min_cb_width + x_cb;
++            const int log2_cb = CU_LOG2_SIZE(idx);
++            AVVideoBlockParams *b;
++
++            if (!CU_ORIGIN(x_cb, y_cb, log2_cb))
++                continue;
++            b           = av_video_enc_params_block(par, i++);
++            b->src_x    = x_cb << log2_min_cb;
++            b->src_y    = y_cb << log2_min_cb;
++            b->w        = 1 << log2_cb;
++            b->h        = 1 << log2_cb;
++            b->delta_qp = l->qp_y_tab[idx] - par->qp;
++        }
++#undef CU_LOG2_SIZE
++#undef CU_ORIGIN
++    return 0;
++}
++
+ static int hevc_frame_end(HEVCContext *s, HEVCLayerContext *l)
+ {
+     HEVCFrame *out = l->cur_frame;
+@@ -3440,6 +3560,16 @@ static int hevc_frame_end(HEVCContext *s, HEVCLayerContext *l)
+             if (ret < 0 && s->avctx->err_recognition & AV_EF_EXPLODE)
+                 return ret;
+         }
++        if (s->avctx->export_side_data & AV_CODEC_EXPORT_DATA_MVS) {
++            ret = export_mvs(l, out->f);
++            if (ret < 0)
++                return ret;
++        }
++        if (s->avctx->export_side_data & AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS) {
++            ret = export_enc_params(l, out->f);
++            if (ret < 0)
++                return ret;
++        }
+     }
+     s->sei.picture_hash.is_md5 = 0;
+ 
+@@ -3604,6 +3734,7 @@ fail:
+ static int decode_nal_units(HEVCContext *s, const uint8_t *buf, int length)
+ {
+     int i, ret = 0;
++    unsigned export_deferred = 0;
+     int eos_at_start = 1;
+     int flags = (H2645_FLAG_IS_NALFF * !!s->is_nalff) | H2645_FLAG_SMALL_PADDING;
+ 
+@@ -3697,10 +3828,32 @@ fail:
+         if (ret >= 0)
+             ret = hevc_frame_end(s, l);
+ 
++        if (l->cur_frame->export_pending) {
++            l->cur_frame->export_pending = 0;
++            export_deferred |= 1 << i;
++        }
++
+         if (s->avctx->active_thread_type == FF_THREAD_FRAME)
+             ff_progress_frame_report(&l->cur_frame->tf, INT_MAX);
+     }
+ 
++    // Output the frames whose output waited for their side data. With frame
++    // threads the DPB state was already handed to the next thread, which
++    // outputs them instead.
++    for (int i = 0; i < FF_ARRAY_ELEMS(s->layers); i++) {
++        const HEVCSPS *sps = s->layers[i].sps;
++        int ret2;
++
++        if (!(export_deferred & (1 << i)) ||
++            s->avctx->active_thread_type == FF_THREAD_FRAME)
++            continue;
++        ret2 = ff_hevc_output_frames(s, s->layers_active_decode, s->layers_active_output,
++                                     sps->temporal_layer[sps->max_sub_layers - 1].num_reorder_pics,
++                                     sps->temporal_layer[sps->max_sub_layers - 1].max_dec_pic_buffering, 0);
++        if (ret2 < 0 && ret >= 0)
++            ret = ret2;
++    }
++
+     return ret;
+ }
+ 
+diff --git a/libavcodec/hevc/hevcdec.h b/libavcodec/hevc/hevcdec.h
+index 473709b..52cec46 100644
+--- a/libavcodec/hevc/hevcdec.h
++++ b/libavcodec/hevc/hevcdec.h
+@@ -383,6 +383,14 @@ typedef struct HEVCFrame {
+      * A combination of HEVC_FRAME_FLAG_*
+      */
+     uint8_t flags;
++
++    /**
++     * Set while this context is decoding the frame and motion vectors or
++     * encoding parameters are to be exported for it: the frame must not be
++     * output before hevc_frame_end() has attached that side data.
++     * Not copied between frame threads.
++     */
++    uint8_t export_pending;
+ } HEVCFrame;
+ 
+ typedef struct HEVCLocalContext {
+@@ -678,6 +686,13 @@ int ff_hevc_output_frames(HEVCContext *s,
+                           unsigned layers_active_decode, unsigned layers_active_output,
+                           unsigned max_output, unsigned max_dpb, int discard);
+ 
++/**
++ * The export_side_data flags for which the decoder attaches side data
++ * computed from the decoded picture (motion vectors, encoding parameters).
++ */
++#define HEVC_EXPORT_BLOCK_DATA (AV_CODEC_EXPORT_DATA_MVS | \
++                                AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS)
++
+ void ff_hevc_unref_frame(HEVCFrame *frame, int flags);
+ 
+ void ff_hevc_set_neighbour_available(HEVCLocalContext *lc, int x0, int y0,
+diff --git a/libavcodec/hevc/refs.c b/libavcodec/hevc/refs.c
+index 6ba667e..c6186c7 100644
+--- a/libavcodec/hevc/refs.c
++++ b/libavcodec/hevc/refs.c
+@@ -21,6 +21,7 @@
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  */
+ 
++#include "libavutil/frame.h"
+ #include "libavutil/mem.h"
+ #include "libavutil/stereo3d.h"
+ 
+@@ -48,6 +49,7 @@ void ff_hevc_unref_frame(HEVCFrame *frame, int flags)
+         frame->refPicList = NULL;
+ 
+         ff_refstruct_unref(&frame->hwaccel_picture_private);
++        frame->export_pending = 0;
+     }
+ }
+ 
+@@ -213,6 +215,32 @@ int ff_hevc_set_new_ref(HEVCContext *s, HEVCLayerContext *l, int poc)
+     return 0;
+ }
+ 
++/* The film grain frame was set up before the side data computed from the
++ * decoded picture existed; give it the same buffers. */
++static int copy_block_side_data(AVFrame *dst, const AVFrame *src)
++{
++    static const enum AVFrameSideDataType types[] = {
++        AV_FRAME_DATA_MOTION_VECTORS,
++        AV_FRAME_DATA_VIDEO_ENC_PARAMS,
++    };
++
++    for (int i = 0; i < FF_ARRAY_ELEMS(types); i++) {
++        const AVFrameSideData *sd = av_frame_get_side_data(src, types[i]);
++        AVBufferRef *buf;
++
++        if (!sd || av_frame_get_side_data(dst, types[i]))
++            continue;
++        buf = av_buffer_ref(sd->buf);
++        if (!buf)
++            return AVERROR(ENOMEM);
++        if (!av_frame_new_side_data_from_buf(dst, types[i], buf)) {
++            av_buffer_unref(&buf);
++            return AVERROR(ENOMEM);
++        }
++    }
++    return 0;
++}
++
+ static void unref_missing_refs(HEVCLayerContext *l)
+ {
+     for (int i = 0; i < FF_ARRAY_ELEMS(l->DPB); i++) {
+@@ -265,6 +293,20 @@ int ff_hevc_output_frames(HEVCContext *s,
+             AVFrame *f = frame->needs_fg ? frame->frame_grain : frame->f;
+             int output = !discard && (layers_active_output & (1 << min_layer));
+ 
++            if (output && (s->avctx->export_side_data & HEVC_EXPORT_BLOCK_DATA) &&
++                !s->avctx->hwaccel) {
++                // the side data is attached when the frame is decoded
++                if (frame->export_pending)
++                    return 0;
++                if (s->avctx->active_thread_type == FF_THREAD_FRAME)
++                    ff_progress_frame_await(&frame->tf, INT_MAX);
++                if (frame->needs_fg) {
++                    ret = copy_block_side_data(f, frame->f);
++                    if (ret < 0)
++                        return ret;
++                }
++            }
++
+             if (output) {
+                 f->pkt_dts = s->pkt_dts;
+                 ret = ff_container_fifo_write(s->output_fifo, f);
+diff --git a/libavcodec/version.h b/libavcodec/version.h
+index d0980e2..ef9018e 100644
+--- a/libavcodec/version.h
++++ b/libavcodec/version.h
+@@ -30,7 +30,7 @@
+ #include "version_major.h"
+ 
+ #define LIBAVCODEC_VERSION_MINOR  20
+-#define LIBAVCODEC_VERSION_MICRO 100
++#define LIBAVCODEC_VERSION_MICRO 101
+ 
+ #define LIBAVCODEC_VERSION_INT  AV_VERSION_INT(LIBAVCODEC_VERSION_MAJOR, \
+                                                LIBAVCODEC_VERSION_MINOR, \
+diff --git a/libavutil/version.h b/libavutil/version.h
+index 1ae3f4e..f08a42f 100644
+--- a/libavutil/version.h
++++ b/libavutil/version.h
+@@ -79,7 +79,7 @@
+  */
+ 
+ #define LIBAVUTIL_VERSION_MAJOR  59
+-#define LIBAVUTIL_VERSION_MINOR  40
++#define LIBAVUTIL_VERSION_MINOR  41
+ #define LIBAVUTIL_VERSION_MICRO 100
+ 
+ #define LIBAVUTIL_VERSION_INT   AV_VERSION_INT(LIBAVUTIL_VERSION_MAJOR, \
+diff --git a/libavutil/video_enc_params.h b/libavutil/video_enc_params.h
+index 62265a5..b17fd97 100644
+--- a/libavutil/video_enc_params.h
++++ b/libavutil/video_enc_params.h
+@@ -63,6 +63,21 @@ enum AVVideoEncParamsType {
+      * resulting quantizer for the block.
+      */
+     AV_VIDEO_ENC_PARAMS_MPEG2,
++
++    /**
++     * H.265 stores:
++     * - in PPS (per-picture):
++     *   * initial QP_Y (luma) value (26 + init_qp_minus26), exported as
++     *     AVVideoEncParams.qp
++     *   * pps_cb_qp_offset and pps_cr_qp_offset, exported as
++     *     AVVideoEncParams.delta_qp[1][0] and AVVideoEncParams.delta_qp[2][0]
++     * - per-slice QP delta and chroma QP offsets, not exported directly
++     * - per-CU QP delta, not exported directly; one AVVideoBlockParams is
++     *   exported per coding unit, and the final QP_Y of the coding unit
++     *   minus AVVideoEncParams.qp is exported as AVVideoBlockParams.delta_qp.
++     *   QP_Y can be negative for bit depths above 8.
++     */
++    AV_VIDEO_ENC_PARAMS_HEVC,
+ };
+ 
+ /**
+diff --git a/tests/fate/hevc.mak b/tests/fate/hevc.mak
+index 7f7ec43..009b57d 100644
+--- a/tests/fate/hevc.mak
++++ b/tests/fate/hevc.mak
+@@ -291,6 +291,20 @@ FATE_HEVC-$(call FRAMECRC, HEVC, HEVC, CONCAT_PROTOCOL) += fate-hevc-mv-switch
+ fate-hevc-mv-position: CMD = framecrc -i $(TARGET_SAMPLES)/hevc/multiview.mov -map 0:v:vpos:left -map 0:v:vpos:right
+ FATE_HEVC-$(call FRAMECRC, MOV, HEVC) += fate-hevc-mv-position
+ 
++# export_side_data venc_params (per-CU QP) and mvs (drawn by codecview).
++# The -frame-threads variants must match the single-threaded reference.
++fate-hevc-encparams: CMD = venc_data $(TARGET_SAMPLES)/hevc-conformance/DELTAQP_B_SONY_3.bit 0 3
++fate-hevc-encparams-frame-threads: CMD = venc_data $(TARGET_SAMPLES)/hevc-conformance/DELTAQP_B_SONY_3.bit 0 3 4 frame
++fate-hevc-encparams-frame-threads: REF = $(SRC_PATH)/tests/ref/fate/hevc-encparams
++FATE_HEVC_ENCPARAMS = fate-hevc-encparams fate-hevc-encparams-frame-threads
++FATE_SAMPLES_DUMP_DATA += $(FATE_HEVC_ENCPARAMS)
++FATE_HEVC-$(call DEMDEC, HEVC, HEVC, HEVC_PARSER) += $(FATE_HEVC_ENCPARAMS)
++
++fate-hevc-mvs: CMD = framecrc -flags2 +export_mvs -threads 1 -i $(TARGET_SAMPLES)/hevc-conformance/AMP_A_Samsung_6.bit -vf codecview=mv=pf+bf+bb -frames:v 8
++fate-hevc-mvs-frame-threads: CMD = framecrc -flags2 +export_mvs -threads 4 -thread_type frame -i $(TARGET_SAMPLES)/hevc-conformance/AMP_A_Samsung_6.bit -vf codecview=mv=pf+bf+bb -frames:v 8
++fate-hevc-mvs-frame-threads: REF = $(SRC_PATH)/tests/ref/fate/hevc-mvs
++FATE_HEVC-$(call FRAMECRC, HEVC, HEVC, HEVC_PARSER CODECVIEW_FILTER) += fate-hevc-mvs fate-hevc-mvs-frame-threads
++
+ FATE_SAMPLES_AVCONV += $(FATE_HEVC-yes)
+ FATE_SAMPLES_FFPROBE += $(FATE_HEVC_FFPROBE-yes)
+ 

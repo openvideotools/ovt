@@ -37,6 +37,33 @@ else()
   message(STATUS "OVT: dav1d skipped, third_party/VERSIONS.md has no SHA-256 for it yet")
 endif()
 
+# ---- libaom (WI-0.013) ------------------------------------------------------------------------------
+# tp::aom, the static libaom of third_party/libaom.cmake with CONFIG_INSPECTION=1 CONFIG_ACCOUNTING=1, for the
+# AV1 analysis plugin (ADR-008). OVT_SYSTEM_LIBAOM=ON takes the system libaom instead, which must have been
+# built with inspection: configure fails otherwise (§13.2.2; distro libaom builds usually lack it).
+if(OVT_BUILD_PLUGIN_AOM)
+  if(OVT_SYSTEM_LIBAOM)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ovt_system_aom REQUIRED IMPORTED_TARGET aom)
+    add_library(tp::aom INTERFACE IMPORTED GLOBAL)
+    target_link_libraries(tp::aom INTERFACE PkgConfig::ovt_system_aom)
+    include(OvtAomInspection)
+    ovt_aom_require_inspection(tp::aom)
+    ovt_set_dependency_license(
+      tp::aom
+      SOURCE
+      system
+      SPDX
+      "BSD-2-Clause AND LicenseRef-AOM-Patent-License-1.0"
+      VERSION
+      "${ovt_system_aom_VERSION}"
+      LINKAGE
+      shared)
+  else()
+    include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libaom.cmake")
+  endif()
+endif()
+
 # ---- FFmpeg (WI-0.012) ------------------------------------------------------------------------------
 # tp::ffmpeg_core and tp::ffmpeg_plugin from third_party/ffmpeg.cmake (two flavours, §13.3.3), or both from the
 # system FFmpeg, dynamically linked, with OVT_SYSTEM_FFMPEG=ON (distro preset; ovt_plugin_ffmpeg is then a thin
@@ -47,9 +74,9 @@ endif()
 #   For the shared object that links tp::ffmpeg_plugin (ovt_plugin_ffmpeg, WI-2.169, and the symbol-leak fixture of
 #   plugins/ovt-plugin-ffmpeg/tests): hidden visibility for its own code, and the linker options of §13.3.3 that keep
 #   every symbol of the static FFmpeg archives inside it. Linux/Android: --exclude-libs,ALL, plus -Bsymbolic so
-#   FFmpeg's references bind inside the plugin. macOS: an exported-symbol list naming only the two plugin entry points
-#   (chapter 0 §0.6). Only those two may be declared with default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where
-#   the plugin links the system FFmpeg dynamically.
+#   FFmpeg's references bind inside the plugin, and the version script cmake/ovt_plugin_exports.map. macOS: an
+#   exported-symbol list naming only the two plugin entry points (chapter 0 §0.6). Only those two may be declared with
+#   default visibility. No-op with OVT_SYSTEM_FFMPEG=ON, where the plugin links the system FFmpeg dynamically.
 function(ovt_ffmpeg_hide_symbols target)
   set_target_properties(${target} PROPERTIES C_VISIBILITY_PRESET hidden CXX_VISIBILITY_PRESET hidden
                                              VISIBILITY_INLINES_HIDDEN ON)
@@ -60,7 +87,12 @@ function(ovt_ffmpeg_hide_symbols target)
     target_link_options(${target} PRIVATE "LINKER:-exported_symbol,_ovt_analysis_decoder_v1"
                         "LINKER:-exported_symbol,_ovt_plugin_describe")
   else()
-    target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL" "LINKER:-Bsymbolic")
+    # The version script keeps the dynamic symbol table to the two entry points: hidden visibility does not cover
+    # the libstdc++ template instantiations of a C++ plugin (WI-2.169).
+    target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL" "LINKER:-Bsymbolic"
+                        "LINKER:--version-script=${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ovt_plugin_exports.map")
+    set_property(TARGET ${target} APPEND PROPERTY LINK_DEPENDS
+                                                  "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ovt_plugin_exports.map")
   endif()
 endfunction()
 
@@ -118,6 +150,13 @@ if(OVT_BUILD_PLUGIN_DE265)
   else()
     include("${CMAKE_CURRENT_LIST_DIR}/../third_party/libde265.cmake")
   endif()
+endif()
+
+# ---- HM (WI-4.104) -----------------------------------------------------------------------------------------------
+# tp::hm, HM's unpatched decoder libraries (third_party/hm.cmake), for the optional HM oracle plugin only
+# (BSD-3-Clause, chapter 07 §7.6.4). Slow to build, so OFF by default.
+if(OVT_BUILD_PLUGIN_HM)
+  include("${CMAKE_CURRENT_LIST_DIR}/../third_party/hm.cmake")
 endif()
 
 # ---- libvmaf (WI-0.015) -------------------------------------------------------------------------------

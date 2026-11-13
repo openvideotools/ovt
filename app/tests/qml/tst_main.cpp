@@ -13,30 +13,21 @@
 #include <QTemporaryDir>
 #include <QtGlobal>
 
-#include <memory>
-
 #include "models/selection_model.h"
 #include "models/stream_index_model.h"
 #include "platform/platform.h"
+#include "project.h"
 #include "synthetic_index.h"
 
 class Setup : public QObject {
   Q_OBJECT
 
  public Q_SLOTS:
-  void applicationAvailable() {
-    if (config_dir_.isValid()) {
-      qputenv("OVT_CONFIG_DIR", config_dir_.path().toLocal8Bit());
-    }
-    ovt::app::Platform::selectGraphicsApi();
-    // As in main.cpp: the default style on macOS is the native one, whose menus have no content item.
-    QQuickStyle::setStyle(QStringLiteral("Fusion"));
-  }
-
-  // The Timeline tests (tst_timeline.qml) need an index: 300 frames, 60 fps in a 90 kHz time base, a GOP of 60.
   void qmlEngineAvailable(QQmlEngine* engine) {
     using namespace ovt::app;
     using namespace ovt::app::testing;
+    engine->addImageProvider(QStringLiteral("rawpreview"), new RawPreviewProvider);
+    // The Timeline tests (tst_timeline.qml) need an index: 300 frames, 60 fps in a 90 kHz time base, a GOP of 60.
     index_model_.setIndex(StreamIndexHandle::adopt(build_index(gop60(300, 1500), 1, 90000)));
     engine_ = engine;
     engine->rootContext()->setContextProperty(QStringLiteral("testIndex"), &index_model_);
@@ -50,6 +41,15 @@ class Setup : public QObject {
     if (auto* selection = engine_->singletonInstance<ovt::app::SelectionModel*>(type_id)) {
       selection->setIndex(index_model_.selectionIndex());
     }
+  }
+
+  void applicationAvailable() {
+    if (config_dir_.isValid()) {
+      qputenv("OVT_CONFIG_DIR", config_dir_.path().toLocal8Bit());
+    }
+    ovt::app::Platform::selectGraphicsApi();
+    // As in main.cpp: the default style on macOS is the native one, whose menus have no content item.
+    QQuickStyle::setStyle(QStringLiteral("Fusion"));
   }
 
  private:
