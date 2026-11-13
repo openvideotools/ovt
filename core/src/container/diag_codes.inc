@@ -72,3 +72,10 @@ X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed"
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
   "yuv4mpeg(5), FFmpeg `yuv4mpegdec.c`")
 X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (frame `i`); walk stopped", "yuv4mpeg(5)")
+// WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
+X(CNT_9001, "CNT-9001", Error,
+  "sample bytes do not split into units cleanly (NAL length exceeds sample, OBU size overrun)",
+  "14496-15 §5.3.4.2 / AV1-ISOBMFF §2.4")
+X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
+  "14496-15 §4.3")
+X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")
