@@ -79,6 +79,8 @@ ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
 ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
 # WI-1.108a: H.264 NAL header and SPS parsers (WI-1.108b adds the PPS modes).
 ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
+# WI-1.110: the H.264 SEI framing and payload parsers.
+ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
 
 # WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
 # plugin module from its output directory, so it follows the plugin's own option.

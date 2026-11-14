@@ -9,3 +9,9 @@ target_link_libraries(ovt_tests_syntax_h264_sps_pps PRIVATE ovt_core_objects ovt
                                                             ${Catch2_TARGET})
 ovt_set_license(ovt_tests_syntax_h264_sps_pps "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax_h264_sps_pps)
+
+# WI-1.110: SEI framing and payload parsers.
+add_executable(ovt_tests_syntax_h264_sei test_syntax_h264_sei.cpp)
+target_link_libraries(ovt_tests_syntax_h264_sei PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_tests_syntax_h264_sei "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_syntax_h264_sei)
