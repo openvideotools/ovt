@@ -6,6 +6,7 @@
 // rendering itself is tested in C++ (app/tests/picture, a real RHI); this runs on the offscreen platform.
 
 import QtQuick
+import QtQuick.Window
 import QtTest
 import OvtStudio
 
@@ -19,6 +20,13 @@ TestCase {
         id: panelComponent
 
         PicturePanel {
+            // A top-level item has no window of its own, so it is hidden; the tests need it shown.
+            property Window stage: Window {
+                width: 320
+                height: 180
+                visible: true
+            }
+            parent: stage.contentItem
             panelId: "picture"
             width: 320
             height: 180

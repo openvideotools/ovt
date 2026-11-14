@@ -21,6 +21,11 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <rhi/qrhi.h>
+
+#if QT_CONFIG(vulkan)
+#include <QVersionNumber>
+#include <QVulkanInstance>
+#endif
 #include <QByteArray>
 #include <QColor>
 #include <QFile>
@@ -54,8 +59,10 @@ using ovt::app::PictureFrame;
 using ovt::app::PictureHost;
 
 // Creates the application once, on the platform this test needs. nullptr (the caller skips) when Linux has no display.
+// The application is never destroyed: tearing it down in the static destructors at exit, after Qt's own globals,
+// crashes in ~QGuiApplication.
 QGuiApplication* app_or_null() {
-  static std::unique_ptr<QGuiApplication> app;
+  static QGuiApplication* app = nullptr;
   static bool tried = false;
   if (!tried) {
     tried = true;
@@ -77,9 +84,9 @@ QGuiApplication* app_or_null() {
     static int argc = 1;
     static std::array<char, 22> name{"ovt_tests_app_picture"};
     static std::array<char*, 2> argv{name.data(), nullptr};
-    app = std::make_unique<QGuiApplication>(argc, argv.data());
+    app = new QGuiApplication(argc, argv.data());  // NOLINT(cppcoreguidelines-owning-memory): lives until exit
   }
-  return app.get();
+  return app;
 }
 
 // Frame 0 of sdr709_ramp.mp4 (corpus id syn_pat_sdr709_ramp), from its expected.json: 10-bit 4:2:0 limited BT.709,
@@ -124,6 +131,20 @@ std::shared_ptr<PictureFrame> sdr709_ramp_frame0() {
   return frame;
 }
 
+#if QT_CONFIG(vulkan)
+// A render-controlled window has no QVulkanInstance of its own (Qt's default one is for on-screen windows). Like Qt's
+// default instance it asks for the newest API up to 1.3, so libplacebo gets the Vulkan 1.2 it needs (§10.2.2).
+QVulkanInstance* vulkan_instance() {
+  static QVulkanInstance inst;
+  static const bool ok = [] {
+    const QVersionNumber supported = inst.supportedApiVersion();
+    inst.setApiVersion(supported >= QVersionNumber(1, 3) ? QVersionNumber(1, 3) : supported);
+    return inst.create();
+  }();
+  return ok ? &inst : nullptr;
+}
+#endif
+
 // A QQuickWindow whose content (one PictureHost filling it) renders into a texture through QQuickRenderControl.
 class Harness {
  public:
@@ -143,6 +164,15 @@ class Harness {
   // "" on success, else why not.
   std::string init(QSize size) {
     window_ = std::make_unique<QQuickWindow>(&control_);
+#if QT_CONFIG(vulkan)
+    if (QQuickWindow::graphicsApi() == QSGRendererInterface::Vulkan) {
+      QVulkanInstance* inst = vulkan_instance();
+      if (inst == nullptr) {
+        return "QVulkanInstance::create failed";
+      }
+      window_->setVulkanInstance(inst);
+    }
+#endif
     window_->setColor(QColor(0x00, 0xFF, 0x00));  // where the item draws nothing
     if (!control_.initialize()) {
       return "QQuickRenderControl::initialize failed (no RHI device)";
@@ -229,13 +259,18 @@ std::vector<std::uint8_t> reference_pixels(const PictureFrame& frame, int w, int
   return px.bytes;
 }
 
+// Pixels whose R, G or B differs by more than 1 (the ±1 per channel of the render PNG goldens,
+// render/tests/png_golden.h): the two surfaces dither independently (ViewState::dither is on, as in the app), which
+// moves single code values. The window's alpha channel is the scene graph's, not the picture's, so it is not compared.
 std::size_t differing_pixels(const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>& b) {
   REQUIRE(a.size() == b.size());
   std::size_t n = 0;
   for (std::size_t i = 0; i + 3 < a.size(); i += 4) {
-    // RGB only: the window's alpha channel is the scene graph's, not the picture's.
-    if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2]) {
-      ++n;
+    for (std::size_t c = 0; c < 3; ++c) {
+      if (std::abs(static_cast<int>(a[i + c]) - static_cast<int>(b[i + c])) > 1) {
+        ++n;
+        break;
+      }
     }
   }
   return n;
@@ -269,7 +304,8 @@ TEST_CASE("picture_host_matches_sdr_png8_of_frame_0", "[fast][gui]") {
   REQUIRE(why.empty());
   harness.host().set_picture(frame);
   std::vector<std::uint8_t> shown = harness.frame();
-  shown = harness.frame();  // the stats reach the item in the next synchronize()
+  harness.host().update();  // the stats reach the item in the next synchronize()
+  shown = harness.frame();
   INFO("interop " << harness.host().interop().toStdString() << ", error '" << harness.host().last_error().toStdString()
                   << "'");
   REQUIRE(harness.host().last_error().isEmpty());

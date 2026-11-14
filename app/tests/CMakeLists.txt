@@ -96,8 +96,8 @@ if(OVT_STUDIO_PICTURE_HOST)
   set_target_properties(ovt_tests_app_picture PROPERTIES AUTOMOC ON)
   ovt_studio_add_picture_shaders(ovt_tests_app_picture)
   target_include_directories(ovt_tests_app_picture PRIVATE ../src "${PROJECT_SOURCE_DIR}/render/src")
-  target_link_libraries(ovt_tests_app_picture PRIVATE Qt6::Core Qt6::Gui Qt6::Quick ovt::render ovt::flags
-                                                      ${Catch2_TARGET})
+  target_link_libraries(ovt_tests_app_picture PRIVATE Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Quick ovt::render
+                                                      ovt::flags ${Catch2_TARGET})
   target_compile_definitions(ovt_tests_app_picture
                              PRIVATE QT_NO_KEYWORDS "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
   ovt_set_license(ovt_tests_app_picture "GPL-3.0-or-later")

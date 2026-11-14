@@ -298,7 +298,7 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     switch (interop_) {
       case DisplayTarget::Interop::VulkanSharedDevice:
       case DisplayTarget::Interop::MetalTexture: {
-        const auto object = static_cast<quint64>(reinterpret_cast<quintptr>(ext.handle));  // NOLINT: VkImage / id
+        const quint64 object = reinterpret_cast<quintptr>(ext.handle);  // NOLINT: VkImage / id<MTLTexture>
         const int layout = static_cast<int>(ext.layout);
         if (wrapped_ == nullptr || wrapped_object_ != object || wrapped_->pixelSize() != size) {
           src_texture_ = nullptr;
@@ -536,7 +536,8 @@ void PictureHost::report_stats(const PictureHostStats& stats) {
                        stats.frames_rendered != stats_.frames_rendered;
   stats_ = stats;
   if (changed) {
-    QMetaObject::invokeMethod(this, &PictureHost::statsChanged, Qt::QueuedConnection);
+    // By name: the functor overload trips clang-analyzer's NewDeleteLeaks inside Qt's header.
+    QMetaObject::invokeMethod(this, "statsChanged", Qt::QueuedConnection);
   }
 }
 

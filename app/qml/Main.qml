@@ -201,7 +201,7 @@ ApplicationWindow {
         id: pictureComponent
 
         PicturePanel {
-            actions: actions
+            shellActions: actions
         }
     }
 

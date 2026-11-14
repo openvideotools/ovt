@@ -177,7 +177,8 @@ function(ovt_studio_add_qml_module target)
   target_compile_definitions(${target} PRIVATE QT_NO_KEYWORDS)
   if(OVT_STUDIO_PICTURE_HOST)
     # render/src for the exported download helper of the Interop::None row (surface/output_download.h).
-    target_link_libraries(${target} PRIVATE ovt::render)
+    # QRhi's headers (<rhi/qrhi.h>, semi-public since Qt 6.6) are on Qt6::GuiPrivate's include path.
+    target_link_libraries(${target} PRIVATE ovt::render Qt6::GuiPrivate)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
     target_compile_definitions(${target} PRIVATE OVT_HAVE_PICTURE_HOST=1)
     ovt_studio_add_picture_shaders(${target})

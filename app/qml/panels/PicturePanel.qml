@@ -17,7 +17,7 @@ Rectangle {
 
     required property string panelId
     // The shell's Actions, for the Welcome page's buttons; null in tests that build the panel alone.
-    property var actions: null
+    property var shellActions: null
     // The PictureHost item once PictureView.qml is loaded, else null (WI-1.456 binds its ViewState here).
     readonly property var host: pictureView.item ? pictureView.item.host : null
 
@@ -27,7 +27,7 @@ Rectangle {
     WelcomePage {
         anchors.fill: parent
         visible: Project.fileCount === 0
-        actions: panel.actions
+        actions: panel.shellActions
     }
 
     Loader {
