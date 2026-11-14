@@ -15,9 +15,10 @@
 #   build and are added by third_party/ffmpeg.cmake.
 #
 #   HW_DECODE              OVT_ENABLE_HW_DECODE: the platform hwaccels (VideoToolbox, VA-API, MediaCodec).
-#   PATENT_CODECS_IN_CORE  OVT_PATENT_CODECS_IN_CORE: the core flavour keeps the h264/hevc decoders and hwaccels, and
-#                          the other pool-covered decoders (VVC, AAC, MPEG-4 Part 2 and its
-#                          Microsoft variants msmpeg4v1-v3/wmv1/wmv2, VC-1).
+#   PATENT_CODECS_IN_CORE  OVT_PATENT_CODECS_IN_CORE (ON by default since the owner decision of 2026-11-12,
+#                          ADR-015): the core flavour keeps the h264/hevc decoders and hwaccels, and the other
+#                          pool-covered decoders (VVC, AAC, MPEG-4 Part 2 and its Microsoft variants
+#                          msmpeg4v1-v3/wmv1/wmv2, VC-1). OFF is the patent-pool-free split build.
 #   GPL                    --enable-gpl for this flavour (ffmpeg.cmake derives it from OVT_FFMPEG_GPL*).
 #   DAV1D                  the core flavour links libdav1d (tp::dav1d or the system dav1d is available).
 #
@@ -48,22 +49,22 @@ set(OVT_FFMPEG_COMMON_FLAGS
     --enable-zlib
     --pkg-config-flags=--static)
 
-# The patent-encumbered decoders (and their hwaccels) that the core flavour leaves out unless
-# OVT_PATENT_CODECS_IN_CORE=ON. The plugin flavour enables exactly these.
+# The patent-encumbered decoders (and their hwaccels) that the core flavour leaves out when
+# OVT_PATENT_CODECS_IN_CORE=OFF. The plugin flavour enables exactly these.
 set(OVT_FFMPEG_PATENT_DECODERS h264 hevc)
 set(OVT_FFMPEG_PATENT_MEDIACODEC_DECODERS h264_mediacodec hevc_mediacodec)
 set(OVT_FFMPEG_PATENT_HWACCELS_macos h264_videotoolbox hevc_videotoolbox)
 set(OVT_FFMPEG_PATENT_HWACCELS_linux h264_vaapi hevc_vaapi)
 set(OVT_FFMPEG_PATENT_HWACCELS_android "")
 
-# The other pool-covered decoders the core flavour leaves out (ADR-015, chapter 15 §15.5 POL-PAT-2; Karl's decision on
-# #132): H.266/VVC, AAC and HE-AAC (one FFmpeg decoder family: aac, aac_fixed, aac_latm, plus the AudioToolbox and
+# The other pool-covered decoders the core flavour leaves out with OVT_PATENT_CODECS_IN_CORE=OFF (ADR-015, chapter 15
+# §15.5 POL-PAT-2; Karl's decision on #132): H.266/VVC, AAC and HE-AAC (one FFmpeg decoder family: aac, aac_fixed, aac_latm, plus the AudioToolbox and
 # MediaCodec wrappers), MPEG-4 Part 2 Visual with its Microsoft pre-standard variants (msmpeg4v1/v2/v3 and wmv1/wmv2,
 # i.e. WMV7/8: all five are built from libavcodec/msmpeg4dec.c, configure's msmpeg4dec component, which is then not
 # built; the h263 decoder stays), and SMPTE VC-1 (vc1 and wmv3 are the same decoder; *image are its sprite variants).
-# No requirement asks the core to decode any of them: they are recognised and demuxed, never decoded,
-# because demuxers, parsers and bitstream filters stay on. The plugin flavour does not enable them either.
-# OVT_PATENT_CODECS_IN_CORE=ON keeps them, like h264/hevc. Names checked against libavcodec/allcodecs.c and
+# No requirement asks the core to decode any of them: in the split build they are recognised and demuxed, never
+# decoded, because demuxers, parsers and bitstream filters stay on. The plugin flavour does not enable them either.
+# OVT_PATENT_CODECS_IN_CORE=ON (the default) keeps them, like h264/hevc. Names checked against libavcodec/allcodecs.c and
 # hwaccels.h of n7.1.1; the cuvid/qsv/mmal/v4l2m2m/nvdec/vdpau/d3d* variants are never built (--disable-autodetect
 # and no --enable for their APIs), so only the hwaccels of the APIs the core enables are listed.
 set(OVT_FFMPEG_POOL_DECODERS
@@ -88,7 +89,7 @@ set(OVT_FFMPEG_POOL_HWACCELS_macos mpeg4_videotoolbox)
 set(OVT_FFMPEG_POOL_HWACCELS_linux mpeg4_vaapi vc1_vaapi wmv3_vaapi)
 
 function(ovt_ffmpeg_configure_flags out_var)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "" "FLAVOUR;PLATFORM;HW_DECODE;PATENT_CODECS_IN_CORE;GPL;DAV1D" "")
+  cmake_parse_arguments(PARSE_ARGV 1 arg "" "FLAVOUR;PLATFORM;HW_DECODE;PATENT_CODECS_IN_CORE;GPL;DAV1D;STATIC" "")
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_ffmpeg_configure_flags: unknown arguments ${arg_UNPARSED_ARGUMENTS}")
   endif()
@@ -123,7 +124,11 @@ function(ovt_ffmpeg_configure_flags out_var)
 
   # ---- flavour part ---------------------------------------------------------------------------------
   if(arg_FLAVOUR STREQUAL "core")
-    list(APPEND flags --enable-shared --disable-static --build-suffix=_ovt)
+    if(arg_STATIC) # OVT_FFMPEG_CORE_STATIC, fuzz builds only
+      list(APPEND flags --disable-shared --enable-static --build-suffix=_ovt)
+    else()
+      list(APPEND flags --enable-shared --disable-static --build-suffix=_ovt)
+    endif()
     if(arg_DAV1D)
       list(APPEND flags --enable-libdav1d)
     endif()

@@ -79,6 +79,17 @@ TEST_CASE("test_canonical: tiny16_hevc.fa canonicalises to its recorded SHA-256 
   CHECK(canonical == file);
 }
 
+TEST_CASE("test_canonical: every golden fixture is canonical", "[model][golden][fast]") {
+  for (const auto& spec : ovt::golden::kFixtures) {
+    const std::string name = std::string(spec.stem) + ".fa";
+    INFO(name);
+    const Bytes file = read_file(name);
+    const auto canonical = ovt::model::canonicalize(file, SchemaId::Model, kRoot);
+    CHECK(ovt::golden::sha256_hex(canonical) == recorded_sha(name));
+    CHECK(ovt::model::structural_diff(file, canonical, SchemaId::Model, kRoot).empty());
+  }
+}
+
 TEST_CASE("test_canonical: canonicalize is idempotent and deterministic", "[model][fast]") {
   const Bytes file = fixture();
   const auto once = ovt::model::canonicalize(file, SchemaId::Model, kRoot);

@@ -24,6 +24,13 @@ EXPECTED = {
     "CC0-1.0.txt",  # generated corpus test patterns (WI-1.413)
     "LicenseRef-AOM-Patent-License-1.0.txt",
     "LicenseRef-DCO-verbatim.txt",  # DCO, taken verbatim (WI-0.604)
+    # Texts of code bundled in dependencies (third_party/licenses/, WI-0.017 follow-up; REUSE needs each id's text).
+    "ISC.txt",
+    "MIT.txt",
+    "Unlicense.txt",
+    "Zlib.txt",
+    "LicenseRef-Peslyak-md5-public-domain.txt",
+    "GPL-2.0-or-later.txt",  # tests/oracles/x264_ssim, x264's SSIM kernel vendored for the oracle (WI-0.565)
     "Apache-2.0.txt",  # core/share/models/uvq/labels_yt8m.txt, data from google/uvq (WI-3.314)
 }
 

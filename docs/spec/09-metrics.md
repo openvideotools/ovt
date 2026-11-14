@@ -64,8 +64,8 @@ Requirement ids are defined only in chapter 04 (§4.8 VQ, §4.7 HDR, §4.15 NFR)
 | **FR-VQ-006** | SSIM MUST be offered in two variants: `ssim` (Wang et al. 11×11 Gaussian window σ = 1.5, C1 = (0.01·L)², C2 = (0.03·L)², L = 2^bd − 1) and `ssim_x264` (8×8 blocks of 4×4 sums as in x264/libaom `ssim.c`), each per plane with a per-pixel/per-block map output. | §9.4.3, §9.4.4, §9.4.7, WI-3.307, WI-3.308 |  |
 | **FR-VQ-007** | VMAF MUST be computed by calling libvmaf (≥ 3.0, fixed-point build) directly on the normalised planes with the bundled models addressed by the ids `vmaf` (= `vmaf_v0.6.1`), `vmaf_neg` (= `vmaf_v0.6.1neg`), `vmaf_4k` (= `vmaf_4k_v0.6.1`), `vmaf_b` (= `vmaf_b_v0.6.3`, bootstrap CI) and `vmaf_<name>` for any other model file shipped with libvmaf ≥ 3.0.0 (chapter 9 §9.6.2), and the per-frame and pooled scores MUST be bit-identical to the `vmaf` CLI on the Netflix test vectors. | §9.5, WI-3.309, WI-3.310, WI-3.591 (chapter 14) | Models: `vmaf_v0.6.1`, `vmaf_v0.6.1neg`, `vmaf_4k_v0.6.1`, `vmaf_b_v0.6.3`; newer bundled models when present (§9.5.3). |
 | **FR-VQ-008** | The libvmaf host MUST also expose `ms_ssim`, `psnr_hvs`, `ciede2000`, `cambi` (with its heat-map output) and `vif` as metric ids through the same ABI, with results identical to the `vmaf --feature <name>` output. | §9.5.3, §9.5.5, WI-3.309, WI-4.307 |  |
-| **FR-VQ-009** | UVQ MUST be implemented as a `NoReference` metric running the google/uvq 1.5 (default) and 1.0 models exported to ONNX (ContentNet, CompressionNet, DistortionNet, AggregationNet) (TensorFlow SavedModels exported via `tf2onnx`, D11) through ONNX Runtime with the CoreML EP on macOS, the XNNPACK EP on Android (NNAPI is deprecated from API 35) and the CPU EP on Linux, with preprocessing (1 fps sampling default, resize to the model input geometry with bilinear interpolation, RGB float normalisation, 1-second chunks) reproducing the reference CLI, and the `compression_content_distortion` output as the MOS score. | §9.6, WI-3.314, WI-3.315 | Android default EP is XNNPACK; NNAPI only on API < 35 when explicitly requested (§9.6.1). |
-| **FR-VQ-010** | UVQ MUST also emit its per-chunk 4×4 compression-level map and 2×2 distortion-type labels as map outputs so that the GUI can overlay them, and model weights (≈ 100 MB) MUST be downloaded on first use into the user cache directory, never bundled in the Android APK. | §9.6.3, §9.6.5 |  |
+| **FR-VQ-009** | UVQ MUST be implemented as a `NoReference` metric running the google/uvq 1.5 (default: ContentNet, DistortionNet, AggregationNet) and 1.0 (ContentNet, CompressionNet, DistortionNet, AggregationNet) models exported to ONNX (PyTorch checkpoints exported with `torch.onnx.export`, D11) through ONNX Runtime with the CoreML EP on macOS, the XNNPACK EP on Android (NNAPI is deprecated from API 35) and the CPU EP on Linux, with preprocessing (1 fps sampling default, resize to the model input geometry with the reference's swscale bicubic kernel, RGB float normalisation, per-frame scoring for 1.5 and 1-second chunks of 5 frames for 1.0) reproducing the reference CLI, and the aggregated MOS (`compression_content_distortion` for 1.0; the single AggregationNet output for 1.5) as the MOS score. | §9.6, WI-3.314, WI-3.315 | Android default EP is XNNPACK; NNAPI only on API < 35 when explicitly requested (§9.6.1). |
+| **FR-VQ-010** | UVQ MUST also emit its per-chunk 4×4 compression-level map and 2×2 distortion-type labels as map outputs so that the GUI can overlay them when the selected model version produces them (UVQ 1.0; the default UVQ 1.5 has no CompressionNet and emits a single MOS value, §9.6.5), and model weights (≈ 100 MB) MUST be downloaded on first use into the user cache directory, never bundled in the Android APK. | §9.6.3, §9.6.5 |  |
 | **FR-VQ-011** | Every full-reference metric that can be computed locally (PSNR, SSIM variants, ΔE-ITP in phase 4) MUST emit a per-block map at a user-selectable block size `N` ∈ {4, 8, 16, 32, 64} (default: the codec's largest block size when known, else 16) as a `map16` blob, which the GUI MUST render as a heat-map overlay with a selectable colour map including `viridis` and `cividis` and a legend. | §9.4.7, WI-3.306, WI-3.316 | Block sizes here are {8, 16, 32, 64} (4 is not offered: a 4K map at B = 4 is 518 400 cells per frame). |
 | **FR-VQ-012** | Pooled statistics `pooled_mean`, `pooled_harmonic`, `pooled_min`, `pooled_p1`, `pooled_p5`, `pooled_std` MUST be computed per plane/output for every metric, and per-scene means MUST be available when a scene list is supplied (`--scenes file.json`) or detected (phase 4). | §9.8.1–§9.8.3, WI-3.311 | Scene detection is delivered in phase 3 here (WI-3.311). |
 | **FR-VQ-014** | Metric results MUST be exportable as CSV in the layout of chapter 9 §9.9.1 (`<stem>.csv` with one row per frame and columns `frame,display_index,<metric>_<plane>…`, plus `<stem>_summary.csv` with the pooled values; `.` decimal separator, `,` field separator, UTF-8, LF line endings, regardless of system locale), as OVT JSON (`--format json`), as libvmaf-compatible JSON (`--format vmaf-json`: `frames[].metrics.{vmaf,psnr_y,…}`, `pooled_metrics`), and as OVT `MetricsResult` FlatBuffers (`--format fb`). | §9.9, WI-3.312, WI-3.310 | The normative CSV layout is §9.9.1 (long format, one row per frame × metric × component, RFC 4180 `\r\n`). |
@@ -110,12 +110,13 @@ core/tests/metrics/                    Catch2 tests, golden files, oracle script
 
 ```c
 typedef struct ovt_MetricApi {
+  uint32_t struct_size;                       /* D4 */
   uint32_t abi_version;                       /* = 1 */
   ovt_Buffer (*descriptor)(void);             /* MetricDescriptor FlatBuffer */
   ovt_status (*create)(const char* options_json, ovt_Metric** out);
   void       (*destroy)(ovt_Metric*);
   /* Frames are delivered already normalised into descriptor.domain; ref == NULL for NoReference metrics. */
-  ovt_status (*score)(ovt_Metric*, const ovt_PlaneView* ref /* nullable */, const ovt_PlaneView* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
+  ovt_status (*score)(ovt_Metric*, const ovt_MetricPlanes* ref /* nullable */, const ovt_MetricPlanes* dist, ovt_FrameId id, ovt_Buffer* out /* FrameScore */);
   ovt_status (*finish)(ovt_Metric*, ovt_Buffer* out /* optional sequence-level FrameScore */);
 } ovt_MetricApi;
 const ovt_MetricApi* ovt_metric_v1(void);
@@ -130,12 +131,13 @@ Rules (binding on all plugins, in-tree or third-party):
 5. Plugins MUST NOT write to `ref`/`dist` buffers.
 6. `options_json` is a JSON object; unknown keys MUST be rejected with `OVT_E_INVALID_ARG` (so typos are caught).
 
-Supporting types (owned by the Data Model chapter; reproduced here for implementers of this chapter — if Chapter 6 differs, Chapter 6 wins):
+Supporting types (`ovt_FrameId` is owned by the Data Model chapter and reproduced here; `ovt_MetricPlanes` is owned by this chapter and lives only in `metric_v1.h` — if Chapter 6 differs on `ovt_FrameId`, Chapter 6 wins):
 
 ```c
 typedef struct ovt_FrameId { int32_t decode_index; int32_t display_index; } ovt_FrameId;
 
-typedef struct ovt_PlaneView {
+typedef struct ovt_MetricPlanes {   /* the multi-plane view a metric scores; not ovt_PlaneView of ovt/decode.h, which is one plane (#156) */
+  uint32_t struct_size;            /* D4: sizeof(ovt_MetricPlanes) as compiled into the host */
   const uint8_t* data[3];          /* Y, U, V (or R,G,B / I,Ct,Cp for RGB-like domains); data[1],data[2] NULL for 4:0:0 */
   int32_t  stride_bytes[3];
   uint32_t width[3], height[3];    /* per plane, in samples */
@@ -144,9 +146,9 @@ typedef struct ovt_PlaneView {
   uint8_t  sample_bytes;           /* 1, 2 or 4 */
   uint8_t  sample_format;          /* 0 = unsigned integer, 1 = IEEE float32 */
   uint8_t  domain;                 /* ovt.fb.WorkingDomain */
-  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered */
+  ovt_ColorDescription color;      /* §0.5.6; describes the samples as delivered; frozen, embedded by value */
   double   display_peak_nits;      /* display model peak used for linear/pu21/ictcp; 0 for code_value */
-} ovt_PlaneView;
+} ovt_MetricPlanes;
 ```
 
 Sample layout per domain (normative):
@@ -215,7 +217,7 @@ Created ──run()──▶ Probing ──▶ Aligning ──▶ Scoring ──
 
 ### 9.2.4 Normalisation stage
 
-The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_PlaneView` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
+The normalisation stage converts a decoded `ovt_Picture` pair into `ovt_MetricPlanes` pairs in each requested `WorkingDomain`. It is a pipeline of **named steps** executed in this fixed order; each step is a no-op when its config says so.
 
 ```
 crop → scale → chroma_upsample → bit_depth → range → colour(zimg) → domain → temporal(offset/pairing)
@@ -339,7 +341,7 @@ crop → scale → chroma_upsample → bit_depth → range → colour(zimg) → 
 
 Two JSON documents are derived from this schema:
 
-* **`MetricsResult.normalization`** (chapter 06 §6.5, rule V-030) is the canonical serialisation of the *resolved* `NormalizationConfig` — every property present with its resolved value (defaults expanded; `display_model.preset` resolved from `auto`; `temporal.offset_frames` and `spatial.shift_*` as found by alignment) — in chapter 06's canonical JSON form: **keys sorted lexicographically, no whitespace**, numbers in shortest round-trip form. It contains nothing but the schema's properties, so it is byte-deterministic (§0.7.5) and comparable across runs.
+* **`MetricsResult.normalization`** (chapter 06 §6.5, rule V-030) is the canonical serialisation of the *resolved* `NormalizationConfig` — every property that has a `default` or `const` present with its resolved value (defaults expanded; `display_model.preset` resolved from `auto`; `temporal.offset_frames` and `spatial.shift_*` as found by alignment); an object-typed property is always materialised; a nullable property without a default resolves to `null` (`crop.ref`, `crop.dist`); any other property without a default stays absent (the `colour.*` integers and `display_model.*` numbers), so the resolved form of `{}` is exactly the schema's defaults — in chapter 06's canonical JSON form: **keys sorted lexicographically, no whitespace**, numbers in shortest round-trip form. It contains nothing but the schema's properties, so it is byte-deterministic (§0.7.5) and comparable across runs.
 * **The export-level `normalization` object** of the OVT JSON (§9.9.2) is the same resolved configuration plus two read-only objects the parser ignores on input: `"applied": {"ref": {...stream description...}, "dist": {...}}` (dimensions, bit depth, range, matrix/primaries/transfer, fps, crop actually applied per stream) and `"alignment": {AlignmentReport}` (§9.3.1). It is pretty-printed in schema order for readability; `applied` and `alignment` are never written into `MetricsResult.normalization`.
 
 #### Target resolution and kernels
@@ -557,18 +559,20 @@ Per plane `p` with `N_p` samples, `d_i = ref_i − dist_i` (integers in the work
 ```
 SSE_p  = Σ d_i²                         (uint64 accumulator; exact)
 MSE_p  = SSE_p / N_p                    (double)
-PSNR_p = 10·log10( peak² / MSE_p )      if MSE_p > 0
-       = psnr_max                       if MSE_p == 0, with psnr_max = 60 + 6·(b − 8) dB (libvmaf psnr convention: 60 dB at 8-bit, 72 dB at 10-bit, 84 dB at 12-bit)
+PSNR_p = min( 10·log10( peak² / MSE_p ), psnr_max )   (clipped on every frame, as libvmaf's psnr feature does; MSE_p == 0 gives psnr_max)
+       with psnr_max = 60 + 6·(b − 8) dB (libvmaf psnr convention: 60 dB at 8-bit, 72 dB at 10-bit, 84 dB at 12-bit) unless `psnr_max_db` is set
 ```
 Combinations (all reported as separate `values` entries):
 
 | Name | Definition |
 |---|---|
 | `jvet` | `(6·PSNR_Y + PSNR_U + PSNR_V) / 8` (JVET CTC weighted PSNR, JVET-T2010) |
-| `ffmpeg_avg` | `10·log10( peak² / MSE_avg )`, `MSE_avg = (SSE_Y + SSE_U + SSE_V) / (N_Y + N_U + N_V)` (FFmpeg `psnr_avg`, MSE-weighted by sample count) |
+| `ffmpeg_avg` | `min(10·log10( peak² / MSE_avg ), psnr_max)`, `MSE_avg = (SSE_Y + SSE_U + SSE_V) / (N_Y + N_U + N_V)` (FFmpeg `psnr_avg`, MSE-weighted by sample count; clipped like the planes — FFmpeg itself does not clip, so its oracle can differ on near-lossless frames) |
 | `mse_y`, `mse_u`, `mse_v` | raw MSE per plane (so users can re-pool) |
 
-Sequence-level (emitted by `finish`): **APSNR** per plane `= 10·log10( peak² / mean_frames(MSE_p) )` — the AOM CTC "average PSNR from mean MSE" — in `values` named `apsnr_y/u/v`, plus `apsnr_jvet`. Note that `pooled_mean` of per-frame PSNR is *not* APSNR; both are reported.
+The per-frame `values` always have the fixed 8-entry layout `[y, u, v, jvet, ffmpeg_avg, mse_y, mse_u, mse_v]` (issue #385): entries for planes that do not exist (4:0:0) or are not selected by `planes` are NaN; `jvet` and `ffmpeg_avg` equal `y` for 4:0:0 and are NaN when `planes` leaves out an available plane. Exporters write NaN as JSON `null` and as an empty CSV cell (§9.9.1, §9.9.2; WI-3.312).
+
+Sequence-level (emitted by `finish`): **APSNR** per plane `= 10·log10( peak² / mean_frames(MSE_p) )` — the AOM CTC "average PSNR from mean MSE" — in `values = [apsnr_y, apsnr_u, apsnr_v, apsnr_jvet]` with the same NaN rule as the per-frame layout. Note that `pooled_mean` of per-frame PSNR is *not* APSNR; both are reported.
 
 Options JSON: `{"psnr_max_db": number|null, "planes": ["y","u","v"]}`.
 
@@ -616,7 +620,7 @@ This is the SSIM printed by x264 and x265 (`--ssim`). Definition = exactly x264 
 
 `values = [y, u, v, ssim_db_y]`. Options: `{"planes":["y","u","v"]}` (x264 computes luma only; U/V use the same kernel on the chroma planes and are OVT additions).
 
-**Oracle:** a **vendored, unmodified copy of x264's C kernel** (`ssim_4x4x2_core`, `ssim_end1`, `ssim_end4`, `x264_pixel_ssim_wxh` from `common/pixel.c` of the pinned x264 tag) in `tests/oracles/x264_ssim/pixel_ssim.c` (GPL-2.0-or-later; built only as the oracle executable `x264_ssim_oracle <ref.yuv> <dist.yuv> <WxH> <bitdepth>`, never linked into OVT) driven over the same raw planes; tolerance `1e-6` per plane (x264 float vs OVT double) for 8-bit and 10-bit inputs. Secondary cross-check: the `SSIM Mean Y` line of an x264 encode log (`x264 --ssim --psnr --qp 20 ref.y4m -o /dev/null`) is reproduced by running OVT on the source and the x264 reconstruction (`--dump-yuv`), tolerance `1e-4` (the log prints 7 digits). libvpx's `tiny_ssim` is **not** an oracle for this id: it uses 8×8 windows stepping by 4 without the 2-sample offset, constants scaled by `64²` (`cc1 = 26634`, `cc2 = 239708` at 8-bit), and an "All" = `0.8·Y + 0.1·U + 0.1·V`; OVT does not ship that variant (`ssim_tiny` is reserved as an id, not implemented).
+**Oracle:** a **vendored, unmodified copy of x264's C kernel** (`ssim_4x4x2_core`, `ssim_end1`, `ssim_end4`, `x264_pixel_ssim_wxh` from `common/pixel.c` of the pinned x264 tag) in `tests/oracles/x264_ssim/pixel_ssim.c` (GPL-2.0-or-later; built only as the oracle executable `x264_ssim <ref>.y4m <dist>.y4m` — the Y4M header carries size and bit depth; one executable holds the 8-bit integer path and the 10-bit float path and picks by the header (chapter 14 §14.4.12, issue #306) — never linked into OVT) driven over the same raw planes; tolerance `1e-6` per plane (x264 float vs OVT double) for 8-bit and 10-bit inputs. Secondary cross-check: the `SSIM Mean Y` line of an x264 encode log (`x264 --ssim --psnr --qp 20 --bframes 0 ref.y4m -o out.264`; with B-frames x264 scores non-reference B pictures before deblocking, so the log would not match the decoded pictures, issue #306) is reproduced by running OVT on the source and the decoded x264 output, tolerance `1e-4` (the log prints 7 digits). libvpx's `tiny_ssim` is **not** an oracle for this id: it uses 8×8 windows stepping by 4 without the 2-sample offset, constants scaled by `64²` (`cc1 = 26634`, `cc2 = 239708` at 8-bit), and an "All" = `0.8·Y + 0.1·U + 0.1·V`; OVT does not ship that variant (`ssim_tiny` is reserved as an id, not implemented).
 
 ### 9.4.5 `ms_ssim`
 
@@ -645,7 +649,7 @@ struct ovt_MapBlobHeader {        /* little-endian, 32 bytes */
   uint32_t reserved;
 };                                 /* followed by blocks_w*blocks_h float32 */
 ```
-* `FrameScore.map_blob_id = "<metric_id>/<component>/<decode_index>/<B>"`, e.g. `"psnr/y/000123/16"`. In memory the blob lives in the job's `MapStore` (LRU, ≤ 256 MB); on disk at `<map_dir>/<metric_id>/<component>/f<decode_index:06>_b<B>.ovtmap`. Descriptors list `"map16"` (or `"map"` generally) in `outputs` when maps are supported.
+* `FrameScore.map_blob_id = "<metric_id>/<component>/<decode_index>/<B>"`, e.g. `"psnr/y/000123/16"`. `FrameScore` carries one `map_blob_id`, which names the first selected component; the other components' ids differ only in the `<component>` field. In memory the blob lives in the job's `MapStore` (LRU, ≤ 256 MB); until WI-3.316 lands, kernels write `.ovtmap` images to a `MapSink` (`core/src/metrics/kernels/map_sink.h`) installed by a process-wide hook (`ovt_MetricApi.create()` takes only `options_json`), and WI-3.316 implements the sink on the `MapStore` (issue #385); on disk at `<map_dir>/<metric_id>/<component>/f<decode_index:06>_b<B>.ovtmap`. Descriptors list `"map16"` (or `"map"` generally) in `outputs` when maps are supported.
 
 ### 9.4.8 `xpsnr` (phase 4; port of FFmpeg 7.1 `libavfilter/vf_xpsnr.c`, LGPL-2.1+)
 
@@ -755,7 +759,7 @@ All models are compiled in (`built_in_models=true`) and loaded with `vmaf_model_
 
 Each id is a separate `ovt_MetricApi` exported from `libovt-core` itself (`ovt_metric_vmaf_<id>()`), registered by the host at start-up; third-party plugins use the same ABI.
 
-### 9.5.4 Filling `VmafPicture` from `ovt_PlaneView`
+### 9.5.4 Filling `VmafPicture` from `ovt_MetricPlanes`
 
 ```cpp
 VmafPixelFormat fmt = (pv.planes == 1) ? VMAF_PIX_FMT_YUV400P
@@ -809,40 +813,43 @@ Metric keys are libvmaf's names; multiple models add `vmaf_neg`, `vmaf_4k` keys;
 
 ### 9.6.1 Source and pins
 
-* **Source repository:** `google/uvq` (https://github.com/google/uvq), **Apache-2.0** (code and weights). Pinned to a commit hash recorded in `third_party/VERSIONS.md` (`UVQ_COMMIT`). The published models are **TensorFlow SavedModels** (`models/` directory of the repository release, loaded by `uvq_main.py`/`uvq_utils.py` with `tf.saved_model.load`); two model generations are used: **UVQ 1.5** (default) and **UVQ 1.0** (the 2021 model). Sub-networks: ContentNet, CompressionNet, DistortionNet, AggregationNet (research §4b). The exact directory and signature names MUST be read from the pinned commit and recorded in `docs/dev/uvq_preprocessing.md`.
+* **Source repository:** `google/uvq` (https://github.com/google/uvq), **Apache-2.0** (code and weights). Pinned to a commit hash recorded in `third_party/VERSIONS.md` (`UVQ_COMMIT`). The pinned commit is `c204ecc0` (2026-09-29, owner decision 2026-11-05, issue #47): the published models are **PyTorch** checkpoints run by `uvq_inference.py <video> --model_version 1.0|1.5` (`torch == 2.8.0` CPU; TensorFlow and `tf2onnx` are no longer involved, the last TensorFlow revision `d563abfa` is not used); two model generations are used: **UVQ 1.5** (default; sub-networks ContentNet, DistortionNet, AggregationNet, one score per sampled frame) and **UVQ 1.0** (the 2021 model; ContentNet, CompressionNet, DistortionNet, AggregationNet, research §4b). The exact directory and signature names MUST be read from the pinned commit and recorded in `docs/dev/uvq_preprocessing.md`.
 * **ONNX Runtime:** pinned ≥ 1.20 (exact version in `VERSIONS.md`), MIT licence, consumed as the prebuilt C/C++ package per platform (vcpkg `onnxruntime` where available, else `third_party/onnxruntime.cmake` download with SHA-256). Execution providers: **CoreML EP** on macOS (`OrtSessionOptionsAppendExecutionProvider_CoreML`, flags `COREML_FLAG_USE_CPU_AND_GPU`), **XNNPACK EP** on Android (default; the NNAPI EP is deprecated by Android as of API 35 and is used only when the option `"ep":"nnapi"` is given on a device with API < 35, falling back to XNNPACK when NNAPI rejects the graph), **CPU EP** on Linux (and as the universal fallback). `OVT_UVQ_FORCE_CPU=1` forces the CPU EP everywhere (used by golden tests so scores are platform-independent).
 * `MetricsResult.engine = "onnxruntime <OrtGetApiBase()->GetVersionString()> / uvq <1.5|1.0> <UVQ_COMMIT[:8]> / ep=<coreml|nnapi|xnnpack|cpu>"`.
 
 ### 9.6.2 Model export work item (deliverable spec)
 
-The export is a Python tool `tools/uvq_export/export_uvq.py` (runs in a venv with the pinned TensorFlow 2.x and `tf2onnx`; **TensorFlow is never a runtime dependency of OVT**):
+The export is a Python tool `tools/uvq_export/export_uvq.py` (runs in a venv with the pinned `torch == 2.8.0` CPU and `torchvision`; **PyTorch is never a runtime dependency of OVT**):
 
-1. Clone `google/uvq` at `UVQ_COMMIT`; download the official SavedModel weights through the repo's own instructions; verify their SHA-256 against `tools/uvq_export/weights.sha256`.
-2. For each sub-network and each generation, convert the SavedModel with **tf2onnx** (`python -m tf2onnx.convert --saved-model <dir> --opset 17 --output <file>.onnx`, with `--inputs <name>:0[1,F,H,W,C]` to freeze the batch and frame dimensions — fixed input shapes; the geometry is read from the pinned source, see §9.6.4). tf2onnx is the only converter (`keras2onnx` is archived and does not support TensorFlow ≥ 2.6; tf2onnx also converts Keras SavedModels). When tf2onnx rejects an op, re-implement the failing layer manually in the ONNX graph (or register a tf2onnx custom-op handler in `export_uvq.py`) and document it in `report.json`. CompressionNet takes the fixed frame stack; the aggregator takes the concatenated feature vector (size read from the source and recorded in the preprocessing table).
-3. Produce **fp32 reference** models (`uvq15_{content,compression,distortion,aggregation}.onnx`) and **fp16 variants** (`onnxconverter_common.float16.convert_float_to_float16`, keep IO fp32) for Android/CoreML.
-4. Run `onnxruntime` CPU on the fp32 models and compare with the reference CLI (`python uvq_main.py --input_files=<clip>,<len_s>,<w>,<h> --output_dir=out --model_dir=models` at the pinned commit; the exact entry point and flags are read from the pinned README) on the **20 YouTube-UGC clips** `ytugc_clip01` … `ytugc_clip20` (entries of the single manifest `tests/corpora/manifest.json`, chapter 14 §14.3.1; mixed resolutions and orientations): MOS `|Δ| ≤ 0.01` per clip; per-chunk labels identical in argmax. fp16: `|Δ| ≤ 0.02` MOS, documented in the export report.
+1. Clone `google/uvq` at `UVQ_COMMIT`; download the official PyTorch weights through the repo's own instructions; verify their SHA-256 against `tools/uvq_export/weights.sha256`.
+2. For each sub-network and each generation, export the PyTorch module with **`torch.onnx.export`** (opset 17, TorchScript exporter, fixed input shapes `[1, F, C, H, W]` freezing the batch and frame dimensions; the geometry is read from the pinned source, see §9.6.4). When the exporter rejects an op, re-implement the failing layer manually in the ONNX graph and document it in `report.json`. CompressionNet (1.0 only) takes the fixed frame stack; the aggregator takes the concatenated feature vector (size read from the source and recorded in the preprocessing table).
+3. Produce **fp32 reference** models (`uvq15_{content,distortion,aggregation}.onnx` and `uvq10_{content,compression,distortion,aggregation}.onnx`) and **fp16 variants** (`onnxconverter_common.float16.convert_float_to_float16`, keep IO fp32) for Android/CoreML.
+4. Run `onnxruntime` CPU on the fp32 models and compare with the reference CLI (`python uvq_inference.py <clip>.mp4 --model_version 1.5` and `--model_version 1.0` at the pinned commit; the exact flags are read from the pinned README) on the **20 YouTube-UGC clips** `ytugc_clip01` … `ytugc_clip20` (entries of the single manifest `tests/corpora/manifest.json`, chapter 14 §14.3.1; mixed resolutions and orientations): MOS `|Δ| ≤ 0.01` per clip; per-chunk labels identical in argmax. fp16: `|Δ| ≤ 0.02` MOS, documented in the export report.
 5. Write `docs/dev/uvq_preprocessing.md` (§9.6.4) and `tools/uvq_export/report.json` (per-clip deltas, ORT version, opset, hashes).
-6. Upload the `.onnx` files as release assets; write `core/share/models/uvq/manifest.json` (installed to `${CMAKE_INSTALL_DATADIR}/ovt/models/uvq/manifest.json`, chapter 13 §13.2.6 install layout) with URL, size, SHA-256 and licence for each file.
+6. Upload the `.onnx` files as release assets (`https://github.com/openvideotools/ovt/releases/download/uvq-models-<UVQ_COMMIT[:8]>/<file>`; the upload is a publishing step done by the owner, the manifest carries the hashes of the deterministic export); write `core/share/models/uvq/manifest.json` (installed to `${CMAKE_INSTALL_DATADIR}/ovt/models/uvq/manifest.json`, chapter 13 §13.2.6 install layout) with URL, size, SHA-256 and licence for each file.
 
 ### 9.6.3 Weight distribution
 
 Models are **not** in the repository or the APK/DMG. `manifest.json` (schema below) is bundled; the GUI/CLI downloads on first use into `<cache_root>/models/uvq/`, where `<cache_root>` is the cache root of chapter 06 §6.7 (D32: `$XDG_CACHE_HOME/ovt/` on Linux, `~/Library/Caches/org.openvideotools.ovt/` on macOS, `Context.getCacheDir()/ovt/` on Android), verifies SHA-256, and refuses to load a file whose hash mismatches (`OVT_E_CORRUPT`, code `VQ-UVQ-0002`). `ovt models fetch uvq` does the same from the CLI.
 
 ```json
-{ "schema": 1, "model": "uvq", "version": "1.5", "source": "https://github.com/google/uvq", "commit": "<UVQ_COMMIT>", "license": "Apache-2.0",
-  "files": [ { "name": "uvq15_compression_fp32.onnx", "url": "https://.../uvq15_compression_fp32.onnx", "bytes": 0, "sha256": "<hex>", "precision": "fp32" } ] }
+{ "schema": 1, "model": "uvq", "version": "1.5", "versions": ["1.5", "1.0"], "opset": 17, "source": "https://github.com/google/uvq", "commit": "<UVQ_COMMIT>", "license": "Apache-2.0",
+  "labels": "labels_yt8m.txt",
+  "files": [ { "name": "uvq15_distortion_fp32.onnx", "url": "https://.../uvq15_distortion_fp32.onnx", "bytes": 0, "sha256": "<hex>", "precision": "fp32",
+               "uvq_version": "1.5", "role": "distortion", "inputs": [{"name": "frames", "shape": [1, 1, 3, 1080, 1920]}], "outputs": [{"name": "features", "shape": [1, 0]}] } ] }
 ```
+`version` is the default generation; `versions`, `opset`, `labels` and the per-file `uvq_version`, `role`, `inputs`, `outputs` keys are additive (a reader ignores keys it does not know).
 
 ### 9.6.4 Preprocessing specification
 
 The host reproduces the reference CLI's preprocessing exactly. **The exact geometry, frames-per-chunk, channel order, mean/std normalisation and interpolation MUST be read from the pinned source (`uvq_main.py`, `uvq_utils.py`, the SavedModel signatures, and the FFmpeg command lines they issue) and written to `docs/dev/uvq_preprocessing.md`; implementers MUST NOT guess them from this chapter.** What this chapter fixes is the *structure*:
 
-1. **Frame sampling.** Option `fps` (default `1`, CLI `--opt uvq.fps=<n>`, chapter 12 §12.2.9; `-1` = every frame). Sampled frame `k` is the displayed frame whose pts is the closest to `k / fps` seconds (the reference uses FFmpeg `fps=` filter semantics; the WI records whether the reference picks nearest or floor and matches it).
+1. **Frame sampling.** Option `fps` (default `1`, CLI `--opt uvq.fps=<n>`, chapter 12 §12.2.9; `-1` = every frame). UVQ 1.5 samples with FFmpeg `fps=<fps>:start_time=0:round=up` semantics and scores every sampled frame on its own (`F = 1`); UVQ 1.0 is fixed at 5 fps (`-r 5`) in 1-second chunks of 5 frames. Both score `ceil(duration) × fps` frames and pad any shortfall with black frames that count in the mean.
 2. **Rotation.** Apply the container display matrix (`TrackInfo.rotation`, Chapter 8) so the frame is upright, as the reference does via `--transpose`/ffprobe rotation. Option `{"rotation":"auto"|0|90|180|270}`.
 3. **Colour.** Decode → `model_rgb` domain (§9.2.5 g): limited/full range per stream, matrix per stream; result is 8-bit-equivalent sRGB-encoded RGB float. For SDR BT.709 this equals FFmpeg's `format=rgb24` output used by the reference (bit-exact except for rounding, which the ≤ 0.01 MOS tolerance absorbs).
-4. **Resize** to the model input geometry with **bilinear** interpolation, implemented by zimg `ZIMG_RESIZE_BILINEAR` on the RGB float planes (the reference uses FFmpeg `scale` → `bilinear` per the research note; the WI confirms the flag from the source and records it). Aspect-ratio handling (stretch vs letterbox) as in the source.
-5. **Normalisation** per model (e.g. `/255`, or mean/std) as in the source; **chunking** into 1-second windows of `F` frames; padding of the last partial chunk as in the source.
-6. **Inference**: run the three feature nets per chunk, concatenate, run AggregationNet; `compression_content_distortion` is the official MOS.
+4. **Resize** to the model input geometry with the reference's **bicubic** kernel (FFmpeg swscale `flags=bicubic`; zimg bicubic with `b = 0, c = 0.6` matches swscale's defaults) as `docs/dev/uvq_preprocessing.md` §2 records it: UVQ 1.5 stretches to 1920×1080 (no letterbox); UVQ 1.0 letterboxes to 1280×720 with `force_original_aspect_ratio` and a black pad, then a bilinear 496×496 pass for ContentNet. The reference scales in Y'CbCr inside one swscale context with the RGB conversion and 8-bit rounding at the output; WI-3.315's `metrics_uvq_parity` test decides whether resizing in float RGB stays within the 0.01 tolerance.
+5. **Normalisation** per model (`× 2/255 − 1` after 8-bit rounding, as in the source); **chunking** into 1-second windows of `F` frames (`F = 1` for 1.5, `F = 5` for 1.0); padding per step 1.
+6. **Inference**: run the feature nets per chunk (two for 1.5, three for 1.0), concatenate, run AggregationNet; the official MOS is AggregationNet's single output (`tanh(x) × 2 + 3`) for 1.5 and `compression_content_distortion` for 1.0.
 
 `docs/dev/uvq_preprocessing.md` MUST contain a table: `model version | input tensor name | shape | dtype | channel order | value range/normalisation | frames per chunk | resize filter | source file:line`.
 
@@ -851,11 +858,11 @@ The host reproduces the reference CLI's preprocessing exactly. **The exact geome
 ```json
 { "id": "uvq", "display_name": "UVQ (YouTube UGC MOS)", "kind": "NoReference", "domain": "ModelRGB", "per_plane": false,
   "higher_is_better": true, "range_min": 1.0, "range_max": 5.0, "temporal_unit_frames": 1,
-  "outputs": ["mos", "compression", "content", "distortion", "compression_content", "compression_distortion", "content_distortion", "compression_map4"],
+  "outputs": ["mos"],   // UVQ 1.5; for `uvq.version = "1.0"`: ["mos", "compression", "content", "distortion", "compression_content", "compression_distortion", "content_distortion", "compression_map4"]
   "license": "Apache-2.0 (google/uvq models); MIT (ONNX Runtime)", "version": "uvq 1.5 <commit8>" }
 ```
-* `temporal_unit_frames = 1` on the *sampled* frame sequence (the descriptor counts sampled frames, so the host neither buffers nor overlaps extra frames; the plugin itself accumulates `F` sampled frames per 1-second chunk and emits nothing until a chunk is complete). UVQ scores **chunks** (1 s). The plugin emits one `FrameScore` per chunk with `frame.decode_index` of the chunk's first sampled frame; `values = [mos, compression, content, distortion, compression_content, compression_distortion, content_distortion]` (the seven combinations of the README; `mos` = `compression_content_distortion`). `finish` emits the sequence-level `FrameScore` with the same vector (mean over chunks, as the reference CLI prints).
-* **Maps:** per chunk, the CompressionNet 4×4 grid of predicted compression levels and the DistortionNet 2×2 grid (upsampled to 4×4 by repetition) are written as `MapBlob`s with `blocks_w = blocks_h = 4`, `block_size = ceil(W/4)` (`value_kind = 1`, lower level = less compression), `map_blob_id = "uvq/compression/<decode_index>/grid4"` and `"uvq/distortion/<decode_index>/grid4"`. Content labels (top-5 of 3 862 YouTube-8M classes with probabilities) are **not** stored in the FlatBuffer (`FrameScore` has no string field, chapter 06 §6.5); they are written as the side file `<map_dir>/uvq/labels.json` (`{"chunks":[{"decode_index":0,"labels":[["Music",0.42],…]}]}`) next to the maps, and the OVT JSON export (§9.9.2) embeds the same array under `results[].extra.uvq_labels`. Label names come from `share/ovt/models/uvq/labels_yt8m.txt` (exported from the repo).
+* `temporal_unit_frames = 1` on the *sampled* frame sequence (the descriptor counts sampled frames, so the host neither buffers nor overlaps extra frames; the plugin itself accumulates `F` sampled frames per 1-second chunk and emits nothing until a chunk is complete). The plugin emits one `FrameScore` per chunk with `frame.decode_index` of the chunk's first sampled frame. **UVQ 1.5:** a chunk is one sampled frame and `values = [mos]` (no maps, no labels). **UVQ 1.0:** a chunk is 1 s (5 frames) and `values = [mos, compression, content, distortion, compression_content, compression_distortion, content_distortion]` (the seven combinations of the README; `mos` = `compression_content_distortion`). `finish` emits the sequence-level `FrameScore` with the same vector (mean over chunks including padded black frames, as the reference CLI prints). The GUI accepts a single-value UVQ result.
+* **Maps (UVQ 1.0 only):** per chunk, the CompressionNet 4×4 grid of predicted compression levels and the DistortionNet 2×2 grid (upsampled to 4×4 by repetition) are written as `MapBlob`s with `blocks_w = blocks_h = 4`, `block_size = ceil(W/4)` (`value_kind = 1`, lower level = less compression), `map_blob_id = "uvq/compression/<decode_index>/grid4"` and `"uvq/distortion/<decode_index>/grid4"`. Content labels (UVQ 1.0 only; top-5 of 3 862 YouTube-8M classes with probabilities) are **not** stored in the FlatBuffer (`FrameScore` has no string field, chapter 06 §6.5); they are written as the side file `<map_dir>/uvq/labels.json` (`{"chunks":[{"decode_index":0,"labels":[["Music",0.42],…]}]}`) next to the maps, and the OVT JSON export (§9.9.2) embeds the same array under `results[].extra.uvq_labels`. Label names come from `share/ovt/models/uvq/labels_yt8m.txt` (exported from the repo).
 
 Options JSON: `{"version":"1.5"|"1.0", "fps": 1, "rotation":"auto", "precision":"fp32"|"fp16", "ep":"auto"|"cpu"}`.
 
@@ -1052,7 +1059,7 @@ What Chapter 11 (GUI) and Chapter 10 (rendering) MAY assume from this module, vi
 /* core/include/ovt/metrics.h — metrics C API (WI-3.300 skeleton, WI-3.316 final) */
 typedef struct ovt_MetricsJob ovt_MetricsJob;                /* opaque */
 typedef struct ovt_MapView { uint32_t struct_size; /* D4 d: = sizeof(ovt_MapView) */ const struct ovt_MapBlobHeader* header; const float* values; } ovt_MapView;
-typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_PlaneView ref, dist; } ovt_PlanePair;
+typedef struct ovt_PlanePair { uint32_t struct_size; /* D4 d */ ovt_MetricPlanes ref, dist; } ovt_PlanePair;
 typedef void (*ovt_MetricsEventFn)(const char* event_json, void* user);   /* JobEvent as JSON, ≤ 10 Hz */
 
 ovt_status ovt_metrics_list_descriptors(ovt_Buffer* out_descriptors_json);               /* JSON array of MetricDescriptor */
@@ -1090,7 +1097,7 @@ ovt_status ovt_metrics_bd(const char* curves_json, const char* options_json, ovt
 | Corpus | Content | Used for |
 |---|---|---|
 | `netflix_src01_hrc00_576x324`, `netflix_src01_hrc01_576x324` (Netflix vmaf `python/test/resource/yuv/`) and the further `netflix` pairs of the pinned tree | 8-bit 4:2:0 576×324, 48 frames (wrapped to Y4M by the fetcher) | libvmaf parity, PSNR/SSIM oracles, pooling, scene detector |
-| `ytugc_clip01` … `ytugc_clip20` (YouTube-UGC, https://media.withyoutube.com; `ytugc_clip01`–`03` are `fast`; mixed 360p–1080p, landscape/portrait) | MP4 H.264 | UVQ parity |
+| `ytugc_clip01` … `ytugc_clip20` (YouTube-UGC, https://media.withyoutube.com; `ytugc_clip01` and `ytugc_clip03` are `fast` (chapter 14 §14.3.2, issue #179); mixed 360p–1080p, landscape/portrait) | MP4 H.264 | UVQ parity |
 | OVT synthetic `syn_metrics_*` (`syn_metrics_1080p_pair`, `syn_metrics_1080p_bitflip_f37`, `syn_metrics_10bit_8bit_pair`, `syn_metrics_444_420_pair`, `syn_metrics_fps_mismatch_pair`, `syn_metrics_scale_range_pair`, `syn_metrics_ladder_*`, `syn_metrics_pq_1080p_pair`), `syn_align_drop7`, `syn_scenes_5cuts` (chapter 14 §14.3.3 recipes 24, 25, 52–59); in-test frames from `tools/gen_metrics_synth.py` (gradient/noise/flat, 8/10-bit, 4:2:0/4:2:2/4:4:4, generated in memory by the unit tests, not corpus entries) | Y4M | kernel unit tests, HDR domain tests, alignment tests (frame drops, shifts, letterbox inserted programmatically) |
 | AWCY sample RD data (`bd/*.json`) | numbers | BD-rate |
 | HDR: `syn_metrics_pq_1080p_pair`, `syn_h265_main10_pq_hdr`, `syn_hlg_1080p` and the `patterns`-tagged ids (`syn_pat_pq_patches_1000`, …; chapter 14 §14.3.3 recipes 10, 38, 58, 73) | HEVC Main10 PQ/HLG | HDR domain, wPSNR, ΔE-ITP. Netflix "Sol Levante" is CC BY-NC-ND 4.0 (no derivatives, non-commercial) and therefore **not** used as a corpus. |
@@ -1164,15 +1171,15 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 ### WI-3.300 — Create the metrics schema, C API skeleton and plugin ABI header
 **Goal:** land `ovt_metrics.fbs`, `metric_v1.h`, `metrics.h` and an empty `MetricJob` so every later WI compiles against fixed interfaces.
 **Depends on:** WI-0.082 (`ovt_metrics.fbs`), WI-0.083 (generated headers), WI-1.512 (`jobs::Pool`).
-**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_PlaneView`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
+**Produces:** `core/schema/ovt_metrics.fbs` (§0.5.7 tables + `RdPoint`, `BdRateResult`, `SceneSegment`, `MetricsReport` — names as in chapter 06 §6.5), `core/include/ovt/abi/metric_v1.h` (BSD-2-Clause, §9.2.2 verbatim + `ovt_MetricPlanes`, `ovt_FrameId`), `core/include/ovt/metrics.h`, `core/src/metrics/host/{metric_job.h,.cpp,plugin_registry.h,.cpp}`, `core/schema/normalization_config.schema.json`.
 **Interface:** §9.2.2, §9.2.3, §9.2.4 schema.
-**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `share/ovt/metrics/` and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
+**Steps:** 1. Write the `.fbs` and run `flatc --cpp --python --reflect-names`. 2. Write the ABI header; compile it as C11 and C++20 in a test. 3. Implement `PluginRegistry`: static registration of in-tree metrics + `dlopen` of `libovt_metric_*.{so,dylib}` from `OVT_PLUGIN_DIR` (chapter 13 §13.2.6, the same directories and `$OVT_PLUGIN_PATH` rule as decoder plugins, chapter 12 §12.3.11) and `$OVT_METRIC_PATH`, calling `ovt_metric_v1()`. 4. `MetricJob` state machine with events, no scoring yet. 5. JSON-Schema validator for `NormalizationConfig` (use `nlohmann/json-schema-validator`, MIT) with default expansion and deterministic key order.
 **Acceptance tests:** 1. Given a `NormalizationConfig` of `{}`, When resolved, Then the output JSON equals `golden/norm_defaults.json` byte for byte. 2. Given `{"scale":{"kernel":"nearest"}}`, When parsed, Then `OVT_E_INVALID_ARG` with message naming `scale.kernel`. 3. Given a dummy plugin `libovt_metric_example`, When the registry loads, Then `ovt_metrics_list_descriptors()` contains id `example`.
 **Size:** M.
 **Notes / pitfalls:** `MetricsResult.normalization` uses chapter 06's canonical form (sorted keys, no whitespace — V-030); only the pretty export of §9.9.2 uses schema order. The ABI header must not include any C++ or FlatBuffers headers.
 
 ### WI-3.301 — Implement the normalisation pipeline (crop, bit depth, range, pairing) without zimg
-**Goal:** produce `ovt_PlaneView` pairs in `CodeValue` for equal-geometry inputs.
+**Goal:** produce `ovt_MetricPlanes` pairs in `CodeValue` for equal-geometry inputs.
 **Depends on:** WI-3.300, WI-2.171 (playback decoder for frame access).
 **Produces:** `core/src/metrics/normalize/{pipeline.h,.cpp,crop.cpp,bit_depth.cpp,frame_pairing.cpp}`.
 **Interface:** §9.2.4 steps 1, 4, 8; `AlignmentReport` fields `ref_frames,dist_frames,paired_frames,skipped_*`.
@@ -1224,7 +1231,7 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 ### WI-3.306 — Implement the PSNR kernel with combinations, APSNR and maps
 **Goal:** §9.4.2 + §9.4.7 for PSNR.
 **Depends on:** WI-3.300; vcpkg `highway`.
-**Produces:** `core/src/metrics/kernels/{psnr_scalar.cpp,psnr_hwy.cpp,psnr_metric.cpp}`, `tests/oracles/run_ffmpeg_psnr.py` (the map store `core/src/metrics/host/map_store.{h,cpp}` is WI-3.316; this WI only writes into it).
+**Produces:** `core/src/metrics/kernels/{psnr_scalar.cpp,psnr_hwy.cpp,psnr_metric.cpp}`, `tests/oracles/run_ffmpeg_psnr.py` (the map store `core/src/metrics/host/map_store.{h,cpp}` is WI-3.316; this WI writes maps through the interim `MapSink` of §9.4.7, `core/src/metrics/kernels/map_sink.h`).
 **Interface:** `ovt_metric_v1` for id `psnr`; `ovt_MapBlobHeader`.
 **Steps:** 1. SSE per row band (uint64) scalar. 2. Highway version with `hwy::HWY_NAMESPACE::ReduceSum` on widened lanes. 3. Combinations + `psnr_max` rule. 4. APSNR in `finish`. 5. Block maps for B ∈ {8,16,32,64}. 6. Golden tests against libvmaf `psnr_y/cb/cr` (from the parity run) and FFmpeg stats.
 **Acceptance tests:** 1. Given the Netflix pair, When `psnr` runs, Then `values[0..2]` equal libvmaf's `psnr_y/cb/cr` within 1e-6 dB on every frame. 2. Given identical inputs at 10-bit, When `psnr` runs, Then `values == 72.0` and the map is all 72.0. 3. Given 100 random frames, When the scalar and the Highway kernels run, Then their SSE values are bit-identical. 4. Given `syn_metrics_1080p_pair` on `m1-air-8gb`, When `bench_metrics_psnr_1080p` runs, Then it meets its chapter 14 §14.9.3 budget.
@@ -1247,7 +1254,7 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 **Produces:** `core/src/metrics/kernels/{ssim_x264.cpp,identity.cpp}`, `tests/oracles/x264_ssim/{pixel_ssim.c,main.c,CMakeLists.txt}` (vendored x264 kernel, GPL-2.0-or-later, oracle only), `tests/oracles/run_x264_ssim.py`.
 **Interface:** ids `ssim_x264`, `identity`; `VQ-DIFF-0001`.
 **Steps:** 1. 4×4 sums (Highway `SumsOf4`-style), 8×8 window combination stepping 4, integer constants, 2-sample offset, `(W'/4 − 1)·(H'/4 − 1)` window count. 2. `ssim_db`. 3. Identity fractions + SHA-256 (use the io module's SHA-256) + first-mismatch position (`VQ-DIFF-0001`). 4. Vendor the x264 kernel as the oracle executable; golden tests.
-**Acceptance tests:** 1. Given the Netflix pair and `syn_metrics_10bit_8bit_pair`'s 10-bit reference against its 10-bit re-encode, When `ssim_x264` runs, Then Y/U/V equal the x264 kernel oracle within 1e-6 at 8-bit and at 10-bit (float path, §9.4.4) and `ssim_db_y == 100` for an identical pair. 2. Given the x264 reconstruction of the Netflix reference (`x264 --qp 20 --ssim --dump-yuv`), When OVT compares source and reconstruction, Then OVT's `ssim_x264/y` mean equals the log's `SSIM Mean Y` within 1e-4. 3. Given ref == dist, When `identity` runs, Then `identity.all == 1.0` and `sha256_match == 1.0`; given `syn_metrics_1080p_bitflip_f37` against its reference, When `identity` runs, Then `all < 1.0`, `sha256_match == 0.0` and `VQ-DIFF-0001` names the sample recorded in `tests/corpora/compare_expected.json`.
+**Acceptance tests:** 1. Given the Netflix pair and `syn_metrics_10bit_8bit_pair`'s 10-bit reference against its 10-bit re-encode, When `ssim_x264` runs, Then Y/U/V equal the x264 kernel oracle within 1e-6 at 8-bit and at 10-bit (float path, §9.4.4) and `ssim_db_y == 100` for an identical pair. 2. Given the x264 reconstruction of the Netflix reference (`x264 --qp 20 --ssim --bframes 0 --dump-yuv`; issue #306), When OVT compares source and reconstruction, Then OVT's `ssim_x264/y` mean equals the log's `SSIM Mean Y` within 1e-4. 3. Given ref == dist, When `identity` runs, Then `identity.all == 1.0` and `sha256_match == 1.0`; given `syn_metrics_1080p_bitflip_f37` against its reference, When `identity` runs, Then `all < 1.0`, `sha256_match == 0.0` and `VQ-DIFF-0001` names the sample recorded in `tests/corpora/compare_expected.json`.
 **Size:** S.
 **Notes / pitfalls:** the `+2+2*stride` offset and `(W−2)×(H−2)` size are part of the definition; `ssim_c2` uses `64·63`, not `64²`; libvpx `tiny_ssim` is a different kernel (no offset, `64²` constants) — do not use it as an oracle (D10).
 
@@ -1307,10 +1314,10 @@ All WIs below use the backbone template (§0.1.6). Phase-3 items are WI-3.300–
 **Depends on:** none (Python only).
 **Produces:** `tools/uvq_export/{export_uvq.py,check_doc.py,weights.sha256,requirements.txt,report.json}`, `docs/dev/uvq_preprocessing.md`, `core/share/models/uvq/manifest.json`, `core/share/models/uvq/labels_yt8m.txt` (installed to `<prefix>/share/ovt/models/uvq/`).
 **Interface:** manifest schema §9.6.3; preprocessing table §9.6.4.
-**Steps:** 1. Pin `UVQ_COMMIT`, venv, weights fetch + hash. 2. Read the source and fill the preprocessing table (geometry, F, normalisation, resize flag). 3. Export fp32 opset 17, fixed shapes, for 1.5 and 1.0. 4. fp16 variants. 5. Validation run on ≥ 20 YouTube-UGC clips. 6. Manifest with SHA-256.
+**Steps:** 1. Pin `UVQ_COMMIT` (`c204ecc0`), venv with `torch == 2.8.0` CPU, weights fetch + hash. 2. Read the source and fill the preprocessing table (geometry, F, normalisation, resize kernel and letterbox rule per version). 3. Export fp32 opset 17 with `torch.onnx.export`, fixed shapes, for 1.5 (three nets) and 1.0 (four nets). 4. fp16 variants. 5. Validation run on ≥ 20 YouTube-UGC clips. 6. Manifest with SHA-256.
 **Acceptance tests:** 1. Given `ytugc_clip01` … `ytugc_clip20`, When ORT CPU fp32 runs the exported graphs with the Python preprocessing copied from the reference, Then `|Δ MOS| ≤ 0.01` per clip. 2. Given each exported `.onnx` file, When `onnx.checker.check_model` runs, Then no error is raised. 3. Given `docs/dev/uvq_preprocessing.md`, When `tools/uvq_export/check_doc.py` parses it, Then every table row carries a `source file:line` reference.
 **Size:** L.
-**Notes / pitfalls:** do not guess the input geometry; tf2onnx needs `--opset ≥ 13` for the `tf.nn.silu`/`Swish` patterns of EfficientNet-style nets (use 17); freeze batch size 1 and the frame count with `--inputs name:0[shape]`; if a SavedModel signature uses string tensors (file names) write a thin wrapper that exposes the image tensor input before converting.
+**Notes / pitfalls:** do not guess the input geometry; use opset 17 and the TorchScript exporter; freeze batch size 1 and the frame count in the example input; wrap the reference's file-based entry points in a thin module that takes the image tensor before exporting; the release-asset upload is the owner's publishing step.
 
 ### WI-3.315 — UVQ host plugin on ONNX Runtime
 **Goal:** §9.6.4–9.6.6 in C++.

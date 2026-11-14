@@ -68,19 +68,19 @@ Requirement ids are defined only in chapter 04; this table copies chapter 04's s
 | `--output <path>`, `-o` | path | `-` (stdout) | Write the result to a file instead of stdout. Required for `fb` when stdout is a TTY (refuses to print binary to a terminal; exit 2). |
 | `--cache-dir <dir>` | path | `$OVT_CACHE_DIR` else the platform cache root of chapter 06 §6.7 (D32): `~/Library/Caches/org.openvideotools.ovt/` (macOS), `$XDG_CACHE_HOME/ovt/` (Linux; `~/.cache/ovt/` when unset), `Context.getCacheDir()/ovt/` (Android) | Location of the on-disk index/analysis cache (chapter 06 §6.7). |
 | `--no-cache` | flag | off | Neither read nor write the cache. |
-| `--plugin-dir <dir>` | path, repeatable | `$OVT_PLUGIN_PATH` (colon-separated) plus built-in search paths (§12.3.11) | Additional directories searched for `libovt_plugin_*.{so,dylib}`. |
+| `--plugin-dir <dir>` | path, repeatable | `$OVT_PLUGIN_PATH` (colon-separated) plus built-in search paths (§12.3.11) | Directories searched for `libovt_plugin_*.{so,dylib}`; given, they **replace** `OVT_PLUGIN_PATH`, and the plugin host always appends the built-in search paths of §12.3.11. |
 | `--threads <n>` | int ≥ 0 | 0 (= hardware concurrency, capped at 16) | Worker threads for `ovt::jobs::Pool`; decoders receive `min(n, 8)`. |
-| `--log-level <l>` | enum `trace\|debug\|info\|warn\|error\|fatal\|off` | `warn` | Log threshold for stderr. Maps to `ovt_log_fn` levels 0..5. |
+| `--log-level <l>` | enum `trace\|debug\|info\|warn\|error\|fatal\|off` | `warn` | Log threshold for stderr. Maps to `ovt_log_fn` levels 0..5 (`off` = 6, §12.3.4). An explicit `--log-level` wins over `--quiet`, which wins over `OVT_LOG_LEVEL`. JSON log lines (`--format json`) use these lower-case names (`{"level":"warn","module":"cli","msg":"…"}`); text log lines use the chapter 07 §7.1.6 line format. |
 | `--log-file <path>` | path | | Append log lines to this file instead of stderr (same threshold). Diagnostics still go into the result's `diagnostics[]`; with `--format json` the log lines written to the file (or stderr) are JSON Lines `{"level","module","msg"}`, otherwise human text (chapter 04 FR-CLI-003/FR-CLI-015). |
 | `--partial-ok` | flag | off | On exit 7 (`CANCELLED`) or 5 (`CORRUPT`) keep the partial `--output` file instead of deleting it; stdout output is always flushed as far as it was produced (§12.1.3). Without the flag a partial `-o` file is removed so that scripts never consume a truncated result silently. |
-| `--progress` | flag | off | Emit progress to stderr. If stderr is a TTY: a single rewriting line `[####      ] 42% frames 1200/2850 ETA 00:12`. If not a TTY: one JSON Lines record per ≥ 1 % step `{"progress":0.42,"done":1200,"total":2850,"stage":"index"}`. |
-| `--time` | flag | off | Append a `timing` object to the envelope (`--format json`/`fb`) or print it as a `timing:` footer on stderr (`text`/`csv`): `{container_ms, index_ms, analysis_ms, seek_ms, decode_ms_per_frame, first_frame_ms, metrics_fps, wall_ms, cache_hit}`. Each subcommand fills the members it measured and omits the others (`cache_hit` is a boolean; `metrics_fps` = scored frames / scoring wall time). Chapter 04 performance acceptance tests (NFR-001…NFR-006, FR-DEC, FR-VQ) read these members; `dump --time` adds its per-frame members (§12.2.6). (OI-13.) |
+| `--progress` | flag | off | Emit progress to stderr. If stderr is a TTY: a single rewriting line `[####      ] 42% frames 1200/2850 ETA 00:12`. If not a TTY: one JSON Lines record per ≥ 1 % step `{"progress":0.42,"done":1200,"total":2850,"stage":"index"}` (`progress` is the reached 1 % step, not the raw fraction). |
+| `--time` | flag | off | Append a `timing` object to the envelope (`--format json`) or print it as a `timing:` footer on stderr (`text`, `csv` and `fb`: the v1 `fb` stream carries no timing): `{container_ms, index_ms, analysis_ms, seek_ms, decode_ms_per_frame, first_frame_ms, metrics_fps, wall_ms, cache_hit}`. Each subcommand fills the members it measured and omits the others (`cache_hit` is a boolean; `metrics_fps` = scored frames / scoring wall time). Chapter 04 performance acceptance tests (NFR-001…NFR-006, FR-DEC, FR-VQ) read these members; `dump --time` adds its per-frame members (§12.2.6). (OI-13.) |
 | `--quiet`, `-q` | flag | off | Equivalent to `--log-level error`, suppresses the `text` format footer. |
 | `--color <m>` | enum `auto\|always\|never` | `auto` | ANSI colour in `text` output. |
-| `--version`, `-V` | flag | | Prints `ovt <semver> (core <semver>, api <OVT_API_VERSION>)` and exits 0. With `--format json`: `{"ovt":"1.2.0","core":"1.2.0","api":"1.2.0","build":{"commit":"<sha>","profile":"release","platform":"macos-arm64"},"features":["aom","de265","vmaf","uvq"]}`. |
+| `--version`, `-V` | flag | | Prints `ovt <semver> (core <semver>, api <OVT_API_VERSION>)` and exits 0 (`text` and `json` only; `fb`/`csv` are `CLI-0002`). With `--format json`: `{"ovt":"1.2.0","core":"1.2.0","api":"1.2.0","build":{"commit":"<sha>","profile":"release","platform":"macos-arm64"},"features":["aom","de265","vmaf","uvq"]}`. |
 | `--help`, `-h` | flag | | Help for the tool or the subcommand. |
 
-Precedence: command-line flag > environment variable (`OVT_CACHE_DIR`, `OVT_PLUGIN_PATH`, `OVT_THREADS`, `OVT_LOG_LEVEL`, `OVT_FORMAT`) > built-in default. The alias flags (`--json`, `--text`, `--flatbuffers`, and the per-subcommand aliases listed in §12.2.0) are ordinary CLI11 flags that set the same variable as the canonical option; `--help` lists them under "aliases" and the GUI's "Copy as command" (§12.5) always emits the canonical spelling. `--threads` and `--log-level` MUST be honoured identically by the GUI (chapter 11 settings dialog).
+Precedence: command-line flag > environment variable (`OVT_CACHE_DIR`, `OVT_PLUGIN_PATH`, `OVT_THREADS`, `OVT_LOG_LEVEL`, `OVT_FORMAT`) > built-in default. The alias flags (`--json`, `--text`, `--flatbuffers`, and the per-subcommand aliases listed in §12.2.0) are ordinary CLI11 flags that set the same variable as the canonical option (an agreeing pair such as `--json --format json` is accepted; a disagreeing pair such as `--json --format csv` or `--json --text` is `CLI-0006`); `--help` lists them under an "Aliases" heading and the GUI's "Copy as command" (§12.5) always emits the canonical spelling. `--threads` and `--log-level` MUST be honoured identically by the GUI (chapter 11 settings dialog).
 
 The parser is **CLI11** (vcpkg port `cli11`, BSD-3-Clause). Subcommands and flags are `kebab-case` (§0.4). Unknown flags are an error (exit 2), never ignored. Every flag has a long form; only `-f`, `-o`, `-q`, `-h`, `-V`, `-t` (track), `-n` (frame count), `-r`/`-d`/`-m` (`metrics`) have short forms.
 
@@ -90,7 +90,7 @@ The parser is **CLI11** (vcpkg port `cli11`, BSD-3-Clause). Subcommands and flag
 |---|---|---|---|
 | 0 | `OK` | Result produced. Diagnostics of severity Info/Warning may be present. | `OVT_OK` |
 | 1 | `ERROR` | Unclassified failure (internal error, assertion). A bug; always logs a stack trace at `--log-level debug`. | `OVT_E_INTERNAL`, `OVT_E_NOMEM` |
-| 2 | `USAGE` | Bad flag, missing argument, unsupported format for the subcommand, mutually exclusive flags. The message always ends with `See 'ovt <sub> --help'.` | `OVT_E_INVALID_ARG` |
+| 2 | `USAGE` | Bad flag, missing argument, unsupported format for the subcommand, mutually exclusive flags, invalid environment variable value. The message is always one human line ending with `See 'ovt <sub> --help'.`, also under `--format json` (chapter 04 FR-CLI-003); every other diagnostic and every log line follows `--format json`. | `OVT_E_INVALID_ARG` |
 | 3 | `IO` | File not found, permission denied, read error, cannot write `--output`. | `OVT_E_IO` |
 | 4 | `UNSUPPORTED` | Format/codec/feature recognised but not implemented (e.g. MXF in phase 1, a plugin missing for the codec). | `OVT_E_UNSUPPORTED` |
 | 5 | `CORRUPT` | Input violates its specification badly enough that the requested result is incomplete. Partial output IS still written (as much as could be produced) together with `diagnostics[]`. | `OVT_E_CORRUPT` |
@@ -105,7 +105,7 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 
 | Code | Severity | Message template | When raised | Exit |
 |---|---|---|---|---|
-| `CLI-0001` | Error | `unknown option '{opt}' for '{subcommand}'` (or `unknown subcommand '{name}'`) | CLI11 parse failure; the message appends `--help` guidance and the closest spelling from the alias table of §12.2.0 | 2 |
+| `CLI-0001` | Error | `unknown option '{opt}' for '{subcommand}'` (or `unknown subcommand '{name}'`) | every CLI11 parse failure, also `a subcommand is required` (bare `ovt`), `unexpected argument '{arg}' for '{subcommand}'`, a bad value and a missing positional; the message appends `--help` guidance and, within edit distance 2 of a long option or subcommand, `(did you mean '--json'?)` | 2 |
 | `CLI-0002` | Error | `format '{fmt}' is not supported by '{subcommand}'` | `--format` value outside the subcommand's set (§12.2.0 table) | 2 |
 | `CLI-0003` | Error | `bad selector '{sel}': {reason}` | frame/sample/track selector (§12.1.5 grammar) does not parse, or an index exceeds the stream (`{reason}` = `index 500 > last frame 299`) | 2 |
 | `CLI-0004` | Error | `cannot write '{path}': {errno text}` | `-o`/`--planes-dir` target not creatable or not writable | 3 |
@@ -114,6 +114,8 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 | `CLI-0007` | Error | `stdin ('-') may be used for one input only and must be a regular file or pipe` | `-` given twice, or the input needs seeking and stdin is not seekable (§12.1.5) | 2 |
 | `CLI-0008` | Error | `plugin '{id}' not found; installed: {list}` | `--plugin <id>` / `--verify-with <id>` names an unloaded plugin (`ovt plugins` lists them) | 6 |
 | `CLI-0009` | Error | `input '{path}': {reason}` | file missing, unreadable or not sniffable as any supported format (wraps `IO-*`/`CNT-*` library diagnostics for the top-level message) | 3 or 4 |
+| `CLI-0010` | Error | `refusing to write binary to a terminal; use -o` | `--format fb` with stdout a TTY and no `-o` (WI-1.500 step 4) | 2 |
+| `CLI-0011` | Error | `invalid value '{value}' in {variable}` | `OVT_FORMAT`, `OVT_THREADS` or `OVT_LOG_LEVEL` holds a value the matching option would reject | 2 |
 
 ### 12.1.4 Output formats
 
@@ -121,7 +123,7 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 
 ```json
 {
-  "$schema": "https://openvideotools.org/schema/ovt-cli-1.json",
+  "$schema": "https://ovt.dev/schema/ovt-cli-1.json",
   "ovt_version": "1.2.0",
   "schema_version": 1,
   "command": "probe",
@@ -132,7 +134,7 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 }
 ```
 
-`input.path` is the path exactly as given on the command line (so output is deterministic for the same invocation). `result` is the JSON mapping of the FlatBuffers root table named by the subcommand (table 12.2.0), produced by OVT's own reflection-based printer (`ovt_fb_to_json`, §12.3.8; chapter 06 §6.8.1 is the normative field-for-field rule set). The printer follows `flatc --json` where flatc has a rule and adds the rules flatc lacks: field names as in the schema (`snake_case`), enums as their *names* (`"PredKind": "Inter"` → `"pred": "Inter"`), structs as objects, vectors as arrays, absent fields omitted, `ulong`/`long` as JSON numbers when |v| ≤ 2^53 and as decimal **strings** otherwise (flatc prints them as numbers, which loses precision in JavaScript consumers), `[ubyte]` vectors as **base64 strings** (flatc has no base64 mode; `flatc --json` would print byte arrays) **except** `CellGrid` vectors, which are arrays of numbers, and `float`/`double` printed with the shortest round-trip representation (`std::to_chars`), `NaN`/`±Inf` as the strings `"nan"`, `"inf"`, `"-inf"`. All numbers use `.` as decimal separator and no thousands separator regardless of `LANG`/`LC_ALL`; the CLI calls `setlocale(LC_NUMERIC, "C")` before any formatting and the printer never uses locale-dependent functions (chapter 04 FR-CLI-010). The nested FlatBuffers in `Block.ext` and `FrameAnalysis.filter_params` are decoded in place into `ext_decoded` / `filter_params_decoded` objects, keyed by `ext_type`. JSON Schema files for the envelope and for every root table are generated at build time by `tools/fbs_to_jsonschema.py` from the `.fbs` files into `docs/spec/schemas/<Table>.schema.json` (chapter 04 FR-CLI-002; WI-1.501) and the `json` output of every subcommand MUST validate against them.
+`input.path` is the path exactly as given on the command line (so output is deterministic for the same invocation). `result` is the JSON mapping of the FlatBuffers root table named by the subcommand (table 12.2.0), produced by OVT's own reflection-based printer (`ovt_fb_to_json`, §12.3.8; chapter 06 §6.8.1 is the normative field-for-field rule set). The printer follows `flatc --json` where flatc has a rule and adds the rules flatc lacks: field names as in the schema (`snake_case`), enums as their *names* (`"PredKind": "Inter"` → `"pred": "Inter"`), structs as objects, vectors as arrays, absent fields omitted, `ulong`/`long` as JSON numbers when |v| ≤ 2^53 and as decimal **strings** otherwise (flatc prints them as numbers, which loses precision in JavaScript consumers), `[ubyte]` vectors as arrays of numbers (as flatc prints them) **except** the hash-like fields `source_hash`, `reference_source_hash`, `distorted_source_hash`, `default_kid`, `system_id`, `uuid`, `iv`, `kid`, `kids`, `default_constant_iv` and `bytes`, which are lowercase hex strings (chapter 06 §6.8.1), and `float`/`double` printed with the shortest round-trip representation (`std::to_chars`), `NaN`/`±Inf` as the strings `"nan"`, `"inf"`, `"-inf"`. All numbers use `.` as decimal separator and no thousands separator regardless of `LANG`/`LC_ALL`; the CLI calls `setlocale(LC_NUMERIC, "C")` before any formatting and the printer never uses locale-dependent functions (chapter 04 FR-CLI-010). The nested FlatBuffers `Block.ext`, `FrameAnalysis.filter_params`, `FrameInfo.ref_state`, `HevcCu.palette` and `Av1Block.palette` are **replaced in place** by the decoded object under the same key (the sibling `*_type` field is kept; chapter 06 §6.8.1); there are no `*_decoded` keys. JSON Schema files for the envelope and for every root table are generated at build time by `tools/fbs_to_jsonschema.py` from the `.fbs` files into `docs/spec/schemas/<Table>.schema.json` (chapter 04 FR-CLI-002; WI-1.501) and the `json` output of every subcommand MUST validate against them.
 
 **JSON compatibility policy (normative; the CI-consumer guarantee).** `schema_version` in the envelope is an integer that is bumped only on a breaking change of the envelope or of a root table's JSON mapping. Within one `schema_version` changes are **additive only**: new fields, new enum names and new diagnostic codes may appear; existing field names, types, units, enum names, the envelope keys and the exit-code table never change or disappear. A consumer MUST ignore unknown fields. A breaking change bumps `schema_version`, bumps `OVT_API_VERSION_MAJOR` (§12.3.2) in the same release, is listed in `CHANGELOG.md` under `changed`, and the previous layout stays readable by `ovt cache import` (§12.2.13) for one major version. The generated JSON Schemas (`docs/spec/schemas/`, WI-1.501) are versioned by the same integer (`ovt-cli-<schema_version>.schema.json`) and `tools/check_schema_compat.py` (chapter 13 WI-0.003) fails a PR that removes or retypes a field without a bump. This paragraph is the policy chapter 17 OI-14 referred to; it is owned here.
 
@@ -140,7 +142,7 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 
 The envelope table is `ovt.fb.CliEnvelope` (`core/schema/ovt_model.fbs`, chapter 06 §6.3 "CLI / API report tables", `file_identifier "OVTE"`): fields `ovt_version`, `schema_version`, `command`, `input_path`, `input_size`, `source_hash`, `record_count` (number of result records that follow), `diagnostics`, `status`. Chapter 06 is the only place the schema text lives; this chapter never redefines tables.
 
-**`csv`.** RFC 4180, comma separator, `\n` line ending, header row first, UTF-8, no BOM, numbers with `.` decimal separator and at most 6 fractional digits, booleans as `0`/`1`, enums as names. Column sets are fixed per subcommand (§12.2). A `csv` request on a tree-shaped result (`probe`, `syntax`) flattens the tree with the columns `depth,path,name,descriptor,value,bit_offset,bit_length,spec_ref` where `path` is `/`-joined names with `[i]` for array elements.
+**`csv`.** RFC 4180, comma separator, `\n` line ending, header row first, UTF-8, no BOM, numbers with `.` decimal separator and at most 6 fractional digits (trailing zeros dropped, `-0` printed as `0`, NaN/±Inf as `nan`, `inf`, `-inf`), booleans as `0`/`1`, enums as names. Column sets are fixed per subcommand (§12.2). A `csv` request on a tree-shaped result (`probe`, `syntax`) flattens the tree with the columns `depth,path,name,descriptor,value,bit_offset,bit_length,spec_ref` where `path` is `/`-joined names with `[i]` for array elements.
 
 **`yuview`.** YUView statistics CSV ("Statistics Extension Syntax", semicolon-separated, `%;syntax-version;v1.2` header). Exact mapping of `CellGrid`/`Block`/`MotionVector` to YUView types is normative in chapter 06 §6.8.2; `analyze --format yuview` MUST produce a file that YUView 2.14 opens over the matching decoded YUV without warnings.
 
@@ -390,7 +392,7 @@ ovt syntax clip.hevc --filter "slice_qp_delta > 10" --json
 | `--with-headers` | flag | off | Include `Unit.header` trees inside `units[]`. |
 | `--gop` | flag | off | Add `gops[]` derived view: one record per RAP-to-RAP span (`start_decode_index,length,bytes,types`). |
 | `--refgraph` | flag | off | Add `refgraph[]`: one `{decode_index, refs:[decode_index]}` edge list per frame built from `FrameInfo.declared_refs` (chapter 04 FR-SYN-017 `ovt index --refgraph --json`); `text` prints a DOT digraph. |
-| `--validate` | flag | off | Run the `StreamIndex` validation rules of chapter 06 §6.9 (`validate_stream_index`, WI-0.086) on the built or cached index and append every violation to `diagnostics[]` as `{code:"V-nnn", severity, message, path}`. Exit 0 when no violation, **5** (`CORRUPT`) when at least one Error-severity violation is reported (the index is still written), 3 for unreadable input (§12.1.3). `text` prints one line per violation. |
+| `--validate` | flag | off | Run the `StreamIndex` validation rules of chapter 06 §6.9 (`validate_stream_index`, WI-0.086) on the built or cached index and append every violation to `diagnostics[]` as `{code:"MDL-VAL-0nnn", severity, message /* begins with V-nnn */, path}`. Exit 0 when no violation, **5** (`CORRUPT`) when at least one Error-severity violation is reported (the index is still written), 3 for unreadable input (§12.1.3). `text` prints one line per violation. |
 
 **Output.** `result` = `StreamIndex` (filtered per flags). `text --summary` prints:
 
@@ -406,7 +408,7 @@ temporal layers 3  max temporal_id 2  fields no  diagnostics 0
 ovt index clip.mp4 --summary
 ovt index clip.mp4 --rebuild --format fb -o clip.index.fb
 ovt index clip.ivf --gop -f json | jq '.result.gops | length'
-ovt index clip.mp4 --validate -f json | jq '.diagnostics[] | select(.code|startswith("V-"))'
+ovt index clip.mp4 --validate -f json | jq '.diagnostics[] | select(.code|startswith("MDL-VAL-"))'
 ```
 
 ### 12.2.5 `ovt frames`
@@ -517,7 +519,7 @@ ovt extract clip.h264 --temporal-id 0 -o base_layer.h264
 | `--threads` | (global) | | Passed to the plugin as `threads` in `create()`. |
 | `--csv-rows <r>` | enum `cell\|mv` | `cell` | Row kind for `--format csv`: `cell` (below) or `mv` = one row per `MotionVector`: `decode_index,display_index,x,y,w,h,list,ref,mv_x,mv_y,mvd_x,mvd_y,predictor,flags` (`--format mv-csv` is the alias of `--format csv --csv-rows mv`; chapter 04 FR-CLI-008). |
 | `--verify-with <id>` | plugin id | | Decode every emitted frame a second time with plugin `id` (typically `hm`) and compare reconstruction planes sample-by-sample and every `CellGrid` vector; differences become `VER-0001`/`VER-0002` diagnostics (chapter 07 §7.6.4 "Verify mode", WI-4.106). Exit 8 when any frame differs, 6 when `id` is not available. |
-| `--validate` | flag | off | Run the `FrameAnalysis` validation rules V-001…V-032 of chapter 06 §6.9 (`validate_frame_analysis`, WI-0.086) on every emitted record and append violations to `diagnostics[]` as `{code:"V-nnn", severity, message, path}` (`path` is the FlatBuffers-style locator, e.g. `grid.qp[1234]`). Exit 0 when no violation, **5** (`CORRUPT`) when any Error-severity violation is reported (records are still written), 6 when the plugin itself fails (§12.1.3). Also accepts a stored `.fa`/`.fa.zst` file or a cache directory instead of a stream (`ovt analyze --validate out.fa`), in which case nothing is decoded. |
+| `--validate` | flag | off | Run the `FrameAnalysis` validation rules V-001…V-032 of chapter 06 §6.9 (`validate_frame_analysis`, WI-0.086) on every emitted record and append violations to `diagnostics[]` as `{code:"MDL-VAL-0nnn", severity, message /* begins with V-nnn */, path}` (`path` is the FlatBuffers-style locator, e.g. `grid.qp[1234]`). Exit 0 when no violation, **5** (`CORRUPT`) when any Error-severity violation is reported (records are still written), 6 when the plugin itself fails (§12.1.3). Also accepts a stored `.fa`/`.fa.zst` file or a cache directory instead of a stream (`ovt analyze --validate out.fa`), in which case nothing is decoded. |
 
 **Output.** `fb`: one `FrameAnalysis` record per emitted frame in `--order`. `json`: `result` = array of `FrameAnalysis`; `CellGrid` vectors are JSON arrays. `csv`: one row per **cell**: `decode_index,display_index,cx,cy,block_id,partition_id,pred,qp,intra_mode_y,intra_mode_c,mv0_x,mv0_y,mv1_x,mv1_y,ref0,ref1,tx_log2_w,tx_log2_h,tx_type,cbf,bits_x8,deblock_bs_v,deblock_bs_h,filter_idx` (missing vectors → empty cells). `yuview`: §12.1.4. `aom-inspect`: §12.1.4. Determinism: `FrameAnalysis.plugin_version` is a fixed string per build, so output is byte-stable.
 
@@ -528,7 +530,7 @@ ovt analyze clip.obu --frame 30 --format json | jq '.result[0].grid.qp | length'
 ovt analyze clip.hevc --range 0-59 --plugin de265 --planes recon,pred --format fb -o gop0.fb
 ovt analyze clip.ivf --all --format yuview -o clip_stats.csv
 ovt analyze clip.obu --frame 0 --format aom-inspect
-ovt analyze clip.hevc --range 0-59 --plugin de265 --validate -f json | jq '[.diagnostics[] | select(.code|startswith("V-"))] | length'
+ovt analyze clip.hevc --range 0-59 --plugin de265 --validate -f json | jq '[.diagnostics[] | select(.code|startswith("MDL-VAL-"))] | length'
 ```
 
 ### 12.2.9 `ovt metrics`
@@ -658,9 +660,9 @@ ovt verify clip.obu --plugin aom --against dav1d --tolerance 0 --stop-on-first
 
 | Form | Description |
 |---|---|
-| `ovt cache list` | One row per cached entry: `key,kind (index\|analysis\|metrics),source_path_basename,size_bytes,created (ISO 8601),last_used`. Timestamps live in cache metadata only (§0.7 rule 5) — therefore `cache list` output is exempt from FR-CLI-004 and says so in `--help`. |
-| `ovt cache stats` | Totals, entry count, limit (`--max-size` setting), hit/miss counters since creation. |
-| `ovt cache clear [--kind k] [--older-than <days>] [--source <path>]` | Delete entries. Without filters: everything (asks for confirmation on a TTY unless `--yes`). |
+| `ovt cache list` | One row per (entry, kind present): `key,kind (index\|analysis\|metrics),source_path_basename,size_bytes,created (ISO 8601),last_used` with that kind's bytes; the kinds map to entry files as chapter 06 WI-0.092 states (`index` = `index.fb`, `container.fb.zst`; `analysis` = `frames/`, `planes/`, `reports/*` except `metrics`; `metrics` = `maps/`, `metrics/`, `reports/metrics.fb.zst`; `meta.json` belongs to no kind). Timestamps live in cache metadata only (§0.7 rule 5) — therefore `cache list` output is exempt from FR-CLI-004 and says so in `--help`. |
+| `ovt cache stats` | Totals, entry count, limit (`--max-size` setting), hit/miss counters since the process started (`CacheReport.hits`/`misses` are process-lifetime lookup counters; `cache.json` persists none). |
+| `ovt cache clear [--kind k] [--older-than <days>] [--source <path>]` | Delete entries. Without filters: everything (asks for confirmation on a TTY unless `--yes`). `--kind k` deletes only that kind's files from matching closed entries and updates `meta.json` (`index_complete=false`, or `plugins=[]`/`planes_cached=false`); an entry left with only `meta.json` is removed whole. Entries open through any handle of this process are skipped and reported. `--source <path>` is `OVT_E_UNSUPPORTED` (exit 4) until the §6.2.8 source hasher exists (WI-1.121). |
 | `ovt cache path` | Print the resolved cache directory. |
 | `ovt cache import <path>` | Import stored records into the cache for their `source_hash`: `path` is a `.json` export (reverse of the JSON exporter, chapter 06 §6.8.1 and WI-0.088 — the round-trip MUST be byte-identical), a `.fa`/`.fa.zst` `FrameAnalysis`, an `.index.fb` `StreamIndex` or a directory of them. Records whose `schema_version` or `source_hash` do not match an existing entry create a new entry. `result` = `CacheReport` restricted to the touched entries. Exit 5 when a record fails `ovt_validate_*` (§12.3.8). |
 | `ovt cache stats --max-size` | (setting) `--max-size <GiB>` on `stats`/`clear` sets the cap persistently in `cache.json` (default 20 GiB desktop, 2 GiB Android; chapter 06 §6.7.4). |
@@ -687,7 +689,7 @@ vmaf     metric    -      3.2.1      BSD-2-Clause-Patent     1    (built-in)
 
 ### 12.2.15 `ovt completion`
 
-`ovt completion <bash|zsh|fish>` prints a completion script to stdout. CLI11 (2.4.x) has no completion generator of its own; `cli/tools/gen_completions.cpp` (WI-1.500 step 7) walks the `CLI::App` tree (subcommands, options, enum choices from `CLI::IsMember` validators) at build time and writes the three scripts into `build/<preset>/generated/completions/`, which are embedded as string constants. Installed by the Homebrew cask, the `.deb`/`.rpm` and Flatpak (chapter 13 §13.6).
+`ovt completion <bash|zsh|fish>` always prints the completion script to stdout (the TTY default and `OVT_FORMAT` are ignored so that `ovt completion zsh > _ovt` works; only an explicit non-`text` `--format` flag is `CLI-0002`). CLI11 (2.4.x) has no completion generator of its own; `cli/tools/gen_completions.cpp` (WI-1.500 step 7) walks the `CLI::App` tree (subcommands, options, enum choices from `CLI::IsMember` validators) at build time and writes the three scripts into `build/<preset>/generated/completions/`, which are embedded as string constants. Installed by the Homebrew cask, the `.deb`/`.rpm` and Flatpak (chapter 13 §13.6).
 
 ### 12.2.16 `ovt doctor`
 
@@ -836,7 +838,7 @@ ovt render clip.hevc --frame 0 --overlays F4 --plane y --out mv_overlay.png
 | `ovt/ovt.h` | includes every header below; nothing else | — |
 | `ovt/version.h` | `OVT_API_VERSION*`, `ovt_version*` | |
 | `ovt/status.h` | `ovt_status`, `ovt_status_string`, `ovt_Buffer`, `ovt_buffer_free` | |
-| `ovt/log.h` | `ovt_log_fn`, `ovt_set_logger`, `ovt_set_log_level` | |
+| `ovt/log.h` | `ovt_log_fn`, `ovt_set_logger`, `ovt_set_log_level`, `ovt_log_write` | |
 | `ovt/jobs.h` | `ovt_Job` | |
 | `ovt/io.h` | `ovt_File` | |
 | `ovt/container.h` | `ovt_Container` | |
@@ -846,7 +848,7 @@ ovt render clip.hevc --frame 0 --overlays F4 --plane y --out mv_overlay.png
 | `ovt/hrd.h` | `ovt_HrdOptions`, `ovt_index_hrd_trace` (chapter 07 §7.4.8) | |
 | `ovt/decode.h` | `ovt_Decoder`, `ovt_Picture` (reference counted: `ovt_picture_ref`/`ovt_picture_release`), `ovt_PlaneView`, `ovt_picture_export_plane` | |
 | `ovt/analysis.h` | `ovt_Analysis` | |
-| `ovt/color.h` | `ovt_ColorDescription` (§0.5.6), `ovt_hdr_measure` | |
+| `ovt/color.h` | `ovt_ColorDescription` (§0.5.6), `ovt_hdr_measure` | created by WI-0.087 (chapter 06) with the struct only; the functions are added by their WIs |
 | `ovt/metrics.h` | `ovt_MetricsJob` (chapter 09 §9.10 job API), `ovt_metrics_push`/`ovt_metrics_finish`, `ovt_bdrate` | |
 | `ovt/cache.h` | process-wide cache control; `ovt_Cache`/`ovt_CacheEntry` object API (chapter 06 §6.7) | |
 | `ovt/plugins.h` | plugin search path, dynamic loading, static registration, listing | |
@@ -860,7 +862,7 @@ Conventions (normative, in addition to §0.4 naming):
 4. **Threading.** Handles (`ovt_File`, `ovt_Container`, `ovt_Stream`, `ovt_Analysis`, `ovt_Decoder`, `ovt_MetricsJob`) are **not thread-safe**: concurrent calls on the same handle are undefined behaviour, with one documented exception — the container **byte service** (`ovt_container_bytes`, `ovt_container_box_at`, `ovt_container_segment_for_offset`, `ovt_container_size`, `ovt_container_stats_json`, chapter 08 §8.8) MAY be called concurrently with each other and with reads on `ovt_Stream`s of the same container (they only read the immutable top-level tree and the file). Different handles may be used from different threads concurrently, including two `ovt_Stream` handles on the same `ovt_Container` (the container serialises its own file reads). Debug builds detect a violation with an assertion naming the object (`ovt_Analysis used from two threads`, chapter 04 FR-API-005). `ovt_Job` functions are thread-safe. The logger callback MAY be invoked from any thread and MUST be reentrant with respect to the API (it must not call back into OVT). `ovt_set_logger` MUST be called before any other API call from any thread.
 5. Strings are UTF-8, NUL-terminated, owned by the callee unless an `out` parameter says otherwise; strings returned by value are valid for the life of the handle.
 6. No function blocks on a GUI event loop; long operations take an `ovt_Job*` (nullable) and check cancellation ≥ every 50 ms (§0.7 rule 2).
-7. **Public-layout structs begin with `uint32_t struct_size` (D4 d).** Every struct with public layout that is passed by pointer across the ABI (`ovt_PlaneView`, `ovt_Picture`, `ovt_ColorDescription`, `ovt_HdrMeasurement`, `ovt_JobProgress`, `ovt_HrdOptions`, `ovt_BdResult`, `ovt_MapView`, `ovt_PlanePair`, and the plugin ABI structs `ovt_AnalysisCaps`, `ovt_AnalysisDecoderApi`, `ovt_MetricApi`) has `uint32_t struct_size` as its first member; the caller sets it to `sizeof(struct)` on input structs and the library sets it on output structs. New fields are only appended; a reader compares `struct_size` before touching an appended field, so a minor version may extend a struct without renaming it. The two value-type pairs `ovt_Buffer {data,size}` and `ovt_FrameId {decode_index, display_index}` are exempt (they are never extended; `sizeof(ovt_Buffer) == 16` is asserted in `test_c_api_abi.cpp`). Chapter 0 §0.5.6 (`ovt_ColorDescription`) and §0.6.2/§0.6.3 (plugin ABI structs) follow the same rule.
+7. **Public-layout structs begin with `uint32_t struct_size` (D4 d).** Every struct with public layout that is passed by pointer across the ABI (`ovt_PlaneView`, `ovt_Picture`, `ovt_ColorDescription`, `ovt_HdrMeasurement`, `ovt_JobProgress`, `ovt_HrdOptions`, `ovt_BdResult`, `ovt_MapView`, `ovt_PlanePair`, and the plugin ABI structs `ovt_AnalysisCaps`, `ovt_AnalysisDecoderApi`, `ovt_MetricApi`) has `uint32_t struct_size` as its first member; the caller sets it to `sizeof(struct)` on input structs and the library sets it on output structs. New fields are only appended; a reader compares `struct_size` before touching an appended field, so a minor version may extend a struct without renaming it. The two value-type pairs `ovt_Buffer {data,size}` and `ovt_FrameId {decode_index, display_index}` are exempt (they are never extended; `sizeof(ovt_Buffer) == 16` is asserted in `test_c_api_abi.cpp`). Chapter 0 §0.5.6 (`ovt_ColorDescription`) and §0.6.2/§0.6.3 (plugin ABI structs) follow the same rule. A struct embedded **by value** in another ABI struct (`ovt_ColorDescription` and `ovt_PlaneView` inside `ovt_Picture`, `ovt_ColorDescription` inside `ovt_MetricPlanes`) is frozen: it cannot grow, and an extension goes as a new trailing member of the outer struct.
 8. **No exceptions cross the C ABI (D4 c).** Every exported function is implemented as `noexcept` in `core/src/api/*.cpp`; the implementation catches `ovt::ParseError`, `std::bad_alloc` and every other exception at the boundary and converts it into `OVT_E_CORRUPT`, `OVT_E_NOMEM` or `OVT_E_INTERNAL` with the thread-local last-error `Diagnostic` set (§12.3.3). Callbacks supplied by the caller (`ovt_log_fn`, `ovt_progress_fn`, `ovt_analysis_frame_fn`, `ovt_MetricsEventFn`) MUST NOT throw into the library; the C++ side invokes them inside a `noexcept` wrapper that terminates on a throw.
 9. **Documentation.** Every function carries a Doxygen comment that states the ownership of every pointer parameter and return value in the words of rule 3 (chapter 04 FR-API-001; `doxygen -q` with `WARN_AS_ERROR = YES` is a CI gate, WI-1.511).
 
@@ -898,9 +900,17 @@ const char* ovt_last_error_json(void);
 ### 12.3.4 `ovt/log.h`
 
 ```c
-typedef void (*ovt_log_fn)(int level /*0 trace,1 debug,2 info,3 warn,4 error,5 fatal*/, const char* module, const char* msg, void* user);
-void ovt_set_logger(ovt_log_fn, void* user);           /* §0.6.1 signature; NULL restores the default stderr logger */
-void ovt_set_log_level(int level);                      /* messages below are not formatted at all (cheap) */
+#define OVT_LOG_TRACE 0
+#define OVT_LOG_DEBUG 1
+#define OVT_LOG_INFO  2
+#define OVT_LOG_WARN  3
+#define OVT_LOG_ERROR 4
+#define OVT_LOG_FATAL 5
+#define OVT_LOG_OFF   6                                   /* threshold only */
+typedef void (*ovt_log_fn)(int level /*0 trace,1 debug,2 info,3 warn,4 error,5 fatal*/, const char* module, const char* msg /* starts with "[CODE] " when the line carries a diagnostic code */, void* user);
+void ovt_set_logger(ovt_log_fn, void* user);           /* §0.6.1 signature; NULL restores the default (silent) logger, chapter 04 FR-API-006 */
+void ovt_set_log_level(int level);                      /* clamped to 0..6; default OVT_LOG_WARN; messages below are not formatted at all (cheap) */
+void ovt_log_write(int level, const char* module, const char* code /*nullable*/, const char* msg);   /* additive (issue #209 item 4, ruling 2026-11-13): emits through the installed logger exactly as the core's own lines (§7.1.6 format); for separate shared libraries (libovt-render) and plugins that cannot call the hidden C++ ovt::log; no-op below the level */
 ```
 
 ### 12.3.5 `ovt/jobs.h`
@@ -928,11 +938,11 @@ A job is passed to one blocking call at a time; passing the same job to two conc
 
 ```c
 typedef struct ovt_File ovt_File;
-ovt_status ovt_file_open(const char* path, ovt_File** out);                   /* UTF-8 path; read-only; pread()-based with a 64 KiB-page read cache (chapter 08 §8.1 rule 5: no mmap, so bytes_read statistics stay exact) */
+ovt_status ovt_file_open(const char* path, ovt_File** out);                   /* UTF-8 path; read-only; pread()-based with a 64 KiB-page read cache (chapter 08 §8.1 rule 5: no mmap, so bytes_read statistics stay exact); returns IoError::code (chapter 07 §7.1.3), not a flat OVT_E_IO */
 /* Opt-in mmap for bulk readers (metrics, Python): disables bytes_read accounting; never used by the container module. */
 ovt_status ovt_file_open_mapped(const char* path, ovt_File** out);
-/* take_ownership=1: the ovt_File owns fd and closes it (Android: pass the result of ParcelFileDescriptor.detachFd()); take_ownership=0: the library dup()s fd. display_name (nullable) is what ovt_file_display_name returns, else "fd:<n>". Mirrors chapter 07 §7.1.2 open_fd(). */
-ovt_status ovt_file_open_fd(int fd, uint64_t size /*0 = fstat*/, int take_ownership, const char* display_name, ovt_File** out);
+/* take_ownership=1: the ovt_File owns fd and closes it, on failure too (except EBADF) — Android: pass the result of ParcelFileDescriptor.detachFd(), never getFd(); take_ownership=0: the library dup()s fd (F_DUPFD_CLOEXEC) and adopts the copy. display_name (nullable) is what ovt_file_display_name returns, else "fd:<n>" with the caller's fd number. FIFOs and sockets are rejected (OVT_E_INVALID_ARG). Mirrors chapter 07 §7.1.2 open_fd() (issue #110). */
+ovt_status ovt_file_open_fd(int fd, uint64_t size /*0 or UINT64_MAX = unknown, fstat()*/, int take_ownership, const char* display_name, ovt_File** out);
 ovt_status ovt_file_open_memory(const uint8_t* data, size_t size, int copy, ovt_File** out);   /* copy=0: caller keeps data alive */
 uint64_t   ovt_file_size(const ovt_File*);
 ovt_status ovt_file_read(ovt_File*, uint64_t offset, uint8_t* dst, size_t len, size_t* out_read);
@@ -946,7 +956,7 @@ void       ovt_file_close(ovt_File*);                   /* only after all contai
 typedef struct ovt_Container ovt_Container;
 ovt_status ovt_container_open(ovt_File*, ovt_Container** out);                 /* sniffs format; builds top-level tree lazily */
 ovt_status ovt_container_open_format(ovt_File*, const char* format /*"isobmff","ivf","annexb","obu","y4m","raw"; phase 4: "ts","mkv"*/,
-                                     const char* raw_format /*nullable; "1920x1080:yuv420p10le:30000/1001" (§12.1.5 grammar; required for "raw")*/,
+                                     const char* raw_format /*nullable; "1920x1080:yuv420p10le:30000/1001" (§12.1.5 grammar); for "raw" NULL runs the sidecar/heuristics resolution of chapter 08 §8.6.6 (OVT_E_INVALID_ARG + CNT-RAW-0002 when not exactly one candidate)*/,
                                      const char* codec_hint /*nullable "h264","h265","av1"*/, ovt_Container** out);
 ovt_status ovt_container_open_manifest(const char* url_or_path, const char* variant_selector /*nullable; "1" = Representation/variant index*/, ovt_Container** out);   /* phase 4, DASH MPD / HLS playlist (chapter 08 §8.6.9, WI-4.210) */
 const char* ovt_container_format(const ovt_Container*);
@@ -1005,7 +1015,7 @@ ovt_status ovt_stream_min_cvs_units(ovt_Stream*, int decode_index, int with_sei,
 void       ovt_stream_close(ovt_Stream*);
 
 /* ovt/validate.h — chapter 06 §6.9 rules (WI-0.086 implements; this is the exported signature). Violations come back as a
-   DiagnosticList with code "V-nnn" (severity per rule), path in FlatBuffers locator syntax ("grid.qp[1234]"). */
+   DiagnosticList with code "MDL-VAL-0nnn" (message begins with "V-nnn"; severity per rule), path in FlatBuffers locator syntax ("grid.qp[1234]"). */
 ovt_status ovt_validate_frame_analysis(const uint8_t* fb, size_t len, const uint8_t* expected_source_hash /*nullable, 32 bytes*/, int codec_override /*-1 none, else ovt.fb.Codec*/, ovt_Buffer* out /* DiagnosticList */);
 ovt_status ovt_validate_stream_index(const uint8_t* fb, size_t len, ovt_Buffer* out /* DiagnosticList */);
 
@@ -1047,6 +1057,9 @@ typedef struct ovt_Picture {
    planes stay valid across any further decoder calls (including close) until that reference is released. */
 void ovt_picture_ref(ovt_Picture*);           /* +1; thread-safe */
 void ovt_picture_release(ovt_Picture*);       /* -1; frees planes and the struct when it reaches 0; NULL is a no-op */
+/* These two functions are produced by the first decoder WI that hands out an ovt_Picture (chapter 07 decoder wrapper); WI-0.087 produces
+   the types only. `opaque` holds a library-private box carrying the atomic count and the std::shared_ptr owner (chapter 06 §6.6.1 Picture.owner).
+   The layouts in this section are authoritative; chapter 0 §0.6.1 abbreviates them. */
 /* Per-plane export on CPU planes (chapter 10 §10.6.3): format "pgm" (P5, maxval 2^bd−1, 16-bit big-endian when bd > 8) or "y4m"
    (single-frame Y4M with C420jpeg/C420mpeg2/C420paldv/C422/C444 + XYSCSS=/XCOLORRANGE=). plane < 0 exports all planes (y4m only). */
 ovt_status ovt_picture_export_plane(const ovt_Picture*, int plane, const char* format, const char* path);
@@ -1090,9 +1103,10 @@ void       ovt_analysis_close(ovt_Analysis*);
 ### 12.3.11 `ovt/plugins.h`
 
 ```c
-/* Search paths, in order: (1) paths added here, (2) $OVT_PLUGIN_PATH, (3) platform defaults:
-   macOS   <bundle>/Contents/PlugIns, ~/Library/Application Support/ovt/plugins, /usr/local/lib/ovt/plugins, <homebrew prefix>/lib/ovt/plugins
-   Linux   $XDG_DATA_HOME/ovt/plugins, /usr/lib/ovt/plugins, /usr/lib64/ovt/plugins, /app/lib/ovt/plugins (Flatpak), $APPDIR/usr/lib/ovt/plugins (AppImage)
+/* Search paths, in order (the one list of chapter 07 §7.5.1, issue #212): (1) paths added here, (2) $OVT_PLUGIN_PATH
+   (if set and not ending in ':' it replaces the platform defaults; a trailing ':' appends them), (3) platform defaults:
+   macOS   <bundle>/Contents/PlugIns/ovt, <bundle>/Contents/PlugIns, <exe>/../lib/ovt/plugins, ~/Library/Application Support/ovt/plugins, /usr/local/lib/ovt/plugins, /opt/homebrew/lib/ovt/plugins
+   Linux   <exe>/../lib/ovt/plugins, $XDG_DATA_HOME/ovt/plugins, /usr/local/lib/ovt/plugins, /usr/lib/ovt/plugins, /usr/lib64/ovt/plugins, /usr/lib/<multiarch>/ovt/plugins, /app/lib/ovt/plugins (Flatpak), $APPDIR/usr/lib/ovt/plugins (AppImage)
    Android <nativeLibraryDir>, <filesDir>/plugins  (chapter 13 §13.4.6 rules) */
 ovt_status ovt_plugins_add_search_path(const char* dir);
 ovt_status ovt_plugins_scan(void);                                       /* dlopen()s every libovt_plugin_*.{so,dylib}; idempotent; thread-safe */
@@ -1102,11 +1116,11 @@ ovt_status ovt_plugins_load_file(const char* path, ovt_Buffer* out /* PluginInfo
 ovt_status ovt_plugins_register_analysis_decoder(const ovt_AnalysisDecoderApi* api, const char* origin /*"(built-in)"*/);
 ovt_status ovt_plugins_register_metric(const ovt_MetricApi* api, const char* origin);
 ovt_status ovt_plugins_list(ovt_Buffer* out /* PluginList */);
-ovt_status ovt_plugins_set_default(uint8_t codec, const char* analysis_plugin_id);   /* default order otherwise: AV1 aom; H265 de265 > hm > ffmpeg; H264 ffmpeg */
+ovt_status ovt_plugins_set_default(uint8_t codec, const char* analysis_plugin_id);   /* default order otherwise: AV1 aom; H265 de265 > hm > ffmpeg; H264 ffmpeg; then the first registered plugin for the codec, never ffmpeg_hevc (opt-in only, chapter 07 §7.5.1; issues #212, #370) */
 const char* ovt_plugins_default(uint8_t codec);
 ```
 
-Loading rules: the file MUST export exactly one of `ovt_analysis_decoder_v1` / `ovt_metric_v1` (checked with `dlsym`); `abi_version` MUST equal the host's constant or the plugin is rejected with `OVT_E_PLUGIN` and Diagnostic `ANA-PLG-0001`; a plugin whose `caps()->codec` duplicates a registered id loses to the earlier one (first path wins) with Diagnostic `ANA-PLG-0002`. The plugin-host diagnostics `ANA-PLG-0001` (ABI version mismatch), `ANA-PLG-0002` (duplicate plugin id), `ANA-PLG-0003` (Android: codec-pack signature mismatch, chapter 13 §13.4.6) and `ANA-PLG-0004` (macOS/Linux: plugin file world-writable or not owned by the user, chapter 13 §13.5.3) are registered in chapter 07 §7.9 (D2 family `ANA`); a missing decoder plugin for a codec is `DEC-PLUGIN-0001` (chapter 07 §7.9). Plugins are never unloaded before process exit (decoders may keep static state).
+Loading rules: the file MUST export exactly one of `ovt_analysis_decoder_v1` / `ovt_metric_v1` (checked with `dlsym`); `abi_version` MUST equal the host's constant or the plugin is rejected with `OVT_E_PLUGIN` and Diagnostic `ANA-PLG-0001`; a second file with the same `<id>` (checked by file name before `dlopen`) loses to the earlier one (first path wins) with Diagnostic `ANA-PLG-0002`; several plugins for one codec may coexist (issue #212). The FFmpeg plugin may additionally export `const char* ovt_plugin_describe(void)` (chapter 07 §7.6.3), which the host may `dlsym` for `ovt plugins` and logs (issue #261). The plugin-host diagnostics `ANA-PLG-0001` (ABI version mismatch), `ANA-PLG-0002` (duplicate plugin id), `ANA-PLG-0003` (Android: codec-pack signature mismatch, chapter 13 §13.4.6) and `ANA-PLG-0004` (macOS/Linux: plugin file world-writable or not owned by the user, chapter 13 §13.5.3) are registered in chapter 07 §7.9 (D2 family `ANA`); a missing decoder plugin for a codec is `DEC-PLUGIN-0001` (chapter 07 §7.9). Plugins are never unloaded before process exit (decoders may keep static state).
 
 ### 12.3.12 `ovt/color.h`
 
@@ -1171,9 +1185,13 @@ ovt_status ovt_bdrate(const double* anchor_kbps, const double* anchor_q, size_t 
 ovt_status ovt_cache_set_dir(const char* dir);          /* before any stream is opened; NULL = platform default */
 const char* ovt_cache_dir(void);
 ovt_status ovt_cache_set_enabled(int enabled);
-ovt_status ovt_cache_set_max_bytes(uint64_t max_bytes); /* default 20 GiB desktop, 2 GiB Android (chapter 06 §6.7.4, NFR-010); LRU eviction */
-ovt_status ovt_cache_report(ovt_Buffer* out /* CacheReport */);
-ovt_status ovt_cache_clear(const char* kind /*nullable*/, const char* source_path /*nullable*/, int older_than_days /*0 = any*/);
+ovt_status ovt_cache_set_max_bytes(uint64_t max_bytes); /* default 20 GiB desktop, 2 GiB Android (chapter 06 §6.7.4, NFR-010); LRU eviction;
+                                                           0 withdraws the process setting, and a default open then keeps the cap stored in cache.json */
+int        ovt_cache_enabled(void);
+uint64_t   ovt_cache_max_bytes(void);                   /* the effective cap (WI-0.091) */
+ovt_status ovt_cache_report(ovt_Buffer* out /* CacheReport; hits/misses are process-lifetime lookup counters */);
+ovt_status ovt_cache_clear(const char* kind /*nullable*/, const char* source_path /*nullable; non-NULL is OVT_E_UNSUPPORTED until the §6.2.8 hasher exists (WI-1.121)*/, int older_than_days /*0 = any*/);
+                                                        /* entries open through any handle of this process are skipped (cache state is shared per root per process, chapter 06 §6.7.4) */
 
 /* Object API over one cache root (chapter 06 §6.7; WI-0.091 implements). The process-wide functions above operate on the default cache;
    `ovt cache import` and tests use explicit handles. Files and names exactly as chapter 06 §6.7.1. */
@@ -1187,7 +1205,7 @@ ovt_status ovt_cache_put_frame(ovt_CacheEntry*, uint32_t decode_index, const uin
 ovt_status ovt_cache_get_frame(ovt_CacheEntry*, uint32_t decode_index, ovt_Buffer* out);
 ovt_status ovt_cache_put_plane(ovt_CacheEntry*, uint32_t decode_index, uint8_t stage /*ovt.fb.PlaneStage*/, uint8_t plane, const ovt_PlaneView* view);
 ovt_status ovt_cache_get_plane(ovt_CacheEntry*, uint32_t decode_index, uint8_t stage, uint8_t plane, ovt_Buffer* out_storage, ovt_PlaneView* out_view);
-ovt_status ovt_cache_put_report(ovt_CacheEntry*, const char* kind /*"metrics","hdr","verify"*/, const uint8_t* fb, size_t len);
+ovt_status ovt_cache_put_report(ovt_CacheEntry*, const char* kind /*"metrics","hdr","verify"; stored as reports/<kind>.fb.zst, chapter 06 §6.7.1*/, const uint8_t* fb, size_t len);
 ovt_status ovt_cache_get_report(ovt_CacheEntry*, const char* kind, ovt_Buffer* out);
 void       ovt_cache_entry_release(ovt_CacheEntry*);
 void       ovt_cache_close(ovt_Cache*);                      /* flushes meta.json; entries must be released first */
@@ -1223,7 +1241,7 @@ int main(int argc, char** argv) {
 | Binding technology | **pybind11** (vcpkg port `pybind11`, BSD-3) over the **C API only** (no C++ internals), in `python/src/_core.cpp` → extension module `ovt._core`. Pure-Python layer `python/ovt/*.py` provides the object model. |
 | Python versions | CPython 3.11, 3.12, 3.13 — **one wheel per interpreter version and platform** (`cibuildwheel` `CIBW_BUILD="cp311-* cp312-* cp313-*"`). pybind11 (verified 2.13) does not support the Limited API / abi3, so a single abi3 wheel is not possible; 3.11 is the oldest supported interpreter (D5). |
 | Wheels | `macosx_13_0_arm64`, `macosx_13_0_x86_64` (`MACOSX_DEPLOYMENT_TARGET=13.0`, equal to the app's deployment target, chapter 13 §13.1), `manylinux_2_28_x86_64`, `manylinux_2_28_aarch64` — 12 files per release (3 interpreters × 4 platforms). manylinux_2_28 caps the system `libstdc++` at `GLIBCXX_3.4.25` (GCC 8), so the extension and the bundled `libovt_core` are built with `-static-libstdc++ -static-libgcc` and `auditwheel repair` is the gate. Built by **cibuildwheel** in CI (chapter 13 §13.7.1). **No Android wheel** (Android uses the Qt app; `ovt_py` is not built in android presets). Windows is a non-target. |
-| Bundled native code | `libovt_core`, the LGPL FFmpeg build (demux + AV1/VP9 playback), `libovt_plugin_aom`, libvmaf, zimg, ONNX Runtime (x86_64/arm64 CPU EP). **No AVC/HEVC decoder plugins** (ADR-015): they are found via `OVT_PLUGIN_PATH` / `ovt.plugins.add_path()` or installed by the `ovt-codecs` optional extra that downloads the codec pack from the project's release page with SHA-256 verification (`pip install ovt[codecs]` runs nothing at install time; the download happens on first `ovt.plugins.install_codec_pack()` call and prints the patent notice). |
+| Bundled native code | `libovt_core`, the LGPL FFmpeg core flavour as the split build (`OVT_PATENT_CODECS_IN_CORE=OFF`): demux + AV1/VP9 playback, no AVC/HEVC decoder, until the owner's legal check of a wheel with pool-covered decoders (chapter 15 POL-PAT-2), `libovt_plugin_aom`, libvmaf, zimg, ONNX Runtime (x86_64/arm64 CPU EP). **No AVC/HEVC decoder plugins** (ADR-015): they are found via `OVT_PLUGIN_PATH` / `ovt.plugins.add_path()` or installed by the `ovt-codecs` optional extra that downloads the codec pack from the project's release page with SHA-256 verification (`pip install ovt[codecs]` runs nothing at install time; the download happens on first `ovt.plugins.install_codec_pack()` call and prints the patent notice). |
 | Licence | `python/` is GPL-3.0-or-later (ADR-002); the wheel's `METADATA` `License-Expression: GPL-3.0-or-later`; `THIRD_PARTY_NOTICES.md` and AOM `PATENTS` in the wheel's `.dist-info/licenses/`. |
 | Dependencies | `numpy >= 1.24` (required), `flatbuffers >= 24.3` (required, for generated readers), optional extras: `plot` (`matplotlib`), `pandas`, `codecs`. |
 | Build | `pyproject.toml` with **scikit-build-core**; `cmake --preset <platform>-release -DOVT_BUILD_PYTHON=ON` builds `ovt_py` as target; `pip wheel python/` works from an already configured build tree when scikit-build-core's `build-dir` setting (environment variable `SKBUILD_BUILD_DIR`) points at it; otherwise scikit-build-core configures its own tree. |
@@ -1415,12 +1433,12 @@ Phase numbering follows §0.8. "CLI skeleton" items are prerequisites for every 
 **Steps:**
 1. Add CLI11 to `vcpkg.json`; create `ovt_cli` target linking `ovt_core`, `fmt`, `flatbuffers`; set GPL-3.0-or-later SPDX headers.
 2. Implement `Globals` parsing with env-var fallbacks and precedence rule; `--format` default by `isatty(STDOUT_FILENO)`.
-3. Implement `ExitCode from_status(ovt_status)`; install SIGINT/SIGTERM handler that cancels a global `ovt_Job` and sets a flag; second signal → `_exit(130)`.
+3. Implement `ExitCode from_status(ovt_status)`; install a SIGINT/SIGTERM handler that sets an atomic flag and calls a registered cancel hook (`ovt::cli::set_cancel_hook(fn, arg)`; the first command that creates an `ovt_Job` registers `ovt_job_cancel` there — WI-1.502/WI-1.505, since `ovt_Job` is WI-1.512's); second signal → `_exit(130)`.
 4. Implement the `fb` stream writer (magic + size-prefixed buffers with identifiers), refusing to write to a TTY without `-o`.
-5. Implement the generic JSON envelope writer using `ovt_fb_to_json` and a hand-written envelope; `--pretty`.
+5. Implement the generic JSON envelope writer with a hand-written envelope whose `result` member is supplied as a callback that writes one JSON value (`JsonWriter::raw()` takes the text of `ovt_fb_to_json` once WI-0.088 exists); `--pretty`.
 6. Implement CSV writer (RFC 4180 quoting) and text table helper (`ovt::cli::Table` with column alignment and SI formatting).
 7. Implement `--version` (text and JSON) and `completion`: CLI11 has no completion generator, so `cli/tools/gen_completions.cpp` links the parsing library (`ovt_cli_lib`), walks the `CLI::App` tree (subcommands, options, `IsMember` choices, alias flags) and writes the three scripts; run as a CMake custom command, output embedded via `configure_file`/`xxd`-style string constants.
-8. Wire the stderr logger (`ovt_set_logger`) honouring `--log-level` and `--color`; implement `--progress` TTY and JSON Lines modes via `ovt_job_set_progress_callback`.
+8. Wire the stderr logger (`ovt_set_logger`) honouring `--log-level` and `--color`; implement `--progress` TTY and JSON Lines modes as `ovt::cli::ProgressReporter`; the first command that runs a job connects it to `ovt_job_set_progress_callback` (WI-1.502/WI-1.505).
 **Acceptance tests:**
 1. Given no args, When `ovt`, Then exit 2 and stderr ends with `See 'ovt --help'.`.
 2. Given `ovt --version --format json`, Then stdout is valid JSON with keys `ovt, core, api, build, features`.
@@ -1434,8 +1452,8 @@ Phase numbering follows §0.8. "CLI skeleton" items are prerequisites for every 
 **Depends on:** WI-1.500.
 **Produces:** `tools/fbs_to_jsonschema.py`, `docs/spec/schemas/ovt-cli-1.schema.json`, `docs/spec/schemas/<Table>.schema.json`, CMake custom target `ovt_json_schema` (and `ovt_json_schema_check`), test `cli/tests/test_schema_validate.py`.
 **Interface:** §12.1.4 JSON mapping rules.
-**Steps:** 1. Run `flatc --jsonschema` for each `.fbs`; 2. post-process: enums as string names, `ulong`/`long` as `oneOf[integer,string]`, `[ubyte]` as base64 `string` (except `CellGrid` vectors: `array` of `integer`), floats allowing the strings `nan`/`inf`/`-inf`, nested `ext` → `ext_decoded` with `oneOf` over codec extension tables (the §12.1.4 printer rules); 3. write the envelope schema referencing per-command result schemas; 4. add a Python test (`check-jsonschema` package) validating `ovt info/probe/syntax/frames/index` outputs for every mini-corpus file.
-**Acceptance tests:** 1. Given every MP4 of the `fast` corpus subset (chapter 14 §14.2.4), When `ovt probe f -f json` is piped into `check-jsonschema` (pinned in `tools/requirements.txt`, which this WI extends) with the schema `docs/spec/schemas/ovt-cli-1.schema.json`, Then the output validates. 2. Given a change to `ovt_model.fbs` without regenerating, When the CI target `ovt_json_schema_check` builds, Then CI target `ovt_json_schema_check` fails with a diff.
+**Steps:** 1. Run `flatc --jsonschema` for each `.fbs`; 2. post-process: enums as string names, `ulong`/`long` as `oneOf[integer,string]`, `[ubyte]` as `array` of `integer` (the hash-like fields of §12.1.4 as hex `string`), floats allowing the strings `nan`/`inf`/`-inf`, each of the five nested fields as `oneOf` over its extension tables checked against the sibling `*_type` (the §12.1.4 printer rules), a permissive `result` (`object` or `array`) for `info`, `stats`, `compare`, `hrd` and `models` until their chapters fix a table; 3. write the envelope schema referencing per-command result schemas; 4. add a Python test (`check-jsonschema` package) validating `ovt info/probe/syntax/frames/index` outputs for every mini-corpus file.
+**Acceptance tests:** 1. Given every MP4 of the `fast` corpus subset (chapter 14 §14.2.4), When `ovt probe f -f json` is piped into `check-jsonschema` (pinned in `tools/requirements.txt`, which this WI extends) with the schema `docs/spec/schemas/ovt-cli-1.schema.json`, Then the output validates (the test `cli/tests/test_schema_validate.py::test_ovt_json_output_validates_over_fast_mp4_corpus` runs `probe`, `info`, `syntax`, `frames` and `index` over those files and skips a command that exits 2 with `CLI-0001` because its WI has not merged; each of WI-1.502 to WI-1.506 is covered by this test as soon as its command exists, with no new dependency edge). 2. Given a change to `ovt_model.fbs` without regenerating, When the CI target `ovt_json_schema_check` builds, Then CI target `ovt_json_schema_check` fails with a diff.
 **Size:** S.
 **Notes / pitfalls:** `flatc --jsonschema` emits `integer` for 64-bit; override. Keep the generated files committed so the docs site needs no build step.
 ### WI-1.502 — `ovt info`

@@ -54,6 +54,10 @@ class Settings : public QObject {
   // const, minimum, maximum, properties, required, items). On failure `reason` says where.
   static bool validate(const QJsonObject& document, QString* reason);
 
+  // The same validator against any schema document (used for .ovtproj, chapter 11 §11.2.6). Adds `pattern`,
+  // `minItems` and `maxItems` to the subset above. Unknown keywords constrain nothing.
+  static bool validateAgainst(const QJsonObject& document, const QJsonObject& schema, QString* reason);
+
   // Writes the document next to the final path (temp file + rename). Creates the directory.
   bool save();
 
