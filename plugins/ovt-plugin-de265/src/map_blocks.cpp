@@ -27,7 +27,6 @@ namespace {
 namespace fb = ovt::fb;
 
 constexpr int16_t kMvdUnavailable = -32768;
-constexpr int32_t kNoPoc = std::numeric_limits<int32_t>::min();
 constexpr int kMaxTrafoDepth = 4;  // tu_info has split bits for trafoDepth 0..4
 constexpr int kMaxTbLog2 = 5;      // H.265: MaxTbLog2SizeY <= 5
 
