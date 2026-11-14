@@ -846,6 +846,7 @@ the licence gate fails when this file is stale.
 | syn_mp4_frag_cmaf | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_mp4_nero_chapters | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_mp4_piff | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mxf_op1a_xdcam | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_pat_hlg_patches | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_p3_saturation | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_pq_patches_1000 | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
