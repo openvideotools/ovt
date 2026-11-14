@@ -26,6 +26,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <set>
 #include <span>
 #include <string>
 #include <vector>
@@ -428,6 +429,63 @@ TEST_CASE("aom map_mi_ext: mvd, tx_type and cdef_idx of av1-1-b8-05-mv equal pat
     }
   }
   CHECK(coded_mvd > 0);
+}
+
+namespace {
+
+// Checks that every cell of the luma TXB @p r (clipped to the grid) has grid.tx_type @p tx_type; returns the
+// number of cells checked.
+size_t check_txb_cells(const fb::FrameAnalysis& fa, const fb::CellGrid& g, const fb::Rect& r, uint8_t tx_type) {
+  const auto y0 = static_cast<uint32_t>(r.y() / 4);
+  const auto x0 = static_cast<uint32_t>(r.x() / 4);
+  const uint32_t y1 = std::min(static_cast<uint32_t>((r.y() + r.h()) / 4), g.cells_h());
+  const uint32_t x1 = std::min(static_cast<uint32_t>((r.x() + r.w()) / 4), g.cells_w());
+  size_t n = 0;
+  for (uint32_t y = y0; y < y1; ++y) {
+    for (uint32_t x = x0; x < x1; ++x) {
+      INFO("decode index " << fa.frame()->id()->decode_index() << " MI (" << y << ", " << x << ")");
+      CHECK(g.tx_type()->Get((y * g.cells_w()) + x) == tx_type);
+      ++n;
+    }
+  }
+  return n;
+}
+
+}  // namespace
+
+// Var-tx: an inter block whose transform units have different sizes reads each MI's tx_type at the top-left of
+// its own unit (inter_tx_size[], not the block's last tx_size), so every MI inside one luma TXB carries that
+// TXB's TxType, and the TxType is what tx_type_map holds at the TXB origin.
+TEST_CASE("aom map_mi_ext: every MI of a var-tx transform unit carries the unit's tx_type",
+          "[fast][third_party][needs-corpus]") {
+  size_t mixed = 0;
+  size_t checked = 0;
+  // The libaom fast vectors code no inter block with mixed transform unit sizes; syn_av1_tiles_cdef_lr (aomenc
+  // --cpu-used=4) has some, so it comes first and the test skips without it.
+  for (const char* id : {"syn_av1_tiles_cdef_lr", "aom_av1_1_b8_05_mv"}) {
+    INFO(id);
+    for (const Pulled& p : analyse(ovt::test::corpus_or_skip(id), 0)) {
+      const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(p.fa.data());
+      const fb::CellGrid& g = *fa.grid();
+      std::map<uint32_t, std::set<int>> sizes;  // leaf id -> TxSize of its TXBs
+      for (const fb::Block* b : *fa.blocks()) {
+        if (b->kind() != fb::BlockKind::TXB) {  // intra leaves have one luma TX size: "mixed" counts var-tx only
+          continue;
+        }
+        const auto* t = flatbuffers::GetRoot<fb::Av1Txb>(b->ext()->data());
+        sizes[static_cast<uint32_t>(b->parent())].insert(static_cast<int>(t->txSz()));
+        if (t->TxType() == fb::Av1TxType::Av1TxType_Unknown) {
+          continue;
+        }
+        checked += check_txb_cells(fa, g, *b->rect(), static_cast<uint8_t>(t->TxType()));
+      }
+      for (const auto& [leaf, s] : sizes) {
+        mixed += s.size() > 1 ? 1U : 0U;
+      }
+    }
+  }
+  CHECK(mixed > 0);  // var-tx inter blocks with mixed unit sizes were seen
+  CHECK(checked > 0);
 }
 
 namespace {
