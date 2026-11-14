@@ -1,0 +1,8 @@
+[{"name": "buildtype", "value": "release", "section": "core", "type": "combo"},
+ {"name": "default_library", "value": "static", "section": "core", "type": "combo"},
+ {"name": "enable_float", "value": true, "section": "user", "type": "boolean"},
+ {"name": "enable_avx512", "value": true, "section": "user", "type": "boolean"},
+ {"name": "built_in_models", "value": true, "section": "user", "type": "boolean"},
+ {"name": "enable_cuda", "value": false, "section": "user", "type": "boolean"},
+ {"name": "enable_nvtx", "value": false, "section": "user", "type": "boolean"},
+ {"name": "enable_docs", "value": false, "section": "user", "type": "boolean"}]

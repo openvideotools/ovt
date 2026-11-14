@@ -6,7 +6,9 @@
 //    one context and for every split into 2..8 overlapping chunks;
 //  - acceptance test 2: vmaf_b has 4 values and ci_p95_lo <= bagging <= ci_p95_hi on every frame;
 //  - the per-frame values equal the vmaf CLI goldens of WI-0.565 at %.6f;
-//  - every generated id's outputs are names libvmaf really writes, the ABI rules and the chunk planner.
+//  - every generated id's outputs are names libvmaf really writes, the ABI rules and the chunk planner;
+//  - the feature ids (WI-3.309b): acceptance test 5 (`vif` gives the four integer_vif_scale* scores), per-frame
+//    delivery, options, and the `vmaf --feature` values of the same golden.
 
 #include <algorithm>
 #include <array>
@@ -491,5 +493,252 @@ TEST_CASE("vmaf_b has four values with the bagging score inside its 95% interval
     CHECK(v[1] <= v[0]);
     CHECK(v[0] <= v[2]);
     CHECK(v[3] >= 0.0);
+  }
+}
+
+// ---- Feature ids (WI-3.309b) -------------------------------------------------------------------------------------
+
+namespace {
+
+const vm::FeatureInfo& feature(std::string_view id) {
+  const auto fs = vm::features();
+  const auto it = std::find_if(fs.begin(), fs.end(), [id](const vm::FeatureInfo& f) { return id == f.id; });
+  REQUIRE(it != fs.end());
+  return *it;
+}
+
+// Per-frame values of a feature id over the whole pair, one instance; frame t's score must come with frame t.
+std::vector<std::vector<double>> run_feature(std::string_view id, const Y4m& ref, const Y4m& dist,
+                                             const char* options = "{}") {
+  Instance inst(id, options);
+  std::vector<Score> got;
+  for (size_t f = 0; f < ref.frames.size(); ++f) {
+    const auto r = ref.planes(f);
+    const auto d = dist.planes(f);
+    REQUIRE(inst.score(r, d, static_cast<int32_t>(f), got) == OVT_OK);
+    REQUIRE(got.size() == f + 1);
+    CHECK(got.back().frame == static_cast<int32_t>(f));
+  }
+  REQUIRE(inst.finish(got) == OVT_OK);
+  REQUIRE(got.size() == ref.frames.size());  // no sequence-level score
+  std::vector<std::vector<double>> v;
+  v.reserve(got.size());
+  for (auto& s : got) {
+    v.push_back(std::move(s.values));
+  }
+  return v;
+}
+
+}  // namespace
+
+TEST_CASE("vmaf feature ids: table, descriptors and chunk overlap", "[metrics][vmaf][fast]") {
+  std::set<std::string> ids;
+  for (const auto& f : vm::features()) {
+    ids.insert(f.id);
+    INFO(f.id);
+    REQUIRE(vm::feature_available(f));  // -Denable_float=true builds float_ms_ssim (§9.5.1)
+    const auto* api = vm::metric_api(f.id);
+    REQUIRE(api != nullptr);
+    const std::string id = f.id;
+    std::string error;
+    const auto bytes = ovt::metrics::validate_metric_api(api, &id, error);
+    INFO(error);
+    REQUIRE(bytes.has_value());
+    const auto* d = flatbuffers::GetRoot<ovt::fb::MetricDescriptor>(bytes->data());
+    CHECK(d->kind() == (f.no_reference ? ovt::fb::MetricKind::NoReference : ovt::fb::MetricKind::FullReference));
+    CHECK(d->domain() == ovt::fb::WorkingDomain::CodeValue);
+    CHECK(d->temporal_unit_frames() == 1);
+    REQUIRE(d->outputs() != nullptr);
+    REQUIRE(d->outputs()->size() == f.output_count());
+    for (size_t k = 0; k < f.output_count(); ++k) {
+      CHECK(d->outputs()->Get(static_cast<flatbuffers::uoffset_t>(k))->str() == f.outputs.at(k));
+    }
+    CHECK(d->license()->str() == "BSD-2-Clause-Patent");
+    CHECK(vm::overlap(f.id) == vm::Overlap{0, 0});
+  }
+  CHECK(ids == std::set<std::string>{"cambi", "ciede2000", "ms_ssim", "psnr_hvs", "vif", "vmaf_psnr"});
+  CHECK(feature("cambi").no_reference);
+  CHECK(feature("psnr_hvs").output_count() == 4);
+  CHECK(vm::overlap("vmaf") == vm::Overlap{vm::kLookbehind, vm::kLookahead});
+  CHECK(vm::overlap("vmaf_b") == vm::Overlap{1, 1});
+  CHECK(vm::overlap("nosuch") == vm::Overlap{0, 0});
+
+  ovt::metrics::PluginRegistry::Options o;
+  o.ovt_metric_path = "";
+  o.ovt_plugin_path = "";
+  o.defaults = std::vector<std::string>{};
+  ovt::metrics::PluginRegistry registry(o);
+  (void)vm::register_builtin_vmaf(registry);
+  for (const auto& f : vm::features()) {
+    CHECK(registry.find(f.id) != nullptr);
+  }
+}
+
+TEST_CASE("vmaf feature ids score each frame on its own call", "[metrics][vmaf][fast]") {
+  std::mt19937 rng(5);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
+  for (const auto& f : vm::features()) {
+    INFO(f.id);
+    const auto* api = vm::metric_api(f.id);
+    ovt_Metric* m = nullptr;
+    REQUIRE(api->create("{}", &m) == OVT_OK);
+    for (int32_t i = 0; i < 3; ++i) {
+      Pic r(352, 288, 2, 2, 8);  // cambi and ms_ssim need a few scales' worth of picture
+      Pic d(352, 288, 2, 2, 8);
+      r.randomize(rng);
+      d.randomize(rng);
+      ovt_Buffer b{};
+      // A NoReference id gets ref == NULL from the host (metric_v1.h).
+      REQUIRE(api->score(m, f.no_reference ? nullptr : &r.planes, &d.planes, ovt_FrameId{i * 3, i * 3}, &b) == OVT_OK);
+      REQUIRE(b.data != nullptr);
+      const Score s = decode(b);
+      CHECK(s.frame == i * 3);
+      REQUIRE(s.values.size() == f.output_count());
+      for (const double v : s.values) {
+        CHECK(!std::isnan(v));
+      }
+    }
+    ovt_Buffer b{};
+    CHECK(api->finish(m, &b) == OVT_OK);
+    CHECK(b.data == nullptr);  // SPEC-ASSUMPTION(#460): no sequence-level score
+    api->destroy(m);
+  }
+  {
+    // A full-reference feature id needs ref.
+    Instance inst("psnr_hvs");
+    Pic d(64, 64, 2, 2, 8);
+    ovt_Buffer b{};
+    CHECK(vm::metric_api("psnr_hvs")->score(nullptr, nullptr, &d.planes, ovt_FrameId{0, 0}, &b) == OVT_E_INVALID_ARG);
+  }
+  {
+    // 4:0:0 has no chroma: vmaf_psnr's chroma values are NaN.
+    Instance inst("vmaf_psnr");
+    Pic r(64, 64, 1, 1, 10, 1);
+    Pic d(64, 64, 1, 1, 10, 1);
+    r.randomize(rng);
+    d.randomize(rng);
+    std::vector<Score> got;
+    REQUIRE(inst.score(r.planes, d.planes, 0, got) == OVT_OK);
+    REQUIRE(got.size() == 1);
+    REQUIRE(got[0].values.size() == 3);
+    CHECK(std::isfinite(got[0].values[0]));
+    CHECK(std::isnan(got[0].values[1]));
+    CHECK(std::isnan(got[0].values[2]));
+  }
+}
+
+TEST_CASE("vmaf feature ids check their options", "[metrics][vmaf][fast]") {
+  ovt_Metric* m = nullptr;
+  const auto create = [&m](std::string_view id, const char* options) {
+    const ovt_status st = vm::metric_api(id)->create(options, &m);
+    if (st == OVT_OK) {
+      vm::metric_api(id)->destroy(m);
+      m = nullptr;
+    }
+    return st;
+  };
+  CHECK(create("cambi", R"({"window_size":31,"topk":0.5,"tvi_threshold":0.02,"max_log_contrast":3,"eotf":"pq",)"
+                        R"("enc_width":1920,"enc_height":1080,"enc_bitdepth":10,"full_ref":false})") == OVT_OK);
+  CHECK(create("cambi", R"({"full_ref":true})") == OVT_E_UNSUPPORTED);  // SPEC-ASSUMPTION(#460)
+  CHECK(create("cambi", R"({"eotf":"hlg"})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"window_size":5})") == OVT_E_INVALID_ARG);  // libvmaf range 15..127
+  CHECK(create("cambi", R"({"window_size":31.5})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"topk":"0.5"})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"float":true})") == OVT_E_INVALID_ARG);
+  CHECK(create("vif", R"({"float":true})") == OVT_OK);
+  CHECK(create("vif", R"({"float":1})") == OVT_E_INVALID_ARG);
+  CHECK(create("vif", R"({"window_size":31})") == OVT_E_INVALID_ARG);
+  CHECK(create("psnr_hvs", R"({"nosuch":1})") == OVT_E_INVALID_ARG);
+  CHECK(create("ms_ssim", "[]") == OVT_E_INVALID_ARG);
+  CHECK(m == nullptr);
+}
+
+TEST_CASE("cambi writes its heat maps to heatmaps_path", "[metrics][vmaf][fast]") {
+  const auto dir = std::filesystem::temp_directory_path() / "ovt_test_vmaf_cambi_heatmaps";
+  std::filesystem::remove_all(dir);
+  {
+    const std::string options = R"({"heatmaps_path":")" + dir.generic_string() + R"("})";
+    Instance inst("cambi", options.c_str());
+    std::mt19937 rng(9);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
+    Pic d(352, 288, 2, 2, 8);
+    d.randomize(rng);
+    std::vector<Score> got;
+    REQUIRE(inst.score(d.planes, d.planes, 0, got) == OVT_OK);
+    REQUIRE(inst.finish(got) == OVT_OK);
+  }
+  size_t files = 0;
+  for (const auto& e : std::filesystem::directory_iterator(dir)) {
+    CHECK(e.path().filename().string().rfind("cambi_heatmap_scale_", 0) == 0);
+    ++files;
+  }
+  CHECK(files == 5);  // one per CAMBI scale
+  std::filesystem::remove_all(dir);
+}
+
+TEST_CASE("metrics_vmaf_vif_feature", "[metrics][vmaf][golden][needs-corpus]") {
+  // Acceptance test 5: id `vif` runs libvmaf's integer VIF extractor (named "vif" in libvmaf 3.0.0, #460) and its
+  // values are the four integer_vif_scale* scores, those of the vmaf CLI.
+  const auto& vif = feature("vif");
+  REQUIRE(vif.output_count() == 4);
+  CHECK(std::string_view(vif.extractor) == "vif");
+  for (size_t k = 0; k < 4; ++k) {
+    CHECK(std::string(vif.outputs.at(k)) == "integer_vif_scale" + std::to_string(k));
+  }
+  const Y4m ref(ovt::test::corpus_or_skip("netflix_src01_hrc00_576x324"));
+  const Y4m dist(ovt::test::corpus_or_skip("netflix_src01_hrc01_576x324"));
+  const auto golden = nlohmann::json::parse(
+      gunzip(std::filesystem::path(OVT_GOLDEN_METRICS_DIR) / "netflix_src01_576x324.vmaf_v0.6.1.vmaf.json.gz"));
+  const auto got = run_feature("vif", ref, dist);
+  REQUIRE(got.size() == golden.at("frames").size());
+  for (size_t f = 0; f < got.size(); ++f) {
+    REQUIRE(got[f].size() == 4);
+    for (size_t k = 0; k < 4; ++k) {
+      INFO("frame " << f << " " << vif.outputs.at(k));
+      const double want = golden.at("frames")[f].at(vif.outputs.at(k)).get<double>();
+      if (kGoldenArch) {
+        CHECK(fmt6(got[f][k]) == fmt6(want));
+      } else {
+        CHECK(std::abs(got[f][k] - want) <= kIntegerTolerance);
+      }
+    }
+  }
+  // {"float": true} runs float_vif: the same four scales, close to the integer ones but not equal.
+  const auto fl = run_feature("vif", ref, dist, R"({"float":true})");
+  CHECK(fl != got);
+  for (size_t f = 0; f < got.size(); ++f) {
+    for (size_t k = 0; k < 4; ++k) {
+      CHECK(std::abs(fl[f][k] - got[f][k]) < 1e-2);
+    }
+  }
+}
+
+TEST_CASE("vmaf feature ids equal the vmaf CLI features on the Netflix pair", "[metrics][vmaf][golden][needs-corpus]") {
+  // The WI-0.565 golden of vmaf_v0.6.1 was written by `vmaf --feature cambi --feature ciede --feature
+  // float_ms_ssim --feature psnr --feature psnr_hvs ...`; each feature id must give the same per-frame values.
+  const Y4m ref(ovt::test::corpus_or_skip("netflix_src01_hrc00_576x324"));
+  const Y4m dist(ovt::test::corpus_or_skip("netflix_src01_hrc01_576x324"));
+  const auto golden = nlohmann::json::parse(
+      gunzip(std::filesystem::path(OVT_GOLDEN_METRICS_DIR) / "netflix_src01_576x324.vmaf_v0.6.1.vmaf.json.gz"));
+  const auto& frames = golden.at("frames");
+  struct Case {
+    const char* id;
+    bool exact;  // an integer path: bit-exact at %.6f on the goldens' architecture
+  };
+  for (const Case c : {Case{"cambi", true}, Case{"ciede2000", false}, Case{"ms_ssim", false}, Case{"psnr_hvs", false},
+                       Case{"vmaf_psnr", true}}) {
+    INFO(c.id);
+    const auto& f = feature(c.id);
+    const auto got = run_feature(c.id, ref, dist);
+    REQUIRE(got.size() == frames.size());
+    for (size_t i = 0; i < got.size(); ++i) {
+      for (size_t k = 0; k < f.output_count(); ++k) {
+        INFO("frame " << i << " " << f.outputs.at(k));
+        const double want = frames[i].at(f.outputs.at(k)).get<double>();
+        if (kGoldenArch && c.exact) {
+          CHECK(fmt6(got[i][k]) == fmt6(want));
+        } else {
+          CHECK(std::abs(got[i][k] - want) <= (c.exact ? kIntegerTolerance : kFloatTolerance));
+        }
+      }
+    }
   }
 }
