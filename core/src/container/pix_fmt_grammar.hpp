@@ -29,8 +29,7 @@ struct PixFmt {
   std::string name;  // exactly the accepted spelling, e.g. "yuv420p10le"
   PixLayout layout = PixLayout::Planar;
   // ovt_ColorDescription.chroma_format: 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4, 4 = 4:1:1.
-  // SPEC-ASSUMPTION(#366): 4:1:1 is 4 (as in the Y4M reader); 4:4:0 and RGB have no value of their own and
-  // map to 2 (vertical-only subsampling is the 4:2:2 transpose) and 3.
+  // §8.6.6 defaults: 4:1:1 is 4 (as in the Y4M reader); 4:4:0 is 2 and RGB is 3.
   uint8_t chroma_format = 1;
   uint8_t bit_depth = 8;
   uint8_t sub_x = 2;  // horizontal chroma subsampling factor (0 = no chroma plane)

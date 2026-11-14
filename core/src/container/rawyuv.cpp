@@ -371,9 +371,12 @@ std::optional<std::pair<uint32_t, uint32_t>> json_fps(const nlohmann::json& v) {
   if (v.is_number_float()) {
     const double d = v.get<double>();
     if (std::isfinite(d) && d > 0.0 && d < 1e6) {
-      std::array<char, 40> buf{};
-      (void)std::snprintf(buf.data(), buf.size(), "%.6f", d);
-      return parse_fps(buf.data());
+      // Integer arithmetic only: snprintf("%.6f") and floating to_chars depend on the locale or the library.
+      const auto micro = static_cast<uint64_t>(std::llround(d * 1e6));
+      std::string text = std::to_string(micro / 1000000U) + ".";
+      const std::string frac = std::to_string(micro % 1000000U);
+      text.append(6 - frac.size(), '0').append(frac);
+      return parse_fps(text);
     }
   }
   return std::nullopt;
@@ -540,17 +543,31 @@ struct Ranked {
   size_t order;
 };
 
-// Rank (§8.6.6 step 4): file-name geometry first (all or none here), then frame_count ≤ 100 000 with the larger
-// count first, then 4:2:0 < 4:2:2 < 4:4:4, 8-bit before deeper, then generation order.
-// SPEC-ASSUMPTION(#366): "larger frame_count ≤ 100 000" is read literally; counts above the bound rank after.
-bool ranks_before(const Ranked& a, const Ranked& b) {
-  const bool a_big = a.cand.frame_count > kMaxRankedFrameCount;
-  const bool b_big = b.cand.frame_count > kMaxRankedFrameCount;
-  if (a_big != b_big) {
-    return b_big;
+// Position of a candidate in the §8.6.6 step 4 ranking: frame_count >= 2 first, then a single frame, and
+// frame_count > 100 000 last.
+int count_group(uint64_t frame_count) noexcept {
+  if (frame_count > kMaxRankedFrameCount) {
+    return 2;
   }
-  if (a.cand.frame_count != b.cand.frame_count) {
-    return a.cand.frame_count > b.cand.frame_count;
+  return frame_count >= 2 ? 0 : 1;
+}
+
+// Rank (§8.6.6 step 4): file-name geometry first (all or none here), then among frame_count >= 2 the larger frame
+// size first, then 4:2:0 < 4:2:2 < 4:4:4, 8-bit before deeper, then generation order;
+// candidates with frame_count > 100 000 come last. A single-frame candidate is outside the ">= 2" clause and ranks
+// after that group (reading confirmed in the review of #482). "Larger frame size" is read as the larger picture
+// (width x height), which is the smaller frame_count for one pix_fmt; comparing bytes would put 4:4:4 before 4:2:0
+// and leave the chroma tie-break without effect (spec question #366 follow-up).
+bool ranks_before(const Ranked& a, const Ranked& b) {
+  const int ga = count_group(a.cand.frame_count);
+  const int gb = count_group(b.cand.frame_count);
+  if (ga != gb) {
+    return ga < gb;
+  }
+  const uint64_t area_a = uint64_t{a.cand.format.width} * a.cand.format.height;
+  const uint64_t area_b = uint64_t{b.cand.format.width} * b.cand.format.height;
+  if (area_a != area_b) {
+    return area_a > area_b;
   }
   if (chroma_rank(a.cand.format.pix) != chroma_rank(b.cand.format.pix)) {
     return chroma_rank(a.cand.format.pix) < chroma_rank(b.cand.format.pix);
@@ -730,8 +747,7 @@ class RawReader final : public Reader {
 
   [[nodiscard]] std::vector<uint8_t> build_sample_table(uint32_t first, size_t n) const {
     treefb::Fbb fbb;
-    // SPEC-ASSUMPTION(#366): §8.6.6 says `dts = i`, `timescale = fps_num`, `duration = fps_den`; with that timescale
-    // a frame lasts fps_den ticks, so dts = i * fps_den (as in the Y4M reader).
+    // §8.6.6 (ruling on #366): `SampleTable.dts = i × fps_den` with `timescale = fps_num`, as in the Y4M reader.
     std::vector<int64_t> dts(n);
     std::vector<uint64_t> offset(n);
     for (size_t k = 0; k < n; ++k) {

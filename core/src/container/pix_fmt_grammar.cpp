@@ -138,7 +138,7 @@ std::optional<PixFmt> semi_planar(std::string_view name) {
     p.bytes_per_sample = r.wide ? 2 : 1;
     p.interleaved_uv = true;
     if (rest.empty()) {
-      p.little_endian = true;  // SPEC-ASSUMPTION(#366): a bare p010 is little-endian (FFmpeg: native; x86 and ARM)
+      p.little_endian = true;  // §8.6.6: a bare p010 is little-endian
       return p;
     }
     if (!r.wide || (rest != "le" && rest != "be")) {
@@ -175,7 +175,7 @@ std::optional<PixFmt> rgb(std::string_view name) {
   p.name = std::string(name);
   p.sub_x = 1;
   p.sub_y = 1;
-  p.chroma_format = 3;  // SPEC-ASSUMPTION(#366): RGB is reported as 4:4:4
+  p.chroma_format = 3;  // §8.6.6: RGB is reported as 4:4:4
   if (name == "rgb24" || name == "bgr24") {
     p.layout = PixLayout::PackedRgb;
     p.planar = false;

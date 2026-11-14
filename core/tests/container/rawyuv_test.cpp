@@ -360,13 +360,41 @@ TEST_CASE("raw: candidates from name tokens", "[container][raw][fast]") {
   CHECK(raw::candidates("clip_1920x1080_yuv420p.yuv", f1080 + 1).empty());
   CHECK(raw::candidates("clip.yuv", 0).empty());
   CHECK(raw::candidates("clip.yuv", 7).empty());
-  // Rank: 4:2:0 before 4:2:2 before 4:4:4 at equal frame count, 8-bit before 10-bit.
-  const auto eq =
-      raw::candidates("clip_16x16.yuv", 16ULL * 16 * 6);  // several formats divide it; counts never increase
+  // Rank: the larger picture first, then 4:2:0 before 4:2:2 before 4:4:4, 8-bit before 10-bit.
+  const auto eq = raw::candidates("clip_16x16.yuv", 16ULL * 16 * 6);  // several formats divide it
   REQUIRE(eq.size() >= 2);
-  for (size_t i = 1; i < eq.size(); ++i) {
-    CHECK(eq[i - 1].frame_count >= eq[i].frame_count);
-  }
+  CHECK(eq.front().format.pix.chroma_format == 1);
+  CHECK(eq.front().format.pix.bit_depth == 8);
+}
+
+TEST_CASE("raw: the larger frame size ranks first", "[container][raw][fast]") {
+  // 4 frames of 1920x1080 yuv420p are also 16 frames of 960x540: the larger frame wins.
+  const uint64_t size = 4ULL * 1920 * 1080 * 3 / 2;
+  const auto c = raw::candidates("clip.yuv", size);
+  const auto find = [&](uint32_t w, uint32_t h) {
+    return std::ranges::find_if(c, [&](const raw::Candidate& x) {
+      return x.format.width == w && x.format.height == h && x.format.pix.name == "yuv420p";
+    });
+  };
+  const auto big = find(1920, 1080);
+  const auto small = find(960, 540);
+  REQUIRE(big != c.end());
+  REQUIRE(small != c.end());
+  CHECK(big->frame_count == 4);
+  CHECK(small->frame_count == 16);
+  CHECK(big < small);
+  // A single frame ranks after the candidates with two or more frames.
+  const auto one = raw::candidates("clip.yuv", 1920ULL * 1080 * 3 / 2 * 2);
+  REQUIRE(one.size() >= 2);
+  CHECK(one.front().frame_count >= 2);
+  CHECK(one.back().frame_count == 1);
+}
+
+TEST_CASE("raw: a float sidecar frame rate does not depend on the locale", "[container][raw][fast]") {
+  const auto s = raw::parse_sidecar(R"({"width":64,"height":48,"pix_fmt":"yuv420p","fps":29.97})");
+  REQUIRE(s);
+  CHECK(s->fps_num == 30000);
+  CHECK(s->fps_den == 1001);
 }
 
 TEST_CASE("raw: frame rate from the file name", "[container][raw][fast]") {
@@ -560,7 +588,23 @@ TEST_CASE("raw: ovt_container_open_format(\"raw\")", "[container][raw][fast]") {
   CHECK(ovt_container_open_format(&handle, "raw", "1280x720:nv13", nullptr, &c) == OVT_E_INVALID_ARG);
   CHECK(c == nullptr);
   CHECK(ovt_container_open_format(&handle, "raw", "", nullptr, &c) == OVT_E_INVALID_ARG);
-  CHECK(ovt_container_open_format(&handle, "raw", nullptr, nullptr, &c) == OVT_E_INVALID_ARG);
+  // NULL runs resolve(): without a sidecar and with several candidates that is CNT-RAW-0002 / INVALID_ARG.
+  const std::string many = dir.make("many.yuv", 1920ULL * 1080 * 3 / 2 * 4);
+  ovt_File many_handle{ovt::io::RandomAccessFile::open(many)};
+  CHECK(ovt_container_open_format(&many_handle, "raw", nullptr, nullptr, &c) == OVT_E_INVALID_ARG);
+  CHECK(c == nullptr);
+  // With a sidecar the NULL format reaches the C API, `header_bytes` included.
+  const std::string with_side = dir.make("side.yuv", 16 + 64ULL * 48 * 3 / 2 * 6);
+  dir.write("side.yuv.ovt-raw.json", R"({"width":64,"height":48,"pix_fmt":"yuv420p","fps":29.97,"header_bytes":16})");
+  ovt_File side_handle{ovt::io::RandomAccessFile::open(with_side)};
+  REQUIRE(ovt_container_open_format(&side_handle, "raw", nullptr, nullptr, &c) == OVT_OK);
+  CHECK(ovt_container_size(c) == 16 + 64ULL * 48 * 3 / 2 * 6);
+  const ovt_Buffer side_tree = ovt_container_tree(c);
+  REQUIRE(side_tree.size > 0);
+  const Bytes side_bytes(side_tree.data, side_tree.data + side_tree.size);
+  const auto* side_diags = tree_of(side_bytes)->diagnostics();
+  CHECK((side_diags == nullptr || side_diags->begin() == side_diags->end()));  // no trailing bytes
+  ovt_container_close(c);
   // Headerless: the plain open of a raw file still wants a format.
   CHECK(ovt_container_open(&handle, &c) != OVT_OK);
 }

@@ -29,7 +29,7 @@ inline constexpr uint64_t kMaxRankedFrameCount = 100000;          // §8.6.6 ste
 // The optional `color` object of the sidecar (H.273 code points).
 struct RawColor {
   bool present = false;
-  uint8_t primaries = 2;  // SPEC-ASSUMPTION(#366): 2 = unspecified when the sidecar says nothing
+  uint8_t primaries = 2;  // §8.6.6: 2 = unspecified when the sidecar says nothing
   uint8_t transfer = 2;
   uint8_t matrix = 2;
   bool full_range = false;
