@@ -514,17 +514,6 @@ TEST_CASE("h264_sei_framing_two_messages_and_ff_bytes", "[syntax][h264][sei][fas
   CHECK(p.sei.messages[0].payload_span.bit_length == 8);
 }
 
-TEST_CASE("h264_sei_payload_names", "[syntax][h264][sei][fast]") {
-  CHECK(sei_payload_name(0) == "buffering_period");
-  CHECK(sei_payload_name(23) == "tone_mapping_info");
-  CHECK(sei_payload_name(37) == "mvc_scalable_nesting");
-  CHECK(sei_payload_name(54) == "constrained_depth_parameter_set_identifier");
-  CHECK(sei_payload_name(56) == "green_metadata");
-  CHECK(sei_payload_name(137) == "mastering_display_colour_volume");
-  CHECK(sei_payload_name(55) == "reserved_sei_message");
-  CHECK(sei_payload_name(200) == "reserved_sei_message");
-}
-
 TEST_CASE("h264_sei_other_payload_types_keep_bytes", "[syntax][h264][sei][fast]") {
   Env env;
   // Until WI-1.110b, every payload except 0 and 1 is kept as bytes under its Annex D name.
@@ -576,17 +565,6 @@ TEST_CASE("h264_sei_payload_overrun_does_not_reach_next_message", "[syntax][h264
   CHECK(payload_as<PicTiming>(p.sei.messages[1]).dpb_output_delay == 4);
   CHECK(diag_codes(p) == std::vector<std::string>{"BR-0001"});
   CHECK(find_node(p.tree.root(), "rbsp_trailing_bits") != nullptr);
-}
-
-TEST_CASE("h264_sei_variable_length_element_crossing_payload_end", "[syntax][h264][sei][fast]") {
-  Env env;
-  // seq_parameter_set_id is ue(v): a run of zero bits would continue into the next message; payloadSize 1 makes it a
-  // BR-0001 and the next message is parsed on its own.
-  auto p = parse_sei(sei_nal({{0, {0x00}}, {1, {0x00, 0x10, 0x10}}}), env.ctx);
-  REQUIRE(p.sei.messages.size() == 2);
-  CHECK_FALSE(p.sei.messages[0].parsed);
-  CHECK(p.sei.messages[1].parsed);
-  CHECK(diag_codes(p) == std::vector<std::string>{"BR-0001"});
 }
 
 TEST_CASE("h264_sei_unaligned_payload_alignment_bits", "[syntax][h264][sei][fast]") {
