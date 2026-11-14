@@ -228,8 +228,9 @@ void read_long_header(Section& s) {
 
 // Interprets the body of a section whose CRC is good; sets `decoded`.
 void decode_section(Section& s) {
-  // Every table but the TDT is a long-form section with a CRC_32; nothing to read otherwise.
-  if (!s.syntax_indicator && s.table_id != kTableTdt) {
+  // The TDT and the TOT are short-form sections (EN 300 468 §5.2.5, §5.2.6; the TOT still ends in a CRC_32). Every
+  // other table read here is long-form with a CRC_32; nothing to read otherwise.
+  if (!s.syntax_indicator && s.table_id != kTableTdt && s.table_id != kTableTot) {
     return;
   }
   const size_t end = s.has_crc ? s.bytes.size() - kCrcBytes : s.bytes.size();

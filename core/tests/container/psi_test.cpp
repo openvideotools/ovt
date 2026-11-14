@@ -430,9 +430,9 @@ TEST_CASE("psi: DVB SDT, EIT, TDT and TOT are decoded read-only", "[container][m
   eit.push_back(0x4E);
   append(eit, ev);
   append(data, packetize(ts::kEitPid, section(0x4E, 1, 0, eit), cc2));
-  // TDT and TOT with the same time.
+  // TDT and TOT with the same time; both are short-form (section_syntax_indicator 0, EN 300 468 §5.2.5/§5.2.6).
   Bytes tdt{0x70, 0x70, 0x05, 0xC0, 0x79, 0x12, 0x45, 0x00};
-  Bytes tot{0x73, 0xF0, 0x00, 0xC0, 0x79, 0x12, 0x45, 0x00, 0xF0, 0x00};
+  Bytes tot{0x73, 0x70, 0x00, 0xC0, 0x79, 0x12, 0x45, 0x00, 0xF0, 0x00};
   tot[2] = static_cast<uint8_t>(tot.size() - 3 + 4);
   const uint32_t crc = ts::crc32_mpeg2(tot);
   put16(tot, crc >> 16U);
@@ -485,6 +485,8 @@ TEST_CASE("psi: DVB SDT, EIT, TDT and TOT are decoded read-only", "[container][m
   CHECK(tdt_s->decoded);
   CHECK(tot_s->decoded);
   CHECK(tdt_s->utc_time == 0xC079124500ULL);
+  CHECK_FALSE(tot_s->syntax_indicator);
+  CHECK(tot_s->utc_time == 0xC079124500ULL);
   CHECK(tot_s->crc_ok);
 }
 
