@@ -302,47 +302,40 @@ struct Located {
   int cy = 0;
 };
 
-// The cell left of (a) or above (not a) the cell (bx, by) of `m` in an MBAFF frame (H.264 6.4.12.2, Table 6-4, for the
-// luma location (-1, 4 * by) or (4 * bx, -1)). The pairs are in frame coordinates: the top macroblock of a pair is at
-// an even y and the bottom one below it, whether the pair is a frame or a field pair.
-Located locate_mbaff(const Frame& f, const Mb& m, int bx, int by, bool a) {
-  if (a && bx > 0) {
-    return Located{&m, bx - 1, by};
-  }
-  if (!a && by > 0) {
-    return Located{&m, bx, by - 1};
-  }
+// The cell left of the cell (0, by) of `m` in an MBAFF frame (H.264 6.4.12.2, Table 6-4, luma location (-1, 4 * by)).
+// The pairs are in frame coordinates: the top macroblock of a pair is at an even y and the bottom one below it,
+// whether the pair is a frame or a field pair.
+Located locate_mbaff_left(const Frame& f, const Mb& m, int by) {
   const bool top = (m.y & 1) == 0;
   const bool frame_mb = m.field == 0;
   const int pair_y = m.y & ~1;
-  if (a) {
-    const Mb* x_top = f.at(m.x - 1, pair_y);
-    const Mb* x_bottom = f.at(m.x - 1, pair_y + 1);
-    if (x_top == nullptr || x_bottom == nullptr) {
-      return {};
-    }
-    const bool x_frame = x_top->field == 0;
-    const int y_n = by * 4;
-    bool bottom = false;
-    int y_m = y_n;
-    if (frame_mb) {
-      if (!x_frame) {
-        bottom = y_n % 2 != 0;  // never with y_n a multiple of 4; kept as the table reads
-        y_m = top ? y_n >> 1 : (y_n + 16) >> 1;
-      } else {
-        bottom = !top;
-      }
-    } else if (x_frame) {
-      bottom = y_n >= 8;
-      y_m = (top ? y_n << 1 : (y_n << 1) + 1) - (bottom ? 16 : 0);
-    } else {
-      bottom = !top;
-    }
-    return Located{bottom ? x_bottom : x_top, 3, y_m >> 2};
+  const Mb* x_top = f.at(m.x - 1, pair_y);
+  const Mb* x_bottom = f.at(m.x - 1, pair_y + 1);
+  if (x_top == nullptr || x_bottom == nullptr) {
+    return {};
   }
+  const bool x_frame = x_top->field == 0;
+  const int y_n = by * 4;
+  if (frame_mb == x_frame) {
+    return Located{top ? x_top : x_bottom, 3, by};  // same kind of pair: the macroblock of the same parity, same rows
+  }
+  if (frame_mb) {  // frame macroblock, field pair left: the top field macroblock holds the even rows
+    return Located{x_top, 3, (top ? y_n >> 1 : (y_n + 16) >> 1) >> 2};
+  }
+  const bool bottom = y_n >= 8;  // field macroblock, frame pair left: rows 2 * y_n (+ 1)
+  const int y_m = (top ? y_n << 1 : (y_n << 1) + 1) - (bottom ? 16 : 0);
+  return Located{bottom ? x_bottom : x_top, 3, y_m >> 2};
+}
+
+// The cell above the cell (bx, 0) of `m` in an MBAFF frame (Table 6-4, luma location (4 * bx, -1)): always the last
+// cell row.
+Located locate_mbaff_above(const Frame& f, const Mb& m, int bx) {
+  const bool top = (m.y & 1) == 0;
+  const bool frame_mb = m.field == 0;
   if (frame_mb && !top) {
     return Located{f.at(m.x, m.y - 1), bx, 3};  // the top macroblock of the same pair
   }
+  const int pair_y = m.y & ~1;
   const Mb* above_top = f.at(m.x, pair_y - 2);
   const Mb* above_bottom = f.at(m.x, pair_y - 1);
   if (above_top == nullptr || above_bottom == nullptr) {
@@ -352,6 +345,17 @@ Located locate_mbaff(const Frame& f, const Mb& m, int bx, int by, bool a) {
   // macroblock takes its top macroblock when that pair is a field pair, and its bottom one (row 14) when it is not.
   const bool use_top = !frame_mb && top && above_top->field != 0;
   return Located{use_top ? above_top : above_bottom, bx, 3};
+}
+
+// The cell left of (a) or above (not a) the cell (bx, by) of `m` in an MBAFF frame.
+Located locate_mbaff(const Frame& f, const Mb& m, int bx, int by, bool a) {
+  if (a && bx > 0) {
+    return Located{&m, bx - 1, by};
+  }
+  if (!a && by > 0) {
+    return Located{&m, bx, by - 1};
+  }
+  return a ? locate_mbaff_left(f, m, by) : locate_mbaff_above(f, m, bx);
 }
 
 // The cell left of (a) or above (not a) the cell (bx, by) of `m`, in a frame without MBAFF pairs. `step` is 2 in field
@@ -710,10 +714,25 @@ json avc_view(const Mb& m) {
 // at its frame position, also for a field macroblock of an MBAFF pair) owns the 16 cells at its position. Each of
 // them carries the macroblock's block_id and QP, its transform size and (I_NxN) the mode of its 4x4 block.
 // SPEC-ASSUMPTION(#395): the 16x32 pair rects and AvcMb.pair_parity of chapter 06 §6.2.4 wait for WI-4.110.
+// Whether cell (bx, by) of macroblock `m` (Block `b`, index `i`) is as the macroblock says.
+bool grid_cell_ok(const ovt::fb::CellGrid& g, const Mb& m, const ovt::fb::Block& b, size_t i, int bx, int by) {
+  const size_t cells_w = g.cells_w();
+  const size_t cell = (static_cast<size_t>((m.y * 4) + by) * cells_w) + static_cast<size_t>((m.x * 4) + bx);
+  if (get_at(g.block_id(), cell, -1) != static_cast<int>(i + 1) || get_at(g.qp(), cell, -1000) != b.qp()) {
+    return false;
+  }
+  if (m.cls != 255 && g.tx_log2_w() != nullptr) {
+    const int tx = get_at(g.tx_log2_w(), cell, 255);
+    if (tx != 255 && tx != (m.t8 != 0 ? 3 : 2)) {
+      return false;
+    }
+  }
+  return m.cls != 0 || g.intra_mode_y() == nullptr || get_at(g.intra_mode_y(), cell, -2) == cell_mode(m, bx, by);
+}
+
 void check_grid_in_frame_coordinates(const ovt::fb::FrameAnalysis& fa, const Frame& f) {
   const ovt::fb::CellGrid* g = fa.grid();
   REQUIRE(g != nullptr);
-  const auto cells_w = static_cast<size_t>(g->cells_w());
   CHECK(g->cells_w() == static_cast<uint32_t>((fa.frame()->coded_size()->w() + 3) / 4));
   CHECK(g->cells_h() == static_cast<uint32_t>((fa.frame()->coded_size()->h() + 3) / 4));
   size_t bad = 0;
@@ -721,24 +740,12 @@ void check_grid_in_frame_coordinates(const ovt::fb::FrameAnalysis& fa, const Fra
   for (size_t i = 0; i < f.mbs.size(); ++i) {
     const Mb& m = f.mbs[i];
     const ovt::fb::Block* b = fa.blocks()->Get(static_cast<flatbuffers::uoffset_t>(i + 1));
-    const bool placed = b->rect()->w() == 16 && b->rect()->h() == 16 && b->rect()->x() % 16 == 0 &&
-                        b->rect()->y() % 16 == 0 &&
+    const bool placed = b->rect()->w() == 16 && b->rect()->h() == 16 && b->rect()->x() == m.x * 16 &&
+                        b->rect()->y() == m.y * 16 &&
                         (static_cast<size_t>(m.y) * static_cast<size_t>(f.w)) + static_cast<size_t>(m.x) == i;
-    for (int by = 0; by < 4; ++by) {
-      for (int bx = 0; bx < 4; ++bx) {
-        const size_t cell = (static_cast<size_t>((m.y * 4) + by) * cells_w) + static_cast<size_t>((m.x * 4) + bx);
-        bool ok = placed && get_at(g->block_id(), cell, -1) == static_cast<int>(i + 1) &&
-                  get_at(g->qp(), cell, -1000) == b->qp();
-        if (ok && m.cls != 255 && g->tx_log2_w() != nullptr) {
-          const int tx = get_at(g->tx_log2_w(), cell, 255);
-          ok = tx == 255 || tx == (m.t8 != 0 ? 3 : 2);
-        }
-        if (ok && m.cls == 0 && g->intra_mode_y() != nullptr) {
-          ok = get_at(g->intra_mode_y(), cell, -2) == cell_mode(m, bx, by);
-        }
-        if (!ok && bad++ == 0) {
-          first = "macroblock " + std::to_string(i) + " cell " + std::to_string(bx) + "," + std::to_string(by);
-        }
+    for (int cell = 0; cell < 16; ++cell) {
+      if (!placed || !grid_cell_ok(*g, m, *b, i, cell % 4, cell / 4)) {
+        first = bad++ == 0 ? "macroblock " + std::to_string(i) + " cell " + std::to_string(cell) : first;
       }
     }
   }
