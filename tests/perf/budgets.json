@@ -1,0 +1,465 @@
+{
+  "schema": 1,
+  "source": "docs/spec/14-testing.md §14.9.3 (checked by tools/check_budgets.py)",
+  "hardware_budget_keys": {
+    "m1-air-8gb": "m1-air-8gb",
+    "linux-x64-ref": "m1-air-8gb",
+    "pixel-tablet": "pixel-tablet",
+    "chromebook-hdr": "pixel-tablet"
+  },
+  "benchmarks": {
+    "bench_index_h264_1h_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 2000,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_index_h265_10min_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 400,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1200,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_index_av1_10min_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 400,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1200,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_first_frame_<codec>_<container>": {
+      "m1-air-8gb": [
+        {
+          "metric": "hw_ms",
+          "op": "<=",
+          "value": 500,
+          "unit": "ms"
+        },
+        {
+          "metric": "sw_ms",
+          "op": "<=",
+          "value": 800,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "hw_ms",
+          "op": "<=",
+          "value": 1500,
+          "unit": "ms"
+        },
+        {
+          "metric": "sw_ms",
+          "op": "<=",
+          "value": 2400,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_analysis_de265_gop60_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 5000,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_analysis_aom_gop60_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 3000,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 5000,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_analysis_ffmpeg_gop60_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1000,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 5000,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_analysis_cached_frame": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 30,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_overlay_4k_mv_arrows": {
+      "m1-air-8gb": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 16,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 33,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_overlay_build": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 8,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_render_video_4k": {
+      "m1-air-8gb": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 8,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 16,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_render_first_frame": {
+      "m1-air-8gb": [
+        {
+          "metric": "warm_ms",
+          "op": "<=",
+          "value": 150,
+          "unit": "ms"
+        },
+        {
+          "metric": "cold_ms",
+          "op": "<=",
+          "value": 1500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_metrics_psnr_ssim_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "fps_4_threads",
+          "op": ">=",
+          "value": 200,
+          "unit": "fps"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "fps_4_threads",
+          "op": ">=",
+          "value": 60,
+          "unit": "fps"
+        }
+      ]
+    },
+    "bench_metrics_psnr_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "fps_1_thread",
+          "op": ">=",
+          "value": 600,
+          "unit": "fps"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_metrics_vmaf_1080p": {
+      "m1-air-8gb": [
+        {
+          "metric": "fps",
+          "op": ">=",
+          "value": 60,
+          "unit": "fps"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "fps",
+          "op": ">=",
+          "value": 15,
+          "unit": "fps"
+        }
+      ]
+    },
+    "bench_metrics_normalize_1080p_pq": {
+      "m1-air-8gb": [
+        {
+          "metric": "fps",
+          "op": ">=",
+          "value": 120,
+          "unit": "fps"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_metrics_align": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_metrics_maps": {
+      "m1-air-8gb": [
+        {
+          "metric": "overhead_ms_per_frame",
+          "op": "<=",
+          "value": 1.5,
+          "unit": "ms/frame"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_metrics_uvq_chunk": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 4500,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_metrics_memory_4k": {
+      "m1-air-8gb": [
+        {
+          "metric": "peak_rss_bytes",
+          "op": "<=",
+          "value": 2,
+          "unit": "GiB"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "peak_rss_bytes",
+          "op": "<=",
+          "value": 1,
+          "unit": "GiB"
+        }
+      ]
+    },
+    "bench_gui_open_first_frame": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_gui_cold_start": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 1500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 3000,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_gui_scrub": {
+      "m1-air-8gb": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 16,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "p95_ms",
+          "op": "<=",
+          "value": 33,
+          "unit": "ms"
+        }
+      ]
+    },
+    "bench_container_open_moov_1h": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 150,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_container_sample_table_1h": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 200,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_container_fragments_3600": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 500,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_demux_packets_1h": {
+      "m1-air-8gb": [
+        {
+          "metric": "packets_per_s",
+          "op": ">=",
+          "value": 50000,
+          "unit": "packets/s"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_memory_4k_stream": {
+      "m1-air-8gb": [
+        {
+          "metric": "peak_rss_bytes",
+          "op": "<=",
+          "value": 2,
+          "unit": "GiB"
+        }
+      ],
+      "pixel-tablet": [
+        {
+          "metric": "peak_rss_bytes",
+          "op": "<=",
+          "value": 1,
+          "unit": "GiB"
+        }
+      ]
+    },
+    "bench_validator": {
+      "m1-air-8gb": [
+        {
+          "metric": "real_time_ms",
+          "op": "<=",
+          "value": 200,
+          "unit": "ms"
+        }
+      ],
+      "pixel-tablet": null
+    },
+    "bench_cache_write": {
+      "m1-air-8gb": [
+        {
+          "metric": "bytes_per_second",
+          "op": ">=",
+          "value": 200,
+          "unit": "MB/s"
+        }
+      ],
+      "pixel-tablet": null
+    }
+  }
+}

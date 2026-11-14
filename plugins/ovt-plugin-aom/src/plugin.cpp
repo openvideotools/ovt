@@ -3,9 +3,9 @@
 //
 // libovt_plugin_aom: the ABI glue of the AV1 analysis plugin (chapter 0 §0.6.2, chapter 07 §7.6.1, WI-2.155).
 // It exports ovt_analysis_decoder_v1() and nothing else; every entry point is noexcept and turns an exception into
-// an error status. This skeleton produces frame-level FrameAnalysis buffers (FrameInfo, the empty 4x4 cell grid
-// size, diagnostics) and the Reconstruction planes of shown frames. The inspection callback already runs
-// ifd_inspect() on every frame; WI-2.156 maps insp_mi_data into the grid and WI-2.157 maps the accounting.
+// an error status. It produces FrameAnalysis buffers with FrameInfo, the cell grid, block tree, motion vectors,
+// reference slots and tiles mapped from libaom's insp_mi_data (WI-2.156), diagnostics, and the Reconstruction
+// planes of shown frames. WI-2.157 adds the accounting.
 
 #include <aom/aom_codec.h>
 
@@ -19,7 +19,9 @@
 
 #include "decoder.hpp"
 #include "fb_builder.hpp"
+#include "map_mi.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
+#include "planes.hpp"
 
 namespace {
 
@@ -32,8 +34,8 @@ struct ovt_AnalysisDecoder {
   // A FrameAnalysis handed out by pull() and not yet released, with the planes its PlaneRefs name.
   struct Pulled {
     std::unique_ptr<flatbuffers::FlatBufferBuilder> fbb;
-    ovt::aom::Frame frame;
-    std::map<std::string, const ovt::aom::Plane*> blobs;  // blob_id -> plane of `frame`
+    ovt::aom::Frame frame;                             // holds the frame buffer the views point into
+    std::map<std::string, ovt::aom::PlaneView> blobs;  // blob_id -> plane of `frame.recon`
   };
   std::unique_ptr<ovt::aom::Decoder> decoder;
   std::map<const uint8_t*, std::unique_ptr<Pulled>> pulled;
@@ -44,17 +46,18 @@ namespace {
 // Strings and caps are built once from the linked libaom (static locals: thread-safe initialisation).
 struct Info {
   std::string version = std::string("0.1.0+libaom.") + aom_codec_version_str();
-  std::string notes = std::string("AV1 analysis via libaom ") + aom_codec_version_str() +
-                      " inspection (frame level and reconstruction; block data arrives with WI-2.156/2.157)";
+  std::string notes =
+      std::string("AV1 analysis via libaom ") + aom_codec_version_str() +
+      " inspection (blocks, motion vectors, reference slots, tiles and reconstruction; no symbol accounting yet)";
   ovt_AnalysisCaps caps{};
   Info() {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
     caps.codec = kCodecAv1;
-    caps.plane_stages = 1U << kStageRecon;  // stock libaom: Reconstruction only (§7.6.1 Caps row)
-    caps.grid_fields = 0U;                  // none yet: WI-2.156 maps insp_mi_data and announces the §7.6.1 bits
-    caps.has_symbol_accounting = 0;         // WI-2.157
+    caps.plane_stages = 1U << kStageRecon;     // stock libaom: Reconstruction only (§7.6.1 Caps row)
+    caps.grid_fields = ovt::aom::kGridFields;  // §7.6.1 Caps row with stock libaom, before accounting (WI-2.157)
+    caps.has_symbol_accounting = 0;            // WI-2.157
     caps.bit_exact = 1;
-    caps.supports_threads = 1;  // libaom worker threads with row-MT
+    caps.supports_threads = 1;  // safe; libaom runs on one thread while accounting is on (decoder.cpp)
     caps.id = "aom";
     caps.version = version.c_str();
     caps.license = "BSD-2-Clause AND ISC AND LicenseRef-AOM-Patent-License-1.0";  // plugin + static libaom
@@ -131,7 +134,7 @@ ovt_status aom_pull(ovt_AnalysisDecoder* dec, uint32_t plane_stage_mask, ovt_Buf
       return OVT_OK;
     }
     if ((plane_stage_mask & (1U << kStageRecon)) == 0) {
-      pulled->frame.planes = {};  // not requested: drop the copy now
+      pulled->frame.recon = {};  // not requested: give the frame buffer back now; the samples were never copied
     }
     pulled->fbb = ovt::aom::build_frame_analysis(pulled->frame, plane_stage_mask, info().caps.id, info().caps.version,
                                                  &pulled->blobs);
@@ -151,8 +154,10 @@ ovt_status aom_plane(ovt_AnalysisDecoder* dec, const char* blob_id, const uint8_
   return guarded([&] {
     for (const auto& [ptr, pulled] : dec->pulled) {
       if (const auto it = pulled->blobs.find(blob_id); it != pulled->blobs.end()) {
-        *data = it->second->data.data();
-        *size = it->second->data.size();
+        // In place in libaom's frame buffer: PlaneRef.stride_bytes apart, so the size runs to the last sample.
+        // SPEC-ASSUMPTION(#389): the ABI does not say what *size covers for a strided plane.
+        *data = it->second.data;
+        *size = it->second.span_bytes();
         return OVT_OK;
       }
     }

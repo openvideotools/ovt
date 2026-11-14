@@ -1,6 +1,6 @@
 # WI-0.060 acceptance record
 
-Spec version: 1.0-rc17. Written 2026-11-09 in a Linux cloud container (no macOS, no `otool`, no Qt), so the
+Spec version: 1.0-rc25. Written 2026-11-09 in a Linux cloud container (no macOS, no `otool`, no Qt), so the
 macOS-only steps are **pending**: they run on the Mac Mini and the output is pasted into this file before the PR is
 approved. Nothing below has been run on a Mac yet.
 

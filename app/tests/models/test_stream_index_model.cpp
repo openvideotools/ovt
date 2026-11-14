@@ -27,104 +27,12 @@
 #include "models/stream_index_model.h"
 #include "ovt_model_generated.h"
 #include "qt_test_app.h"
+#include "synthetic_index.h"
 
-namespace {
+using namespace ovt::app;           // NOLINT(google-build-using-namespace): test file
+using namespace ovt::app::testing;  // NOLINT(google-build-using-namespace): test file
 
-using namespace ovt::app;  // NOLINT(google-build-using-namespace): test file
-
-// The value of an optional the test expects to hold one; throws (failing the test case) when it is empty.
-template <typename T>
-T must(std::optional<T> value) {
-  if (!value.has_value()) {
-    throw std::runtime_error("expected a value");
-  }
-  return *std::move(value);
-}
-
-struct SyntheticFrame {
-  std::int64_t pts;
-  std::uint64_t bytes;
-  int qp;
-  bool rap;
-  int tid;
-};
-
-// Appends the two units of frame `i` (an AUD, non-VCL, and a slice) laid out as Annex B with 4-byte start codes.
-void add_units(ovt::fb::StreamIndexT& index, ovt::fb::FrameInfoT& fi, std::size_t i, std::uint64_t& offset,
-               int display_index, bool with_samples) {
-  for (int k = 0; k < 2; ++k) {
-    auto u = std::make_unique<ovt::fb::UnitT>();
-    u->index = static_cast<std::uint32_t>(2 * i + static_cast<std::size_t>(k));
-    const std::uint64_t payload = k == 0 ? 2 : (fi.size_bytes > 8 ? fi.size_bytes - 8 : 1);
-    u->prefix_span = std::make_unique<ovt::fb::ByteSpan>(offset, 4);
-    u->file_span = std::make_unique<ovt::fb::ByteSpan>(offset + 4, payload);
-    offset += 4 + payload;
-    u->type_name = k == 0 ? "AUD" : "SLICE";
-    u->frame = std::make_unique<ovt::fb::FrameId>(k == 0 ? -1 : static_cast<int>(i), k == 0 ? -1 : display_index);
-    if (k == 1) {
-      u->epb_positions = {3, 9};
-    }
-    u->sample_index = with_samples ? static_cast<std::int32_t>(i) : -1;
-    fi.units.push_back(u->index);
-    index.units.push_back(std::move(u));
-  }
-}
-
-// Serializes a StreamIndex whose frame i (decode order) has one AUD unit and one slice unit; the display order is the
-// pts order.
-std::vector<std::uint8_t> build_index(const std::vector<SyntheticFrame>& frames, std::int32_t tb_num,
-                                      std::int32_t tb_den, bool with_samples = false) {
-  ovt::fb::StreamIndexT index;
-  index.codec = ovt::fb::Codec::H264;
-  index.schema_version = 1;
-  std::vector<int> by_pts(frames.size());
-  std::iota(by_pts.begin(), by_pts.end(), 0);
-  std::stable_sort(by_pts.begin(), by_pts.end(), [&](int a, int b) {
-    return frames[static_cast<std::size_t>(a)].pts < frames[static_cast<std::size_t>(b)].pts;
-  });
-  std::vector<int> display_of(frames.size());
-  for (std::size_t slot = 0; slot < by_pts.size(); ++slot) {
-    display_of[static_cast<std::size_t>(by_pts[slot])] = static_cast<int>(slot);
-  }
-  index.display_order = by_pts;
-
-  std::uint64_t offset = 100;  // some bytes before the first start code
-  for (std::size_t i = 0; i < frames.size(); ++i) {
-    auto fi = std::make_unique<ovt::fb::FrameInfoT>();
-    fi->id = std::make_unique<ovt::fb::FrameId>(static_cast<int>(i), display_of[i]);
-    fi->pts = frames[i].pts;
-    fi->dts = static_cast<std::int64_t>(i);
-    fi->timebase_num = tb_num;
-    fi->timebase_den = tb_den;
-    fi->size_bytes = frames[i].bytes;
-    fi->qp_base = static_cast<std::int16_t>(frames[i].qp);
-    fi->is_rap = frames[i].rap;
-    fi->shown = true;
-    fi->temporal_id = static_cast<std::uint8_t>(frames[i].tid);
-    fi->type = frames[i].rap ? ovt::fb::FrameType::I : ovt::fb::FrameType::P;
-    add_units(index, *fi, i, offset, display_of[i], with_samples);
-    index.frames.push_back(std::move(fi));
-  }
-  flatbuffers::FlatBufferBuilder fbb;
-  fbb.Finish(ovt::fb::StreamIndex::Pack(fbb, &index));
-  const auto bytes = fbb.GetBufferSpan();
-  return {bytes.begin(), bytes.end()};
-}
-
-// Frames of an IPPP stream with a GOP of 60: an I frame every 60, sizes depend on the position.
-std::vector<SyntheticFrame> gop60(std::size_t n, std::int64_t pts_step) {
-  std::vector<SyntheticFrame> frames;
-  for (std::size_t i = 0; i < n; ++i) {
-    const bool rap = i % 60 == 0;
-    frames.push_back({static_cast<std::int64_t>(i) * pts_step, rap ? 60000U + i : 900U + (i * 37U) % 400U,
-                      rap ? 22 : 24 + static_cast<int>(i % 7), rap, 0});
-  }
-  return frames;
-}
-
-}  // namespace
-
-TEST_CASE("StreamIndexHandle verifies the bytes", "[app][timeline][adapter]") {
+TEST_CASE("StreamIndexHandle verifies the bytes", "[fast][gui][timeline][adapter]") {
   CHECK(StreamIndexHandle::adopt({}) == nullptr);
   CHECK(StreamIndexHandle::adopt(std::vector<std::uint8_t>(64, 0xFF)) == nullptr);
   std::vector<std::uint8_t> truncated = build_index(gop60(4, 1), 1, 60);
@@ -133,7 +41,7 @@ TEST_CASE("StreamIndexHandle verifies the bytes", "[app][timeline][adapter]") {
   CHECK(StreamIndexHandle::adopt(build_index(gop60(4, 1), 1, 60)) != nullptr);
 }
 
-TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamIndex", "[app][timeline][adapter]") {
+TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamIndex", "[fast][gui][timeline][adapter]") {
   // Decode order I P B B with display order I B B P: pts 0, 3, 1, 2.
   const std::vector<SyntheticFrame> frames{
       {0, 5000, 20, true, 0}, {3, 800, 26, false, 0}, {1, 300, 30, false, 1}, {2, 310, 30, false, 1}};
@@ -195,7 +103,7 @@ TEST_CASE("the adapter answers the five SelectionIndex lookups from a StreamInde
   }
 }
 
-TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[app][timeline][adapter]") {
+TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[fast][gui][timeline][adapter]") {
   ovt::app::testing::qt_app();
   const std::vector<SyntheticFrame> frames{{0, 5000, 20, true, 0}, {1, 800, 26, false, 0}};
   StreamIndexModel model;
@@ -209,7 +117,7 @@ TEST_CASE("SelectionModel derives from a StreamIndex through the adapter", "[app
 }
 
 TEST_CASE("range statistics: bitrate is Σbytes×8 / Δpts from the time base, exact to one tick",
-          "[app][timeline][stats]") {
+          "[fast][gui][timeline][stats]") {
   // 90 kHz track, 60 fps: 1500 ticks per frame. The drag covers frames 120–240.
   const auto frames = gop60(300, 1500);
   const FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 90000))->index()};
@@ -234,7 +142,7 @@ TEST_CASE("range statistics: bitrate is Σbytes×8 / Δpts from the time base, e
   CHECK(must(table.range_stats(299, 299)).ticks == 1500);
 }
 
-TEST_CASE("display order re-sorts the bars and keeps the selection on the same frame", "[app][timeline][order]") {
+TEST_CASE("display order re-sorts the bars and keeps the selection on the same frame", "[fast][gui][timeline][order]") {
   // Decode order I P B B: pts 0 3 1 2.
   const std::vector<SyntheticFrame> frames{
       {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};
@@ -259,7 +167,7 @@ TEST_CASE("display order re-sorts the bars and keeps the selection on the same f
   CHECK(must(table.range_stats(1, 2)).bytes == 61);
 }
 
-TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[app][timeline][series]") {
+TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[fast][gui][timeline][series]") {
   const std::vector<SyntheticFrame> frames{{0, 500, 20, true, 0}, {1, 80, 26, false, 2}, {2, 30, 30, false, 1}};
   FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 30))->index()};
   CHECK(table.aggregator({Series::Qp, {}, 0}).max(0, 3) == 30.0);
@@ -273,7 +181,7 @@ TEST_CASE("series: qp, temporal id, bits and metrics with gaps", "[app][timeline
   CHECK(std::isnan(table.aggregator({Series::Metric, "psnr", 1}).max(0, 3)));  // another plane
 }
 
-TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[app][timeline][model]") {
+TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[fast][gui][timeline][model]") {
   ovt::app::testing::qt_app();
   const std::vector<SyntheticFrame> frames{
       {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};
@@ -316,4 +224,19 @@ TEST_CASE("StreamIndexModel: range selection, order toggle and signals", "[app][
 
   model.setIndex(nullptr);
   CHECK(model.frame_count() == 0);
+}
+
+TEST_CASE("declared references and the display index come from the index", "[fast][gui][timeline][refs]") {
+  // Decode order I P B B with pts 0 3 1 2; the synthetic index makes every inter frame refer to the frame before it.
+  const std::vector<SyntheticFrame> frames{
+      {0, 500, 20, true, 0}, {3, 80, 26, false, 0}, {1, 30, 30, false, 1}, {2, 31, 30, false, 1}};
+  const FrameTable table{StreamIndexHandle::adopt(build_index(frames, 1, 30))->index()};
+  CHECK(table.declared_refs(0).empty());
+  REQUIRE(table.declared_refs(2).size() == 1);
+  CHECK(table.declared_refs(2)[0] == 1);
+  CHECK(table.declared_refs(3)[0] == 2);
+  CHECK(table.declared_refs(-1).empty());
+  CHECK(table.declared_refs(4).empty());
+  CHECK(table.display_index_of(1) == 3);
+  CHECK(table.display_index_of(9) == -1);
 }

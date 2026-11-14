@@ -1,0 +1,28 @@
+Static libaom convenience copy (ovt-plugin-aom)
+================================================
+
+ovt-plugin-aom links a private, static build of libaom 3.12.1 instead of the
+system libaom (the distro preset sets OVT_SYSTEM_LIBAOM=OFF).
+
+Why: the plugin needs libaom's inspection and accounting hooks, which are
+compiled in only with -DCONFIG_INSPECTION=1 -DCONFIG_ACCOUNTING=1. Debian's
+libaom is built without them, so a system-library build cannot provide the
+data OVT analyses (chapter 13 section 13.6.3).
+
+Policy: Debian Policy 4.13 (embedded code copies) is satisfied because the
+system library lacks a required feature. Facts for the reviewer:
+
+ * The copy is not shipped as a separate library and exports no libaom
+   symbols (plugins/ovt-plugin-aom/exports.map); no other package links it.
+ * The source is the upstream release tarball pinned in
+   third_party/VERSIONS.md (SHA-256 recorded there). A distribution build must
+   supply it as a second upstream tarball (debian/watch component "libaom") so
+   the build needs no network access.
+ * Licences: BSD-2-Clause, ISC (x86inc.asm) and the AOMedia patent licence
+   (PATENTS), which ships in /usr/share/doc/ovt-plugin-aom/.
+ * When Debian's libaom enables CONFIG_INSPECTION, drop the copy and set
+   OVT_SYSTEM_LIBAOM=ON in debian/rules.
+
+SKELETON NOTE: the second tarball and debian/watch are not wired yet.
+
+Bundled FFmpeg is NOT used: the distro preset builds against Debian's FFmpeg.

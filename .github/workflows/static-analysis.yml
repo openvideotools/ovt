@@ -89,9 +89,12 @@ jobs:
           "$LLVM/bin/clang-tidy" --version
           echo "SDKROOT=$(xcrun --show-sdk-path)" >> "$GITHUB_ENV"
 
+      # OVT_BUILD_PLUGIN_HM=ON (WI-4.104): the HM smoke program and, later, the HM plugin are in the compilation
+      # database only when HM is built; without it clang-tidy cannot find HM's headers. HM is fetched from vcgit at
+      # the commit pinned in third_party/VERSIONS.md.
       - name: Configure
         if: steps.diff.outputs.run == 'true'
-        run: cmake --preset "$PRESET"
+        run: cmake --preset "$PRESET" -DOVT_BUILD_PLUGIN_HM=ON
 
       # The configure step is enough for the file API reply.
       - name: Every OVT target links ovt::flags

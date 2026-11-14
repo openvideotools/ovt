@@ -47,15 +47,19 @@ Done 253592 runs in 61 second(s)
 
 No crash, timeout, leak or sanitizer report.
 
-## Test 3 and step 5: pending (#233 item 5)
+## Test 3 and step 5: passed on the Mac Mini (2026-11-13)
 
-AT3 (YUView 2.14 loads `tiny16.yuv` plus `tiny16_hevc.csv` and exits 0 with no "error" line) and the step 5
-screenshot need a YUView binary. This container can't download one. To run them on a desktop with YUView 2.14:
+Machine: the project's Mac Mini (macOS, `ovt-build` account), YUView 2.14 from the official release installed under
+`~/Applications`. YUView 2.14 has no `--loadfile` or `--quit-after-load` option and no exit code: files are plain
+arguments and the application stays open, so the AT3 line of WI-0.089 was reworded accordingly (spec 1.0-rc24).
 
 ```sh
-YUView --loadfile core/tests/golden/tiny16.yuv --loadfile core/tests/golden/tiny16_hevc.csv --quit-after-load
+cp core/tests/golden/tiny16.yuv /tmp/tiny16_16x16.yuv        # the size in the name lets YUView infer 16x16
+open -a YUView /tmp/tiny16_16x16.yuv core/tests/golden/tiny16_hevc.csv
 ```
 
-Set the YUV item to 16×16 YUV 4:2:0 8-bit. The statistics item should list 23 OVT types (PredMode … BlockGrid_TU)
-over one frame. Record the command, the exit code, the log and a screenshot here. If YUView rejects a
-keyword, the exporter gets fixed, not the spec (§6.8.2 verification note).
+Result: both items load with no error dialog (the only dialog was YUView's "newer version available" notice);
+the statistics panel lists the OVT types from `OVT_Skip` through `OVT_DeblockBsH` without scrolling (the CSV
+declares all 23 types, `OVT_PredMode` … `OVT_BlockGrid_TU`; the panel cannot be scrolled far enough to show all 23
+on one screen). The application was closed by hand after about 20 seconds. Screenshot: attached to the Mac Mini
+thread's report of 2026-11-13 04:03 UTC. No keyword was rejected, so the exporter needed no change.
