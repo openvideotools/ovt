@@ -4,7 +4,7 @@ Machine: Linux x86_64 cloud container (4 vCPU), GCC 13, `linux-x64-debug` config
 (`OVT_SYSTEM_LIBAOM=OFF`, `OVT_BUILD_PLUGIN_AOM=ON`), date 2026-11-14. Corpus: the 21 `aom_av1_1_*` entries of
 `tests/golden/av1-index.json`, fetched with `tools/fetch_corpora.py`. The `syn_av1_*` streams need the pinned `aomenc`
 and are exercised by CI only (the test skips an entry whose corpus file is not fetched, and fails under
-`OVT_REQUIRE_CORPORA=1`). Spec version: 1.0-rc22. Questions and assumptions: issue #499.
+`OVT_REQUIRE_CORPORA=1`). Spec version: 1.0-rc24. Questions and assumptions: issue #499.
 
 ## Test 1: grid fields, `symbols` and `bits_x8` equal the golden
 
