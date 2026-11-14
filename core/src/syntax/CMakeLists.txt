@@ -26,7 +26,8 @@ target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.c
 target_sources(ovt_core_objects PRIVATE av1/decoder_state.cpp)
 # WI-1.117: AV1 uncompressed_header() part 1 (chapter 7 §7.3.6 rows 11–19); part a: frame_size / superres /
 # render_size / frame_size_with_refs (rows 12–14) and tile_info (row 15).
-target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp)
+target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp av1/quantization.cpp av1/segmentation.cpp
+                                        av1/delta_params.cpp)
 # WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
 # st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
 # rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).

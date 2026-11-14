@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Unit tests of the AV1 uncompressed_header() sub-structures of chapter 7 §7.3.6 rows 12–15 (WI-1.117a):
-// frame_size with superres_params and compute_image_size, render_size, frame_size_with_refs and tile_info. Rows
-// 16–19 (quantization, segmentation, delta q / lf, lossless derivations) are WI-1.117b; the uncompressed_header()
-// orchestration (row 11) and its corpus tests are WI-1.117c.
+// Unit tests of the AV1 uncompressed_header() sub-structures (chapter 7 §7.3.6 rows 12–19, WI-1.117): frame_size
+// with superres_params and compute_image_size, render_size, frame_size_with_refs, tile_info, quantization_params,
+// segmentation_params, delta_q_params and delta_lf_params, plus get_qindex() and the lossless derivations. The
+// uncompressed_header() orchestration (row 11) and its corpus tests are WI-1.117c.
 //
 // Expected values come from a recorded oracle run cited at each fixture (FFmpeg 6.1.1 `-bsf:v trace_headers` on
 // the chapter 14 synthetic stream syn_av1_tiles_cdef_lr, recipe 13; bit offsets are those the trace prints,
 // counted from the first OBU header bit) or from a hand-worked transcription of the AV1 §5.9.x equations given in
 // the comments. GStreamer's av1parse (acceptance test 2) is not available on the build hosts: the sizes of the
 // frame_size_with_refs tests are the §5.9.7 / §5.9.8 / §5.9.9 equations worked by hand on the slot values (issue
-// #513). Parity over the aom vectors is WI-1.572.
+// #513, ruled: oracle substitution). Parity over the aom vectors is WI-1.572.
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -619,7 +619,341 @@ TEST_CASE("av1_tile_info_recording_off_returns_same_values", "[syntax][av1][fast
   CHECK(on.span.bit_length == off.span.bit_length);
 }
 
-// ---- corpus (acceptance test 3 on the stream: tile_info() of its first frame header) ---------------------------
+// ---- row 16: quantization_params ------------------------------------------------------------------------------
+
+TEST_CASE("av1_quantization_params_separate_uv_and_qmatrix", "[syntax][av1][fast]") {
+  // NumPlanes = 3, separate_uv_delta_q = 1: base_q_idx f(8) = 100, DeltaQYDc = delta_coded 1 su(1+6) = -5,
+  // diff_uv_delta = 1, DeltaQUDc = 3, DeltaQUAc = 0 (delta_coded 0), DeltaQVDc = -2, DeltaQVAc = 7,
+  // using_qmatrix = 1, qm_y = 4, qm_u = 5, qm_v = 6.
+  ColorConfig cc;
+  cc.NumPlanes = 3;
+  cc.separate_uv_delta_q = true;
+  BitWriter w;
+  w.put(100, 8).delta_q(-5).put(1, 1).delta_q(3).delta_q(0).delta_q(-2).delta_q(7).put(1, 1).put(4, 4).put(5, 4).put(6,
+                                                                                                                     4);
+  w.trailing();
+  QuantizationParams q;
+  uint64_t bits = 0;
+  const SyntaxNodeBuffer tree =
+      with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { q = parse_quantization_params(br, b, cc); }, &bits);
+  CHECK(bits == 8 + 8 + 1 + 8 + 1 + 8 + 8 + 1 + 12);
+  CHECK(q.base_q_idx == 100);
+  CHECK(q.DeltaQYDc == -5);
+  CHECK(q.diff_uv_delta);
+  CHECK(q.DeltaQUDc == 3);
+  CHECK(q.DeltaQUAc == 0);
+  CHECK(q.DeltaQVDc == -2);
+  CHECK(q.DeltaQVAc == 7);
+  CHECK(q.using_qmatrix);
+  CHECK(q.qm_y == 4);
+  CHECK(q.qm_u == 5);
+  CHECK(q.qm_v == 6);
+  CHECK(q.span.bit_offset == 0);
+  CHECK(q.span.bit_length == bits);
+  CHECK(node(tree, "base_q_idx").uvalue == 100);
+  const SyntaxNodeData& ydc = node(tree, "DeltaQYDc");
+  CHECK(ydc.ivalue == -5);
+  CHECK(ydc.span.bit_length == 8);
+  CHECK(node(tree, "qm_v").uvalue == 6);
+}
+
+TEST_CASE("av1_quantization_params_shared_uv_and_monochrome", "[syntax][av1][fast]") {
+  SECTION("separate_uv_delta_q = 0 copies U into V and qm_u into qm_v") {
+    ColorConfig cc;
+    cc.NumPlanes = 3;
+    cc.separate_uv_delta_q = false;
+    BitWriter w;
+    w.put(12, 8).delta_q(0).delta_q(4).delta_q(-1).put(1, 1).put(9, 4).put(2, 4).trailing();
+    QuantizationParams q;
+    const SyntaxNodeBuffer tree =
+        with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { q = parse_quantization_params(br, b, cc); });
+    CHECK(q.base_q_idx == 12);
+    CHECK_FALSE(q.diff_uv_delta);
+    CHECK(q.DeltaQUDc == 4);
+    CHECK(q.DeltaQUAc == -1);
+    CHECK(q.DeltaQVDc == 4);
+    CHECK(q.DeltaQVAc == -1);
+    CHECK(q.qm_y == 9);
+    CHECK(q.qm_u == 2);
+    CHECK(q.qm_v == 2);
+    CHECK(find(tree.root(), "diff_uv_delta") == nullptr);
+    REQUIRE(find(tree.root(), "qm_v") != nullptr);  // derived node
+    CHECK(find(tree.root(), "qm_v")->kind == ValueKind::None);
+  }
+  SECTION("NumPlanes = 1 reads only the luma delta") {
+    ColorConfig cc;
+    cc.NumPlanes = 1;
+    cc.mono_chrome = true;
+    BitWriter w;
+    w.put(255, 8).delta_q(63).put(0, 1).trailing();
+    QuantizationParams q;
+    uint64_t bits = 0;
+    (void)with_tree(
+        w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { q = parse_quantization_params(br, b, cc); }, &bits);
+    CHECK(bits == 8 + 8 + 1);
+    CHECK(q.base_q_idx == 255);
+    CHECK(q.DeltaQYDc == 63);
+    CHECK(q.DeltaQUDc == 0);
+    CHECK(q.DeltaQVAc == 0);
+    CHECK_FALSE(q.using_qmatrix);
+  }
+}
+
+// ---- row 17: segmentation_params ------------------------------------------------------------------------------
+
+TEST_CASE("av1_segmentation_params_update_data_with_clipping", "[syntax][av1][fast]") {
+  // primary_ref_frame = PRIMARY_REF_NONE: update_map = 1, temporal_update = 0, update_data = 1 inferred. Tables:
+  // segment 0: ALT_Q enabled su(1+8) = -256 → clipped to -255 (Segmentation_Feature_Max[0] = 255); segment 1:
+  // ALT_LF_Y_H enabled su(1+6) = 40 (limit 63, kept), REF_FRAME enabled f(3) = 5; segment 3: SKIP enabled (0
+  // bits); every other feature_enabled = 0. Derived: LastActiveSegId = 3, SegIdPreSkip = 1 (REF_FRAME and SKIP are
+  // >= SEG_LVL_REF_FRAME).
+  BitWriter w;
+  w.put(1, 1);  // segmentation_enabled
+  // segment 0
+  w.put(1, 1).su(-256, 9);
+  w.put(0, 7);
+  // segment 1
+  w.put(0, 1);
+  w.put(0, 1);
+  w.put(1, 1).su(40, 7);
+  w.put(0, 1).put(0, 1);
+  w.put(1, 1).put(5, 3);
+  w.put(0, 1).put(0, 1);
+  // segment 2
+  w.put(0, 8);
+  // segment 3
+  w.put(0, 6).put(1, 1).put(0, 1);
+  // segments 4..7
+  w.put(0, 32);
+  w.trailing();
+  SegmentationParams seg;
+  uint64_t bits = 0;
+  const SyntaxNodeBuffer tree = with_tree(
+      w.bytes(),
+      [&](BitReader& br, SyntaxBuilder& b) {
+        seg = parse_segmentation_params(br, b, kPrimaryRefNone, FeatureEnabledTable{}, FeatureDataTable{});
+      },
+      &bits);
+  CHECK(bits == 1 + 64 + 9 + 7 + 3);
+  CHECK(seg.segmentation_enabled);
+  CHECK(seg.segmentation_update_map);
+  CHECK_FALSE(seg.segmentation_temporal_update);
+  CHECK(seg.segmentation_update_data);
+  CHECK(seg.FeatureEnabled[0][kSegLvlAltQ]);
+  CHECK(seg.FeatureData[0][kSegLvlAltQ] == -255);
+  CHECK(seg.FeatureEnabled[1][2]);
+  CHECK(seg.FeatureData[1][2] == 40);
+  CHECK(seg.FeatureEnabled[1][kSegLvlRefFrame]);
+  CHECK(seg.FeatureData[1][kSegLvlRefFrame] == 5);
+  CHECK(seg.FeatureEnabled[3][kSegLvlSkip]);
+  CHECK(seg.FeatureData[3][kSegLvlSkip] == 0);
+  CHECK_FALSE(seg.FeatureEnabled[2][0]);
+  CHECK(seg.LastActiveSegId == 3);
+  CHECK(seg.SegIdPreSkip);
+  CHECK(seg.span.bit_length == bits);
+  // Tree: the feature_value of segment 0 feature 0 is su(1+8) with the raw -256 and the enum name on the flag.
+  const SyntaxNodeData& seg0 = node(tree, "segment", 0);
+  const SyntaxNodeData* f0 = find(&seg0, "feature", 0);
+  REQUIRE(f0 != nullptr);
+  const SyntaxNodeData* enabled = find(f0, "feature_enabled");
+  REQUIRE(enabled != nullptr);
+  CHECK(enabled->enum_name == "SEG_LVL_ALT_Q");
+  const SyntaxNodeData* value = find(f0, "feature_value");
+  REQUIRE(value != nullptr);
+  CHECK(value->ivalue == -256);
+  CHECK(value->descriptor == "su(1+8)");
+  CHECK(find(tree.root(), "segmentation_update_map") == nullptr);  // inferred, derived node instead
+  CHECK(find(tree.root(), "segmentation_update") != nullptr);
+}
+
+TEST_CASE("av1_segmentation_params_update_data_zero_keeps_previous_tables", "[syntax][av1][fast]") {
+  // primary_ref_frame = 2: segmentation_update_map f(1) = 1, segmentation_temporal_update f(1) = 1,
+  // segmentation_update_data f(1) = 0 → the load_previous() tables stay.
+  FeatureEnabledTable prev_enabled{};
+  FeatureDataTable prev_data{};
+  prev_enabled[4][kSegLvlAltQ] = true;
+  prev_data[4][kSegLvlAltQ] = -20;
+  prev_enabled[6][kSegLvlGlobalMv] = true;
+  BitWriter w;
+  w.put(1, 1).put(1, 1).put(1, 1).put(0, 1).trailing();
+  SegmentationParams seg;
+  uint64_t bits = 0;
+  (void)with_tree(
+      w.bytes(),
+      [&](BitReader& br, SyntaxBuilder& b) { seg = parse_segmentation_params(br, b, 2, prev_enabled, prev_data); },
+      &bits);
+  CHECK(bits == 4);
+  CHECK(seg.segmentation_update_map);
+  CHECK(seg.segmentation_temporal_update);
+  CHECK_FALSE(seg.segmentation_update_data);
+  CHECK(seg.FeatureEnabled == prev_enabled);
+  CHECK(seg.FeatureData == prev_data);
+  CHECK(seg.LastActiveSegId == 6);
+  CHECK(seg.SegIdPreSkip);
+  SECTION("update_map = 0 skips temporal_update") {
+    BitWriter w2;
+    w2.put(1, 1).put(0, 1).put(0, 1).trailing();
+    uint64_t bits2 = 0;
+    (void)with_tree(
+        w2.bytes(),
+        [&](BitReader& br, SyntaxBuilder& b) { seg = parse_segmentation_params(br, b, 0, prev_enabled, prev_data); },
+        &bits2);
+    CHECK(bits2 == 3);
+    CHECK_FALSE(seg.segmentation_update_map);
+    CHECK_FALSE(seg.segmentation_temporal_update);
+  }
+}
+
+TEST_CASE("av1_segmentation_params_disabled_zeroes_tables", "[syntax][av1][fast]") {
+  FeatureEnabledTable prev_enabled{};
+  prev_enabled[1][1] = true;
+  FeatureDataTable prev_data{};
+  prev_data[1][1] = 9;
+  BitWriter w;
+  w.put(0, 1).trailing();
+  SegmentationParams seg;
+  (void)with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) {
+    seg = parse_segmentation_params(br, b, 0, prev_enabled, prev_data);
+  });
+  CHECK_FALSE(seg.segmentation_enabled);
+  CHECK(seg.FeatureEnabled == FeatureEnabledTable{});
+  CHECK(seg.FeatureData == FeatureDataTable{});
+  CHECK(seg.LastActiveSegId == 0);
+  CHECK_FALSE(seg.SegIdPreSkip);
+  CHECK(segmentation_feature_name(0) == "SEG_LVL_ALT_Q");
+  CHECK(segmentation_feature_name(7) == "SEG_LVL_GLOBALMV");
+  CHECK(segmentation_feature_name(8).empty());
+}
+
+// ---- rows 18 / 19: delta_q_params, delta_lf_params ------------------------------------------------------------
+
+TEST_CASE("av1_delta_q_and_delta_lf_params", "[syntax][av1][fast]") {
+  SECTION("base_q_idx = 0 reads nothing; delta_lf follows delta_q_present") {
+    BitWriter w;
+    w.put(0, 1).trailing();
+    DeltaQParams dq;
+    DeltaLfParams dlf;
+    uint64_t bits = 0;
+    const SyntaxNodeBuffer tree = with_tree(
+        w.bytes(),
+        [&](BitReader& br, SyntaxBuilder& b) {
+          dq = parse_delta_q_params(br, b, 0);
+          dlf = parse_delta_lf_params(br, b, dq.delta_q_present, false);
+        },
+        &bits);
+    CHECK(bits == 0);
+    CHECK_FALSE(dq.delta_q_present);
+    CHECK(dq.delta_q_res == 0);
+    CHECK_FALSE(dlf.delta_lf_present);
+    CHECK(find(tree.root(), "delta_q_params") != nullptr);
+    CHECK(find(tree.root(), "delta_lf_params") != nullptr);
+    CHECK(node(tree, "delta_q_params").span.bit_length == 0);
+  }
+  SECTION("delta_q_present with delta_q_res, delta_lf_present with res and multi") {
+    // delta_q_present = 1, delta_q_res f(2) = 2; delta_lf_present = 1, delta_lf_res f(2) = 3, delta_lf_multi = 1.
+    BitWriter w;
+    w.put(1, 1).put(2, 2).put(1, 1).put(3, 2).put(1, 1).trailing();
+    DeltaQParams dq;
+    DeltaLfParams dlf;
+    uint64_t bits = 0;
+    (void)with_tree(
+        w.bytes(),
+        [&](BitReader& br, SyntaxBuilder& b) {
+          dq = parse_delta_q_params(br, b, 36);
+          dlf = parse_delta_lf_params(br, b, dq.delta_q_present, false);
+        },
+        &bits);
+    CHECK(bits == 7);
+    CHECK(dq.delta_q_present);
+    CHECK(dq.delta_q_res == 2);
+    CHECK(dq.span.bit_length == 3);
+    CHECK(dlf.delta_lf_present);
+    CHECK(dlf.delta_lf_res == 3);
+    CHECK(dlf.delta_lf_multi);
+    CHECK(dlf.span.bit_offset == 3);
+    CHECK(dlf.span.bit_length == 4);
+  }
+  SECTION("allow_intrabc suppresses delta_lf_present") {
+    BitWriter w;
+    w.put(1, 1).put(0, 2).trailing();
+    DeltaQParams dq;
+    DeltaLfParams dlf;
+    uint64_t bits = 0;
+    (void)with_tree(
+        w.bytes(),
+        [&](BitReader& br, SyntaxBuilder& b) {
+          dq = parse_delta_q_params(br, b, 1);
+          dlf = parse_delta_lf_params(br, b, dq.delta_q_present, true);
+        },
+        &bits);
+    CHECK(bits == 3);
+    CHECK(dq.delta_q_present);
+    CHECK_FALSE(dlf.delta_lf_present);
+    CHECK(dlf.span.bit_length == 0);
+  }
+}
+
+// ---- get_qindex and the lossless derivations ------------------------------------------------------------------
+
+TEST_CASE("av1_get_qindex_and_lossless", "[syntax][av1][fast]") {
+  QuantizationParams q;
+  SegmentationParams seg;
+  SECTION("base_q_idx = 0 without deltas is CodedLossless and AllLossless") {
+    const Lossless l = compute_lossless(q, seg, true);
+    CHECK(l.CodedLossless);
+    CHECK(l.AllLossless);
+    CHECK(l.LosslessArray == std::array<bool, 8>{true, true, true, true, true, true, true, true});
+    CHECK_FALSE(compute_lossless(q, seg, false).AllLossless);  // superres: FrameWidth != UpscaledWidth
+  }
+  SECTION("a chroma delta breaks losslessness") {
+    q.DeltaQUAc = 1;
+    const Lossless l = compute_lossless(q, seg, true);
+    CHECK_FALSE(l.CodedLossless);
+    CHECK_FALSE(l.LosslessArray[0]);
+  }
+  SECTION("ALT_Q feature per segment: get_qindex clips and selects") {
+    // AV1 §7.12.2: segment 2 adds -10 to base_q_idx 10 → 0 (lossless), segment 3 adds +300 → clipped to 255,
+    // segment 0 has no feature → base_q_idx.
+    q.base_q_idx = 10;
+    seg.segmentation_enabled = true;
+    seg.FeatureEnabled[2][kSegLvlAltQ] = true;
+    seg.FeatureData[2][kSegLvlAltQ] = -10;
+    seg.FeatureEnabled[3][kSegLvlAltQ] = true;
+    seg.FeatureData[3][kSegLvlAltQ] = 255;  // the parser clips to 255; +300 cannot be stored
+    CHECK(get_qindex(true, 0, q, seg, 0) == 10);
+    CHECK(get_qindex(true, 2, q, seg, 0) == 0);
+    CHECK(get_qindex(true, 3, q, seg, 0) == 255);
+    CHECK(get_qindex(false, 2, q, seg, 50) == 40);    // CurrentQIndex + delta
+    CHECK(get_qindex(false, 0, q, seg, 50) == 50);    // no feature: CurrentQIndex
+    CHECK(get_qindex(false, 3, q, seg, 250) == 255);  // clipped
+    const Lossless l = compute_lossless(q, seg, true);
+    CHECK_FALSE(l.CodedLossless);
+    CHECK(l.LosslessArray[2]);
+    CHECK_FALSE(l.LosslessArray[3]);
+    CHECK_FALSE(l.AllLossless);
+    // SegQMLevel only with using_qmatrix: 15 for the lossless segment, qm_y / qm_u / qm_v otherwise.
+    CHECK(l.SegQMLevel[0][2] == 0);
+    q.using_qmatrix = true;
+    q.qm_y = 3;
+    q.qm_u = 4;
+    q.qm_v = 5;
+    const Lossless lq = compute_lossless(q, seg, true);
+    CHECK(lq.SegQMLevel[0][2] == kQmLevelLossless);
+    CHECK(lq.SegQMLevel[2][2] == kQmLevelLossless);
+    CHECK(lq.SegQMLevel[0][0] == 3);
+    CHECK(lq.SegQMLevel[1][0] == 4);
+    CHECK(lq.SegQMLevel[2][3] == 5);
+  }
+  SECTION("segmentation disabled ignores the tables") {
+    q.base_q_idx = 10;
+    seg.segmentation_enabled = false;
+    seg.FeatureEnabled[2][kSegLvlAltQ] = true;
+    seg.FeatureData[2][kSegLvlAltQ] = -10;
+    CHECK(get_qindex(true, 2, q, seg, 0) == 10);
+  }
+}
+
+// ---- corpus (acceptance test 3 on the stream; the chained rows 15–19 of its first frame header) ---------------
 
 Bytes read_file(const std::filesystem::path& p) {
   std::ifstream in(p, std::ios::binary);
@@ -710,7 +1044,24 @@ TEST_CASE("av1_tile_info_corpus_syn_av1_tiles_cdef_lr", "[syntax][av1][fast][nee
     CHECK(t.MiRowStarts == std::vector<uint32_t>{0, 96, 180});
     CHECK(t.context_update_tile_id == 6);
     CHECK(t.TileSizeBytes == 2);
-    CHECK(br.bit_pos() == 61);  // base_q_idx follows (WI-1.117b)
+    const QuantizationParams q = parse_quantization_params(br, b, seq.color_config);
+    CHECK(q.span.bit_offset == 61);
+    CHECK(q.base_q_idx == 36);
+    CHECK(q.DeltaQYDc == 0);
+    CHECK(q.DeltaQVAc == 0);
+    CHECK_FALSE(q.using_qmatrix);
+    const SegmentationParams seg =
+        parse_segmentation_params(br, b, kPrimaryRefNone, FeatureEnabledTable{}, FeatureDataTable{});
+    CHECK(seg.span.bit_offset == 73);
+    CHECK_FALSE(seg.segmentation_enabled);
+    const DeltaQParams dq = parse_delta_q_params(br, b, q.base_q_idx);
+    CHECK(dq.span.bit_offset == 74);
+    CHECK_FALSE(dq.delta_q_present);
+    const DeltaLfParams dlf = parse_delta_lf_params(br, b, dq.delta_q_present, false);
+    CHECK_FALSE(dlf.delta_lf_present);
+    CHECK(br.bit_pos() == 75);  // loop_filter_level[0] follows (WI-1.118)
+    const Lossless l = compute_lossless(q, seg, fs.FrameWidth == fs.UpscaledWidth);
+    CHECK_FALSE(l.CodedLossless);
     done = true;
   });
   REQUIRE(done);
