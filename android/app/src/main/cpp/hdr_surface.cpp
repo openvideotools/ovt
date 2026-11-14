@@ -32,13 +32,13 @@
 namespace ovt::android_shell {
 
 // hdr_pattern.h spells the ADataSpace fields as numbers so that the host test can use them; they must be the NDK's.
-static_assert(kStandardBt709 == ADATASPACE_STANDARD_BT709);
-static_assert(kStandardBt2020 == ADATASPACE_STANDARD_BT2020);
-static_assert(kTransferSmpte170m == ADATASPACE_TRANSFER_SMPTE_170M);
-static_assert(kTransferSt2084 == ADATASPACE_TRANSFER_ST2084);
-static_assert(kTransferHlg == ADATASPACE_TRANSFER_HLG);
-static_assert(kRangeFull == ADATASPACE_RANGE_FULL);
-static_assert(kRangeLimited == ADATASPACE_RANGE_LIMITED);
+static_assert(kStandardBt709 == STANDARD_BT709);
+static_assert(kStandardBt2020 == STANDARD_BT2020);
+static_assert(kTransferSmpte170m == TRANSFER_SMPTE_170M);
+static_assert(kTransferSt2084 == TRANSFER_ST2084);
+static_assert(kTransferHlg == TRANSFER_HLG);
+static_assert(kRangeFull == RANGE_FULL);
+static_assert(kRangeLimited == RANGE_LIMITED);
 // The field combinations dataspace_for() returns are the NDK's named dataspaces.
 static_assert((kStandardBt2020 | kTransferSt2084 | kRangeFull) == ADATASPACE_BT2020_PQ);
 static_assert((kStandardBt2020 | kTransferHlg | kRangeFull) == ADATASPACE_BT2020_HLG);
