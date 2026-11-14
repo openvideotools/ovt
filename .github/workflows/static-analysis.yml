@@ -9,9 +9,11 @@
 # OVT_WERROR=ON in build-linux-x64 / build-macos-arm64, not here.
 # Third-party actions are pinned by commit SHA, never by tag.
 #
-# Runners: clang-tidy runs on the owner's Mac Mini (self-hosted, label macos-arm64) with Homebrew llvm@19 (the
-# same LLVM major as the clang-format pin) on the macos-arm64-debug compilation database; never for fork pull
-# requests. cppcheck needs Linux and skips when the repository variable OVT_HOSTED_RUNNERS is `off` (ci.yml).
+# Runners: clang-tidy runs on GitHub-hosted macos-15 (arm64, macOS 15 and Xcode 16 like the owner's Mac Mini) with
+# Homebrew llvm@19 (the same LLVM major as the clang-format pin, and the Mini's clang-tidy) on the macos-arm64-debug
+# compilation database, which keeps the Mini's three runners for the builds. Under the owner's OVT_HOSTED_RUNNERS=off
+# switch (ci.yml) it falls back to the Mini (self-hosted, label macos-arm64), never for fork pull requests there.
+# cppcheck needs Linux and skips under that switch.
 name: static-analysis
 
 on:
@@ -29,18 +31,22 @@ permissions:
 
 env:
   PRESET: macos-arm64-debug
-  LLVM: /opt/homebrew/opt/llvm@19 # brew install llvm@19 (keg-only; never on PATH)
+  LLVM: /opt/homebrew/opt/llvm@19 # brew install llvm@19 (keg-only; never on PATH); same prefix on hosted and Mini
   # Directories that hold OVT code (header filter of .clang-tidy); third_party is never analysed.
   OVT_DIRS: core render plugins cli app
 
 jobs:
   clang-tidy:
-    # Never run a fork's code on the Mini.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macos-arm64]
+    # Hosted macos-15; the Mini only under the owner's OVT_HOSTED_RUNNERS=off switch (ci.yml header).
+    # SELF_HOSTED_OK: a fork's code runs only on the hosted runner, never on the Mini.
+    if: >-
+      vars.OVT_HOSTED_RUNNERS != 'off' || github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.OVT_HOSTED_RUNNERS == 'off' && fromJSON('["self-hosted", "macos-arm64"]') || 'macos-15' }}
     timeout-minutes: 60 # the PR run on changed lines must stay under 10 minutes once the build cache is warm
     env:
-      # The Mini's 3 runners share 10 cores: 3 jobs each keeps the machine at about its core count.
+      # 3 jobs: the hosted macos-15 arm64 image has 3 cores; the Mini's 3 runners share 10 cores, so 3 jobs each keeps
+      # the machine at about its core count.
       CMAKE_BUILD_PARALLEL_LEVEL: "3"
       VCPKG_MAX_CONCURRENCY: "3"
       JOBS: "3"
@@ -79,9 +85,15 @@ jobs:
           qt: "true" # app/ sources need Qt in the compilation database (WI-0.019)
 
       # The compilation database comes from AppleClang; Homebrew's clang-tidy needs the SDK named explicitly.
+      # Hosted images have no llvm@19: install it (the Mini's runner cannot write to Homebrew, so there it must exist).
       - name: clang-tidy
         if: steps.diff.outputs.run == 'true'
+        env:
+          HOSTED: ${{ runner.environment == 'github-hosted' }}
         run: |
+          if [ "$HOSTED" = true ] && [ ! -x "$LLVM/bin/clang-tidy" ]; then
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install llvm@19
+          fi
           if [ ! -x "$LLVM/bin/clang-tidy" ]; then
             echo "::error::$LLVM/bin/clang-tidy is missing on this runner (brew install llvm@19)"
             exit 1
