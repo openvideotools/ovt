@@ -333,7 +333,7 @@ const char* stream_type_name(uint8_t stream_type) noexcept {
   }
 }
 
-std::string format_dvb_time(uint64_t mjd_bcd) noexcept {
+std::string format_dvb_time(uint64_t mjd_bcd) {
   const auto bcd = [](uint32_t byte, int& out) {
     if ((byte >> 4U) > 9U || (byte & 15U) > 9U) {
       return false;
