@@ -8,7 +8,7 @@ and are exercised by CI only (the test skips an entry whose corpus file is not f
 
 ## Test 1: grid fields, `symbols` and `bits_x8` equal the golden
 
-```
+```text
 OVT_CORPORA_DIR=~/.cache/ovt/corpora ctest -R golden_av1_inspect -j6
 100% tests passed, 0 tests failed out of 7        (AT1 groups 0..5 and AT2)
 ```
@@ -17,10 +17,10 @@ OVT_CORPORA_DIR=~/.cache/ovt/corpora ctest -R golden_av1_inspect -j6
 `FrameAnalysis` is converted to the golden's shape and compared: header (`base_q_idx`, `delta_q_*`, `frame_type`,
 `show_frame`, tile size), every grid layer cell by cell (25 layers), every `(x4, y4, name)` symbol total, and for every
 leaf block `Block.bits_x8` against the sum of the oracle's symbols in the cells it owns. Not compared, with the reason in
-#499: `TxType` (no tx_type vector until WI-2.159), the header's `frame_number` (the host fills `FrameInfo.poc`), the
+issue 499: `TxType` (no tx_type vector until WI-2.159), the header's `frame_number` (the host fills `FrameInfo.poc`), the
 CDEF strength layers except on blocks that cover a known unit origin, and the inter-only layers on intra blocks (libaom
 prints stale memory there). The committed goldens lack the first accounting symbol of each context (stock `inspect`,
-#103): the test adds those records back from libaom's own accounting (`kGoldensHaveFirstSymbol`). Streams not read by the
+issue 103): the test adds those records back from libaom's own accounting (`kGoldensHaveFirstSymbol`). Streams not read by the
 test: Annex B and container-wrapped files (`aom_av1_1_b8_03_size{up,down}.mkv`, `syn_av1_annexb*`).
 
 Sensitivity check (not kept): adding 1 to the plugin's `qp` of one cell, and setting `kGoldensHaveFirstSymbol = true`, each
