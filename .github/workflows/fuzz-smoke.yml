@@ -84,8 +84,9 @@ jobs:
 
       # The fuzzers run from their build-tree paths in the shards: the RPATHs and OVT_FFMPEG_PLUGIN_DIR are absolute,
       # and every hosted runner checks out to the same workspace. Pack the executables, the plugin modules they load,
-      # and every shared library under the workspace that ldd resolves for them; plus libstdc++ and libgcc_s, which
-      # come from the GCC 13 toolchain PPA that setup-ovt installs here but the shards do not.
+      # and every shared library under the workspace that ldd resolves for them. The system libraries they need besides
+      # glibc (libstdc++ and libgcc_s from the GCC 13 toolchain PPA, libva and the other host packages setup-ovt installs
+      # here but the shards do not) go to runtime/, which the shards put on LD_LIBRARY_PATH.
       - name: Pack fuzz binaries
         shell: bash
         run: |
@@ -102,7 +103,9 @@ jobs:
             done | sort -u | while read -r lib; do
               case "$lib" in
                 "$ws"/*) echo "${lib#"$ws"/}" ;;
-                */libstdc++.so.6|*/libgcc_s.so.1) cp -L "$lib" fuzz-stage/runtime/ ;;
+                # glibc itself matches on every ubuntu-22.04 runner; leave it to the system.
+                */libc.so.*|*/libm.so.*|*/libpthread.so.*|*/libdl.so.*|*/librt.so.*|*/ld-linux*) ;;
+                *) cp -L "$lib" fuzz-stage/runtime/ ;;
               esac
             done
           } | sort -u > fuzz-files.txt
