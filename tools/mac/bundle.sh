@@ -137,6 +137,9 @@ for plugin in "$contents"/PlugIns/ovt/*.dylib; do
   [ -e "$plugin" ] && dq_args+=("-executable=$plugin")
 done
 "$macdeployqt" "${dq_args[@]}"
+# macdeployqt copies Qt's SQL driver plugins, which link client libraries outside the bundle (Postgres.app's libpq,
+# libiodbc, libmimerapi). OVT does not use QtSql, so they go before fix_rpaths.py checks the bundle.
+rm -rf "$contents/PlugIns/sqldrivers"
 
 # Bundle icon: best effort, from app/resources/icons/ovt-studio.svg (a bundle without it shows the generic icon).
 if command -v rsvg-convert >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
