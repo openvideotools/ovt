@@ -58,3 +58,10 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # WI-1.403: ViewState -> pl_render_params, target frames, tone/gamut mapping, dithering (§10.3.2, §10.3.4, §10.3.5). The
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
+
+# WI-2.431: overlay layer, heatmap LUTs and the heatmap/fill/hatch passes (§10.5). The tests read render/luts/ and the
+# image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
