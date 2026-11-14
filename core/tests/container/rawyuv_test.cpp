@@ -533,7 +533,7 @@ TEST_CASE("raw: reader sample table, tree, RawVideoFormat and trailing bytes", "
   const ovt::io::MemoryFile exact_file(exact);
   const Bytes exact_tree = raw::make_reader(exact_file, fmt)->tree();
   const auto* exact_diags = tree_of(exact_tree)->diagnostics();
-  CHECK((exact_diags == nullptr || exact_diags->empty()));
+  CHECK((exact_diags == nullptr || exact_diags->begin() == exact_diags->end()));
 }
 
 TEST_CASE("raw: ovt_container_open_format(\"raw\")", "[container][raw][fast]") {
