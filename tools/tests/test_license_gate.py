@@ -608,3 +608,139 @@ def test_corpora_denies_compound_expression(tmp_path: Path) -> None:
     )
     code, _, err = run("--corpora", "--manifest", str(manifest))
     assert code == 1 and "E-DENY corpora:bad_nc" in err
+
+
+# --- 3. CI wiring (chapter 13 WI-0.032) ----------------------------------------------------------------------------
+
+
+def test_ci_bad_versions_fixture_names_the_row(tmp_path: Path) -> None:
+    # WI-0.032 acceptance test 1: the fixture the license-gate job feeds to the gate fails and names its row.
+    code, data, err = run("--versions", str(FIX.parent / "VERSIONS_bad.md"), report=tmp_path / "r.json")
+    assert code == 1
+    assert [f for f in data["findings"] if f["code"] == "E-DENY" and "fake-agpl-service" in f["where"]]
+    assert "E-DENY third_party/VERSIONS.md:fake-agpl-service AGPL-3.0-only" in err
+
+
+def test_ci_vcpkg_licence_missing_from_policy_is_unknown(tmp_path: Path) -> None:
+    # WI-0.032 acceptance test 2: a vcpkg port whose licence is in no policy table fails with E-UNKNOWN.
+    vc = tmp_path / "vcpkg_installed"
+    d = vc / "share" / "mysteryport"
+    d.mkdir(parents=True)
+    (d / "vcpkg.spdx.json").write_text(json.dumps({"packages": [{"licenseConcluded": "Frobnicate-1.0"}]}))
+    code, data, err = run("--vcpkg", str(vc), "--strict-or", report=tmp_path / "r.json")
+    assert code == 1
+    assert [(f["code"], f["where"]) for f in data["findings"]] == [("E-UNKNOWN", "vcpkg:mysteryport")]
+    assert "E-UNKNOWN vcpkg:mysteryport" in err
+
+
+def test_ci_workflow_wires_every_gate_input() -> None:
+    text = (REPO / ".github" / "workflows" / "ci.yml").read_text()
+    jobs = {m.group(1): m.start() for m in re.finditer(r"^  ([a-z0-9-]+):\n", text, re.M)}
+    assert "license-gate" in jobs and "build-linux-x64" in jobs
+    gate_job = text[jobs["license-gate"] : jobs["build-linux-x64"]]
+    for needle in ("--corpora", "--versions third_party/VERSIONS.md", "--sources", "--strict-or", "--require-all"):
+        assert needle in gate_job, needle
+    assert "VERSIONS_bad.md" in gate_job and "continue-on-error" not in gate_job
+    assert "ovt_license_manifest" in text
+    assert "--manifest build/linux-x64-release/license_manifest.json" in text
+
+
+def test_manifest_library_file_takes_the_licence_of_its_vcpkg_port(tmp_path: Path) -> None:
+    # tp::placebo links vcpkg's libglslang.a by absolute path; the manifest has no licence for it (NOASSERTION), the
+    # port's vcpkg.spdx.json says null, so the reviewed [vcpkg_overrides] entry applies. WI-0.032.
+    installed = tmp_path / "vcpkg_installed"
+    root = installed / "x64-linux-ovt"
+    (root / "share" / "glslang").mkdir(parents=True)
+    (root / "share" / "glslang" / "vcpkg.spdx.json").write_text(
+        json.dumps({"packages": [{"versionInfo": "16", "licenseConcluded": "LicenseRef-vcpkg-null"}]})
+    )
+    (installed / "vcpkg" / "info").mkdir(parents=True)
+    (installed / "vcpkg" / "info" / "glslang_16.4.0_x64-linux-ovt.list").write_text("x64-linux-ovt/lib/libglslang.a\n")
+    lib = str(root / "lib" / "libglslang.a")
+
+    def manifest(path_name: str) -> Path:
+        m = tmp_path / "m.json"
+        m.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "preset": "x",
+                    "options": {},
+                    "targets": [
+                        {
+                            "name": "ovt_render",
+                            "type": "STATIC",
+                            "spdx": "LGPL-2.1-or-later",
+                            "directory": "render/",
+                            "links": [
+                                {
+                                    "name": path_name,
+                                    "source": "system",
+                                    "version": "",
+                                    "spdx": "NOASSERTION",
+                                    "linkage": "static",
+                                    "patched": False,
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+        return m
+
+    code, data, _ = run("--manifest", str(manifest(lib)), "--vcpkg", str(root), report=tmp_path / "ok.json")
+    assert code == 0, data
+    # a file that no port installed stays unknown
+    code, data, _ = run("--manifest", str(manifest(lib + ".x")), "--vcpkg", str(root), report=tmp_path / "bad.json")
+    assert code == 1 and codes(data) == ["E-UNKNOWN"]
+    # without --vcpkg nothing resolves it
+    assert run("--manifest", str(manifest(lib)), report=tmp_path / "novcpkg.json")[0] == 1
+
+
+def _target_manifest(tmp_path: Path, name: str, directory: str, own: str, link_spdx: str = "MIT") -> Path:
+    m = tmp_path / f"{name}.json"
+    m.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "preset": "x",
+                "options": {},
+                "targets": [
+                    {
+                        "name": name,
+                        "type": "EXECUTABLE",
+                        "spdx": own,
+                        "directory": directory,
+                        "links": [
+                            {
+                                "name": "libx",
+                                "source": "vcpkg",
+                                "version": "1",
+                                "spdx": link_spdx,
+                                "linkage": "static",
+                                "patched": False,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    return m
+
+
+def test_test_targets_need_no_policy_row_but_are_still_link_checked(tmp_path: Path) -> None:
+    # WI-0.032 review: a target under tests/ is not shipped, so no [targets] row; a target elsewhere still needs one.
+    ok = _target_manifest(tmp_path, "ovt_tests_brand_new", "core/tests/brand_new/", "LGPL-2.1-or-later")
+    assert run("--manifest", str(ok), report=tmp_path / "a.json")[0] == 0
+    shipped = _target_manifest(tmp_path, "ovt_brand_new", "core/src/", "LGPL-2.1-or-later")
+    code, data, _ = run("--manifest", str(shipped), report=tmp_path / "b.json")
+    assert code == 1 and codes(data) == ["E-TARGET"]
+    # the link rules still apply to a test target: an LGPL test must not link a GPL library
+    bad = _target_manifest(tmp_path, "ovt_tests_gpl_link", "core/tests/x/", "LGPL-2.1-or-later", "GPL-3.0-only")
+    code, data, _ = run("--manifest", str(bad), report=tmp_path / "c.json")
+    assert code == 1 and "E-LINK" in codes(data)
+    # an own licence that is not allowed is still reported
+    odd = _target_manifest(tmp_path, "ovt_tests_odd", "core/tests/x/", "Frobnicate-1.0")
+    assert run("--manifest", str(odd), report=tmp_path / "d.json")[0] == 1

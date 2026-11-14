@@ -12,9 +12,11 @@ add_executable(
   field_builder_test.cpp
   ivf_test.cpp
   mpd_test.cpp
+  mxf_placeholder_test.cpp
   obu_test.cpp
-  registry_lookup_test.cpp
+  psi_test.cpp
   rawyuv_test.cpp
+  registry_lookup_test.cpp
   sniff_test.cpp
   ts_packets_test.cpp
   y4m_test.cpp)

@@ -15,7 +15,9 @@ target_sources(
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
+          mpegts/psi.cpp
           mpegts/ts_packets.cpp
+          mxf_placeholder.cpp
           obu.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp

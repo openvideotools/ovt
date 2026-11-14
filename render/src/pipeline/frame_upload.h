@@ -28,6 +28,7 @@ struct FrameSlot {
   uint32_t coded_width = 0;
   uint32_t coded_height = 0;
   ovt::fb::Rect crop;
+  ovt::fb::FrameId id;  // Picture.id of the uploaded picture (Measurements.measured_frame, §10.7.9)
   uint64_t generation = 0;
   bool valid = false;  // a picture has been uploaded
 };

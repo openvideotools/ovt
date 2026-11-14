@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: BSD-3-Clause
+#
+# HM plugin tests (WI-4.105): the relaxations of plugins/ovt-plugin-de265/tests/.clang-tidy.
+InheritParentConfig: true
+Checks: >
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -bugprone-unchecked-optional-access
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true
