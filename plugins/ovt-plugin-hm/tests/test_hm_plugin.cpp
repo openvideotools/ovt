@@ -674,10 +674,16 @@ void check_grids(std::string_view id, const StreamResult& r) {
   const auto golden =
       nlohmann::json::parse(gunzip(std::filesystem::path(OVT_HM_GOLDEN_DIR) / (std::string(id) + ".hm-grid.json.gz")));
   const auto& frames = golden.at("frames");
-  REQUIRE(frames.size() == r.actual.size());
-  std::size_t f = 0;
-  for (const auto& [idx, out] : r.actual) {
-    const nlohmann::json& g = frames.at(f++);
+  // The goldens hold the first decoded pictures of each stream, in decode order. Their "frame" counts decoded
+  // pictures only, while the plugin's decode index also counts the leading pictures HM skips, so the two are paired
+  // in order and checked by POC.
+  REQUIRE(!frames.empty());
+  REQUIRE(frames.size() <= r.actual.size());
+  auto it = r.actual.begin();
+  for (const nlohmann::json& g : frames) {
+    const auto& [idx, out] = *it++;
+    INFO(id << " golden frame " << g.at("frame").get<int>() << ", decode index " << idx);
+    REQUIRE(g.at("poc").get<int64_t>() == out.poc);
     REQUIRE(out.grid != nullptr);
     REQUIRE(g.at("w4") == out.grid->w4);
     REQUIRE(g.at("h4") == out.grid->h4);

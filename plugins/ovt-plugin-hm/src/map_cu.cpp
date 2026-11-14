@@ -29,7 +29,6 @@
 namespace ovt::hm {
 namespace {
 
-constexpr uint8_t kTxNone = 0xFF;
 constexpr int16_t kModePcm = 64;  // CellGrid.intra_mode_y of a PCM CU (chapter 06 §6.3.1)
 constexpr uint16_t kMvBi = 1U << 0;
 constexpr uint16_t kMvWeighted = 1U << 1;
