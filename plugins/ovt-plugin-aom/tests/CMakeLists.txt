@@ -78,3 +78,18 @@ target_compile_definitions(
 add_dependencies(ovt_plugin_aom_accounting_tests ovt_plugin_aom)
 ovt_set_license(ovt_plugin_aom_accounting_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_aom_accounting_tests)
+
+# ---- WI-2.581: the plugin against libaom `inspect -A -a` goldens (tests/golden/av1, WI-0.566) ---------------------------
+# golden_av1_inspect: every grid field, symbol and block bit total of the first temporal units of each stream equals the
+# oracle's; threads = 1 and threads = 4 give the same bytes. The corpus files come from tools/fetch_corpora.py.
+add_executable(ovt_plugin_aom_golden_tests test_aom_golden.cpp)
+target_include_directories(ovt_plugin_aom_golden_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+target_link_libraries(
+  ovt_plugin_aom_golden_tests PRIVATE tp::aom_inspection ovt_core_objects ovt_schemas ovt_test_support ovt::flags
+                                      nlohmann_json::nlohmann_json ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_plugin_aom_golden_tests PRIVATE "OVT_AOM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_aom>\""
+                                      "OVT_AV1_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/av1\"")
+add_dependencies(ovt_plugin_aom_golden_tests ovt_plugin_aom)
+ovt_set_license(ovt_plugin_aom_golden_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_aom_golden_tests)
