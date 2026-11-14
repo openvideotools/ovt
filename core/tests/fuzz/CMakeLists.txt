@@ -84,3 +84,6 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
     endif()
   endforeach()
 endif()
+
+# WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
+ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
