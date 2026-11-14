@@ -6,14 +6,12 @@
     python -I tools/goldens/gen_units.py FILE --codec h264|h265|av1 --framing annexb|obu|ivf|y4m   # one file to stdout
     python -I tools/goldens/gen_units.py --out tests/golden --corpora-dir DIR [--only ID[,ID...]]  # every entry
 
-The oracle is FFmpeg: ``ffprobe -show_packets`` gives the position and size of every packet (an access unit of an
-Annex B stream, a temporal unit of an OBU stream, a frame of an IVF or Y4M file); the ``trace_headers`` filter, run
-with ``-loglevel repeat+trace``, logs the ``nal_unit_type`` of every NAL unit of each packet (H.264/HEVC only). Compare
-per packet, not per NAL unit: FFmpeg's parsers merge AUD, SEI and parameter sets into the following slice's packet.
-Per-NAL sizes are not oracle output; ``tools/ref_annexb.py`` covers them. Golden format: one packet per line,
-``{"pos":0,"size":1500,"types":[7,8,6,5]}``; ``pos`` is absent when ffprobe has none, ``types`` for AV1 and Y4M. The IVF
-position is the frame header (payload 12 bytes later); an Annex B packet includes its start codes. Self check: for
-Annex B H.264/HEVC the per-packet NAL types must equal ``tools/ref_annexb.py``'s, else the entry fails.
+The oracle is FFmpeg: ``ffprobe -show_packets`` gives the position and size of every packet (an access unit, a temporal
+unit or a frame), and the ``trace_headers`` filter (``-loglevel repeat+trace``) logs the ``nal_unit_type`` of every NAL
+unit of each packet (H.264/HEVC). Compare per packet, not per NAL unit: FFmpeg merges AUD, SEI and parameter sets into
+the following slice's packet. One packet per line, ``{"pos":0,"size":1500,"types":[7,8,6,5]}``; ``pos`` is absent when
+ffprobe has none, ``types`` for AV1 and Y4M. The IVF position is the frame header; an Annex B packet includes its start
+codes. Self check: the Annex B NAL types must equal ``tools/ref_annexb.py``'s, else the entry fails.
 
 Exit status: 0 ok, 1 a step failed, 2 usage, 4 a tool is missing. In bulk mode a failing entry is listed in
 ``units-index.json`` and the status stays 0 unless ``--strict``.

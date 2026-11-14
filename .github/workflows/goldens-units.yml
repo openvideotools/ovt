@@ -1,11 +1,9 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Elementary-stream unit goldens (chapter 14 WI-1.570): runs tools/goldens/gen_units.py inside the oracle image
-# (ghcr.io/openvideotools/ovt-oracles:main, chapter 14 §14.2.6) over the `fast` Annex B and IVF corpora (plus
-# jvt_CABA3_TOSHIBA_E) and uploads tests/golden/{h264,h265,av1}/<id>.ovt-units.json + units-index.json as the artifact
-# `goldens-units`. Run twice; the two outputs must be byte-identical (chapter 0 §0.7.5). The workflow never writes to
-# the repository: goldens are committed by hand from the artifact.
+# Elementary-stream unit goldens (WI-1.570): runs tools/goldens/gen_units.py in the oracle image (chapter 14 §14.2.6)
+# over the `fast` Annex B and IVF corpora (plus jvt_CABA3_TOSHIBA_E) and uploads the goldens as artifact `goldens-units`.
+# Run twice, byte-identical (chapter 0 §0.7.5). Never writes to the repository: goldens are committed by hand.
 name: goldens-units
 
 on:

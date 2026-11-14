@@ -49,23 +49,8 @@ def test_render_and_classify() -> None:
 @pytest.mark.skipif(not (shutil.which("ffmpeg") and shutil.which("ffprobe")), reason="needs ffmpeg and ffprobe")
 def test_live_h264_multislice(tmp_path: Path) -> None:
     src = tmp_path / "a.264"
-    cmd = [
-        "ffmpeg",
-        "-v",
-        "error",
-        "-y",
-        "-f",
-        "lavfi",
-        "-i",
-        "testsrc=size=64x64:rate=10",
-        "-frames:v",
-        "6",
-        "-c:v",
-        "libx264",
-        "-x264-params",
-        "keyint=3:slices=2",
-        str(src),
-    ]
+    cmd = ["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=64x64:rate=10", "-frames:v", "6"]
+    cmd += ["-c:v", "libx264", "-x264-params", "keyint=3:slices=2", str(src)]
     if subprocess.run(cmd, check=False).returncode != 0:
         pytest.skip("no libx264")
     doc = gen.build(src, "x", "h264", "annexb")
