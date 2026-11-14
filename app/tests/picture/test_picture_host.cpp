@@ -71,6 +71,9 @@ QGuiApplication* app_or_null() {
     if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM")) {
       qputenv("QT_QPA_PLATFORM", "offscreen");
     }
+    // The offscreen platform lacks the RhiBasedRendering capability, so Qt Quick would pick the software adaptation,
+    // which QQuickRhiItem cannot use; "rhi" asks for the default (QRhi) adaptation explicitly.
+    QQuickWindow::setSceneGraphBackend(QStringLiteral("rhi"));
     QQuickWindow::setGraphicsApi(QSGRendererInterface::Metal);
 #else
     if (!qEnvironmentVariableIsSet("QT_QPA_PLATFORM")) {
