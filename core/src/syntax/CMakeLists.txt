@@ -42,3 +42,5 @@ target_sources(
 # substream mapping (chapter 7 §7.3.5 rows 10–12).
 target_sources(ovt_core_objects PRIVATE h265/slice_segment_header.cpp h265/ref_pic_lists_modification.cpp
                                         h265/pred_weight_table.cpp)
+# WI-1.115: H.265 parameter-set activation tracking (chapter 7 §7.3.8).
+target_sources(ovt_core_objects PRIVATE h265/active_sets.cpp)
