@@ -133,9 +133,11 @@ TEST_CASE("aom plugin: caps through the registry", "[fast][third_party]") {
   const ovt_AnalysisCaps* caps = plugin().api->caps();
   REQUIRE(caps != nullptr);
   CHECK(caps->codec == 3);  // ovt.fb.Codec.AV1
-  CHECK(caps->plane_stages == kReconMask);
-  // §7.6.1 Caps row with stock libaom and no accounting yet: all but tx_type, bits_x8 and deblock_bs.
-  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_TX_TYPE | OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
+  // §7.6.1 Caps row with the bundled libaom, which carries extension patches 0001 and 0002 (WI-2.159): the pre-filter
+  // snapshot stages besides Reconstruction, and every grid field but bits_x8 (no accounting yet) and deblock_bs.
+  constexpr uint32_t kSnapshotStages = (1U << 3) | (1U << 4) | (1U << 5);  // PreDeblock, PreSaoOrCdef, PreLr
+  CHECK(caps->plane_stages == (kReconMask | kSnapshotStages));
+  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
   CHECK(std::string(caps->id) == "aom");
   CHECK(std::string(caps->version).find("libaom") != std::string::npos);
   const Instance inst;

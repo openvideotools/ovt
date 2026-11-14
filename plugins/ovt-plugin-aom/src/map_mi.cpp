@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "enums.h"
+#include "map_mi_ext.hpp"
 #include "partition_reconstruct.hpp"
 
 namespace ovt::aom {
@@ -26,8 +27,7 @@ namespace fb = ovt::fb;
 
 constexpr uint8_t kNotApplicable = 0xFF;
 constexpr uint8_t kCdefNotSignalled = 0xFE;  // cdef_idx -1 (chapter 06 §6.3.1 CellGrid.filter_idx)
-constexpr int16_t kMvdUnavailable = -32768;
-constexpr int32_t kCdefUnitMi = 16;  // CDEF works on 64x64 units whatever the superblock size
+constexpr int32_t kCdefUnitMi = 16;          // CDEF works on 64x64 units whatever the superblock size
 
 bool is_inter(const MiInfo& m) {
   return m.intrabc == 0 && m.ref_frame[0] > 0;
@@ -38,7 +38,8 @@ uint8_t pred_kind(const MiInfo& m) {
     return kPredIntraBc;
   }
   if (m.ref_frame[0] > 0) {
-    return kPredInter;  // skip_mode is not in stock inspection data: skip_mode blocks read as Inter (§6.3.1)
+    // skip_mode comes only with extension patch 0001; stock inspection data reads skip_mode blocks as Inter (§6.3.1).
+    return m.skip_mode > 0 ? kPredSkip : kPredInter;
   }
   return m.palette > 0 || m.uv_palette > 0 ? kPredPalette : kPredIntra;
 }
@@ -124,8 +125,9 @@ std::vector<uint8_t> cdef_unit_indices(const BlockData& d, bool enable_cdef, int
       const int32_t c0 = ux * kCdefUnitMi;
       if (cdef_unit_coded(d, r0, c0)) {
         const MiInfo& o = d.mi[static_cast<size_t>(r0) * static_cast<size_t>(d.mi_cols) + static_cast<size_t>(c0)];
+        // With extension patch 0001 the unit's cdef_idx is read directly; stock data needs the strength match.
         out[static_cast<size_t>(uy) * static_cast<size_t>(units_w) + static_cast<size_t>(ux)] =
-            match_cdef_strength(d, o);
+            d.ext ? ext_cdef_idx(o, d.cdef_strengths.size()) : match_cdef_strength(d, o);
       }
     }
   }
@@ -171,9 +173,11 @@ struct Mapper {
     fb::Rect rect;
     int16_t x;
     int16_t y;
+    Mvd16 mvd;
     std::string predictor;
     uint16_t flags;
   };
+  uint32_t partition_mismatch = 0;  // leaves whose extension `partition` disagrees with the reconstructed tree
   std::vector<Mv> mvs;
   uint32_t ambiguous = 0;
   std::string first_ambiguous;
@@ -210,6 +214,10 @@ struct Mapper {
     flatbuffers::Offset<flatbuffers::Vector<int8_t>> ref_frame;
     flatbuffers::Offset<flatbuffers::Vector<int16_t>> mv;
     flatbuffers::Offset<flatbuffers::Vector<fb::Av1InterpFilter>> interp;
+    Av1BlockExt ext;
+    if (leaf && d.ext) {
+      ext = make_block_ext(ext_fbb, m, inter, d.filters.delta_lf_present);
+    }
     if (leaf) {
       ref_frame = ext_fbb.CreateVector(
           std::vector<int8_t>{static_cast<int8_t>(m.ref_frame[0]), static_cast<int8_t>(m.ref_frame[1])});
@@ -260,6 +268,9 @@ struct Mapper {
     }
     const uint8_t cdef = cdef_at(n.mi_row, n.mi_col);
     b.add_cdef_idx(cdef == kCdefNotSignalled || cdef == kNotApplicable ? int8_t{-1} : static_cast<int8_t>(cdef));
+    if (d.ext) {
+      add_block_ext(b, m, ext, inter);
+    }
     return finish(b);
   }
 
@@ -327,6 +338,9 @@ struct Mapper {
         t.add_startX(static_cast<uint32_t>(c * 4));
         t.add_startY(static_cast<uint32_t>(r * 4));
         t.add_txSz(static_cast<fb::Av1TxSize>(tx));
+        if (d.ext && grid_tx_type(mi(r, c)) != kNotApplicable) {
+          t.add_TxType(static_cast<fb::Av1TxType>(grid_tx_type(mi(r, c))));
+        }
         ext_fbb.Finish(t.Finish());
         OutBlock txb;
         txb.parent = static_cast<int32_t>(leaf_id);
@@ -367,7 +381,8 @@ struct Mapper {
     for (size_t list = 0; list < lists; ++list) {
       mvs.push_back(Mv{leaf_id, static_cast<uint8_t>(list), static_cast<int8_t>(m.ref_frame.at(list)),
                        rect_of(n.mi_row, n.mi_col, n.mi_w, n.mi_h), static_cast<int16_t>(m.mv_col.at(list) * 2),
-                       static_cast<int16_t>(m.mv_row.at(list) * 2), predictor, flags});
+                       static_cast<int16_t>(m.mv_row.at(list) * 2), d.ext ? mvd_of(m, static_cast<int>(list)) : Mvd16{},
+                       predictor, flags});
     }
   }
 
@@ -387,6 +402,17 @@ struct Mapper {
       first_ambiguous = "(" + std::to_string(n.mi_row) + ", " + std::to_string(n.mi_col) + ")";
     }
     const MiInfo& m = mi(n.mi_row, n.mi_col);
+    // Extension patch 0001 gives each block the partition type libaom decoded it with: PARTITION_NONE for a square
+    // read as NONE (a SPLIT quadrant, 4x4 included, or the whole superblock), else its parent's type. A
+    // disagreement means the reconstructed tree is wrong; report it.
+    if (leaf && d.ext && m.partition >= 0) {
+      uint8_t expected = 0;
+      if (n.parent >= 0) {
+        const PartNode& p = nodes[static_cast<size_t>(n.parent)];
+        expected = p.partition == static_cast<uint8_t>(Partition::Split) ? uint8_t{0} : p.partition;
+      }
+      partition_mismatch += static_cast<uint8_t>(m.partition) != expected ? 1U : 0U;
+    }
     if (leaf) {
       b.pred = pred_kind(m);
       b.skip = m.skip != 0;
@@ -420,7 +446,7 @@ flatbuffers::Offset<flatbuffers::Vector<T>> vec(flatbuffers::FlatBufferBuilder& 
 }
 
 flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
-                                                                bool enable_cdef) {
+                                                                bool enable_cdef, int32_t frame_h) {
   flatbuffers::FlatBufferBuilder f(512);
   std::vector<uint8_t> y_pri;
   std::vector<uint8_t> y_sec;
@@ -446,6 +472,7 @@ flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params(flatbuffers::Fla
     }
   }
   const auto gm_v = f.CreateVector(gm);
+  const FilterParamsExt ext = d.ext ? make_filter_ext(f, d, frame_h) : FilterParamsExt{};
   uint8_t res_log2 = 0;
   while ((1 << res_log2) < d.delta_q_res && res_log2 < 3) {
     ++res_log2;
@@ -469,6 +496,9 @@ flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params(flatbuffers::Fla
   p.add_delta_q_present(static_cast<uint8_t>(d.delta_q_present));
   p.add_delta_q_res(d.delta_q_present ? res_log2 : uint8_t{0});
   p.add_gm(gm_v);
+  if (d.ext) {
+    add_filter_ext(p, d, ext);
+  }
   f.Finish(p.Finish());
   return fbb.CreateVector(f.GetBufferPointer(), f.GetSize());
 }
@@ -542,6 +572,7 @@ struct Cells {
         ref1(n, -1),
         tx_w(n, kNotApplicable),
         tx_h(n, kNotApplicable),
+        tx_type(n, kNotApplicable),
         cbf(n),
         filter_idx(n) {}
   std::vector<uint8_t> pred;
@@ -556,6 +587,7 @@ struct Cells {
   std::vector<int8_t> ref1;
   std::vector<uint8_t> tx_w;
   std::vector<uint8_t> tx_h;
+  std::vector<uint8_t> tx_type;  // extension patch 0001 only
   std::vector<uint8_t> cbf;
   std::vector<uint8_t> filter_idx;
   std::array<uint32_t, 8> usage{};
@@ -578,7 +610,10 @@ struct Cells {
     }
   }
 
-  void set(size_t i, const MiInfo& m, bool monochrome, uint8_t cdef) {
+  void set(size_t i, const MiInfo& m, bool monochrome, uint8_t cdef, bool ext) {
+    if (ext) {
+      tx_type[i] = grid_tx_type(m);
+    }
     pred[i] = pred_kind(m);
     qp[i] = m.current_qindex;
     mode_y[i] = intra_mode_y(m);
@@ -609,6 +644,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   const auto ref1_v = vec(fbb, c.ref1);
   const auto tx_w_v = vec(fbb, c.tx_w);
   const auto tx_h_v = vec(fbb, c.tx_h);
+  const auto tx_type_v = mp.d.ext ? vec(fbb, c.tx_type) : flatbuffers::Offset<flatbuffers::Vector<uint8_t>>();
   const auto cbf_v = vec(fbb, c.cbf);
   const auto filter_v = vec(fbb, c.filter_idx);
   fb::CellGridBuilder g(fbb);
@@ -628,6 +664,9 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   g.add_ref1(ref1_v);
   g.add_tx_log2_w(tx_w_v);
   g.add_tx_log2_h(tx_h_v);
+  if (!tx_type_v.IsNull()) {
+    g.add_tx_type(tx_type_v);
+  }
   g.add_cbf(cbf_v);
   g.add_filter_idx(filter_v);
   return g.Finish();
@@ -647,8 +686,8 @@ void serialise_blocks(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, Map
   std::vector<flatbuffers::Offset<fb::MotionVector>> mvs;
   mvs.reserve(mp.mvs.size());
   for (const auto& m : mp.mvs) {
-    mvs.push_back(fb::CreateMotionVectorDirect(fbb, m.block_id, m.list, m.ref, &m.rect, m.x, m.y, kMvdUnavailable,
-                                               kMvdUnavailable, m.predictor.c_str(), m.flags));
+    mvs.push_back(fb::CreateMotionVectorDirect(fbb, m.block_id, m.list, m.ref, &m.rect, m.x, m.y, m.mvd.x, m.mvd.y,
+                                               m.predictor.c_str(), m.flags));
   }
   out->mvs = fbb.CreateVector(mvs);
 }
@@ -705,11 +744,15 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
       const auto r = static_cast<int32_t>(y);
       const auto c = static_cast<int32_t>(x);
       uncovered += mp.block_id[i] == 0 ? 1U : 0U;
-      cells.set(i, mp.mi(r, c), d.monochrome, mp.cdef_at(r, c));
+      cells.set(i, mp.mi(r, c), d.monochrome, mp.cdef_at(r, c), d.ext);
     }
   }
   if (uncovered > 0) {
     out.warnings.push_back(std::to_string(uncovered) + " cells are not covered by the reconstructed partition tree");
+  }
+  if (mp.partition_mismatch > 0) {
+    out.warnings.push_back(std::to_string(mp.partition_mismatch) +
+                           " blocks whose libaom partition type differs from the reconstructed partition tree");
   }
   if (mp.ambiguous > 0) {
     out.warnings.push_back("partition ambiguous at " + std::to_string(mp.ambiguous) + " nodes, first at MI " +
@@ -718,7 +761,7 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
 
   serialise_blocks(fbb, mp, &out);
   out.refs = ref_slots(fbb, d, cells.usage);
-  out.filter_params = filter_params(fbb, d, enable_cdef);
+  out.filter_params = filter_params(fbb, d, enable_cdef, coded_h);
   out.grid = build_grid(fbb, mp, cells);
   return out;
 }

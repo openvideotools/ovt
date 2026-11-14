@@ -5,6 +5,8 @@
 
 #include "fb_builder.hpp"
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -56,6 +58,13 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   // Hidden frames have no output image, so no planes without the snapshot patch (the host adds ANA-0001).
   std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>> planes;
   add_plane_refs(*fbb, f.decode_index, f.recon, plane_stage_mask, &planes, blobs);
+  // Extension patch 0002: the frame before each in-loop filter, hidden frames included (WI-2.159).
+  constexpr std::array<ovt::fb::PlaneStage, 3> kSnapshotStages = {
+      ovt::fb::PlaneStage::PreDeblock, ovt::fb::PlaneStage::PreSaoOrCdef, ovt::fb::PlaneStage::PreLoopRestoration};
+  for (size_t k = 0; k < kSnapshotStages.size(); ++k) {
+    add_stage_plane_refs(*fbb, f.decode_index, kSnapshotStages.at(k), f.snapshots.at(k), plane_stage_mask, &planes,
+                         blobs);
+  }
   const auto planes_v = fbb->CreateVector(planes);
   const auto filter_type_off =
       mapped.filter_params.IsNull() ? flatbuffers::Offset<flatbuffers::String>() : fbb->CreateString("Av1FilterParams");

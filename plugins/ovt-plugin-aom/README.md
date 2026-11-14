@@ -15,8 +15,16 @@ The AV1 analysis plugin (`libovt_plugin_aom`): libaom's inspection API behind th
 - **Status:** frame-level `FrameAnalysis` (WI-2.155); the cell grid, the superblock partition tree rebuilt from
   the per-MI block sizes (`src/partition_reconstruct.cpp`), luma TXBs, motion vectors, the eight AV1 reference
   slots, tiles and `Av1FilterParams` (WI-2.156, `src/map_mi.cpp`); the `Reconstruction` planes of shown frames
-  (WI-2.158, `src/planes.cpp`). Symbol accounting (WI-2.157) and the extension patches with the other plane
-  stages and hidden-frame planes (WI-2.159, `patches/`) follow.
+  (WI-2.158, `src/planes.cpp`); the extension fields and the pre-deblocking, pre-CDEF and pre-loop-restoration
+  plane stages of every frame (WI-2.159, `src/map_mi_ext.cpp`). Symbol accounting (WI-2.157), the Prediction and
+  Residual stages and the reconstruction of hidden frames follow.
+- **Patches:** `patches/0001-inspection-extend-mi-data.patch` adds the mode-info, motion vector difference, loop
+  filter, CDEF and loop restoration fields to libaom's inspection data (and fixes its `tx_type`);
+  `patches/0002-inspection-frame-snapshots.patch` copies the frame before each in-loop filter while an inspection
+  callback is set. `third_party/libaom.cmake` applies them (WI-2.154 hook) and records them in
+  `<prefix>/libaom/share/ovt/patches.json`. Everything is under `CONFIG_INSPECTION`, so libaom's default build is
+  unchanged. The plugin reads the extension only when `inspection.h` defines `INSPECTION_EXT_VERSION` and
+  `INSPECTION_FRAME_SNAPSHOTS`; without them it maps the stock fields as before.
 - **Planes:** decoded pictures live in the plugin's own libaom frame buffers (`FramePool`,
   `aom_codec_set_frame_buffer_functions`), which stay alive after libaom releases them for as long as a pulled
   `FrameAnalysis` names them. `plane()` hands out the samples in place, so `PlaneRef.stride_bytes` is libaom's
@@ -27,4 +35,7 @@ The AV1 analysis plugin (`libovt_plugin_aom`): libaom's inspection API behind th
 - **Tests:** `tests/test_aom_planes.cpp` checks the planes against the vectors' `.md5` files and `aomdec
   --skip-film-grain`; `tests/test_aom_map_mi.cpp` compares the plugin's grid with libaom `inspect` layers recorded in
   `tests/data/inspect_reference.json`; regenerate it with `tests/data/make_inspect_reference.py` (usage in the
-  script) when the libaom pin moves.
+  script) when the libaom pin moves. `tests/test_aom_map_mi_ext.cpp` compares the extension fields with the patched
+  `inspect` (`-DOVT_BUILD_AOM_INSPECT=ON`, new flags `-pt -ad -fi -ii -wg -drl -sm -sip -wm -npr -dlf -cdi -its
+  -mvd -plc -lr`, `-X` for all) recorded in `tests/data/inspect_ext_reference.json` by
+  `tests/data/make_inspect_ext_reference.py`.

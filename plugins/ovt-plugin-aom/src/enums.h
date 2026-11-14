@@ -83,6 +83,7 @@ enum class Partition : uint8_t { None = 0, Horz, Vert, Split, HorzA, HorzB, Vert
 constexpr uint8_t kPredNone = 0;
 constexpr uint8_t kPredIntra = 1;
 constexpr uint8_t kPredInter = 2;
+constexpr uint8_t kPredSkip = 3;  // skip_mode blocks (extension patch 0001 only)
 constexpr uint8_t kPredIntraBc = 4;
 constexpr uint8_t kPredPalette = 6;
 

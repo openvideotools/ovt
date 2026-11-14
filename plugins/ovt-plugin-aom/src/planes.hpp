@@ -100,6 +100,13 @@ void add_plane_refs(flatbuffers::FlatBufferBuilder& fbb, int32_t decode_index, c
                     uint32_t plane_stage_mask, std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>* out,
                     std::map<std::string, PlaneView>* blobs);
 
+/// The same for a picture of stage @p stage (the PreDeblock, PreSaoOrCdef and PreLoopRestoration snapshots of
+/// extension patch 0002, WI-2.159).
+void add_stage_plane_refs(flatbuffers::FlatBufferBuilder& fbb, int32_t decode_index, ovt::fb::PlaneStage stage,
+                          const Picture& pic, uint32_t plane_stage_mask,
+                          std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>* out,
+                          std::map<std::string, PlaneView>* blobs);
+
 }  // namespace ovt::aom
 
 #endif  // OVT_PLUGIN_AOM_PLANES_HPP

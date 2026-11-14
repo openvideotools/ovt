@@ -1,0 +1,635 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-14
+Subject: [PATCH 1/2] inspection: extend insp_mi_data and insp_frame_data
+
+Exports the per-block mode info that analysis tools need and the stock
+inspection data lacks, and fixes the transform type:
+
+- insp_mi_data gains partition, angle_delta[2], filter_intra_mode, the
+  interintra and compound (wedge, mask, comp_group_idx, compound_idx)
+  fields, ref_mv_idx, skip_mode, seg_id_predicted, the local warp model
+  (wm_type, wm_invalid, wm_params[6]), num_proj_ref,
+  overlappable_neighbors, delta_lf_from_base, delta_lf[4], cdef_idx,
+  inter_tx_size[16], palette_colors[3][8] and the coded motion vector
+  differences mvd[2][2] with their mv_joint[2]. Fields that do not apply
+  to a block read -1 (mvd: INSPECTION_MVD_NONE).
+- The differences are not kept by the decoder: read_inter_block_mode_info()
+  stores them in two new MB_MODE_INFO members under CONFIG_INSPECTION.
+- insp_frame_data gains the frame's loop filter, delta LF, CDEF and global
+  motion parameters and its loop restoration units.
+- tx_type is now read for coded blocks; ifd_inspect() copied it only for
+  skipped blocks and wrote 0 for every coded block (inverted condition).
+  Skipped blocks read -1.
+- examples/inspect gains one flag per new layer (-pt -ad -fi -ii -wg -drl
+  -sm -sip -wm -npr -dlf -cdi -its -mvd -plc -lr) and -X for all of them;
+  -A selects the same layers as before.
+
+INSPECTION_EXT_VERSION in inspection.h tells users which fields exist.
+Every change is under CONFIG_INSPECTION: the default build is unchanged.
+
+Upstream-Status: Pending [to be submitted to aomedia-review.googlesource.com by OVT WI-2.160]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: BSD-2-Clause
+Rationale: libaom's inspection API (av1/decoder/inspection.h) is the only interface to per-block
+  decoder state, and it omits these fields; no public control reads MB_MODE_INFO.
+---
+  av1/common/blockd.h      |   5 ++
+  av1/decoder/decodemv.c   |  21 +++++
+  av1/decoder/inspection.c | 148 ++++++++++++++++++++++++++++++++-
+  av1/decoder/inspection.h |  70 ++++++++++++++++
+  examples/inspect.c       | 209 +++++++++++++++++++++++++++++++++++++++++++++++
+  5 files changed, 450 insertions(+), 3 deletions(-)
+
+diff --git a/av1/common/blockd.h b/av1/common/blockd.h
+index b95235f..9a9c21b 100644
+--- a/av1/common/blockd.h
++++ b/av1/common/blockd.h
+@@ -337,6 +337,11 @@ typedef struct MB_MODE_INFO {
+ #if CONFIG_INSPECTION
+   /*! \brief Whether we are skipping the current rows or columns. */
+   int16_t tx_skip[TXK_TYPE_BUF_LEN];
++  /*! \brief Coded motion vector differences [ref][row, col] (1/8 pel) of an
++   * inter block, -32768 for a reference without NEWMV. */
++  int16_t insp_mvd[2][2];
++  /*! \brief MV_JOINT_TYPE of each coded difference, -1 without NEWMV. */
++  int8_t insp_mv_joint[2];
+ #endif
+ } MB_MODE_INFO;
+ 
+diff --git a/av1/decoder/decodemv.c b/av1/decoder/decodemv.c
+index 7d8971d..bd3e831 100644
+--- a/av1/decoder/decodemv.c
++++ b/av1/decoder/decodemv.c
+@@ -1379,6 +1379,27 @@ static void read_inter_block_mode_info(AV1Decoder *const pbi,
+                  nearestmv, nearmv, is_compound, allow_hp, r);
+   aom_merge_corrupted_flag(&dcb->corrupted, mv_corrupted_flag);
+ 
++#if CONFIG_INSPECTION
++  // read_mv() sets mv = ref_mv + diff, and a coded component is never 0, so
++  // the difference and its joint follow from the result.
++  for (int i = 0; i < 2; ++i) {
++    const PREDICTION_MODE m =
++        is_compound ? (i == 0 ? compound_ref0_mode(mbmi->mode)
++                              : compound_ref1_mode(mbmi->mode))
++                    : (i == 0 ? mbmi->mode : NEARESTMV);
++    if (m == NEWMV) {
++      const int dr = mbmi->mv[i].as_mv.row - ref_mv[i].as_mv.row;
++      const int dc = mbmi->mv[i].as_mv.col - ref_mv[i].as_mv.col;
++      mbmi->insp_mvd[i][0] = (int16_t)dr;
++      mbmi->insp_mvd[i][1] = (int16_t)dc;
++      mbmi->insp_mv_joint[i] = (int8_t)((dr != 0) * 2 + (dc != 0));
++    } else {
++      mbmi->insp_mvd[i][0] = mbmi->insp_mvd[i][1] = -32768;
++      mbmi->insp_mv_joint[i] = -1;
++    }
++  }
++#endif
++
+   mbmi->use_wedge_interintra = 0;
+   if (cm->seq_params->enable_interintra_compound && !mbmi->skip_mode &&
+       is_interintra_allowed(mbmi)) {
+diff --git a/av1/decoder/inspection.c b/av1/decoder/inspection.c
+index f84ed17..9585cd9 100644
+--- a/av1/decoder/inspection.c
++++ b/av1/decoder/inspection.c
+@@ -16,6 +16,9 @@
+ #include "av1/decoder/inspection.h"
+ #include "av1/common/enums.h"
+ #include "av1/common/cdef.h"
++#include "av1/common/reconinter.h"
++#include "av1/common/reconintra.h"
++#include "av1/common/restoration.h"
+ 
+ static void ifd_init_mi_rc(insp_frame_data *fd, int mi_cols, int mi_rows) {
+   fd->mi_cols = mi_cols;
+@@ -37,6 +40,141 @@ void ifd_init(insp_frame_data *fd, int frame_width, int frame_height) {
+ void ifd_clear(insp_frame_data *fd) {
+   aom_free(fd->mi_grid);
+   fd->mi_grid = NULL;
++  for (int p = 0; p < 3; p++) {
++    aom_free(fd->lr_units[p]);
++    fd->lr_units[p] = NULL;
++    fd->lr_units_alloc[p] = 0;
++  }
++}
++
++// Frame-level loop filter, CDEF, global motion and loop restoration data.
++static void ifd_inspect_frame_filters(insp_frame_data *fd,
++                                      const AV1_COMMON *cm) {
++  const struct loopfilter *lf = &cm->lf;
++  fd->lf_filter_level[0] = lf->filter_level[0];
++  fd->lf_filter_level[1] = lf->filter_level[1];
++  fd->lf_filter_level[2] = lf->filter_level_u;
++  fd->lf_filter_level[3] = lf->filter_level_v;
++  fd->lf_sharpness_level = lf->sharpness_level;
++  fd->lf_mode_ref_delta_enabled = lf->mode_ref_delta_enabled;
++  for (int i = 0; i < REF_FRAMES; i++) fd->lf_ref_deltas[i] = lf->ref_deltas[i];
++  for (int i = 0; i < MAX_MODE_LF_DELTAS; i++)
++    fd->lf_mode_deltas[i] = lf->mode_deltas[i];
++  fd->delta_lf_present_flag = cm->delta_q_info.delta_lf_present_flag;
++  fd->delta_lf_res = cm->delta_q_info.delta_lf_res;
++  fd->delta_lf_multi = cm->delta_q_info.delta_lf_multi;
++  const CdefInfo *cdef = &cm->cdef_info;
++  fd->cdef_damping = cdef->cdef_damping;
++  fd->cdef_bits = cdef->cdef_bits;
++  for (int i = 0; i < CDEF_MAX_STRENGTHS; i++) {
++    fd->cdef_strengths[i] = cdef->cdef_strengths[i];
++    fd->cdef_uv_strengths[i] = cdef->cdef_uv_strengths[i];
++  }
++  for (int t = 0; t < REF_FRAMES; t++) {
++    fd->gm_type[t] = cm->global_motion[t].wmtype;
++    for (int k = 0; k < 6; k++)
++      fd->gm_params[t][k] = cm->global_motion[t].wmmat[k];
++  }
++  const int num_planes = av1_num_planes(cm);
++  for (int p = 0; p < 3; p++) {
++    const RestorationInfo *rsi = &cm->rst_info[p];
++    const int used = p < num_planes &&
++                     rsi->frame_restoration_type != RESTORE_NONE &&
++                     rsi->unit_info != NULL;
++    fd->lr_frame_type[p] = p < num_planes ? rsi->frame_restoration_type : 0;
++    fd->lr_unit_size[p] = used ? rsi->restoration_unit_size : 0;
++    fd->lr_horz_units[p] = used ? rsi->horz_units : 0;
++    fd->lr_vert_units[p] = used ? rsi->vert_units : 0;
++    const int n = fd->lr_horz_units[p] * fd->lr_vert_units[p];
++    if (n > fd->lr_units_alloc[p]) {
++      aom_free(fd->lr_units[p]);
++      fd->lr_units[p] =
++          (insp_lr_unit *)aom_malloc(sizeof(*fd->lr_units[p]) * n);
++      if (!fd->lr_units[p]) {
++        fprintf(stderr, "Error allocating inspection data\n");
++        abort();
++      }
++      fd->lr_units_alloc[p] = n;
++    }
++    for (int u = 0; u < n; u++) {
++      const RestorationUnitInfo *ru = &rsi->unit_info[u];
++      insp_lr_unit *out = &fd->lr_units[p][u];
++      out->restoration_type = ru->restoration_type;
++      for (int k = 0; k < 3; k++) {
++        out->wiener_vfilter[k] = ru->wiener_info.vfilter[k];
++        out->wiener_hfilter[k] = ru->wiener_info.hfilter[k];
++      }
++      out->sgrproj_ep = ru->sgrproj_info.ep;
++      out->sgrproj_xqd[0] = ru->sgrproj_info.xqd[0];
++      out->sgrproj_xqd[1] = ru->sgrproj_info.xqd[1];
++    }
++  }
++}
++
++// Mode info fields of INSPECTION_EXT_VERSION 1 for one MI.
++static void ifd_inspect_mi_ext(insp_mi_data *mi, const MB_MODE_INFO *mbmi,
++                               const CommonModeInfoParams *mi_params, int row,
++                               int col) {
++  const int inter = is_inter_block(mbmi) && !is_intrabc_block(mbmi);
++  const int compound = has_second_ref(mbmi);
++  const int interintra = is_interintra_pred(mbmi);
++  mi->partition = mbmi->partition;
++  // The decoder leaves stale angle deltas in non-directional and inter blocks.
++  const int intra = !is_inter_block(mbmi) && !is_intrabc_block(mbmi);
++  mi->angle_delta[0] = intra && av1_is_directional_mode(mbmi->mode)
++                           ? mbmi->angle_delta[PLANE_TYPE_Y]
++                           : 0;
++  mi->angle_delta[1] =
++      intra && av1_is_directional_mode(get_uv_mode(mbmi->uv_mode))
++          ? mbmi->angle_delta[PLANE_TYPE_UV]
++          : 0;
++  mi->filter_intra_mode =
++      mbmi->filter_intra_mode_info.use_filter_intra
++          ? mbmi->filter_intra_mode_info.filter_intra_mode
++          : -1;
++  mi->interintra_mode = interintra ? mbmi->interintra_mode : -1;
++  mi->wedge_interintra = interintra ? mbmi->use_wedge_interintra : -1;
++  mi->interintra_wedge_index =
++      interintra && mbmi->use_wedge_interintra ? mbmi->interintra_wedge_index
++                                               : -1;
++  mi->interinter_comp_type = compound ? mbmi->interinter_comp.type : -1;
++  mi->wedge_index = compound ? mbmi->interinter_comp.wedge_index : -1;
++  mi->wedge_sign = compound ? mbmi->interinter_comp.wedge_sign : -1;
++  mi->mask_type = compound ? mbmi->interinter_comp.mask_type : -1;
++  mi->comp_group_idx = compound ? mbmi->comp_group_idx : -1;
++  mi->compound_idx = compound ? mbmi->compound_idx : -1;
++  mi->ref_mv_idx = inter ? mbmi->ref_mv_idx : -1;
++  mi->skip_mode = mbmi->skip_mode;
++  mi->seg_id_predicted = mbmi->seg_id_predicted;
++  const int warped = inter && mbmi->motion_mode == WARPED_CAUSAL;
++  mi->wm_type = warped ? mbmi->wm_params.wmtype : -1;
++  mi->wm_invalid = warped ? mbmi->wm_params.invalid : -1;
++  for (int k = 0; k < 6; k++)
++    mi->wm_params[k] = warped ? mbmi->wm_params.wmmat[k] : 0;
++  mi->num_proj_ref = inter ? mbmi->num_proj_ref : -1;
++  mi->overlappable_neighbors = inter ? mbmi->overlappable_neighbors : -1;
++  mi->delta_lf_from_base = mbmi->delta_lf_from_base;
++  for (int k = 0; k < FRAME_LF_COUNT; k++) mi->delta_lf[k] = mbmi->delta_lf[k];
++  // The strength index is stored in the block at the origin of its 64x64.
++  const int cdef_size = MI_SIZE_64X64;
++  const MB_MODE_INFO *cdef_mbmi =
++      mi_params->mi_grid_base[(row & ~(cdef_size - 1)) * mi_params->mi_stride +
++                              (col & ~(cdef_size - 1))];
++  mi->cdef_idx = cdef_mbmi != NULL ? cdef_mbmi->cdef_strength : -1;
++  for (int k = 0; k < INTER_TX_SIZE_BUF_LEN; k++)
++    mi->inter_tx_size[k] = mbmi->inter_tx_size[k];
++  for (int k = 0; k < 2; k++) {
++    mi->mvd[k][0] = inter ? mbmi->insp_mvd[k][0] : INSPECTION_MVD_NONE;
++    mi->mvd[k][1] = inter ? mbmi->insp_mvd[k][1] : INSPECTION_MVD_NONE;
++    mi->mv_joint[k] = inter ? mbmi->insp_mv_joint[k] : -1;
++  }
++  const PALETTE_MODE_INFO *pmi = &mbmi->palette_mode_info;
++  for (int p = 0; p < 3; p++) {
++    const int n = pmi->palette_size[p > 0];
++    for (int i = 0; i < PALETTE_MAX_SIZE; i++)
++      mi->palette_colors[p][i] =
++          i < n ? pmi->palette_colors[p * PALETTE_MAX_SIZE + i] : 0;
++  }
+ }
+ 
+ /* TODO(negge) This function may be called by more than one thread when using
+@@ -67,7 +205,7 @@ int ifd_inspect(insp_frame_data *fd, void *decoder, int skip_not_transform) {
+ #if CONFIG_ACCOUNTING
+   fd->accounting = &pbi->accounting;
+ #endif
+-  // TODO(negge): copy per frame CDEF data
++  ifd_inspect_frame_filters(fd, cm);
+   int i, j;
+   for (i = 0; i < MAX_SEGMENTS; i++) {
+     for (j = 0; j < 2; j++) {
+@@ -127,14 +265,17 @@ int ifd_inspect(insp_frame_data *fd, void *decoder, int skip_not_transform) {
+ 
+       if (skip_not_transform && mi->skip) mi->tx_size = -1;
+ 
+-      if (mi->skip) {
++      // The transform type of the transform unit covering this MI; skipped
++      // blocks code none. (Before INSPECTION_EXT_VERSION 1 the condition was
++      // inverted: coded blocks read 0 and skipped blocks a stale map entry.)
++      if (!mi->skip && mi->tx_size >= 0) {
+         const int tx_type_row = j - j % tx_size_high_unit[mi->tx_size];
+         const int tx_type_col = i - i % tx_size_wide_unit[mi->tx_size];
+         const int tx_type_map_idx =
+             tx_type_row * mi_params->mi_stride + tx_type_col;
+         mi->tx_type = mi_params->tx_type_map[tx_type_map_idx];
+       } else {
+-        mi->tx_type = 0;
++        mi->tx_type = -1;
+       }
+ 
+       if (skip_not_transform &&
+@@ -156,6 +297,7 @@ int ifd_inspect(insp_frame_data *fd, void *decoder, int skip_not_transform) {
+       }
+       // delta_q
+       mi->current_qindex = mbmi->current_qindex;
++      ifd_inspect_mi_ext(mi, mbmi, mi_params, j, i);
+     }
+   }
+   return 1;
+diff --git a/av1/decoder/inspection.h b/av1/decoder/inspection.h
+index 7d1c14d..68e374d 100644
+--- a/av1/decoder/inspection.h
++++ b/av1/decoder/inspection.h
+@@ -31,6 +31,11 @@ struct insp_mv {
+   int16_t col;
+ };
+ 
++// Version of the extended inspection data below (fields after uv_palette in
++// insp_mi_data, the frame-level loop filter, CDEF, global motion and loop
++// restoration data in insp_frame_data). Absent from older libaom versions.
++#define INSPECTION_EXT_VERSION 1
++
+ typedef struct insp_mi_data insp_mi_data;
+ 
+ struct insp_mi_data {
+@@ -55,6 +60,47 @@ struct insp_mi_data {
+   int16_t intrabc;
+   int16_t palette;
+   int16_t uv_palette;
++  // Extension (INSPECTION_EXT_VERSION 1). -1 where a field does not apply.
++  int16_t partition;           // PARTITION_TYPE of the containing square
++  int16_t angle_delta[2];      // [PLANE_TYPE_Y], [PLANE_TYPE_UV]
++  int16_t filter_intra_mode;   // FILTER_INTRA_MODE, -1 without filter intra
++  int16_t interintra_mode;     // INTERINTRA_MODE, -1 unless interintra
++  int16_t wedge_interintra;    // use_wedge_interintra, -1 unless interintra
++  int16_t interintra_wedge_index;
++  int16_t interinter_comp_type;  // COMPOUND_TYPE, -1 unless compound
++  int16_t wedge_index;
++  int16_t wedge_sign;
++  int16_t mask_type;
++  int16_t comp_group_idx;
++  int16_t compound_idx;
++  int16_t ref_mv_idx;  // DRL index, -1 for intra blocks
++  int16_t skip_mode;
++  int16_t seg_id_predicted;
++  int16_t wm_type;     // TransformationType, -1 unless WARPED_CAUSAL
++  int16_t wm_invalid;
++  int16_t num_proj_ref;  // -1 for intra blocks
++  int16_t overlappable_neighbors;
++  int16_t delta_lf_from_base;
++  int16_t delta_lf[4];  // FRAME_LF_COUNT
++  int16_t cdef_idx;     // cdef_strength index of the 64x64, -1 if not coded
++  int16_t inter_tx_size[16];  // INTER_TX_SIZE_BUF_LEN
++  int16_t mvd[2][2];  // [ref][row, col], 1/8 pel; INSPECTION_MVD_NONE if none
++  int16_t mv_joint[2];  // MV_JOINT_TYPE per ref, -1 without NEWMV
++  uint16_t palette_colors[3][8];  // [plane][i] for i < palette size
++  int32_t wm_params[6];
++};
++
++#define INSPECTION_MVD_NONE (-32768)
++
++typedef struct insp_lr_unit insp_lr_unit;
++
++// One loop restoration unit: RestorationUnitInfo of the frame.
++struct insp_lr_unit {
++  int16_t restoration_type;  // RestorationType
++  int16_t wiener_vfilter[3];  // coded taps 0..2 (the filter is symmetric)
++  int16_t wiener_hfilter[3];
++  int16_t sgrproj_ep;
++  int16_t sgrproj_xqd[2];
+ };
+ 
+ typedef struct insp_frame_data insp_frame_data;
+@@ -79,6 +125,30 @@ struct insp_frame_data {
+   int delta_q_present_flag;
+   int delta_q_res;
+   int show_existing_frame;
++  // Extension (INSPECTION_EXT_VERSION 1): frame-level filter parameters.
++  int lf_filter_level[4];  // Y vertical, Y horizontal, U, V
++  int lf_sharpness_level;
++  int lf_mode_ref_delta_enabled;
++  int lf_ref_deltas[8];
++  int lf_mode_deltas[2];
++  int delta_lf_present_flag;
++  int delta_lf_res;
++  int delta_lf_multi;
++  int cdef_damping;
++  int cdef_bits;
++  int cdef_strengths[16];  // CDEF_MAX_STRENGTHS; 1 << cdef_bits used
++  int cdef_uv_strengths[16];
++  int gm_type[8];  // per reference frame type, [0] unused
++  int32_t gm_params[8][6];
++  // Loop restoration units of each plane in raster order; lr_units[p] holds
++  // lr_horz_units[p] * lr_vert_units[p] entries and is NULL when the plane
++  // has no restoration (lr_frame_type[p] == RESTORE_NONE).
++  int lr_frame_type[3];
++  int lr_unit_size[3];
++  int lr_horz_units[3];
++  int lr_vert_units[3];
++  insp_lr_unit *lr_units[3];
++  int lr_units_alloc[3];
+ };
+ 
+ void ifd_init(insp_frame_data *fd, int frame_width, int frame_height);
+diff --git a/examples/inspect.c b/examples/inspect.c
+index 28d3f74..7ff12d0 100644
+--- a/examples/inspect.c
++++ b/examples/inspect.c
+@@ -68,7 +68,30 @@ typedef enum {
+   ALL_LAYERS = (1 << 20) - 1
+ } LayerType;
+ 
++// Layers of the extended inspection data (INSPECTION_EXT_VERSION 1). -A does
++// not select them, so its output is unchanged; -X selects all of them.
++typedef enum {
++  PARTITION_LAYER = 1,
++  ANGLE_DELTA_LAYER = 1 << 1,
++  FILTER_INTRA_LAYER = 1 << 2,
++  INTERINTRA_LAYER = 1 << 3,
++  WEDGE_LAYER = 1 << 4,
++  DRL_LAYER = 1 << 5,
++  SKIP_MODE_LAYER = 1 << 6,
++  WARP_LAYER = 1 << 7,
++  DELTA_LF_LAYER = 1 << 8,
++  CDEF_IDX_LAYER = 1 << 9,
++  LR_LAYER = 1 << 10,
++  PALETTE_COLORS_LAYER = 1 << 11,
++  MVD_LAYER = 1 << 12,
++  INTER_TX_SIZE_LAYER = 1 << 13,
++  SEG_ID_PREDICTED_LAYER = 1 << 14,
++  PROJ_REF_LAYER = 1 << 15,
++  ALL_EXT_LAYERS = (1 << 16) - 1
++} ExtLayerType;
++
+ static LayerType layers = 0;
++static int ext_layers = 0;
+ 
+ static int stop_after = 0;
+ static int compress = 0;
+@@ -115,6 +138,41 @@ static const arg_def_t dump_palette_arg =
+     ARG_DEF("plt", "palette", 0, "Dump Palette Size");
+ static const arg_def_t dump_uv_palette_arg =
+     ARG_DEF("uvp", "uv_palette", 0, "Dump UV Palette Size");
++static const arg_def_t dump_all_ext_arg =
++    ARG_DEF("X", "all_ext", 0, "Dump all extended inspection layers");
++static const arg_def_t dump_partition_arg =
++    ARG_DEF("pt", "partition", 0, "Dump Partition Type");
++static const arg_def_t dump_angle_delta_arg =
++    ARG_DEF("ad", "angle_delta", 0, "Dump Intra Angle Deltas (Y, UV)");
++static const arg_def_t dump_filter_intra_arg =
++    ARG_DEF("fi", "filter_intra", 0, "Dump Filter Intra Mode");
++static const arg_def_t dump_interintra_arg =
++    ARG_DEF("ii", "interintra", 0, "Dump Inter-Intra Mode and Wedge");
++static const arg_def_t dump_wedge_arg =
++    ARG_DEF("wg", "wedge", 0, "Dump Compound Type, Wedge and Mask");
++static const arg_def_t dump_drl_arg =
++    ARG_DEF("drl", "ref_mv_idx", 0, "Dump DRL Index");
++static const arg_def_t dump_skip_mode_arg =
++    ARG_DEF("sm", "skip_mode", 0, "Dump Skip Mode");
++static const arg_def_t dump_warp_arg =
++    ARG_DEF("wm", "warp", 0, "Dump Local Warp Parameters");
++static const arg_def_t dump_delta_lf_arg =
++    ARG_DEF("dlf", "delta_lf", 0, "Dump Loop Filter Deltas");
++static const arg_def_t dump_cdef_idx_arg =
++    ARG_DEF("cdi", "cdef_idx", 0, "Dump CDEF Index");
++static const arg_def_t dump_lr_arg =
++    ARG_DEF("lr", "loop_restoration", 0, "Dump Loop Restoration Units");
++static const arg_def_t dump_palette_colors_arg =
++    ARG_DEF("plc", "palette_colors", 0, "Dump Palette Colors");
++static const arg_def_t dump_mvd_arg =
++    ARG_DEF("mvd", "mvd", 0, "Dump Motion Vector Differences and Joints");
++static const arg_def_t dump_inter_tx_size_arg =
++    ARG_DEF("its", "inter_tx_size", 0, "Dump Inter Transform Sizes");
++static const arg_def_t dump_seg_id_predicted_arg =
++    ARG_DEF("sip", "seg_id_predicted", 0, "Dump Segment ID Predicted");
++static const arg_def_t dump_proj_ref_arg =
++    ARG_DEF("npr", "num_proj_ref", 0,
++            "Dump Warp Sample Count and Overlappable Neighbors");
+ static const arg_def_t usage_arg = ARG_DEF("h", "help", 0, "Help");
+ static const arg_def_t skip_non_transform_arg = ARG_DEF(
+     "snt", "skip_non_transform", 1, "Skip is counted as a non transform.");
+@@ -149,6 +207,23 @@ static const arg_def_t *main_args[] = { &limit_arg,
+                                         &dump_intrabc_arg,
+                                         &dump_palette_arg,
+                                         &dump_uv_palette_arg,
++                                        &dump_all_ext_arg,
++                                        &dump_partition_arg,
++                                        &dump_angle_delta_arg,
++                                        &dump_filter_intra_arg,
++                                        &dump_interintra_arg,
++                                        &dump_wedge_arg,
++                                        &dump_drl_arg,
++                                        &dump_skip_mode_arg,
++                                        &dump_warp_arg,
++                                        &dump_delta_lf_arg,
++                                        &dump_cdef_idx_arg,
++                                        &dump_lr_arg,
++                                        &dump_palette_colors_arg,
++                                        &dump_mvd_arg,
++                                        &dump_inter_tx_size_arg,
++                                        &dump_seg_id_predicted_arg,
++                                        &dump_proj_ref_arg,
+                                         &usage_arg,
+                                         &skip_non_transform_arg,
+                                         &combined_arg,
+@@ -611,6 +686,105 @@ static int put_accounting(char *buffer) {
+ }
+ #endif
+ 
++// Local warp parameters: [[wmmat[0..5]], ...] per MI (int32, so not through
++// put_block_info, which reads int16 values).
++static int put_warp_params(char *buffer) {
++  const int mi_rows = frame_data.mi_rows;
++  const int mi_cols = frame_data.mi_cols;
++  char *buf = buffer;
++  buf += put_str(buf, "  \"wm_params\": [");
++  for (int r = 0; r < mi_rows; ++r) {
++    *(buf++) = '[';
++    for (int c = 0; c < mi_cols; ++c) {
++      const insp_mi_data *mi = &frame_data.mi_grid[r * mi_cols + c];
++      for (int k = 0; k < 6; ++k)
++        buf += put_num(buf, k == 0 ? '[' : ',', mi->wm_params[k], 0);
++      *(buf++) = ']';
++      if (c < mi_cols - 1) *(buf++) = ',';
++    }
++    *(buf++) = ']';
++    if (r < mi_rows - 1) *(buf++) = ',';
++  }
++  buf += put_str(buf, "],\n");
++  return (int)(buf - buffer);
++}
++
++// Loop restoration: per plane the frame type, unit size, unit grid and the
++// units as [type, vfilter[0..2], hfilter[0..2], ep, xqd[0], xqd[1]].
++static int put_loop_restoration(char *buffer) {
++  char *buf = buffer;
++  buf += put_str(buf, "  \"loopRestoration\": [");
++  for (int p = 0; p < 3; ++p) {
++    const int n = frame_data.lr_horz_units[p] * frame_data.lr_vert_units[p];
++    *(buf++) = '{';
++    buf += put_str(buf, "\"frameType\":");
++    buf += put_num(buf, 0, frame_data.lr_frame_type[p], 0);
++    buf += put_str(buf, ",\"unitSize\":");
++    buf += put_num(buf, 0, frame_data.lr_unit_size[p], 0);
++    buf += put_str(buf, ",\"horzUnits\":");
++    buf += put_num(buf, 0, frame_data.lr_horz_units[p], 0);
++    buf += put_str(buf, ",\"vertUnits\":");
++    buf += put_num(buf, 0, frame_data.lr_vert_units[p], 0);
++    buf += put_str(buf, ",\"units\":[");
++    for (int u = 0; u < n; ++u) {
++      const insp_lr_unit *lu = &frame_data.lr_units[p][u];
++      buf += put_num(buf, '[', lu->restoration_type, 0);
++      for (int k = 0; k < 3; ++k)
++        buf += put_num(buf, ',', lu->wiener_vfilter[k], 0);
++      for (int k = 0; k < 3; ++k)
++        buf += put_num(buf, ',', lu->wiener_hfilter[k], 0);
++      buf += put_num(buf, ',', lu->sgrproj_ep, 0);
++      buf += put_num(buf, ',', lu->sgrproj_xqd[0], 0);
++      buf += put_num(buf, ',', lu->sgrproj_xqd[1], ']');
++      if (u < n - 1) *(buf++) = ',';
++    }
++    buf += put_str(buf, "]}");
++    if (p < 2) *(buf++) = ',';
++  }
++  buf += put_str(buf, "],\n");
++  return (int)(buf - buffer);
++}
++
++#define PUT_EXT(layer, name, field, len)                                 \
++  if (ext_layers & (layer)) {                                            \
++    buf += put_block_info(buf, NULL, name, offsetof(insp_mi_data, field), \
++                          len);                                          \
++  }
++
++static int put_ext_layers(char *buffer) {
++  char *buf = buffer;
++  PUT_EXT(PARTITION_LAYER, "partition", partition, 0)
++  PUT_EXT(ANGLE_DELTA_LAYER, "angle_delta", angle_delta, 2)
++  PUT_EXT(FILTER_INTRA_LAYER, "filter_intra_mode", filter_intra_mode, 0)
++  PUT_EXT(INTERINTRA_LAYER, "interintra_mode", interintra_mode, 0)
++  PUT_EXT(INTERINTRA_LAYER, "wedge_interintra", wedge_interintra, 0)
++  PUT_EXT(INTERINTRA_LAYER, "interintra_wedge_index", interintra_wedge_index,
++          0)
++  PUT_EXT(WEDGE_LAYER, "interinter_comp_type", interinter_comp_type, 0)
++  PUT_EXT(WEDGE_LAYER, "wedge_index", wedge_index, 0)
++  PUT_EXT(WEDGE_LAYER, "wedge_sign", wedge_sign, 0)
++  PUT_EXT(WEDGE_LAYER, "mask_type", mask_type, 0)
++  PUT_EXT(WEDGE_LAYER, "comp_group_idx", comp_group_idx, 0)
++  PUT_EXT(WEDGE_LAYER, "compound_idx", compound_idx, 0)
++  PUT_EXT(DRL_LAYER, "ref_mv_idx", ref_mv_idx, 0)
++  PUT_EXT(SKIP_MODE_LAYER, "skip_mode", skip_mode, 0)
++  PUT_EXT(SEG_ID_PREDICTED_LAYER, "seg_id_predicted", seg_id_predicted, 0)
++  PUT_EXT(WARP_LAYER, "wm_type", wm_type, 0)
++  PUT_EXT(WARP_LAYER, "wm_invalid", wm_invalid, 0)
++  if (ext_layers & WARP_LAYER) buf += put_warp_params(buf);
++  PUT_EXT(PROJ_REF_LAYER, "num_proj_ref", num_proj_ref, 0)
++  PUT_EXT(PROJ_REF_LAYER, "overlappable_neighbors", overlappable_neighbors, 0)
++  PUT_EXT(DELTA_LF_LAYER, "delta_lf_from_base", delta_lf_from_base, 0)
++  PUT_EXT(DELTA_LF_LAYER, "delta_lf", delta_lf, 4)
++  PUT_EXT(CDEF_IDX_LAYER, "cdef_idx", cdef_idx, 0)
++  PUT_EXT(INTER_TX_SIZE_LAYER, "inter_tx_size", inter_tx_size, 16)
++  PUT_EXT(MVD_LAYER, "mvd", mvd, 4)
++  PUT_EXT(MVD_LAYER, "mv_joint", mv_joint, 2)
++  PUT_EXT(PALETTE_COLORS_LAYER, "palette_colors", palette_colors, 24)
++  if (ext_layers & LR_LAYER) buf += put_loop_restoration(buf);
++  return (int)(buf - buffer);
++}
++
+ int skip_non_transform = 0;
+ 
+ static void inspect(void *pbi, void *data) {
+@@ -706,6 +880,7 @@ static void inspect(void *pbi, void *data) {
+     buf += put_block_info(buf, palette_map, "uv_palette",
+                           offsetof(insp_mi_data, uv_palette), 0);
+   }
++  if (ext_layers) buf += put_ext_layers(buf);
+   if (combined_parm_count > 0) buf += put_combined(buf);
+   if (layers & REFERENCE_FRAME_LAYER) {
+     buf += put_block_info(buf, refs_map, "referenceFrame",
+@@ -932,6 +1107,40 @@ static void parse_args(char **argv) {
+       layers |= UV_PALETTE_LAYER;
+     else if (arg_match(&arg, &dump_all_arg, argi))
+       layers |= ALL_LAYERS;
++    else if (arg_match(&arg, &dump_all_ext_arg, argi))
++      ext_layers |= ALL_EXT_LAYERS;
++    else if (arg_match(&arg, &dump_partition_arg, argi))
++      ext_layers |= PARTITION_LAYER;
++    else if (arg_match(&arg, &dump_angle_delta_arg, argi))
++      ext_layers |= ANGLE_DELTA_LAYER;
++    else if (arg_match(&arg, &dump_filter_intra_arg, argi))
++      ext_layers |= FILTER_INTRA_LAYER;
++    else if (arg_match(&arg, &dump_interintra_arg, argi))
++      ext_layers |= INTERINTRA_LAYER;
++    else if (arg_match(&arg, &dump_wedge_arg, argi))
++      ext_layers |= WEDGE_LAYER;
++    else if (arg_match(&arg, &dump_drl_arg, argi))
++      ext_layers |= DRL_LAYER;
++    else if (arg_match(&arg, &dump_skip_mode_arg, argi))
++      ext_layers |= SKIP_MODE_LAYER;
++    else if (arg_match(&arg, &dump_warp_arg, argi))
++      ext_layers |= WARP_LAYER;
++    else if (arg_match(&arg, &dump_delta_lf_arg, argi))
++      ext_layers |= DELTA_LF_LAYER;
++    else if (arg_match(&arg, &dump_cdef_idx_arg, argi))
++      ext_layers |= CDEF_IDX_LAYER;
++    else if (arg_match(&arg, &dump_lr_arg, argi))
++      ext_layers |= LR_LAYER;
++    else if (arg_match(&arg, &dump_palette_colors_arg, argi))
++      ext_layers |= PALETTE_COLORS_LAYER;
++    else if (arg_match(&arg, &dump_mvd_arg, argi))
++      ext_layers |= MVD_LAYER;
++    else if (arg_match(&arg, &dump_inter_tx_size_arg, argi))
++      ext_layers |= INTER_TX_SIZE_LAYER;
++    else if (arg_match(&arg, &dump_seg_id_predicted_arg, argi))
++      ext_layers |= SEG_ID_PREDICTED_LAYER;
++    else if (arg_match(&arg, &dump_proj_ref_arg, argi))
++      ext_layers |= PROJ_REF_LAYER;
+     else if (arg_match(&arg, &compress_arg, argi))
+       compress = 1;
+     else if (arg_match(&arg, &usage_arg, argi))
