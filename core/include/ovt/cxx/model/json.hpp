@@ -24,6 +24,7 @@ struct JsonOptions {
   bool compact = false;
   /// true: NaN and the infinities are written as the strings "nan", "inf" and "-inf", so the text is RFC 8259
   /// JSON. false: they are written as the bare tokens nan, inf and -inf (as FlatBuffers prints them).
+  /// The CLI always passes true (chapter 12 §12.1.4); false is for library callers that want the §6.8.1 text.
   bool strict_numbers = false;
 };
 
@@ -38,12 +39,14 @@ struct JsonOptions {
 ///    and `1e-7` beyond);
 ///  - strings are UTF-8 with the JSON escapes (control characters as \u00XX);
 ///  - a `[ubyte]` field is an array of numbers, except the hash-like fields (`source_hash`, `uuid`, `kid`, ...,
-///    the list of §6.8.1), which are lowercase hex strings, and a nested buffer (a `[ubyte]` field `X` next to
-///    a string field `X_type` that names a table), which is replaced by the JSON object of that table. When
-///    `X_type` is empty or names no table the bytes stay an array of numbers.
+///    the list of §6.8.1), which are lowercase hex strings, and a nested buffer, which is replaced by the JSON
+///    object of its table. A nested buffer is a non-empty `[ubyte]` field `X` next to a string field `X_type`
+///    that names a table (`Block.ext`, `FrameAnalysis.filter_params`, `FrameInfo.ref_state`), or one of the
+///    two fields whose table the schema fixes: `HevcCu.palette` (an `HevcPalette`) and `Av1Block.palette` (an
+///    `Av1Palette`). When `X_type` is empty or names no table the bytes stay an array of numbers.
 /// The output is a deterministic function of the buffer's values.
 /// @throws std::invalid_argument for an unknown schema or root table, a buffer (or a nested buffer whose
-///         `X_type` names a table) that fails the reflection verifier, a string that is not UTF-8, nested
+///         `X_type` names a table, or a palette) that fails the reflection verifier, a string that is not UTF-8, nested
 ///         buffers more than 4 levels deep, or a buffer whose shared offsets expand past 16 x its size +
 ///         1 MiB of work (capped below 2 GiB).
 [[nodiscard]] std::string to_json(std::span<const std::uint8_t> buf, SchemaId schema, std::string_view root_table,

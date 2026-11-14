@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The field-name rule of chapter 06 §6.8.1 that the JSON exporter and importer (WI-0.088) share.
+// The field-name rules of chapter 06 §6.8.1 that the JSON exporter and importer (WI-0.088) share.
 // Internal header.
 
 #ifndef OVT_CORE_MODEL_JSON_RULES_HPP
@@ -30,6 +30,22 @@ inline constexpr std::array<std::string_view, 11> kHashFields = {"source_hash",
 
 constexpr bool is_hash_field(std::string_view name) {
   return std::ranges::find(kHashFields, name) != kHashFields.end();
+}
+
+/// The table of a nested buffer whose type is fixed by the schema, for the `[ubyte]` field @p field of table
+/// @p object (fully qualified): the two palette fields of §6.8.1, which have no `_type` sibling. Empty for
+/// every other field.
+constexpr std::string_view fixed_nested_table(std::string_view object, std::string_view field) {
+  if (field != "palette") {
+    return {};
+  }
+  if (object == "ovt.fb.HevcCu") {
+    return "HevcPalette";
+  }
+  if (object == "ovt.fb.Av1Block") {
+    return "Av1Palette";
+  }
+  return {};
 }
 
 }  // namespace ovt::model::detail

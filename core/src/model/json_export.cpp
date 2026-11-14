@@ -529,23 +529,31 @@ class Printer {
         hex(bytes);
         return;
       }
-      if (const auto* type_field = detail::nested_type_sibling(object, field); type_field != nullptr && count != 0) {
-        const auto* name = table.GetPointer<const flatbuffers::String*>(type_field->offset());
-        const auto* nested =
-            detail::find_table(schema_, object, name == nullptr ? std::string_view{} : name->string_view());
-        if (nested != nullptr) {
-          if (nesting_ == detail::kMaxNestedBuffers) {
-            fail("nested buffers deeper than " + std::to_string(detail::kMaxNestedBuffers) + " levels");
-          }
-          ++nesting_;
-          buffer(*nested, bytes, indent);
-          --nesting_;
-          return;
+      if (const auto* nested = count == 0 ? nullptr : nested_table(object, field, table); nested != nullptr) {
+        if (nesting_ == detail::kMaxNestedBuffers) {
+          fail("nested buffers deeper than " + std::to_string(detail::kMaxNestedBuffers) + " levels");
         }
+        ++nesting_;
+        buffer(*nested, bytes, indent);
+        --nesting_;
+        return;
       }
     }
     budget_.charge(bytes.size());
     array(count, indent, [&](std::size_t i) { scalar(type.element(), type.index(), bytes.subspan(i * size).data()); });
+  }
+
+  /// The table that the nested buffer in `[ubyte]` field @p field of @p table holds: the one its `_type`
+  /// sibling names, or the fixed one of a palette field (§6.8.1). Null when the field is plain bytes.
+  [[nodiscard]] const reflection::Object* nested_table(const reflection::Object& object, const reflection::Field& field,
+                                                       const flatbuffers::Table& table) const {
+    if (const auto* type_field = detail::nested_type_sibling(object, field); type_field != nullptr) {
+      const auto* name = table.GetPointer<const flatbuffers::String*>(type_field->offset());
+      return detail::find_table(schema_, object, name == nullptr ? std::string_view{} : name->string_view());
+    }
+    const std::string_view fixed =
+        detail::fixed_nested_table(deref(object.name()).string_view(), deref(field.name()).string_view());
+    return fixed.empty() ? nullptr : detail::find_table(schema_, object, fixed);
   }
 
   void table(const reflection::Object& object, const flatbuffers::Table& table, int indent) {

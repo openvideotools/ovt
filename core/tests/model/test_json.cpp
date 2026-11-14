@@ -222,6 +222,22 @@ Bytes untyped_ext() {
   return edited_fixture([](fb::FrameAnalysisT& frame) { frame.blocks[2]->ext_type = "Nope"; });
 }
 
+/// An HevcCu whose `palette` holds @p palette (a finished HevcPalette buffer, or any bytes).
+Bytes palette_cu(const Bytes& palette) {
+  fb::HevcCuT cu;
+  cu.palette_mode_flag = 1;
+  cu.palette = palette;
+  return pack(cu, nullptr);
+}
+
+Bytes hevc_palette() {
+  fb::HevcPaletteT palette;
+  palette.num_signalled_palette_entries = 2;
+  palette.new_palette_entries = {512, 1023};
+  palette.PaletteIndexMap = {0, 1, 1, 0};
+  return pack(palette, nullptr);
+}
+
 /// Strict RFC 8259 parse (nlohmann rejects bare nan / inf tokens).
 Json parse_strict(const std::string& text) {
   return Json::parse(text, nullptr, true, false);
@@ -392,6 +408,39 @@ TEST_CASE("nested buffers follow their _type sibling and bad input is refused", 
   // `ext_type` names a table the bytes are not: no JSON.
   const Bytes broken = edited_fixture([](fb::FrameAnalysisT& frame) { frame.blocks[2]->ext = {1, 2, 3}; });
   CHECK_THROWS_AS(to_json(broken, SchemaId::Model, kFrameAnalysis), std::invalid_argument);
+
+  // The two palette fields are nested buffers of a fixed table, without a `_type` sibling (§6.8.1).
+  const Json cu = parse_strict(to_json(palette_cu(hevc_palette()), SchemaId::Model, "ovt.fb.HevcCu"));
+  REQUIRE(cu["palette"].is_object());
+  CHECK(cu["palette"]["num_signalled_palette_entries"] == 2);
+  CHECK(cu["palette"]["new_palette_entries"] == Json::array({512, 1023}));
+  CHECK(cu["palette"]["PaletteIndexMap"] == Json::array({0, 1, 1, 0}));
+  CHECK(to_json(palette_cu(hevc_palette()), SchemaId::Model, "ovt.fb.HevcCu", kCompact).find("\"palette\": {") !=
+        std::string::npos);
+
+  fb::Av1PaletteT colors;
+  colors.palette_colors_y = {16, 235};
+  colors.ColorMapY = {1, 0};
+  fb::Av1BlockT av1;
+  av1.PaletteSizeY = 2;
+  av1.palette = pack(colors, nullptr);
+  const Json av1_json = parse_strict(to_json(pack(av1, nullptr), SchemaId::Model, "ovt.fb.Av1Block"));
+  CHECK(av1_json["palette"]["palette_colors_y"] == Json::array({16, 235}));
+  CHECK(av1_json["palette"]["ColorMapY"] == Json::array({1, 0}));
+
+  // Inside a block's ext the palette is the second nested level.
+  const Bytes in_frame = edited_fixture([](fb::FrameAnalysisT& frame) {
+    REQUIRE(frame.blocks[2]->ext_type == "HevcCu");
+    frame.blocks[2]->ext = palette_cu(hevc_palette());
+  });
+  const Json framed = parse_strict(to_json(in_frame, SchemaId::Model, kFrameAnalysis));
+  CHECK(framed["blocks"][2]["ext"]["palette"]["new_palette_entries"] == Json::array({512, 1023}));
+
+  // Bytes that are no palette table give no JSON; a CU without a palette has no such key.
+  CHECK_THROWS_AS(to_json(palette_cu({1, 2, 3}), SchemaId::Model, "ovt.fb.HevcCu"), std::invalid_argument);
+  CHECK_FALSE(
+      parse_strict(to_json(fixture("tiny16_hevc.fa"), SchemaId::Model, kFrameAnalysis))["blocks"][2]["ext"].contains(
+          "palette"));
 
   const Bytes bytes = fixture("tiny16_hevc.fa");
   CHECK_THROWS_AS(to_json(bytes, SchemaId::Model, "ovt.fb.NoSuchTable"), std::invalid_argument);
