@@ -347,47 +347,108 @@ bool have_ffprobe() {
   return run("ffprobe -version 2>/dev/null").starts_with("ffprobe version");
 }
 
-// True when ffprobe runs the libavformat the Demuxer links ("libavformat    61.  7.100 / ..." in -version).
-bool ffprobe_has_our_libavformat() {
+// The libavformat version of a `-version` banner ("libavformat    61.  7.100 / 61.  7.100" → "61.7.100"), or "?".
+std::string banner_libavformat(std::string banner) {
+  std::erase(banner, ' ');
+  const size_t at = banner.find("libavformat");
+  if (at == std::string::npos) {
+    return "?";
+  }
+  const size_t from = at + std::string_view("libavformat").size();
+  return banner.substr(from, banner.find('/', from) - from);
+}
+
+// The libavformat the Demuxer links, as "61.7.100".
+std::string our_libavformat() {
   const unsigned v = avformat_version();
-  std::string out = run("ffprobe -version 2>/dev/null");
-  std::erase(out, ' ');
-  return out.find("libavformat" + std::to_string(v >> 16U) + "." + std::to_string((v >> 8U) & 0xFFU) + "." +
-                  std::to_string(v & 0xFFU) + "/") != std::string::npos;
+  return std::to_string(v >> 16U) + "." + std::to_string((v >> 8U) & 0xFFU) + "." + std::to_string(v & 0xFFU);
+}
+
+// The libavformat ffprobe runs.
+std::string ffprobe_libavformat() {
+  return banner_libavformat(run("ffprobe -version 2>/dev/null"));
+}
+
+// Our side of acceptance test 1 for one file: every packet read, and why the file was rejected ("" when it was not).
+// Never aborts the test, so the corpus loop goes on to the next entry.
+struct Demuxed {
+  std::vector<Read> packets;
+  std::string error;
+};
+
+Demuxed demux_all(const std::filesystem::path& path, std::string_view hint) {
+  Demuxed out;
+  std::shared_ptr<ovt::io::RandomAccessFile> file;
+  try {
+    file = ovt::io::RandomAccessFile::open(path.string());
+  } catch (const std::exception& e) {
+    out.error = std::string("RandomAccessFile::open: ") + e.what();
+    return out;
+  }
+  auto d = Demuxer::open(std::move(file), hint);
+  if (!d.has_value()) {
+    out.error = "Demuxer::open: " + std::string(d.message());
+    return out;
+  }
+  for (;;) {
+    auto r = d.value()->read_packet();
+    if (!r.has_value()) {
+      out.error = "read_packet after " + std::to_string(out.packets.size()) + " packets: " + std::string(r.message());
+      return out;
+    }
+    if (!r.value()) {
+      return out;
+    }
+    const Packet& p = *r.value();
+    out.packets.push_back({p.avstream_index, p.pts, p.file_pos, p.keyframe, Bytes(p.data.begin(), p.data.end())});
+  }
 }
 
 // Acceptance test 1 for one file: packet counts per stream equal ffprobe's, and so does every file_pos.
 // `tolerant`: MPEG-TS / Annex B, where ±1 packet is accepted and positions are compared only on equal counts
-// (§8.7.1 "Oracle parity").
-void check_parity(const std::filesystem::path& path, std::string_view hint, bool tolerant) {
+// (§8.7.1 "Oracle parity"). The open outcome is part of the parity: a file ffprobe reads must open and read to the
+// end here, and a file ffprobe rejects must be rejected here too when both run the same libavformat (a different
+// libavformat may parse boxes the other one does not know, e.g. FFmpeg ≥ 5.1 rejects a 'kind' box that has no
+// value string, which 4.4 skips). Uses CHECK only; returns false when any check failed.
+bool check_parity(const std::filesystem::path& path, std::string_view hint, bool tolerant) {
+  static const std::string ours = our_libavformat();
+  static const std::string theirs = ffprobe_libavformat();
+  const bool same_lavf = ours == theirs;
+  INFO("libavformat: ours " << ours << ", ffprobe's " << theirs);
   const auto probe = ffprobe_packets(path, hint);
+  const auto got = demux_all(path, hint);
   if (!probe) {
-    WARN("ffprobe rejected " << path << "; not compared");
-    return;
-  }
-  auto d = open_ok(std::shared_ptr<ovt::io::RandomAccessFile>(ovt::io::RandomAccessFile::open(path.string())), hint);
-  const auto got = read_all(*d);
-  if (!tolerant) {
-    REQUIRE(got.size() == probe->size());
-    for (size_t i = 0; i < got.size(); ++i) {
-      INFO("packet " << i);
-      CHECK(got[i].avstream_index == (*probe)[i].stream_index);
-      CHECK(got[i].file_pos == (*probe)[i].pos);
+    if (!same_lavf) {
+      WARN("ffprobe rejected " << path << "; not compared (ffprobe runs another libavformat)");
+      return true;
     }
-    return;
+    INFO("ffprobe rejected " << path << "; the Demuxer read " << got.packets.size() << " packets");
+    CHECK_FALSE(got.error.empty());
+    return !got.error.empty();
   }
-  const auto diff = static_cast<int64_t>(got.size()) - static_cast<int64_t>(probe->size());
-  CHECK(diff >= -1);
-  CHECK(diff <= 1);
-  // Annex B positions come from the codec parser, whose start-code accounting changed between FFmpeg releases
-  // (one byte off on some HEVC streams), so they are compared only against the same libavformat.
-  static const bool same_lavf = ffprobe_has_our_libavformat();
-  if (diff == 0 && same_lavf) {
-    for (size_t i = 0; i < got.size(); ++i) {
+  if (!got.error.empty()) {
+    FAIL_CHECK("ffprobe read " << probe->size() << " packets from " << path
+                               << " but the Demuxer failed: " << got.error);
+    return false;
+  }
+  const auto& packets = got.packets;
+  const auto diff = static_cast<int64_t>(packets.size()) - static_cast<int64_t>(probe->size());
+  bool ok = tolerant ? (diff >= -1 && diff <= 1) : diff == 0;
+  INFO("packets: Demuxer " << packets.size() << ", ffprobe " << probe->size());
+  CHECK(ok);
+  // Positions only on equal counts (otherwise every packet after the first difference would fail). Annex B
+  // positions come from the codec parser, whose start-code accounting changed between FFmpeg releases (one byte off
+  // on some HEVC streams), so they are compared only against the same libavformat.
+  if (diff == 0 && (!tolerant || same_lavf)) {
+    for (size_t i = 0; i < packets.size(); ++i) {
       INFO("packet " << i);
-      CHECK(got[i].file_pos == (*probe)[i].pos);
+      const bool same = packets[i].avstream_index == (*probe)[i].stream_index && packets[i].file_pos == (*probe)[i].pos;
+      CHECK(packets[i].avstream_index == (*probe)[i].stream_index);
+      CHECK(packets[i].file_pos == (*probe)[i].pos);
+      ok = ok && same;
     }
   }
+  return ok;
 }
 
 // A RandomAccessFile whose reads throw IoError past `limit` bytes.
@@ -674,6 +735,8 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
   REQUIRE(in);
   const auto manifest = nlohmann::json::parse(in);
   int compared = 0;
+  // Every entry is checked, also after one fails, and the failures are listed once at the end.
+  std::vector<std::string> failed;
   for (const auto& entry : manifest.at("entries")) {
     const auto containers = entry.value("containers", std::vector<std::string>{});
     if (containers.size() != 1) {
@@ -701,8 +764,17 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
       continue;
     }
     INFO("corpus " << id);
-    check_parity(*path, hint, c == "annexb" || c == "mpegts");
+    if (!check_parity(*path, hint, c == "annexb" || c == "mpegts")) {
+      failed.push_back(id);
+    }
     ++compared;
+  }
+  if (!failed.empty()) {
+    std::string list;
+    for (const auto& id : failed) {
+      list += (list.empty() ? "" : ", ") + id;
+    }
+    WARN(failed.size() << " of " << compared << " corpus files differ from ffprobe: " << list);
   }
   if (compared == 0) {
     SKIP("no corpus MP4/IVF/ES/Y4M file is present");
