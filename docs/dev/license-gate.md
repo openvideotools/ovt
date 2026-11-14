@@ -21,6 +21,25 @@ inventory as a Markdown table, and `--report <json>` overrides the report path (
 Exit codes: 0 pass, 1 at least one finding, 2 usage error (bad flags, unreadable policy, missing required
 input). Warnings (`W-*`) never change the exit code.
 
+## CI wiring (WI-0.032)
+
+`ci.yml` runs the gate in two places, both with `--strict-or` and `--require-all`:
+
+- Job `license-gate` (Mini): `--corpora`, then `--versions third_party/VERSIONS.md --sources`, plus `--pip
+  python/requirements.txt` and `--gradle android/app/build/reports/dependency-license/index.json` once those files
+  exist (their producers have not landed; the job adds the flag only when the file is there). It then runs the
+  gate on `tools/tests/fixtures/VERSIONS_bad.md` and fails if the gate accepts it or does not print the `E-DENY` row.
+- Last step of `build-linux-x64`: builds `ovt_license_manifest` and checks
+  `build/linux-x64-release/license_manifest.json` with `--vcpkg build/vcpkg_installed/x64-linux-ovt`. The gate reads
+  the built tree, because a transitive vcpkg port can carry a licence `vcpkg.json` does not list. The report is
+  uploaded as `license-gate-report-linux-x64`.
+
+A target whose manifest `directory` has a `tests` or `test` component is not shipped, so it needs no `[targets]`
+row: the gate still checks its own licence and its whole link graph (an LGPL test must not link GPL). Everything else
+needs a row, or it is `E-TARGET`.
+
+An unknown SPDX id is `E-UNKNOWN`; it fails the job and is never a warning.
+
 ## Corpora mode
 
 `--corpora` (WI-0.561) checks the test-media registry instead of the dependencies (chapter 14 §14.3.4). It is

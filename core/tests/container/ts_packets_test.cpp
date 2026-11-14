@@ -642,7 +642,11 @@ TEST_CASE("corpus: tsduck-test input walks to the reference PID statistics",
   REQUIRE(f);
   CHECK(f->geometry.stride == 188);
   CHECK(f->packet_count == 1987);
-  CHECK(f->diagnostics.empty());
+  // No sync, continuity or transport errors; the only diagnostics are the CNT-TS-1007 of WI-4.205 for the five
+  // PMT streams that have no packets in this excerpt (0x424..0x427, 0x42B).
+  CHECK(std::all_of(f->diagnostics.begin(), f->diagnostics.end(),
+                    [](const ts::Diagnostic& d) { return d.code == DiagCode::CNT_TS_1007; }));
+  CHECK(f->diagnostics.size() == 5);
   REQUIRE(f->pids.size() == 3);
   CHECK(f->pids[0].pid == 0);
   CHECK(f->pids[0].packets == 78);
