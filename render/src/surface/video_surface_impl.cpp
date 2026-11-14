@@ -23,6 +23,7 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
@@ -115,6 +116,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+    overlay_gpu_ = std::make_unique<detail::OverlayLayerGpu>(vk_->gpu);  // WI-2.431
 
     target_ = target;
     return create_texture(target.width, target.height);
@@ -169,7 +171,19 @@ class VideoSurfaceImpl final : public VideoSurface {
     error_.clear();
   }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
-  void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
+    overlays_ = std::move(overlays);
+    if (overlay_gpu_ == nullptr) {
+      return;
+    }
+    std::string err;
+    if (!overlay_gpu_->upload(overlays_.get(), err)) {
+      error_ = "RND-0002 renderer init failed: overlays: " + err;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+    }
+  }
 
   void render(const ViewState& view) override {
     if (tex_ == nullptr) {
@@ -268,6 +282,16 @@ class VideoSurfaceImpl final : public VideoSurface {
     target.color = detail::target_color(target_, encoding);
     target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
     params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
+    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1).
+    struct pl_overlay overlay = {};
+    std::string overlay_err;
+    if (overlay_gpu_ != nullptr && overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio,
+                                                      target.crop, overlay, overlay_err)) {
+      target.overlays = &overlay;
+      target.num_overlays = 1;
+    } else if (!overlay_err.empty()) {
+      error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
+    }
     if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
@@ -397,6 +421,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    overlay_gpu_.reset();
     if (vk_ != nullptr) {
       detail::destroy_slot(vk_->gpu, slot_a_);
       pl_tex_destroy(vk_->gpu, &tex_);
@@ -420,6 +445,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
+  std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
 };
 
 }  // namespace
