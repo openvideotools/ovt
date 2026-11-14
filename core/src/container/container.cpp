@@ -14,6 +14,7 @@
 #include <span>
 
 #include "container/ivf.hpp"
+#include "container/mpegts/ts_packets.hpp"
 #include "container/rawyuv.hpp"
 #include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
@@ -30,6 +31,7 @@ bool has_reader(Format f) noexcept {
     case Format::AnnexB:
     case Format::Obu:
     case Format::Raw:
+    case Format::Mpegts:
       return true;
     default:  // phase 4 formats and unknown
       return false;
@@ -43,6 +45,8 @@ std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, 
   switch (f) {
     case Format::Ivf:
       return ivf::make_reader(file);
+    case Format::Mpegts:
+      return mpegts::make_reader(file);
     case Format::Y4m:
       return y4m::make_reader(file, why);
     case Format::Isobmff:

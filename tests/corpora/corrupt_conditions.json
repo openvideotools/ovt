@@ -34,6 +34,8 @@
     {"code": "SYN-CONF-0001", "input": "syn_h264_multislice_cavlc", "input_file": "syn_h264_multislice_cavlc.264", "edit": ["--set-bits", "sps", "--bit", "24", "--width", "8", "--value", "10"], "why": "level_idc = 10 (Level 1, MaxFS 99) on a 1280x720 stream"}
   ],
   "not_in_table": {
+    "SYN-H265-0011": "needs a PPS NAL removed from the stream, not a bit edit; covered by the WI-1.113 unit tests",
+    "SYN-H265-0061": "needs the independent slice segment removed before a dependent one, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-GEN-0103": "a cancelled or partial index is a run-time condition, not a property of the file",
     "SYN-GEN-0104": "every unedited Annex B / OBU recipe output already lacks timing information",
     "SYN-GEN-0105": "a length-prefixed sample overrun is an MP4 edit: chapter 8 broken corpus (WI-1.201)",
@@ -54,6 +56,13 @@
     "SYN-AV1-0020": "needs the tile size fields, which follow a fully parsed frame header; not in this table yet",
     "SYN-AV1-0031": "libaom writes OBU_FRAME units, so there is no separate tile group to orphan",
     "SYN-HRD-0001": "true of every recipe stream encoded without HRD; not an edit",
-    "SYN-CONF-0002": "needs a DPB size rewrite in the VUI; not in this table yet"
+    "SYN-CONF-0002": "needs a DPB size rewrite in the VUI; not in this table yet",
+    "SYN-GEN-0004": "needs a 00 00 02 byte pattern inserted inside a NAL payload, a payload edit rather than a header bit edit; not in this table yet (WI-1.107)",
+    "SYN-H264-0002": "generic H.264 range violation; its first edit comes with the H.264 header parser (WI-1.108); not in this table yet",
+    "SYN-H264-0003": "needs a reserved profile_idc or aspect_ratio_idc in an H.264 SPS; comes with the H.264 header parser (WI-1.108); not in this table yet",
+    "SYN-H265-0004": "needs sps_extension_4bits or pps_extension_4bits set, which sit after variable-length fields; not in this table yet",
+    "SYN-AV1-0004": "needs a reserved obu_type or chroma_sample_position = 3; the OBU edits of this table move whole units; not in this table yet (WI-1.116)",
+    "SYN-AV1-0005": "needs a metadata OBU of an unregistered type; no recipe input writes metadata OBUs; not in this table yet (WI-1.116)",
+    "SYN-AV1-0006": "needs a large-scale tile list OBU; no recipe produces one"
   }
 }

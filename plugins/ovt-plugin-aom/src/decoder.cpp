@@ -6,16 +6,18 @@
 #include "decoder.hpp"
 
 #include <aom/aom_decoder.h>
+#include <aom/aom_frame_buffer.h>
 #include <aom/aom_image.h>
 #include <aom/aomdx.h>
 
-// Semi-public: not installed by libaom, included from the pinned source tree (tp::aom_inspection).
+// Semi-public and internal: not installed by libaom, included from the pinned source tree (tp::aom_inspection).
+// decoder.h gives the AV1_COMMON frame state ifd_inspect() reads; the callback reads a few more of its fields.
+#include "av1/decoder/decoder.h"
 #include "av1/decoder/inspection.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <span>
 #include <string>
@@ -93,28 +95,105 @@ uint8_t chroma_format_of(aom_img_fmt_t fmt, bool monochrome) {
   }
 }
 
-// Copies the visible part of plane @p p of @p img (d_w × d_h luma; chroma rounded up by the subsampling).
-Plane copy_plane(const aom_image_t& img, int p) {
-  Plane out;
-  out.sample_bytes = (static_cast<unsigned>(img.fmt) & AOM_IMG_FMT_HIGHBITDEPTH) != 0 ? 2 : 1;
-  out.bit_depth = static_cast<uint8_t>(img.bit_depth);
-  const unsigned sx = p == 0 ? 0 : img.x_chroma_shift;
-  const unsigned sy = p == 0 ? 0 : img.y_chroma_shift;
-  out.width = (img.d_w + sx) >> sx;
-  out.height = (img.d_h + sy) >> sy;
-  const size_t row = size_t{out.width} * out.sample_bytes;
-  const auto stride = static_cast<size_t>(img.stride[p]);
-  out.data.resize(row * out.height);
-  const std::span<const uint8_t> src(img.planes[p], stride * (out.height - 1) + row);
-  for (uint32_t y = 0; y < out.height; ++y) {
-    std::memcpy(std::span<uint8_t>(out.data).subspan(row * y).data(), src.subspan(stride * y).data(), row);
+// Copies the inspection MI grid and the frame-header values the block mapping needs (chapter 07 §7.6.1). Runs inside
+// the inspection callback: it only reads the decoder's frame state, as ifd_inspect() does.
+// SPEC-ASSUMPTION(#360): superblock size, ref_frame_idx[], tile layout, CDEF strengths and global-motion types come
+// from libaom's AV1_COMMON, because the plugin ABI gives the plugin no parsed headers.
+void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* out) {
+  const AV1_COMMON& cm = pbi.common;
+  BlockData& d = *out;
+  // The grid's dimensions come from the decoder, not from fd: when ifd_inspect() reallocates the grid for a new frame
+  // size it stores mi_rows in fd.mi_cols and mi_cols in fd.mi_rows (libaom v3.12.1 inspection.c passes them to
+  // ifd_init_mi_rc() in the wrong order). The grid itself is laid out with the decoder's mi_cols.
+  const int mi_rows = cm.mi_params.mi_rows;
+  const int mi_cols = cm.mi_params.mi_cols;
+  d.valid = mi_rows > 0 && mi_cols > 0 && fd.mi_grid != nullptr && fd.mi_rows * fd.mi_cols == mi_rows * mi_cols;
+  if (!d.valid) {
+    return;
   }
-  return out;
+  d.mi_rows = mi_rows;
+  d.mi_cols = mi_cols;
+  const size_t n = static_cast<size_t>(mi_rows) * static_cast<size_t>(mi_cols);
+  const std::span<const insp_mi_data> grid(fd.mi_grid, n);
+  d.mi.resize(n);
+  for (size_t i = 0; i < n; ++i) {
+    const insp_mi_data& s = grid[i];
+    MiInfo& m = d.mi[i];
+    for (size_t k = 0; k < 2; ++k) {
+      m.mv_row.at(k) = s.mv[k].row;
+      m.mv_col.at(k) = s.mv[k].col;
+      m.ref_frame.at(k) = s.ref_frame[k];
+      m.filter.at(k) = s.filter[k];
+    }
+    m.mode = s.mode;
+    m.uv_mode = s.uv_mode;
+    m.bsize = s.bsize;
+    m.skip = s.skip;
+    m.segment_id = s.segment_id;
+    m.tx_size = s.tx_size;
+    m.cdef_level = s.cdef_level;
+    m.cdef_strength = s.cdef_strength;
+    m.cfl_alpha_idx = s.cfl_alpha_idx;
+    m.cfl_alpha_sign = s.cfl_alpha_sign;
+    m.current_qindex = s.current_qindex;
+    m.compound_type = s.compound_type;
+    m.motion_mode = s.motion_mode;
+    m.intrabc = s.intrabc;
+    m.palette = s.palette;
+    m.uv_palette = s.uv_palette;
+  }
+  const SequenceHeader& seq = *cm.seq_params;
+  d.sb_mi = seq.sb_size == BLOCK_128X128 ? 32 : 16;
+  d.monochrome = seq.monochrome != 0;
+  d.intra_frame = frame_is_intra_only(&cm) != 0;
+  if (!d.intra_frame) {
+    for (size_t t = 0; t < d.ref_frame_idx.size(); ++t) {
+      d.ref_frame_idx.at(t) = static_cast<int8_t>(cm.remapped_ref_idx[t]);
+    }
+  }
+  for (size_t t = 0; t < d.gm_type.size(); ++t) {
+    d.gm_type.at(t) = cm.global_motion[t].wmtype;
+    for (size_t k = 0; k < 6; ++k) {
+      d.gm_params.at(t).at(k) = cm.global_motion[t].wmmat[k];
+    }
+  }
+  const CommonTileParams& tiles = cm.tiles;
+  d.tile_col_starts.assign(static_cast<size_t>(tiles.cols) + 1, 0);
+  d.tile_row_starts.assign(static_cast<size_t>(tiles.rows) + 1, 0);
+  for (size_t i = 0; i <= static_cast<size_t>(tiles.cols); ++i) {
+    d.tile_col_starts[i] = std::min(tiles.col_start_sb[i] << seq.mib_size_log2, mi_cols);
+  }
+  for (size_t i = 0; i <= static_cast<size_t>(tiles.rows); ++i) {
+    d.tile_row_starts[i] = std::min(tiles.row_start_sb[i] << seq.mib_size_log2, mi_rows);
+  }
+  const CdefInfo& cdef = cm.cdef_info;
+  d.cdef_damping = cdef.cdef_damping;
+  d.cdef_bits = cdef.cdef_bits;
+  // CDEF runs only when the sequence enables it outside coded-lossless and IntraBC frames (read_cdef()).
+  if (seq.enable_cdef != 0 && !cm.features.coded_lossless && !cm.features.allow_intrabc) {
+    const auto nb = static_cast<size_t>(std::clamp(cdef.nb_cdef_strengths, 0, CDEF_MAX_STRENGTHS));
+    const auto y = std::span(cdef.cdef_strengths).first(nb);
+    const auto uv = std::span(cdef.cdef_uv_strengths).first(nb);
+    d.cdef_strengths.assign(y.begin(), y.end());
+    d.cdef_uv_strengths.assign(uv.begin(), uv.end());
+  }
+  // Super-resolution (AV1 §5.9.8): cm.width is FrameWidth, the coded (downscaled) width the MI grid covers; by the
+  // time the callback runs, superres_post_decode() has upscaled the frame buffer to superres_upscaled_width.
+  d.superres_denom = cm.superres_scale_denominator;
+  d.frame_width = cm.width;
+  d.upscaled_width = cm.superres_upscaled_width;
+  d.base_qindex = fd.base_qindex;
+  d.delta_q_present = fd.delta_q_present_flag != 0;
+  d.delta_q_res = fd.delta_q_res;
+  for (size_t s = 0; s < d.y_dequant.size(); ++s) {
+    d.y_dequant.at(s) = {fd.y_dequant[s][0], fd.y_dequant[s][1]};
+  }
 }
 
 }  // namespace
 
 struct Decoder::Impl {
+  FramePool pool;  // libaom's frame buffers (planes.hpp); must outlive ctx, which releases them in its destroy
   aom_codec_ctx_t ctx{};
   bool open = false;
   insp_frame_data fd{};
@@ -124,7 +203,9 @@ struct Decoder::Impl {
   int frame_type = -1;
   bool show_frame = false;
   int base_qindex = 0;
+  bool apply_grain = false;
   bool monochrome = false;  // sequence-level, from the last output image
+  BlockData blocks;         // filled by the callback
 
   Impl() = default;
   ~Impl() {
@@ -142,7 +223,8 @@ struct Decoder::Impl {
 
   // The Frame of the frame the last aom_codec_decode() call handled with the callback: frame-level fields from
   // the callback, sizes and format from codec queries (after the call, never from inside the callback), and the
-  // planes of the image it showed, which are valid only until the next aom_codec_decode().
+  // image it showed. libaom reuses that image's frame buffer once it has released it, at the next
+  // aom_codec_decode() at the latest, so the Picture holds the buffer (FramePool) instead of copying the samples.
   Frame take_frame(int32_t decode_index, int64_t pts) {
     Frame f;
     f.decode_index = decode_index;
@@ -150,6 +232,7 @@ struct Decoder::Impl {
     f.frame_type = fb_frame_type(frame_type);
     f.shown = show_frame;
     f.qp_base = static_cast<int16_t>(base_qindex);
+    f.apply_grain = apply_grain;
     std::array<int, 2> size{};
     if (aom_codec_control(&ctx, AV1D_GET_FRAME_SIZE, size.data()) == AOM_CODEC_OK) {
       f.coded_w = size[0];
@@ -168,15 +251,15 @@ struct Decoder::Impl {
     const bool have_fmt = aom_codec_control(&ctx, AV1D_GET_IMG_FORMAT, &fmt) == AOM_CODEC_OK;
     aom_codec_iter_t iter = nullptr;
     while (const aom_image_t* img = aom_codec_get_frame(&ctx, &iter)) {
-      if (!f.shown || !f.planes[0].data.empty()) {
+      if (!f.shown || !f.recon.empty()) {
         continue;
       }
       monochrome = img->monochrome != 0;
-      for (int p = 0; p < (monochrome ? 1 : 3); ++p) {
-        f.planes.at(static_cast<size_t>(p)) = copy_plane(*img, p);
-      }
+      f.recon = pool.retain(*img);
     }
     f.chroma_format = have_fmt ? chroma_format_of(fmt, monochrome) : 1;
+    f.blocks = std::move(blocks);
+    blocks = BlockData{};
     return f;
   }
 
@@ -195,6 +278,11 @@ struct Decoder::Impl {
     self->frame_type = self->fd.frame_type;
     self->show_frame = self->fd.show_frame != 0;
     self->base_qindex = self->fd.base_qindex;
+    // read_film_grain_params() leaves the frame's parameters in cm.film_grain_params (zeroed when the sequence
+    // has none). Read here: decoder_get_frame() clears apply_grain in the output frame when grain is skipped.
+    const auto* pbi = static_cast<const AV1Decoder*>(decoder);
+    self->apply_grain = pbi->common.film_grain_params.apply_grain != 0;
+    copy_blocks(self->fd, *pbi, &self->blocks);
     self->fired = true;
   }
 };
@@ -206,13 +294,23 @@ ovt_status Decoder::create(int threads, std::unique_ptr<Decoder>* out, std::stri
   dec->impl_ = std::make_unique<Impl>();
   Impl& im = *dec->impl_;
   aom_codec_dec_cfg_t cfg{};
-  cfg.threads = static_cast<unsigned>(std::max(1, threads));
+  // The bundled libaom is always built with CONFIG_ACCOUNTING=1 (inspection needs it). Its tile workers record
+  // symbols into the one shared pbi->accounting without a lock (decodeframe.c, tile_worker_hook_init), which corrupts
+  // the heap on frames with several tiles: decode on one thread.
+  // SPEC-ASSUMPTION(#360): §7.6.1 expects row-MT worker threads; they are unusable with accounting on.
+  static_cast<void>(threads);
+  cfg.threads = 1;
   cfg.allow_lowbitdepth = 1;  // 8-bit streams give 8-bit planes, as aomdec and inspect do
   if (aom_codec_dec_init(&im.ctx, aom_codec_av1_dx(), &cfg, 0) != AOM_CODEC_OK) {
     *error = std::string("aom_codec_dec_init failed: ") + aom_codec_error(&im.ctx);
     return OVT_E_PLUGIN;
   }
   im.open = true;
+  // Before the first decode call, as libaom requires: decoded pictures live in the plugin's pool (planes.hpp).
+  if (aom_codec_set_frame_buffer_functions(&im.ctx, &FramePool::get, &FramePool::release, &im.pool) != AOM_CODEC_OK) {
+    *error = std::string("aom_codec_set_frame_buffer_functions failed: ") + aom_codec_error(&im.ctx);
+    return OVT_E_PLUGIN;
+  }
   // The host delivers Section 5 OBUs; operating point 0, one output layer; reconstruction before film grain
   // synthesis (chapter 06 §6.6.1 rule 5). AV1_SET_SKIP_LOOP_FILTER is never set in analysis mode.
   if (aom_codec_control(&im.ctx, AV1D_SET_IS_ANNEXB, 0U) != AOM_CODEC_OK ||

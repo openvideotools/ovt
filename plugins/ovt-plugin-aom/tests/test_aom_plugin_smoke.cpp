@@ -20,100 +20,20 @@
 #include <string>
 #include <vector>
 
+#include "aom_test_util.inc"
 #include "ovt/abi/analysis_decoder_v1.h"
-#include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
 #include "ovt_model_generated.h"
 #include "test_support/corpus.h"
+
+using ovt::aom::test::Instance;
+using ovt::aom::test::Obu;
+using ovt::aom::test::plugin;
+using ovt::aom::test::read_ivf;
+using ovt::aom::test::TemporalUnit;
 
 namespace {
 
 constexpr uint32_t kReconMask = 1U << 0;  // ovt.fb.PlaneStage.Reconstruction
-
-const ovt::analysis::LoadedPlugin& plugin() {
-  static ovt::analysis::PluginRegistry registry(
-      ovt::analysis::PluginRegistry::Options{std::string(OVT_AOM_PLUGIN_DIR), std::vector<std::string>{}});
-  const ovt::analysis::LoadedPlugin* p = registry.find("aom");
-  REQUIRE(p != nullptr);
-  return *p;
-}
-
-// One decoder instance, destroyed at scope exit.
-struct Instance {
-  Instance() : api(*plugin().api) { status = api.create(nullptr, 0, 2, &dec); }
-  ~Instance() {
-    if (dec != nullptr) {
-      api.destroy(dec);
-    }
-  }
-  Instance(const Instance&) = delete;
-  Instance& operator=(const Instance&) = delete;
-  Instance(Instance&&) = delete;
-  Instance& operator=(Instance&&) = delete;
-  const ovt_AnalysisDecoderApi& api;
-  ovt_AnalysisDecoder* dec = nullptr;
-  ovt_status status = OVT_E_INTERNAL;
-};
-
-// ---- IVF / OBU reading (the host's index does this in production) -----------------------------------------------
-
-struct Obu {
-  std::vector<uint8_t> bytes;
-  unsigned type = 0;
-  bool show_existing = false;  // OBU_FRAME_HEADER with show_existing_frame = 1
-};
-using TemporalUnit = std::vector<Obu>;
-
-uint32_t le32(std::span<const uint8_t> b, size_t at) {
-  return uint32_t{b[at]} | (uint32_t{b[at + 1]} << 8U) | (uint32_t{b[at + 2]} << 16U) | (uint32_t{b[at + 3]} << 24U);
-}
-
-// Splits Section 5 OBUs (obu_has_size_field = 1, as libaom's vectors are written). The libaom vectors have
-// reduced_still_picture_header = 0, so show_existing_frame is the first bit of a frame header.
-TemporalUnit split_obus(std::span<const uint8_t> tu) {
-  TemporalUnit out;
-  size_t pos = 0;
-  while (pos < tu.size()) {
-    Obu o;
-    const uint8_t h = tu[pos];
-    REQUIRE((h & 0x02U) != 0);
-    o.type = (h >> 3U) & 0x0FU;
-    size_t p = pos + ((h & 0x04U) != 0 ? 2 : 1);
-    uint64_t size = 0;
-    for (unsigned i = 0;; ++i) {
-      REQUIRE(p < tu.size());
-      const uint8_t b = tu[p++];
-      size |= uint64_t{b & 0x7FU} << (7U * i);
-      if ((b & 0x80U) == 0) {
-        break;
-      }
-    }
-    REQUIRE(p + size <= tu.size());
-    o.show_existing = o.type == 3 && size > 0 && (tu[p] & 0x80U) != 0;
-    o.bytes.assign(tu.begin() + static_cast<std::ptrdiff_t>(pos), tu.begin() + static_cast<std::ptrdiff_t>(p + size));
-    out.push_back(std::move(o));
-    pos = p + size;
-  }
-  return out;
-}
-
-std::vector<TemporalUnit> read_ivf(const std::filesystem::path& path) {
-  std::ifstream in(path, std::ios::binary);
-  REQUIRE(in.good());
-  const std::vector<uint8_t> file((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-  const std::span<const uint8_t> b(file);
-  REQUIRE(b.size() >= 32);
-  REQUIRE(std::string(b.begin(), b.begin() + 4) == "DKIF");
-  std::vector<TemporalUnit> tus;
-  size_t pos = 32;
-  while (pos + 12 <= b.size()) {
-    const uint32_t size = le32(b, pos);
-    pos += 12;
-    REQUIRE(pos + size <= b.size());
-    tus.push_back(split_obus(b.subspan(pos, size)));
-    pos += size;
-  }
-  return tus;
-}
 
 // ---- driving the plugin like the host -----------------------------------------------------------------------------
 
@@ -124,6 +44,7 @@ struct Result {
   int32_t coded_h = 0;
   std::vector<uint32_t> plane_w;  // per PlaneRef
   std::vector<uint32_t> plane_h;
+  std::vector<uint32_t> stride;   // PlaneRef.stride_bytes
   std::vector<size_t> blob_size;  // bytes returned by plane()
 };
 
@@ -153,6 +74,7 @@ void drain(Instance& inst, uint32_t mask, Run* run) {
     for (const ovt::fb::PlaneRef* p : *fa->planes()) {
       r.plane_w.push_back(p->width());
       r.plane_h.push_back(p->height());
+      r.stride.push_back(p->stride_bytes());
       const uint8_t* data = nullptr;
       size_t size = 0;
       REQUIRE(inst.api.plane(inst.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
@@ -212,7 +134,8 @@ TEST_CASE("aom plugin: caps through the registry", "[fast][third_party]") {
   REQUIRE(caps != nullptr);
   CHECK(caps->codec == 3);  // ovt.fb.Codec.AV1
   CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == 0U);
+  // §7.6.1 Caps row with stock libaom and no accounting yet: all but tx_type, bits_x8 and deblock_bs.
+  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_TX_TYPE | OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
   CHECK(std::string(caps->id) == "aom");
   CHECK(std::string(caps->version).find("libaom") != std::string::npos);
   const Instance inst;
@@ -235,7 +158,11 @@ TEST_CASE("aom plugin AT1: one FrameAnalysis per frame of av1-1-b8-01-size-66x66
     REQUIRE(r.plane_w.size() == 3);
     CHECK(r.plane_w == std::vector<uint32_t>{66, 33, 33});
     CHECK(r.plane_h == std::vector<uint32_t>{66, 33, 33});
-    CHECK(r.blob_size == std::vector<size_t>{4356, 1089, 1089});  // 66 x 66 and 33 x 33 8-bit samples
+    // 66 x 66 and 33 x 33 8-bit samples in place in libaom's frame buffer: stride_bytes apart (WI-2.158).
+    for (size_t p = 0; p < 3; ++p) {
+      CHECK(r.stride[p] >= r.plane_w[p]);
+      CHECK(r.blob_size[p] == size_t{r.stride[p]} * (r.plane_h[p] - 1) + r.plane_w[p]);
+    }
   }
 }
 

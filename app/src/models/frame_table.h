@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <map>
 #include <optional>
+#include <span>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -76,6 +77,11 @@ class FrameTable {
   [[nodiscard]] std::int64_t pts(int decode_index) const { return pts_.at(static_cast<std::size_t>(decode_index)); }
   [[nodiscard]] fb::FrameType type(int decode_index) const { return type_.at(static_cast<std::size_t>(decode_index)); }
   [[nodiscard]] bool is_rap(int decode_index) const { return rap_.at(static_cast<std::size_t>(decode_index)) != 0; }
+  [[nodiscard]] std::int64_t poc(int decode_index) const { return poc_.at(static_cast<std::size_t>(decode_index)); }
+  // The display index of a frame (its slot in display order), or -1.
+  [[nodiscard]] int display_index_of(int decode_index) const;
+  // The decode indices this frame references per its headers (`declared_refs`); empty for intra frames.
+  [[nodiscard]] std::span<const int> declared_refs(int decode_index) const;
   [[nodiscard]] bool shown(int decode_index) const { return shown_.at(static_cast<std::size_t>(decode_index)) != 0; }
 
   // The positions (in the current order) of the random access points, ascending: the GOP markers.
@@ -100,9 +106,13 @@ class FrameTable {
   std::vector<std::int16_t> qp_;
   std::vector<std::uint8_t> tid_;
   std::vector<std::int64_t> pts_;
+  std::vector<std::int64_t> poc_;
+  std::vector<int> display_of_;  // decode index -> display slot
   std::vector<fb::FrameType> type_;
   std::vector<std::uint8_t> rap_;
   std::vector<std::uint8_t> shown_;
+  std::vector<int> refs_;               // all declared_refs, frame after frame
+  std::vector<std::size_t> ref_begin_;  // size n + 1: refs_[ref_begin_[d], ref_begin_[d + 1]) belong to frame d
   std::int64_t timebase_num_ = 0;
   std::int64_t timebase_den_ = 0;
 

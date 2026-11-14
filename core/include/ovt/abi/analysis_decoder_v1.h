@@ -112,7 +112,9 @@ typedef struct ovt_AnalysisDecoderApi {
    *  selects the ovt.fb.PlaneStage planes to export for this frame. */
   ovt_status (*pull)(ovt_AnalysisDecoder*, uint32_t plane_stage_mask, ovt_Buffer* out_fb);
   /** Looks up a plane named by FrameAnalysis.planes[].blob_id. *data stays owned by the plugin and is
-   *  valid until the FrameAnalysis that names it is released. */
+   *  valid until the FrameAnalysis that names it is released. *size covers
+   *  stride_bytes * (height - 1) + width * sample_bytes of the named PlaneRef, so a plugin may export
+   *  decoder-owned planes in place with the decoder's stride (consumers MUST use stride_bytes). */
   ovt_status (*plane)(ovt_AnalysisDecoder*, const char* blob_id, const uint8_t** data, size_t* size);
   /** Returns a buffer obtained from pull() to the plugin. */
   void (*release)(ovt_AnalysisDecoder*, ovt_Buffer fb);

@@ -24,7 +24,8 @@ function(ovt_add_fuzz_target name source)
   set(corpus_dir "${CMAKE_CURRENT_SOURCE_DIR}/corpus/${name}")
 
   add_executable(ovt_fuzz_${name}_regress "${source}" test_fuzz_regressions.cpp)
-  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ovt::flags)
+  target_link_libraries(ovt_fuzz_${name}_regress PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET}
+                                                         ${pugixml_TARGET} ovt::flags)
   target_include_directories(ovt_fuzz_${name}_regress PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   ovt_set_license(ovt_fuzz_${name}_regress "LGPL-2.1-or-later")
   add_test(NAME fuzz_${name}_regress COMMAND ovt_fuzz_${name}_regress "${regress_dir}" "${corpus_dir}")
@@ -32,8 +33,8 @@ function(ovt_add_fuzz_target name source)
 
   if(OVT_ENABLE_FUZZ AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     add_executable(ovt_fuzz_${name} "${source}")
-    target_link_libraries(ovt_fuzz_${name} PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ovt::flags
-                                                   ${OVT_FUZZ_ENGINE})
+    target_link_libraries(ovt_fuzz_${name} PRIVATE ovt_core_objects ovt_schemas ${flatbuffers_TARGET} ${pugixml_TARGET}
+                                                   ovt::flags ${OVT_FUZZ_ENGINE})
     target_include_directories(ovt_fuzz_${name} PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
     set_target_properties(ovt_fuzz_${name} PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/fuzz")
     ovt_set_license(ovt_fuzz_${name} "LGPL-2.1-or-later")
@@ -44,6 +45,8 @@ ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
+ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
+ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(y4m fuzz_y4m.cpp)
@@ -53,6 +56,17 @@ ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
 ovt_add_fuzz_target(cache_blob fuzz_cache_blob.cpp)
 ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
+# WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
+ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
+# WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
+ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
+# WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry points.
+ovt_add_fuzz_target(h265_slice fuzz_h265_slice.cpp)
+# WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
+ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
+ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
+# WI-1.231: the unit splitter of §8.7.4 over every framing.
+ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)

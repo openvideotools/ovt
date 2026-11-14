@@ -9,14 +9,17 @@ target_sources(
   ovt_core_objects
   PRIVATE annexb.cpp
           container.cpp
+          isobmff/box_walk.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
+          mpegts/ts_packets.cpp
           obu.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp
+          virtual_file/mpd.cpp
           y4m.cpp)
 # ovt_schemas orders the build after flatc and puts ovt_container_generated.h on the include path.
 target_link_libraries(ovt_core_objects PRIVATE ovt_schemas)
-# nlohmann_json parses and writes the raw-YUV sidecar (WI-1.229); header-only, an implementation detail.
-target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${nlohmann_json_TARGET}>")
+# The DASH MPD parser (WI-4.208) reads XML with pugixml (MIT); the target is found in core/CMakeLists.txt.
+target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${pugixml_TARGET}>")

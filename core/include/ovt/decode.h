@@ -47,6 +47,9 @@ typedef struct ovt_PlaneView {
   uint8_t reserved[3];   /**< Zero. */
 } ovt_PlaneView;
 
+/* ovt/abi/metric_v1.h repeats this type under the same guard (#156, #211). */
+#ifndef OVT_FRAME_ID_DEFINED
+#define OVT_FRAME_ID_DEFINED
 /**
  * Identity of a frame in a stream (backbone §0.5.3). A value type: never extended, no struct_size
  * (§12.3.1 rule 7). @c display_index is -1 for a frame that is never shown.
@@ -56,6 +59,7 @@ typedef struct ovt_FrameId {
   int32_t decode_index;
   int32_t display_index;
 } ovt_FrameId;
+#endif /* OVT_FRAME_ID_DEFINED */
 
 /**
  * A decoded picture (chapter 12 §12.3.9). Reference counted (D4 b): a function that hands one out through an

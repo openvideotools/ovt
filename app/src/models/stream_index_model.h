@@ -63,6 +63,11 @@ class StreamIndexModel : public QObject {
 
   // Sets the selected range (positions, inclusive, either order, clamped) or clears it. Emits rangeChanged(first,
   // last) with the normalised positions; clearing emits rangeChanged(-1, -1).
+  // Frame lookups for QML (the panel steps through frames and maps Selection back to positions).
+  Q_INVOKABLE [[nodiscard]] int decodeIndexAt(int position) const;
+  Q_INVOKABLE [[nodiscard]] int displayIndexOf(int decode_index) const;
+  Q_INVOKABLE [[nodiscard]] int positionOf(int decode_index) const;
+
   Q_INVOKABLE void setRange(int first, int last);
   Q_INVOKABLE void clearRange();
   [[nodiscard]] bool has_range() const noexcept { return range_.has_value(); }
