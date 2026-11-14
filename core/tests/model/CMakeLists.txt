@@ -7,12 +7,14 @@
 # WI-0.083 acceptance test 2: the embedded .bfbs resources and the schema identity accessors.
 # WI-0.084: the model helpers (grid, tree, units, labels); test_labels compares labels_golden.txt.
 # WI-0.087: the PictureStore and the ovt/decode.h view types.
-add_executable(ovt_tests_model test_bfbs_resources.cpp test_grid.cpp test_labels.cpp test_picture_c_api.cpp
-                               test_picture_store.cpp test_tree.cpp test_units.cpp)
+# WI-0.085: canonicalize() and structural_diff() on the WI-0.093 fixture (ovt_golden_fixtures: sha256_hex).
+add_executable(ovt_tests_model test_bfbs_resources.cpp test_canonical.cpp test_grid.cpp test_labels.cpp
+                               test_picture_c_api.cpp test_picture_store.cpp test_tree.cpp test_units.cpp)
 target_link_libraries(ovt_tests_model PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
-                                              ${flatbuffers_TARGET} ${Catch2_TARGET})
-target_compile_definitions(ovt_tests_model
-                           PRIVATE "OVT_MODEL_LABELS_GOLDEN=\"${CMAKE_CURRENT_SOURCE_DIR}/labels_golden.txt\"")
+                                              ovt_golden_fixtures ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_tests_model PRIVATE "OVT_MODEL_LABELS_GOLDEN=\"${CMAKE_CURRENT_SOURCE_DIR}/labels_golden.txt\""
+                          "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
 # ovt_metrics.fbs arrives with WI-0.082. Until then bfbs(Metrics) is empty and its check is skipped; once the
 # file exists the check is required (a schema that is present but not embedded fails).
 if(EXISTS "${PROJECT_SOURCE_DIR}/core/schema/ovt_metrics.fbs")

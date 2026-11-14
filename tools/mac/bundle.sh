@@ -8,6 +8,9 @@
 #
 #   <preset>   macos-arm64-release or macos-x86_64-release (any macos-* preset works; only *-release strips)
 #   --out DIR  where the bundle is staged (default build/<preset>/bundle)
+#   --skip-notices-build  do not build ovt_notices; use build/<preset>/THIRD_PARTY_NOTICES.md if it exists. If it
+#              does not, the result is a local test bundle with Contents/Resources/NOT_FOR_DISTRIBUTION.txt in place of
+#              the notices: shipping it would break the licences' notice obligations (chapter 15 §15.6).
 #
 # The preset must be configured and built first (`cmake --preset <p> && cmake --build --preset <p>`). Environment:
 #   QT_ROOT_DIR               Qt install (macdeployqt is $QT_ROOT_DIR/macos/bin/macdeployqt); else macdeployqt on PATH
@@ -26,7 +29,7 @@
 set -euo pipefail
 
 die() { echo "bundle.sh: $*" >&2; exit 1; }
-usage() { sed -n "5,22p" "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n "5,25p" "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 preset=""
 out=""
@@ -84,7 +87,12 @@ if [ "$build_notices" -eq 1 ]; then
   cmake --build "$build" --target ovt_notices
 fi
 notices="$build/THIRD_PARTY_NOTICES.md"
-[ -f "$notices" ] || die "$notices is missing: build the ovt_notices target (licence obligation: the notices travel with the bundle)"
+have_notices=1
+if [ ! -f "$notices" ]; then
+  [ "$build_notices" -eq 0 ] || die "$notices is missing after building ovt_notices"
+  have_notices=0
+  echo "bundle.sh: WARNING: $notices is missing (--skip-notices-build): this bundle is NOT for distribution" >&2
+fi
 cmake --install "$build" --prefix "$contents"
 
 # ---- (3) install tree -> bundle layout ---------------------------------------------------------------------------
@@ -103,7 +111,13 @@ fi
 rm -rf "${contents:?}/bin" "${contents:?}/lib" "${contents:?}/include" "${contents:?}/share"
 
 # ---- (4) notices, PATENTS, MoltenVK ------------------------------------------------------------------------------
-cp "$notices" "$contents/Resources/THIRD_PARTY_NOTICES.md"
+if [ "$have_notices" -eq 1 ]; then
+  cp "$notices" "$contents/Resources/THIRD_PARTY_NOTICES.md"
+else
+  printf '%s\n' "Test bundle built with --skip-notices-build and without THIRD_PARTY_NOTICES.md." \
+    "It lacks the third-party notices its licences require: do not distribute it." \
+    > "$contents/Resources/NOT_FOR_DISTRIBUTION.txt"
+fi
 if [ -f "$build/PATENT_NOTICE.md" ]; then cp "$build/PATENT_NOTICE.md" "$contents/Resources/"; fi
 mkdir -p "$contents/Resources/LICENSES"
 cp "$repo"/LICENSES/*.txt "$contents/Resources/LICENSES/"
@@ -123,6 +137,9 @@ for plugin in "$contents"/PlugIns/ovt/*.dylib; do
   [ -e "$plugin" ] && dq_args+=("-executable=$plugin")
 done
 "$macdeployqt" "${dq_args[@]}"
+# macdeployqt copies Qt's SQL driver plugins, which link client libraries outside the bundle (Postgres.app's libpq,
+# libiodbc, libmimerapi). OVT does not use QtSql, so they go before fix_rpaths.py checks the bundle.
+rm -rf "$contents/PlugIns/sqldrivers"
 
 # Bundle icon: best effort, from app/resources/icons/ovt-studio.svg (a bundle without it shows the generic icon).
 if command -v rsvg-convert >/dev/null 2>&1 && command -v iconutil >/dev/null 2>&1; then
@@ -158,6 +175,7 @@ esac
 
 # Licence notices must name what the bundle ships (FFmpeg, MoltenVK and Qt are the ones with obligations).
 check_notice() { # <file in Frameworks> <name in the notices>
+  [ "$have_notices" -eq 1 ] || return 0 # a test bundle without notices (--skip-notices-build)
   # shellcheck disable=SC2086 # the pattern argument is a glob on purpose
   if ls "$contents"/Frameworks/$1 >/dev/null 2>&1 && ! grep -qi "$2" "$contents/Resources/THIRD_PARTY_NOTICES.md"; then
     die "the bundle ships $1 but THIRD_PARTY_NOTICES.md does not mention $2"
