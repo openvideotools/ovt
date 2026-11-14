@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc30 — 2026-11-14
+
+PATCH-level: spec-amendment pass 10 folds in the accepted answer of `spec-question` issue #418 from WI-1.115 (H.265 activation). Two diagnostic codes are registered (D2, additive); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.8 H.265 row, §7.9 table; `corrupt_conditions.json` — `SYN-H265-0021` Error `"%s %d changed within a picture"` (VPS/SPS/PPS; new content held back until the next picture, mirrors `SYN-H264-0021`) and `SYN-H265-0022` Warning `"SPS %d refers to missing VPS %d"` (once per SPS generation); `SYN-H265-0022` gets a bit-edit condition (`sps_video_parameter_set_id = 1`), `SYN-H265-0021` a `not_in_table` reason — WI-1.115 (#418)
+
 ## 1.0.0-rc29 — 2026-11-14
 
 PATCH-level: spec-amendment pass 9 folds in the accepted answers of `spec-question` issues #495 and #498 from the HM plugin work (WI-4.105 part b, PR #496). No public C header, FlatBuffers schema (`predictor` is already a free string), plugin ABI or CLI grammar change.

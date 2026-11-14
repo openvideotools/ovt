@@ -48,9 +48,9 @@ target_sources(ovt_core_objects PRIVATE h265/slice_segment_header.cpp h265/ref_p
                                         h265/pred_weight_table.cpp)
 # WI-1.115: H.265 parameter-set activation tracking (chapter 7 §7.3.8).
 target_sources(ovt_core_objects PRIVATE h265/active_sets.cpp)
-# WI-1.108a: H.264 NAL header and SPS (VUI, HRD, scaling lists) parsers; H.273 code-point names shared with the
-# H.265 and AV1 parsers. WI-1.108b adds h264/pps.cpp.
+# WI-1.108: H.264 NAL header, SPS (VUI, HRD, scaling lists) and PPS parsers; H.273 code-point names shared with
+# the H.265 and AV1 parsers.
 target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp h264/vui.cpp
-                                        h264/sps.cpp)
+                                        h264/sps.cpp h264/pps.cpp)
 # WI-1.110: SEI framing shared by H.264 and H.265, and the H.264 SEI payload parsers (chapter 7 §7.3.4 rows 7–18).
 target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp)

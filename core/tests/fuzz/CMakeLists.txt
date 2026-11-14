@@ -77,7 +77,7 @@ ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
 # WI-0.094: the FrameAnalysis and StreamIndex readers (Verifier + validator).
 ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
 ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
-# WI-1.108a: H.264 NAL header and SPS parsers (WI-1.108b adds the PPS modes).
+# WI-1.108: H.264 NAL header, SPS and PPS parsers (byte 0 selects the mode).
 ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
 # WI-1.110: the H.264 SEI framing and payload parsers.
 ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)

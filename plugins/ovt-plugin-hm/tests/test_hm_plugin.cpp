@@ -10,25 +10,32 @@
 #include <catch2/generators/catch_generators_range.hpp>
 
 #include <flatbuffers/flatbuffers.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "TLibCommon/CommonDef.h"  // HM's typedefs, which its MD5.h needs
 #include "libmd5/MD5.h"            // HM's public-domain MD5 (Colin Plumb), compiled into tp::hm_common
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
+#include "ovt/cxx/model/tree.hpp"
+#include "ovt/cxx/model/validator.hpp"
 #include "ovt_model_generated.h"
 #include "test_support/corpus.h"
 
@@ -213,7 +220,65 @@ struct PictureOut {
   uint8_t bit_depth_chroma = 0;
   std::vector<uint8_t> plane_bit_depths;
   std::vector<uint8_t> plane_sample_bytes;
+  std::shared_ptr<const struct GridOut> grid;  // when StreamResult::keep_grids
 };
+
+// The CellGrid of one picture, with ref0/ref1 resolved to the refIdx of their RefSlot ("L0[i]", "S<n>:L1[i]") and,
+// per cell, the cell index of the top-left of its CU (Block of grid.block_id).
+struct GridOut {
+  uint32_t w4 = 0;
+  uint32_t h4 = 0;
+  std::map<std::string, std::vector<int>> fields;
+  std::vector<std::size_t> cu_origin;
+  bool mv_clamp_reported = false;  // FrameAnalysis.diagnostics holds MDL-GEN-0003
+};
+
+int ref_idx(const ovt::fb::FrameAnalysis& fa, int slot) {
+  if (slot < 0 || fa.refs() == nullptr || static_cast<uint32_t>(slot) >= fa.refs()->size()) {
+    return -1;
+  }
+  const std::string name = fa.refs()->Get(static_cast<uint32_t>(slot))->name()->str();
+  const auto open = name.rfind('[');
+  return open == std::string::npos ? -1 : std::stoi(name.substr(open + 1));
+}
+
+std::shared_ptr<const GridOut> grid_of(const ovt::fb::FrameAnalysis& fa) {
+  auto out = std::make_shared<GridOut>();
+  const ovt::fb::CellGrid& g = *fa.grid();
+  out->w4 = g.cells_w();
+  out->h4 = g.cells_h();
+  const auto copy = [&](const char* name, const auto* v, auto map) {
+    std::vector<int>& dst = out->fields[name];
+    if (v != nullptr) {
+      for (const auto x : *v) {
+        dst.push_back(map(static_cast<int>(x)));
+      }
+    }
+  };
+  const auto same = [](int v) { return v; };
+  copy("pred", g.pred(), same);
+  copy("qp", g.qp(), same);
+  copy("intra_mode_y", g.intra_mode_y(), same);
+  copy("intra_mode_c", g.intra_mode_c(), same);
+  copy("mv0_x", g.mv0_x(), same);
+  copy("mv0_y", g.mv0_y(), same);
+  copy("mv1_x", g.mv1_x(), same);
+  copy("mv1_y", g.mv1_y(), same);
+  copy("ref0", g.ref0(), [&](int v) { return ref_idx(fa, v); });
+  copy("ref1", g.ref1(), [&](int v) { return ref_idx(fa, v); });
+  copy("tx_log2_w", g.tx_log2_w(), same);
+  copy("cbf", g.cbf(), same);
+  if (fa.diagnostics() != nullptr) {
+    for (const ovt::fb::Diagnostic* d : *fa.diagnostics()) {
+      out->mv_clamp_reported = out->mv_clamp_reported || (d->code() != nullptr && d->code()->str() == "MDL-GEN-0003");
+    }
+  }
+  for (const uint32_t id : *g.block_id()) {
+    const ovt::fb::Rect* r = fa.blocks()->Get(id)->rect();
+    out->cu_origin.push_back((static_cast<std::size_t>(r->y() / 4) * out->w4) + static_cast<std::size_t>(r->x() / 4));
+  }
+  return out;
+}
 
 struct StreamResult {
   int pictures = 0;                     // pictures in the stream (first_slice_segment_in_pic_flag = 1)
@@ -222,7 +287,98 @@ struct StreamResult {
   std::map<int, PictureOut> actual;     // decode index -> what pull() returned
   std::vector<int> pull_order;          // decode indices as pull() returned them
   int push_errors = 0;
+  std::vector<std::string> violations;  // chapter 06 §6.9 validator findings (first few)
+  bool keep_grids = false;
+  // 4:2:2 HevcTu.cbf_cb / cbf_cr (ovt_model.fbs: two entries per chroma-coding node, one per vertical half).
+  int tu422_two_entry_nodes = 0;   // nodes that carry two entries per component
+  int tu422_halves_differ = 0;     // ... of which the two halves of a component differ (so they are not the OR twice)
+  int tu422_parent_two_entry = 0;  // ... of which 8x8 nodes split into 4x4 luma TUs
+  int tu422_parent_differ = 0;     // ... of those, with differing halves
+  std::vector<std::string> tu422_errors;  // first few mismatches
 };
+
+// Checks the chroma cbf entries of every HevcTu of a 4:2:2 picture: their count per 7.3.8.8 (none at a 4x4 luma
+// node, two where the node codes its chroma TBs: a leaf, or an 8x8 node split into 4x4 luma TUs; one otherwise),
+// and that the OR of a node's two entries equals the chroma cbf bit of every grid cell the node covers (HM keeps
+// the halves and their OR at different transform depths, so a wrong depth or half shows up as a mismatch).
+// The cell index of the first grid cell inside @p rect whose chroma cbf bit @p c differs from @p any.
+std::optional<uint32_t> grid_cbf_mismatch(const ovt::fb::CellGrid& g, const ovt::fb::Rect& rect, int c, int any) {
+  const int w4 = static_cast<int>(g.cells_w());
+  const int x1 = std::min((rect.x() + rect.w()) / 4, w4);
+  const int y1 = std::min((rect.y() + rect.h()) / 4, static_cast<int>(g.cells_h()));
+  for (int y4 = rect.y() / 4; y4 < y1; ++y4) {
+    for (int x4 = rect.x() / 4; x4 < x1; ++x4) {
+      const auto i = static_cast<uint32_t>((y4 * w4) + x4);
+      if (((g.cbf()->Get(i) >> c) & 1) != any) {
+        return i;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+// One component's chroma cbf entries of a 4:2:2 TU node: "" when they hold @p want entries and, for two, their OR
+// matches the grid; sets *differ when the two entries differ.
+std::string check_chroma_cbf(const ovt::fb::CellGrid& g, const ovt::fb::Rect& rect, int c,
+                             const flatbuffers::Vector<uint8_t>* v, std::size_t want, bool* differ) {
+  const std::size_t n = v == nullptr ? 0 : v->size();
+  if (n != want) {
+    return std::to_string(n) + " entries, want " + std::to_string(want);
+  }
+  if (n != 2) {
+    return "";
+  }
+  *differ = *differ || v->Get(0) != v->Get(1);
+  const auto bad = grid_cbf_mismatch(g, rect, c, (v->Get(0) | v->Get(1)) != 0 ? 1 : 0);
+  return bad ? "OR of the halves differs from grid cbf at cell " + std::to_string(*bad) : "";
+}
+
+// Checks the chroma cbf entries of every HevcTu of a 4:2:2 picture: their count per 7.3.8.8 (none at a 4x4 luma
+// node, two where the node codes its chroma TBs: a leaf, or an 8x8 node split into 4x4 luma TUs; one otherwise),
+// and that the OR of a node's two entries equals the chroma cbf bit of every grid cell the node covers (HM keeps
+// the halves and their OR at different transform depths, so a wrong depth or half shows up as a mismatch).
+void check_tu_node(const ovt::fb::FrameAnalysis& fa, const ovt::fb::Block& b, const ovt::fb::HevcTu& tu,
+                   StreamResult* r) {
+  const int l2 = tu.log2TrafoSize();
+  const bool split = tu.split_transform_flag() == 1;
+  const std::size_t want = l2 == 2 ? 0 : ((!split || l2 == 3) ? 2 : 1);
+  bool differ = false;
+  for (int c = 1; c <= 2; ++c) {
+    const std::string error =
+        check_chroma_cbf(*fa.grid(), *b.rect(), c, c == 1 ? tu.cbf_cb() : tu.cbf_cr(), want, &differ);
+    if (!error.empty() && r->tu422_errors.size() < 8) {
+      std::string where = "decode index ";
+      where += std::to_string(fa.frame()->id()->decode_index());
+      where += " TU at " + std::to_string(b.rect()->x());
+      where += "," + std::to_string(b.rect()->y());
+      where += " log2 " + std::to_string(l2);
+      where += " component " + std::to_string(c);
+      where += ": ";
+      where += error;
+      r->tu422_errors.push_back(std::move(where));
+    }
+  }
+  if (want == 2) {
+    ++r->tu422_two_entry_nodes;
+    r->tu422_halves_differ += differ ? 1 : 0;
+    r->tu422_parent_two_entry += split ? 1 : 0;
+    r->tu422_parent_differ += split && differ ? 1 : 0;
+  }
+}
+
+void check_tu_cbf_422(const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
+  for (const ovt::fb::Block* b : *fa.blocks()) {
+    if (const auto* tu = ovt::model::ext_as<ovt::fb::HevcTu>(*b)) {
+      check_tu_node(fa, *b, *tu, r);
+    }
+  }
+}
+
+// Validator findings on what the host completes: the timebase and the source-hash prefix of blob ids.
+bool host_fills(const ovt::model::Violation& v) {
+  return (v.rule == "V-002" && v.path == "frame.timebase_den") ||
+         (v.rule == "V-023" && v.path.ends_with(".blob_id") && v.message.find("source-hash") != std::string::npos);
+}
 
 // Pulls every ready frame; hashes its Reconstruction planes the way the stream's SEI for that picture does.
 void drain(Instance& in, StreamResult* r) {
@@ -233,6 +389,11 @@ void drain(Instance& in, StreamResult* r) {
       return;
     }
     const ovt::fb::FrameAnalysis* fa = as_fa(fb);
+    for (const auto& v : ovt::model::validate_frame_analysis(std::span<const uint8_t>(fb.data, fb.size))) {
+      if (!host_fills(v) && r->violations.size() < 8) {
+        r->violations.push_back(v.rule + " " + v.path + ": " + v.message);
+      }
+    }
     REQUIRE(fa->frame() != nullptr);
     REQUIRE(fa->frame()->id() != nullptr);
     CHECK(fa->plugin_id()->str() == "hm");
@@ -273,6 +434,12 @@ void drain(Instance& in, StreamResult* r) {
             plane_hash(type, data, p->width(), p->height(), p->sample_bytes()));
       }
     }
+    if (r->keep_grids) {
+      out.grid = grid_of(*fa);
+    }
+    if (out.chroma_format == 2) {
+      check_tu_cbf_422(*fa, r);
+    }
     CHECK(!r->actual.contains(idx));
     r->actual[idx] = std::move(out);
     in.api.release(in.dec, fb);
@@ -286,6 +453,7 @@ class StreamFeeder {
   StreamFeeder(Instance& in, const std::vector<uint8_t>& bytes) : in_(in), nals_(split_annexb(bytes)) {}
 
   [[nodiscard]] bool done() const { return next_ >= nals_.size(); }
+  void keep_grids(bool keep) { r_.keep_grids = keep; }
 
   // Pushes the next NAL unit and pulls what is ready.
   void step() {
@@ -346,10 +514,11 @@ class StreamFeeder {
   StreamResult r_;
 };
 
-StreamResult run_stream(const std::vector<uint8_t>& bytes) {
+StreamResult run_stream(const std::vector<uint8_t>& bytes, bool keep_grids = false) {
   Instance in(plugin_api());
   REQUIRE(in.status == OVT_OK);
   StreamFeeder feeder(in, bytes);
+  feeder.keep_grids(keep_grids);
   while (!feeder.done()) {
     feeder.step();
   }
@@ -360,6 +529,10 @@ StreamResult run_stream(const std::vector<uint8_t>& bytes) {
 // host's pts; every hash equal to its SEI.
 void check_stream(const StreamResult& r, bool expect_hashes) {
   CHECK(r.push_errors == 0);
+  for (const std::string& v : r.violations) {
+    UNSCOPED_INFO(v);
+  }
+  CHECK(r.violations.empty());
   REQUIRE(r.pictures > 0);
   std::set<int> want;
   for (int i = 0; i < r.pictures; ++i) {
@@ -509,4 +682,225 @@ TEST_CASE("hm plugin: RExt 4:4:4 12-bit yields a FrameAnalysis per picture", "[f
     CHECK(out.plane_bit_depths == std::vector<uint8_t>{12, 12, 12});
     CHECK(out.plane_sample_bytes == std::vector<uint8_t>{2, 2, 2});
   }
+}
+
+TEST_CASE("hm plugin: 4:2:2 HevcTu chroma cbf has one entry per chroma TB", "[fast][third_party][needs-corpus]") {
+  // syn_h265_422_444_rext (recipe 11) also holds the x265 main422-10 stream next to its primary file.
+  const std::filesystem::path path =
+      ovt::test::corpus_or_skip("syn_h265_422_444_rext").parent_path() / "syn_h265_422_10bit.265";
+  REQUIRE(std::filesystem::exists(path));
+  const StreamResult r = run_stream(read_file(path));
+  check_stream(r, false);
+  std::string errors;
+  for (const std::string& e : r.tu422_errors) {
+    errors += e + "\n";
+  }
+  INFO(errors);
+  CHECK(r.tu422_errors.empty());
+  INFO("two-entry nodes " << r.tu422_two_entry_nodes << ", halves differ " << r.tu422_halves_differ << ", 8x8 parents "
+                          << r.tu422_parent_two_entry);
+  CHECK(r.tu422_two_entry_nodes > 0);
+  // Reading the OR's depth would give the same flag twice; the halves must differ somewhere in the stream.
+  CHECK(r.tu422_halves_differ > 0);
+  CHECK(r.tu422_parent_differ > 0);  // HM keeps those halves one depth lower than at a leaf
+}
+
+namespace {
+
+// ---- part b: the CellGrid against hm_cu_dump --------------------------------------------------------------------
+
+// The hm-grid goldens: tests/oracles/hm_cu_dump.cpp output normalised by tests/oracles/normalize/hm_grid.py.
+constexpr std::array<std::string_view, 32> kGridGoldens = {
+    "jctvc_CAINIT_A_SHARP_4",
+    "jctvc_CONFWIN_A_Sony_1",
+    "jctvc_EXT_A_ericsson_4",
+    "jctvc_FILLER_A_Sony_1",
+    "jctvc_HRD_A_Fujitsu_3",
+    "jctvc_MAXBINS_A_TI_5",
+    "jctvc_MERGE_B_TI_3",
+    "jctvc_MVCLIP_A_qualcomm_3",
+    "jctvc_MVEDGE_A_qualcomm_3",
+    "jctvc_NUT_A_ericsson_5",
+    "jctvc_NoOutPrior_A_Qualcomm_1",
+    "jctvc_OPFLAG_A_Qualcomm_1",
+    "jctvc_PMERGE_A_TI_3",
+    "jctvc_POC_A_Bossen_3",
+    "jctvc_PPS_A_qualcomm_7",
+    "jctvc_RAP_A_docomo_6",
+    "jctvc_RAP_B_Bossen_2",
+    "jctvc_RPS_A_docomo_5",
+    "jctvc_RPS_B_qualcomm_5",
+    "jctvc_RPS_C_ericsson_5",
+    "jctvc_RPS_D_ericsson_6",
+    "jctvc_RPS_E_qualcomm_5",
+    "jctvc_RPS_F_docomo_2",
+    "jctvc_SAO_A_MediaTek_4",
+    "jctvc_SLIST_A_Sony_5",
+    "jctvc_STRUCT_B_Samsung_7",
+    "jctvc_TSCL_A_VIDYO_5",
+    "jctvc_VPSID_A_VIDYO_2",
+    "jctvc_WPP_A_ericsson_MAIN10_2",
+    "jctvc_WPP_A_ericsson_MAIN_2",
+    "jctvc_WP_A_Toshiba_3",
+    "jctvc_ipcm_A_NEC_3",
+};
+
+// The text of a .gz golden (gzip is on every desktop CI image, as for the vmaf goldens).
+std::string gunzip(const std::filesystem::path& path) {
+  const std::string cmd = "gzip -dc '" + path.string() + "'";
+  std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(cmd.c_str(), "r"),  // NOLINT(cert-env33-c): fixed command
+                                             pclose);
+  REQUIRE(pipe != nullptr);
+  std::string text;
+  std::array<char, 65536> buf{};
+  size_t n = 0;
+  while ((n = std::fread(buf.data(), 1, buf.size(), pipe.get())) > 0) {
+    text.append(buf.data(), n);
+  }
+  return text;
+}
+
+constexpr int kPredInter = 2;
+constexpr int kPredSkip = 3;
+constexpr int kPredPcm = 5;
+constexpr int kTxNone = 0xFF;
+constexpr int kDmChroma = 36;  // HM's DM_CHROMA_IDX, kept raw by hm_cu_dump
+
+constexpr int kNeutralMvMax = 32767;
+
+bool is_mv(const std::string& name) {
+  return name.starts_with("mv");
+}
+
+// The value the plugin must report for cell i of field `name`, given the golden's raw readings (chapter 06 §6.3.1):
+// PCM luma mode 64; chroma DM resolved to the luma mode of the CU's first partition; no transform (0xFF) for skip,
+// PCM and inter CUs without a transform tree (rqt_root_cbf = 0, so cbf 0); MVs (already x4) clamped to ±32767
+// (chapter 06 §6.2.3).
+int expected_cell(const std::string& name, const nlohmann::json& want, const GridOut& got, std::size_t i) {
+  const auto w = [&](const char* f) { return want.at(f).at(i).get<int>(); };
+  if (name == "intra_mode_y") {
+    return w("pred") == kPredPcm ? 64 : w(name.c_str());
+  }
+  if (name == "intra_mode_c") {
+    const int c = w(name.c_str());
+    return c == kDmChroma ? want.at("intra_mode_y").at(got.cu_origin[i]).get<int>() : c;
+  }
+  if (is_mv(name)) {
+    return std::clamp(w(name.c_str()), -kNeutralMvMax, kNeutralMvMax);
+  }
+  if (name == "tx_log2_w" && got.fields.at(name)[i] == kTxNone) {
+    const int pred = w("pred");
+    if (pred == kPredSkip || pred == kPredPcm || (pred == kPredInter && w("cbf") == 0)) {
+      return kTxNone;
+    }
+  }
+  return w(name.c_str());
+}
+
+void check_grids(std::string_view id, const StreamResult& r) {
+  const auto golden =
+      nlohmann::json::parse(gunzip(std::filesystem::path(OVT_HM_GOLDEN_DIR) / (std::string(id) + ".hm-grid.json.gz")));
+  const auto& frames = golden.at("frames");
+  // The goldens hold the first decoded pictures of each stream, in decode order. Their "frame" counts decoded
+  // pictures only, while the plugin's decode index also counts the leading pictures HM skips, so the two are paired
+  // in order and checked by POC.
+  REQUIRE(!frames.empty());
+  REQUIRE(frames.size() <= r.actual.size());
+  auto it = r.actual.begin();
+  for (const nlohmann::json& g : frames) {
+    const auto& [idx, out] = *it++;
+    INFO(id << " golden frame " << g.at("frame").get<int>() << ", decode index " << idx);
+    REQUIRE(g.at("poc").get<int64_t>() == out.poc);
+    REQUIRE(out.grid != nullptr);
+    REQUIRE(g.at("w4") == out.grid->w4);
+    REQUIRE(g.at("h4") == out.grid->h4);
+    bool clamp_needed = false;
+    for (const auto& [name, values] : g.at("fields").items()) {
+      if (name == "tx_log2_h") {
+        continue;  // equal to tx_log2_w on both sides
+      }
+      REQUIRE(out.grid->fields.contains(name));
+      const std::vector<int>& got = out.grid->fields.at(name);
+      std::size_t bad = 0;
+      std::size_t first = 0;
+      int first_want = 0;
+      for (std::size_t i = 0; i < values.size(); ++i) {
+        clamp_needed = clamp_needed || (is_mv(name) && std::abs(values.at(i).get<int>()) > kNeutralMvMax);
+        const int want = expected_cell(name, g.at("fields"), *out.grid, i);
+        if (got[i] != want && bad++ == 0) {
+          first = i;
+          first_want = want;
+        }
+      }
+      INFO(id << " decode index " << idx << " field " << name << ": " << bad << " cells differ, first at cell " << first
+              << " (x4 " << first % out.grid->w4 << ", y4 " << first / out.grid->w4 << "): got "
+              << (bad == 0 ? 0 : got[first]) << ", want " << first_want);
+      CHECK(bad == 0);
+    }
+    // A clamp is reported once per frame with MDL-GEN-0003 (chapter 06 §6.2.3), and only then.
+    CHECK(out.grid->mv_clamp_reported == clamp_needed);
+  }
+}
+
+}  // namespace
+
+TEST_CASE("hm plugin: CellGrid matches hm_cu_dump on the hm-grid goldens", "[fast][third_party][needs-corpus]") {
+  for (const std::string_view id : kGridGoldens) {
+    const auto path = ovt::test::corpus_or_skip(id);
+    INFO(id);
+    const StreamResult r = run_stream(read_file(path), true);
+    CHECK(r.violations.empty());
+    check_grids(id, r);
+  }
+}
+
+TEST_CASE("hm plugin: caps and ABI table", "[fast][third_party]") {
+  const ovt_AnalysisDecoderApi& api = plugin_api();
+  CHECK(api.struct_size == sizeof(ovt_AnalysisDecoderApi));
+  CHECK(api.abi_version == OVT_ANALYSIS_ABI_VERSION);
+  const ovt_AnalysisCaps* caps = api.caps();
+  REQUIRE(caps != nullptr);
+  CHECK(caps->struct_size == sizeof(ovt_AnalysisCaps));
+  CHECK(caps->codec == 2);  // ovt.fb.Codec.H265
+  CHECK(std::string_view(caps->id) == "hm");
+  CHECK(std::string_view(caps->license) == "BSD-3-Clause");
+  CHECK(caps->plane_stages == kReconMask);
+  // Chapter 07 §7.6.4: every grid vector but bits_x8 and deblock bS; partition_id waits for PartitionInfo.
+  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_PARTITION_ID | OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
+  CHECK(caps->has_symbol_accounting == 0);
+  CHECK(caps->bit_exact == 1);
+  CHECK(caps->supports_threads == 0);
+}
+
+TEST_CASE("hm plugin: two instances decode interleaved", "[fast][third_party][needs-corpus]") {
+  // HM keeps its scan-order and z-scan tables in globals (decoder.cpp): two live instances, fed alternately, must
+  // both still match their hashes, and destroying one must leave the other's tables intact.
+  const std::filesystem::path a_path = ovt::test::corpus_or_skip("jctvc_WPP_A_ericsson_MAIN10_2");
+  const std::filesystem::path b_path = ovt::test::corpus_or_skip("jctvc_SAO_A_MediaTek_4");
+  const std::vector<uint8_t> a_bytes = read_file(a_path);
+  const std::vector<uint8_t> b_bytes = read_file(b_path);
+  const ovt_AnalysisDecoderApi& api = plugin_api();
+  StreamResult b_result;
+  {
+    Instance a(api);
+    REQUIRE(a.status == OVT_OK);
+    StreamFeeder fa(a, a_bytes);
+    {
+      Instance b(api);
+      REQUIRE(b.status == OVT_OK);
+      StreamFeeder fb(b, b_bytes);
+      while (!fb.done()) {
+        fb.step();
+        if (!fa.done()) {
+          fa.step();
+        }
+      }
+      b_result = fb.finish();
+    }  // b destroyed while a is mid-stream
+    while (!fa.done()) {
+      fa.step();
+    }
+    check_stream(fa.finish(), true);
+  }
+  check_stream(b_result, true);
 }

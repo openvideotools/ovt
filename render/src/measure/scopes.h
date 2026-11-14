@@ -1,15 +1,15 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Luminance waveform, vectorscope and CIE xy scopes of picture A (chapter 10 §10.7.6-§10.7.7, WI-4.454a): the
-// coordinate mappings (CPU reference of render/src/shaders/scopes.glsl) and ScopeSet, which accumulates the scopes from
-// the measurement texture M on the GPU and hands them to the host as ScopeTexture (§10.2.6) through the surface's
-// interop. The overlay point tables, the CIE 1931 locus and the ExportKind::Scope*Png export are WI-4.454b. Internal to
-// libovt-render; the CPU helpers are exported for the render tests.
+// Luminance waveform, vectorscope and CIE xy scopes of picture A (chapter 10 §10.7.6-§10.7.7, WI-4.454): the
+// coordinate mappings (CPU reference of render/src/shaders/scopes.glsl), the overlay point tables of gamut_tables.cpp,
+// and ScopeSet, which accumulates the scopes from the measurement texture M on the GPU and hands them to the host as
+// ScopeTexture (§10.2.6) through the surface's interop. Internal to libovt-render; the CPU helpers are exported for the
+// render tests.
 //
 // Texture content (SPEC-ASSUMPTION(#512)): ExternalTexture formats have no R32F, so each scope is an RGBA16F texture
 // holding log2(1 + count) per channel (R = G = B for a single-channel scope; R, G, B = the three parade channels) and
-// A = 1. The GUI's display LUT (§10.7.6) works on that value directly.
+// A = 1. The GUI's display LUT (§10.7.6) works on that value directly; export_png() normalises it to 8 bits.
 
 #ifndef OVT_RENDER_SRC_MEASURE_SCOPES_H
 #define OVT_RENDER_SRC_MEASURE_SCOPES_H
@@ -77,6 +77,23 @@ OVT_RENDER_API std::array<int, 2> scope_texel(double u, double v, int size);
 OVT_RENDER_API std::array<float, 9> rgb_to_xyz_rows(enum pl_color_primaries primaries);
 OVT_RENDER_API std::array<float, 9> rgb_to_bt2020_rows(enum pl_color_primaries primaries);
 
+// ---- §10.7.7 overlay tables (gamut_tables.cpp) ----------------------------------------------------------------------
+struct CbCr {
+  float cb;
+  float cr;
+};
+struct Chromaticity {
+  float x;
+  float y;
+};
+enum class Gamut : uint8_t { Bt709, P3D65, Bt2020 };
+// The 100 % primaries and secondaries R, Y, G, C, B, M of `gamut` as BT.2020 (Cb, Cr) of the PQ signal, with linear
+// 1.0 = 10 000 nits (12 values each). For Gamut::Bt2020 this is the colour-bar hexagon.
+OVT_RENDER_API const std::array<CbCr, 6>& vectorscope_targets(Gamut gamut);
+// The R, G, B primaries of `gamut` in CIE 1931 xy, and the D65 white point.
+OVT_RENDER_API const std::array<Chromaticity, 3>& gamut_primaries_xy(Gamut gamut);
+OVT_RENDER_API Chromaticity d65_white_xy();
+
 // ---- GPU accumulation (scopes.cpp) ----------------------------------------------------------------------------------
 // The scope textures of one surface: two sets, one per readback slot of the Measurer, so the textures measure() hands
 // out belong to the frame its numbers describe. Confined to the render thread.
@@ -101,8 +118,7 @@ class OVT_RENDER_API ScopeSet {
   // Whether `set` holds a completed accumulation, and its textures as the host sees them.
   [[nodiscard]] bool valid(int set) const;
   [[nodiscard]] ScopeTexture texture(int set, ScopeKind kind) const;
-  // The pl_tex behind a scope texture (for the readback of the tests and export_png); nullptr before the first run of
-  // `set`.
+  // The pl_tex behind a scope texture (for export_png and the tests); nullptr before the first run of `set`.
   [[nodiscard]] pl_tex tex(int set, ScopeKind kind) const;
 
  private:
@@ -127,6 +143,14 @@ OVT_RENDER_API bool hold_readbacks(VideoSurface& surface, bool hold);
 // rows top first). Returns false when there is none. Defined in render/src/surface/video_surface_impl.cpp.
 OVT_RENDER_API bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width,
                                    int& height);
+
+// ---- export (scopes.cpp) --------------------------------------------------------------------------------------------
+// The GUI-independent LUT of ExportKind::Scope*Png (§10.8): each channel of the RGBA16F scope texels (log2(1 + count))
+// scaled so that the largest value over the image is 255, rounded; RGB 8-bit, rows top first.
+OVT_RENDER_API std::vector<uint8_t> scope_png_rgb(const std::vector<uint16_t>& rgba16hf, int width, int height);
+// Writes 8-bit RGB as a PNG (colour type 2, stored deflate blocks, no zlib). Returns false when the file cannot be
+// written.
+OVT_RENDER_API bool write_png_rgb8(const char* path, const std::vector<uint8_t>& rgb, int width, int height);
 
 }  // namespace ovt::render::detail
 
