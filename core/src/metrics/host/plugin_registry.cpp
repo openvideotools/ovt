@@ -10,6 +10,7 @@
 #include "metrics/host/plugin_registry.h"
 
 #include "metrics/kernels/psnr_metric.h"
+#include "metrics/vmaf/vmaf_host.h"
 
 #include <dlfcn.h>
 
@@ -241,8 +242,9 @@ std::optional<std::vector<uint8_t>> validate_metric_api(const ovt_MetricApi* api
 PluginRegistry& PluginRegistry::instance() {
   // Never destroyed: plugins stay loaded (§12.3.11).
   static PluginRegistry* const registry = [] {
-    auto* r = new PluginRegistry();  // NOLINT(cppcoreguidelines-owning-memory)
-    register_builtin_kernels(*r);    // the in-tree kernel metrics (WI-3.306 onward)
+    auto* r = new PluginRegistry();         // NOLINT(cppcoreguidelines-owning-memory)
+    register_builtin_kernels(*r);           // the in-tree kernel metrics (WI-3.306 onward)
+    (void)vmaf::register_builtin_vmaf(*r);  // the libvmaf ids (WI-3.309)
     return r;
   }();
   return *registry;
