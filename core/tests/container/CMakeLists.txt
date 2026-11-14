@@ -10,6 +10,7 @@ add_executable(
   box_walk_test.cpp
   c_api_test.cpp
   ivf_test.cpp
+  m3u8_test.cpp
   mpd_test.cpp
   obu_test.cpp
   sniff_test.cpp

@@ -9,3 +9,4 @@ py7zr==1.1.4
 flatbuffers==25.12.19  # Python runtime for the generated ovt.fb modules (same version as the vcpkg port)
 numpy==2.2.1  # tools/gen_hdr_patterns.py (WI-1.413)
 scikit-image==0.25.0  # tools/imgdiff.py --mode ui SSIM (WI-0.568); pulls SciPy
+m3u8==6.0.0  # tools/ref_m3u8.py, the reference parse of the HLS playlist tests (WI-4.209; MIT)
