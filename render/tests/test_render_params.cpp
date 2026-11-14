@@ -255,12 +255,12 @@ TEST_CASE("render_test_render_params: gamut mapping per ViewState (§10.3.4)", "
     set.build(view, Encoding::Srgb8, true, pq_source(), target);
     CHECK(name_of(set.params().color_map_params->gamut_mapping) == name_of(row.fn));
   }
-  // §10.7.8: the gamut clip overlay is pl_gamut_map_highlight whatever gamut_map says.
+  // §10.7.8 (WI-4.453): the gamut-clip overlay is its own pass, not pl_gamut_map_highlight; gamut_map still applies.
   view.gamut_map = GamutMap::Perceptual;
   view.gamut_clip_overlay = true;
   struct pl_frame target = target_frame(t, Encoding::Srgb8);
   set.build(view, Encoding::Srgb8, true, pq_source(), target);
-  CHECK(name_of(set.params().color_map_params->gamut_mapping) == name_of(&pl_gamut_map_highlight));
+  CHECK(name_of(set.params().color_map_params->gamut_mapping) == name_of(&pl_gamut_map_perceptual));
 }
 
 TEST_CASE("render_test_render_params: dithering and filters (§10.3.5, §10.3.1)", "[fast][render]") {

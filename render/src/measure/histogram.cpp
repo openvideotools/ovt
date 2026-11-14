@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // §10.7.3 histogram (WI-4.452): 1024 PQ bins of max(R,G,B) over the pixels sampled at factor s, accumulated on the
-// GPU by render/src/shaders/accumulate.glsl, and the 99.99th-percentile MaxCLL derived from it on the CPU.
+// GPU by render/src/shaders/accumulate.glsl together with the band and gamut counts of WI-4.453, and the
+// 99.99th-percentile MaxCLL derived from it on the CPU.
 
 #include <algorithm>
 #include <array>
@@ -95,8 +96,12 @@ bool accumulate_histogram(pl_dispatch dp, pl_tex q, uint32_t s, pl_buf hist, std
   descs[1].desc.type = PL_DESC_BUF_STORAGE;
   descs[1].desc.access = PL_DESC_ACCESS_READWRITE;
   descs[1].binding.object = hist;
-  descs[1].buffer_vars = &bins;
-  descs[1].num_buffer_vars = 1;
+  std::array<struct pl_buffer_var, 2> bufvars = {bins, {}};
+  bufvars[1].var = pl_var_uint("ovt_counts");
+  bufvars[1].var.dim_a = static_cast<int>(kCounters);
+  bufvars[1].layout = pl_std430_layout(kHistogramBins * sizeof(uint32_t), &bufvars[1].var);
+  descs[1].buffer_vars = bufvars.data();
+  descs[1].num_buffer_vars = static_cast<int>(bufvars.size());
   std::array<struct pl_shader_var, 2> vars = {};
   vars[0].var = pl_var_int("ovt_step");
   vars[0].data = &step;

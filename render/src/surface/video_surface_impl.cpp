@@ -187,8 +187,17 @@ class VideoSurfaceImpl final : public VideoSurface {
     color.f[2] = static_cast<float>((bg >> 8U) & 0xFFU) / 255.0F;
     color.f[3] = static_cast<float>(bg & 0xFFU) / 255.0F;
     pl_tex_clear_ex(vk_->gpu, tex_, color);
+    measurer_.begin_render();
     if (slot_a_.valid) {
-      draw_slot_a(view);
+      // §10.7.5 / §10.7.8: the false-colour and gamut-clip views replace the picture. Without the measurement passes
+      // (measurer_.error() says why) the picture is drawn as usual.
+      const detail::AnalysisView mode = detail::analysis_view(view);
+      pl_tex analysis = mode != detail::AnalysisView::None ? measurer_.analysis_view(slot_a_, mode) : nullptr;
+      if (analysis != nullptr) {
+        draw_analysis(view, analysis);
+      } else {
+        draw_slot_a(view);
+      }
     }
     // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
     // being called.
@@ -281,6 +290,39 @@ class VideoSurfaceImpl final : public VideoSurface {
     target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
     params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
     if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
+      error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
+    }
+  }
+
+  // Draws an analysis view (§10.7.5, §10.7.8): an RGBA8 texture of the conformance window holding sRGB-encoded BT.709,
+  // presented as an SDR sRGB frame at the window's place in the viewport, with the ViewState filters but no dithering
+  // (the band colours are exact code values).
+  void draw_analysis(const ViewState& view, pl_tex analysis) {
+    struct pl_frame image = {};
+    image.num_planes = 1;
+    image.planes[0].texture = analysis;
+    image.planes[0].components = 3;
+    for (int c = 0; c < 3; ++c) {
+      image.planes[0].component_mapping[c] = c;
+    }
+    image.repr = pl_color_repr_rgb;
+    image.color = pl_color_space_srgb;
+    image.crop = pl_rect2df{0.0F, 0.0F, static_cast<float>(analysis->params.w), static_cast<float>(analysis->params.h)};
+
+    struct pl_frame target = {};
+    target.num_planes = 1;
+    target.planes[0].texture = tex_;
+    target.planes[0].components = 4;
+    for (int c = 0; c < 4; ++c) {
+      target.planes[0].component_mapping[c] = c;
+    }
+    const DisplayTarget::OutputEncoding encoding = detail::target_encoding(target_);
+    target.color = detail::target_color(target_, encoding);
+    target.crop = detail::target_rect(detail::source_rect(slot_a_, true), view, target_.width, target_.height);
+    params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
+    struct pl_render_params params = params_.params();
+    params.dither_params = nullptr;
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }

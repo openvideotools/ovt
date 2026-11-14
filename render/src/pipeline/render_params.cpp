@@ -186,8 +186,10 @@ void RenderParamSet::build(const ViewState& view, DisplayTarget::OutputEncoding 
       target.color.hdr.max_luma = source_peak(source);
       break;
   }
-  // §10.7.8: the gamut clip overlay is pl_gamut_map_highlight.
-  cmap_.gamut_mapping = view.gamut_clip_overlay ? &pl_gamut_map_highlight : gamut_function(view.gamut_map);
+  // The gamut-clip overlay is not pl_gamut_map_highlight (whose output depends on the target gamut) but its own
+  // target-independent pass (§10.7.8, WI-4.453, render/src/measure/false_color.cpp), so it leaves gamut_map alone.
+  // SPEC-ASSUMPTION(#490): §10.7.8 wins over the §10.3.4 sentence that names Highlight as the overlay.
+  cmap_.gamut_mapping = gamut_function(view.gamut_map);
   params_.color_map_params = &cmap_;
 
   // §10.3.5 dithering: blue noise at the target depth; never for float targets or with ViewState.dither off.
