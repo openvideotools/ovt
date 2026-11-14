@@ -838,7 +838,7 @@ ovt render clip.hevc --frame 0 --overlays F4 --plane y --out mv_overlay.png
 | `ovt/ovt.h` | includes every header below; nothing else | — |
 | `ovt/version.h` | `OVT_API_VERSION*`, `ovt_version*` | |
 | `ovt/status.h` | `ovt_status`, `ovt_status_string`, `ovt_Buffer`, `ovt_buffer_free` | |
-| `ovt/log.h` | `ovt_log_fn`, `ovt_set_logger`, `ovt_set_log_level` | |
+| `ovt/log.h` | `ovt_log_fn`, `ovt_set_logger`, `ovt_set_log_level`, `ovt_log_write` | |
 | `ovt/jobs.h` | `ovt_Job` | |
 | `ovt/io.h` | `ovt_File` | |
 | `ovt/container.h` | `ovt_Container` | |
@@ -910,6 +910,7 @@ const char* ovt_last_error_json(void);
 typedef void (*ovt_log_fn)(int level /*0 trace,1 debug,2 info,3 warn,4 error,5 fatal*/, const char* module, const char* msg /* starts with "[CODE] " when the line carries a diagnostic code */, void* user);
 void ovt_set_logger(ovt_log_fn, void* user);           /* §0.6.1 signature; NULL restores the default (silent) logger, chapter 04 FR-API-006 */
 void ovt_set_log_level(int level);                      /* clamped to 0..6; default OVT_LOG_WARN; messages below are not formatted at all (cheap) */
+void ovt_log_write(int level, const char* module, const char* code /*nullable*/, const char* msg);   /* additive (issue #209 item 4, ruling 2026-11-13): emits through the installed logger exactly as the core's own lines (§7.1.6 format); for separate shared libraries (libovt-render) and plugins that cannot call the hidden C++ ovt::log; no-op below the level */
 ```
 
 ### 12.3.5 `ovt/jobs.h`
@@ -955,7 +956,7 @@ void       ovt_file_close(ovt_File*);                   /* only after all contai
 typedef struct ovt_Container ovt_Container;
 ovt_status ovt_container_open(ovt_File*, ovt_Container** out);                 /* sniffs format; builds top-level tree lazily */
 ovt_status ovt_container_open_format(ovt_File*, const char* format /*"isobmff","ivf","annexb","obu","y4m","raw"; phase 4: "ts","mkv"*/,
-                                     const char* raw_format /*nullable; "1920x1080:yuv420p10le:30000/1001" (§12.1.5 grammar; required for "raw")*/,
+                                     const char* raw_format /*nullable; "1920x1080:yuv420p10le:30000/1001" (§12.1.5 grammar); for "raw" NULL runs the sidecar/heuristics resolution of chapter 08 §8.6.6 (OVT_E_INVALID_ARG + CNT-RAW-0002 when not exactly one candidate)*/,
                                      const char* codec_hint /*nullable "h264","h265","av1"*/, ovt_Container** out);
 ovt_status ovt_container_open_manifest(const char* url_or_path, const char* variant_selector /*nullable; "1" = Representation/variant index*/, ovt_Container** out);   /* phase 4, DASH MPD / HLS playlist (chapter 08 §8.6.9, WI-4.210) */
 const char* ovt_container_format(const ovt_Container*);

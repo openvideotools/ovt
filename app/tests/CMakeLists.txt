@@ -20,16 +20,19 @@ add_executable(
   models/test_project.cpp
   models/test_series_aggregator.cpp
   models/test_stream_index_model.cpp
+  models/test_timeline_viewport.cpp
   models/test_unit_list_model.cpp
   ../src/project.cpp
   models/test_keymap.cpp
   models/test_goto_parser.cpp
   models/test_dock_model.cpp
+  models/test_sample_streams.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
   ../src/goto_parser.cpp
   ../src/platform/platform.cpp
   ../src/models/jobs_model.cpp
+  ../src/models/sample_streams.cpp
   ../src/models/selection_model.cpp
   ../src/models/log_sink.cpp
   ../src/models/diagnostics_model.cpp
@@ -37,6 +40,8 @@ add_executable(
   ../src/models/frame_table.cpp
   ../src/models/stream_index_adapter.cpp
   ../src/models/stream_index_model.cpp
+  ../src/models/timeline_viewport.cpp
+  ../src/models/timeline_geometry.cpp
   ../src/models/unit_list_model.cpp
   ../src/dock/dock_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
@@ -50,7 +55,7 @@ qt_add_resources(
   FILES
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json"
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
-target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models)
+target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models .)
 target_link_libraries(
   ovt_tests_app_models
   PRIVATE Qt6::Core
@@ -70,6 +75,7 @@ ovt_catch_discover_tests(ovt_tests_app_models EXTRA_LABELS gui)
 # ---- QML: tst_main.qml runs against the same module as the application ---------------------------------------
 qt_add_executable(ovt_tests_app_qml MANUAL_FINALIZATION qml/tst_main.cpp)
 ovt_studio_add_qml_module(ovt_tests_app_qml)
+target_include_directories(ovt_tests_app_qml PRIVATE .)
 target_link_libraries(ovt_tests_app_qml PRIVATE Qt6::QuickTest)
 target_compile_definitions(ovt_tests_app_qml PRIVATE "QUICK_TEST_SOURCE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/qml\"")
 ovt_set_license(ovt_tests_app_qml "GPL-3.0-or-later")

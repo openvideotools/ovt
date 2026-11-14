@@ -3,6 +3,7 @@
 //
 // WI-4.101: the AV_FRAME_DATA_VIDEO_BLOCK_PARAMS export of the patched FFmpeg h264 decoder against the JM trace
 // goldens (tests/golden/h264/<id>.jm-trace.json.gz, chapter 14 §14.4.3), through ovt_plugin_ffmpeg_blockparams.
+// WI-4.102: the plugin's AvcMb tables (through the plugin ABI) against the same export and the same goldens.
 //
 // JM traces the syntax as signalled: the mb_type / sub_mb_type numbers of the slice type, intra4x4_pred_mode as
 // -1 (prev_intra4x4_pred_mode_flag) or rem_intra4x4_pred_mode, mvd_l0 in read order. The export carries the
@@ -24,6 +25,7 @@
 #include <string>
 #include <vector>
 
+#include "plugin_test_util.inc"
 #include "test_support/corpus.h"
 
 namespace {
@@ -422,6 +424,7 @@ struct Counts {
   int mvds = 0;
   int sub_mb_types = 0;
   int ref_idx = 0;
+  int inferred_ref_idx = 0;  // partitions whose ref_idx JM does not trace (one active reference): 0 (7.4.5.1)
   std::vector<std::string> bad;
 };
 
@@ -490,6 +493,9 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
     if (g.contains(ref_key)) {
       c.ref_idx += static_cast<int>(g.at(ref_key).size());
       expect_eq(c, where, ref_key.c_str(), expected_ref_idx(*m, list), g.at(ref_key));
+    } else if (const json refs = expected_ref_idx(*m, list); !refs.empty() && g.contains("mb_type")) {
+      c.inferred_ref_idx += static_cast<int>(refs.size());
+      expect_eq(c, where, (ref_key + " (inferred)").c_str(), refs, json(std::vector<int>(refs.size(), 0)));
     }
   }
   // The neighbour derivation of MBAFF pairs (6.4.12.2) is not modelled here, so MBAFF intra modes are not compared.
@@ -500,15 +506,8 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
   }
 }
 
-// AT1 (mb_type class, sub_mb_type and the other signalled fields against JM) and AT3 (frame threads).
-void compare_with_jm(const std::string& id) {
-  CAPTURE(id);
-  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
-  const std::string cmd = std::string("\"") + OVT_FFMPEG_BLOCKPARAMS + "\" \"" + path.string() + "\" ";
-  const std::string single = read_pipe(cmd + "1");
-  CHECK(read_pipe(cmd + "4") == single);  // AT3: frame threading exports the same side data
-
-  const std::vector<Frame> frames = parse_dump(single);
+// The macroblocks of @p frames (decoding order) against the JM golden of @p id.
+Counts check_against_jm(const std::string& id, const std::vector<Frame>& frames) {
   REQUIRE_FALSE(frames.empty());
   for (const Frame& f : frames) {
     REQUIRE(f.w > 0);  // every frame carries the side data
@@ -553,12 +552,255 @@ void compare_with_jm(const std::string& id) {
     }
   }
   INFO("macroblocks " << c.mbs << ", intra modes " << c.intra_modes << ", mvds " << c.mvds << ", sub_mb_types "
-                      << c.sub_mb_types << ", ref_idx " << c.ref_idx);
+                      << c.sub_mb_types << ", ref_idx " << c.ref_idx << " (+" << c.inferred_ref_idx << " inferred)");
   for (const std::string& b : c.bad) {
     UNSCOPED_INFO(b);
   }
   CHECK(c.bad.empty());
   CHECK(c.mbs > 0);
+  return c;
+}
+
+std::string blockparams_cmd(const std::filesystem::path& path) {
+  return std::string("\"") + OVT_FFMPEG_BLOCKPARAMS + "\" \"" + path.string() + "\" ";
+}
+
+// AT1 (mb_type class, sub_mb_type, ref_idx and the other signalled fields against JM) and AT3 (frame threads).
+// `needs_ref_idx`: the golden must hold signalled ref_idx values, so that they are compared at all.
+void compare_with_jm(const std::string& id, bool needs_ref_idx = false) {
+  CAPTURE(id);
+  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  const std::string cmd = blockparams_cmd(path);
+  const std::string single = read_pipe(cmd + "1");
+  CHECK(read_pipe(cmd + "4") == single);  // AT3: frame threading exports the same side data
+  const Counts c = check_against_jm(id, parse_dump(single));
+  if (needs_ref_idx) {
+    CHECK(c.ref_idx > 0);
+  }
+}
+
+// ---- WI-4.102: the plugin's AvcMb ---------------------------------------------------------------------------------
+
+// Unified AvcMbType -> the export's mb_type_class: I_NxN 0, I_16x16 1..24, I_PCM 25, P 26..30, B 31..53 (Table
+// 7-14 raw + 31), P_Skip 54, B_Skip 55.
+int class_of(int t) {
+  if (t >= 31 && t <= 53) {
+    const int raw = t - 31;
+    return raw == 0 ? 8 : raw <= 3 ? 9 : raw == 22 ? 12 : (raw % 2 == 0 ? 10 : 11);
+  }
+  if (t >= 1 && t <= 24) {
+    return 1;
+  }
+  if (t >= 26 && t <= 30) {
+    return std::min(t - 23, 6);  // P_L0_16x16 3 .. P_8x8 6; P_8x8ref0 (30) reads as P_8x8
+  }
+  static const std::map<int, int> kOther = {{0, 0}, {25, 2}, {54, 7}, {55, 13}};
+  const auto it = kOther.find(t);
+  return it != kOther.end() ? it->second : -1;
+}
+
+// AvcSubMbType -> the export's shape bits (0 8x8, 1 8x4, 2 4x8, 3 4x4) + 0x10 direct.
+int sub_bits(int cls, int s) {
+  if (cls == 6) {
+    return s;
+  }
+  return s == 4 ? 0x10 : s <= 7 ? 0 : s <= 13 ? (s % 2 == 0 ? 1 : 2) : 3;
+}
+
+template <typename V>
+int get_at(const V* v, size_t i, int none) {
+  return v != nullptr && i < v->size() ? static_cast<int>(v->Get(static_cast<flatbuffers::uoffset_t>(i))) : none;
+}
+
+// The per-partition and per-4x4 vectors of AvcMb, in the export's terms.
+void partitions_from_avc(const ovt::fb::AvcMb& e, Mb* out) {
+  Mb& m = *out;
+  const auto get = [](const auto* v, size_t i, int none) { return get_at(v, i, none); };
+  for (size_t k = 0; k < 4; ++k) {
+    const int s = get(e.sub_mb_type(), k, 0);
+    m.sub.at(k) = sub_bits(m.cls, s);
+    m.dir.at(k) = get(e.pred_flag(), 4 * k, 0);
+    m.ref.at(0).at(k) = get(e.ref_idx_l0(), k, -1);
+    m.ref.at(1).at(k) = get(e.ref_idx_l1(), k, -1);
+    m.i8.at(k) = get(e.intra8x8_pred_mode(), k, -1);
+  }
+  for (size_t i = 0; i < 16; ++i) {
+    m.i4.at(i) = get(e.intra4x4_pred_mode(), i, -1);
+    const std::array<const flatbuffers::Vector<int16_t>*, 4> mvd = {e.mvd_l0_x(), e.mvd_l0_y(), e.mvd_l1_x(),
+                                                                    e.mvd_l1_y()};
+    for (size_t v = 0; v < 4; ++v) {
+      const int d = get(mvd.at(v), i, -32768);
+      m.mvd.at(v / 2).at(i).at(v % 2) = d == -32768 ? 0 : d;
+    }
+  }
+}
+
+// The export's record of one macroblock rebuilt from the plugin's AvcMb (chapter 06 §6.4 sentinels -> the export's
+// zeros), so that the WI-4.101 comparison applies unchanged.
+Mb mb_from_avc(const ovt::fb::Block& b, const ovt::fb::AvcMb& e) {
+  Mb m;
+  m.x = b.rect()->x() / 16;
+  m.y = b.rect()->y() / 16;
+  const int t = static_cast<int>(e.mb_type());
+  if (t == 255) {
+    return m;  // cls 255: not decoded
+  }
+  m.cls = class_of(t);
+  m.slice = e.slice_index();
+  partitions_from_avc(e, &m);
+  const auto or_zero = [](int v) { return v == 255 ? 0 : v; };
+  m.i16 = e.Intra16x16PredMode() == ovt::fb::AvcIntra16x16PredMode::AvcIntra16x16_Unknown
+              ? -1
+              : static_cast<int>(e.Intra16x16PredMode());
+  m.chroma = e.intra_chroma_pred_mode() == ovt::fb::AvcIntraChromaPredMode::AvcIntraChroma_Unknown
+                 ? -1
+                 : static_cast<int>(e.intra_chroma_pred_mode());
+  m.cbp = or_zero(e.coded_block_pattern());
+  m.t8 = or_zero(e.transform_size_8x8_flag());
+  m.field = or_zero(e.mb_field_decoding_flag());
+  m.qpd = e.mb_qp_delta();  // NOLINT(bugprone-signed-char-misuse,cert-str34-c): a number, not a character
+  return m;
+}
+
+bool uses_list(const Mb& m, size_t k, size_t l) {
+  return (m.dir.at(k) & (1 << static_cast<int>(l))) != 0;
+}
+
+// The inter fields of an export record: directions, ref_idx and the signalled mvds.
+void inter_view(const Mb& m, bool skip, json* out) {
+  json dirs = json::array();
+  json refs = json::array();
+  for (size_t k = 0; k < 4; ++k) {
+    dirs.push_back(m.dir.at(k));
+    for (size_t l = 0; l < 2; ++l) {
+      refs.push_back(uses_list(m, k, l) ? m.ref.at(l).at(k) : -1);
+    }
+  }
+  (*out)["dir"] = dirs;
+  (*out)["ref"] = refs;
+  json mvds = json::array();
+  for (size_t l = 0; l < 2; ++l) {
+    for (size_t i = 0; i < 16; ++i) {
+      const size_t k = i / 4;
+      const bool direct = m.cls == 8 || (m.cls == 12 && (m.sub.at(k) & 0x10) != 0);
+      const bool signalled = uses_list(m, k, l) && !skip && !direct;
+      mvds.push_back(signalled ? json::array({m.mvd.at(l).at(i)[0], m.mvd.at(l).at(i)[1]}) : json(nullptr));
+    }
+  }
+  (*out)["mvd"] = mvds;
+}
+
+// The fields of an export record that AvcMb carries, with what AvcMb leaves out (n/a) zeroed, for an exact comparison.
+json avc_view(const Mb& m) {
+  const bool inter = m.cls >= 3 && m.cls <= 13;
+  const bool skip = m.cls == 7 || m.cls == 13;
+  if (m.cls == 255) {
+    return {{"cls", m.cls}};  // not decoded: the other fields are unspecified
+  }
+  json j = {{"cls", m.cls}, {"slice", m.slice}, {"qpd", m.qpd}};
+  if (m.cls == 6 || m.cls == 12) {
+    j["sub"] = m.sub;
+  }
+  if (inter) {
+    inter_view(m, skip, &j);
+  }
+  if (m.cls == 0) {
+    j[m.t8 != 0 ? "i8" : "i4"] = m.t8 != 0 ? json(m.i8) : json(m.i4);
+  }
+  if (m.cls == 1) {
+    j["i16"] = m.i16;
+  }
+  if (m.cls <= 1) {
+    j["chroma"] = m.chroma;
+  }
+  if (m.cls != 2 && !skip) {
+    j["cbp"] = m.cbp;
+  }
+  if (m.cls != 1 && m.cls != 2 && !skip) {
+    j["t8"] = m.t8;
+  }
+  return j;
+}
+
+// The frames the plugin reports for @p path (decoding order), checking on the way that every reference of the grid
+// and of each vector names the slot "L<list>[ref_idx]" of the AvcMb of its 8x8 (acceptance test 2's slot part).
+std::vector<Frame> frames_from_plugin(const std::filesystem::path& path, int threads, int* checked_refs) {
+  std::vector<Frame> frames;
+  ovt_ffmpeg_test::for_each_frame(ovt_ffmpeg_test::read_file(path), threads, [&](const ovt::fb::FrameAnalysis* fa) {
+    Frame f;
+    f.idx = fa->frame()->id()->decode_index();
+    f.w = fa->frame()->coded_size()->w() / 16;
+    f.h = fa->frame()->coded_size()->h() / 16;
+    const auto* blocks = fa->blocks();
+    REQUIRE(blocks != nullptr);
+    std::vector<std::string> names;
+    for (const ovt::fb::RefSlot* r : *fa->refs()) {
+      names.push_back(r->name()->str());
+    }
+    for (uint32_t i = 1; i < blocks->size(); ++i) {
+      const ovt::fb::Block* b = blocks->Get(i);
+      REQUIRE(b->ext() != nullptr);
+      f.mbs.push_back(mb_from_avc(*b, *flatbuffers::GetRoot<ovt::fb::AvcMb>(b->ext()->data())));
+    }
+    const ovt::fb::CellGrid* g = fa->grid();
+    const uint32_t cells_w = g->cells_w();
+    size_t bad = 0;
+    for (const auto& [vec, list] : {std::pair{g->ref0(), 0}, std::pair{g->ref1(), 1}}) {
+      for (uint32_t c = 0; vec != nullptr && c < vec->size(); ++c) {
+        if (vec->Get(c) < 0) {
+          continue;
+        }
+        const size_t cx = c % cells_w;
+        const size_t cy = c / cells_w;
+        const Mb& m = f.mbs.at(((cy / 4) * static_cast<size_t>(f.w)) + (cx / 4));
+        const size_t part8 = (((cy % 4) / 2) * 2) + ((cx % 4) / 2);
+        const std::string want = std::string(list == 0 ? "L0[" : "L1[") +
+                                 std::to_string(m.ref.at(static_cast<size_t>(list)).at(part8)) + "]";
+        const size_t slot = static_cast<uint8_t>(vec->Get(c));  // >= 0 above
+        if ((slot >= names.size() || names[slot] != want) && bad++ == 0) {
+          UNSCOPED_INFO("frame " << f.idx << " cell " << cx << "," << cy << " list " << list << ": slot " << slot
+                                 << (slot < names.size() ? " " + names[slot] : std::string(" (none)"))
+                                 << ", AvcMb ref_idx " << want << ", class " << m.cls);
+        }
+        ++*checked_refs;
+      }
+    }
+    CHECK(bad == 0);
+    frames.push_back(std::move(f));
+  });
+  std::stable_sort(frames.begin(), frames.end(), [](const Frame& a, const Frame& b) { return a.idx < b.idx; });
+  return frames;
+}
+
+// WI-4.102 AT1 / AT2 and step 4: the plugin's AvcMb equals the export (all fields AvcMb defines) and passes the JM
+// comparison of WI-4.101; at 1 and 4 (slice) threads.
+Counts compare_plugin_with_jm(const std::string& id) {
+  CAPTURE(id);
+  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  const std::vector<Frame> oracle = parse_dump(read_pipe(blockparams_cmd(path) + "1"));
+  int checked_refs = 0;
+  const std::vector<Frame> frames = frames_from_plugin(path, 1, &checked_refs);
+  REQUIRE(frames.size() == oracle.size());
+  size_t differing = 0;
+  std::string first;
+  for (size_t k = 0; k < frames.size(); ++k) {
+    REQUIRE(frames[k].mbs.size() == oracle[k].mbs.size());
+    for (size_t i = 0; i < frames[k].mbs.size(); ++i) {
+      const json got = avc_view(frames[k].mbs[i]);
+      const json want = avc_view(oracle[k].mbs[i]);
+      if (got != want && differing++ == 0) {
+        first = "frame " + std::to_string(k) + " mb " + std::to_string(i) + ": AvcMb " + got.dump() + ", export " +
+                want.dump();
+      }
+    }
+  }
+  INFO(first);
+  CHECK(differing == 0);
+  int refs4 = 0;
+  const std::vector<Frame> threaded = frames_from_plugin(path, 4, &refs4);
+  CHECK(refs4 == checked_refs);
+  CHECK(threaded.size() == frames.size());
+  return check_against_jm(id, frames);
 }
 
 }  // namespace
@@ -662,12 +904,41 @@ TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm", "[fast][third_party][needs-cor
                            "jvt_MR1_BT_A", "jvt_MR6_BT_B", "jvt_MR9_BT_B", "jvt_NRF_MW_E", "jvt_aud_mw_e"));
 }
 
+TEST_CASE("ffmpeg plugin: AvcMb intra 4x4 modes of CI1_FT_B equal JM's", "[fast][third_party][needs-corpus]") {
+  // WI-4.102 AT1: CABAC intra; every I_NxN macroblock's intra4x4_pred_mode[16] turns back into JM's signalled form.
+  const Counts c = compare_plugin_with_jm("jvt_CI1_FT_B");
+  CHECK(c.intra_modes > 0);
+}
+
+TEST_CASE("ffmpeg plugin: AvcMb ref_idx_l0 of CVSE3_Sony_H names JM's references",
+          "[fast][third_party][needs-corpus]") {
+  // WI-4.102 AT2: every partition's ref_idx_l0 equals JM's (signalled, or 0 with one active reference), and the grid's
+  // ref0 names the slot "L0[ref_idx_l0]". SPEC-ASSUMPTION(#395): resolving the slots to POCs through RefPicList0 is the
+  // host's DPB model (§7.5.3 A6, issue #253), so the POC half of AT2 waits for it.
+  const Counts c = compare_plugin_with_jm("jvt_CVSE3_Sony_H");
+  CHECK(c.ref_idx + c.inferred_ref_idx > 0);
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_avcmb_vs_jm", "[fast][third_party][needs-corpus]") {
+  // WI-4.102 step 4 on the JVT streams with a JM golden (the two above have their own cases).
+  compare_plugin_with_jm(GENERATE(as<std::string>{}, "jvt_BA1_Sony_D", "jvt_BA_MW_D", "jvt_CABA1_SVA_B",
+                                  "jvt_CVPCMNL1_SVA_C", "jvt_CVSE2_Sony_B", "jvt_CVWP1_TOSHIBA_E",
+                                  "jvt_FRExt1_Panasonic_D", "jvt_HCAFF1_HHI_B", "jvt_Hi422FR1_SONY_A", "jvt_MIDR_MW_D",
+                                  "jvt_MR1_BT_A", "jvt_MR6_BT_B", "jvt_MR9_BT_B", "jvt_NRF_MW_E", "jvt_aud_mw_e"));
+}
+
 TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm on CAMA1_Sony_C", "[slow][third_party][needs-corpus]") {
-  // Acceptance test 1 names this MBAFF stream; its JM golden is not committed yet (docs/acceptance/wi/WI-4.101.md has
-  // the oracle-image commands that make it).
-  const std::string id = "jvt_CAMA1_Sony_C";
+  // The MBAFF stream acceptance test 1 names. Its 5 frames are all intra, so this compares the macroblock-level
+  // fields (mb_type, cbp, mb_qp_delta, chroma mode, transform size, field flag) only; ref_idx is the next case.
+  compare_with_jm("jvt_CAMA1_Sony_C");
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F", "[slow][third_party][needs-corpus]") {
+  // Acceptance test 1's ref_idx: an MBAFF + PAFF CABAC stream with P and B pictures and several references, whose
+  // traced pictures signal ref_idx. Its JM golden comes from the oracle image (docs/acceptance/wi/WI-4.101.md).
+  const std::string id = "jvt_CAPAMA3_Sand_F";
   if (!std::filesystem::exists(std::filesystem::path(OVT_JM_GOLDEN_DIR) / (id + ".jm-trace.json.gz"))) {
     SKIP("no JM golden for " << id);
   }
-  compare_with_jm(id);
+  compare_with_jm(id, true);
 }

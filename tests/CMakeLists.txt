@@ -19,6 +19,13 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME tools_pytest COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
                                        "${PROJECT_SOURCE_DIR}/tools/tests" WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_tests_properties(tools_pytest PROPERTIES LABELS "fast;tools")
+    if(OVT_FLATC_EXECUTABLE)
+      # tools/tests/test_check_schema_compat.py runs the flatc of the build (vcpkg host port), which is not on PATH;
+      # without this its three flatc tests skip.
+      get_filename_component(_ovt_flatc_dir "${OVT_FLATC_EXECUTABLE}" DIRECTORY)
+      set_tests_properties(tools_pytest PROPERTIES ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${_ovt_flatc_dir}")
+      unset(_ovt_flatc_dir)
+    endif()
   else()
     message(STATUS "pytest not found for ${Python3_EXECUTABLE}: tools/tests not registered "
                    "(pip install -r tools/requirements-test.txt)")

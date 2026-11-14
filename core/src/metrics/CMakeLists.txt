@@ -16,8 +16,24 @@ configure_file(normalize/normalization_schema.inc.in "${OVT_GENERATED_DIR}/metri
 unset(_ovt_norm_schema)
 unset(OVT_NORMALIZATION_SCHEMA_TEXT)
 
-target_sources(ovt_core_objects PRIVATE host/c_api.cpp host/metric_job.cpp host/plugin_registry.cpp jobspec_json.cpp
-                                        normalize/normalization_config.cpp)
+target_sources(
+  ovt_core_objects
+  PRIVATE host/c_api.cpp
+          host/metric_job.cpp
+          host/plugin_registry.cpp
+          jobspec_json.cpp
+          kernels/psnr_hwy.cpp
+          kernels/psnr_metric.cpp
+          kernels/psnr_scalar.cpp
+          kernels/ssim_hwy.cpp
+          kernels/ssim_metric.cpp
+          kernels/ssim_scalar.cpp
+          normalize/normalization_config.cpp)
+# The ssim kernels promise bit-identical scalar and SIMD results: no fused multiply-add (WI-3.307).
+set_source_files_properties(kernels/ssim_hwy.cpp kernels/ssim_scalar.cpp TARGET_DIRECTORY ovt_core_objects
+                            PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+# Google Highway (Apache-2.0, vcpkg port highway, found in core/CMakeLists.txt) for the SIMD kernels (WI-3.306).
+target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${hwy_TARGET}>")
 # nlohmann_json (the module headers expose nlohmann::json in their signatures, core-objects rule 1, #62) and
 # the JSON Schema validator (WI-3.300 step 5; vcpkg port json-schema-validator, MIT). Both found by
 # core/CMakeLists.txt; BUILD_INTERFACE keeps them out of the export set.

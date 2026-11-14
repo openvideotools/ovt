@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <memory>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "ovt_model_generated.h"
@@ -151,6 +152,24 @@ inline const std::vector<RuleMutation>& rule_mutations() {
          symbol->count = 1;
          fa.symbols.push_back(std::move(symbol));
        }},
+      {"V-025", Fixture::H264_32, "first two motion vectors swapped",
+       [](fb::FrameAnalysisT& fa) { std::swap(fa.mvs[0], fa.mvs[1]); }},
+      {"V-026", Fixture::H264_32, "intra cell referencing L0[0] (usage_cells kept consistent)",
+       [](fb::FrameAnalysisT& fa) {
+         fa.grid->ref0[0] = 0;
+         fa.refs[0]->usage_cells += 1;
+       }},
+      {"V-027", Fixture::Hevc16, "cbf 9", [](fb::FrameAnalysisT& fa) { fa.grid->cbf[0] = 9; }},
+      {"V-028", Fixture::Hevc16, "qp_hist bin 0 counts a phantom cell",
+       [](fb::FrameAnalysisT& fa) { fa.qp_hist[0] = 1; }},
+      {"V-029", Fixture::Hevc16, "diagnostic code without family",
+       [](fb::FrameAnalysisT& fa) {
+         auto diag = std::make_unique<fb::DiagnosticT>();
+         diag->severity = fb::Severity::Info;
+         diag->code = "OOPS-1";
+         diag->message = "malformed code";
+         fa.diagnostics.push_back(std::move(diag));
+       }},
       // Extra rows: the codec-specific branches of rules already covered above.
       {"V-014", Fixture::Av1_64, "AV1 refs[0] not named INTRA",
        [](fb::FrameAnalysisT& fa) { fa.refs[0]->name = "LAST0"; }},
@@ -164,6 +183,76 @@ inline const std::vector<RuleMutation>& rule_mutations() {
        }},
       {"V-023", Fixture::Av1_64, "blob_id names another stream",
        [](fb::FrameAnalysisT& fa) { fa.planes[1]->blob_id[0] = '7'; }},
+  };
+  return rows;
+}
+
+// ---- StreamIndex (V-031) -------------------------------------------------------------------------------------
+
+using IndexMutator = void (*)(fb::StreamIndexT&);
+
+/// A small consistent StreamIndex: 3 frames in decode order with display order 0, 2, 1, two units each (a
+/// parameter set or AUD, then the slice), the first unit listed as a parameter set.
+inline fb::StreamIndexT tiny_stream_index() {
+  fb::StreamIndexT si;
+  si.codec = fb::Codec::H265;
+  si.schema_version = 1;
+  constexpr std::array<std::int32_t, 3> kDisplay{0, 2, 1};
+  std::uint64_t offset = 0;
+  for (std::uint32_t u = 0; u < 6; ++u) {
+    auto unit = std::make_unique<fb::UnitT>();
+    unit->index = u;
+    unit->prefix_span = std::make_unique<fb::ByteSpan>(offset, 4U);
+    unit->file_span = std::make_unique<fb::ByteSpan>(offset + 4, 10U + u);
+    offset += 14U + u;
+    unit->frame = std::make_unique<fb::FrameId>(static_cast<std::int32_t>(u / 2), kDisplay.at(u / 2));
+    si.units.push_back(std::move(unit));
+  }
+  for (std::uint32_t f = 0; f < 3; ++f) {
+    auto frame = std::make_unique<fb::FrameInfoT>();
+    frame->id = std::make_unique<fb::FrameId>(static_cast<std::int32_t>(f), kDisplay.at(f));
+    frame->units = {2 * f, (2 * f) + 1};
+    frame->size_bytes = 28U + (4U * f) + 1U;  // (4 + 10 + 2f) + (4 + 10 + 2f + 1)
+    if (f > 0) {
+      frame->declared_refs = {0};
+    }
+    si.frames.push_back(std::move(frame));
+  }
+  si.display_order = {0, 2, 1};
+  auto ps = std::make_unique<fb::UnitT>();
+  ps->index = 0;
+  si.parameter_sets.push_back(std::move(ps));
+  return si;
+}
+
+inline Bytes pack_index(const fb::StreamIndexT& si) {
+  flatbuffers::FlatBufferBuilder builder;
+  builder.Finish(fb::StreamIndex::Pack(builder, &si), "OVTI");
+  return {builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize()};
+}
+
+struct IndexMutation {
+  std::string_view rule;
+  std::string_view what;
+  IndexMutator mutate;
+};
+
+inline const std::vector<IndexMutation>& index_mutations() {
+  static const std::vector<IndexMutation> rows{
+      {"V-001", "schema_version 2", [](fb::StreamIndexT& si) { si.schema_version = 2; }},
+      {"V-029", "diagnostic without message",
+       [](fb::StreamIndexT& si) {
+         auto diag = std::make_unique<fb::DiagnosticT>();
+         diag->code = "SYN-H265-0007";
+         si.diagnostics.push_back(std::move(diag));
+       }},
+      {"V-031", "unit index gap", [](fb::StreamIndexT& si) { si.units[3]->index = 7; }},
+      {"V-031", "display_order swapped",
+       [](fb::StreamIndexT& si) { std::swap(si.display_order[1], si.display_order[2]); }},
+      {"V-031", "size_bytes off by one", [](fb::StreamIndexT& si) { si.frames[1]->size_bytes += 1; }},
+      {"V-031", "frame lists another frame's unit", [](fb::StreamIndexT& si) { si.frames[2]->units[0] = 0; }},
+      {"V-031", "declared ref names the frame itself", [](fb::StreamIndexT& si) { si.frames[1]->declared_refs = {1}; }},
+      {"V-031", "parameter set outside units", [](fb::StreamIndexT& si) { si.parameter_sets[0]->index = 6; }},
   };
   return rows;
 }

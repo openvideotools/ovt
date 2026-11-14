@@ -60,6 +60,19 @@ std::vector<SeriesColumn> StreamIndexModel::columns(const SeriesRef& series, std
   return table_.aggregator(series).columns(first, last, width);
 }
 
+int StreamIndexModel::decodeIndexAt(int position) const {
+  return position < 0 ? -1 : table_.decode_index_at(static_cast<std::size_t>(position));
+}
+
+int StreamIndexModel::displayIndexOf(int decode_index) const {
+  return table_.display_index_of(decode_index);
+}
+
+int StreamIndexModel::positionOf(int decode_index) const {
+  const auto position = table_.position_of(decode_index);
+  return position ? static_cast<int>(*position) : -1;
+}
+
 void StreamIndexModel::setRange(int first, int last) {
   if (table_.size() == 0) {
     return;

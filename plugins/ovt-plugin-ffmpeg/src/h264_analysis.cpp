@@ -222,6 +222,11 @@ ovt_status H264Analysis::create(Codec codec_id, const uint8_t* codec_private, si
   }
   AVCodecContext* ctx = dec->ctx_;
   ctx->export_side_data = AV_CODEC_EXPORT_DATA_MVS | AV_CODEC_EXPORT_DATA_VIDEO_ENC_PARAMS;
+#ifdef AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS
+  if (!hevc) {
+    ctx->export_side_data |= AV_CODEC_EXPORT_DATA_VIDEO_BLOCK_PARAMS;  // the OVT FFmpeg patch 0001 (WI-4.102)
+  }
+#endif
   ctx->thread_count = std::max(threads, 1);
   // SPEC-ASSUMPTION(#302): slice threads only. With FF_THREAD_FRAME the exported motion vectors and QPs differ from a
   // single-threaded decode and from run to run (libavcodec 6.1.1), so §7.6.3's "frame threading is fine" does not hold.
@@ -373,6 +378,9 @@ ovt_status H264Analysis::receive_all() {
     }
     p.info.side = codec_ == Codec::H265 ? map_hevc_sidedata(frame_, &pending_diags_)
                                         : map_h264_sidedata(frame_, p.info.bit_depth_luma, &pending_diags_);
+    if (codec_ == Codec::H264) {
+      p.info.blocks = map_h264_blockparams(frame_, p.info.bit_depth_chroma, &p.info.side, &pending_diags_);
+    }
     p.info.diagnostics = std::move(pending_diags_);
     pending_diags_.clear();
     p.frame.reset(av_frame_alloc());

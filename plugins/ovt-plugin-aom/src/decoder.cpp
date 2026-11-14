@@ -6,6 +6,7 @@
 #include "decoder.hpp"
 
 #include <aom/aom_decoder.h>
+#include <aom/aom_frame_buffer.h>
 #include <aom/aom_image.h>
 #include <aom/aomdx.h>
 
@@ -17,7 +18,6 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <span>
 #include <string>
@@ -93,25 +93,6 @@ uint8_t chroma_format_of(aom_img_fmt_t fmt, bool monochrome) {
     default:
       return 1;
   }
-}
-
-// Copies the visible part of plane @p p of @p img (d_w × d_h luma; chroma rounded up by the subsampling).
-Plane copy_plane(const aom_image_t& img, int p) {
-  Plane out;
-  out.sample_bytes = (static_cast<unsigned>(img.fmt) & AOM_IMG_FMT_HIGHBITDEPTH) != 0 ? 2 : 1;
-  out.bit_depth = static_cast<uint8_t>(img.bit_depth);
-  const unsigned sx = p == 0 ? 0 : img.x_chroma_shift;
-  const unsigned sy = p == 0 ? 0 : img.y_chroma_shift;
-  out.width = (img.d_w + sx) >> sx;
-  out.height = (img.d_h + sy) >> sy;
-  const size_t row = size_t{out.width} * out.sample_bytes;
-  const auto stride = static_cast<size_t>(img.stride[p]);
-  out.data.resize(row * out.height);
-  const std::span<const uint8_t> src(img.planes[p], stride * (out.height - 1) + row);
-  for (uint32_t y = 0; y < out.height; ++y) {
-    std::memcpy(std::span<uint8_t>(out.data).subspan(row * y).data(), src.subspan(stride * y).data(), row);
-  }
-  return out;
 }
 
 // Copies the inspection MI grid and the frame-header values the block mapping needs (chapter 07 §7.6.1). Runs inside
@@ -196,6 +177,11 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
     d.cdef_strengths.assign(y.begin(), y.end());
     d.cdef_uv_strengths.assign(uv.begin(), uv.end());
   }
+  // Super-resolution (AV1 §5.9.8): cm.width is FrameWidth, the coded (downscaled) width the MI grid covers; by the
+  // time the callback runs, superres_post_decode() has upscaled the frame buffer to superres_upscaled_width.
+  d.superres_denom = cm.superres_scale_denominator;
+  d.frame_width = cm.width;
+  d.upscaled_width = cm.superres_upscaled_width;
   d.base_qindex = fd.base_qindex;
   d.delta_q_present = fd.delta_q_present_flag != 0;
   d.delta_q_res = fd.delta_q_res;
@@ -207,6 +193,7 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
 }  // namespace
 
 struct Decoder::Impl {
+  FramePool pool;  // libaom's frame buffers (planes.hpp); must outlive ctx, which releases them in its destroy
   aom_codec_ctx_t ctx{};
   bool open = false;
   insp_frame_data fd{};
@@ -216,6 +203,7 @@ struct Decoder::Impl {
   int frame_type = -1;
   bool show_frame = false;
   int base_qindex = 0;
+  bool apply_grain = false;
   bool monochrome = false;  // sequence-level, from the last output image
   BlockData blocks;         // filled by the callback
 
@@ -235,7 +223,8 @@ struct Decoder::Impl {
 
   // The Frame of the frame the last aom_codec_decode() call handled with the callback: frame-level fields from
   // the callback, sizes and format from codec queries (after the call, never from inside the callback), and the
-  // planes of the image it showed, which are valid only until the next aom_codec_decode().
+  // image it showed. libaom reuses that image's frame buffer once it has released it, at the next
+  // aom_codec_decode() at the latest, so the Picture holds the buffer (FramePool) instead of copying the samples.
   Frame take_frame(int32_t decode_index, int64_t pts) {
     Frame f;
     f.decode_index = decode_index;
@@ -243,6 +232,7 @@ struct Decoder::Impl {
     f.frame_type = fb_frame_type(frame_type);
     f.shown = show_frame;
     f.qp_base = static_cast<int16_t>(base_qindex);
+    f.apply_grain = apply_grain;
     std::array<int, 2> size{};
     if (aom_codec_control(&ctx, AV1D_GET_FRAME_SIZE, size.data()) == AOM_CODEC_OK) {
       f.coded_w = size[0];
@@ -261,13 +251,11 @@ struct Decoder::Impl {
     const bool have_fmt = aom_codec_control(&ctx, AV1D_GET_IMG_FORMAT, &fmt) == AOM_CODEC_OK;
     aom_codec_iter_t iter = nullptr;
     while (const aom_image_t* img = aom_codec_get_frame(&ctx, &iter)) {
-      if (!f.shown || !f.planes[0].data.empty()) {
+      if (!f.shown || !f.recon.empty()) {
         continue;
       }
       monochrome = img->monochrome != 0;
-      for (int p = 0; p < (monochrome ? 1 : 3); ++p) {
-        f.planes.at(static_cast<size_t>(p)) = copy_plane(*img, p);
-      }
+      f.recon = pool.retain(*img);
     }
     f.chroma_format = have_fmt ? chroma_format_of(fmt, monochrome) : 1;
     f.blocks = std::move(blocks);
@@ -290,7 +278,11 @@ struct Decoder::Impl {
     self->frame_type = self->fd.frame_type;
     self->show_frame = self->fd.show_frame != 0;
     self->base_qindex = self->fd.base_qindex;
-    copy_blocks(self->fd, *static_cast<const AV1Decoder*>(decoder), &self->blocks);
+    // read_film_grain_params() leaves the frame's parameters in cm.film_grain_params (zeroed when the sequence
+    // has none). Read here: decoder_get_frame() clears apply_grain in the output frame when grain is skipped.
+    const auto* pbi = static_cast<const AV1Decoder*>(decoder);
+    self->apply_grain = pbi->common.film_grain_params.apply_grain != 0;
+    copy_blocks(self->fd, *pbi, &self->blocks);
     self->fired = true;
   }
 };
@@ -314,6 +306,11 @@ ovt_status Decoder::create(int threads, std::unique_ptr<Decoder>* out, std::stri
     return OVT_E_PLUGIN;
   }
   im.open = true;
+  // Before the first decode call, as libaom requires: decoded pictures live in the plugin's pool (planes.hpp).
+  if (aom_codec_set_frame_buffer_functions(&im.ctx, &FramePool::get, &FramePool::release, &im.pool) != AOM_CODEC_OK) {
+    *error = std::string("aom_codec_set_frame_buffer_functions failed: ") + aom_codec_error(&im.ctx);
+    return OVT_E_PLUGIN;
+  }
   // The host delivers Section 5 OBUs; operating point 0, one output layer; reconstruction before film grain
   // synthesis (chapter 06 §6.6.1 rule 5). AV1_SET_SKIP_LOOP_FILTER is never set in analysis mode.
   if (aom_codec_control(&im.ctx, AV1D_SET_IS_ANNEXB, 0U) != AOM_CODEC_OK ||

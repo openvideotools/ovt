@@ -9,6 +9,8 @@
 
 #include "metrics/host/plugin_registry.h"
 
+#include "metrics/kernels/psnr_metric.h"
+
 #include <dlfcn.h>
 
 #include <algorithm>
@@ -237,8 +239,13 @@ std::optional<std::vector<uint8_t>> validate_metric_api(const ovt_MetricApi* api
 }
 
 PluginRegistry& PluginRegistry::instance() {
-  static PluginRegistry registry;  // never destroyed before exit; plugins stay loaded (§12.3.11)
-  return registry;
+  // Never destroyed: plugins stay loaded (§12.3.11).
+  static PluginRegistry* const registry = [] {
+    auto* r = new PluginRegistry();  // NOLINT(cppcoreguidelines-owning-memory)
+    register_builtin_kernels(*r);    // the in-tree kernel metrics (WI-3.306 onward)
+    return r;
+  }();
+  return *registry;
 }
 
 PluginRegistry::PluginRegistry() = default;
