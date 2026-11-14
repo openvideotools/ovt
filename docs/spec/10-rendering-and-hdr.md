@@ -568,14 +568,15 @@ Display luminance (for `DisplayCaps`): `render/src/platform/linux_wayland.cpp` b
 
 ### 10.4.3 Android (SurfaceView + dataspace, EGL path; ADR-014)
 
-The Kotlin shell (Chapter 11 §11.5) owns a `SurfaceView` sibling of the `QtQuickView`, `setZOrderMediaOverlay(true)`, positioned at the Picture panel rect. In `surfaceCreated`, the shell passes the `Surface` to JNI; `render/src/platform/android_egl.cpp` does:
+The Kotlin shell (Chapter 11 §11.5) owns a `SurfaceView` sibling of the `QtQuickView`, below the Qt UI at the `SurfaceView` default z-order (chapter 4 FR-AND-002 wins; no `setZOrderMediaOverlay` call, #436), positioned at the Picture panel rect. In `surfaceCreated`, the shell passes the `Surface` to JNI; `render/src/platform/android_egl.cpp` does:
 
 ```c
 ANativeWindow* win = ANativeWindow_fromSurface(env, jsurface);
-// 1. Dataspace BEFORE the EGL surface exists (SurfaceFlinger reads it at buffer queue setup)
+// 1. Dataspace BEFORE the EGL surface exists, and AGAIN after eglCreateWindowSurface (libEGL resets the window
+//    dataspace from EGL_GL_COLORSPACE) before the first eglSwapBuffers; a non-zero rc of either call is RND-0050 (#436)
 int32_t ds = (enc == Pq10) ? 163971072 /* ADATASPACE_BT2020_PQ  = STANDARD_BT2020|TRANSFER_ST2084|RANGE_FULL */
            : (enc == Hlg10)? 168165376 /* ADATASPACE_BT2020_HLG = STANDARD_BT2020|TRANSFER_HLG|RANGE_FULL */
-           : 0 /* ADATASPACE_UNKNOWN -> sRGB */;
+           : 281083904 /* ADATASPACE_BT709 = STANDARD_BT709|TRANSFER_SMPTE_170M|RANGE_LIMITED (SDR, chapter 4 FR-AND-002; log name SRGB; #436) */;
 int rc = ANativeWindow_setBuffersDataSpace(win, ds);           // <android/native_window.h>, API 28; 0 on success
 // 2. EGL config: RGB10A2 for PQ/HLG, RGBA8 for SDR
 EGLint attribs[] = { EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT, EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
@@ -594,7 +595,7 @@ pl_swapchain sw = pl_opengl_create_swapchain(gl, &(struct pl_opengl_swapchain_pa
 
 The numeric dataspace constants are those of `<android/data_space.h>`; the implementer MUST compile against the NDK header names and keep the literal values only in the unit test `test_android_dataspace.cpp` as a guard. `ANativeWindow_setBuffersDataSpace` returning non-zero → `hdr_capable=false` for this session and `RND-0050`. Android HDR dataspaces are full range by definition; libplacebo's PQ target (`PL_COLOR_LEVELS_FULL`, set by `pl_frame_from_swapchain` for GL swapchains with our explicit `target.repr.levels = PL_COLOR_LEVELS_FULL`) matches.
 
-Shell-side calls (Kotlin, `android/app/src/main/kotlin/org/ovt/HdrSurfaceView.kt`, WI-0.052/WI-A.400):
+Shell-side calls (Kotlin, `android/app/src/main/kotlin/org/openvideotools/studio/HdrSurfaceView.kt`, WI-0.052/WI-A.400):
 
 - `window.colorMode = ActivityInfo.COLOR_MODE_HDR` (API 26) before the surface is created.
 - API ≥ 35: `surfaceView.setDesiredHdrHeadroom(2.0f)` in mixed SDR/HDR layout, `8.0f` in full-screen picture mode (Google's guidance: https://android-developers.googleblog.com/2025/09/hdr-and-user-interfaces.html).
@@ -820,8 +821,8 @@ Id-buffer readback: after each `render()`, the surface issues `pl_tex_download` 
 | `plane_mode` | Behaviour |
 |---|---|
 | 0 YUV | Normal libplacebo path (`pl_render_image`). |
-| 1 Y | The surface builds a **second `pl_frame`** whose single plane is the Y texture with `repr.sys = PL_COLOR_SYSTEM_RGB`, `components = 1`, `component_mapping = {0, -1, -1}` (libplacebo's `component_mapping[]` maps each texture channel to at most one frame channel; a channel cannot be duplicated), and a one-line custom shader hook (`pl_hook` at `PL_HOOK_RGB_INPUT`: `color.rgb = color.rrr;`) that replicates Y to R,G,B, `repr.levels` = content range (so limited 64–940 expands to black–white) unless `raw_code_values`, in which case `repr.levels = PL_COLOR_LEVELS_FULL` and `transfer = SRGB` on both source and target so code values pass through unchanged to display values (`display = code >> (bit_depth − 8)` for 8-bit targets; 10-bit targets show the top 10 bits). `color.primaries = BT_709`. In HDR content, plane views are **always SDR views of code values** (never tone-mapped): they show what the encoder stored. |
-| 2 U / 3 V | Same construction with the chroma texture as the single plane at **chroma resolution** (the frame reports the chroma plane size; crop scaled by `sub_x/sub_y`), upscaled with **nearest** to the viewport; value remapping in a tiny custom `pl_shader` (`pl_shader_custom`): `g = (c − 0.5) + 0.5` i.e. identity on normalised full-range chroma, so neutral chroma (code 512 of 10-bit) is mid-grey. Optional tint (`ViewState` flag, default off): U → blue/yellow axis (`rgb = (0.5 − d, 0.5 − d, 0.5 + d)`), V → red/cyan. |
+| 1 Y | The surface builds a **second `pl_frame`** whose single plane is the Y texture with `repr.sys = PL_COLOR_SYSTEM_RGB`, declared with `components = 3`, `component_mapping = {R, G, B}` (the single-channel texture samples as `(r, 0, 0)`; libplacebo merges only a plane's first `components` channels into the frame, so a `{0, −1, −1}` mapping would leave G and B untouched and the picture would come out red, #465), and a custom shader hook (`pl_hook` at `PL_HOOK_RGB_INPUT` with `input = PL_HOOK_SIG_TEX`, body `color.rgb = color.rrr;`) that replicates Y to R,G,B before the merge. The hook takes the texture, not the pre-sampled colour, because input stages are resizable and the returned shader must fix its own output size; and it applies `pl_color_repr_normalize` itself, because a hook shader replaces libplacebo's plane sampling and with it the bit-depth scaling of LSB-aligned 10/12-bit codes in R16 textures (#465). `repr.levels` = content range (so limited 64–940 expands to black–white) unless `raw_code_values`, in which case `repr.levels = PL_COLOR_LEVELS_FULL`, `transfer = SRGB` on both source and target and **dithering off for that render** (§10.3.5; pass-through is exact only without it, #465) so code values pass through unchanged to display values (`display = code >> (bit_depth − 8)` for 8-bit targets; 10-bit targets show the top 10 bits). `color.primaries = BT_709`. In HDR content, plane views are **always SDR views of code values** (never tone-mapped): they show what the encoder stored. |
+| 2 U / 3 V | Same construction with the chroma texture as the single plane at **chroma resolution** (the frame reports the chroma plane size; crop scaled by `sub_x/sub_y`), upscaled with **nearest** to the viewport; `repr.levels = PL_COLOR_LEVELS_FULL` always (a limited-range expansion would map the neutral code to 130/255, not mid-grey; `raw_code_values` changes only the target pass-through for U/V; FR-PLN-001, #465); value remapping in a tiny custom `pl_shader` (`pl_shader_custom`): `g = (c − 0.5) + 0.5` i.e. identity on normalised full-range chroma, so neutral chroma (code 512 of 10-bit) is mid-grey. A tint (U → blue/yellow axis `rgb = (0.5 − d, 0.5 − d, 0.5 + d)`, V → red/cyan) is **deferred**: `ViewState` (§10.2.3) has no tint flag, adding one is a public header change for a later work item, and WI-1.408 does not implement it (#465). |
 | 4 gray | Normal path but chroma planes replaced by a 1×1 neutral texture (planes 1 and 2 of the `pl_frame` point to a constant mid-code texture: 128·2^(b−8) in the plane's bit depth) → correct luma rendering including tone mapping, no colour. |
 | rotation / fields | `ViewState.rotation ∈ {0, 90, 180, 270}` (from `TrackInfo.rotation`, chapter 08, or user override) is applied as `pl_frame.rotation = PL_ROTATION_0/90/180/270` so the picture is upright; picking and the view transform operate in the rotated image space. `ViewState.field_mode ∈ {Frame, TopField, BottomField, Weave}` for interlaced pictures (`Picture.interlaced`, `top_field_first`): `TopField`/`BottomField` upload every second row of each plane (stride doubled, height halved) and display it at double vertical zoom; `Weave` is the default frame view; `Frame` shows the stored frame with a 1-px field-parity tint of the odd rows when `show_field_tint`. |
 
@@ -957,8 +958,9 @@ Overlay-only export (`ViewPng8` with `background_rgba = 0x00000000` and the pict
 1. **Test patterns** generated by `tools/gen_hdr_patterns.py` (NumPy; writes Y4M + encodes with `x265 --lossless` / `aomenc --lossless` into `tests/corpora/patterns/`): `pq_patches_1000.mp4` (6 equal-area patches at 1/100/203/1000/4000/10000 nits — limited-range 10-bit codes 195/509/573/723/855/940, §10.4.4 — 10-bit limited BT.2020 PQ, 1920×1080, 3 frames; the file name records the 1000-nit *reference* patch, the pattern's MaxCLL is 10 000), `hlg_patches.mp4` (HLG 75 % and 100 % white, grey ramp), `sdr709_ramp.mp4`, `p3_saturation.mp4` (P3 primaries outside 709), `siting_checker.mp4` (4:2:0 2×2 checker to verify chroma siting). Corpus ids (chapter 14 §14.3.3 recipe 73, tag `patterns`; there is no separate pattern manifest): `syn_pat_pq_patches_1000`, `syn_pat_hlg_patches`, `syn_pat_sdr709_ramp`, `syn_pat_p3_saturation`, `syn_pat_siting_checker`; the file names above are their aliases (chapter 14 §14.3.5). The HLG demo stream is `syn_hlg_1080p` (recipe 38). Expected values are computed by the generator from ST 2084 and written next to the file (`*.expected.json`: nits per patch, FALL, band fractions, out-of-gamut counts).
 2. **Measurement tests**: render each pattern offscreen, `measure()` → MaxCLL within 1 %, FALL within 1 %, band fractions within 0.5 % absolute, `out_of_gamut_709` for `p3_saturation` ≥ 99 % of the saturated area.
 3. **libplacebo parity with mpv** (normative definition: Chapter 14 §14.4.15, suite WI-1.575): for the corpus frames listed there (8-bit 709, 10-bit PQ with MDCV, HLG, 4:4:4 12-bit, DV P8, HDR10+), `tests/oracles/mpv_capture.py` produces mpv `gpu-next` references with the fixed flag set of §14.4.15 (same libplacebo major as `third_party/VERSIONS.md`); OVT renders the same frame offscreen (`SdrPng8` with `ToneMap::BT2390`, `dither=false`, `downscale=Bilinear` at 1:1 for the SDR target; PQ pass-through 16-bit PNG for the HDR target). Pass criterion is `tools/imgdiff.py --mode hdr-parity`: **p99 ΔE_ITP ≤ 1.0 and mean ≤ 0.3 for the SDR target, p99 ΔE_ITP ≤ 0.5 for the HDR pass-through** (BT.2124 ΔE in linear light). PSNR gates are not used.
-4. **Overlay goldens**: `synthetic_4k_grid.fb`, `synthetic_4k_mv.fb`, `labels_zoom32.fb` rendered to `ViewPng8` at fixed viewport 1920×1080, dpr 1.0 → compared with ≤ 0.1 % differing pixels (SDF text is deterministic; CI uses lavapipe references separate from GPU references, keyed by `pl_gpu` name).
+4. **Overlay goldens**: `synthetic_4k_grid.fb`, `synthetic_4k_mv.fb`, `labels_zoom32.fb` rendered to `ViewPng8` at fixed viewport 1920×1080, dpr 1.0 → compared with ≤ 0.1 % differing pixels (SDF text is deterministic; CI uses lavapipe references separate from GPU references, keyed by `pl_gpu` name). **Comparison rule for every 8-bit image golden of this chapter** (overlay, plane-view, compare, measurement and selection goldens alike; #469, #465): golden and render have the same dimensions; a pixel *differs* when any 8-bit channel is more than 2 codes away from the reference (the allowance absorbs last-bit differences of blending and sRGB encode/decode between Vulkan drivers: lavapipe, MoltenVK, Android GPUs); at most 0.1 % of the pixels may differ. A test may assert tighter bounds on named pixels or regions in addition (for example the exact grey 128 of WI-1.408 AT1), never a looser golden rule. On failure the test writes `<name>.actual.png` into the build directory and names both files in the failure message.
 5. **Determinism**: every golden render runs twice and must be byte-identical (FR-PLN-101, §10.1.1).
+6. **Golden layout**: render image goldens live in `tests/golden/render/<name>.png` (chapter 14 §14.2.2; the goldens named in a work item's Produces line are relative to it; `render/tests/fixtures/` holds inputs only), are rewritten only by `OVT_UPDATE_GOLDEN=1` (chapter 14 §14.4.0, never on CI), and are read and written through the shared test header `render/tests/png_io.h`: 8-bit PNG (colour type 2 or 6) with stored deflate blocks, so the tests need no zlib until WI-1.412 vendors lodepng, after which the header may wrap it (#465, #469).
 
 ### 10.9.3 Performance tests
 
@@ -1080,12 +1082,12 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 ### WI-1.408 — Plane modes Y/U/V/gray and raw code values
 **Goal:** `plane_mode` 1–4 and `raw_code_values` behave per §10.6.1.
 **Depends on:** WI-1.403.
-**Produces:** `render/src/pipeline/plane_views.cpp`, goldens `plane_y_10bit.png`, `plane_u_nearest.png`, `plane_gray_pq.png`.
+**Produces:** `render/src/pipeline/plane_views.cpp`, goldens `tests/golden/render/plane_y_10bit.png`, `plane_u_nearest.png`, `plane_gray_pq.png` (§10.9.2 item 6).
 **Interface:** `ViewState.plane_mode`, `raw_code_values`.
 **Steps:** 1. Secondary `pl_frame` builders for Y and chroma. 2. Chroma value remap custom shader. 3. Gray mode via neutral chroma texture. 4. Goldens.
 **Acceptance tests:** 1. Given a 10-bit frame with luma code 512 and `raw_code_values`, When plane mode Y rendered to `Rgba8Srgb`, Then output grey = 128. 2. Given plane mode U at zoom 8 on 4:2:0, When rendered, Then each chroma sample covers 16×16 device px with sharp edges (golden).
 **Size:** M.
-**Notes / pitfalls:** `component_mapping` cannot duplicate a channel (§10.6.1) — replicate Y in the `PL_HOOK_RGB_INPUT` hook; keep the plane-view `pl_frame`s cached per slot so switching modes does not re-upload.
+**Notes / pitfalls:** `component_mapping` cannot duplicate a channel — declare the plane with three components mapped to R, G, B and replicate Y in the `PL_HOOK_RGB_INPUT` hook, which scales the bit depth itself (§10.6.1, #465); `raw_code_values` turns dithering off; U/V are always full range; keep the plane-view `pl_frame`s cached per slot so switching modes does not re-upload.
 
 ### WI-1.409 — Zoom, pan, nearest-neighbour magnification and sample-value text
 **Goal:** Viewport mapping, zoom thresholds and value labels per §10.2.3 and §10.6.2.
@@ -1179,7 +1181,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Steps:** 1. LUT generator + 5 textures. 2. Overlay RGBA8 layer + `pl_overlay` wiring. 3. Fill pass (one full-viewport quad, `texelFetch` on cell attributes). 4. Hatch procedural. 5. Heatmap pass. 6. Goldens, including an HDR target check that overlay white equals 203 nits in `M`.
 **Acceptance tests:** 1. Given the synthetic fixture with QP heatmap, When rendered, Then golden match. 2. Given a PQ target, When the overlay layer contains white, Then the measurement texture reads 1.0 (= 203 nits) at that pixel.
 **Size:** M.
-**Notes / pitfalls:** `pl_overlay` expects straight (non-premultiplied) alpha in `PL_OVERLAY_NORMAL` mode and composites in the target's colour space — set `overlay.repr`/`color` to sRGB BT.709 so white lands at reference white.
+**Notes / pitfalls:** the overlay passes write straight-alpha fragments and blend "over" (`src_rgb = SRC_ALPHA, dst_rgb = ONE_MINUS_SRC_ALPHA, src_alpha = ONE, dst_alpha = ONE_MINUS_SRC_ALPHA`) into a layer cleared to transparent, so the layer holds **premultiplied** colour as §10.5 declares (`pl_blend_params` has no blend equation; this is the only portable "over" for stacking several passes); set `overlay.repr.alpha = PL_ALPHA_PREMULTIPLIED` and `overlay.color` to sRGB BT.709 so white lands at reference white, and libplacebo composites in the target's colour space (#467).
 
 ### WI-2.432 — Grid line pass with viewport/level culling
 **Goal:** Partition grids per §10.5.3 with R-GRID-1.
@@ -1372,17 +1374,17 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Goal:** `HdrSurfaceView.kt`: a `SurfaceView` positioned over the Picture panel, lifecycle-safe.
 **Overlap:** this WI extends `HdrSurfaceView.kt` and `hdr_surface.cpp` of WI-0.052 with the geometry callbacks, visibility rule and lifecycle tests; no `HdrSurface.kt`/`hdr_surface_jni.cpp`. See chapter 16 §16.3.
 **Depends on:** WI-0.050 (Android Gradle project with `QtQuickView`), WI-0.052 (`HdrSurfaceView.kt` skeleton), WI-A.450.
-**Produces:** extensions to `android/app/src/main/kotlin/org/ovt/HdrSurfaceView.kt` and `android/app/src/main/cpp/hdr_surface.cpp` (geometry callbacks, visibility rule), `android/app/src/androidTest/java/org/ovt/HdrSurfaceGeometryTest.kt`.
+**Produces:** extensions to `android/app/src/main/kotlin/org/openvideotools/studio/HdrSurfaceView.kt` and `android/app/src/main/cpp/hdr_surface.cpp` (geometry callbacks, visibility rule), `android/app/src/androidTest/java/org/openvideotools/studio/HdrSurfaceGeometryTest.kt`.
 **Interface:** QML → Kotlin geometry callback `onPictureRectChanged(x, y, w, h)` (window px); JNI `nativeSurfaceCreated(Surface)`, `nativeSurfaceChanged(w, h)`, `nativeSurfaceDestroyed()`, `nativeSetVisible(bool)`.
-**Steps:** 1. `FrameLayout` with `QtQuickView` + `SurfaceView(setZOrderMediaOverlay(true))`. 2. Geometry updates on the UI thread. 3. `window.colorMode = COLOR_MODE_HDR`. 4. Visibility toggling (popup rule R-ARCH-3).
+**Steps:** 1. `FrameLayout` with `QtQuickView` + `SurfaceView` (default z-order below the Qt UI, no `setZOrderMediaOverlay` call, #436). 2. Geometry updates on the UI thread. 3. `window.colorMode = COLOR_MODE_HDR`. 4. Visibility toggling (popup rule R-ARCH-3).
 **Acceptance tests:** 1. Given the Picture panel is resized by dragging a splitter, When measured, Then the `SurfaceView` bounds equal the panel bounds within 1 px on every frame. 2. Given the Activity is rotated, When the configuration change completes, Then the surface is recreated and `init()` succeeds without leaking the previous `ANativeWindow` (LeakCanary clean).
 **Size:** M.
-**Notes / pitfalls:** `ANativeWindow_fromSurface` adds a reference — release it in `nativeSurfaceDestroyed`; `setZOrderMediaOverlay` must be called before the view is attached.
+**Notes / pitfalls:** `ANativeWindow_fromSurface` adds a reference — release it in `nativeSurfaceDestroyed`; if a device does not composite Qt's surface above the default-z-order `SurfaceView` (WI-0.055 checks), revisit the order with `setCompositionOrder` (API 36) and the popup rule R-ARCH-3 (#436).
 
 ### WI-A.401 — EGL + dataspace native target (`AndroidWindow`)
 **Goal:** `render/src/platform/android_egl.cpp` per §10.4.3 with libplacebo's OpenGL backend.
 **Depends on:** WI-1.403, WI-A.400.
-**Produces:** `render/src/platform/android_egl.cpp`, `render/tests/test_android_dataspace.cpp`, `android/app/src/androidTest/java/org/ovt/HdrSurfaceTest.kt`.
+**Produces:** `render/src/platform/android_egl.cpp`, `render/tests/test_android_dataspace.cpp`, `android/app/src/androidTest/java/org/openvideotools/studio/HdrSurfaceTest.kt`.
 **Interface:** `DisplayTarget::Kind::AndroidWindow`; encoding selection rule.
 **Steps:** 1. Dataspace before EGL surface. 2. RGB10A2 config; `EGL_EXT_gl_colorspace_bt2020_*` when present. 3. SMPTE2086/CTA861.3 surface attribs. 4. `pl_opengl_create` with make/release-current callbacks; swapchain. 5. SDR fallback.
 **Acceptance tests:** 1. Given the HDR-capable Android device `android-hdr` of chapter 14 §14.9.2 (HDR10 and/or HLG in `supportedHdrTypes`), When NATIVE is requested for a PQ stream, Then `active_encoding() == Pq10` (or `Hlg10` on an HLG-only panel), `ANativeWindow_setBuffersDataSpace` returned 0 and `adb logcat -d -s OVT_HDR` shows `dataspace=BT2020_PQ` (line format of chapter 13 WI-0.052). 2. Given the Pixel Tablet (SDR panel) or an SDR-only emulator, When a PQ stream is opened, Then NATIVE is never requested (`hdr_capable == false`), EMBEDDED `Srgb8` is used and no `RND-0050` is logged. 3. Given an HDR-capable device whose `ANativeWindow_setBuffersDataSpace` returns non-zero (fault injection in the test), When NATIVE is requested, Then `Srgb8` is used, `RND-0050` is logged once and `OVT_HDR dataspace=SRGB` is logged.
@@ -1414,7 +1416,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Goal:** display HDR capability query (`Display.getMode().getSupportedHdrTypes()` on API ≥ 34, `Display.getHdrCapabilities()` fallback below), `hdrSdrRatio` listener, `setDesiredHdrHeadroom` per §10.4.3.
 **Overlap:** this WI extends `DisplayCaps.kt` created as a stub by WI-0.052. See chapter 16 §16.3.
 **Depends on:** WI-A.400, WI-4.458.
-**Produces:** `android/app/src/main/kotlin/org/ovt/DisplayCaps.kt`.
+**Produces:** `android/app/src/main/kotlin/org/openvideotools/studio/DisplayCaps.kt`.
 **Interface:** `nativeSetDisplayCaps(...)` of WI-4.458; `Display.Mode.getSupportedHdrTypes()` (API 34+), `Display.getHdrCapabilities()` (API < 34 types; luminance on all levels), `Display.getHdrSdrRatio()` (API 34), `SurfaceView.setDesiredHdrHeadroom()` (API 35).
 **Steps:** 1. Query and marshal to JNI. 2. API-level guards (28/34/35). 3. Headroom 2.0 mixed / 8.0 full-screen.
 **Acceptance tests:** 1. Given API 35, When the Picture panel enters full-screen, Then `setDesiredHdrHeadroom(8.0f)` is called (verified by instrumentation test). 2. Given the Pixel Tablet, When the app queries the display, Then `hdrTypes` is empty and the HDR toggle stays disabled.
@@ -1424,7 +1426,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 ### WI-A.405 — Android performance tuning for overlays (GLES)
 **Goal:** Meet the D5 Android overlay budget (chapter 14 §14.9.3 `pixel-tablet` row) on the Pixel Tablet with all overlays.
 **Depends on:** WI-2.438, WI-A.403 (GLES interop; HDR output is not needed for performance).
-**Produces:** Android budget rows in `tests/perf/budgets.json` (`bench_overlay_4k_mv_arrows` on the `pixel-tablet` runner at 1080p), culling threshold tuning (R-8K-1 at 262,144 cells), `android/app/src/androidTest/java/org/ovt/RenderBenchTest.kt` (drives the benchmark binary).
+**Produces:** Android budget rows in `tests/perf/budgets.json` (`bench_overlay_4k_mv_arrows` on the `pixel-tablet` runner at 1080p), culling threshold tuning (R-8K-1 at 262,144 cells), `android/app/src/androidTest/java/org/openvideotools/studio/RenderBenchTest.kt` (drives the benchmark binary).
 **Interface:** chapter 14 §14.9.3 budget table; `tools/perf_run.py --runner pixel-tablet`.
 **Steps:** 1. Run the render benchmarks via the instrumentation harness. 2. Profile with AGI/Perfetto. 3. Tune texture formats (RGBA16F vs RGBA32F instance data where precision allows).
 **Acceptance tests:** 1. Given the chapter 14 §14.9.3 Android input (`fa_1080p_dense.bin`) and, as a second run, `real_1080p_hevc_frame.fb`, When `bench_overlay_4k_mv_arrows` runs on `pixel-tablet`, Then p95 meets the §14.9.3 `pixel-tablet` budget for both inputs.
