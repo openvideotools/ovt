@@ -120,24 +120,16 @@ the licence gate fails when this file is stale.
 | aom_av1_1_b8_04_cdfupdate | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_05_mv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_06_mfmv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1_1_b8_16_intra_only | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_16_intra_only_intrabc_extreme_dv | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_22_svc_L1T2 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_22_svc_L2T1 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_22_svc_L2T2 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_23_film_grain_50 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1c_vs_00 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1c_vs_01 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1c_vs_02 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1c_vs_03 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | apple_bipbop_adv_avc | apple | Apple HLS sample content, for testing; not redistributable | LicenseRef-Apple-HLS-Examples | no |
 | apple_bipbop_adv_hevc | apple | Apple HLS sample content, for testing; not redistributable | LicenseRef-Apple-HLS-Examples | no |
 | bento4_audio_aac_001 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | bento4_audio_aac_002 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | bento4_audio_aac_003 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
-| bento4_cenc_subsample | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
-| bento4_frag_cenc | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
-| bento4_playready | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | bento4_video_h264_001 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | bento4_video_h264_002 | bento4 | Bento4 test media, freely downloadable; treated as non-redistributable | LicenseRef-Bento4-Test-Media | no |
 | cta_cmaf_video_cmfv | cta | CTA WAVE test content for conformance; free use; not redistributable | LicenseRef-CTA-WAVE-Test-Content | no |
@@ -155,7 +147,6 @@ the licence gate fails when this file is stale.
 | fixture_synthetic_8k_mv | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | gpac_chroma_pulse | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | gpac_dolby_vision_cenc | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
-| gpac_eac3_atmos | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | gpac_enc_cenc | gpac | GPAC test suite media; per-file notices in media/README | LicenseRef-GPAC-Testsuite-Media | no |
 | hdr_dovi_p5 | hdr | Per-clip demo-content terms; download for testing; not redistributable | LicenseRef-HDR-Demo-Content | no |
 | hdr_hdr10plus_dv81 | hdr | dovi_tool test assets: MIT repository; treated as not redistributable (third-party picture data) | LicenseRef-DoviTool-Assets | no |

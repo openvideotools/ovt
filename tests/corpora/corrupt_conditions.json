@@ -22,6 +22,7 @@
     {"code": "SYN-H265-0003", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--truncate-nal", "sps", "--keep-bytes", "9"], "why": "the SPS cut to 9 bytes (same edit as syn_broken_h265_truncated_sps)"},
     {"code": "SYN-H265-0007", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--set-bits", "vps", "--bit", "28", "--width", "3", "--value", "7"], "why": "vps_max_sub_layers_minus1 = 7 (allowed 0..6)"},
     {"code": "SYN-H265-0010", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--set-ue", "pps", "--bit", "16", "--value", "64"], "why": "pps_pic_parameter_set_id = 64"},
+    {"code": "SYN-H265-0022", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--set-bits", "sps", "--bit", "16", "--width", "4", "--value", "1"], "why": "sps_video_parameter_set_id = 1 while the stream carries only VPS 0 (Warning, once per SPS generation)"},
     {"code": "SYN-H265-0050", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--set-bits", "sei", "--bit", "16", "--width", "8", "--value", "132"], "why": "the first prefix SEI's payloadType set to 132 (decoded picture hash, suffix only)"},
     {"code": "SYN-H265-0060", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--set-bits", "slice", "--nth", "1", "--bit", "16", "--width", "1", "--value", "0"], "why": "first_slice_segment_in_pic_flag = 0 on the only slice of picture 1"},
     {"code": "SYN-H265-0102", "input": "syn_h265_amp_sao_on", "input_file": "syn_h265_amp_sao_on.265", "edit": ["--drop-picture", "1"], "why": "picture 1 (a reference of the following pictures) removed"},
@@ -36,6 +37,7 @@
   "not_in_table": {
     "SYN-AV1-0103": "Info on a stream with enable_order_hint = 0, not a corruption; covered by the WI-1.119 unit tests",
     "SYN-H265-0011": "needs a PPS NAL removed from the stream, not a bit edit; covered by the WI-1.113 unit tests",
+    "SYN-H265-0021": "needs a second, different VPS/SPS/PPS inserted inside a picture, not a bit edit; covered by the WI-1.115 unit tests",
     "SYN-H265-0061": "needs the independent slice segment removed before a dependent one, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-GEN-0103": "a cancelled or partial index is a run-time condition, not a property of the file",
     "SYN-GEN-0104": "every unedited Annex B / OBU recipe output already lacks timing information",
@@ -54,6 +56,7 @@
     "SYN-AV1-0012": "needs an intra_only frame header rewrite; not in this table yet",
     "SYN-AV1-0013": "needs a show_existing_frame of a slot that the edit empties; not in this table yet",
     "SYN-AV1-0014": "libaom does not use frame_refs_short_signaling",
+    "SYN-AV1-0015": "frame size above the sequence maximum, found_ref into an empty slot or more than 64 tile columns need a hand-assembled frame header; covered by the WI-1.117 unit tests",
     "SYN-AV1-0020": "needs the tile size fields, which follow a fully parsed frame header; not in this table yet",
     "SYN-AV1-0031": "libaom writes OBU_FRAME units, so there is no separate tile group to orphan",
     "SYN-HRD-0001": "true of every recipe stream encoded without HRD; not an edit",

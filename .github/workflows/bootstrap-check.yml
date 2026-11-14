@@ -24,6 +24,11 @@ on:
       - tools/requirements.txt
       - .github/workflows/bootstrap-check.yml
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs only; scheduled and manual runs always finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

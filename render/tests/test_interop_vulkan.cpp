@@ -8,17 +8,22 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <string>
+#include <thread>
+#include <utility>
 #include <vector>
 
 #include <dlfcn.h>
 #include <vulkan/vulkan.h>
 
 #include "crash_backtrace.h"
+#include "measure/scopes.h"
 #include "ovt/render/video_surface.h"
 #include "render_test_support.h"
 #include "surface/output_download.h"
@@ -391,6 +396,76 @@ TEST_CASE("render_test_interop: VulkanSharedDevice exports a VkImage the host ca
   CHECK(resized_bytes == px.bytes);
 
   surface.reset();  // the host's device survives the surface
+}
+
+// WI-4.454a: the scope textures of measure() go to the host the same way as the output texture (§10.7.9).
+TEST_CASE("render_test_interop: VulkanSharedDevice hands the scope textures to the host",
+          "[fast][render][vulkan][interop]") {
+  ovt::render::test::install_crash_backtrace();
+  TestHost host;
+  const std::string why = host.create();
+  if (!why.empty()) {
+    SKIP("no host Vulkan device: " << why);
+  }
+  ovt::render::test::pin_vulkan_icds();
+  const VulkanDeviceInfo info = host.info();
+
+  auto surface = VideoSurface::create("render-interop");
+  REQUIRE(surface != nullptr);
+  constexpr int kW = 32;
+  constexpr int kH = 16;
+  DisplayTarget t;
+  t.width = kW;
+  t.height = kH;
+  t.interop = DisplayTarget::Interop::VulkanSharedDevice;
+  t.interop_device = const_cast<VulkanDeviceInfo*>(&info);  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+  REQUIRE(surface->init(t));
+  OwnedPicture ramp = rgb_ramp(kW, kH);
+  ramp.pic.id = ovt::fb::FrameId(0, 0);
+  ViewState view;
+  view.pan_x = kW / 2.0;
+  view.pan_y = kH / 2.0;
+  const auto measured = [&](VideoSurface& vs) {  // render while measure() asks, until a result is back
+    vs.set_frame(ramp.pic);
+    static_cast<void>(vs.measure());
+    ovt::render::Measurements r;
+    for (int tries = 0; tries < 60000 && !r.valid; ++tries) {
+      vs.render(view);
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      r = vs.measure();
+    }
+    REQUIRE(r.valid);
+    return r;
+  };
+  const ovt::render::Measurements m = measured(*surface);
+  // The same picture measured on a surface with its own device, for the expected texels.
+  auto own = ovt::render::test::surface_or_skip(kW, kH);
+  static_cast<void>(measured(*own));
+  using Kind = ovt::render::detail::ScopeKind;
+  const std::array<std::pair<Kind, ovt::render::ScopeTexture>, 3> scopes = {
+      {{Kind::Waveform, m.waveform}, {Kind::Vectorscope, m.vectorscope}, {Kind::CieXy, m.cie_xy}}};
+  for (const auto& [kind, scope] : scopes) {
+    INFO("scope " << static_cast<int>(kind));
+    REQUIRE(scope.valid);
+    CHECK(scope.tex.interop == DisplayTarget::Interop::VulkanSharedDevice);
+    REQUIRE(scope.tex.handle != nullptr);
+    CHECK(scope.tex.format == DisplayTarget::OffscreenFormat::Rgba16F);
+    CHECK(scope.tex.layout == static_cast<uint32_t>(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
+    // The host's copy equals the same scope measured on a surface of its own device: libplacebo's download of an
+    // imported device's texture crashes on MoltenVK (vk_malloc_slice in its staging-buffer path).
+    const std::vector<uint8_t> host_bytes =
+        host.read_image(static_cast<VkImage>(scope.tex.handle), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        static_cast<uint32_t>(scope.tex.width), static_cast<uint32_t>(scope.tex.height), 8);
+    std::vector<uint16_t> texels;
+    int w = 0;
+    int h = 0;
+    REQUIRE(ovt::render::detail::download_scope(*own, kind, texels, w, h));
+    CHECK((w == scope.tex.width && h == scope.tex.height));
+    REQUIRE(host_bytes.size() == texels.size() * sizeof(uint16_t));
+    CHECK(std::memcmp(host_bytes.data(), texels.data(), host_bytes.size()) == 0);
+  }
+  own.reset();
+  surface.reset();
 }
 
 TEST_CASE("render_test_interop: VulkanSharedDevice rejects incomplete device info", "[fast][render][interop]") {
