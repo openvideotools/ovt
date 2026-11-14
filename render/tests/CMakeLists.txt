@@ -72,6 +72,9 @@ endif()
 # WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
 target_sources(ovt_tests_render PRIVATE test_measure.cpp)
 
+# WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
+
 # WI-4.453: false-colour view, gamut-clip overlay, band fractions and gamut counts (§10.7.5, §10.7.8). The image goldens
 # live in tests/golden/render/ (§10.9.2 item 6; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
 target_sources(ovt_tests_render PRIVATE test_false_color.cpp)

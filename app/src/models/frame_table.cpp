@@ -37,8 +37,13 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
     if (const auto* refs = f->declared_refs(); refs != nullptr) {
       refs_.insert(refs_.end(), refs->begin(), refs->end());
     }
+    dpb_begin_.push_back(dpb_.size());
+    if (const auto* dpb = f->dpb_after(); dpb != nullptr) {
+      dpb_.insert(dpb_.end(), dpb->begin(), dpb->end());
+    }
   }
   ref_begin_.push_back(refs_.size());
+  dpb_begin_.push_back(dpb_.size());
   if (n != 0) {
     timebase_num_ = (*frames)[0]->timebase_num();
     timebase_den_ = (*frames)[0]->timebase_den();
@@ -79,6 +84,21 @@ std::span<const int> FrameTable::declared_refs(int decode_index) const {
   }
   const auto d = static_cast<std::size_t>(decode_index);
   return std::span<const int>(refs_).subspan(ref_begin_[d], ref_begin_[d + 1] - ref_begin_[d]);
+}
+
+std::span<const int> FrameTable::dpb_after(int decode_index) const {
+  if (decode_index < 0 || static_cast<std::size_t>(decode_index) + 1 >= dpb_begin_.size()) {
+    return {};
+  }
+  const auto d = static_cast<std::size_t>(decode_index);
+  return std::span<const int>(dpb_).subspan(dpb_begin_[d], dpb_begin_[d + 1] - dpb_begin_[d]);
+}
+
+int FrameTable::decode_index_of_display(int display_index) const {
+  if (display_index < 0 || static_cast<std::size_t>(display_index) >= display_order_.size()) {
+    return -1;
+  }
+  return display_order_[static_cast<std::size_t>(display_index)];
 }
 
 int FrameTable::display_index_of(int decode_index) const {

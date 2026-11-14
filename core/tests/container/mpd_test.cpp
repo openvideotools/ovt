@@ -499,3 +499,70 @@ TEST_CASE("mpd: the segment budget is shared by all representations", "[containe
   CHECK(total == 1'000'000);
   CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0004));
 }
+
+TEST_CASE("mpd: a SegmentList timeline expands only as far as its SegmentURLs", "[container][dash][fast]") {
+  // fuzz-smoke timeout (ovt_fuzz_mpd): one SegmentList with a 1-million-entry timeline shared by many
+  // representations used to expand the whole timeline for each one without spending the segment budget.
+  std::string reps;
+  for (int i = 0; i < 200; ++i) {
+    reps += "<Representation/>";
+  }
+  const auto r = mpd::parse(
+      "<MPD><Period duration=\"PT1S\"><SegmentList><SegmentURL media=\"a\"/><SegmentURL media=\"b\"/>"
+      "<SegmentTimeline><S d=\"1\" r=\"999999\"/></SegmentTimeline></SegmentList><AdaptationSet>" +
+          reps + "</AdaptationSet></Period></MPD>",
+      {"http://h/d/m.mpd", {}});
+  REQUIRE(r.ok);
+  const auto& out = r.manifest.periods[0].adaptation_sets[0].representations;
+  REQUIRE(out.size() == 200);
+  for (const auto& rep : out) {
+    REQUIRE(rep.segments.size() == 2);
+    CHECK(rep.segments[1].url == "http://h/d/b");
+    CHECK(rep.segments[1].start_time == 1);
+    CHECK(rep.segments[1].number == 2);
+  }
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0008));
+  CHECK(std::none_of(r.manifest.diagnostics.begin(), r.manifest.diagnostics.end(), [](const auto& d) {
+    return d.code == DiagCode::CNT_DASH_0004;  // a longer timeline is a mismatch, not a budget truncation
+  }));
+}
+
+TEST_CASE("mpd: a shorter SegmentList timeline still times the first segments", "[container][dash][fast]") {
+  const auto r = mpd::parse(wrap("<Representation id=\"l\"><SegmentList timescale=\"10\"><SegmentTimeline>"
+                                 "<S t=\"5\" d=\"10\"/></SegmentTimeline><SegmentURL media=\"a\"/>"
+                                 "<SegmentURL media=\"b\"/></SegmentList></Representation>"),
+                            {"http://h/m.mpd", {}});
+  const auto& rep = only_rep(r);
+  REQUIRE(rep.segments.size() == 2);
+  CHECK(rep.segments[0].start_time == 5);
+  CHECK(rep.segments[1].start_time == -1);
+  CHECK(has_diag(r.manifest, DiagCode::CNT_DASH_0008));
+}
+
+TEST_CASE("mpd: an invalid media template is reported once per representation", "[container][dash][fast]") {
+  const auto r = mpd::parse(
+      wrap(
+          R"(<Representation id="t"><SegmentTemplate timescale="1" duration="1" media="s$Bogus$.m4s"/></Representation>)",
+          R"(duration="PT1000S")"),
+      {"http://h/d/m.mpd", {}});
+  const auto& rep = only_rep(r);
+  REQUIRE(rep.segments.size() == 1000);
+  CHECK(rep.segments[0].url == "http://h/d/s$Bogus$.m4s");
+  CHECK(rep.segments[999].url == "http://h/d/s$Bogus$.m4s");
+  CHECK(std::count_if(r.manifest.diagnostics.begin(), r.manifest.diagnostics.end(),
+                      [](const auto& d) { return d.code == DiagCode::CNT_DASH_0005; }) == 1);
+}
+
+TEST_CASE("mpd: segment URLs resolve against bases with dot segments and queries", "[container][dash][fast]") {
+  // The per-representation fast path must give what RFC 3986 resolution gives.
+  const auto r = mpd::parse(
+      wrap(R"(<BaseURL>../x/./y/?q=1</BaseURL><Representation id="v"><SegmentTemplate timescale="1" duration="1" )"
+           R"(startNumber="7" media="$RepresentationID$/$Number%03d$.m4s"/></Representation>)",
+           R"(duration="PT2S")"),
+      {"http://h/a/b/m.mpd", {}});
+  const auto& rep = only_rep(r);
+  REQUIRE(rep.segments.size() == 2);
+  CHECK(rep.segments[0].url == mpd::resolve_url("http://h/a/x/y/?q=1", "v/007.m4s"));
+  CHECK(rep.segments[0].url == "http://h/a/x/y/v/007.m4s");
+  CHECK(rep.segments[1].url == "http://h/a/x/y/v/008.m4s");
+}

@@ -99,7 +99,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
-    static_cast<void>(measurer_.init(log_, gpu_));
+    static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
 
     target_ = target;
     return create_texture(target.width, target.height);
@@ -226,6 +226,17 @@ class VideoSurfaceImpl final : public VideoSurface {
     return false;
   }
 
+  void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
+
+  // The `kind` scope texture of the newest measurement, downloaded (blocking).
+  bool download_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    offscreen_.begin_frame();  // textures held by the host come back for the read ...
+    const bool ok = read_scope(kind, texels, width, height);
+    offscreen_.end_frame();  // ... and go back to it, as after render()
+    return ok;
+  }
+
   [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override {
     return detail::target_encoding(target_);
   }
@@ -326,6 +337,24 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
+  }
+
+  // Between offscreen_.begin_frame() and end_frame().
+  bool read_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    pl_tex tex = measurer_.scope_tex(kind);
+    if (tex == nullptr || !tex->params.host_readable) {
+      return false;
+    }
+    width = tex->params.w;
+    height = tex->params.h;
+    texels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    struct pl_tex_transfer_params tp = {};
+    tp.tex = tex;
+    tp.row_pitch = static_cast<size_t>(width) * 4 * sizeof(uint16_t);
+    tp.ptr = texels.data();
+    const bool ok = pl_tex_download(gpu_, &tp);
+    pl_gpu_finish(gpu_);
+    return ok;
   }
 
   bool create_texture(int /*width*/, int /*height*/) {
@@ -482,6 +511,29 @@ bool download_output(const VideoSurface& surface, OutputPixels& out) {
     return false;
   }
   return impl->download(out);
+}
+
+bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->set_scope_config(config);
+  return true;
+}
+
+bool hold_readbacks(VideoSurface& surface, bool hold) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->hold_readbacks(hold);
+  return true;
+}
+
+bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width, int& height) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->download_scope(kind, rgba16hf, width, height);
 }
 
 bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {

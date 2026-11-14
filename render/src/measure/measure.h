@@ -5,7 +5,8 @@
 // texture M, the per-pixel quantities Q, the MaxCLL / FALL / min reduction chain, the 1024-bin PQ histogram with its
 // 99.99th percentile, and the double-buffered, non-blocking readback behind VideoSurface::measure(). WI-4.453 adds the
 // out-of-gamut flags and counts, the false-colour band fractions and the two analysis views drawn from Q (§10.7.5,
-// §10.7.8). Internal to libovt-render; the CPU helpers are exported for the render tests.
+// §10.7.8); WI-4.454 adds the scope textures of §10.7.6-§10.7.7 (scopes.h). Internal to libovt-render; the CPU helpers
+// are exported for the render tests.
 
 #ifndef OVT_RENDER_SRC_MEASURE_MEASURE_H
 #define OVT_RENDER_SRC_MEASURE_MEASURE_H
@@ -22,6 +23,7 @@
 #include <libplacebo/log.h>
 #include <libplacebo/renderer.h>
 
+#include "measure/scopes.h"
 #include "ovt/render/render_api.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
@@ -108,8 +110,9 @@ class OVT_RENDER_API Measurer {
   ~Measurer();
 
   // Creates the renderer, dispatch and buffers on `gpu`. Returns false (and leaves the measurer unavailable, so
-  // measure() never becomes valid) when the GPU lacks a capability the passes need; error() says which.
-  bool init(pl_log log, pl_gpu gpu);
+  // measure() never becomes valid) when the GPU lacks a capability the passes need; error() says which. `host` creates
+  // the scope textures with the target's interop (nullptr: plain textures).
+  bool init(pl_log log, pl_gpu gpu, OffscreenGpu* host = nullptr);
   // Frees every GPU object. Must run before the pl_gpu is destroyed.
   void destroy();
 
@@ -127,7 +130,15 @@ class OVT_RENDER_API Measurer {
   // when both readback buffers are still in flight.
   void run(const FrameSlot& slot);
   // Collects every completed readback without blocking and returns the newest result (valid = false until one).
+  // Its scope textures are the ones accumulated for measured_frame.
   Measurements poll();
+  // Test hook: while held, completed readbacks are treated as still in flight (a slow GPU), so the slot rotation of
+  // run() can be exercised deterministically.
+  void hold_readbacks(bool hold) { hold_readbacks_ = hold; }
+  // §10.7.6-§10.7.7 options for the next runs.
+  void set_scope_config(const ScopeConfig& config) { scope_config_ = config; }
+  // The pl_tex behind a scope texture of the newest result (nullptr when there is none).
+  [[nodiscard]] pl_tex scope_tex(ScopeKind kind) const;
 
   [[nodiscard]] const std::string& error() const { return error_; }
 
@@ -141,6 +152,7 @@ class OVT_RENDER_API Measurer {
     ovt::fb::FrameId frame;
     uint64_t pixels = 0;
     uint32_t sampled = 0;
+    bool scopes = false;  // the scope textures of this slot's set were accumulated with it
   };
   static constexpr size_t kHistogramBytes = kHistogramBins * sizeof(uint32_t);
   static constexpr size_t kCountsOffset = kHistogramBytes;
@@ -149,6 +161,7 @@ class OVT_RENDER_API Measurer {
   static constexpr size_t kReadbackBytes = kTexelOffset + (4 * sizeof(float));
 
   void collect(Readback& rb);
+  void fill_scopes(Measurements& m) const;
   // Renders M and Q for `slot` unless this render already did.
   bool prepare(const FrameSlot& slot, std::string& err);
   bool fail(const std::string& what);
@@ -169,6 +182,10 @@ class OVT_RENDER_API Measurer {
   bool available_ = false;
   std::string error_;
   Measurements last_{};
+  ScopeSet scopes_;           // set i belongs to readbacks_[i]
+  ScopeConfig scope_config_;  // §10.7.6-§10.7.7 options
+  int shown_set_ = -1;
+  bool hold_readbacks_ = false;  // hold_readbacks()        // the scope set of last_, -1 when it has none
 };
 
 }  // namespace ovt::render::detail

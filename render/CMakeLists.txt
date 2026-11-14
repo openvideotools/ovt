@@ -22,6 +22,8 @@ target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
 # WI-4.453 adds the false-colour and gamut-clip views (§10.7.5, §10.7.8) on the same Q.
 target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
                                   src/measure/measurer.cpp src/measure/false_color.cpp)
+# WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_render PRIVATE src/measure/scopes.cpp)
 include(OvtEmbedShaders)
 ovt_embed_shaders(
   "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h"
@@ -33,6 +35,8 @@ ovt_embed_shaders(
   src/shaders/accumulate.glsl
   kShaderFalseColor
   src/shaders/false_color.frag)
+ovt_embed_shaders("${CMAKE_CURRENT_BINARY_DIR}/generated/scope_shaders.h" kShaderScopes src/shaders/scopes.glsl
+                  kShaderScopeClear src/shaders/scope_clear.glsl kShaderScopeResolve src/shaders/scope_resolve.frag)
 target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 target_include_directories(
