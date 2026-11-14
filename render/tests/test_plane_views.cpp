@@ -2,19 +2,21 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // WI-1.408 (chapter 10 §10.11): plane modes Y / U / V / gray and raw code values (§10.6.1), with the goldens
-// plane_y_10bit.png, plane_u_nearest.png and plane_gray_pq.png (render/tests/golden/, png_golden.h).
+// plane_y_10bit.png, plane_u_nearest.png and plane_gray_pq.png (tests/golden/render/, png_io.h).
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "ovt/render/video_surface.h"
 #include "pipeline/plane_views.h"
-#include "png_golden.h"
+#include "png_io.h"
 #include "render_test_support.h"
 #include "surface/output_download.h"
 
@@ -23,10 +25,9 @@ namespace {
 using ovt::render::VideoSurface;
 using ovt::render::ViewState;
 using ovt::render::detail::OutputPixels;
-using ovt::render::test::check_golden;
 using ovt::render::test::OwnedPicture;
+using ovt::render::test::RgbImage;
 using ovt::render::test::surface_or_skip;
-using ovt::render::test::to_image;
 
 struct Rgb {
   int r = 0;
@@ -67,6 +68,50 @@ OutputPixels render_deterministic(VideoSurface& surface, const ViewState& view) 
   const OutputPixels second = render(surface, view);
   REQUIRE(first.bytes == second.bytes);
   return first;
+}
+
+// The RGB of an Rgba8 output.
+RgbImage to_rgb(const OutputPixels& px) {
+  REQUIRE(px.texel_bytes == 4);
+  RgbImage img;
+  img.width = px.width;
+  img.height = px.height;
+  for (size_t i = 0; i + 3 < px.bytes.size(); i += 4) {
+    img.rgb.insert(img.rgb.end(), px.bytes.begin() + static_cast<std::ptrdiff_t>(i),
+                   px.bytes.begin() + static_cast<std::ptrdiff_t>(i + 3));
+  }
+  return img;
+}
+
+// §10.9.2 golden rule (#465, #469): a pixel differs when any 8-bit channel is more than 2 codes off, and at most 0.1 %
+// of the pixels may differ. The tests assert tighter bounds on their own pixels separately. OVT_UPDATE_GOLDEN=1
+// rewrites tests/golden/render/<name> instead of comparing.
+void check_golden(const std::string& name, const OutputPixels& px) {
+  const RgbImage actual = to_rgb(px);
+  const std::string path = std::string(OVT_RENDER_GOLDEN_DIR) + "/" + name;
+  const char* update = std::getenv("OVT_UPDATE_GOLDEN");  // NOLINT(concurrency-mt-unsafe): test setup
+  if (update != nullptr && std::strcmp(update, "1") == 0) {
+    REQUIRE(ovt::render::test::write_png(path, actual));
+    WARN("rewrote golden " << path);
+    return;
+  }
+  const std::optional<RgbImage> read = ovt::render::test::read_png(path);
+  INFO("golden " << path);
+  REQUIRE(read.has_value());
+  const RgbImage golden = read.value_or(RgbImage{});
+  REQUIRE(golden.width == actual.width);
+  REQUIRE(golden.height == actual.height);
+  const size_t pixels = static_cast<size_t>(actual.width) * static_cast<size_t>(actual.height);
+  size_t differing = 0;
+  for (size_t p = 0; p < pixels; ++p) {
+    bool differs = false;
+    for (size_t c = 0; c < 3; ++c) {
+      differs = differs || std::abs(int{golden.rgb.at((p * 3) + c)} - int{actual.rgb.at((p * 3) + c)}) > 2;
+    }
+    differing += differs ? 1 : 0;
+  }
+  INFO(differing << " of " << pixels << " pixels differ by more than 2 codes");
+  CHECK(differing * 1000 <= pixels);
 }
 
 }  // namespace
@@ -155,7 +200,7 @@ TEST_CASE("render_test_plane_views: plane Y of a 10-bit frame shows raw code val
       REQUIRE(std::abs(p.r - (code >> 2)) <= 1);
     }
   }
-  check_golden("plane_y_10bit.png", to_image(ramp));
+  check_golden("plane_y_10bit.png", ramp);
 }
 
 // Acceptance test 2: plane U at zoom 8 on 4:2:0 -> each chroma sample covers 16 x 16 device pixels with sharp edges.
@@ -204,7 +249,7 @@ TEST_CASE("render_test_plane_views: plane U at zoom 8 is nearest-neighbour at ch
       CHECK(mismatches == 0);
     }
   }
-  check_golden("plane_u_nearest.png", to_image(px));
+  check_golden("plane_u_nearest.png", px);
 
   // Plane V of the same picture: the flat Cr plane, neutral 128 -> mid-grey everywhere.
   view.plane_mode = 3;
@@ -272,7 +317,7 @@ TEST_CASE("render_test_plane_views: gray mode is the normal path without colour 
     colour_spread = std::max(colour_spread, std::max(std::abs(c.r - c.g), std::abs(c.b - c.g)));
   }
   CHECK(colour_spread > 20);  // the coloured picture really is coloured in mode 0
-  check_golden("plane_gray_pq.png", to_image(gray));
+  check_golden("plane_gray_pq.png", gray);
 
   // Plane views of HDR content are SDR views of the code values, never tone-mapped: plane Y of the brightest patch
   // (940, the top of the limited range) is white, the 203-nit patch (573) is (573 - 64) / 876 = 58 % grey.
