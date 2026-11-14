@@ -541,7 +541,7 @@ typedef struct ovt_AnalysisDecoderApi {
 const ovt_AnalysisDecoderApi* ovt_analysis_decoder_v1(void);
 ```
 
-Rules: a plugin is single-threaded from the caller's point of view (one instance, one thread); it MUST never crash on malformed input (return `OVT_E_CORRUPT` with a `Diagnostic`); it MUST fill `FrameAnalysis.frame.id.decode_index` from `decode_index_hint`; all per-block syntax it reads MUST appear in the codec extension table.
+Rules: a plugin is single-threaded from the caller's point of view (one instance, one thread); it MUST never crash on malformed input (return `OVT_E_CORRUPT` with a `Diagnostic`; the one exemption is the HM oracle plugin, chapter 7 §7.6.4, #442); it MUST fill `FrameAnalysis.frame.id.decode_index` from `decode_index_hint`; all per-block syntax it reads MUST appear in the codec extension table.
 
 ### 0.6.3 Metric plugin ABI (`core/include/ovt/abi/metric_v1.h`, BSD-2-Clause)
 
