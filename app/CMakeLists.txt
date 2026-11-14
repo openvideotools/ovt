@@ -14,6 +14,37 @@
 # work items that use them (§13.2.1).
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 
+# The Picture panel's PictureHost (WI-1.405) is a QQuickRhiItem (Qt 6.7+) drawing libovt-render's offscreen texture
+# with a passthrough shader compiled by Qt Shader Tools. Distro builds with an older Qt, builds without ovt_render and
+# Android (its EMBEDDED host is WI-A.403) get the panel without it: Platform.pictureHostAvailable is false there.
+set(OVT_STUDIO_PICTURE_HOST OFF)
+if(NOT ANDROID AND TARGET ovt::render AND Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
+  find_package(Qt6 COMPONENTS ShaderTools QUIET)
+  if(TARGET Qt6::ShaderTools OR COMMAND qt_add_shaders)
+    set(OVT_STUDIO_PICTURE_HOST ON)
+  else()
+    message(STATUS "Qt Shader Tools not found: OVT Studio builds without the PictureHost item")
+  endif()
+elseif(NOT ANDROID)
+  message(STATUS "OVT Studio builds without the PictureHost item (needs Qt >= 6.7 and OVT_BUILD_RENDER)")
+endif()
+
+# The passthrough shaders of PictureHost as resources under the module prefix
+# (:/qt/qml/OvtStudio/shaders/picture_quad.{vert,frag}.qsb). Also called by app/tests for the PictureHost test.
+function(ovt_studio_add_picture_shaders target)
+  set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+  qt_add_shaders(
+    ${target}
+    "${target}_picture_shaders"
+    PREFIX
+    "/qt/qml/OvtStudio"
+    BASE
+    "${app_dir}"
+    FILES
+    "${app_dir}/shaders/picture_quad.vert"
+    "${app_dir}/shaders/picture_quad.frag")
+endfunction()
+
 # The QML module "OvtStudio": the QML files, the C++ types they use (Platform, Settings) and the settings schema.
 # A function so that the QML test executable (app/tests/qml) builds the same module under the same URI. The QML
 # files sit in app/qml/ (chapter 0 §0.4), but the aliases put them at the module root, so Main.qml is
@@ -44,7 +75,15 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/panels/DiagnosticsPanel.qml"
       "${app_dir}/qml/panels/UnitListPanel.qml"
       "${app_dir}/qml/panels/TimelinePanel.qml"
-      "${app_dir}/qml/panels/BookmarksPanel.qml")
+      "${app_dir}/qml/panels/BookmarksPanel.qml"
+      "${app_dir}/qml/panels/PicturePanel.qml")
+  # PictureView.qml instantiates PictureHost, so it exists only where the type does (PicturePanel loads it by URL).
+  set(picture_sources "")
+  if(OVT_STUDIO_PICTURE_HOST)
+    list(APPEND qml_files "${app_dir}/qml/panels/PictureView.qml")
+    set(picture_sources "${app_dir}/src/picture_frame.h" "${app_dir}/src/picture_host.h"
+                        "${app_dir}/src/picture_host.cpp")
+  endif()
   # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
   foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
     list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
@@ -121,6 +160,7 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/bookmarks_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
     "${app_dir}/src/dock/dock_model.cpp"
+    ${picture_sources}
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
     "${schema}"
@@ -135,6 +175,13 @@ function(ovt_studio_add_qml_module target)
                                           "$<BUILD_INTERFACE:ovt_schemas>" ovt::flags)
   # No QSettings anywhere in app/ (D8) and no Qt keyword macros (the headers use Q_SIGNALS).
   target_compile_definitions(${target} PRIVATE QT_NO_KEYWORDS)
+  if(OVT_STUDIO_PICTURE_HOST)
+    # render/src for the exported download helper of the Interop::None row (surface/output_download.h).
+    target_link_libraries(${target} PRIVATE ovt::render)
+    target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
+    target_compile_definitions(${target} PRIVATE OVT_HAVE_PICTURE_HOST=1)
+    ovt_studio_add_picture_shaders(${target})
+  endif()
 endfunction()
 
 # Generated code is not ours to fix: Qt's QML cache compiler (AOT) and type registration output trips -Wshadow and
