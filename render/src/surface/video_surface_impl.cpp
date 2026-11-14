@@ -6,7 +6,7 @@
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
 // dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
-// and export arrive with their own work items; until then those entry points are inert.
+// (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are inert.
 
 #include <algorithm>
 #include <cstdint>
@@ -24,6 +24,7 @@
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/overlay_set_impl.h"
+#include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
@@ -116,6 +117,9 @@ class VideoSurfaceImpl final : public VideoSurface {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
 
+    // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
+    static_cast<void>(measurer_.init(log_, vk_->gpu));
+
     target_ = target;
     return create_texture(target.width, target.height);
   }
@@ -186,6 +190,11 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (slot_a_.valid) {
       draw_slot_a(view);
     }
+    // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
+    // being called.
+    if (measurer_.due()) {
+      measurer_.run(slot_a_);
+    }
     pl_gpu_flush(vk_->gpu);
   }
 
@@ -204,7 +213,10 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
-  Measurements measure() override { return Measurements{}; }                         // §10.7.9
+  Measurements measure() override {                                                  // §10.7.9: never blocks
+    measurer_.request();
+    return measurer_.poll();
+  }
 
   bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
     error_ = "export_png is not implemented yet (chapter 10 §10.8)";
@@ -397,6 +409,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    measurer_.destroy();
     if (vk_ != nullptr) {
       detail::destroy_slot(vk_->gpu, slot_a_);
       pl_tex_destroy(vk_->gpu, &tex_);
@@ -420,6 +433,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
+  detail::Measurer measurer_;  // §10.7 (WI-4.452)
 };
 
 }  // namespace
