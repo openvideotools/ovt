@@ -82,6 +82,13 @@ ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
 
+# Targets built under a `tests/` directory need no row here: the gate checks their own licence and link graph without one
+# (SPEC-ASSUMPTION(#432), WI-0.032). Rows are for what ships or is built outside such a directory:
+ovt_core_objects = "LGPL-2.1-or-later"
+ovt_gen_completions = "GPL-3.0-or-later"
+ovt_tests_cli = "GPL-3.0-or-later"       # defined in cli/CMakeLists.txt, outside a tests/ directory
+ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level directory
+
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
 "core/schema" = "BSD-2-Clause"
