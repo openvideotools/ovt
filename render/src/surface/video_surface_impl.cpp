@@ -212,8 +212,20 @@ class VideoSurfaceImpl final : public VideoSurface {
     return measurer_.poll();
   }
 
-  bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
-    error_ = "export_png is not implemented yet (chapter 10 §10.8)";
+  bool export_png(const char* path, ExportKind kind, const ViewState* /*view_or_null*/) override {
+    switch (kind) {
+      case ExportKind::ScopeWaveformPng:
+        return export_scope(path, detail::ScopeKind::Waveform);
+      case ExportKind::ScopeVectorscopePng:
+        return export_scope(path, detail::ScopeKind::Vectorscope);
+      case ExportKind::ScopeCiePng:
+        return export_scope(path, detail::ScopeKind::CieXy);
+      case ExportKind::HdrPng16:
+      case ExportKind::SdrPng8:
+      case ExportKind::ViewPng8:
+        break;
+    }
+    error_ = "export_png is not implemented yet for this kind (chapter 10 §10.8, WI-1.412)";
     return false;
   }
 
@@ -297,6 +309,34 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
   }
 
+  // ExportKind::Scope*Png (§10.8, WI-4.454): measures picture A now (blocking, unlike measure()), then writes the scope
+  // texture through the GUI-independent LUT of detail::scope_png_rgb().
+  bool export_scope(const char* path, detail::ScopeKind kind) {
+    if (!slot_a_.valid) {
+      error_ = "export_png: no picture in slot A";
+      return false;
+    }
+    offscreen_.begin_frame();  // textures held by the host come back for the passes
+    const bool measured = measurer_.measure_now(slot_a_);
+    std::vector<uint16_t> texels;
+    int width = 0;
+    int height = 0;
+    const bool ok = measured && read_scope(kind, texels, width, height);
+    offscreen_.end_frame();  // and go back to the host, as after render()
+    if (!ok) {
+      error_ = measured ? "export_png: the scope texture cannot be read back"
+                        : "export_png: scope measurement failed: " + measurer_.error();
+      return false;
+    }
+    const std::vector<uint8_t> rgb = detail::scope_png_rgb(texels, width, height);
+    if (!detail::write_png_rgb8(path, rgb, width, height)) {
+      error_ = std::string("export_png: cannot write ") + (path != nullptr ? path : "(null)");
+      return false;
+    }
+    error_.clear();
+    return true;
+  }
+
   // Between offscreen_.begin_frame() and end_frame().
   bool read_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
     pl_tex tex = measurer_.scope_tex(kind);
@@ -306,12 +346,21 @@ class VideoSurfaceImpl final : public VideoSurface {
     width = tex->params.w;
     height = tex->params.h;
     texels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    // Through an explicit host-readable buffer: libplacebo's own staging path for a pointer download
+    // (pl_tex_download_pbo) crashes in vk_malloc_slice on MoltenVK when the device was imported (VulkanSharedDevice).
+    struct pl_buf_params bp = {};
+    bp.size = texels.size() * sizeof(uint16_t);
+    bp.host_readable = true;
+    pl_buf buf = pl_buf_create(gpu_, &bp);
+    if (buf == nullptr) {
+      return false;
+    }
     struct pl_tex_transfer_params tp = {};
     tp.tex = tex;
     tp.row_pitch = static_cast<size_t>(width) * 4 * sizeof(uint16_t);
-    tp.ptr = texels.data();
-    const bool ok = pl_tex_download(gpu_, &tp);
-    pl_gpu_finish(gpu_);
+    tp.buf = buf;
+    const bool ok = pl_tex_download(gpu_, &tp) && pl_buf_read(gpu_, buf, 0, texels.data(), bp.size);
+    pl_buf_destroy(gpu_, &buf);
     return ok;
   }
 
