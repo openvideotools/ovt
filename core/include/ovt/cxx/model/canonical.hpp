@@ -26,8 +26,9 @@ namespace ovt::model {
 /// buffers (a `[ubyte]` field `X` next to a string field `X_type` naming a table) are canonicalised
 /// recursively before the outer table. The schema's file_identifier is written when @p buffer carries it.
 /// The output is deterministic, and canonicalize(canonicalize(b)) == canonicalize(b).
-/// @throws std::invalid_argument for an unknown schema or root table, or a buffer (or nested buffer) that
-///         fails the reflection verifier.
+/// @throws std::invalid_argument for an unknown schema or root table, a buffer (or nested buffer) that fails
+///         the reflection verifier (max_depth 64, max_tables 10 000 000), nested buffers more than 4 levels
+///         deep, or a buffer whose shared offsets expand past 16 x its size + 1 MiB of work (capped below 2 GiB).
 [[nodiscard]] std::vector<std::uint8_t> canonicalize(std::span<const std::uint8_t> buffer, SchemaId schema,
                                                      std::string_view root_table);
 
@@ -37,7 +38,8 @@ namespace ovt::model {
 /// when the buffers are structurally equal (an absent field equals its default; an absent string or vector
 /// equals an empty one). Enums print their value name, strings are quoted, a vector whose lengths differ
 /// gets a `<path>.length` line and its common prefix is compared element by element.
-/// @throws std::invalid_argument for an unknown schema or root table, or a buffer that fails the verifier.
+/// @throws std::invalid_argument for an unknown schema or root table, a buffer that fails the verifier, nested
+///         buffers more than 4 levels deep, or work past 16 x (size of A + size of B) + 1 MiB (capped below 2 GiB).
 [[nodiscard]] std::vector<std::string> structural_diff(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b,
                                                        SchemaId schema, std::string_view root_table);
 

@@ -38,7 +38,10 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
+
+#include "verifier_options.hpp"
 
 namespace ovt::model {
 namespace {
@@ -58,6 +61,33 @@ constexpr int kMaxNesting = 4;
   throw std::invalid_argument(std::string(caller) + ": nested buffers deeper than " + std::to_string(kMaxNesting) +
                               " levels at " + path);
 }
+
+/// Work budget against shared offsets. A buffer that verifies may point many offsets at one table, string or
+/// vector (or at one nested buffer), so the canonical output and the work of both walkers can grow far beyond
+/// the input. Every byte the walkers write, copy, verify or compare is charged; past 16 x input + 1 MiB, capped
+/// below 2 GiB (the FlatBuffers size limit), the call throws std::invalid_argument.
+class Budget {
+ public:
+  Budget(std::size_t input, const char* caller) : caller_(caller) {
+    constexpr std::size_t kCap = (std::size_t{1} << 31U) - 1;
+    constexpr std::size_t kSlack = std::size_t{1} << 20U;
+    constexpr std::size_t kFactor = 16;
+    limit_ = input >= (kCap - kSlack) / kFactor ? kCap : kFactor * input + kSlack;
+  }
+
+  void charge(std::size_t bytes) {
+    if (bytes > limit_ - spent_) {
+      throw std::invalid_argument(std::string(caller_) + ": work exceeds the budget of " + std::to_string(limit_) +
+                                  " bytes (offsets shared by many parents?)");
+    }
+    spent_ += bytes;
+  }
+
+ private:
+  const char* caller_;
+  std::size_t limit_ = 0;
+  std::size_t spent_ = 0;
+};
 
 // ---- schema helpers -------------------------------------------------------------------------------------
 
@@ -104,6 +134,22 @@ std::vector<const reflection::Field*> fields_by_id(const reflection::Object& obj
             [](const reflection::Field* lhs, const reflection::Field* rhs) { return lhs->id() < rhs->id(); });
   return fields;
 }
+
+/// fields_by_id() per object, computed once per call: shared offsets make the walkers visit a table type
+/// millions of times.
+class FieldOrder {
+ public:
+  const std::vector<const reflection::Field*>& operator()(const reflection::Object& object) {
+    auto [it, inserted] = cache_.try_emplace(&object);
+    if (inserted) {
+      it->second = fields_by_id(object);
+    }
+    return it->second;
+  }
+
+ private:
+  std::unordered_map<const reflection::Object*, std::vector<const reflection::Field*>> cache_;
+};
 
 bool is_scalar(BaseType type) {
   return type >= BaseType::UType && type <= BaseType::Double;
@@ -213,15 +259,17 @@ class AlignedCopy {
 };
 
 // Reflection verifier. flatbuffers::Verify (reflection.cpp, v25.12.19) reads a sub-table field's offset before
-// it checks that the offset slot lies inside the buffer, an out-of-bounds read that fuzz_canonical found. This
-// verifier walks the schema the same way but checks every slot first (Table::VerifyOffset), as generated
+// it checks that the offset slot lies inside the buffer, an out-of-bounds read that fuzz_canonical found
+// (regression input core/tests/fuzz/regressions/canonical/; upstream report tracked as a follow-up of #271).
+// This verifier walks the schema the same way but checks every slot first (Table::VerifyOffset), as generated
 // verifiers do, and it enforces `required`. Unions and 64-bit vectors, which the OVT schemas do not use, fail.
-// The depth is bounded by the Verifier's max_depth (VerifyTableStart / EndTable), hence the recursion is too.
+// Limits are those of WI-0.094 (verifier_options(): max_depth 64, max_tables 10 000 000), as in the validator.
+// The depth is bounded by max_depth (VerifyTableStart / EndTable), hence the recursion is too.
 // NOLINTBEGIN(misc-no-recursion)
 class SafeVerifier {
  public:
   SafeVerifier(const reflection::Schema& schema, ByteView buffer)
-      : schema_(schema), verifier_(buffer.data(), buffer.size()) {}
+      : schema_(schema), verifier_(buffer.data(), buffer.size(), detail::verifier_options()) {}
 
   bool table(const reflection::Object& object, const flatbuffers::Table* table) {
     if (table == nullptr || !table->VerifyTableStart(verifier_)) {
@@ -349,17 +397,19 @@ std::size_t element_size(const reflection::Schema& schema, const reflection::Typ
 
 // ---- canonical builder ----------------------------------------------------------------------------------
 
-// The walkers below recurse along the object tree. The depth is bounded: every buffer passes
-// flatbuffers::Verify (max_depth 64) before it is walked, and nested buffers are verified the same way.
+// The walkers below recurse along the object tree. The depth is bounded: every buffer passes SafeVerifier
+// (max_depth 64) before it is walked, nested buffers are verified the same way and at most kMaxNesting deep.
+// The width is bounded by the Budget.
 // NOLINTBEGIN(misc-no-recursion)
 
 class Canonicalizer {
  public:
-  explicit Canonicalizer(const reflection::Schema& schema) : schema_(schema) {}
+  Canonicalizer(const reflection::Schema& schema, Budget& budget) : schema_(schema), budget_(budget) {}
 
   /// Canonical bytes of a finished buffer of @p object; @p identifier is written when non-null.
   std::vector<std::uint8_t> finish(const reflection::Object& object, const AlignedCopy& buffer, const char* identifier,
                                    const std::string& path) {
+    budget_.charge(buffer.size());
     if (!verifies(schema_, object, buffer)) {
       throw std::invalid_argument("canonicalize: " + (path.empty() ? std::string("buffer") : path) +
                                   " is not a valid " + name_of(object));
@@ -374,6 +424,8 @@ class Canonicalizer {
 
  private:
   const reflection::Schema& schema_;
+  Budget& budget_;
+  FieldOrder field_order_;
   int nesting_ = 0;  ///< nested-buffer levels above the table being copied
 
   struct RawVector {
@@ -394,8 +446,8 @@ class Canonicalizer {
     return {offset, MutableBytes(out, count * elem_size)};
   }
 
-  static flatbuffers::uoffset_t copy_bytes(flatbuffers::FlatBufferBuilder& builder, ByteView bytes,
-                                           std::size_t elem_size) {
+  flatbuffers::uoffset_t copy_bytes(flatbuffers::FlatBufferBuilder& builder, ByteView bytes, std::size_t elem_size) {
+    budget_.charge(bytes.size() + sizeof(flatbuffers::uoffset_t));
     const auto vector = raw_vector(builder, bytes.size() / elem_size, elem_size, elem_size);
     std::ranges::copy(bytes, vector.bytes.begin());
     return vector.offset;
@@ -422,6 +474,7 @@ class Canonicalizer {
                                            const reflection::Field& field, const flatbuffers::Table& table,
                                            const std::string& path) {
     const auto* src = vector_field<flatbuffers::Offset<flatbuffers::Table>>(table, field);
+    budget_.charge((src == nullptr ? 0 : std::size_t{src->size()}) * sizeof(flatbuffers::uoffset_t));
     std::vector<flatbuffers::Offset<flatbuffers::Table>> offsets;
     for (flatbuffers::uoffset_t i = 0; src != nullptr && i < src->size(); ++i) {
       offsets.emplace_back(copy_table(builder, element, *src->Get(i), path + '[' + std::to_string(i) + ']'));
@@ -429,12 +482,12 @@ class Canonicalizer {
     return builder.CreateVector(offsets).o;
   }
 
-  static flatbuffers::uoffset_t copy_string_vector(flatbuffers::FlatBufferBuilder& builder,
-                                                   const reflection::Field& field, const flatbuffers::Table& table) {
+  flatbuffers::uoffset_t copy_string_vector(flatbuffers::FlatBufferBuilder& builder, const reflection::Field& field,
+                                            const flatbuffers::Table& table) {
     const auto* src = vector_field<flatbuffers::Offset<flatbuffers::String>>(table, field);
     std::vector<flatbuffers::Offset<flatbuffers::String>> offsets;
     for (flatbuffers::uoffset_t i = 0; src != nullptr && i < src->size(); ++i) {
-      offsets.push_back(builder.CreateString(src->Get(i)->c_str(), src->Get(i)->size()));
+      offsets.emplace_back(copy_string(builder, src->Get(i)->string_view()));
     }
     return builder.CreateVector(offsets).o;
   }
@@ -457,6 +510,7 @@ class Canonicalizer {
       }
       const auto size = static_cast<std::size_t>(element.bytesize());
       const auto src = vector_bytes(table, field, size);
+      budget_.charge(std::size_t{count} * size);
       const auto vector = raw_vector(builder, count, size, static_cast<std::size_t>(element.minalign()));
       for (std::size_t i = 0; i < count; ++i) {
         copy_struct(element, src.subspan(i * size, size), vector.bytes.subspan(i * size, size));
@@ -482,6 +536,11 @@ class Canonicalizer {
     return copy_bytes(builder, src, elem);
   }
 
+  flatbuffers::uoffset_t copy_string(flatbuffers::FlatBufferBuilder& builder, std::string_view text) {
+    budget_.charge(text.size() + sizeof(flatbuffers::uoffset_t) + 1);
+    return builder.CreateString(text.data(), text.size()).o;
+  }
+
   /// Pass 1 of copy_table: the string, vector or sub-table of @p field (0 when none is written).
   flatbuffers::uoffset_t copy_child(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& object,
                                     const reflection::Field& field, const flatbuffers::Table& table,
@@ -489,7 +548,7 @@ class Canonicalizer {
     switch (type_of(field).base_type()) {
       case BaseType::String: {
         const auto text = string_field(table, field);
-        return text.empty() && !field.required() ? 0 : builder.CreateString(text.data(), text.size()).o;
+        return text.empty() && !field.required() ? 0 : copy_string(builder, text);
       }
       case BaseType::Vector:
         return copy_vector(builder, object, field, table, path);
@@ -498,22 +557,19 @@ class Canonicalizer {
         const auto* child = sub.is_struct() ? nullptr : table.GetPointer<const flatbuffers::Table*>(field.offset());
         return child == nullptr ? 0 : copy_table(builder, sub, *child, path);
       }
-      default:
-        if (!is_scalar(type_of(field).base_type())) {  // unions, 64-bit vectors: not used by the OVT schemas
-          throw std::invalid_argument("canonicalize: unsupported field type at " + path);
-        }
-        return 0;
+      default:  // unions, 64-bit vectors: not used by the OVT schemas (scalars never get here)
+        throw std::invalid_argument("canonicalize: unsupported field type at " + path);
     }
   }
 
   flatbuffers::uoffset_t copy_table(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& object,
                                     const flatbuffers::Table& table, const std::string& path) {
-    const auto fields = fields_by_id(object);
+    const auto& fields = field_order_(object);
     const auto prefix = path.empty() ? std::string{} : path + '.';
     // 1. children, in field-id order
     std::vector<flatbuffers::uoffset_t> children(fields.size(), 0);
     for (std::size_t i = 0; i < fields.size(); ++i) {
-      if (!fields[i]->deprecated()) {
+      if (!fields[i]->deprecated() && !is_scalar(type_of(*fields[i]).base_type())) {
         children[i] = copy_child(builder, object, *fields[i], table, prefix + name_of(*fields[i]));
       }
     }
@@ -527,7 +583,9 @@ class Canonicalizer {
         }
       }
     }
-    return builder.EndTable(start);
+    const auto end = builder.EndTable(start);
+    budget_.charge(builder.GetSize() - start);  // the table and its vtable (unless deduplicated)
+    return end;
   }
 
   template <class T>
@@ -738,19 +796,30 @@ std::string indexed(const std::string& path, std::size_t index) {
 
 class Differ {
  public:
-  Differ(const reflection::Schema& schema, std::vector<std::string>& out) : schema_(schema), out_(out) {}
+  Differ(const reflection::Schema& schema, Budget& budget, std::vector<std::string>& out)
+      : schema_(schema), budget_(budget), out_(out) {}
 
   void tables(const reflection::Object& object, const flatbuffers::Table& a, const flatbuffers::Table& b,
               const std::string& path) {
+    budget_.charge(kTableCost);
     const auto prefix = path.empty() ? std::string{} : path + '.';
-    for (const auto* field : fields_by_id(object)) {
+    for (const auto* field : field_order_(object)) {
       if (field->deprecated()) {
         continue;
       }
-      const auto field_path = prefix + name_of(*field);
       const auto& type = type_of(*field);
+      if (is_scalar(type.base_type())) {  // the common case: no path unless the values differ
+        const auto sa = table_scalar(a, *field);
+        const auto sb = table_scalar(b, *field);
+        if (!(sa == sb)) {
+          compare(prefix + name_of(*field), type, false, sa, sb);
+        }
+        continue;
+      }
+      const auto field_path = prefix + name_of(*field);
       switch (type.base_type()) {
         case BaseType::String:
+          budget_.charge(string_field(a, *field).size() + string_field(b, *field).size());
           if (string_field(a, *field) != string_field(b, *field)) {
             report(field_path, quote(string_field(a, *field)), quote(string_field(b, *field)));
           }
@@ -762,24 +831,27 @@ class Differ {
           objects(object_at(schema_, type.index()), *field, a, b, field_path);
           break;
         default:
-          if (!is_scalar(type.base_type())) {  // unions, 64-bit vectors: not used by the OVT schemas
-            throw std::invalid_argument("structural_diff: unsupported field type at " + field_path);
-          }
-          compare(field_path, type, false, table_scalar(a, *field), table_scalar(b, *field));
-          break;
+          // unions, 64-bit vectors: not used by the OVT schemas
+          throw std::invalid_argument("structural_diff: unsupported field type at " + field_path);
       }
     }
   }
 
  private:
+  /// Charged per pair of tables compared: two vtable lookups per field, at least.
+  static constexpr std::size_t kTableCost = 16;
+
   const reflection::Schema& schema_;
+  Budget& budget_;
   std::vector<std::string>& out_;
+  FieldOrder field_order_;
   int nesting_ = 0;  ///< nested-buffer levels above the tables being compared
 
   static std::string presence(bool present) { return present ? "<present>" : "<absent>"; }
 
   void report(const std::string& path, const std::string& a, const std::string& b) {
     out_.push_back(path + ": " + a + " != " + b);
+    budget_.charge(out_.back().size());
   }
 
   void compare(const std::string& path, const reflection::Type& type, bool element, const Scalar& a, const Scalar& b) {
@@ -845,7 +917,7 @@ class Differ {
   }
 
   void structs(const reflection::Object& object, ByteView a, ByteView b, const std::string& path) {
-    for (const auto* field : fields_by_id(object)) {
+    for (const auto* field : field_order_(object)) {
       const auto& type = type_of(*field);
       const auto field_path = path + '.' + name_of(*field);
       const std::size_t offset = field->offset();
@@ -865,6 +937,7 @@ class Differ {
   /// The first @p count inline elements (structs or scalars) of an array or vector of type @p type.
   void elements(const reflection::Type& type, ByteView a, ByteView b, std::size_t count, const std::string& path) {
     const std::size_t size = element_size(schema_, type);
+    budget_.charge(2 * count * size);
     for (std::size_t i = 0; i < count; ++i) {
       const auto ea = a.subspan(i * size, size);
       const auto eb = b.subspan(i * size, size);
@@ -890,6 +963,7 @@ class Differ {
     if (nesting_ == kMaxNesting) {
       too_deep("structural_diff", path);
     }
+    budget_.charge(vector_size(a, field) + vector_size(b, field));  // copied and verified
     const AlignedCopy ca(vector_bytes(a, field, 1));
     const AlignedCopy cb(vector_bytes(b, field, 1));
     if (!verifies(schema_, *table_object, ca) || !verifies(schema_, *table_object, cb)) {
@@ -917,6 +991,7 @@ class Differ {
       const auto* sa = vector_field<flatbuffers::Offset<flatbuffers::String>>(a, field);
       const auto* sb = vector_field<flatbuffers::Offset<flatbuffers::String>>(b, field);
       for (flatbuffers::uoffset_t i = 0; i < common; ++i) {
+        budget_.charge(sa->Get(i)->size() + sb->Get(i)->size());
         if (sa->Get(i)->string_view() != sb->Get(i)->string_view()) {
           report(indexed(path, i), quote(sa->Get(i)->string_view()), quote(sb->Get(i)->string_view()));
         }
@@ -954,7 +1029,8 @@ std::vector<std::uint8_t> canonicalize(std::span<const std::uint8_t> buffer, Sch
                            flatbuffers::kFileIdentifierLength)) {
     identifier = ident->c_str();
   }
-  return Canonicalizer(*resolved.schema).finish(*resolved.root, copy, identifier, {});
+  Budget budget(copy.size(), "canonicalize");
+  return Canonicalizer(*resolved.schema, budget).finish(*resolved.root, copy, identifier, {});
 }
 
 std::vector<std::string> structural_diff(std::span<const std::uint8_t> a, std::span<const std::uint8_t> b,
@@ -969,7 +1045,8 @@ std::vector<std::string> structural_diff(std::span<const std::uint8_t> a, std::s
     throw std::invalid_argument("structural_diff: buffer B is not a valid " + std::string(root_table));
   }
   std::vector<std::string> out;
-  Differ(*resolved.schema, out)
+  Budget budget(ca.size() + cb.size(), "structural_diff");
+  Differ(*resolved.schema, budget, out)
       .tables(*resolved.root, *flatbuffers::GetAnyRoot(ca.data()), *flatbuffers::GetAnyRoot(cb.data()), {});
   return out;
 }

@@ -8,6 +8,7 @@
 #include <flatbuffers/flatbuffers.h>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -234,4 +235,58 @@ TEST_CASE("test_canonical: nested-buffer recursion is bounded", "[model][fast]")
   const Bytes very_deep = nested_chain(200);  // would recurse 200 levels without the cap
   CHECK_THROWS_AS(ovt::model::canonicalize(very_deep, SchemaId::Model, kRoot), std::invalid_argument);
   CHECK_THROWS_AS(ovt::model::structural_diff(very_deep, very_deep, SchemaId::Model, kRoot), std::invalid_argument);
+}
+
+namespace {
+
+/// A FrameAnalysis whose `blocks` vector holds @p count offsets to one shared Block (a valid buffer: the
+/// verifier checks each offset, not that offsets are distinct). The Block carries @p ext_size bytes of `ext`
+/// with no `ext_type`, so the bytes are not a nested buffer.
+Bytes aliased_blocks(std::size_t count, std::size_t ext_size) {
+  flatbuffers::FlatBufferBuilder builder;
+  flatbuffers::Offset<flatbuffers::Vector<std::uint8_t>> ext;
+  if (ext_size != 0) {
+    const std::vector<std::uint8_t> bytes(ext_size, 0x5A);
+    ext = builder.CreateVector(bytes);
+  }
+  fb::BlockBuilder block(builder);
+  block.add_qp(1);
+  if (ext_size != 0) {
+    block.add_ext(ext);
+  }
+  const auto shared = block.Finish();
+  const std::vector<flatbuffers::Offset<fb::Block>> blocks(count, shared);
+  const auto vector = builder.CreateVector(blocks);
+  fb::FrameAnalysisBuilder root(builder);
+  root.add_schema_version(1);
+  root.add_blocks(vector);
+  fb::FinishFrameAnalysisBuffer(builder, root.Finish());
+  return {builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize()};
+}
+
+}  // namespace
+
+TEST_CASE("test_canonical: the verifier takes the WI-0.094 max_tables (more than 1M tables)", "[model][fast]") {
+  // 1 100 001 tables as the verifier counts them: over the FlatBuffers default of 1 000 000, under 10 000 000.
+  constexpr std::size_t kBlocks = 1'100'000;
+  const Bytes input = aliased_blocks(kBlocks, 0);
+  const auto canonical = ovt::model::canonicalize(input, SchemaId::Model, kRoot);
+  const auto* fa = fb::GetFrameAnalysis(canonical.data());
+  REQUIRE(fa->blocks() != nullptr);
+  CHECK(fa->blocks()->size() == kBlocks);
+  CHECK(fa->blocks()->Get(kBlocks - 1)->qp() == 1);
+  CHECK(ovt::model::structural_diff(input, canonical, SchemaId::Model, kRoot).empty());
+}
+
+TEST_CASE("test_canonical: shared offsets cannot expand past the work budget", "[model][fast]") {
+  // 10 000 blocks share one 64 KiB `ext`: about 100 KiB of input, 640 MiB to copy or compare.
+  constexpr std::size_t kExt = std::size_t{64} * 1024;
+  const Bytes aliased = aliased_blocks(10'000, kExt);
+  CHECK_THROWS_AS(ovt::model::canonicalize(aliased, SchemaId::Model, kRoot), std::invalid_argument);
+  CHECK_THROWS_AS(ovt::model::structural_diff(aliased, aliased, SchemaId::Model, kRoot), std::invalid_argument);
+
+  // A few sharers stay well inside the budget (16 x input + 1 MiB).
+  const Bytes few = aliased_blocks(8, kExt);
+  CHECK(ovt::model::canonicalize(few, SchemaId::Model, kRoot).size() > 8 * kExt);
+  CHECK(ovt::model::structural_diff(few, few, SchemaId::Model, kRoot).empty());
 }
