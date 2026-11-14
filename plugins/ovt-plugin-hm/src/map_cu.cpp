@@ -596,6 +596,22 @@ class Mapper {
     out_.blocks[id].ext = tu_ext(cu, z, t, l2, blk_idx, split, pred);
   }
 
+  // cbf_cb / cbf_cr of a transform-tree node (7.3.8.8): one entry, or for 4:2:2 two where the node codes its chroma
+  // TBs (a leaf, or the 8x8 node holding the chroma of four 4x4 luma TUs), one per vertical half. HM's parseQtCbf
+  // stores each half's flag one depth below the node's lowest chroma level (t at a leaf, t + 1 at that 8x8 node),
+  // and their OR at the node's own depth t.
+  void chroma_cbf(const TComDataCU& cu, UInt z, UInt t, int l2, bool split, ComponentID c,
+                  std::vector<uint8_t>* out) const {
+    if (chroma_ != CHROMA_422 || (split && l2 != 3)) {
+      out->push_back(cu.getCbf(z, c, t));
+      return;
+    }
+    const UInt sub_depth = t + (split ? 2U : 1U);
+    const UInt half = (total_parts_ >> (2 * (cu.getDepth(z) + t))) / 2;
+    out->push_back(cu.getCbf(z, c, sub_depth));
+    out->push_back(cu.getCbf(z + half, c, sub_depth));
+  }
+
   std::vector<uint8_t> tu_ext(const TComDataCU& cu, UInt z, UInt t, int l2, uint8_t blk_idx, bool split,
                               fb::PredKind pred) {
     // Chroma flags of a node: none for 4:0:0, and a 4x4 luma node of 4:2:0 / 4:2:2 carries none of its own.
@@ -603,8 +619,8 @@ class Mapper {
     std::vector<uint8_t> cb;
     std::vector<uint8_t> cr;
     if (chroma) {
-      cb.push_back(cu.getCbf(z, COMPONENT_Cb, t));
-      cr.push_back(cu.getCbf(z, COMPONENT_Cr, t));
+      chroma_cbf(cu, z, t, l2, split, COMPONENT_Cb, &cb);
+      chroma_cbf(cu, z, t, l2, split, COMPONENT_Cr, &cr);
     }
     std::vector<uint8_t> skip;
     if (!split && pps_.getUseTransformSkip()) {

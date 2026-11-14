@@ -27,12 +27,14 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "TLibCommon/CommonDef.h"  // HM's typedefs, which its MD5.h needs
 #include "libmd5/MD5.h"            // HM's public-domain MD5 (Colin Plumb), compiled into tp::hm_common
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
+#include "ovt/cxx/model/tree.hpp"
 #include "ovt/cxx/model/validator.hpp"
 #include "ovt_model_generated.h"
 #include "test_support/corpus.h"
@@ -287,7 +289,90 @@ struct StreamResult {
   int push_errors = 0;
   std::vector<std::string> violations;  // chapter 06 §6.9 validator findings (first few)
   bool keep_grids = false;
+  // 4:2:2 HevcTu.cbf_cb / cbf_cr (ovt_model.fbs: two entries per chroma-coding node, one per vertical half).
+  int tu422_two_entry_nodes = 0;   // nodes that carry two entries per component
+  int tu422_halves_differ = 0;     // ... of which the two halves of a component differ (so they are not the OR twice)
+  int tu422_parent_two_entry = 0;  // ... of which 8x8 nodes split into 4x4 luma TUs
+  int tu422_parent_differ = 0;     // ... of those, with differing halves
+  std::vector<std::string> tu422_errors;  // first few mismatches
 };
+
+// Checks the chroma cbf entries of every HevcTu of a 4:2:2 picture: their count per 7.3.8.8 (none at a 4x4 luma
+// node, two where the node codes its chroma TBs: a leaf, or an 8x8 node split into 4x4 luma TUs; one otherwise),
+// and that the OR of a node's two entries equals the chroma cbf bit of every grid cell the node covers (HM keeps
+// the halves and their OR at different transform depths, so a wrong depth or half shows up as a mismatch).
+// The cell index of the first grid cell inside @p rect whose chroma cbf bit @p c differs from @p any.
+std::optional<uint32_t> grid_cbf_mismatch(const ovt::fb::CellGrid& g, const ovt::fb::Rect& rect, int c, int any) {
+  const int w4 = static_cast<int>(g.cells_w());
+  const int x1 = std::min((rect.x() + rect.w()) / 4, w4);
+  const int y1 = std::min((rect.y() + rect.h()) / 4, static_cast<int>(g.cells_h()));
+  for (int y4 = rect.y() / 4; y4 < y1; ++y4) {
+    for (int x4 = rect.x() / 4; x4 < x1; ++x4) {
+      const auto i = static_cast<uint32_t>((y4 * w4) + x4);
+      if (((g.cbf()->Get(i) >> c) & 1) != any) {
+        return i;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+// One component's chroma cbf entries of a 4:2:2 TU node: "" when they hold @p want entries and, for two, their OR
+// matches the grid; sets *differ when the two entries differ.
+std::string check_chroma_cbf(const ovt::fb::CellGrid& g, const ovt::fb::Rect& rect, int c,
+                             const flatbuffers::Vector<uint8_t>* v, std::size_t want, bool* differ) {
+  const std::size_t n = v == nullptr ? 0 : v->size();
+  if (n != want) {
+    return std::to_string(n) + " entries, want " + std::to_string(want);
+  }
+  if (n != 2) {
+    return "";
+  }
+  *differ = *differ || v->Get(0) != v->Get(1);
+  const auto bad = grid_cbf_mismatch(g, rect, c, (v->Get(0) | v->Get(1)) != 0 ? 1 : 0);
+  return bad ? "OR of the halves differs from grid cbf at cell " + std::to_string(*bad) : "";
+}
+
+// Checks the chroma cbf entries of every HevcTu of a 4:2:2 picture: their count per 7.3.8.8 (none at a 4x4 luma
+// node, two where the node codes its chroma TBs: a leaf, or an 8x8 node split into 4x4 luma TUs; one otherwise),
+// and that the OR of a node's two entries equals the chroma cbf bit of every grid cell the node covers (HM keeps
+// the halves and their OR at different transform depths, so a wrong depth or half shows up as a mismatch).
+void check_tu_node(const ovt::fb::FrameAnalysis& fa, const ovt::fb::Block& b, const ovt::fb::HevcTu& tu,
+                   StreamResult* r) {
+  const int l2 = tu.log2TrafoSize();
+  const bool split = tu.split_transform_flag() == 1;
+  const std::size_t want = l2 == 2 ? 0 : ((!split || l2 == 3) ? 2 : 1);
+  bool differ = false;
+  for (int c = 1; c <= 2; ++c) {
+    const std::string error =
+        check_chroma_cbf(*fa.grid(), *b.rect(), c, c == 1 ? tu.cbf_cb() : tu.cbf_cr(), want, &differ);
+    if (!error.empty() && r->tu422_errors.size() < 8) {
+      std::string where = "decode index ";
+      where += std::to_string(fa.frame()->id()->decode_index());
+      where += " TU at " + std::to_string(b.rect()->x());
+      where += "," + std::to_string(b.rect()->y());
+      where += " log2 " + std::to_string(l2);
+      where += " component " + std::to_string(c);
+      where += ": ";
+      where += error;
+      r->tu422_errors.push_back(std::move(where));
+    }
+  }
+  if (want == 2) {
+    ++r->tu422_two_entry_nodes;
+    r->tu422_halves_differ += differ ? 1 : 0;
+    r->tu422_parent_two_entry += split ? 1 : 0;
+    r->tu422_parent_differ += split && differ ? 1 : 0;
+  }
+}
+
+void check_tu_cbf_422(const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
+  for (const ovt::fb::Block* b : *fa.blocks()) {
+    if (const auto* tu = ovt::model::ext_as<ovt::fb::HevcTu>(*b)) {
+      check_tu_node(fa, *b, *tu, r);
+    }
+  }
+}
 
 // Validator findings on what the host completes: the timebase and the source-hash prefix of blob ids.
 bool host_fills(const ovt::model::Violation& v) {
@@ -351,6 +436,9 @@ void drain(Instance& in, StreamResult* r) {
     }
     if (r->keep_grids) {
       out.grid = grid_of(*fa);
+    }
+    if (out.chroma_format == 2) {
+      check_tu_cbf_422(*fa, r);
     }
     CHECK(!r->actual.contains(idx));
     r->actual[idx] = std::move(out);
@@ -594,6 +682,27 @@ TEST_CASE("hm plugin: RExt 4:4:4 12-bit yields a FrameAnalysis per picture", "[f
     CHECK(out.plane_bit_depths == std::vector<uint8_t>{12, 12, 12});
     CHECK(out.plane_sample_bytes == std::vector<uint8_t>{2, 2, 2});
   }
+}
+
+TEST_CASE("hm plugin: 4:2:2 HevcTu chroma cbf has one entry per chroma TB", "[fast][third_party][needs-corpus]") {
+  // syn_h265_422_444_rext (recipe 11) also holds the x265 main422-10 stream next to its primary file.
+  const std::filesystem::path path =
+      ovt::test::corpus_or_skip("syn_h265_422_444_rext").parent_path() / "syn_h265_422_10bit.265";
+  REQUIRE(std::filesystem::exists(path));
+  const StreamResult r = run_stream(read_file(path));
+  check_stream(r, false);
+  std::string errors;
+  for (const std::string& e : r.tu422_errors) {
+    errors += e + "\n";
+  }
+  INFO(errors);
+  CHECK(r.tu422_errors.empty());
+  INFO("two-entry nodes " << r.tu422_two_entry_nodes << ", halves differ " << r.tu422_halves_differ << ", 8x8 parents "
+                          << r.tu422_parent_two_entry);
+  CHECK(r.tu422_two_entry_nodes > 0);
+  // Reading the OR's depth would give the same flag twice; the halves must differ somewhere in the stream.
+  CHECK(r.tu422_halves_differ > 0);
+  CHECK(r.tu422_parent_differ > 0);  // HM keeps those halves one depth lower than at a leaf
 }
 
 namespace {
