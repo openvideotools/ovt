@@ -4,6 +4,8 @@
 // §10.7.9 readback strategy (WI-4.452): the measurement passes run after the display render in the same submission,
 // only while a consumer calls measure(); their results come back through two host-readable buffers that measure()
 // polls without blocking. measure() returns the newest completed result, with measured_frame naming its frame.
+// WI-4.453: the same M and Q also feed the false-colour and gamut-clip views (§10.7.5, §10.7.8), computed once per
+// render.
 
 #include <array>
 #include <cstdint>
@@ -86,6 +88,7 @@ void Measurer::destroy() {
       rb = Readback{};
     }
     destroy_levels(gpu_, levels_);
+    pl_tex_destroy(gpu_, &view_);
     pl_tex_destroy(gpu_, &q_);
     pl_tex_destroy(gpu_, &m_);
   }
@@ -95,6 +98,7 @@ void Measurer::destroy() {
   next_seq_ = 1;
   shown_seq_ = 0;
   renders_since_request_ = 2;
+  prepared_ = false;
   last_ = Measurements{};
 }
 
@@ -104,6 +108,29 @@ bool Measurer::due() {
     ++renders_since_request_;
   }
   return wanted && available_;
+}
+
+bool Measurer::prepare(const FrameSlot& slot, std::string& err) {
+  if (prepared_) {
+    return true;
+  }
+  if (!render_linear(gpu_, renderer_, slot, &m_, err) || !prep_pass(dispatch_, gpu_, m_, slot.frame.color, &q_, err)) {
+    return false;
+  }
+  prepared_ = true;
+  return true;
+}
+
+pl_tex Measurer::analysis_view(const FrameSlot& slot, AnalysisView mode) {
+  if (!available_ || !slot.valid || mode == AnalysisView::None) {
+    return nullptr;
+  }
+  std::string err;
+  if (!prepare(slot, err) || !analysis_pass(dispatch_, gpu_, q_, mode, &view_, err)) {
+    report(err);
+    return nullptr;
+  }
+  return view_;
 }
 
 void Measurer::run(const FrameSlot& slot) {
@@ -125,9 +152,7 @@ void Measurer::run(const FrameSlot& slot) {
   }
 
   std::string err;
-  if (!render_linear(gpu_, renderer_, slot, &m_, err) ||
-      !prep_pass(dispatch_, gpu_, m_, slot.frame.color.primaries, &q_, err) ||
-      !reduce_chain(dispatch_, gpu_, q_, levels_, err)) {
+  if (!prepare(slot, err) || !reduce_chain(dispatch_, gpu_, q_, levels_, err)) {
     report(err);
     return;
   }
@@ -136,9 +161,9 @@ void Measurer::run(const FrameSlot& slot) {
   const uint64_t pixels = static_cast<uint64_t>(width) * height;
   const uint32_t s = subsample_factor(pixels);
 
-  // The buffer is idle (not pending), so this write does not block. The histogram counts start from zero.
-  static const std::array<uint32_t, kHistogramBins> kZero{};
-  pl_buf_write(gpu_, rb->buf, 0, kZero.data(), kHistogramBytes);
+  // The buffer is idle (not pending), so this write does not block. The histogram and the counters start from zero.
+  static const std::array<uint32_t, kHistogramBins + kCounters> kZero{};
+  pl_buf_write(gpu_, rb->buf, 0, kZero.data(), kHistogramBytes + kCountsBytes);
   if (!accumulate_histogram(dispatch_, q_, s, rb->buf, err)) {
     report(err);
     return;
@@ -168,8 +193,10 @@ void Measurer::collect(Readback& rb) {
     return;  // an older frame than the result already shown
   }
   std::array<uint32_t, kHistogramBins> hist{};
+  std::array<uint32_t, kCounters> counts{};
   std::array<float, 4> texel{};
   if (!pl_buf_read(gpu_, rb.buf, 0, hist.data(), kHistogramBytes) ||
+      !pl_buf_read(gpu_, rb.buf, kCountsOffset, counts.data(), kCountsBytes) ||
       !pl_buf_read(gpu_, rb.buf, kTexelOffset, texel.data(), sizeof(texel))) {
     return;
   }
@@ -182,6 +209,16 @@ void Measurer::collect(Readback& rb) {
   std::memcpy(static_cast<void*>(m.histogram_pq), hist.data(), kHistogramBytes);
   m.sampled_pixels = rb.sampled;
   m.max_cll_p9999_nits = histogram_p9999_nits(hist, rb.sampled);
+  // §10.7.5 / §10.7.8 (WI-4.453): over the same sampled pixels as the histogram.
+  std::array<float, kFalseColorBands> fractions{};
+  for (size_t b = 0; b < fractions.size(); ++b) {
+    fractions.at(b) =
+        rb.sampled > 0 ? static_cast<float>(static_cast<double>(counts.at(b)) / static_cast<double>(rb.sampled)) : 0;
+  }
+  static_assert(sizeof(fractions) == sizeof(m.false_color_band_fraction));
+  std::memcpy(static_cast<void*>(m.false_color_band_fraction), fractions.data(), sizeof(fractions));
+  m.out_of_gamut_709 = counts.at(kCountOutside709);
+  m.out_of_gamut_p3 = counts.at(kCountOutsideP3);
   m.gpu_time_ms = 0;  // no GPU timers: libovt-render hides timestamp queries (vk_no_timestamps.cpp)
   last_ = m;
   shown_seq_ = rb.seq;
