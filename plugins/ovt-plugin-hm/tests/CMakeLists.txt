@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: BSD-3-Clause
 #
-# Smoke test of the HM build (chapter 07 §7.6.4, WI-4.104). The plugin itself arrives with WI-4.105; until then
-# plugins/CMakeLists.txt adds only this directory, and only with OVT_BUILD_PLUGIN_HM=ON.
+# Tests of the HEVC oracle plugin (chapter 07 §7.6.4): the smoke program of the HM build (WI-4.104) and the plugin
+# itself (WI-4.105).
 #
 # The smoke program links HM's BSD-3-Clause libraries and nothing of OVT, so it carries the plugin's licence and the
 # ovt_plugin_ name prefix (tools/license_policy.toml [targets]). HM's headers are included as system headers: HM's
@@ -25,3 +25,18 @@ add_test(
           "-DDEFAULT_CORPORA_DIR=${OVT_CORPORA_DIR}" -P "${CMAKE_CURRENT_SOURCE_DIR}/run_hm_smoke.cmake")
 set_tests_properties(ovt_plugin_hm_smoke_wpp_a PROPERTIES LABELS "third_party;needs-corpus" SKIP_REGULAR_EXPRESSION
                                                           "corpus file missing: ")
+
+# ---- WI-4.105: the plugin, loaded through the host's plugin registry ----------------------------------------------
+# Loads libovt_plugin_hm through the host's PluginRegistry (LGPL-2.1-or-later, so the test is too, as for
+# ovt_plugin_aom_smoke_tests); MD5 comes from HM's public-domain libmd5 in tp::hm_common.
+ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
+add_executable(ovt_plugin_hm_tests test_hm_plugin.cpp)
+target_link_libraries(ovt_plugin_hm_tests PRIVATE ovt_core_objects ovt_schemas ovt_test_support tp::hm_common
+                                                  ovt::flags ${Catch2_TARGET})
+get_target_property(_ovt_hm_includes tp::hm_common INTERFACE_INCLUDE_DIRECTORIES)
+target_include_directories(ovt_plugin_hm_tests SYSTEM PRIVATE ${_ovt_hm_includes})
+unset(_ovt_hm_includes)
+target_compile_definitions(ovt_plugin_hm_tests PRIVATE "OVT_HM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_hm>\"")
+add_dependencies(ovt_plugin_hm_tests ovt_plugin_hm)
+ovt_set_license(ovt_plugin_hm_tests "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_plugin_hm_tests)

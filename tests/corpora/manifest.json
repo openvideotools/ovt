@@ -21374,6 +21374,27 @@
       }
     },
     {
+      "id": "syn_mxf_op1a_xdcam",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "77",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "mxf",
+        "mpeg2",
+        "op1a"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "aliases": [
+        "op1a_xdcam.mxf"
+      ]
+    },
+    {
       "id": "fixture_fa_4k_dense",
       "source": "syn",
       "kind": "fixture",

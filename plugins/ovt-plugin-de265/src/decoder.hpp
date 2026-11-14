@@ -38,7 +38,11 @@ struct Plane {
   uint32_t height = 0;
   uint8_t bit_depth = 8;
   uint8_t sample_bytes = 1;
+  bool is_signed = false;  // Residual (int16) and Coefficients (int32) planes
 };
+
+/// The planes of one ovt.fb.PlaneStage: Y, U, V (U and V empty for 4:0:0).
+using StagePlanes = std::array<Plane, 3>;
 
 /// Everything the plugin keeps of one output picture, or a diagnostics-only record (picture == false).
 struct Frame {
@@ -62,7 +66,9 @@ struct Frame {
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
   uint16_t slice_count = 0;
-  std::array<Plane, 3> planes;  // planes 1 and 2 are empty for 4:0:0
+  std::array<Plane, 3> planes;  // Reconstruction; planes 1 and 2 are empty for 4:0:0
+  // The patch-0003 stages (planes.hpp), keyed by ovt.fb.PlaneStage value; only stages the host has asked for.
+  std::map<uint32_t, StagePlanes> snapshots;
   std::vector<Diag> diagnostics;
 };
 
@@ -87,6 +93,11 @@ class Decoder {
   /// it was held back by the outstanding-frame limit.
   bool pop(Frame* out);
 
+  /// Notes the ovt.fb.PlaneStage bits of a pull(). The first request for a patch-0003 stage (Prediction,
+  /// Residual, PreDeblock, PreSaoOrCdef, Coefficients) turns libde265's plane snapshots on for every picture that
+  /// starts decoding afterwards; requests add up for the decoder's lifetime (planes.hpp).
+  void request_stages(uint32_t plane_stage_mask);
+
  private:
   ovt_status decode_loop();
   void collect_warnings();
@@ -101,7 +112,8 @@ class Decoder {
   std::vector<Diag> pending_diags_;  // attached to the next frame that comes out
   std::map<int32_t, int64_t> pts_;   // decode index -> host pts (libde265's pts carries the decode index)
   bool flushed_ = false;
-  bool held_back_ = false;  // decode_loop stopped at the outstanding-frame limit with input left
+  bool held_back_ = false;        // decode_loop stopped at the outstanding-frame limit with input left
+  uint32_t snapshot_stages_ = 0;  // patch-0003 stages requested so far
 };
 
 }  // namespace ovt::de265

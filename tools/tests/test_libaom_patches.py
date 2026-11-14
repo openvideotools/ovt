@@ -46,6 +46,16 @@ install(FILES aom/aom_decoder.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/aom)
 """
 
 
+# The one line of libaom's build/cmake/aom_optimization.cmake that third_party/libaom/nasm3_check.cmake rewrites.
+AOM_OPTIMIZATION = """\
+function(test_nasm)
+  if(NOT "${nasm_helptext}" MATCHES "-Ox")
+    message(FATAL_ERROR "Unsupported nasm: multipass optimization not supported.")
+  endif()
+endfunction()
+"""
+
+
 def patch(name: str, old: str, new: str) -> tuple[str, str]:
     body = (
         f"From: OVT\nSubject: [PATCH] {name}\nUpstream-Status: Inappropriate [test fixture]\n\n"
@@ -69,6 +79,8 @@ def fixture_archive(tmp: Path) -> tuple[Path, str]:
     (src / "av1" / "decoder").mkdir(parents=True)
     (src / "aom").mkdir()
     (src / "CMakeLists.txt").write_text(UPSTREAM_CMAKE)
+    (src / "build" / "cmake").mkdir(parents=True)
+    (src / "build" / "cmake" / "aom_optimization.cmake").write_text(AOM_OPTIMIZATION)
     (src / "LICENSE").write_text("BSD-2-Clause\n")
     (src / "PATENTS").write_text("AOM Patent License 1.0\n")
     (src / "aom" / "aom_decoder.h").write_text("#pragma once\n")
@@ -176,6 +188,10 @@ def test_missing_patch_dir_builds_upstream_and_exports_source_dir(
     result = build.run()
     assert result.returncode == 0, result.stdout + result.stderr
     assert build.patched_source() == INSPECTION_C
+    # NASM 3.x no longer lists -Ox in `nasm -hf`; the nasm3_check step lets test_nasm() accept it (WI-0.063).
+    optimization = (build.source / "build" / "cmake" / "aom_optimization.cmake").read_text()
+    assert optimization.count("OVT nasm3_check") == 1
+    assert 'NOT "${ovt_nasm_version}" MATCHES "NASM version ([3-9]|[1-9][0-9])\\\\."' in optimization
     source_dir, binary_dir, includes = (tmp_path / "build" / "libaom_dirs.txt").read_text().splitlines()
     assert Path(source_dir) == build.source
     assert (Path(source_dir) / "av1" / "decoder" / "inspection.h").is_file()
