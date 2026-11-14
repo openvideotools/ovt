@@ -268,6 +268,12 @@ val ovtCheckAndroidSetup by tasks.registering {
 // the foss/play flavours none of those exist, so every variant's preBuild waits for the Qt build instead.
 tasks.named("QtBuildTask") { dependsOn(ovtCheckAndroidSetup) }
 tasks.named("preBuild") { dependsOn("QtBuildTask") }
+// QtBuildTask declares projectPath (the repository root) as an @InputDirectory, and that tree holds this project's
+// build/ directory, so every task writing under build/ counts as a producer of its input. Gradle accepts that as long
+// as the two are ordered (MissingTaskDependencyDetector: any order in either direction), so the native build goes
+// first. Tasks that do not hang off preBuild, such as buildKotlinToolingMetadata, otherwise fail validation.
+val ovtNativeBuildDeps = setOf("QtBuildTask", ovtCheckAndroidSetup.name)
+tasks.matching { it.name !in ovtNativeBuildDeps }.configureEach { mustRunAfter("QtBuildTask") }
 
 // ---- Dependencies ------------------------------------------------------------------------------------------------
 
