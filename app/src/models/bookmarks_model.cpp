@@ -216,7 +216,7 @@ QString BookmarksModel::current_file() const {
 QString BookmarksModel::next_id(const QString& prefix) const {
   const QJsonArray& items = prefix == QLatin1String("b") ? bookmark_items() : comment_items();
   int highest = 0;
-  for (const QJsonValue& value : items) {
+  for (const QJsonValue value : items) {
     const QString id = value.toObject().value(QStringLiteral("id")).toString();
     if (id.startsWith(prefix)) {
       highest = std::max(highest, id.mid(prefix.size()).toInt());
@@ -242,7 +242,7 @@ QVariantList BookmarksModel::markers() const {
   };
   std::vector<Marker> found;
   const QString file = current_file();
-  for (const QJsonValue& value : bookmark_items()) {
+  for (const QJsonValue value : bookmark_items()) {
     const QJsonObject item = value.toObject();
     if (item.value(QStringLiteral("file")).toString() == file) {
       found.push_back({item.value(QStringLiteral("decode_index")).toInt(-1),
@@ -267,7 +267,7 @@ QString BookmarksModel::addBookmark() {
   const int decode = selection_->frame_decode_index();
   const QString file = current_file();
   QJsonArray items = bookmark_items();
-  for (const QJsonValue& value : items) {
+  for (const QJsonValue value : items) {
     const QJsonObject item = value.toObject();
     if (item.value(QStringLiteral("file")).toString() == file &&
         item.value(QStringLiteral("decode_index")).toInt(-1) == decode) {
@@ -414,7 +414,7 @@ bool BookmarksModel::step(int direction) {
   }
   std::vector<int> frames;
   const QString file = current_file();
-  for (const QJsonValue& value : bookmark_items()) {
+  for (const QJsonValue value : bookmark_items()) {
     const QJsonObject item = value.toObject();
     if (item.value(QStringLiteral("file")).toString() == file) {
       frames.push_back(item.value(QStringLiteral("decode_index")).toInt(-1));
@@ -503,7 +503,7 @@ bool BookmarksModel::exportJson(const QString& path) const {
 bool BookmarksModel::exportCsv(const QString& path) const {
   QString out = csv_row({QStringLiteral("id"), QStringLiteral("file"), QStringLiteral("decode_index"),
                          QStringLiteral("name"), QStringLiteral("color"), QStringLiteral("created")});
-  for (const QJsonValue& value : bookmark_items()) {
+  for (const QJsonValue value : bookmark_items()) {
     const QJsonObject item = value.toObject();
     out += csv_row({item.value(QStringLiteral("id")).toString(), item.value(QStringLiteral("file")).toString(),
                     QString::number(item.value(QStringLiteral("decode_index")).toInt(-1)),
@@ -514,7 +514,7 @@ bool BookmarksModel::exportCsv(const QString& path) const {
   out +=
       csv_row({QStringLiteral("id"), QStringLiteral("file"), QStringLiteral("anchor"), QStringLiteral("decode_index"),
                QStringLiteral("author"), QStringLiteral("created"), QStringLiteral("text")});
-  for (const QJsonValue& value : comment_items()) {
+  for (const QJsonValue value : comment_items()) {
     const QJsonObject item = value.toObject();
     const QJsonObject anchor = item.value(QStringLiteral("anchor")).toObject();
     out += csv_row({item.value(QStringLiteral("id")).toString(), item.value(QStringLiteral("file")).toString(),
@@ -539,7 +539,7 @@ int BookmarksModel::importJson(const QString& path) {
   const auto merge = [&](const QString& section, BookmarkRows* rows, const QString& prefix,
                          const QStringList& required) {
     QJsonArray items = rows->items();
-    for (const QJsonValue& value : doc.object().value(section).toArray()) {
+    for (const QJsonValue value : doc.object().value(section).toArray()) {
       QJsonObject item = value.toObject();
       const bool complete = std::ranges::all_of(required, [&item](const QString& key) { return item.contains(key); });
       if (!complete) {
@@ -549,7 +549,7 @@ int BookmarksModel::importJson(const QString& path) {
       if (id.isEmpty() || index_of(items, id) >= 0) {
         // A fresh id that is unique in this array, including entries added by this import.
         int highest = 0;
-        for (const QJsonValue& existing : items) {
+        for (const QJsonValue existing : items) {
           highest =
               std::max(highest, existing.toObject().value(QStringLiteral("id")).toString().mid(prefix.size()).toInt());
         }
