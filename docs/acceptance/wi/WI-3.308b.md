@@ -30,4 +30,5 @@ benchmark binary exists yet, WI-0.560).
 ## Deviations (all in the PR body and issue #419)
 
 * No SHA-256 code: `sha256_match` is derived from the sample comparison (#419 point 1).
-* `VQ-DIFF-0001` leaves `identity` through a process-wide `DiagSink`, as the maps leave through the `MapSink` (#419 point 2).
+* `VQ-DIFF-0001` leaves `identity` through a process-wide `DiagSink`, as the maps leave through the `MapSink`
+  (#419 point 2).
