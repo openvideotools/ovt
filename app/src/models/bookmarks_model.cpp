@@ -426,7 +426,7 @@ bool BookmarksModel::step(int direction) {
   std::ranges::sort(frames);
   frames.erase(std::unique(frames.begin(), frames.end()), frames.end());
   const int current = selection_->frame_decode_index();
-  int target = frames.front();
+  int target = 0;
   if (direction > 0) {
     const auto next = std::ranges::upper_bound(frames, current);
     target = next == frames.end() ? frames.front() : *next;

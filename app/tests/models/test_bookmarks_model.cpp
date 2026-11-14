@@ -34,7 +34,6 @@ namespace {
 using ovt::app::BitSpan;
 using ovt::app::BookmarkRows;
 using ovt::app::BookmarksModel;
-using ovt::app::ByteSpan;
 using ovt::app::FrameId;
 using ovt::app::Project;
 using ovt::app::SelectionIndex;
@@ -61,7 +60,7 @@ class FakeIndex final : public SelectionIndex {
     return std::nullopt;
   }
   [[nodiscard]] int first_vcl_unit(FrameId f) const override { return f.decode_index < 2 ? f.decode_index : -1; }
-  [[nodiscard]] std::optional<SelectionSample> sample(int) const override { return std::nullopt; }
+  [[nodiscard]] std::optional<SelectionSample> sample(int /*sample_index*/) const override { return std::nullopt; }
   [[nodiscard]] int unit_at_byte(std::uint64_t offset) const override {
     return offset >= 100 && offset < 150 ? 0 : (offset >= 150 && offset < 200 ? 1 : -1);
   }
@@ -85,7 +84,7 @@ struct Fixture {
     REQUIRE(!model.addBookmark().isEmpty());
   }
 
-  [[nodiscard]] QJsonObject read_json(const QString& path) const {
+  [[nodiscard]] static QJsonObject read_json(const QString& path) {
     QFile file(path);
     REQUIRE(file.open(QIODevice::ReadOnly));
     return QJsonDocument::fromJson(file.readAll()).object();

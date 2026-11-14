@@ -124,8 +124,8 @@ class BookmarksModel : public QObject {
 
   // Import / export (JSON: {"bookmarks": [...], "comments": [...]}; CSV: bookmarks, then a blank line, then comments).
   // Import merges: an entry whose id exists already gets a fresh id. Returns the number of entries added, -1 on error.
-  Q_INVOKABLE bool exportJson(const QString& path) const;
-  Q_INVOKABLE bool exportCsv(const QString& path) const;
+  Q_INVOKABLE [[nodiscard]] bool exportJson(const QString& path) const;
+  Q_INVOKABLE [[nodiscard]] bool exportCsv(const QString& path) const;
   Q_INVOKABLE int importJson(const QString& path);
 
  Q_SIGNALS:

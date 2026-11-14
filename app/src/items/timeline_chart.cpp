@@ -166,8 +166,8 @@ double TimelineChart::xOfFrame(int decode_index) const {
     return -1.0;
   }
   const int position = model_->positionOf(decode_index);
-  if (position < 0 || static_cast<double>(position) < view_.first_frame() ||
-      static_cast<double>(position) >= view_.end_frame()) {
+  if (position < 0 || static_cast<std::size_t>(position) < view_.first_frame() ||
+      static_cast<std::size_t>(position) >= view_.end_frame()) {
     return -1.0;
   }
   return view_.x_of(static_cast<double>(position) + 0.5, width());
