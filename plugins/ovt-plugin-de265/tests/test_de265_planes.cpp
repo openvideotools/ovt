@@ -440,7 +440,7 @@ TEST_CASE("de265 planes: de265_snapshots_off_memory", "[fast][third_party][needs
   CHECK(peak_on > 0U);
   REQUIRE(!on.empty());
   const std::size_t picture_samples = on[0].planes[0].size() / static_cast<std::size_t>(on[0].bytes[0]);
-  CHECK(peak_on < std::size_t{16 * 9} * picture_samples);  // < 16 pictures' worth of snapshots: freed at output
+  CHECK(peak_on < std::size_t{16} * 9U * picture_samples);  // < 16 pictures' worth of snapshots: freed at output
   CHECK(off.size() == on.size());
 
   const std::vector<FrameOut> frames = run_plugin(bytes, 0, kRecon);
