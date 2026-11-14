@@ -85,6 +85,8 @@ ovt_tests_render = "LGPL-2.1-or-later"
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
 "core/schema" = "BSD-2-Clause"
+# WI-0.094: the test-only copy of ovt_model.fbs (schema evolution tests) keeps the schema's licence.
+"core/tests/schema/evolution" = "BSD-2-Clause"
 "core" = "LGPL-2.1-or-later"
 "render" = "LGPL-2.1-or-later"
 "cli" = "GPL-3.0-or-later"

@@ -1,0 +1,12 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Schema tests. Same relaxations as core/tests/model/ (WI-0.083, WI-0.093), added with WI-0.094's
+# test_evolution: Catch2's CHECK/REQUIRE macros expand to branches, so count only the test's own branches; and
+# the generated UnPackTo() trips Apple clang's clang-analyzer-cplusplus.NewDeleteLeaks inside flatc output
+# (the unique_ptr owns the object), a false positive in code we do not write.
+InheritParentConfig: true
+Checks: >
+  -clang-analyzer-cplusplus.NewDeleteLeaks
+CheckOptions:
+  readability-function-cognitive-complexity.IgnoreMacros: true

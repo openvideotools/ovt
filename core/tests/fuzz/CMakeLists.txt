@@ -69,3 +69,6 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
+# WI-0.094: the FrameAnalysis and StreamIndex readers (Verifier + validator + object API rebuild).
+ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
+ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
