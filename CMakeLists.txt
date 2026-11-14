@@ -18,30 +18,20 @@ elseif(CMAKE_TOOLCHAIN_FILE MATCHES "/vcpkg\\.cmake$" AND NOT EXISTS "${CMAKE_TO
       "or configure with -DOVT_USE_VCPKG=OFF to use system packages.")
 endif()
 
-# Android builds through the Qt Gradle plugin (android/, WI-0.050) configure this directory with qt-cmake once per
-# ABI (QT_ANDROID_BUILD_ALL_ABIS), so no preset names the vcpkg triplet or the third-party prefix: derive both from
-# ANDROID_ABI, as the android-* presets spell them (chapter 13 §13.2.4, §13.4.2). Before project(), which loads the
-# toolchain chain qt.toolchain.cmake -> vcpkg.cmake -> android.toolchain.cmake. Preset builds set both already.
-if(DEFINED ANDROID_ABI AND NOT DEFINED VCPKG_TARGET_TRIPLET)
-  if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set(VCPKG_TARGET_TRIPLET "arm64-android-ovt" CACHE STRING "vcpkg triplet (derived from ANDROID_ABI)")
-  elseif(ANDROID_ABI STREQUAL "x86_64")
-    set(VCPKG_TARGET_TRIPLET "x64-android-ovt" CACHE STRING "vcpkg triplet (derived from ANDROID_ABI)")
-  else()
-    message(FATAL_ERROR "Unsupported ANDROID_ABI '${ANDROID_ABI}' (arm64-v8a, x86_64; chapter 13 §13.4.7).")
-  endif()
-  if(NOT DEFINED OVT_THIRD_PARTY_PREFIX)
-    set(OVT_THIRD_PARTY_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/build/third_party/android-${ANDROID_ABI}"
-        CACHE PATH "Install prefix of the third_party/*.cmake builds (derived from ANDROID_ABI)")
-  endif()
-endif()
-
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" OVT_VERSION_RAW)
 string(STRIP "${OVT_VERSION_RAW}" OVT_VERSION)
 
 project(OpenVideoTools VERSION ${OVT_VERSION} LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+# Android builds through the Qt Gradle plugin (android/, WI-0.050) configure this directory once per ABI
+# (QT_ANDROID_BUILD_ALL_ABIS) outside the presets, so name the third-party prefix the way the android-* presets do
+# (chapter 13 §13.2.4, §13.4.2); cmake/toolchains/android-vcpkg.cmake picks the vcpkg triplet the same way.
+if(ANDROID AND NOT DEFINED OVT_THIRD_PARTY_PREFIX)
+  set(OVT_THIRD_PARTY_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/build/third_party/android-${ANDROID_ABI}"
+      CACHE PATH "Install prefix of the third_party/*.cmake builds (derived from ANDROID_ABI)")
+endif()
 
 include(OvtOptions) # all options of §13.2.2 and their validation
 include(OvtCorpora) # OVT_CORPORA_DIR consumers: tagged-subset gate, skip-not-fail (WI-0.040)

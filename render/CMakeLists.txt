@@ -11,8 +11,19 @@ target_sources(ovt_render PRIVATE src/overlay/builder.cpp src/overlay/heatmap_so
 add_library(ovt::render ALIAS ovt_render)
 # WI-1.401: Picture -> pl_frame upload (§10.3.1).
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
+# WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
+target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
+# WI-4.452: HDR measurements (§10.7.1-§10.7.4, §10.7.9). The GLSL of render/src/shaders/ is embedded as string
+# constants in a generated header (cmake/OvtEmbedShaders.cmake).
+target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
+                                  src/measure/measurer.cpp)
+include(OvtEmbedShaders)
+ovt_embed_shaders(
+  "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h" kShaderMeasurePrep src/shaders/measure_prep.frag
+  kShaderReduce8 src/shaders/reduce8.frag kShaderAccumulate src/shaders/accumulate.glsl)
+target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

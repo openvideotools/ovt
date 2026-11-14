@@ -211,7 +211,8 @@ Header read_header(Span hdr, uint64_t pos, uint64_t remaining, unsigned depth, c
     }
   } else if (size32 < 8) {  // 2.6 impossible size; recover when the type is a known one
     const std::string what = "box size " + std::to_string(size32) + " < 8" + at(pos);
-    if (plausible_type(h.type, ctx) && box_kind(h.type) != BoxKind::Unknown) {
+    // SPEC-ASSUMPTION(#323): a `uuid` box can never be 8 bytes, so it is never recovered (no size 8): CNT-0106, stop.
+    if (sv(h.type) != "uuid" && plausible_type(h.type, ctx) && box_kind(h.type) != BoxKind::Unknown) {
       h.size = 8;
       h.finding = DiagCode::CNT_0106;
       h.finding_msg = what + "; treated as 8";
@@ -348,6 +349,21 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
   uint64_t pos = parent_payload_begin;
   while (pos < parent_end) {  // 2.
     const uint64_t remaining = parent_end - pos;
+    // SPEC-ASSUMPTION(#323): node bound. Once kMaxBoxNodes BoxNodes exist the rest of every open parent becomes one
+    // trailing-bytes node (so the sum of child spans still equals the parent size); CNT-0111 is emitted once, on the
+    // parent that hit the bound. The trailing nodes themselves are not counted against the bound.
+    if (st.nodes >= kMaxBoxNodes) {
+      if (!st.node_bound_hit) {
+        st.node_bound_hit = true;
+        parent_diags.push_back(
+            make_diag(DiagCode::CNT_0111, "more than 1000000 boxes; remaining bytes not walked", pos - parent_offset));
+      }
+      auto n = make_node(pos, remaining);
+      n->payload_span = std::make_unique<fb::ByteSpan>(pos, remaining);
+      n->description = "trailing bytes";
+      out.push_back(std::move(n));
+      break;
+    }
     std::array<uint8_t, kHeaderProbe> buf{};
     const size_t got =
         remaining < 8 ? 0
@@ -361,6 +377,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
     const Span hdr = Span(buf).first(got);
     const Header h = read_header(hdr, pos, remaining, depth, ctx);
     if (h.wide) {  // 2.3
+      ++st.nodes;
       auto n = make_node(pos, 8);
       n->fourcc = "wide";
       n->header_length = 8;
@@ -373,6 +390,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
       break;
     }
     auto n = build_node(h, hdr, pos, parent_end, ctx);
+    ++st.nodes;
     const uint64_t end = pos + n->file_span->length();
     fill_payload(st, *n, h.type, depth, ctx);
     out.push_back(std::move(n));

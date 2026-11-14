@@ -20,8 +20,7 @@ if(OVT_BUILD_PLUGIN_DE265 AND TARGET tp::de265)
 endif()
 
 # ---- HM oracle (WI-4.104) -------------------------------------------------------------------------------------------
-# WI-4.104 builds HM's decoder libraries (tp::hm) and their smoke test; the plugin itself (WI-4.105) adds
-# ovt-plugin-hm/ here and moves the test under it.
-if(OVT_BUILD_PLUGIN_HM AND OVT_BUILD_TESTS AND TARGET tp::hm)
-  add_subdirectory(ovt-plugin-hm/tests)
+# WI-4.104 builds HM's decoder libraries (tp::hm); ovt-plugin-hm/ holds the plugin (WI-4.105) and its tests.
+if(OVT_BUILD_PLUGIN_HM AND TARGET tp::hm)
+  add_subdirectory(ovt-plugin-hm)
 endif()
