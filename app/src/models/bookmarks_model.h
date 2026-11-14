@@ -64,7 +64,7 @@ class BookmarkRows : public QAbstractListModel {
 
 class BookmarksModel : public QObject {
   Q_OBJECT
-  QML_ELEMENT
+  QML_NAMED_ELEMENT(Bookmarks)
   QML_SINGLETON
   Q_PROPERTY(QObject* bookmarks READ bookmarks CONSTANT)
   Q_PROPERTY(QObject* comments READ comments CONSTANT)
