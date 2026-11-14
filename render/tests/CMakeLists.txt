@@ -70,4 +70,3 @@ if(APPLE)
   target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
                                                  "-framework CoreFoundation")
 endif()
-
