@@ -38,6 +38,9 @@ libxkbcommon-x11-dev
 libxcb1-dev
 libxcb-xkb-dev
 libx11-xcb-dev
+# Qt's xcb platform plugin needs libxcb-cursor0 since Qt 6.5; the PictureHost tests run under xvfb-run (WI-1.405)
+libxcb-cursor0
+xvfb
 libgl1-mesa-dev
 libegl1-mesa-dev
 libva-dev
