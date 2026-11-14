@@ -397,7 +397,9 @@
     {"recipe": "75", "id": "syn_m4a_aac_lc", "features": ["aac", "audio"], "tags": ["fast"], "files": ["syn_m4a_aac_lc.m4a"], "aliases": ["aac_lc.m4a"], "steps": [
       {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000", "-ac", "2", "-t", "2", "-c:a", "aac", "-profile:a", "aac_low", "syn_m4a_aac_lc.m4a"]}]},
     {"recipe": "76", "id": "syn_raw_yuv420p10le_1080p", "features": ["raw", "10bit"], "tags": ["fast"], "needs": ["src_1080p_10bit.y4m"], "files": ["foo_1920x1080_yuv420p10le.yuv"], "aliases": ["foo_1920x1080_yuv420p10le.yuv"], "steps": [
-      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "30", "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "foo_1920x1080_yuv420p10le.yuv"]}]}
+      {"cmd": ["ffmpeg", "-i", "src_1080p_10bit.y4m", "-frames:v", "30", "-f", "rawvideo", "-pix_fmt", "yuv420p10le", "foo_1920x1080_yuv420p10le.yuv"]}]},
+    {"recipe": "77", "id": "syn_mxf_op1a_xdcam", "features": ["mxf", "mpeg2", "op1a"], "tags": ["fast"], "files": ["syn_mxf_op1a_xdcam.mxf"], "aliases": ["op1a_xdcam.mxf"], "note": "SPEC-ASSUMPTION(#429): the corpus of chapter 8 WI-4.211 test 1 (XDCAM HD422-like: MPEG-2 4:2:2 50 Mb/s CBR, interlaced, GOP 12, plus PCM; OP1a)", "steps": [
+      {"cmd": ["ffmpeg", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=25,format=yuv422p", "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=48000", "-frames:v", "12", "-t", "0.48", "-map", "0:v", "-map", "1:a", "-c:v", "mpeg2video", "-threads", "1", "-pix_fmt", "yuv422p", "-profile:v", "0", "-level:v", "2", "-b:v", "50M", "-minrate", "50M", "-maxrate", "50M", "-bufsize", "17825792", "-rc_init_occupancy", "17825792", "-g", "12", "-bf", "2", "-flags", "+ildct+ilme", "-top", "1", "-c:a", "pcm_s24le", "-fflags", "+bitexact", "-flags:v", "+bitexact", "-flags:a", "+bitexact", "-f", "mxf", "syn_mxf_op1a_xdcam.mxf"]}]}
   ],
   "fixtures": [
     {"id": "fixture_fa_4k_dense", "path": "tests/perf/data/fa_4k_dense.bin", "cmd": ["{python}", "{repo}/tools/gen_dense_fa.py", "--size", "4k", "--out", "{out}"], "local_only": true},

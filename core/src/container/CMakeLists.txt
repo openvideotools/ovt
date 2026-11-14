@@ -14,6 +14,7 @@ target_sources(
           format_sniff.cpp
           ivf.cpp
           mpegts/ts_packets.cpp
+          mxf_placeholder.cpp
           obu.cpp
           virtual_file/mpd.cpp
           y4m.cpp)
