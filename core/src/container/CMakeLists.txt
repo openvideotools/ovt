@@ -17,6 +17,7 @@ target_sources(
           obu.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp
+          virtual_file/m3u8.cpp
           virtual_file/mpd.cpp
           y4m.cpp)
 # ovt_schemas orders the build after flatc and puts ovt_container_generated.h on the include path.
