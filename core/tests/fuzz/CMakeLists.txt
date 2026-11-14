@@ -65,6 +65,8 @@ ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
 # grows with parts b (quantization, segmentation, delta q / lf) and c (the whole header).
 ovt_add_fuzz_target(syntax_av1_frame_header fuzz_syntax_av1_frame_header.cpp)
+# WI-1.118: the uncompressed_header() rows 20–25 parsers (part a; part b appends rows 26–27), in syntax order.
+ovt_add_fuzz_target(syntax_av1_frame_header2 fuzz_syntax_av1_frame_header2.cpp)
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
 # WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry points.
