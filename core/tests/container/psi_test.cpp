@@ -17,6 +17,7 @@
 #include <map>
 #include <optional>
 #include <pugixml.hpp>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -710,10 +711,12 @@ bool compare_with_tstables(const std::filesystem::path& path) {
   const auto f = ts::parse(*file);
   REQUIRE(f);
   REQUIRE(f->psi.programs.size() == pmt_pid_of.size());
+  std::set<unsigned long> parsed_programs;
   for (const ts::Program& p : f->psi.programs) {
+    parsed_programs.insert(p.number);
     REQUIRE(pmt_pid_of.count(p.number) == 1);
     CHECK(p.pmt_pid == pmt_pid_of[p.number]);
-    if (pmts.count(p.number) == 0) {
+    if (!pmts.contains(p.number)) {
       continue;  // the PAT lists the program, the stream carries no PMT for it (test-137): nothing to compare
     }
     CHECK(p.pcr_pid == pmts[p.number].first);
@@ -725,9 +728,7 @@ bool compare_with_tstables(const std::filesystem::path& path) {
   }
   // Every PMT that tstables reports belongs to a program the parser reports too.
   for (const auto& [service_id, entry] : pmts) {
-    const bool found = std::any_of(f->psi.programs.begin(), f->psi.programs.end(),
-                                   [&](const ts::Program& p) { return p.number == service_id; });
-    CHECK(found);
+    CHECK(parsed_programs.contains(service_id));
   }
   return true;
 }
@@ -745,17 +746,18 @@ TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections
 TEST_CASE("oracle: every tsduck-test stream's programs, PIDs and stream types equal tstables",
           "[container][mpegts][psi][needs-corpus][needs-oracle:tstables][slow]") {
   size_t compared = 0;
+  std::vector<std::pair<const char*, std::filesystem::path>> present;
   for (const char* id : {"ts_test_025", "ts_test_026", "ts_test_052", "ts_test_064", "ts_test_072", "ts_test_097",
                          "ts_test_100_1", "ts_test_125", "ts_test_137", "ts_test_139"}) {
-    const auto path = ovt::test::corpus_path(id);
-    if (!path) {
-      if (ovt::test::require_corpora()) {
-        FAIL("corpus file missing: " << id);
-      }
-      continue;
+    if (const auto path = ovt::test::corpus_path(id)) {
+      present.emplace_back(id, *path);
+    } else if (ovt::test::require_corpora()) {
+      FAIL("corpus file missing: " << id);
     }
+  }
+  for (const auto& [id, path] : present) {
     DYNAMIC_SECTION(id) {
-      if (!compare_with_tstables(*path)) {
+      if (!compare_with_tstables(path)) {
         SKIP("tstables is not available");
       }
       ++compared;
