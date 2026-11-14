@@ -111,7 +111,7 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
         const SegmentationParams seg =
             parse_segmentation_params(br, b, primary_ref_frame, FeatureEnabledTable{}, FeatureDataTable{});
         const Lossless l = compute_lossless(q, seg, override_flag);
-        summary = mix(mix(q.base_q_idx, static_cast<uint64_t>(q.DeltaQVAc + 64)),
+        summary = mix(mix(q.base_q_idx, static_cast<uint64_t>(static_cast<int64_t>(q.DeltaQVAc) + 64)),
                       mix(seg.LastActiveSegId, l.CodedLossless ? 1U : 0U));
         break;
       }
