@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc28 (2026-11-14) |
+| **Version** | 1.0-rc29 (2026-11-14) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -83,3 +83,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc26 (2026-11-14) | Corpus fix (#507, #160 follow-up): five ITU conformance ids that were never fetchable are replaced by the streams that exist, the absent AV1 Annex B vector gives way to `syn_av1_annexb`, `ALPHACONFORMANCEG` moves to `slow` (see `CHANGELOG.md`). |
 | 1.0-rc27 (2026-11-14) | Spec-amendment pass 7 (unblocking in-flight work items): accepted answers of `spec-question` issues #415, #416, #417, #419, #421, #425, #426, #429, #430, #432, #435, #436, #437, #443, #442, #444, #457, #460, #461, #465, #467, #469, #488, #493 and the WI-1.119 frame-count oracle change (see `CHANGELOG.md`). |
 | 1.0-rc28 (2026-11-14) | Spec-amendment pass 8: accepted answers of `spec-question` issues #466, #473, #512, #513 and the corpus placeholder fix #517 (nine never-fetchable manifest entries deleted, manifest sweeps skip placeholders; see `CHANGELOG.md`). |
+| 1.0-rc29 (2026-11-14) | Spec-amendment pass 9: accepted answers of `spec-question` issues #495, #498 (see `CHANGELOG.md`). |
