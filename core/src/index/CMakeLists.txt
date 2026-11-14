@@ -4,5 +4,5 @@
 # Placeholder for the `index` module of libovt-core (chapter 0 §0.3). Its work items add sources to
 # ovt_core here with target_sources(ovt_core PRIVATE ...).
 
-# WI-1.115: H.265 frame boundary and POC models (chapter 7 §7.3.9, §7.3.10.2).
-target_sources(ovt_core_objects PRIVATE h265_frame_boundary.cpp h265_poc.cpp)
+# WI-1.115: H.265 frame boundary, POC and RPS/DPB models (chapter 7 §7.3.9, §7.3.10.2, §7.4.4).
+target_sources(ovt_core_objects PRIVATE h265_frame_boundary.cpp h265_poc.cpp h265_dpb.cpp)
