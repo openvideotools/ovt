@@ -21381,7 +21381,6 @@
       "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
       "licence_spdx": "CC0-1.0",
       "redistributable": true,
-      "unverified": true,
       "features": [
         "mxf",
         "mpeg2",
@@ -21392,7 +21391,12 @@
       ],
       "aliases": [
         "op1a_xdcam.mxf"
-      ]
+      ],
+      "sha256": "63fd76f7651c1d41bc6693926ae7757c3e25e183ac3af41aa27c51256e010538",
+      "size_bytes": 3092025,
+      "files": {
+        "syn_mxf_op1a_xdcam.mxf": "63fd76f7651c1d41bc6693926ae7757c3e25e183ac3af41aa27c51256e010538"
+      }
     },
     {
       "id": "fixture_fa_4k_dense",
