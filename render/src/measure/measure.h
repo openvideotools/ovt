@@ -105,6 +105,8 @@ class OVT_RENDER_API Measurer {
   // Test hook: while held, completed readbacks are treated as still in flight (a slow GPU), so the slot rotation of
   // run() can be exercised deterministically.
   void hold_readbacks(bool hold) { hold_readbacks_ = hold; }
+  // Measures `slot` now and waits for the result (export_png, §10.8): returns false when the passes failed.
+  bool measure_now(const FrameSlot& slot);
   // §10.7.6-§10.7.7 options for the next runs.
   void set_scope_config(const ScopeConfig& config) { scope_config_ = config; }
   // The pl_tex behind a scope texture of the newest result (nullptr when there is none).
