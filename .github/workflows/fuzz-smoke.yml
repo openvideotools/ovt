@@ -4,6 +4,10 @@
 # Fuzz smoke (chapter 13 §13.7.1 `fuzz-smoke`, chapter 14 §14.7.3, WI-0.557): build the linux-x64-fuzz preset
 # and run every ovt_fuzz_* target for 60 s from its committed seeds. Four shards split the targets (target i
 # runs in shard i mod 4); a crash, timeout or OOM fails the shard and uploads the reproducer.
+# One `fuzz-build` job builds only the fuzz and fuzz-regress targets, replays the regressions and hands the binaries
+# (with the shared libraries and the plugin module they load from the build tree) to the four `fuzz-smoke` shards as an
+# artifact. Each shard used to rebuild the whole tree, all unit tests included; from cold caches that alone took
+# about 38 minutes, which pushed shards past the 45-minute timeout.
 # The nightly 20-minute run is WI-0.033's. Third-party actions are pinned by commit SHA, never by tag.
 name: fuzz-smoke
 
@@ -23,15 +27,11 @@ env:
   PRESET: linux-x64-fuzz
 
 jobs:
-  fuzz-smoke:
+  fuzz-build:
     # The owner's switch for when GitHub-hosted runners are unavailable (ci.yml header).
     if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -51,13 +51,103 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
 
-      - name: Configure and build
+      - name: Configure
+        id: configure
+        run: cmake --preset "$PRESET"
+
+      # setup-ovt's actions/cache saves the vcpkg archives only after a green job. Save them as soon as configure has
+      # built them, so that a later failure or timeout does not leave the next run (and every PR) cold again.
+      # Harmless when the key already exists.
+      - name: Save vcpkg binary cache
+        if: always() && steps.configure.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/vcpkg-archives
+          key: vcpkg-${{ runner.os }}-x64-linux-ovt-${{ hashFiles('vcpkg.json', 'third_party/vcpkg-triplets/**', 'third_party/vcpkg-overlays/**') }}
+
+      # Only the fuzz executables and their regression-replay twins: the unit tests are other jobs' work.
+      - name: Build fuzz targets
+        shell: bash
         run: |
-          cmake --preset "$PRESET"
-          cmake --build --preset "$PRESET"
+          set -eo pipefail
+          mapfile -t targets < <(ninja -C "build/$PRESET" -t targets all | sed -n 's/^\(ovt_fuzz_[A-Za-z0-9_]*\): phony$/\1/p' | sort -u)
+          if [ ${#targets[@]} -eq 0 ]; then
+            echo "::error::no ovt_fuzz_* targets in build/$PRESET (OVT_ENABLE_FUZZ off or not Clang?)"
+            exit 1
+          fi
+          echo "building ${#targets[@]} targets: ${targets[*]}"
+          cmake --build --preset "$PRESET" --target "${targets[@]}"
 
       - name: Replay regressions
         run: ctest --test-dir "build/$PRESET" -L fuzz-regress --output-on-failure
+
+      # The fuzzers run from their build-tree paths in the shards: the RPATHs and OVT_FFMPEG_PLUGIN_DIR are absolute,
+      # and every hosted runner checks out to the same workspace. Pack the executables, the plugin modules they load,
+      # and every shared library under the workspace that ldd resolves for them; plus libstdc++ and libgcc_s, which
+      # come from the GCC 13 toolchain PPA that setup-ovt installs here but the shards do not.
+      - name: Pack fuzz binaries
+        shell: bash
+        run: |
+          set -eo pipefail
+          shopt -s nullglob
+          ws="$GITHUB_WORKSPACE"
+          bins=("build/$PRESET"/fuzz/ovt_fuzz_*)
+          # Plugin modules land in plugins/lib (LIBRARY_OUTPUT_DIRECTORY of every plugin); fuzz_plugin_push_ffmpeg dlopens one.
+          modules=("build/$PRESET"/plugins/lib/*.so)
+          mkdir -p fuzz-stage/runtime
+          { printf '%s\n' "${bins[@]}" "${modules[@]}"
+            for f in "${bins[@]}" "${modules[@]}"; do
+              ldd "$f" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }'
+            done | sort -u | while read -r lib; do
+              case "$lib" in
+                "$ws"/*) echo "${lib#"$ws"/}" ;;
+                */libstdc++.so.6|*/libgcc_s.so.1) cp -L "$lib" fuzz-stage/runtime/ ;;
+              esac
+            done
+          } | sort -u > fuzz-files.txt
+          echo "packing $(wc -l < fuzz-files.txt) files (${#bins[@]} fuzzers, ${#modules[@]} plugin modules)"
+          # -h stores the file behind each soname symlink at the soname path the loader asks for.
+          tar -C "$ws" -h -cf - -T fuzz-files.txt | tar -C fuzz-stage -xf -
+          # Keep the debug info (symbolized crash reports) but compress it.
+          find fuzz-stage -type f \( -perm -u+x -o -name '*.so*' \) -print0 \
+            | xargs -0 -n1 -P"$(nproc)" objcopy --compress-debug-sections=zlib 2>/dev/null || true
+          tar -C fuzz-stage -cf - . | zstd -T0 -6 -q -o fuzz-binaries.tar.zst
+          ls -l fuzz-binaries.tar.zst
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fuzz-binaries
+          path: fuzz-binaries.tar.zst
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  fuzz-smoke:
+    needs: fuzz-build
+    runs-on: ubuntu-22.04
+    # Six targets of 60 s each per shard, plus the download.
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: fuzz-binaries
+
+      - name: Unpack fuzz binaries
+        shell: bash
+        run: |
+          set -eo pipefail
+          zstd -dc fuzz-binaries.tar.zst | tar -C "$GITHUB_WORKSPACE" -xf -
+          rm fuzz-binaries.tar.zst
+          if [ -d runtime ]; then
+            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/runtime${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          fi
 
       # The corpus cache is the FIRST corpus directory: libFuzzer writes new units into it, not into the
       # checkout. The committed seeds are the second, read-only one.
