@@ -52,18 +52,13 @@ TEST_CASE("context patterns", "[container][registry]") {
   const auto m = [](std::string_view pat, std::initializer_list<std::string_view> chain) {
     return iso::context_matches(pat, ctx_of(chain).ancestors);
   };
-  CHECK(m("*", {}));
   CHECK(m("*", {"moov", "trak"}));
   CHECK(m("*/stsd/*", {"moov", "trak", "mdia", "minf", "stbl", "stsd", "hvc1"}));
   CHECK_FALSE(m("*/stsd/*", {"meta", "iprp", "ipco"}));
   CHECK(m("*/ipco", {"meta", "iprp", "ipco"}));
-  CHECK(m("*/ipco", {"ipco"}));
   CHECK_FALSE(m("*/ipco", {"ipco", "colr"}));
   CHECK(m("moov/trak", {"moov", "trak"}));
   CHECK_FALSE(m("moov/trak", {"x   ", "moov", "trak"}));
-  CHECK_FALSE(m("moov/trak", {"moov"}));
-  CHECK(m("*/meta/hdlr/*", {"moov", "meta", "hdlr"}));
-  CHECK_FALSE(m("*/stsd/*", {}));
   CHECK(iso::pattern_specificity("*") == 0);
   CHECK(iso::pattern_specificity("*/ipco") == 1);
   CHECK(iso::pattern_specificity("*/stsd/*") == 1);

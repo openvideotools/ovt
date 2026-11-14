@@ -102,9 +102,14 @@ bool context_matches(std::string_view pattern, const std::vector<FourCC>& ancest
 }
 
 unsigned pattern_specificity(std::string_view pattern) noexcept {
-  const auto segs = split_pattern(pattern);
-  return static_cast<unsigned>(
-      std::ranges::count_if(segs, [](std::string_view seg) { return !seg.empty() && seg != "*"; }));
+  unsigned n = 0;
+  while (!pattern.empty()) {
+    const size_t slash = pattern.find('/');
+    const std::string_view seg = pattern.substr(0, slash);
+    n += (seg.empty() || seg == "*") ? 0U : 1U;
+    pattern.remove_prefix(slash == std::string_view::npos ? pattern.size() : slash + 1);
+  }
+  return n;
 }
 
 BoxRegistry::BoxRegistry(std::span<const RegistryEntry> base_entries) {
