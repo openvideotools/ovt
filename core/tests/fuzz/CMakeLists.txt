@@ -69,3 +69,11 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
+
+# The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
+# only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
+ovt_add_fuzz_target(canary fuzz_canary.cpp)
+add_test(NAME fuzz_canary_trips
+         COMMAND "${CMAKE_COMMAND}" "-DEXE=$<TARGET_FILE:ovt_fuzz_canary_regress>"
+                 "-DDIR=${CMAKE_CURRENT_SOURCE_DIR}/corpus/canary" -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_crash.cmake")
+set_tests_properties(fuzz_canary_trips PROPERTIES LABELS "canary")
