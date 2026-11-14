@@ -106,6 +106,7 @@ RgbImage to_rgb(const OutputPixels& px) {
 
 // §10.9.2 item 4: at most 0.1 % of the pixels may differ. A pixel differs when any channel is more than 2 codes off,
 // which absorbs the last-bit differences of blending and sRGB conversion between Vulkan drivers (lavapipe, MoltenVK).
+// SPEC-ASSUMPTION(#469): §10.9.2 does not define a "differing" pixel; this is the proposed definition.
 void check_golden(const RgbImage& actual, const std::string& name) {
   const std::string golden = std::string(OVT_RENDER_GOLDEN_DIR) + "/" + name;
   const char* update = std::getenv("OVT_UPDATE_GOLDEN");  // NOLINT(concurrency-mt-unsafe): test setup
