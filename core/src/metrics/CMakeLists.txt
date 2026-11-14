@@ -25,8 +25,14 @@ target_sources(
           kernels/psnr_hwy.cpp
           kernels/psnr_metric.cpp
           kernels/psnr_scalar.cpp
+          kernels/ssim_hwy.cpp
+          kernels/ssim_metric.cpp
+          kernels/ssim_scalar.cpp
           normalize/normalization_config.cpp
           vmaf/vmaf_host.cpp)
+# The ssim kernels promise bit-identical scalar and SIMD results: no fused multiply-add (WI-3.307).
+set_source_files_properties(kernels/ssim_hwy.cpp kernels/ssim_scalar.cpp TARGET_DIRECTORY ovt_core_objects
+                            PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 # Google Highway (Apache-2.0, vcpkg port highway, found in core/CMakeLists.txt) for the SIMD kernels (WI-3.306).
 target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${hwy_TARGET}>")
 # libvmaf (WI-3.309, chapter 9 §9.5): the static library of third_party/libvmaf.cmake (or the system library),

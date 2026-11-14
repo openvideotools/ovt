@@ -234,8 +234,15 @@ TEST_CASE("ffmpeg plugin: caps and ABI table", "[fast][third_party]") {
   CHECK((lic == "LGPL-2.1-or-later" || lic == "GPL-2.0-or-later" || lic == "LGPL-3.0-or-later" ||
          lic == "GPL-3.0-or-later"));
   CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == (OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 |
-                              OVT_GRID_REF0 | OVT_GRID_REF1));  // WI-2.170, §7.6.3 caps row
+  const uint32_t phase1 = OVT_GRID_BLOCK_ID | OVT_GRID_PRED | OVT_GRID_QP | OVT_GRID_MV0 | OVT_GRID_MV1 |
+                          OVT_GRID_REF0 | OVT_GRID_REF1;  // WI-2.170, §7.6.3 caps row
+  const uint32_t phase4 = OVT_GRID_PARTITION_ID | OVT_GRID_INTRA_MODE_Y | OVT_GRID_INTRA_MODE_C | OVT_GRID_TX_LOG2 |
+                          OVT_GRID_CBF;  // WI-4.102: "with the phase-4 patch: bits 1, 4, 5, 8, 9, 10, 12"
+#if !OVT_FFMPEG_SYSTEM
+  CHECK(caps->grid_fields == (phase1 | phase4));  // the plugin flavour always carries patch 0001
+#else
+  CHECK((caps->grid_fields == phase1 || caps->grid_fields == (phase1 | phase4)));
+#endif
   CHECK(caps->has_symbol_accounting == 0);
   CHECK(caps->bit_exact == 1);
   CHECK(caps->supports_threads == 1);
@@ -291,7 +298,9 @@ TEST_CASE("ffmpeg plugin: I_PCM pictures come out with their decode index and ex
     CHECK(f.pts == 5000 + (pic * 40));
     CHECK(f.type == ovt::fb::FrameType::I);
     CHECK(f.is_rap);
-    CHECK(f.diagnostics == 1);  // ANA-H264-0002: intra inferred (the decoder reports no error)
+    // ANA-H264-0002 when intra is inferred (phase 1); with the block params I_PCM is known (the decoder reports no
+    // error either way).
+    CHECK(f.diagnostics == (has_block_params() ? 0 : 1));
     for (int c = 0; c < 3; ++c) {
       CHECK(f.planes[static_cast<size_t>(c)] == pcm_plane(pic, c));
     }

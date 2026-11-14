@@ -179,6 +179,21 @@ SliceSegmentHeader parse_slice_segment_header(BitReader& br, SyntaxBuilder& b, c
 /// pictures (no RPS is signalled) and an SPS without that set.
 [[nodiscard]] const StRefPicSet* current_st_ref_pic_set(const SliceSegmentHeader& sh, const Sps& sps) noexcept;
 
+/// One substream of slice_segment_data() (§7.4.7.1): bytes [first_byte, first_byte + size) of the NAL unit in raw
+/// bytes, emulation prevention bytes included (NAL header byte 0 = 0, the convention of Rbsp::epb_positions).
+struct Substream {
+  uint64_t first_byte = 0;
+  uint64_t size = 0;
+};
+
+/// The num_entry_point_offsets + 1 substreams of a slice segment NAL unit of `nal_size` raw bytes:
+/// firstByte[k] = sum of (entry_point_offset_minus1[n] + 1) for n < k, counted from the first raw byte of
+/// slice_segment_data(), and the last substream runs to the end of the unit. `epb_positions` are those of the unit
+/// (Rbsp::epb_positions). Returns std::nullopt when the offsets overrun the unit.
+[[nodiscard]] std::optional<std::vector<Substream>> entry_point_substreams(const SliceSegmentHeader& sh,
+                                                                           std::span<const uint32_t> epb_positions,
+                                                                           uint64_t nal_size);
+
 }  // namespace ovt::syntax::h265
 
 #endif  // OVT_CXX_SYNTAX_H265_SLICE_SEGMENT_HEADER_HPP

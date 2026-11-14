@@ -5,42 +5,35 @@
 
 #include "fb_builder.hpp"
 
-#include <array>
-#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "map_mi.hpp"
 #include "ovt_model_generated.h"
+#include "planes.hpp"
 
 namespace ovt::aom {
 
 namespace {
 
-constexpr uint32_t kStageRecon = 0;      // ovt.fb.PlaneStage.Reconstruction
-constexpr uint8_t kSeverityWarning = 1;  // ovt.fb.Severity
-constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
+constexpr uint8_t kSeverityInfo = 0;  // ovt.fb.Severity
+constexpr uint8_t kSeverityWarning = 1;
 
 }  // namespace
 
-std::string blob_id(int32_t decode_index, int plane) {
-  return std::to_string(decode_index) + "/recon/" + kPlaneNames.at(static_cast<std::size_t>(plane));
-}
-
 std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame& f, uint32_t plane_stage_mask,
                                                                      const char* plugin_id, const char* plugin_version,
-                                                                     std::map<std::string, const Plane*>* blobs) {
+                                                                     std::map<std::string, PlaneView>* blobs) {
   auto fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(1024);
 
   // Block tree, grid, MVs, refs and tiles first: the mapping may add warnings.
   const MappedBlocks mapped = map_blocks(*fbb, f.blocks, f.coded_w, f.coded_h);
 
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size() + mapped.warnings.size());
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + 1);
   for (const Diag& d : f.diagnostics) {
     diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
                                                     d.message.c_str()));
@@ -50,23 +43,19 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
     diags.push_back(
         ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
   }
+  // Chapter 06 §6.6.1 rule 5: Reconstruction is the picture before film grain synthesis (AV1D_SET_SKIP_FILM_GRAIN).
+  // SPEC-ASSUMPTION(#389): §7.6.1's derived note "film grain present (not applied)" has no field in
+  // FrameAnalysis, so it is an Info Diagnostic on the frame, with the DEC-AV1 Info code the #389 triage asks the
+  // §7.9.4 registry to add (V-029 rejects an empty code).
+  if (f.apply_grain) {
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), "DEC-AV1-0001",
+                                                    "film grain present (not applied)"));
+  }
   const auto diags_v = fbb->CreateVector(diags);
 
   // Hidden frames have no output image, so no planes without the snapshot patch (the host adds ANA-0001).
   std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>> planes;
-  if ((plane_stage_mask & (1U << kStageRecon)) != 0) {
-    for (int c = 0; c < 3; ++c) {
-      const Plane& p = f.planes.at(static_cast<std::size_t>(c));
-      if (p.data.empty()) {
-        continue;
-      }
-      std::string id = blob_id(f.decode_index, c);
-      planes.push_back(ovt::fb::CreatePlaneRefDirect(*fbb, ovt::fb::PlaneStage::Reconstruction, static_cast<uint8_t>(c),
-                                                     p.width, p.height, p.width * p.sample_bytes, p.bit_depth,
-                                                     p.sample_bytes, /*is_signed=*/false, id.c_str()));
-      blobs->emplace(std::move(id), &p);
-    }
-  }
+  add_plane_refs(*fbb, f.decode_index, f.recon, plane_stage_mask, &planes, blobs);
   const auto planes_v = fbb->CreateVector(planes);
   const auto filter_type_off =
       mapped.filter_params.IsNull() ? flatbuffers::Offset<flatbuffers::String>() : fbb->CreateString("Av1FilterParams");

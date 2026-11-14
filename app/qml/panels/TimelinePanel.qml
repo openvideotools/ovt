@@ -3,7 +3,7 @@
 //
 // Timeline panel (chapter 11 §11.3.1; WI-1.455b): series and order controls, the TimelineChart and the range status
 // line. The chart reports clicks; this file turns them into Selection changes (origin "timeline") and shows the
-// selected frame back on the chart. The filmstrip, thumbnails and reference arrows follow in WI-1.455c.
+// selected frame back on the chart. The filmstrip and thumbnails follow in WI-1.455d.
 
 import QtQuick
 import QtQuick.Controls
@@ -59,6 +59,11 @@ Item {
                 text: "Mean line"
                 checked: chart.meanLine
                 onToggled: chart.meanLine = checked
+            }
+            CheckBox {
+                text: "Reference arrows"
+                checked: chart.refArrows
+                onToggled: chart.refArrows = checked
             }
             Item {
                 Layout.fillWidth: true
@@ -121,6 +126,23 @@ Item {
                 }
                 HoverHandler {
                     id: hoverHandler
+                }
+            }
+
+            // "I" / "K" labels at the random access points (the ticks are drawn by the chart).
+            Repeater {
+                model: chart.gopMarkers
+
+                Label {
+                    required property var modelData
+
+                    objectName: "gopLabel"
+                    x: chart.x + modelData.x - width / 2
+                    y: chart.y + chart.height - 6 - height
+                    text: modelData.label
+                    color: OvtStyle.text
+                    font.pixelSize: OvtStyle.fontSize - 3
+                    visible: x >= 0 && x + width <= chart.x + chart.width
                 }
             }
 

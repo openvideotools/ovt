@@ -144,11 +144,13 @@ done
     preset = "linux-x64-release"
     build = REPO / "build" / preset
     created = []
-    if not (build / "CMakeCache.txt").exists():
-        build.mkdir(parents=True, exist_ok=True)
-        (build / "CMakeCache.txt").write_text("")
-        (build / "THIRD_PARTY_NOTICES.md").write_text("# notices\n")
-        created = [build / "CMakeCache.txt", build / "THIRD_PARTY_NOTICES.md"]
+    # Inside a real build tree (CTest's tools_pytest) CMakeCache.txt exists but ovt_notices has not been built, so the
+    # two stand-in files are decided separately and the test removes only what it made.
+    for name, text in (("CMakeCache.txt", ""), ("THIRD_PARTY_NOTICES.md", "# notices\n")):
+        if not (build / name).exists():
+            build.mkdir(parents=True, exist_ok=True)
+            (build / name).write_text(text)
+            created.append(build / name)
     env = {
         "PATH": f"{bin_dir}:{os.environ['PATH']}",
         "QT_ROOT_DIR": str(qt),

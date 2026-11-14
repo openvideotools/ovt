@@ -51,7 +51,14 @@ void fill_layer(QSGGeometryNode* node, const std::vector<ColorVertex>& vertices)
 }
 
 // The children of the root node, bottom to top.
-enum Layer : int { Band = 0, Bars = 1, Mean = 2, Marker = 3, LayerCount = 4 };
+enum Layer : int { Band = 0, Bars = 1, Hatch = 2, Mean = 3, Arcs = 4, Ticks = 5, Marker = 6 };
+
+constexpr Rgba kHatchColor{0, 0, 0, 150};
+constexpr Rgba kTickColor{0xE5, 0x39, 0x35, 255};
+constexpr Rgba kArcColor{0xFF, 0x85, 0x1B, 150};       // SPEC-ASSUMPTION(#402): all arrows L0 orange, never dashed
+constexpr Rgba kArcHoverColor{0xFF, 0xD7, 0x00, 255};  // hover gold
+constexpr std::size_t kMaxArcs = 3000;
+constexpr float kTickHeight = 6.0F;
 
 }  // namespace
 
@@ -75,7 +82,7 @@ void TimelineChart::set_model(StreamIndexModel* model) {
   model_ = model;
   if (!model_.isNull()) {
     connect(model_, &StreamIndexModel::indexChanged, this, &TimelineChart::on_index_changed);
-    connect(model_, &StreamIndexModel::orderChanged, this, [this] { update(); });
+    connect(model_, &StreamIndexModel::orderChanged, this, [this] { view_changed(); });
     connect(model_, &StreamIndexModel::rangeChanged, this, [this] { update(); });
   }
   on_index_changed();
@@ -124,6 +131,34 @@ void TimelineChart::set_mean_line(bool on) {
     Q_EMIT meanLineChanged();
     update();
   }
+}
+
+void TimelineChart::set_ref_arrows(bool on) {
+  if (ref_arrows_ != on) {
+    ref_arrows_ = on;
+    Q_EMIT refArrowsChanged();
+    update();
+  }
+}
+
+QVariantList TimelineChart::gop_markers() const {
+  QVariantList out;
+  if (model_.isNull() || width() <= 0.0) {
+    return out;
+  }
+  const FrameTable& table = model_->frames();
+  for (const std::size_t position : table.rap_positions()) {
+    if (position < view_.first_frame() || position >= view_.end_frame()) {
+      continue;
+    }
+    const int decode = table.decode_index_at(position);
+    QVariantMap marker;
+    marker.insert(QStringLiteral("x"), view_.x_of(static_cast<double>(position) + 0.5, width()));
+    marker.insert(QStringLiteral("label"),
+                  table.type(decode) == fb::FrameType::Key ? QStringLiteral("K") : QStringLiteral("I"));
+    out.append(marker);
+  }
+  return out;
 }
 
 void TimelineChart::set_selected_frame(int decode_index) {
@@ -177,6 +212,7 @@ QString TimelineChart::frameTooltip(int position) const {
 
 void TimelineChart::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
   QQuickItem::geometryChange(new_geometry, old_geometry);
+  Q_EMIT viewChanged();  // the marker x positions depend on the width
   update();
 }
 
@@ -186,65 +222,115 @@ QSGNode* TimelineChart::updatePaintNode(QSGNode* old_node, UpdatePaintNodeData* 
     root = new QSGNode;
     root->appendChildNode(make_layer(QSGGeometry::DrawTriangles));  // Band
     root->appendChildNode(make_layer(QSGGeometry::DrawTriangles));  // Bars
+    root->appendChildNode(make_layer(QSGGeometry::DrawLines));      // Hatch
     root->appendChildNode(make_layer(QSGGeometry::DrawLines));      // Mean
+    root->appendChildNode(make_layer(QSGGeometry::DrawLines));      // Arcs
+    root->appendChildNode(make_layer(QSGGeometry::DrawTriangles));  // Ticks
     root->appendChildNode(make_layer(QSGGeometry::DrawTriangles));  // Marker
   }
-  std::array<QSGGeometryNode*, LayerCount> layers{};
+  const LayerVertices layers = build_layers(static_cast<float>(width()), static_cast<float>(height()));
   int i = 0;
   for (QSGNode* child = root->firstChild(); child != nullptr && i < LayerCount; child = child->nextSibling(), ++i) {
-    layers.at(static_cast<std::size_t>(i)) = static_cast<QSGGeometryNode*>(child);
+    fill_layer(static_cast<QSGGeometryNode*>(child), layers.at(static_cast<std::size_t>(i)));
   }
+  return root;
+}
 
-  const auto w = static_cast<float>(width());
-  const auto h = static_cast<float>(height());
-  std::vector<ColorVertex> bars;
-  std::vector<ColorVertex> mean;
-  std::vector<ColorVertex> band;
-  std::vector<ColorVertex> marker;
+TimelineChart::LayerVertices TimelineChart::build_layers(float w, float h) {
+  LayerVertices layers;
   max_value_ = 0.0;
-  if (model_ != nullptr && model_->frames().size() != 0 && w > 0.0F && h > 0.0F) {
-    FrameTable& table = model_->frames();
-    const std::size_t first = view_.first_frame();
-    const std::size_t end = view_.end_frame();
-    const auto pixels = static_cast<std::size_t>(std::max(1.0F, std::floor(w)));
-    const std::vector<SeriesColumn> columns = table.aggregator(series_).columns(first, end, pixels);
-    max_value_ = max_of(columns);
-    // A column takes the colour of its first frame's type; a column that holds a random access point shows the
-    // I colour instead, so the GOP structure survives at any zoom (§11.3.1).
-    const std::vector<std::size_t> raps = table.rap_positions();
-    std::vector<Rgba> colors(columns.size());
-    for (std::size_t c = 0; c < columns.size(); ++c) {
-      const int decode = table.decode_index_at(columns[c].first);
-      const auto rap = std::lower_bound(raps.begin(), raps.end(), columns[c].first);
-      const bool has_rap = rap != raps.end() && *rap < columns[c].last;
-      colors[c] = has_rap ? frame_type_color(fb::FrameType::I, table.shown(decode))
-                          : frame_type_color(table.type(decode), table.shown(decode));
+  if (model_.isNull() || model_->frames().size() == 0 || !(w > 0.0F) || !(h > 0.0F)) {
+    return layers;
+  }
+  FrameTable& table = model_->frames();
+  const std::size_t first = view_.first_frame();
+  const std::size_t end = view_.end_frame();
+  const auto pixels = static_cast<std::size_t>(std::max(1.0F, std::floor(w)));
+  const std::vector<SeriesColumn> columns = table.aggregator(series_).columns(first, end, pixels);
+  max_value_ = max_of(columns);
+  // A column takes the colour of its first frame's type; a column that holds a random access point shows the
+  // I colour instead, so the GOP structure survives at any zoom (§11.3.1).
+  const std::vector<std::size_t> raps = table.rap_positions();
+  std::vector<Rgba> colors(columns.size());
+  for (std::size_t c = 0; c < columns.size(); ++c) {
+    const int decode = table.decode_index_at(columns[c].first);
+    const auto rap = std::lower_bound(raps.begin(), raps.end(), columns[c].first);
+    const bool has_rap = rap != raps.end() && *rap < columns[c].last;
+    colors[c] = has_rap ? frame_type_color(fb::FrameType::I) : frame_type_color(table.type(decode));
+  }
+  layers[Bars] = build_bars(columns, colors, max_value_, w, h);
+  layers[Hatch] = hatch_vertices(columns, w, h);
+  if (mean_line_) {
+    layers[Mean] = build_mean_line(columns, max_value_, w, h, kMeanColor);
+  }
+  layers[Arcs] = arc_vertices(w, h);
+  // GOP ticks at the random access points in view.
+  std::vector<float> tick_xs;
+  for (const std::size_t rap : raps) {
+    if (rap >= first && rap < end) {
+      tick_xs.push_back(x_of_position(static_cast<double>(rap) + 0.5, w));
     }
-    bars = build_bars(columns, colors, max_value_, w, h);
-    if (mean_line_) {
-      mean = build_mean_line(columns, max_value_, w, h, kMeanColor);
+  }
+  layers[Ticks] = build_ticks(tick_xs, h, kTickHeight, kTickColor);
+  if (model_->has_range()) {
+    const float x0 = x_of_position(static_cast<double>(model_->range_first()), w);
+    const float x1 = x_of_position(static_cast<double>(model_->range_last()) + 1.0, w);
+    layers[Band] = build_rect(std::max(x0, 0.0F), 0.0F, std::min(x1, w), h, kRangeBand);
+  }
+  if (const auto selected = table.position_of(selected_frame_)) {
+    const float x0 = x_of_position(static_cast<double>(*selected), w);
+    const float x1 = x_of_position(static_cast<double>(*selected) + 1.0, w);
+    if (x1 > 0.0F && x0 < w) {
+      layers[Marker] = build_rect(x0, h - 3.0F, std::max(x1, x0 + 2.0F), h, kSelected);
     }
-    const auto x_span = [&](std::size_t a, std::size_t b) {
-      return std::pair{static_cast<float>(view_.x_of(static_cast<double>(a), static_cast<double>(w))),
-                       static_cast<float>(view_.x_of(static_cast<double>(b), static_cast<double>(w)))};
-    };
-    if (model_->has_range()) {
-      const auto [x0, x1] =
-          x_span(static_cast<std::size_t>(model_->range_first()), static_cast<std::size_t>(model_->range_last()) + 1);
-      band = build_rect(std::max(x0, 0.0F), 0.0F, std::min(x1, w), h, kRangeBand);
+  }
+  return layers;
+}
+
+float TimelineChart::x_of_position(double position, float w) const {
+  return static_cast<float>(view_.x_of(position, static_cast<double>(w)));
+}
+
+// Hidden frames (AV1 shown == false) are hatched; only where a column is a single frame at least 3 px wide.
+std::vector<ColorVertex> TimelineChart::hatch_vertices(const std::vector<SeriesColumn>& columns, float w,
+                                                       float h) const {
+  std::vector<ColorVertex> out;
+  const float column_width = w / static_cast<float>(columns.size());
+  if (column_width < 3.0F || !(max_value_ > 0.0)) {
+    return out;
+  }
+  const FrameTable& table = model_->frames();
+  for (std::size_t c = 0; c < columns.size(); ++c) {
+    const bool single = columns[c].last - columns[c].first == 1;
+    if (!single || table.shown(table.decode_index_at(columns[c].first)) || !(columns[c].max > 0.0)) {
+      continue;
     }
-    if (const auto selected = table.position_of(selected_frame_)) {
-      const auto [x0, x1] = x_span(*selected, *selected + 1);
-      if (x1 > 0.0F && x0 < w) {
-        marker = build_rect(x0, h - 3.0F, std::max(x1, x0 + 2.0F), h, kSelected);
+    const float x0 = static_cast<float>(c) * column_width;
+    const auto bar_height = static_cast<float>(std::min(columns[c].max / max_value_, 1.0)) * h;
+    const auto lines = build_hatch(x0, h - bar_height, x0 + column_width - 1.0F, h, kHatchColor);
+    out.insert(out.end(), lines.begin(), lines.end());
+  }
+  return out;
+}
+
+// Reference arrows, when a frame is wide enough to tell them apart.
+std::vector<ColorVertex> TimelineChart::arc_vertices(float w, float h) const {
+  if (!ref_arrows_ || static_cast<double>(w) / view_.count() < kMinArrowFramePixels) {
+    return {};
+  }
+  const FrameTable& table = model_->frames();
+  std::vector<RefArc> refs;
+  for (std::size_t p = view_.first_frame(); p < view_.end_frame() && refs.size() < kMaxArcs; ++p) {
+    const bool hovered = static_cast<int>(p) == hover_position_;
+    for (const int ref : table.declared_refs(table.decode_index_at(p))) {
+      if (const auto target = table.position_of(ref)) {
+        refs.push_back(RefArc{x_of_position(static_cast<double>(p) + 0.5, w),
+                              x_of_position(static_cast<double>(*target) + 0.5, w),
+                              hovered ? kArcHoverColor : kArcColor});
       }
     }
   }
-  fill_layer(layers[Band], band);
-  fill_layer(layers[Bars], bars);
-  fill_layer(layers[Mean], mean);
-  fill_layer(layers[Marker], marker);
-  return root;
+  return build_ref_arcs(refs, h - kTickHeight, h / 2.0F);
 }
 
 void TimelineChart::mousePressEvent(QMouseEvent* event) {
@@ -302,10 +388,19 @@ void TimelineChart::wheelEvent(QWheelEvent* event) {
 }
 
 void TimelineChart::hoverMoveEvent(QHoverEvent* event) {
-  Q_EMIT hovered(positionAt(event->position().x()), event->position().x());
+  const int position = positionAt(event->position().x());
+  if (position != hover_position_) {
+    hover_position_ = position;
+    if (ref_arrows_) {
+      update();  // the hovered frame's arrows are highlighted
+    }
+  }
+  Q_EMIT hovered(position, event->position().x());
 }
 
 void TimelineChart::hoverLeaveEvent(QHoverEvent* /*event*/) {
+  hover_position_ = -1;
+  update();
   Q_EMIT hovered(-1, 0.0);
 }
 

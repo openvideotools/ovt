@@ -1,0 +1,337 @@
+{
+ "periods": [
+  {
+   "adaptation_sets": [
+    {
+     "id": "1",
+     "representations": [
+      {
+       "id": "v_1080",
+       "segments": [
+        {
+         "duration": -1,
+         "init": true,
+         "number": -1,
+         "start_time": -1,
+         "url": "https://example.invalid/dash/pkg/v_1080/init.mp4"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 1,
+         "start_time": 0,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00001.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 2,
+         "start_time": 120000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00002.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 3,
+         "start_time": 240000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00003.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 4,
+         "start_time": 360000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00004.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 5,
+         "start_time": 480000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00005.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 6,
+         "start_time": 600000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00006.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 7,
+         "start_time": 720000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00007.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 8,
+         "start_time": 840000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00008.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 9,
+         "start_time": 960000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00009.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 10,
+         "start_time": 1080000,
+         "url": "https://example.invalid/dash/pkg/v_1080/seg-00010.m4s"
+        }
+       ],
+       "timescale": 30000
+      },
+      {
+       "id": "v_480",
+       "segments": [
+        {
+         "duration": -1,
+         "init": true,
+         "number": -1,
+         "start_time": -1,
+         "url": "https://example.invalid/dash/pkg/v_480/init.mp4"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 1,
+         "start_time": 0,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00001.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 2,
+         "start_time": 120000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00002.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 3,
+         "start_time": 240000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00003.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 4,
+         "start_time": 360000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00004.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 5,
+         "start_time": 480000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00005.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 6,
+         "start_time": 600000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00006.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 7,
+         "start_time": 720000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00007.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 8,
+         "start_time": 840000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00008.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 9,
+         "start_time": 960000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00009.m4s"
+        },
+        {
+         "duration": 120000,
+         "init": false,
+         "number": 10,
+         "start_time": 1080000,
+         "url": "https://example.invalid/dash/pkg/v_480/seg-00010.m4s"
+        }
+       ],
+       "timescale": 30000
+      }
+     ]
+    },
+    {
+     "id": "2",
+     "representations": [
+      {
+       "id": "a_en",
+       "segments": [
+        {
+         "duration": -1,
+         "init": true,
+         "number": -1,
+         "start_time": -1,
+         "url": "https://example.invalid/dash/pkg/a/a_en/init.mp4"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 1,
+         "start_time": 0,
+         "url": "https://example.invalid/dash/pkg/a/a_en/0.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 2,
+         "start_time": 192000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/192000.m4s"
+        },
+        {
+         "duration": 96000,
+         "init": false,
+         "number": 3,
+         "start_time": 384000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/384000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 4,
+         "start_time": 480000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/480000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 5,
+         "start_time": 672000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/672000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 6,
+         "start_time": 864000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/864000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 7,
+         "start_time": 1056000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/1056000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 8,
+         "start_time": 1248000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/1248000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 9,
+         "start_time": 1440000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/1440000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 10,
+         "start_time": 1632000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/1632000.m4s"
+        },
+        {
+         "duration": 192000,
+         "init": false,
+         "number": 11,
+         "start_time": 1824000,
+         "url": "https://example.invalid/dash/pkg/a/a_en/1824000.m4s"
+        }
+       ],
+       "timescale": 48000
+      }
+     ]
+    }
+   ],
+   "duration_ms": 40000,
+   "id": "p0",
+   "start_ms": 0
+  },
+  {
+   "adaptation_sets": [
+    {
+     "id": "1",
+     "representations": [
+      {
+       "id": "v_480",
+       "segments": [
+        {
+         "duration": -1,
+         "init": true,
+         "number": -1,
+         "start_time": -1,
+         "url": "https://example.invalid/dash/pkg/p1/init-1200000.mp4"
+        },
+        {
+         "duration": 4000,
+         "init": false,
+         "number": 0,
+         "start_time": 0,
+         "url": "https://example.invalid/dash/pkg/p1/v_480_000_0.m4s"
+        },
+        {
+         "duration": 4000,
+         "init": false,
+         "number": 1,
+         "start_time": 4000,
+         "url": "https://example.invalid/dash/pkg/p1/v_480_001_4000.m4s"
+        },
+        {
+         "duration": 4000,
+         "init": false,
+         "number": 2,
+         "start_time": 8000,
+         "url": "https://example.invalid/dash/pkg/p1/v_480_002_8000.m4s"
+        },
+        {
+         "duration": 4000,
+         "init": false,
+         "number": 3,
+         "start_time": 12000,
+         "url": "https://example.invalid/dash/pkg/p1/v_480_003_12000.m4s"
+        },
+        {
+         "duration": 4000,
+         "init": false,
+         "number": 4,
+         "start_time": 16000,
+         "url": "https://example.invalid/dash/pkg/p1/v_480_004_16000.m4s"
+        }
+       ],
+       "timescale": 1000
+      }
+     ]
+    }
+   ],
+   "duration_ms": 20000,
+   "id": "p1",
+   "start_ms": 40000
+  }
+ ]
+}

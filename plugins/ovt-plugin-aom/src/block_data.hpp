@@ -59,6 +59,9 @@ struct BlockData {
   int32_t cdef_bits = 0;
   std::vector<int32_t> cdef_strengths;  // libaom cdef_strengths[]: pri * 4 + sec code, one per cdef_idx
   std::vector<int32_t> cdef_uv_strengths;
+  int32_t superres_denom = 8;  // SuperresDenom (AV1 §5.9.8); 8 = no super-resolution
+  int32_t frame_width = 0;     // FrameWidth: the coded width, before super-resolution
+  int32_t upscaled_width = 0;  // UpscaledWidth: the output width (= frame_width without super-resolution)
   int32_t base_qindex = 0;
   bool delta_q_present = false;
   int32_t delta_q_res = 1;                            // libaom's value (1 << delta_q_res syntax element)

@@ -9,8 +9,15 @@ add_subdirectory(example_plugin)
 # ---- Module tests: ABI header (C11 + C++20), NormalizationConfig resolver, JobSpec parser, registry, job ----
 add_executable(
   ovt_tests_metrics
-  abi_header_c.c test_metric_abi.cpp test_metric_job.cpp test_metrics_jobspec.cpp test_metrics_plugin_registry.cpp
-  test_metrics_psnr.cpp test_metrics_vmaf.cpp test_normalization_config.cpp)
+  abi_header_c.c
+  test_metric_abi.cpp
+  test_metric_job.cpp
+  test_metrics_jobspec.cpp
+  test_metrics_plugin_registry.cpp
+  test_metrics_psnr.cpp
+  test_metrics_ssim.cpp
+  test_metrics_vmaf.cpp
+  test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_metrics PRIVATE ovt_core_objects ovt_test_support ovt::flags ${flatbuffers_TARGET}
                                                 ${nlohmann_json_TARGET} ${Catch2_TARGET})
