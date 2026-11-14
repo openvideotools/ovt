@@ -69,3 +69,5 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
+# WI-1.108a: H.264 NAL header and SPS parsers (WI-1.108b adds the PPS modes).
+ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
