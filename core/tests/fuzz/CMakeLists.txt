@@ -71,6 +71,9 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
+# WI-0.094: the FrameAnalysis and StreamIndex readers (Verifier + validator).
+ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
+ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
 # WI-1.108a: H.264 NAL header and SPS parsers (WI-1.108b adds the PPS modes).
 ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
 
@@ -86,3 +89,6 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
     endif()
   endforeach()
 endif()
+
+# WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
+ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)

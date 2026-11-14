@@ -56,7 +56,15 @@ runs:
     - name: Host tools (macOS)
       if: runner.os == 'macOS'
       shell: bash
+      env:
+        HOSTED: ${{ runner.environment == 'github-hosted' }}
       run: |
+        # GitHub's macOS images (static-analysis clang-tidy) lack some of tools/brew-packages.txt: install it there.
+        # Not python@3.12: setup-python below provides Python, and Homebrew's would clash with the image's links.
+        if [ "$HOSTED" = true ]; then
+          grep -v -e '^\s*#' -e '^\s*$' -e '^python@' tools/brew-packages.txt |
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 xargs brew install --quiet
+        fi
         # The self-hosted Mac runner has no write access to Homebrew; check what tools/brew-packages.txt
         # lists instead of installing it.
         missing=""
@@ -135,8 +143,9 @@ runs:
         path: build/third_party/${{ inputs.preset }}
         # Exact key only: a prefix restored from other pins or patches would not be reproducible. Per runner: the
         # prefix holds CMake build trees (CMakeCache.txt names the checkout directory), which CMake refuses to
-        # reuse from another runner's workspace (the Mini's runners are actions-runner, -runner-2, ...).
-        key: tp-${{ runner.os }}-${{ runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
+        # reuse from another runner's workspace (the Mini's runners are actions-runner, -runner-2, ...). Hosted runners
+        # all use the same workspace path but a different runner.name per job, so they share one `hosted` entry.
+        key: tp-${{ runner.os }}-${{ runner.environment == 'github-hosted' && 'hosted' || runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
 
     - name: third_party downloads cache
       id: tpdl
