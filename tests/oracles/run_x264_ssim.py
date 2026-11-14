@@ -4,11 +4,16 @@
 """x264 SSIM oracle runner (chapter 9 §9.4.4, WI-3.308): per-frame Y/U/V of the vendored x264 kernel.
 
     run_x264_ssim.py netflix --golden X.x264ssim.json.gz -o OUT.json
+    run_x264_ssim.py netflix-run --oracle PATH_TO_x264_ssim --ref REF.y4m --dist DIST.y4m -o OUT.json
     run_x264_ssim.py synth --oracle PATH_TO_x264_ssim -o OUT.json
 
 ``netflix`` copies the per-frame ``ssim_x264_{y,u,v}`` out of a tests/golden/metrics ``*.x264ssim.json.gz`` file (the
 goldens-metrics workflow of WI-0.565 ran ``x264_ssim`` on the Netflix pair); the output is the golden
 core/tests/metrics/golden/ssim_x264_netflix_src01_576x324.json.
+
+``netflix-run`` runs the ``x264_ssim`` executable on the Netflix pair itself and keeps the nine decimals it prints;
+the checked-in golden comes from here, because the six-decimal golden above is too coarse for a 1e-6 comparison (the
+rounding alone is up to 5e-7).
 
 ``synth`` writes the small deterministic Y4M pairs of ``CASES``, runs the ``x264_ssim`` executable
 (tests/oracles/x264_ssim, built with ``cmake -S tests/oracles/x264_ssim -B build/x264_ssim``) on each and writes
@@ -71,6 +76,11 @@ def main() -> int:
     n = sub.add_parser("netflix")
     n.add_argument("--golden", type=Path, required=True)
     n.add_argument("-o", "--output", type=Path, required=True)
+    r = sub.add_parser("netflix-run")
+    r.add_argument("--oracle", default="x264_ssim")
+    r.add_argument("--ref", type=Path, required=True)
+    r.add_argument("--dist", type=Path, required=True)
+    r.add_argument("-o", "--output", type=Path, required=True)
     s = sub.add_parser("synth")
     s.add_argument("--oracle", default="x264_ssim")
     s.add_argument("-o", "--output", type=Path, required=True)
@@ -82,6 +92,8 @@ def main() -> int:
         doc = {"oracle": "x264_ssim on x264 r3191"}
         for plane in "yuv":
             doc[plane] = [fr[f"ssim_x264_{plane}"] for fr in frames]
+    elif args.mode == "netflix-run":
+        doc = {"oracle": "x264_ssim on x264 r3191", **run_oracle(args.oracle, args.ref, args.dist)}
     else:
         cases = []
         with tempfile.TemporaryDirectory() as tmp:
