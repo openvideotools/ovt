@@ -15,6 +15,8 @@ target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
+# WI-1.404: offscreen interop export, one pl_gpu per §10.2.2 interop row (Metal texture, shared Vulkan device, GL).
+target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
 # WI-4.452: HDR measurements (§10.7.1-§10.7.4, §10.7.9). The GLSL of render/src/shaders/ is embedded as string
 # constants in a generated header (cmake/OvtEmbedShaders.cmake).
 target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
@@ -37,6 +39,18 @@ target_link_libraries(ovt_render PUBLIC ovt::core "$<BUILD_INTERFACE:ovt_schemas
 # WI-1.400 step 1: on macOS ovt_render links the prebuilt MoltenVK of WI-0.017 directly (§13.5.6).
 if(TARGET tp::moltenvk)
   target_link_libraries(ovt_render PRIVATE tp::moltenvk)
+endif()
+
+# WI-1.404: Interop::GlTexture loads GL through EGL and needs GLES 3.0 for its fence; libplacebo has an OpenGL backend
+# on Android (and in system packages, which a local OVT_SYSTEM_LIBPLACEBO build may use). Elsewhere the GL row is
+# compiled out.
+if(ANDROID OR OVT_SYSTEM_LIBPLACEBO)
+  find_library(OVT_GLES_LIBRARY NAMES GLESv3 GLESv2)
+  find_library(OVT_EGL_LIBRARY NAMES EGL)
+  if(OVT_GLES_LIBRARY AND OVT_EGL_LIBRARY)
+    target_link_libraries(ovt_render PRIVATE "${OVT_GLES_LIBRARY}" "${OVT_EGL_LIBRARY}")
+    target_compile_definitions(ovt_render PRIVATE OVT_RENDER_HAVE_GLES=1)
+  endif()
 endif()
 
 # SONAME libovt_render.so.1 (chapter 13 §13.2.1).

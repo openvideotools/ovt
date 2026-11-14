@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: BSD-2-Clause
 //
-// FrameAnalysis FlatBuffer of one AV1 frame (chapter 07 §7.6.1, WI-2.155; block data WI-2.156).
+// FrameAnalysis FlatBuffer of one AV1 frame (chapter 07 §7.6.1, WI-2.155; block data WI-2.156; accounting
+// WI-2.157).
 
 #include "fb_builder.hpp"
 
@@ -33,7 +34,7 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   const MappedBlocks mapped = map_blocks(*fbb, f.blocks, f.coded_w, f.coded_h);
 
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + 1);
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + mapped.notes.size() + 1);
   for (const Diag& d : f.diagnostics) {
     diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
                                                     d.message.c_str()));
@@ -42,6 +43,10 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   for (const std::string& w : mapped.warnings) {
     diags.push_back(
         ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
+  }
+  for (const MappedBlocks::Note& n : mapped.notes) {
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityInfo), n.code.c_str(),
+                                                    n.message.c_str()));
   }
   // Chapter 06 §6.6.1 rule 5: Reconstruction is the picture before film grain synthesis (AV1D_SET_SKIP_FILM_GRAIN).
   // SPEC-ASSUMPTION(#389): §7.6.1's derived note "film grain present (not applied)" has no field in
@@ -94,6 +99,8 @@ std::unique_ptr<flatbuffers::FlatBufferBuilder> build_frame_analysis(const Frame
   fa.add_filter_params(mapped.filter_params);
   fa.add_filter_params_type(filter_type_off);
   fa.add_planes(planes_v);
+  fa.add_symbols(mapped.symbols);
+  fa.add_symbol_names(mapped.symbol_names);
   fa.add_diagnostics(diags_v);
   ovt::fb::FinishFrameAnalysisBuffer(*fbb, fa.Finish());
   return fbb;
