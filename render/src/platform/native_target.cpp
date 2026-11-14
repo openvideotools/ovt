@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 #include "pipeline/render_params.h"
 
@@ -81,22 +82,23 @@ void set_native_provider_for_tests(const NativeProvider* provider) {
 }
 
 NativeChoice choose_native_encoding(const DisplayTarget& target, const std::vector<VkSurfaceFormatKHR>& formats) {
+  const auto pairs_of = [&](Encoding encoding) {
+    std::vector<VkSurfaceFormatKHR> pairs;
+    std::copy_if(formats.begin(), formats.end(), std::back_inserter(pairs), [&](const VkSurfaceFormatKHR& f) {
+      return f.colorSpace == pair_color_space(encoding) && pair_format_ok(encoding, f.format);
+    });
+    return pairs;
+  };
   NativeChoice choice;
-  choice.encoding = Encoding::Srgb8;
-  choice.hint = hint_for(target, Encoding::Srgb8);
-  if (target.encoding == Encoding::Srgb8 || !target.hdr_capable) {
-    return choice;
+  if (target.encoding != Encoding::Srgb8 && target.hdr_capable) {
+    choice.pairs = pairs_of(target.encoding);
+    choice.no_hdr_format = choice.pairs.empty();
+    choice.encoding = choice.no_hdr_format ? Encoding::Srgb8 : target.encoding;
   }
-  const VkColorSpaceKHR space = pair_color_space(target.encoding);
-  const bool offered = std::any_of(formats.begin(), formats.end(), [&](const VkSurfaceFormatKHR& f) {
-    return f.colorSpace == space && pair_format_ok(target.encoding, f.format);
-  });
-  if (!offered) {
-    choice.no_hdr_format = true;
-    return choice;
+  if (choice.encoding == Encoding::Srgb8) {
+    choice.pairs = pairs_of(Encoding::Srgb8);
   }
-  choice.encoding = target.encoding;
-  choice.hint = hint_for(target, target.encoding);
+  choice.hint = hint_for(target, choice.encoding);
   return choice;
 }
 

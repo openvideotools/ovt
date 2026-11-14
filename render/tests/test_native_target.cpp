@@ -64,10 +64,15 @@ TEST_CASE("render_test_native: encoding choice from the surface formats (§10.4.
   CHECK_FALSE(scrgb.no_hdr_format);
   CHECK(scrgb.hint.transfer == PL_COLOR_TRC_LINEAR);
   CHECK(scrgb.hint.primaries == PL_COLOR_PRIM_BT_2020);
+  // Only the pair of the encoding is shown to libplacebo, which would rank BGRA8 + BT2020_LINEAR above it.
+  REQUIRE(scrgb.pairs.size() == 1);
+  CHECK(scrgb.pairs[0].format == VK_FORMAT_R16G16B16A16_SFLOAT);
+  CHECK(scrgb.pairs[0].colorSpace == VK_COLOR_SPACE_BT2020_LINEAR_EXT);
 
   const auto pq = choose_native_encoding(hdr_target(Encoding::Pq10), mvk);
   CHECK(pq.encoding == Encoding::Pq10);
   CHECK(pq.hint.transfer == PL_COLOR_TRC_PQ);
+  CHECK(pq.pairs.size() == 2);  // both 10-bit layouts
   const auto hlg = choose_native_encoding(hdr_target(Encoding::Hlg10), mvk);
   CHECK(hlg.encoding == Encoding::Hlg10);
   CHECK(hlg.hint.transfer == PL_COLOR_TRC_HLG);

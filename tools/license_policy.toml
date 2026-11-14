@@ -81,8 +81,6 @@ ovt_plugin_ffmpeg_smoke_tests = "LGPL-2.1-or-later"
 ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
-# The manual EDR pattern tool of WI-1.406 (macOS only).
-ovt_manual_edr_pattern = "LGPL-2.1-or-later"
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"

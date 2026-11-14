@@ -71,14 +71,3 @@ if(APPLE)
                                                  "-framework CoreFoundation")
 endif()
 
-# WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
-if(APPLE)
-  add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
-  set_source_files_properties(manual_edr_window.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-  set_target_properties(ovt_manual_edr_pattern PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
-  target_link_libraries(ovt_manual_edr_pattern PRIVATE ovt::render ovt::flags ${nlohmann_json_TARGET}
-                                                       "-framework AppKit" "-framework QuartzCore")
-  target_compile_definitions(ovt_manual_edr_pattern
-                             PRIVATE "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
-  ovt_set_license(ovt_manual_edr_pattern "LGPL-2.1-or-later")
-endif()

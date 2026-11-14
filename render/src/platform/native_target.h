@@ -61,6 +61,9 @@ struct NativeChoice {
   // True when an HDR encoding was requested on an HDR-capable display but the surface lacks its format pair:
   // last_error() reports "RND-0040 no HDR surface format; falling back to Srgb8".
   bool no_hdr_format = false;
+  // The offered pairs of `encoding`, the only ones libplacebo then sees (set_surface_format_filter()); empty = no
+  // filter.
+  std::vector<VkSurfaceFormatKHR> pairs;
 };
 
 // Rules: Srgb8 requested, or the display is not HDR capable (DisplayTarget.hdr_capable from display_probe(),

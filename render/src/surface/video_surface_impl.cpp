@@ -206,9 +206,8 @@ class VideoSurfaceImpl final : public VideoSurface {
       const bool size_changed = target.width != target_.width || target.height != target_.height;
       target_ = target;
       if (encoding_changed) {
-        apply_native_encoding();
-      }
-      if (size_changed || encoding_changed) {
+        open_native();  // a new swapchain: libplacebo reads the surface formats only when it creates one
+      } else if (size_changed) {
         resize_swapchain();
       }
       return;
@@ -396,8 +395,22 @@ class VideoSurfaceImpl final : public VideoSurface {
     pl_swapchain_swap_buffers(sw_);
   }
 
-  // Creates the swapchain on native_'s surface surf_ and picks the encoding.
+  // (Re)creates the swapchain on surf_ for target_: picks the encoding from the surface's formats, lets libplacebo see
+  // only that encoding's pairs, and configures the platform object before the swapchain's first present (§10.4.1).
   bool open_native() {
+    if (sw_ != nullptr) {
+      wait_device_idle();
+      pl_swapchain_destroy(&sw_);
+    }
+    const detail::NativeChoice choice = detail::choose_native_encoding(target_, surface_formats());
+    active_ = choice.encoding;
+    if (choice.no_hdr_format) {
+      error_ = "RND-0040 no HDR surface format; falling back to Srgb8";
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+    }
+    detail::set_surface_format_filter(surf_, choice.pairs);
+    native_->configure(active_, target_.width, target_.height);
     struct pl_vulkan_swapchain_params sp = {};
     sp.surface = surf_;
     sp.present_mode = VK_PRESENT_MODE_FIFO_KHR;  // §10.4.1
@@ -407,22 +420,8 @@ class VideoSurfaceImpl final : public VideoSurface {
       close_native();
       return fail("swapchain", "pl_vulkan_create_swapchain failed");
     }
-    apply_native_encoding();
-    return resize_swapchain();
-  }
-
-  // Picks the encoding from the surface's formats, configures the platform object before the first present of the
-  // (re)created swapchain, and makes libplacebo pick the matching surface format pair.
-  void apply_native_encoding() {
-    const detail::NativeChoice choice = detail::choose_native_encoding(target_, surface_formats());
-    active_ = choice.encoding;
-    if (choice.no_hdr_format) {
-      error_ = "RND-0040 no HDR surface format; falling back to Srgb8";
-      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
-    }
-    native_->configure(active_, target_.width, target_.height);
     pl_swapchain_colorspace_hint(sw_, &choice.hint);
+    return resize_swapchain();
   }
 
   // Not an error when it fails: libplacebo cannot size a swapchain on a 0x0 extent (hidden window, layer not laid out)
@@ -438,8 +437,8 @@ class VideoSurfaceImpl final : public VideoSurface {
   std::vector<VkSurfaceFormatKHR> surface_formats() const {
     std::vector<VkSurfaceFormatKHR> formats;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
-    const auto get_formats = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(
-        vk_->get_proc_addr(vk_->instance, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
+    const auto get_formats = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(  // unfiltered: the loader's
+        inst_->get_proc_addr(inst_->instance, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
     uint32_t n = 0;
     if (get_formats == nullptr || get_formats(vk_->phys_device, surf_, &n, nullptr) != VK_SUCCESS) {
       return formats;
@@ -470,6 +469,7 @@ class VideoSurfaceImpl final : public VideoSurface {
       wait_device_idle();
       pl_swapchain_destroy(&sw_);
     }
+    detail::set_surface_format_filter(surf_, {});
     destroy_vk_surface(surf_);
     surf_ = VK_NULL_HANDLE;
     native_.reset();
