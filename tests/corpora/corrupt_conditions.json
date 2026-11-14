@@ -34,6 +34,8 @@
     {"code": "SYN-CONF-0001", "input": "syn_h264_multislice_cavlc", "input_file": "syn_h264_multislice_cavlc.264", "edit": ["--set-bits", "sps", "--bit", "24", "--width", "8", "--value", "10"], "why": "level_idc = 10 (Level 1, MaxFS 99) on a 1280x720 stream"}
   ],
   "not_in_table": {
+    "SYN-H265-0011": "needs a PPS NAL removed from the stream, not a bit edit; covered by the WI-1.113 unit tests",
+    "SYN-H265-0061": "needs the independent slice segment removed before a dependent one, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-GEN-0103": "a cancelled or partial index is a run-time condition, not a property of the file",
     "SYN-GEN-0104": "every unedited Annex B / OBU recipe output already lacks timing information",
     "SYN-GEN-0105": "a length-prefixed sample overrun is an MP4 edit: chapter 8 broken corpus (WI-1.201)",

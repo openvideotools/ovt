@@ -17,9 +17,11 @@ ovt_set_license(ovt_plugin_ffmpeg_sidedata "LGPL-2.1-or-later")
 
 # The internals of the plugin (WI-2.170): compiled with the static plugin flavour, as the plugin itself is.
 # test_ffmpeg_hevc_internals.cpp (WI-4.107) compiles to nothing without patch 0002 (OVT_SYSTEM_FFMPEG).
+# test_ffmpeg_blockparams_internals.cpp (WI-4.102) checks the block-params mapping; most of it needs patch 0001.
 add_executable(
-  ovt_plugin_ffmpeg_internal_tests test_ffmpeg_h264_internals.cpp test_ffmpeg_hevc_internals.cpp
-                                   ../src/h264_analysis.cpp ../src/map_h264_sidedata.cpp ../src/map_hevc_sidedata.cpp)
+  ovt_plugin_ffmpeg_internal_tests
+  test_ffmpeg_h264_internals.cpp test_ffmpeg_hevc_internals.cpp test_ffmpeg_blockparams_internals.cpp
+  ../src/h264_analysis.cpp ../src/map_h264_blockparams.cpp ../src/map_h264_sidedata.cpp ../src/map_hevc_sidedata.cpp)
 target_include_directories(ovt_plugin_ffmpeg_internal_tests PRIVATE "${PROJECT_SOURCE_DIR}/core/include" ../src)
 target_compile_definitions(ovt_plugin_ffmpeg_internal_tests
                            PRIVATE "OVT_FFMPEG_HEVC_ENC_PARAMS=${OVT_FFMPEG_HEVC_ENC_PARAMS}")
@@ -27,7 +29,8 @@ target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin
 ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_internal_tests)
 
-add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp test_ffmpeg_map_sidedata.cpp)
+add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp test_ffmpeg_map_sidedata.cpp
+                                             test_ffmpeg_map_blockparams.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
                                                             ovt_test_support ovt::flags ${Catch2_TARGET})
 target_compile_definitions(ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_SYSTEM=$<BOOL:${OVT_SYSTEM_FFMPEG}>"
@@ -53,13 +56,16 @@ if(NOT OVT_SYSTEM_FFMPEG)
 
   ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
   add_executable(ovt_plugin_ffmpeg_blockparams_tests test_ffmpeg_blockparams.cpp)
-  target_link_libraries(ovt_plugin_ffmpeg_blockparams_tests PRIVATE ovt_test_support ovt::flags ${nlohmann_json_TARGET}
-                                                                    ${Catch2_TARGET})
+  # WI-4.102: it also loads the plugin (host registry, core FFmpeg flavour) to compare its AvcMb tables.
+  target_link_libraries(
+    ovt_plugin_ffmpeg_blockparams_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas ovt_test_support
+                                                ovt::flags ${nlohmann_json_TARGET} ${Catch2_TARGET})
   target_compile_definitions(
     ovt_plugin_ffmpeg_blockparams_tests
     PRIVATE "OVT_FFMPEG_BLOCKPARAMS=\"$<TARGET_FILE:ovt_plugin_ffmpeg_blockparams>\""
+            "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\""
             "OVT_JM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h264\"")
-  add_dependencies(ovt_plugin_ffmpeg_blockparams_tests ovt_plugin_ffmpeg_blockparams)
+  add_dependencies(ovt_plugin_ffmpeg_blockparams_tests ovt_plugin_ffmpeg_blockparams ovt_plugin_ffmpeg)
   ovt_set_license(ovt_plugin_ffmpeg_blockparams_tests "LGPL-2.1-or-later")
   ovt_catch_discover_tests(ovt_plugin_ffmpeg_blockparams_tests)
 endif()

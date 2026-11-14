@@ -53,6 +53,12 @@ option(OVT_ENABLE_UVQ "UVQ metric via ONNX Runtime (ON desktop, OFF Android)" ${
 option(OVT_CLI_WITH_RENDER_PROBE "ovt doctor GPU probe (ON desktop, OFF Android)" ${_ovt_desktop_default})
 unset(_ovt_desktop_default)
 option(OVT_ENABLE_HW_DECODE "VideoToolbox / MediaCodec / VA-API hwaccel in the FFmpeg core flavour" ON)
+# Fuzz builds only (core/tests/fuzz/oss-fuzz/build.sh): OSS-Fuzz runs each binary from $OUT with no shared libraries
+# beside it, so the core FFmpeg flavour is linked statically there. Never in a distributed build: the shipped core
+# flavour stays a shared LGPL library (chapter 13 §13.3.3, chapter 15). SPEC-ASSUMPTION(#406): not in the
+# chapter 13 §13.2.2 option table yet.
+option(OVT_FFMPEG_CORE_STATIC "Build the core FFmpeg flavour as static archives (fuzz builds only)" OFF)
+mark_as_advanced(OVT_FFMPEG_CORE_STATIC)
 option(OVT_UNIVERSAL "macOS: lipo arm64+x86_64 artefacts (§13.5.1)" OFF)
 
 # ---- Licensing-relevant options (chapter 15 §15.4) ------------------------------------------------

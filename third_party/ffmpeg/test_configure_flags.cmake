@@ -129,6 +129,26 @@ foreach(platform linux macos android)
   endforeach()
 endforeach()
 
+# ---- OVT_FFMPEG_CORE_STATIC (OSS-Fuzz build): the core flavour as static archives, same suffix ------------------
+ovt_ffmpeg_configure_flags(
+  f
+  FLAVOUR
+  core
+  PLATFORM
+  linux
+  HW_DECODE
+  OFF
+  PATENT_CODECS_IN_CORE
+  ON
+  DAV1D
+  ON
+  STATIC
+  ON)
+expect_has("${f}" --disable-shared "core/static")
+expect_has("${f}" --enable-static "core/static")
+expect_has("${f}" --build-suffix=_ovt "core/static")
+expect_not("${f}" "^--(enable-shared|disable-static)$" "core/static")
+
 # ---- GPL only where asked ---------------------------------------------------------------------------------------
 ovt_ffmpeg_configure_flags(f FLAVOUR plugin PLATFORM linux GPL ON)
 expect_has("${f}" --enable-gpl "plugin GPL")

@@ -44,6 +44,7 @@ struct Result {
   int32_t coded_h = 0;
   std::vector<uint32_t> plane_w;  // per PlaneRef
   std::vector<uint32_t> plane_h;
+  std::vector<uint32_t> stride;   // PlaneRef.stride_bytes
   std::vector<size_t> blob_size;  // bytes returned by plane()
 };
 
@@ -73,6 +74,7 @@ void drain(Instance& inst, uint32_t mask, Run* run) {
     for (const ovt::fb::PlaneRef* p : *fa->planes()) {
       r.plane_w.push_back(p->width());
       r.plane_h.push_back(p->height());
+      r.stride.push_back(p->stride_bytes());
       const uint8_t* data = nullptr;
       size_t size = 0;
       REQUIRE(inst.api.plane(inst.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
@@ -156,7 +158,11 @@ TEST_CASE("aom plugin AT1: one FrameAnalysis per frame of av1-1-b8-01-size-66x66
     REQUIRE(r.plane_w.size() == 3);
     CHECK(r.plane_w == std::vector<uint32_t>{66, 33, 33});
     CHECK(r.plane_h == std::vector<uint32_t>{66, 33, 33});
-    CHECK(r.blob_size == std::vector<size_t>{4356, 1089, 1089});  // 66 x 66 and 33 x 33 8-bit samples
+    // 66 x 66 and 33 x 33 8-bit samples in place in libaom's frame buffer: stride_bytes apart (WI-2.158).
+    for (size_t p = 0; p < 3; ++p) {
+      CHECK(r.stride[p] >= r.plane_w[p]);
+      CHECK(r.blob_size[p] == size_t{r.stride[p]} * (r.plane_h[p] - 1) + r.plane_w[p]);
+    }
   }
 }
 
