@@ -82,7 +82,6 @@ class BoxRegistry {
 
 [[nodiscard]] BoxRegistry& global_registry();
 
-// The hand-coded entry table (WI-1.203 replaces it with the generated one).
 [[nodiscard]] std::span<const RegistryEntry> generated_entries() noexcept;
 
 const RegistryEntry* lookup(std::string_view fourcc, const BoxContext& ctx);
@@ -93,8 +92,6 @@ struct DecodeOutcome {
   uint64_t children_offset = 0;  // ContainerWithPrefix: payload offset of the first child
   bool truncated = false;        // the decoder threw ParseError; CNT-1002 is on the node
 };
-// The walker's call of a decoder: a ParseError is caught and becomes CNT-1002 ("truncated <box>: <message>"); fields
-// recorded before the throw are kept.
 DecodeOutcome run_decoder(const BoxDecoder& d, BoxContext& ctx, BitReader& br, FieldBuilder& fb);
 
 }  // namespace ovt::container::isobmff

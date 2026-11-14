@@ -117,7 +117,6 @@ std::vector<std::unique_ptr<fb::FieldT>>& FieldBuilder::sink() {
   return stack_.empty() ? node_->fields : stack_.back()->children;
 }
 
-// Appends a field that spans [start_pos, br.bit_pos()) of the reader.
 fb::FieldT& FieldBuilder::add(std::string_view name, SyntaxValueKind kind, uint64_t start_pos) {
   auto f = std::make_unique<fb::FieldT>();
   f->name = std::string(name);

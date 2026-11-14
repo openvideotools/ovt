@@ -78,7 +78,6 @@ unsigned score(const RegistryEntry& e, bool exact_fourcc) {
 
 constexpr uint8_t kV01 = 0x03;
 
-// Hand-coded stand-in for the generated table (WI-1.203). One row per (fourcc, context pattern).
 // clang-format off
 #define OVT_ENTRY(CC, PAT, KIND, FULL, VMASK, FMASK, TRAIL, REF, DESC, PARENTS) \
   RegistryEntry{CC, PAT, BoxKind::KIND, FULL, VMASK, FMASK, TRAIL, REF, DESC, PARENTS, nullptr}
