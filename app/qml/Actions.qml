@@ -22,7 +22,7 @@ QtObject {
     // Preferences and the Keyboard map (WI-1.466), the dock actions (WI-1.451: presets, Reset Layout, Picture only,
     // area toggles, focus panel N and tab cycling; the last two are handled by DockWorkspace through activated()).
     readonly property var enabledIds: ["file.quit", "analysis.cancelAll", "view.theme.system", "view.theme.light", "view.theme.dark",
-        "view.jobs", "edit.goTo", "edit.preferences", "help.keyboardMap",
+        "view.jobs", "navigate.addBookmark", "navigate.addComment", "navigate.nextBookmark", "navigate.previousBookmark", "edit.goTo", "edit.preferences", "help.keyboardMap",
         "view.layout.analyze", "view.layout.syntax", "view.layout.quality", "view.layout.hdr", "view.layout.compare",
         "view.resetLayout", "view.pictureOnly", "view.area.left", "view.area.right", "view.area.bottom",
         "view.nextTab", "view.previousTab", "view.focusPanel1", "view.focusPanel2", "view.focusPanel3",

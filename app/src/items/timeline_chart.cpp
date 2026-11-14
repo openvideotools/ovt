@@ -161,6 +161,18 @@ QVariantList TimelineChart::gop_markers() const {
   return out;
 }
 
+double TimelineChart::xOfFrame(int decode_index) const {
+  if (model_.isNull() || width() <= 0.0) {
+    return -1.0;
+  }
+  const int position = model_->positionOf(decode_index);
+  if (position < 0 || static_cast<std::size_t>(position) < view_.first_frame() ||
+      static_cast<std::size_t>(position) >= view_.end_frame()) {
+    return -1.0;
+  }
+  return view_.x_of(static_cast<double>(position) + 0.5, width());
+}
+
 void TimelineChart::set_selected_frame(int decode_index) {
   if (selected_frame_ != decode_index) {
     selected_frame_ = decode_index;

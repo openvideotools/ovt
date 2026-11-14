@@ -49,6 +49,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
+        Bookmarks.attach(Project, Selection)
         if (initialFile !== "")
             Project.openFile(initialFile)
     }
@@ -146,6 +147,15 @@ ApplicationWindow {
         function onActivated(id) {
             if (id === "view.jobs")
                 jobsPopover.opened ? jobsPopover.close() : jobsPopover.open()
+            else if (id === "navigate.addBookmark")
+                Bookmarks.addBookmark()
+            else if (id === "navigate.addComment") {
+                DockModel.openPanel("bookmarks")
+                Bookmarks.requestComment()
+            } else if (id === "navigate.nextBookmark")
+                Bookmarks.nextBookmark()
+            else if (id === "navigate.previousBookmark")
+                Bookmarks.previousBookmark()
         }
     }
 
@@ -181,7 +191,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             actions: actions
-            panelComponents: ({"diagnostics": diagnosticsComponent})
+            panelComponents: ({"diagnostics": diagnosticsComponent, "bookmarks": bookmarksComponent})
         }
     }
 
@@ -190,6 +200,13 @@ ApplicationWindow {
         id: diagnosticsComponent
 
         DiagnosticsPanel {}
+    }
+
+    // The Bookmarks & Comments panel (§11.3.17, WI-2.487) stores in the project and navigates through Selection.
+    Component {
+        id: bookmarksComponent
+
+        BookmarksPanel {}
     }
 
     footer: ToolBar {
