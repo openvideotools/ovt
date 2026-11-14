@@ -71,4 +71,43 @@ if(TARGET tp_libvmaf)
                    "${SOURCE_DIR}" --check "${PROJECT_SOURCE_DIR}/core/src/metrics/vmaf/vmaf_models.inc")
   set_tests_properties(metrics_vmaf_models_inc_current PROPERTIES LABELS "fast;unit;metrics")
   unset(SOURCE_DIR)
+  # Acceptance test 3 (WI-3.309): the Meson option set of chapter 9 §9.5.1 and, on arm64, vif_neon.c in the
+  # introspection of the libvmaf build. The tp_libvmaf build runs the same check and fails without them.
+  add_test(
+    NAME metrics_vmaf_meson_introspection
+    COMMAND
+      ${CMAKE_COMMAND} "-DOVT_MESON=${OVT_MESON}" "-DBUILD_DIR=${OVT_LIBVMAF_BUILD_DIR}"
+      "-DEXPECT=${OVT_LIBVMAF_EXPECT}" "-DREQUIRE_NEON=${OVT_LIBVMAF_REQUIRE_NEON}" -P
+      "${OVT_LIBVMAF_INTROSPECT_SCRIPT}")
+  set_tests_properties(metrics_vmaf_meson_introspection PROPERTIES LABELS "fast;unit;metrics")
 endif()
+
+# ---- The introspection check itself, on recorded `meson introspect` output (runs without a libvmaf build) ------
+set(_ovt_vi "${CMAKE_CURRENT_SOURCE_DIR}/vmaf_introspect")
+set(_ovt_vi_expect "buildtype=release|default_library=static|enable_float=true|enable_avx512=true|"
+                   "built_in_models=true|enable_cuda=false|enable_nvtx=false|enable_docs=false")
+string(JOIN "" _ovt_vi_expect ${_ovt_vi_expect})
+foreach(
+  _case IN
+  ITEMS "arm64;targets_arm64;ON;${_ovt_vi_expect};0" "x86;targets_scalar;OFF;${_ovt_vi_expect};0"
+        "no_neon;targets_scalar;ON;${_ovt_vi_expect};1" "option;targets_arm64;OFF;enable_float=false;1"
+        "unknown;targets_arm64;OFF;enable_zimg=true;1")
+  list(GET _case 0 _name)
+  list(GET _case 1 _targets)
+  list(GET _case 2 _neon)
+  list(GET _case 3 _expect)
+  list(GET _case 4 _fails)
+  add_test(
+    NAME metrics_vmaf_introspect_check_${_name}
+    COMMAND ${CMAKE_COMMAND} "-DOPTIONS_JSON=${_ovt_vi}/buildoptions.json" "-DTARGETS_JSON=${_ovt_vi}/${_targets}.json"
+            "-DEXPECT=${_expect}" "-DREQUIRE_NEON=${_neon}" -P "${PROJECT_SOURCE_DIR}/cmake/OvtLibvmafIntrospect.cmake")
+  set_tests_properties(metrics_vmaf_introspect_check_${_name} PROPERTIES LABELS "fast;unit;metrics" WILL_FAIL ${_fails})
+endforeach()
+unset(_case)
+unset(_name)
+unset(_targets)
+unset(_neon)
+unset(_expect)
+unset(_fails)
+unset(_ovt_vi_expect)
+unset(_ovt_vi)
