@@ -16,6 +16,7 @@ add_executable(
   test_metrics_plugin_registry.cpp
   test_metrics_psnr.cpp
   test_metrics_ssim.cpp
+  test_metrics_ssim_x264.cpp
   test_metrics_vmaf.cpp
   test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")

@@ -45,7 +45,7 @@ only up to x264's integer rounding. Do not compare the two.
 
 ### Against the x264 / x265 `--ssim` log
 
-That is `ssim_x264` (WI-3.308), a different kernel (4 × 4 sums, 2-sample offset, integer constants). Its value is
+That is `ssim_x264` (below), a different kernel (4 × 4 sums, 2-sample offset, integer constants). Its value is
 normally a few thousandths away from `ssim`.
 
 ### Against Wang's `ssim.m`
@@ -60,3 +60,37 @@ The five moment planes are float32 sums in a fixed tap order (a multiply, then a
 kernel files are built with `-ffp-contract=off`), the per-row window values are float32, the frame score is a double
 sum in raster order. The scalar and the Highway kernels return the same bits whatever the vector width, so a score does
 not depend on the CPU it ran on.
+
+## `ssim_x264` (WI-3.308a, chapter 9 §9.4.4)
+
+`ssim_x264` is the SSIM that x264 and x265 print with `--ssim`: 4 × 4 integer sums over the plane cut by two samples
+at the top and left to `(W − 2) × (H − 2)`, 8 × 8 windows stepping by 4, `(W'/4 − 1)·(H'/4 − 1)` windows per plane.
+It is written from the algorithm of §9.4.4; x264's own code exists only in `tests/oracles/x264_ssim` (GPL, oracle).
+
+### Against the x264 kernel oracle
+
+The oracle is x264 r3191's `ssim_end1` / `ssim_end4` / `x264_pixel_ssim_wxh`. Differences, all below the 1e-6 of the
+acceptance test:
+
+* x264 turns its integer factors into `float` before multiplying and adds the windows of a row in `float`, then adds
+  the rows in `float`. OVT forms the products from exact integers (8-bit and 9-bit branch) or from the same `float`
+  operations in the same order (10-bit and deeper), divides in `double` and sums the windows in `double`.
+* The plane score is `sum / count` in double; the oracle prints `float(sum) / float(count)` with nine digits.
+* On the synthetic pairs of `core/tests/metrics/golden/ssim_x264_synth.json` (8-bit and 10-bit, 330 × 194 and
+  342 × 226) the largest difference is below 1e-7 on every plane.
+
+Bit depths above 10 use the float branch with `peak = 2^b − 1` (x264 has no such build; 12-bit input agrees with an
+exact double evaluation within 1e-4 per plane). A plane with fewer than 2 × 2 blocks after the offset has no window
+and is rejected (`OVT_E_INVALID_ARG`); x264's caller would print 1.0.
+
+### Against the `SSIM Mean Y` line of an x264 log
+
+`x264 --ssim --qp 20 --bframes 0` prints the luma mean over the frames it encoded. With no B-frames the encoder's
+reconstruction is the decoded picture, and `ssim_x264/y` of the source against the decoded stream reproduces the line
+(the run recorded in `docs/acceptance/wi/WI-3.308a.md` agrees to the seven printed digits). With B-frames x264 scores
+non-reference pictures before deblocking and the numbers differ (issue #306).
+
+### Against FFmpeg's `ssim` filter and libvpx
+
+Do not compare: FFmpeg's `ssim` has no 2-sample offset and different constants, libvpx's `tiny_ssim` uses `64²`
+constants without the offset and weights the planes `0.8/0.1/0.1`.
