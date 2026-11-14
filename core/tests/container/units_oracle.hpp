@@ -84,6 +84,7 @@ inline std::vector<Golden> committed_goldens(const std::string& framing) {
 
 // Fail rather than skip when nothing was compared: OVT_REQUIRE_CORPORA=1 or hosted CI (CI=true, `fast` corpora).
 inline bool corpora_required() {
+  // NOLINTNEXTLINE(concurrency-mt-unsafe): read once at test start, nothing sets the environment concurrently
   const char* ci = std::getenv("CI");
   return ovt::test::require_corpora() || (ci != nullptr && std::string(ci) == "true");
 }
