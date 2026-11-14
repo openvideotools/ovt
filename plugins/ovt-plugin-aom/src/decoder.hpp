@@ -55,6 +55,8 @@ class Decoder {
   /// callback. OVT_E_PLUGIN with @p error = "libaom built without CONFIG_INSPECTION" when libaom refuses the
   /// callback; OVT_E_PLUGIN with libaom's message when the decoder cannot be opened.
   static ovt_status create(int threads, std::unique_ptr<Decoder>* out, std::string* error);
+  /// True when libaom was built with CONFIG_ACCOUNTING, so frames carry symbols and bits_x8 (WI-2.157).
+  static bool has_accounting();
 
   Decoder() = default;  // unusable until create() has set it up; public only for std::make_unique
   ~Decoder();
@@ -87,10 +89,11 @@ class Decoder {
   void add_diag(uint8_t severity, std::string code, std::string message);
 
   std::unique_ptr<Impl> impl_;
-  std::vector<uint8_t> tu_;          // the OBUs of the temporal unit being collected
-  std::vector<FrameObu> tu_frames_;  // OBU_FRAME and OBU_FRAME_HEADER units of tu_, in order
-  int32_t tu_first_hint_ = -1;       // decode_index_hint of the first frame OBU of tu_
-  int32_t expected_next_ = -1;       // tu_first_hint_ + frames handled, after a decoded temporal unit; -1 unknown
+  std::vector<uint8_t> tu_;             // the OBUs of the temporal unit being collected
+  std::vector<FrameObu> tu_frames_;     // OBU_FRAME and OBU_FRAME_HEADER units of tu_, in order
+  std::vector<size_t> tu_tile_groups_;  // offsets in tu_ of the OBU_FRAME and OBU_TILE_GROUP units (tile groups)
+  int32_t tu_first_hint_ = -1;          // decode_index_hint of the first frame OBU of tu_
+  int32_t expected_next_ = -1;          // tu_first_hint_ + frames handled, after a decoded temporal unit; -1 unknown
   std::deque<Frame> frames_;
   std::vector<Diag> pending_diags_;  // attached to the next frame that comes out
   std::string last_error_;
