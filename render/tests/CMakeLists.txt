@@ -58,3 +58,7 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # WI-1.403: ViewState -> pl_render_params, target frames, tone/gamut mapping, dithering (§10.3.2, §10.3.4, §10.3.5). The
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
+
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1), with PNG goldens under golden/ (png_golden.h).
+target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)
+target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden\"")
