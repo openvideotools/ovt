@@ -110,3 +110,11 @@ metric goldens). UVQ 1.5 has one `frames` entry per sampled frame (`i` is the so
 `pooled.uvq.mean`; UVQ 1.0 has no per-frame values and keeps its sub-network scores in `pooled.uvq`. `uvq-index.json`
 records the clip hashes and the oracle revision. The workflow runs the generator twice and the outputs must be
 byte-identical (acceptance test 2). Spec questions: #306.
+
+## Elementary-stream unit goldens (WI-1.570)
+
+`<area>/<id>.ovt-units.json` (`h264`, `h265`, `av1`): the packets FFmpeg sees in an Annex B, OBU or IVF corpus file,
+`{"pos":…,"size":…,"types":[…]}` per access unit (position and size from `ffprobe -show_packets`, NAL types from the
+`trace_headers` filter; AV1 has no types). Written by `tools/goldens/gen_units.py` in the oracle image (workflow
+`goldens-units`) and committed by hand. `core/tests/container/test_container_*.cpp` compare the splitters with them.
+Compare per access unit, never per NAL unit: FFmpeg merges AUD, SEI and parameter sets into the following slice.

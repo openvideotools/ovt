@@ -13,6 +13,10 @@ add_executable(
   mpd_test.cpp
   obu_test.cpp
   sniff_test.cpp
+  test_container_annexb.cpp
+  test_container_ivf.cpp
+  test_container_obu.cpp
+  test_container_y4m.cpp
   ts_packets_test.cpp
   y4m_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
