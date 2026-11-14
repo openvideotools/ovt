@@ -68,6 +68,8 @@ ovt_plugin_de265_grid_dump = "LGPL-3.0-or-later"
 ovt_plugin_de265_smoke_tests = "LGPL-3.0-or-later"
 # The block-mapping tests of WI-2.164 (the plugin's map sources linked in).
 ovt_plugin_de265_map_tests = "LGPL-3.0-or-later"
+# The plane snapshot tests (WI-2.166): the host registry plus a direct link of the patched libde265.
+ovt_plugin_de265_planes_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
 # The optional H.265 motion vector / QP plugin (WI-4.107), built from the ovt_plugin_ffmpeg sources.
 ovt_plugin_ffmpeg_hevc = "LGPL-2.1-or-later"
@@ -83,6 +85,13 @@ ovt_plugin_ffmpeg_smoke_tests = "LGPL-2.1-or-later"
 ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
+
+# Targets built under a `tests/` directory need no row here: the gate checks their own licence and link graph without one
+# (SPEC-ASSUMPTION(#432), WI-0.032). Rows are for what ships or is built outside such a directory:
+ovt_core_objects = "LGPL-2.1-or-later"
+ovt_gen_completions = "GPL-3.0-or-later"
+ovt_tests_cli = "GPL-3.0-or-later"       # defined in cli/CMakeLists.txt, outside a tests/ directory
+ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level directory
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"

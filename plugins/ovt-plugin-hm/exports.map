@@ -1,0 +1,11 @@
+/* SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+ * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * Linker version script of the HEVC oracle plugin (plugins/ovt-plugin-hm/CMakeLists.txt; chapter 07 section 7.6.4):
+ * only the plugin entry point stays global, so HM's classes and globals stay inside the module. */
+{
+  global:
+    ovt_analysis_decoder_v1;
+  local:
+    *;
+};

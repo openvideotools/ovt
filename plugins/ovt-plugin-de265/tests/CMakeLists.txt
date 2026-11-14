@@ -46,6 +46,19 @@ if(NOT OVT_SYSTEM_DE265)
   ovt_set_license(ovt_plugin_de265_map_tests "LGPL-3.0-or-later")
   ovt_catch_discover_tests(ovt_plugin_de265_map_tests)
 
+  # ---- WI-2.166: plane snapshots (libde265 patch 0003) ----------------------------------------------------------
+  # Loads the plugin like the smoke tests and compares its planes with direct decodes of the same patched libde265
+  # (in-loop filters switched off), which this executable links statically; the plugin's own copy stays private to
+  # the dlopen()ed module. Same licence and name prefix rules as the smoke tests.
+  add_executable(ovt_plugin_de265_planes_tests test_de265_planes.cpp)
+  target_link_libraries(ovt_plugin_de265_planes_tests PRIVATE ovt_core_objects tp::ffmpeg_core tp::de265 ovt_schemas
+                                                              ovt_test_support ovt::flags ${Catch2_TARGET})
+  target_compile_definitions(ovt_plugin_de265_planes_tests
+                             PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\"")
+  add_dependencies(ovt_plugin_de265_planes_tests ovt_plugin_de265)
+  ovt_set_license(ovt_plugin_de265_planes_tests "LGPL-3.0-or-later")
+  ovt_catch_discover_tests(ovt_plugin_de265_planes_tests)
+
   # WI-4.107: the libde265 MV/QP grid oracle that ovt_plugin_ffmpeg_hevc_tests compares the ffmpeg_hevc plugin with.
   add_executable(ovt_plugin_de265_grid_dump de265_grid_dump.cpp)
   target_link_libraries(ovt_plugin_de265_grid_dump PRIVATE tp::de265 ovt::flags)
