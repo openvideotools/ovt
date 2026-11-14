@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iterator>
+#include <memory>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -198,7 +199,7 @@ std::string decimal_digits(std::string_view text, int& point) {
   if (at + 1 < text.size()) {
     int exponent = 0;
     const std::string_view rest = text.substr(at + 1 + (text[at + 1] == '+' ? 1U : 0U));
-    std::from_chars(rest.data(), rest.data() + rest.size(), exponent);  // NOLINT(*-pointer-arithmetic)
+    std::from_chars(std::to_address(rest.begin()), std::to_address(rest.end()), exponent);
     point += exponent;
   }
   while (!digits.empty() && digits.back() == '0') {
@@ -309,7 +310,7 @@ class Printer {
     return it->second;
   }
 
-  const reflection::Object& object_at(std::int32_t index) const {
+  [[nodiscard]] const reflection::Object& object_at(std::int32_t index) const {
     const auto& objects = deref(schema_.objects());
     if (index < 0 || static_cast<flatbuffers::uoffset_t>(index) >= objects.size()) {
       fail("malformed embedded .bfbs (object index)");
@@ -320,7 +321,7 @@ class Printer {
   template <class T>
   void integer(T value) {
     std::array<char, 24> text{};
-    const auto end = std::to_chars(text.data(), text.data() + text.size(), value).ptr;
+    const auto end = std::to_chars(std::to_address(text.begin()), std::to_address(text.end()), value).ptr;
     // Beyond ±2^53 a JSON number loses precision in double-based consumers: a decimal string (§12.1.4).
     constexpr std::uint64_t kExact = std::uint64_t{1} << 53U;
     const std::uint64_t magnitude = std::cmp_less(value, 0) ? std::uint64_t{0} - static_cast<std::uint64_t>(value)
