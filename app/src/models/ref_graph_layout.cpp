@@ -102,7 +102,7 @@ RefGraphLayout layout_ref_graph(const FrameTable& table, const RefGraphParams& p
       continue;
     }
     const int tid = table.temporal_id(d);
-    const int row = params.mode == RefRowMode::TemporalLayers ? tid : 0;
+    const int row = params.mode == RefRowMode::TemporalLayers ? std::clamp(tid, 0, kMaxTemporalRow) : 0;
     max_tid = std::max(max_tid, row);
     out.nodes.push_back(make_node(table, d, c, row, false));
     if (!table.dpb_after(d).empty()) {

@@ -566,3 +566,35 @@ TEST_CASE("mpd: segment URLs resolve against bases with dot segments and queries
   CHECK(rep.segments[0].url == "http://h/a/x/y/v/007.m4s");
   CHECK(rep.segments[1].url == "http://h/a/x/y/v/008.m4s");
 }
+
+TEST_CASE("mpd: the compiled template path gives what expand_template and resolve_url give",
+          "[container][dash][fast]") {
+  // The segment loop parses a valid media template once; every segment must equal the one-shot expansion, for
+  // plain relative templates (fast path) and for ones that need full RFC 3986 resolution (slow path).
+  const std::vector<std::string> templates = {
+      "$RepresentationID$/s$Number%05d$_$Bandwidth$.m4s",
+      "s$$$Time%03d$.m4s",
+      "$Number$",
+      "../up/$Number$.m4s",
+      "a:b/$Number$",
+      "http://x/$Number$",
+      "/abs/$Time$?q=$Number$",
+      "$Number%064d$.m4s",
+      "no-fields.m4s",
+  };
+  for (const std::string& tmpl : templates) {
+    CAPTURE(tmpl);
+    const auto r = mpd::parse(wrap("<BaseURL>../x/./y/</BaseURL><Representation id=\"r/1\" bandwidth=\"77\">"
+                                   "<SegmentTemplate timescale=\"1\" duration=\"1\" startNumber=\"3\" media=\"" +
+                                       tmpl + "\"/></Representation>",
+                                   R"(duration="PT5S")"),
+                              {"http://h/a/b/m.mpd", {}});
+    const auto& rep = only_rep(r);
+    REQUIRE(rep.segments.size() == 5);
+    for (const auto& seg : rep.segments) {
+      const auto expanded = mpd::expand_template(tmpl, mpd::TemplateValues{"r/1", seg.number, 77, seg.start_time});
+      REQUIRE(expanded.has_value());
+      CHECK(seg.url == mpd::resolve_url("http://h/a/x/y/", *expanded));
+    }
+  }
+}
