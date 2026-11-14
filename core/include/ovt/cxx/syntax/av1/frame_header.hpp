@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // AV1 uncompressed_header() (AV1 §5.9.2) and its sub-structures: chapter 7 §7.3.6 rows 11–19, WI-1.117 (part 1:
-// up to and including delta_lf_params()); rows 20–29 follow in WI-1.118. WI-1.117a delivers rows 12–19 (frame
-// size, render size, frame_size_with_refs, tile_info, quantization, segmentation, delta q / lf and the lossless
-// derivations) in two PRs (a = rows 12–15, b = rows 16–19); WI-1.117c adds the FrameHeader struct and
-// parse_frame_header() for row 11. C++ helper header (D22): semi-public, no ABI promise, never included from a C
-// header, not installed.
+// up to and including delta_lf_params()); rows 20–29 follow in WI-1.118. Rows 12–15 (frame size, render size,
+// frame_size_with_refs, tile_info) and rows 16–19 (quantization, segmentation, delta q / lf, the lossless
+// derivations) came in WI-1.117a/b; the FrameHeader struct and parse_frame_header() for row 11 in WI-1.117c. C++
+// helper header (D22): semi-public, no ABI promise, never included from a C header, not installed.
 //
 // The typed structs hold every syntax element under its spec name and every derived variable (§7.3.7); the
 // SyntaxNode tree is for display. Fields the syntax table infers instead of reading carry the inferred value.
@@ -24,6 +23,7 @@
 
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/av1/decoder_state.hpp"
+#include "ovt/cxx/syntax/av1/obu_header.hpp"
 #include "ovt/cxx/syntax/av1/sequence_header.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 
@@ -56,9 +56,20 @@ inline constexpr std::array<int16_t, kSegLvlMax> kSegmentationFeatureMax{
 /// "SEG_LVL_REF_FRAME", "SEG_LVL_SKIP", "SEG_LVL_GLOBALMV" (§7.3.6 row 17 feature names); "" otherwise.
 [[nodiscard]] std::string_view segmentation_feature_name(int feature) noexcept;
 
+/// interpolation_filter (AV1 §6.8.9). The values equal ovt.fb.Av1InterpFilter.
+enum class InterpolationFilter : uint8_t {
+  EightTap = 0,
+  EightTapSmooth = 1,
+  EightTapSharp = 2,
+  Bilinear = 3,
+  Switchable = 4,
+};
+/// "EIGHTTAP", "EIGHTTAP_SMOOTH", "EIGHTTAP_SHARP", "BILINEAR", "SWITCHABLE".
+[[nodiscard]] std::string_view interpolation_filter_name(InterpolationFilter f) noexcept;
+
 /// Diagnostic codes of rows 11–19 (§7.9). SYN-AV1-0015 (registered through #513) is the Error for frame-header
 /// values that violate a conformance requirement without being a reserved value (see frame_size.cpp /
-/// tile_info.cpp); SYN-AV1-0011 is raised by parse_frame_header() (WI-1.117c).
+/// tile_info.cpp); SYN-AV1-0011 is the Info parse_frame_header() raises for a ref_order_hint mismatch.
 inline constexpr std::string_view kDiagRefOrderHintMismatch = "SYN-AV1-0011";  // Info
 inline constexpr std::string_view kDiagFrameHeaderRange = "SYN-AV1-0015";      // Error
 
@@ -258,14 +269,126 @@ struct Lossless {
   bool AllLossless = false;  // CodedLossless && FrameWidth == UpscaledWidth
 };
 
-/// get_qindex(ignoreDeltaQ, segmentId) (AV1 §7.12.2) with CurrentQIndex = base_q_idx when ignoreDeltaQ (the only
-/// form the header derivations use): base_q_idx plus the clipped SEG_LVL_ALT_Q delta of the segment.
+/// get_qindex(ignoreDeltaQ, segmentId) (AV1 §7.12.2): base_q_idx (or, when !ignoreDeltaQ && delta_q_present,
+/// the caller's CurrentQIndex) plus the clipped SEG_LVL_ALT_Q delta of the segment. The header derivations call it
+/// with ignoreDeltaQ = true; chapter 7.6 passes the tile's CurrentQIndex and the frame's delta_q_present.
 [[nodiscard]] int32_t get_qindex(bool ignoreDeltaQ, int segmentId, const QuantizationParams& q,
-                                 const SegmentationParams& seg, int32_t CurrentQIndex) noexcept;
+                                 const SegmentationParams& seg, bool delta_q_present, int32_t CurrentQIndex) noexcept;
 
 /// CodedLossless, LosslessArray[], SegQMLevel[][] and AllLossless of AV1 §5.9.2 (§7.3.6 row 11).
 [[nodiscard]] Lossless compute_lossless(const QuantizationParams& q, const SegmentationParams& seg,
                                         bool frame_width_equals_upscaled_width) noexcept;
+
+// ---- row 11: uncompressed_header() ----------------------------------------------------------------------------
+
+/// temporal_point_info() (AV1 §5.9.31), read when decoder_model_info_present_flag && !equal_picture_interval.
+struct TemporalPointInfo {
+  BitSpan span{0, 0};
+  uint32_t frame_presentation_time = 0;  // f(frame_presentation_time_length_minus_1 + 1)
+  bool present = false;
+};
+
+/// buffer_removal_time[opNum] (AV1 §5.9.2), one entry per operating point whose decoder model applies to the
+/// OBU's temporal_id / spatial_id.
+struct BufferRemovalTime {
+  uint32_t opNum = 0;
+  uint32_t buffer_removal_time = 0;  // f(buffer_removal_time_length_minus_1 + 1)
+};
+
+/// §7.3.6 row 11: uncompressed_header(), part 1 (WI-1.117): everything up to and including delta_lf_params() and
+/// the lossless derivations. The rows 20–29 fields (loop filter, CDEF, loop restoration, tx mode, reference mode,
+/// skip mode, global motion, film grain) are WI-1.118; until then `part1_only` is true and `state` carries the
+/// defaults of setup_past_independence() / the values of load_previous() for them.
+struct FrameHeader {
+  // The §7.20 variables of this frame (sizes, frame_type, OrderHint, OrderHints, feature tables, loop filter
+  // deltas, gm_params, film grain): what the reference frame update process saves. For show_existing_frame it is
+  // the loaded slot (AV1 §7.21) as the slot model will restore it.
+  FrameState state;
+  TileInfo tile_info;
+  SegmentationParams segmentation_params;
+  std::vector<BufferRemovalTime> buffer_removal_time;  // empty unless buffer_removal_time_present_flag
+  QuantizationParams quantization_params;
+  Lossless lossless;
+  FrameSize frame_size;
+  RenderSize render_size;
+  FrameSizeWithRefs frame_size_with_refs;  // valid when frame_size_with_refs_present
+  TemporalPointInfo temporal_point_info;
+  DeltaQParams delta_q_params;
+  DeltaLfParams delta_lf_params;
+  BitSpan span{0, 0};
+  // ref_order_hint[i] f(OrderHintBits), only with error_resilient_mode && enable_order_hint (ref_order_hint_present)
+  std::array<uint32_t, kNumRefFrames> ref_order_hint{};
+  // ref_frame_idx[0..6] (LAST_FRAME..ALTREF_FRAME): read, or from set_frame_refs(); -1 for an intra frame
+  RefFrameIdx ref_frame_idx{-1, -1, -1, -1, -1, -1, -1};
+  // delta_frame_id_minus_1[i] f(delta_frame_id_length_minus_2 + 2) and the derived expectedFrameId[i], only with
+  // frame_id_numbers_present_flag
+  std::array<uint32_t, kRefsPerFrame> delta_frame_id_minus_1{};
+  std::array<uint32_t, kRefsPerFrame> expectedFrameId{};
+  std::array<bool, kTotalRefsPerFrame> RefFrameSignBias{};  // derived with state.OrderHints (AV1 §5.9.2)
+  // Syntax order: show_existing_frame, frame_to_show_map_idx, temporal_point_info, display_frame_id | frame_type,
+  // show_frame, temporal_point_info, showable_frame, error_resilient_mode, disable_cdf_update,
+  // allow_screen_content_tools, force_integer_mv, current_frame_id, frame_size_override_flag, order_hint,
+  // primary_ref_frame, buffer_removal_time_present_flag, buffer_removal_time[], refresh_frame_flags,
+  // ref_order_hint[], frame_size/render_size/allow_intrabc | frame_refs_short_signaling, last_frame_idx,
+  // gold_frame_idx, ref_frame_idx[], delta_frame_id_minus_1[], frame_size_with_refs | frame_size, render_size,
+  // allow_high_precision_mv, is_filter_switchable, interpolation_filter, is_motion_mode_switchable,
+  // use_ref_frame_mvs; disable_frame_end_update_cdf; tile_info, quantization_params, segmentation_params,
+  // delta_q_params, delta_lf_params.
+  uint32_t display_frame_id = 0;
+  uint32_t current_frame_id = 0;  // also state.current_frame_id
+  uint32_t order_hint = 0;        // f(OrderHintBits); OrderHint = state.OrderHint
+  uint8_t frame_to_show_map_idx = 0;
+  uint8_t primary_ref_frame = kPrimaryRefNone;
+  uint8_t refresh_frame_flags = 0;
+  uint8_t last_frame_idx = 0;  // f(3), only with frame_refs_short_signaling
+  uint8_t gold_frame_idx = 0;
+  InterpolationFilter interpolation_filter = InterpolationFilter::EightTap;
+  FrameType frame_type = FrameType::Key;  // also state.frame_type; RefFrameType[slot] for show_existing_frame
+  bool show_existing_frame = false;
+  bool FrameIsIntra = true;
+  bool show_frame = true;
+  bool showable_frame = false;  // also state.showable_frame
+  bool error_resilient_mode = true;
+  bool disable_cdf_update = false;
+  bool allow_screen_content_tools = false;
+  bool force_integer_mv = true;
+  bool frame_size_override_flag = false;
+  bool buffer_removal_time_present_flag = false;
+  bool allow_high_precision_mv = false;
+  bool use_ref_frame_mvs = false;
+  bool allow_intrabc = false;
+  bool frame_refs_short_signaling = false;
+  bool is_filter_switchable = false;
+  bool is_motion_mode_switchable = false;
+  bool disable_frame_end_update_cdf = true;
+  bool ref_order_hint_present = false;
+  bool frame_size_with_refs_present = false;
+  // Derived summary for FrameInfo (§7.3.6 row 11 "Derived summary"): is_rap = KEY_FRAME && show_frame (a
+  // show_existing_frame of a KEY slot is is_rap in the slot model, §7.4.3); poc = state.OrderHint; qp_base =
+  // quantization_params.base_q_idx; coded_size = FrameWidth × FrameHeight; crop = RenderWidth × RenderHeight.
+  bool is_rap = false;
+  bool part1_only = true;  // rows 20–29 not parsed (WI-1.118)
+};
+
+/// §7.3.7: uncompressed_header() at the current position (node "uncompressed_header") for the OBU `obu`
+/// (temporal_id / spatial_id decide which buffer_removal_time[opNum] are present). Reads the §5.9.2 syntax up to
+/// delta_lf_params() and derives the lossless flags; `state` is consulted for show_existing_frame, ref_order_hint[],
+/// frame_size_with_refs(), set_frame_refs() and load_previous(), and changed only where §5.9.2 changes it inside
+/// the header (shown-KEY reset, mark_ref_frames(), RefValid cleared on a ref_order_hint mismatch, SYN-AV1-0011).
+/// The §7.20 / §7.21 processes stay with the slot model (index). With `is_redundant` (OBU_REDUNDANT_FRAME_HEADER,
+/// frame_header_copy()) the header is parsed against a copy of `state`. Throws ParseError (BR-0001) on a truncated
+/// header; conformance findings are diagnostics on the tree.
+[[nodiscard]] FrameHeader parse_frame_header(BitReader& br, SyntaxBuilder& b, const ObuHeader& obu,
+                                             const SequenceHeader& seq, DecoderState& state, bool is_redundant);
+/// The §7.3.7 signature: the same for an OBU without extension header (temporal_id = spatial_id = 0;
+/// SPEC-ASSUMPTION(#513)).
+[[nodiscard]] FrameHeader parse_frame_header(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                             DecoderState& state, bool is_redundant);
+
+/// mark_ref_frames(idLen) (AV1 §5.9.4): clears RefValid of every slot whose RefFrameId is too far from
+/// current_frame_id (diffLen = delta_frame_id_length_minus_2 + 2). A shown KEY frame has already cleared them.
+void mark_ref_frames(DecoderState& state, const SequenceHeader& seq, uint32_t current_frame_id, FrameType frame_type,
+                     bool show_frame) noexcept;
 
 }  // namespace ovt::syntax::av1
 
