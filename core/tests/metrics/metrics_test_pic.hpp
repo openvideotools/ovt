@@ -5,8 +5,8 @@
 // of ovt_MetricPlanes, the FrameScore decoder, a MapSink that keeps the blobs, and the deterministic synthetic planes
 // of tests/oracles/run_x264_ssim.py (`synth_plane` mirrors `synth_luma` of run_libvmaf_ssim.py sample for sample).
 
-#ifndef OVT_TESTS_METRICS_METRICS_TEST_PIC_H
-#define OVT_TESTS_METRICS_METRICS_TEST_PIC_H
+#ifndef OVT_TESTS_METRICS_METRICS_TEST_PIC_HPP
+#define OVT_TESTS_METRICS_METRICS_TEST_PIC_HPP
 
 #include <array>
 #include <cstdint>
@@ -128,4 +128,4 @@ inline void fill_synth(Pic& pic, uint32_t frame, bool distorted) {
 
 }  // namespace ovt::test
 
-#endif  // OVT_TESTS_METRICS_METRICS_TEST_PIC_H
+#endif  // OVT_TESTS_METRICS_METRICS_TEST_PIC_HPP
