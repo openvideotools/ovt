@@ -99,7 +99,7 @@ struct Pic {
   [[nodiscard]] std::size_t cb_index(int32_t cx, int32_t cy) const {
     return static_cast<std::size_t>(cy) * static_cast<std::size_t>(d.cbs_w) + static_cast<std::size_t>(cx);
   }
-  void cb_flag(int32_t x, int32_t y, int32_t log2, uint8_t CbInfo::*field) {
+  void cb_flag(int32_t x, int32_t y, int32_t log2, uint8_t CbInfo::* field) {
     const int32_t n = 1 << log2;
     const int32_t m = 1 << d.min_cb_log2;
     for (int32_t yy = y; yy < y + n; yy += m) {
