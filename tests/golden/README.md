@@ -88,9 +88,9 @@ the first temporal units of the stream (`av1-index.json` gives the number, the f
 file). Input that is not IVF is first copied into IVF with `ffmpeg -c copy`.
 
 A `block-grid` document carries about 25 per-4×4-cell arrays, so one 352×288 frame is 1 to 2 MB and one 720p frame about
-4.5 MB of JSON. CLAUDE.md forbids goldens over 2 MB uncompressed, so the generator keeps the longest prefix that fits
-`--max-bytes` (1 900 000) and leaves out a stream whose first temporal unit does not fit; `av1-index.json` records the
-size of each such unit under `skipped`.
+4.5 MB of JSON; it compresses about 50:1. The generator keeps the longest prefix (at most 8 temporal units) whose golden
+is at most 2 MB gzip-compressed (CLAUDE.md §5) and 40 MB of JSON, and records a stream that does not fit under `skipped`
+in `av1-index.json`. `aomdec --summary` runs with `--all-layers` because `inspect` lists the frame of every spatial layer.
 
 ## Metric oracle goldens (WI-0.565)
 
