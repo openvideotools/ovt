@@ -28,6 +28,7 @@ target_sources(
           kernels/ssim_hwy.cpp
           kernels/ssim_metric.cpp
           kernels/ssim_scalar.cpp
+          kernels/ssim_x264.cpp
           normalize/normalization_config.cpp)
 # The ssim kernels promise bit-identical scalar and SIMD results: no fused multiply-add (WI-3.307).
 set_source_files_properties(kernels/ssim_hwy.cpp kernels/ssim_scalar.cpp TARGET_DIRECTORY ovt_core_objects

@@ -15,7 +15,7 @@ class PluginRegistry;
 // The function table of the psnr metric; static, never null.
 [[nodiscard]] const ovt_MetricApi* psnr_metric_api() noexcept;
 
-// Registers the in-tree kernel metrics (psnr, ssim; WI-3.308 adds ssim_x264, identity) in `registry`.
+// Registers the in-tree kernel metrics (psnr, ssim, ssim_x264; WI-3.308b adds identity) in `registry`.
 void register_builtin_kernels(PluginRegistry& registry);
 
 }  // namespace ovt::metrics
