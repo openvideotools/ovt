@@ -231,8 +231,12 @@ def parse_args(argv: list[str] | None) -> argparse.Namespace:
     p.add_argument("--generate-syn", action="store_true", help="run generate.py for missing syn_ ids")
     p.add_argument("--jobs", type=int, default=4)
     p.add_argument("--work-dir", type=Path)
-    p.add_argument("--max-bytes", type=int, default=MAX_BYTES, help="largest gzip-compressed golden (default %(default)s)")
-    p.add_argument("--max-raw-bytes", type=int, default=MAX_RAW_BYTES, help="largest normalised JSON (default %(default)s)")
+    p.add_argument(
+        "--max-bytes", type=int, default=MAX_BYTES, help="largest gzip-compressed golden (default %(default)s)"
+    )
+    p.add_argument(
+        "--max-raw-bytes", type=int, default=MAX_RAW_BYTES, help="largest normalised JSON (default %(default)s)"
+    )
     p.add_argument("--max-tus", type=int, default=MAX_TUS, help="most temporal units per golden (default %(default)s)")
     p.add_argument("--skips", type=Path, help="av1_skips.json (default: next to this script)")
     p.add_argument("--keep-going", action="store_true", help="exit 0 even when a step failed (CI report mode)")
@@ -296,7 +300,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.only and index_path.is_file():
         index = json.loads(index_path.read_text(encoding="utf-8")).get("entries", {})
     index.update(results)
-    doc = {"max_bytes": args.max_bytes, "max_raw_bytes": args.max_raw_bytes, "skipped_entries": skipped, "entries": dict(sorted(index.items()))}
+    doc = {
+        "max_bytes": args.max_bytes,
+        "max_raw_bytes": args.max_raw_bytes,
+        "skipped_entries": skipped,
+        "entries": dict(sorted(index.items())),
+    }
     index_path.write_text(json.dumps(doc, indent=1, sort_keys=True) + "\n", encoding="utf-8")
     bad = {c: r for c, r in results.items() if r["failed"] or r.get("selfcheck_problems")}
     for cid, r in bad.items():
