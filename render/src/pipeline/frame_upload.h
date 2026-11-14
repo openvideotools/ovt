@@ -28,6 +28,8 @@ struct FrameSlot {
   uint32_t coded_width = 0;
   uint32_t coded_height = 0;
   ovt::fb::Rect crop;
+  uint8_t chroma_format = 1;  // of the uploaded picture (0 4:0:0, 1 4:2:0, 2 4:2:2, 3 4:4:4); compare slot B (WI-1.410)
+  uint8_t bit_depth = 8;
   uint64_t generation = 0;
   bool valid = false;  // a picture has been uploaded
 };

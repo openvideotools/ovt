@@ -10,6 +10,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 #include "ovt/render/render_api.h"
@@ -31,6 +32,10 @@ OVT_RENDER_API bool download_output(const VideoSurface& surface, OutputPixels& o
 // The chroma-plane shift (pl_plane.shift_x/y of plane 1) of the picture in slot A, as set by the chroma siting
 // (§10.3.1, WI-1.401). Returns false when slot A holds no picture with chroma planes.
 OVT_RENDER_API bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y);
+
+// Replaces the millisecond clock the Flicker compare mode reads in render() (steady_clock by default; WI-1.410) and
+// restarts the flicker phase at the clock's current value.
+OVT_RENDER_API void set_compare_clock(VideoSurface& surface, std::function<int64_t()> clock_ms);
 
 }  // namespace ovt::render::detail
 
