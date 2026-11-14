@@ -31,6 +31,10 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <map>
+#include <mutex>
+#include <utility>
+#include <vector>
 
 namespace ovt::render::detail {
 namespace {
@@ -73,6 +77,35 @@ VKAPI_ATTR void VKAPI_CALL shim_qf_props2(VkPhysicalDevice physical_device, uint
   }
 }
 
+std::atomic<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR> g_real_surface_formats{nullptr};
+std::mutex g_filter_mutex;
+std::map<VkSurfaceKHR, std::vector<VkSurfaceFormatKHR>> g_filters;  // guarded by g_filter_mutex
+
+VKAPI_ATTR VkResult VKAPI_CALL shim_surface_formats(VkPhysicalDevice physical_device, VkSurfaceKHR surface,
+                                                    uint32_t* count, VkSurfaceFormatKHR* formats) {
+  const PFN_vkGetPhysicalDeviceSurfaceFormatsKHR real = g_real_surface_formats.load();
+  std::vector<VkSurfaceFormatKHR> pairs;
+  {
+    const std::lock_guard<std::mutex> lock(g_filter_mutex);
+    const auto it = g_filters.find(surface);
+    if (it != g_filters.end()) {
+      pairs = it->second;
+    }
+  }
+  if (pairs.empty() || count == nullptr) {
+    return real != nullptr ? real(physical_device, surface, count, formats) : VK_ERROR_INITIALIZATION_FAILED;
+  }
+  const auto n = static_cast<uint32_t>(pairs.size());
+  if (formats == nullptr) {
+    *count = n;
+    return VK_SUCCESS;
+  }
+  const uint32_t copied = *count < n ? *count : n;
+  std::memcpy(formats, pairs.data(), copied * sizeof(VkSurfaceFormatKHR));
+  *count = copied;
+  return copied < n ? VK_INCOMPLETE : VK_SUCCESS;
+}
+
 // NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL shim_get_instance_proc(VkInstance instance, const char* name) {
   const PFN_vkGetInstanceProcAddr real = g_real_get_instance_proc.load();
@@ -92,6 +125,10 @@ VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL shim_get_instance_proc(VkInstance insta
     g_real_qf_props2.store(reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties2>(fn));
     return reinterpret_cast<PFN_vkVoidFunction>(&shim_qf_props2);
   }
+  if (std::strcmp(name, "vkGetPhysicalDeviceSurfaceFormatsKHR") == 0) {
+    g_real_surface_formats.store(reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(fn));
+    return reinterpret_cast<PFN_vkVoidFunction>(&shim_surface_formats);
+  }
   return fn;
 }
 // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
@@ -105,6 +142,15 @@ PFN_vkGetInstanceProcAddr no_timestamps_get_proc_addr(PFN_vkGetInstanceProcAddr 
   PFN_vkGetInstanceProcAddr expected = nullptr;
   g_real_get_instance_proc.compare_exchange_strong(expected, real);
   return &shim_get_instance_proc;
+}
+
+void set_surface_format_filter(VkSurfaceKHR surface, std::vector<VkSurfaceFormatKHR> pairs) {
+  const std::lock_guard<std::mutex> lock(g_filter_mutex);
+  if (pairs.empty()) {
+    g_filters.erase(surface);
+  } else {
+    g_filters[surface] = std::move(pairs);
+  }
 }
 
 }  // namespace ovt::render::detail
