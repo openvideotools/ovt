@@ -19,9 +19,9 @@ OVT_CORPORA_DIR=~/.cache/ovt/corpora ctest -R golden_av1_inspect -j6
 leaf block `Block.bits_x8` against the sum of the oracle's symbols in the cells it owns. Not compared, with the reason in
 issue 499: `TxType` (no tx_type vector until WI-2.159), the header's `frame_number` (the host fills `FrameInfo.poc`), the
 CDEF strength layers except on blocks that cover a known unit origin, and the inter-only layers on intra blocks (libaom
-prints stale memory there). The committed goldens lack the first accounting symbol of each context (stock `inspect`,
-issue 103): the test adds those records back from libaom's own accounting (`kGoldensHaveFirstSymbol`). Streams not read by the
-test: Annex B and container-wrapped files (`aom_av1_1_b8_03_size{up,down}.mkv`, `syn_av1_annexb*`).
+prints stale memory there). The committed goldens lack the first accounting symbol of each context (stock
+`inspect`, issue 103): the test adds those records back from libaom's own accounting (`kGoldensHaveFirstSymbol`).
+Streams not read by the test: Annex B and container-wrapped files (`aom_av1_1_b8_03_size{up,down}.mkv`, `syn_av1_annexb*`).
 
 Sensitivity check (not kept): adding 1 to the plugin's `qp` of one cell, and setting `kGoldensHaveFirstSymbol = true`, each
 turn the test red.
