@@ -252,3 +252,24 @@ TEST_CASE("The frame list and the SVG describe the window", "[fast][gui][ref_gra
   }
   CHECK(rects == layout.nodes.size());
 }
+
+TEST_CASE("A hostile temporal_id cannot grow the row count", "[fast][gui][ref_graph]") {
+  auto frames = bpyramid();
+  frames[3].tid = 255;  // the byte the stream could carry
+  frames[5].tid = 200;
+  const auto handle = make_index(frames);
+  REQUIRE(handle != nullptr);
+  const FrameTable table{handle->index()};
+  const RefGraphLayout layout = layout_ref_graph(table, RefGraphParams{});
+  CHECK(layout.rows == kMaxTemporalRow + 1);
+  for (const RefNode& n : layout.nodes) {
+    CHECK(n.row >= 0);
+    CHECK(n.row <= kMaxTemporalRow);
+  }
+  // The clamped frames sit on the top row but still report their stream value, and the geometry stays finite.
+  CHECK(layout.find(3)->row == kMaxTemporalRow);
+  CHECK(layout.find(3)->temporal_id == 255);
+  const RefGraphGeometry g = geometry_of(layout, 640, 240);
+  CHECK(g.row_height() > 10.0);
+  CHECK(g.y_of(layout.find(3)->row) > 0.0);
+}
