@@ -1,7 +1,7 @@
 # WI-0.051 acceptance record
 
 Machine: cloud container, Linux x86_64, no Android SDK/NDK, no emulator, no Qt, no vcpkg network.
-Date: 2026-11-14. Spec version: 1.0-rc25.
+Date: 2026-11-14. Spec version: 1.0-rc24.
 
 **Status: the emulator tests have not been run.** This container cannot build the APK or start an emulator, and
 it has no Kotlin compiler, so the Kotlin sources and the host test below were reviewed but not compiled here.
