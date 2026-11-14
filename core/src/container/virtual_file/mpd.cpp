@@ -337,15 +337,16 @@ void append_padded(std::string& out, int64_t value, size_t width) {
   const bool negative = value < 0;
   const uint64_t magnitude = negative ? (~static_cast<uint64_t>(value) + 1U) : static_cast<uint64_t>(value);
   std::array<char, 24> digits{};
-  const auto end = std::to_chars(digits.data(), digits.data() + digits.size(), magnitude).ptr;
-  const auto count = static_cast<size_t>(end - digits.data());
+  char* const first = digits.data();
+  char* const last = std::to_chars(first, std::next(first, static_cast<std::ptrdiff_t>(digits.size())), magnitude).ptr;
+  const auto count = static_cast<size_t>(std::distance(first, last));
   if (negative) {
     out += '-';
   }
   if (count < width) {
     out.append(width - count, '0');
   }
-  out.append(digits.data(), count);
+  out.append(first, count);
 }
 
 // Width of a `%0Nd` format tag; nullopt when `fmt` is not one. An empty tag means width 1.
@@ -784,6 +785,22 @@ void append_compiled(std::string& out, const std::vector<TemplatePiece>& pieces,
   }
 }
 
+// The compiled form of a valid media template whose expansion is a plain relative reference (see below), or nullopt
+// when the segments must go through segment_url(). The numeric fields only ever add digits and a minus sign, none of
+// which plain_relative() looks at, so one probe expansion decides it for every segment.
+std::optional<std::vector<TemplatePiece>> compile_plain_template(std::string_view tmpl,
+                                                                 std::string_view representation_id) {
+  auto compiled = compile_template(tmpl, representation_id);
+  if (compiled) {
+    std::string probe;
+    append_compiled(probe, *compiled, TemplateValues{representation_id, 0, 0, 0});
+    if (!plain_relative(probe)) {
+      return std::nullopt;
+    }
+  }
+  return compiled;
+}
+
 // Whether a template expands at all. Validity depends only on the identifiers and format tags, never on the values,
 // so a media template is checked (and an invalid one reported) once per representation, not once per segment.
 bool template_valid(std::string_view tmpl) {
@@ -838,12 +855,46 @@ Segment init_from_element(Context& ctx, const pugi::xml_node& init, const std::s
   return seg;
 }
 
+// Spends the budget for `entries` and appends one media segment per entry, expanding `media` for each.
+void append_template_segments(Context& ctx, Representation& rep, const std::vector<TimelineEntry>& entries,
+                              const SplitBase& base, std::string_view media, TemplateValues values,
+                              const pugi::xml_node& at) {
+  spend(ctx, entries.size());
+  rep.segments.reserve(rep.segments.size() + entries.size());
+  // An invalid media template is used as written for every segment: report it once and resolve it once.
+  std::optional<std::string> as_written;
+  if (!entries.empty() && !template_valid(media)) {
+    as_written = segment_url(ctx, base, media, values, at);
+  }
+  std::optional<std::vector<TemplatePiece>> compiled;
+  if (!as_written && !entries.empty() && !base.empty) {
+    compiled = compile_plain_template(media, rep.id);
+  }
+  std::string scratch;
+  for (const TimelineEntry& e : entries) {
+    values.number = e.number;
+    values.time = e.time;
+    Segment seg;
+    if (compiled) {
+      scratch.assign(base.dir_prefix);
+      append_compiled(scratch, *compiled, values);
+      seg.url = scratch;  // exact-size copy; the scratch buffer is reused
+    } else {
+      seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, at);
+    }
+    seg.start_time = e.time;
+    seg.duration = e.duration;
+    seg.number = e.number;
+    rep.segments.push_back(std::move(seg));
+  }
+}
+
 void expand_template_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
                               int64_t period_duration_ms) {
   const Chain& chain = info.template_chain;
   const Timing t = read_timing(ctx, chain, period_duration_ms);
   rep.timescale = t.timescale;
-  TemplateValues values{rep.id, 0, rep.bandwidth, 0};
+  const TemplateValues values{rep.id, 0, rep.bandwidth, 0};
   const SplitBase base(rep_base);
 
   if (const char* init = chain_attr(chain, "initialization")) {
@@ -893,44 +944,7 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
     }
   }
 
-  spend(ctx, entries.size());
-  rep.segments.reserve(rep.segments.size() + entries.size());
-  // An invalid media template is used as written for every segment: report it once and resolve it once.
-  std::optional<std::string> as_written;
-  if (!entries.empty() && !template_valid(media)) {
-    as_written = segment_url(ctx, base, media, values, chain.front());
-  }
-  // Fast path: a valid template whose expansion is a plain relative reference. The numeric fields only ever add
-  // digits and a minus sign, none of which plain_relative() looks at, so one probe expansion decides it for every
-  // segment; anything else keeps going through segment_url().
-  std::optional<std::vector<TemplatePiece>> compiled;
-  if (!as_written && !entries.empty() && !base.empty) {
-    compiled = compile_template(media, rep.id);
-    if (compiled) {
-      std::string probe;
-      append_compiled(probe, *compiled, TemplateValues{rep.id, 0, 0, 0});
-      if (!plain_relative(probe)) {
-        compiled.reset();
-      }
-    }
-  }
-  std::string scratch;
-  for (const TimelineEntry& e : entries) {
-    values.number = e.number;
-    values.time = e.time;
-    Segment seg;
-    if (compiled) {
-      scratch.assign(base.dir_prefix);
-      append_compiled(scratch, *compiled, values);
-      seg.url = scratch;  // exact-size copy; the scratch buffer is reused
-    } else {
-      seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, chain.front());
-    }
-    seg.start_time = e.time;
-    seg.duration = e.duration;
-    seg.number = e.number;
-    rep.segments.push_back(std::move(seg));
-  }
+  append_template_segments(ctx, rep, entries, base, media, values, chain.front());
 }
 
 void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
