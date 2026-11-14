@@ -8,6 +8,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <fstream>
@@ -130,6 +131,21 @@ std::vector<uint8_t> patch_rgb(const OutputPixels& px, const nlohmann::json& exp
     }
   }
   return out;
+}
+
+// IEEE 754 binary16 (little-endian, as Rgba16F output is downloaded) to float.
+float half_at(const std::vector<uint8_t>& bytes, size_t at) {
+  const auto h = static_cast<uint16_t>(bytes.at(at) | (bytes.at(at + 1) << 8U));
+  const float sign = (h & 0x8000U) != 0 ? -1.0F : 1.0F;
+  const auto exponent = static_cast<int>((h >> 10U) & 0x1FU);
+  const auto mantissa = static_cast<float>(h & 0x3FFU);
+  if (exponent == 0) {
+    return sign * std::ldexp(mantissa, -24);  // subnormal
+  }
+  if (exponent == 31) {
+    return mantissa == 0.0F ? sign * INFINITY : NAN;
+  }
+  return sign * std::ldexp(1024.0F + mantissa, exponent - 25);
 }
 
 }  // namespace
@@ -279,6 +295,9 @@ TEST_CASE("render_test_render_params: dithering and filters (§10.3.5, §10.3.1)
   struct pl_frame target = target_frame(t, Encoding::ScRgbLinear16F);
   set.build(view, Encoding::ScRgbLinear16F, true, pq_source(), target);
   CHECK(set.params().dither_params == nullptr);  // float target: libplacebo asserts otherwise
+  // libplacebo infers sample_depth only for UNORM targets; a float target needs it equal to color_depth, or the
+  // output is scaled by 257 (see the Rgba16F read-back test below).
+  CHECK(target.repr.bits.sample_depth == target.repr.bits.color_depth);
   view.dither = false;
   target = target_frame(t, Encoding::Srgb8);
   set.build(view, Encoding::Srgb8, true, pq_source(), target);
@@ -378,6 +397,35 @@ TEST_CASE("render_test_render_params: rendering twice is byte-identical", "[fast
       const OutputPixels second = render_and_download(*surface, view);
       REQUIRE(first.bytes.size() == second.bytes.size());
       CHECK(first.bytes == second.bytes);
+    }
+  }
+}
+
+// Regression: a float target with repr.bits.sample_depth left 0 rendered limited-range 10-bit white (code 940) as
+// 257.0 and alpha as 257.0, because libplacebo defaults an unset sample_depth to 8 bits and scales by (2^16-1)/(2^8-1).
+// SDR reference white is 1.0 in the scRGB-linear target (§10.3.2), and the output alpha is opaque.
+TEST_CASE("render_test_render_params: SDR white and alpha read back 1.0 on an Rgba16F target",
+          "[fast][render][vulkan]") {
+  constexpr uint32_t kSize = 16;
+  OwnedPicture op(kSize, kSize, 10, 1, 2);  // BT.709 limited range, 4:2:0
+  op.fill_plane(0, 940);
+  op.fill_plane(1, 512);
+  op.fill_plane(2, 512);
+  op.pic.generation = 1;
+  auto surface = surface_or_skip(kSize, kSize, DisplayTarget::OffscreenFormat::Rgba16F);
+  surface->set_frame(op.pic);
+  REQUIRE(std::string(surface->last_error()).empty());
+
+  const OutputPixels px = render_and_download(*surface, one_to_one(kSize, kSize));
+  REQUIRE(px.texel_bytes == 8);
+  REQUIRE(px.bytes.size() == size_t{kSize} * kSize * 8);
+  constexpr float kTolerance = 0.01F;  // half float steps by 2^-10 just below 1.0
+  for (size_t i = 0; i < px.bytes.size(); i += 8) {
+    INFO("pixel " << i / 8);
+    for (size_t c = 0; c < 4; ++c) {
+      INFO("channel " << c);
+      const float v = half_at(px.bytes, i + (c * 2));
+      CHECK(std::fabs(v - 1.0F) <= kTolerance);
     }
   }
 }
