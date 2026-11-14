@@ -2,12 +2,6 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc25 — 2026-11-14
-
-PATCH-level: WI-0.060 follow-up after the Mac Mini run and the reviewer's nits. No requirement sentence or acceptance line changes.
-
-- 13 §13.5.2 — the final `fix_rpaths.py` verification runs after `strip.sh`, so it checks the shipped bytes; the macOS bundle's `THIRD_PARTY_NOTICES.md` is generated for the shipping targets only (the gate still checks every shipping target) — WI-0.060
-
 ## 1.0.0-rc24 — 2026-11-13
 
 MINOR-level: spec-amendment pass 5 folds in the accepted answers of five new `spec-question` issues (#385, #388, #389, #391 points 1–3, #395 points 1–5), the three public-header rulings pass 4 left open (#209 item 4 `ovt_log_write`, #366 item 3 `raw_format == NULL`, #318 no `Pool` export) and the WI-0.089 AT3 rewording. New diagnostic codes are registered (D2: `SYN-H265-0011`, `SYN-H265-0061`, `DEC-AV1-0001`, `DEC-AV1-0002`). Public-header text changes (listed for the owner's check-in): the additive `ovt_log_write` declaration in §12.3.4, the `raw_format` NULL semantics comment in §12.3.7, the `plane()` `*size` comment in `core/include/ovt/abi/analysis_decoder_v1.h`, and the `PpsTable` signature in §7.3.7 (`ovt/cxx`). No schema or CLI grammar change.
