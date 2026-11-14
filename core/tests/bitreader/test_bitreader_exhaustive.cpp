@@ -411,8 +411,7 @@ TEST_CASE("br_exhaustive_boundaries", "[bitreader][exhaustive][fast]") {
 }
 
 TEST_CASE("br_exhaustive_more_rbsp_data", "[bitreader][exhaustive][fast]") {
-  // §7.2 more_rbsp_data(): true while a one bit remains after the current position other than the last one in the
-  // buffer. The reference scans for the last set bit. Every 1- and 2-byte buffer, every position.
+  // §7.2 more_rbsp_data(): true while a one bit remains after the position other than the last one in the buffer.
   const auto reference = [](const Bytes& buf, uint64_t pos) {
     uint64_t last = 0;
     bool any = false;
@@ -435,10 +434,9 @@ TEST_CASE("br_exhaustive_more_rbsp_data", "[bitreader][exhaustive][fast]") {
 }
 
 TEST_CASE("br_exhaustive_epb_mapping_through_the_reader", "[bitreader][rbsp][exhaustive][fast]") {
-  // A random RBSP (biased to 00/01/02/03) gets emulation-prevention bytes from an independent inserter; the RBSP read
-  // back by rbsp_from_nal equals the original and the raw size exceeds it by exactly the number of EPBs (acceptance
-  // test 2 of WI-1.570). Then every byte of the RBSP is read through a BitReader and its span is mapped to the raw
-  // bytes: the raw bit at the mapped position equals the RBSP bit.
+  // A random RBSP gets EPBs from an independent inserter; rbsp_from_nal returns the original and the raw size exceeds
+  // it by exactly the number of EPBs (AT2). Every RBSP byte is read through a BitReader and its span is mapped to the
+  // raw bytes: the raw bit at the mapped position equals the RBSP bit.
   std::mt19937_64 rng(0xE9B);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
   size_t with_epb = 0;
   for (int round = 0; round < 600; ++round) {
