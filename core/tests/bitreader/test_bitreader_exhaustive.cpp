@@ -1,10 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Differential and exhaustive tests of ovt::BitReader and the emulation-prevention mapping (WI-1.570 step 1,
-// chapter 7 §7.2.7). The per-descriptor rows live in test_bitreader.cpp, test_bitreader_av1.cpp and
-// test_bitreader_rbsp.cpp; this file writes bit strings with an independent encoder and reads them back, so that
-// every descriptor is checked in sequence, at every alignment, at every buffer length and through EPB mapping.
+// Differential and exhaustive tests of ovt::BitReader and the EPB mapping (WI-1.570 step 1, chapter 7 §7.2.7). The
+// per-descriptor rows live in test_bitreader*.cpp; this file reads back what an independent bit writer produced, in
+// sequence, at every alignment and buffer length.
 
 #include <catch2/catch_test_macros.hpp>
 

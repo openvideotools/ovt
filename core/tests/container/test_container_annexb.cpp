@@ -116,7 +116,7 @@ TEST_CASE("units annexb: corpus access units equal the ffprobe goldens",
     }
   }
   if (compared == 0) {
-    if (ovt::test::require_corpora()) {
+    if (ovt::test::units::corpora_required()) {
       FAIL("no Annex B corpus file has a units golden");
     }
     SKIP("no Annex B corpus file with a units golden is available");

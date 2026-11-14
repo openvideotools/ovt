@@ -48,7 +48,7 @@ TEST_CASE("units ivf: corpus frames equal the ffprobe goldens", "[container][ivf
     }
   }
   if (compared == 0) {
-    if (ovt::test::require_corpora()) {
+    if (ovt::test::units::corpora_required()) {
       FAIL("no IVF corpus file has a units golden");
     }
     SKIP("no IVF corpus file with a units golden is available");

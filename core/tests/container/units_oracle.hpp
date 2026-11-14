@@ -10,6 +10,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "test_support/corpus.h"
+
 #include <unistd.h>
 
 #include <algorithm>
@@ -78,6 +80,12 @@ inline std::vector<Golden> committed_goldens(const std::string& framing) {
     }
   }
   return out;
+}
+
+// Fail rather than skip when nothing was compared: OVT_REQUIRE_CORPORA=1 or hosted CI (CI=true, `fast` corpora).
+inline bool corpora_required() {
+  const char* ci = std::getenv("CI");
+  return ovt::test::require_corpora() || (ci != nullptr && std::string(ci) == "true");
 }
 
 inline std::optional<std::string> capture(const std::string& cmd) {
