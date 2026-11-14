@@ -678,8 +678,18 @@ bool compare_with_tstables(const std::filesystem::path& path) {
     return false;
   }
   pugi::xml_document doc;
-  REQUIRE(doc.load_file(xml.c_str()));
+  const pugi::xml_parse_result loaded = doc.load_file(xml.c_str());
   std::filesystem::remove(xml);
+  if (loaded.status == pugi::status_no_document_element) {
+    // A stream with no complete table (test-125 is 2 KB): tstables exits 0 and writes an empty file; the parser
+    // must not report a program either.
+    const auto empty_file = ovt::io::RandomAccessFile::open(path.string());
+    const auto empty_parse = ts::parse(*empty_file);
+    REQUIRE(empty_parse);
+    CHECK(empty_parse->psi.programs.empty());
+    return true;
+  }
+  REQUIRE(loaded);
 
   std::map<unsigned long, unsigned long> pmt_pid_of;  // service_id -> program_map_PID
   for (const auto& svc : doc.child("tsduck").child("PAT").children("service")) {
@@ -688,7 +698,8 @@ bool compare_with_tstables(const std::filesystem::path& path) {
   std::map<unsigned long, std::pair<unsigned long, std::vector<std::pair<unsigned long, unsigned long>>>> pmts;
   for (const auto& pmt : doc.child("tsduck").children("PMT")) {
     auto& entry = pmts[number_of(pmt, "service_id")];
-    entry.first = number_of(pmt, "PCR_PID");
+    // tstables omits PCR_PID when it is 0x1FFF (no PCR).
+    entry.first = pmt.attribute("PCR_PID").empty() ? 0x1FFFUL : number_of(pmt, "PCR_PID");
     entry.second.clear();
     for (const auto& c : pmt.children("component")) {
       entry.second.emplace_back(number_of(c, "elementary_PID"), number_of(c, "stream_type"));
@@ -702,13 +713,21 @@ bool compare_with_tstables(const std::filesystem::path& path) {
   for (const ts::Program& p : f->psi.programs) {
     REQUIRE(pmt_pid_of.count(p.number) == 1);
     CHECK(p.pmt_pid == pmt_pid_of[p.number]);
-    REQUIRE(pmts.count(p.number) == 1);
+    if (pmts.count(p.number) == 0) {
+      continue;  // the PAT lists the program, the stream carries no PMT for it (test-137): nothing to compare
+    }
     CHECK(p.pcr_pid == pmts[p.number].first);
     REQUIRE(p.streams.size() == pmts[p.number].second.size());
     for (size_t i = 0; i < p.streams.size(); ++i) {
       CHECK(p.streams[i].pid == pmts[p.number].second[i].first);
       CHECK(p.streams[i].stream_type == pmts[p.number].second[i].second);
     }
+  }
+  // Every PMT that tstables reports belongs to a program the parser reports too.
+  for (const auto& [service_id, entry] : pmts) {
+    const bool found = std::any_of(f->psi.programs.begin(), f->psi.programs.end(),
+                                   [&](const ts::Program& p) { return p.number == service_id; });
+    CHECK(found);
   }
   return true;
 }
