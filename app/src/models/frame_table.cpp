@@ -33,7 +33,12 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
     type_.push_back(f->type());
     rap_.push_back(f->is_rap() ? 1 : 0);
     shown_.push_back(f->shown() ? 1 : 0);
+    ref_begin_.push_back(refs_.size());
+    if (const auto* refs = f->declared_refs(); refs != nullptr) {
+      refs_.insert(refs_.end(), refs->begin(), refs->end());
+    }
   }
+  ref_begin_.push_back(refs_.size());
   if (n != 0) {
     timebase_num_ = (*frames)[0]->timebase_num();
     timebase_den_ = (*frames)[0]->timebase_den();
@@ -66,6 +71,14 @@ FrameTable::FrameTable(const fb::StreamIndex& index) {
     display_of_[static_cast<std::size_t>(display_order_[slot])] = static_cast<int>(slot);
   }
   rebuild_order();
+}
+
+std::span<const int> FrameTable::declared_refs(int decode_index) const {
+  if (decode_index < 0 || static_cast<std::size_t>(decode_index) + 1 >= ref_begin_.size()) {
+    return {};
+  }
+  const auto d = static_cast<std::size_t>(decode_index);
+  return std::span<const int>(refs_).subspan(ref_begin_[d], ref_begin_[d + 1] - ref_begin_[d]);
 }
 
 int FrameTable::display_index_of(int decode_index) const {

@@ -1,9 +1,8 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-3.0-or-later
 #
-# Tests of the HEVC analysis plugin's third-party build (WI-0.014) and of libde265 patch 0001, the read-only
-# internals API (WI-2.162). The plugin itself arrives with chapter 07 (WI-2.163); until then plugins/CMakeLists.txt
-# adds only this directory.
+# Tests of the HEVC analysis plugin's third-party build (WI-0.014), of libde265 patch 0001, the read-only internals
+# API (WI-2.162), and of the plugin itself (WI-2.163).
 #
 # The probe links the patched, LGPL-3.0-or-later libde265, so the test target carries the plugin's licence and
 # the ovt_plugin_ name prefix: tools/license_gate.py checks it with the plugin rules (chapter 15 §15.4.2), which
@@ -23,6 +22,19 @@ if(NOT OVT_SYSTEM_DE265)
 endif()
 ovt_set_license(ovt_plugin_de265_probe_tests "LGPL-3.0-or-later")
 ovt_catch_discover_tests(ovt_plugin_de265_probe_tests)
+
+# ---- WI-2.163: the plugin, loaded through the host's plugin registry ----------------------------------------------
+# Loads libovt_plugin_de265 with ovt::analysis::PluginRegistry (WI-2.150), like the analysis host does, and checks
+# every reconstruction against the stream's decoded picture hash SEI. The host code is LGPL-2.1-or-later; this test
+# executable carries the plugin's licence and name prefix (tools/license_policy.toml [targets]).
+add_executable(ovt_plugin_de265_smoke_tests test_de265_plugin_smoke.cpp)
+target_link_libraries(ovt_plugin_de265_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
+                                                           ovt_test_support ovt::flags ${Catch2_TARGET})
+target_compile_definitions(ovt_plugin_de265_smoke_tests
+                           PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\"")
+add_dependencies(ovt_plugin_de265_smoke_tests ovt_plugin_de265)
+ovt_set_license(ovt_plugin_de265_smoke_tests "LGPL-3.0-or-later")
+ovt_catch_discover_tests(ovt_plugin_de265_smoke_tests)
 
 if(NOT OVT_SYSTEM_DE265)
   # WI-4.107: the libde265 MV/QP grid oracle that ovt_plugin_ffmpeg_hevc_tests compares the ffmpeg_hevc plugin with.

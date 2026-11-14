@@ -100,4 +100,21 @@ TestCase {
         verify(tip.indexOf("QP") > 0)
         compare(panel.chart.frameTooltip(-1), "")
     }
+
+    function test_gopMarkersAndRefArrows() {
+        const panel = createPanel()
+        const chart = panel.chart
+        // 300 frames with an I frame every 60: five markers, all labelled "I".
+        compare(chart.gopMarkers.length, 5)
+        compare(chart.gopMarkers[0].label, "I")
+        verify(chart.gopMarkers[1].x > chart.gopMarkers[0].x)
+        // Zoomed in on the first 20 frames only the first marker remains.
+        mouseWheel(chart, 1, chart.height / 2, 0, 120 * 12)
+        verify(chart.viewCount < 60)
+        compare(chart.gopMarkers.length, 1)
+        compare(chart.refArrows, false)
+        chart.refArrows = true
+        compare(chart.refArrows, true)
+        waitForRendering(chart)
+    }
 }

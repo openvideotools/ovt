@@ -21,6 +21,7 @@
 #include "fb_builder.hpp"
 #include "map_mi.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
+#include "planes.hpp"
 
 namespace {
 
@@ -33,8 +34,8 @@ struct ovt_AnalysisDecoder {
   // A FrameAnalysis handed out by pull() and not yet released, with the planes its PlaneRefs name.
   struct Pulled {
     std::unique_ptr<flatbuffers::FlatBufferBuilder> fbb;
-    ovt::aom::Frame frame;
-    std::map<std::string, const ovt::aom::Plane*> blobs;  // blob_id -> plane of `frame`
+    ovt::aom::Frame frame;                             // holds the frame buffer the views point into
+    std::map<std::string, ovt::aom::PlaneView> blobs;  // blob_id -> plane of `frame.recon`
   };
   std::unique_ptr<ovt::aom::Decoder> decoder;
   std::map<const uint8_t*, std::unique_ptr<Pulled>> pulled;
@@ -133,7 +134,7 @@ ovt_status aom_pull(ovt_AnalysisDecoder* dec, uint32_t plane_stage_mask, ovt_Buf
       return OVT_OK;
     }
     if ((plane_stage_mask & (1U << kStageRecon)) == 0) {
-      pulled->frame.planes = {};  // not requested: drop the copy now
+      pulled->frame.recon = {};  // not requested: give the frame buffer back now; the samples were never copied
     }
     pulled->fbb = ovt::aom::build_frame_analysis(pulled->frame, plane_stage_mask, info().caps.id, info().caps.version,
                                                  &pulled->blobs);
@@ -153,8 +154,10 @@ ovt_status aom_plane(ovt_AnalysisDecoder* dec, const char* blob_id, const uint8_
   return guarded([&] {
     for (const auto& [ptr, pulled] : dec->pulled) {
       if (const auto it = pulled->blobs.find(blob_id); it != pulled->blobs.end()) {
-        *data = it->second->data.data();
-        *size = it->second->data.size();
+        // In place in libaom's frame buffer: PlaneRef.stride_bytes apart, so the size runs to the last sample.
+        // SPEC-ASSUMPTION(#389): the ABI does not say what *size covers for a strided plane.
+        *data = it->second.data;
+        *size = it->second.span_bytes();
         return OVT_OK;
       }
     }

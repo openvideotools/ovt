@@ -329,7 +329,7 @@ const fb::FrameAnalysis* analysis_of(const BlockData& d, int32_t w, int32_t h,
   f.render_w = w;
   f.render_h = h;
   f.blocks = d;
-  std::map<std::string, const ovt::aom::Plane*> blobs;
+  std::map<std::string, ovt::aom::PlaneView> blobs;
   *keep = ovt::aom::build_frame_analysis(f, 0, "aom", "test", &blobs);
   flatbuffers::Verifier v((*keep)->GetBufferPointer(), (*keep)->GetSize());
   REQUIRE(fb::VerifyFrameAnalysisBuffer(v));
@@ -686,7 +686,13 @@ TEST_CASE("aom map_mi: every frame of the fast libaom vectors passes the validat
     const fb::FrameAnalysis* fa = fb::GetFrameAnalysis(run.buffers[f].data());
     REQUIRE(fa->blocks() != nullptr);
     CHECK(fa->blocks()->size() > 1);
-    CHECK(fa->diagnostics()->empty());  // no partition ambiguity, no uncovered cell
+    // No partition ambiguity, no uncovered cell. The one diagnostic allowed is the film grain vector's Info note
+    // (WI-2.158).
+    for (const fb::Diagnostic* d : *fa->diagnostics()) {
+      CHECK(d->severity() == fb::Severity::Info);
+      CHECK(d->code()->str() == "DEC-AV1-0001");
+      CHECK(d->message()->str() == "film grain present (not applied)");
+    }
   }
 }
 
