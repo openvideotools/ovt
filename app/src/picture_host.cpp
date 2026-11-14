@@ -427,7 +427,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   std::unique_ptr<VideoSurface> surface_;
   QSize surface_size_;
   DisplayTarget::Interop interop_ = DisplayTarget::Interop::None;
-  ovt::render::VulkanDeviceInfo vk_info_{};
+#if QT_CONFIG(vulkan)
+  ovt::render::VulkanDeviceInfo vk_info_{};  // the device Qt shares with libplacebo (VulkanSharedDevice)
+#endif
   bool init_failed_ = false;
   qreal device_pixel_ratio_ = 1.0;
   std::uint64_t uploaded_generation_ = 0;
