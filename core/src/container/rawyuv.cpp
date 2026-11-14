@@ -5,6 +5,8 @@
 
 #include "container/rawyuv.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -27,7 +29,9 @@ namespace {
 
 static_assert(sizeof(ovt_ColorDescription) == 44, "RawVideoFormat.color is the 44-byte ovt_ColorDescription image");
 
+constexpr size_t kMaxNameChars = 255;                // file-name characters the heuristics read
 constexpr uint32_t kMaxSamplesPerTable = 1U << 20U;  // samples one sample_table() call materialises
+constexpr size_t kMaxListedCandidates = 16;
 
 std::optional<uint64_t> parse_u64(std::string_view s) {
   uint64_t v = 0;
@@ -75,6 +79,190 @@ std::optional<std::pair<uint32_t, uint32_t>> reduce_ratio(uint64_t num, uint64_t
     return std::nullopt;
   }
   return std::pair<uint32_t, uint32_t>{static_cast<uint32_t>(num), static_cast<uint32_t>(den)};
+}
+
+std::string_view last_component(std::string_view path) {
+  const size_t slash = path.find_last_of("/\\");
+  return slash == std::string_view::npos ? path : path.substr(slash + 1);
+}
+
+// ---------------------------------------------------------------------------------------------- file names
+
+struct NameHints {
+  std::optional<std::pair<uint32_t, uint32_t>> geometry;
+  std::vector<PixFmt> formats;  // explicit pix_fmt tokens, in order, without duplicates
+  std::optional<uint8_t> depth;
+  std::optional<uint8_t> chroma;  // 420 / 422 / 444 as ovt chroma_format 1 / 2 / 3
+  std::optional<std::pair<uint32_t, uint32_t>> fps;
+};
+
+// `(\d{2,5})[xX](\d{2,5})`, both runs maximal.
+std::optional<std::pair<uint32_t, uint32_t>> find_geometry(std::string_view s) {
+  size_t i = 0;
+  while (i < s.size()) {
+    if (!is_digit(s[i])) {
+      ++i;
+      continue;
+    }
+    size_t j = i;
+    while (j < s.size() && is_digit(s[j])) {
+      ++j;
+    }
+    const size_t w_len = j - i;
+    if (w_len >= 2 && w_len <= 5 && j < s.size() && (s[j] == 'x' || s[j] == 'X')) {
+      size_t k = j + 1;
+      while (k < s.size() && is_digit(s[k])) {
+        ++k;
+      }
+      const size_t h_len = k - (j + 1);
+      if (h_len >= 2 && h_len <= 5) {
+        const auto w = parse_dimension(s.substr(i, w_len));
+        const auto h = parse_dimension(s.substr(j + 1, h_len));
+        if (w && h) {
+          return std::pair<uint32_t, uint32_t>{*w, *h};
+        }
+      }
+    }
+    i = j;
+  }
+  return std::nullopt;
+}
+
+// `(\d{1,3}(?:\.\d+)?)fps`, else `_(\d{2,3})p\b` (the `_NNfps` form is the first pattern). The first is preferred;
+// values above 240 are not rates.
+std::optional<std::pair<uint32_t, uint32_t>> find_fps(std::string_view s) {
+  for (size_t pos = s.find("fps"); pos != std::string_view::npos; pos = s.find("fps", pos + 1)) {
+    size_t b = pos;
+    while (b > 0 && (is_digit(s[b - 1]) || s[b - 1] == '.')) {
+      --b;
+    }
+    const std::string_view num = s.substr(b, pos - b);
+    if (const auto r = parse_fps(num); r && num.find('/') == std::string_view::npos && num.size() <= 12 &&
+                                       static_cast<double>(r->first) / r->second <= 240.0) {
+      return r;
+    }
+  }
+  for (size_t pos = s.find('_'); pos != std::string_view::npos; pos = s.find('_', pos + 1)) {
+    size_t e = pos + 1;
+    while (e < s.size() && is_digit(s[e])) {
+      ++e;
+    }
+    const size_t n = e - (pos + 1);
+    if (n < 2 || n > 3 || e >= s.size() || s[e] != 'p') {
+      continue;
+    }
+    const size_t after = e + 1;  // \b: the p must end the word
+    if (after < s.size() && std::isalnum(static_cast<unsigned char>(s[after])) != 0) {
+      continue;
+    }
+    const auto v = parse_u32(s.substr(pos + 1, n));
+    if (v && *v >= 1 && *v <= 240) {
+      return std::pair<uint32_t, uint32_t>{*v, 1};
+    }
+  }
+  return std::nullopt;
+}
+
+// "420p10" / "422p" / "444p12le" without the leading "yuv".
+std::optional<PixFmt> short_alias(std::string_view tok) {
+  if (tok.size() < 4 || tok[3] != 'p' || !is_digit(tok[0])) {
+    return std::nullopt;
+  }
+  const std::string_view rest = tok.substr(4);
+  std::string full = "yuv" + std::string(tok.substr(0, 4));
+  if (rest.empty()) {
+    return parse_pix_fmt(full);
+  }
+  if (!rest.ends_with("le") && !rest.ends_with("be")) {
+    full += std::string(rest) + "le";  // "420p10" means little-endian
+  } else {
+    full += std::string(rest);
+  }
+  return parse_pix_fmt(full);
+}
+
+NameHints hints_of(std::string_view display_name) {
+  NameHints h;
+  std::string name(last_component(display_name).substr(0, kMaxNameChars));
+  for (char& c : name) {
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  }
+  h.geometry = find_geometry(name);
+  h.fps = find_fps(name);
+  std::string token;
+  const auto flush = [&] {
+    if (token.empty()) {
+      return;
+    }
+    std::optional<PixFmt> p = parse_pix_fmt(token);
+    if (!p) {
+      p = short_alias(token);
+    }
+    if (p) {
+      const bool seen =
+          std::any_of(h.formats.begin(), h.formats.end(), [&](const PixFmt& q) { return q.name == p->name; });
+      if (!seen) {
+        h.formats.push_back(std::move(*p));
+      }
+    } else if (token == "8bit") {
+      h.depth = 8;
+    } else if (token == "10bit") {
+      h.depth = 10;
+    } else if (token == "12bit") {
+      h.depth = 12;
+    } else if (token == "420") {
+      h.chroma = 1;
+    } else if (token == "422") {
+      h.chroma = 2;
+    } else if (token == "444") {
+      h.chroma = 3;
+    }
+    token.clear();
+  };
+  for (const char c : name) {
+    if (std::isalnum(static_cast<unsigned char>(c)) != 0) {
+      token.push_back(c);
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return h;
+}
+
+constexpr std::array<std::pair<uint32_t, uint32_t>, 16> kCommonSizes = {{
+    {3840, 2160},
+    {2560, 1440},
+    {1920, 1080},
+    {1920, 1088},
+    {1280, 720},
+    {1024, 768},
+    {960, 540},
+    {832, 480},
+    {720, 576},
+    {720, 480},
+    {640, 480},
+    {640, 360},
+    {416, 240},
+    {352, 288},
+    {320, 240},
+    {176, 144},
+}};
+
+constexpr std::array<std::string_view, 9> kCommonFormats = {
+    "yuv420p", "yuv420p10le", "yuv422p", "yuv422p10le", "yuv444p", "yuv444p10le", "nv12", "p010le", "gray"};
+
+int chroma_rank(const PixFmt& p) {
+  switch (p.chroma_format) {
+    case 1:
+      return 0;
+    case 2:
+      return 1;
+    case 3:
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 }  // namespace
@@ -160,7 +348,183 @@ std::optional<RawFormat> parse_format_string(std::string_view text) {
   return f;
 }
 
-// ------------------------------------------------------------------------------------------------- reader
+// ------------------------------------------------------------------------------------------------ sidecar
+
+namespace {
+
+std::optional<uint64_t> json_unsigned(const nlohmann::json& obj, const char* key) {
+  const auto it = obj.find(key);
+  if (it == obj.end() || !it->is_number_unsigned()) {
+    return std::nullopt;
+  }
+  return it->get<uint64_t>();
+}
+
+// The `fps` value: "num/den", a decimal string or a number.
+std::optional<std::pair<uint32_t, uint32_t>> json_fps(const nlohmann::json& v) {
+  if (v.is_string()) {
+    return parse_fps(v.get<std::string>());
+  }
+  if (v.is_number_unsigned()) {
+    return reduce_ratio(v.get<uint64_t>(), 1);
+  }
+  if (v.is_number_float()) {
+    const double d = v.get<double>();
+    if (std::isfinite(d) && d > 0.0 && d < 1e6) {
+      std::array<char, 40> buf{};
+      (void)std::snprintf(buf.data(), buf.size(), "%.6f", d);
+      return parse_fps(buf.data());
+    }
+  }
+  return std::nullopt;
+}
+
+// The `color` object; false when a member has the wrong type or range.
+bool json_color(const nlohmann::json& obj, RawColor& c) {
+  if (!obj.is_object()) {
+    return false;
+  }
+  c.present = true;
+  for (const auto& [key, dst] : std::array<std::pair<const char*, uint8_t*>, 3>{
+           {{"primaries", &c.primaries}, {"transfer", &c.transfer}, {"matrix", &c.matrix}}}) {
+    if (obj.contains(key)) {
+      const auto v = json_unsigned(obj, key);
+      if (!v || *v > 255) {
+        return false;
+      }
+      *dst = static_cast<uint8_t>(*v);
+    }
+  }
+  if (const auto fr = obj.find("full_range"); fr != obj.end()) {
+    if (!fr->is_boolean()) {
+      return false;
+    }
+    c.full_range = fr->get<bool>();
+  }
+  return true;
+}
+
+}  // namespace
+
+std::optional<RawFormat> parse_sidecar(std::string_view json) {
+  if (json.size() > kMaxSidecarBytes) {
+    return std::nullopt;
+  }
+  const auto doc = nlohmann::json::parse(json.begin(), json.end(), nullptr, false);
+  if (!doc.is_object()) {
+    return std::nullopt;
+  }
+  RawFormat f;
+  const auto w = json_unsigned(doc, "width");
+  const auto h = json_unsigned(doc, "height");
+  const auto pix_it = doc.find("pix_fmt");
+  if (!w || !h || *w == 0 || *h == 0 || *w > kMaxDimension || *h > kMaxDimension || pix_it == doc.end() ||
+      !pix_it->is_string()) {
+    return std::nullopt;
+  }
+  auto pix = parse_pix_fmt(pix_it->get<std::string>());
+  if (!pix) {
+    return std::nullopt;
+  }
+  f.width = static_cast<uint32_t>(*w);
+  f.height = static_cast<uint32_t>(*h);
+  f.pix = std::move(*pix);
+  if (const auto it = doc.find("fps"); it != doc.end()) {
+    const auto fps = json_fps(*it);
+    if (!fps) {
+      return std::nullopt;
+    }
+    f.fps_num = fps->first;
+    f.fps_den = fps->second;
+  }
+  if (doc.contains("header_bytes")) {
+    const auto hb = json_unsigned(doc, "header_bytes");
+    if (!hb) {
+      return std::nullopt;
+    }
+    f.header_bytes = *hb;
+  }
+  if (const auto it = doc.find("color"); it != doc.end() && !json_color(*it, f.color)) {
+    return std::nullopt;
+  }
+  if (!finalize(f)) {
+    return std::nullopt;
+  }
+  return f;
+}
+
+std::string sidecar_json(const RawFormat& fmt) {
+  nlohmann::ordered_json j;
+  j["width"] = fmt.width;
+  j["height"] = fmt.height;
+  j["pix_fmt"] = fmt.pix.name;
+  j["fps"] = std::to_string(fmt.fps_num) + "/" + std::to_string(fmt.fps_den);
+  j["header_bytes"] = fmt.header_bytes;
+  if (fmt.color.present) {
+    j["color"] = {{"primaries", fmt.color.primaries},
+                  {"transfer", fmt.color.transfer},
+                  {"matrix", fmt.color.matrix},
+                  {"full_range", fmt.color.full_range}};
+  }
+  return j.dump(2) + "\n";
+}
+
+std::string sidecar_path(std::string_view media_path) {
+  if (media_path.empty() || media_path.starts_with("fd:") || media_path.find("://") != std::string_view::npos) {
+    return {};
+  }
+  return std::string(media_path) + ".ovt-raw.json";
+}
+
+bool write_sidecar(std::string_view media_path, const RawFormat& fmt) {
+  const std::string path = sidecar_path(media_path);
+  if (path.empty()) {
+    return false;
+  }
+  const std::string tmp = path + ".tmp";
+  {
+    std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      return false;
+    }
+    out << sidecar_json(fmt);
+    out.flush();
+    if (!out) {
+      return false;
+    }
+  }
+  std::error_code ec;
+  std::filesystem::rename(tmp, path, ec);  // atomic replace, so a reader never sees half a sidecar
+  if (ec) {
+    std::filesystem::remove(tmp, ec);
+    return false;
+  }
+  return true;
+}
+
+std::optional<RawFormat> read_sidecar(std::string_view media_path) {
+  const std::string path = sidecar_path(media_path);
+  if (path.empty()) {
+    return std::nullopt;
+  }
+  std::error_code ec;
+  const auto size = std::filesystem::file_size(path, ec);
+  if (ec || size > kMaxSidecarBytes) {
+    return std::nullopt;
+  }
+  std::ifstream in(path, std::ios::binary);
+  if (!in) {
+    return std::nullopt;
+  }
+  std::string text(static_cast<size_t>(size), '\0');
+  in.read(text.data(), static_cast<std::streamsize>(text.size()));
+  if (in.gcount() != static_cast<std::streamsize>(text.size())) {
+    return std::nullopt;
+  }
+  return parse_sidecar(text);
+}
+
+// -------------------------------------------------------------------------------------------- heuristics
 
 uint64_t frame_count_of(const RawFormat& fmt, uint64_t file_size) noexcept {
   if (fmt.frame_bytes == 0 || file_size <= fmt.header_bytes) {
@@ -168,6 +532,161 @@ uint64_t frame_count_of(const RawFormat& fmt, uint64_t file_size) noexcept {
   }
   return (file_size - fmt.header_bytes) / fmt.frame_bytes;
 }
+
+namespace {
+
+struct Ranked {
+  Candidate cand;
+  size_t order;
+};
+
+// Rank (§8.6.6 step 4): file-name geometry first (all or none here), then frame_count ≤ 100 000 with the larger
+// count first, then 4:2:0 < 4:2:2 < 4:4:4, 8-bit before deeper, then generation order.
+// SPEC-ASSUMPTION(#366): "larger frame_count ≤ 100 000" is read literally; counts above the bound rank after.
+bool ranks_before(const Ranked& a, const Ranked& b) {
+  const bool a_big = a.cand.frame_count > kMaxRankedFrameCount;
+  const bool b_big = b.cand.frame_count > kMaxRankedFrameCount;
+  if (a_big != b_big) {
+    return b_big;
+  }
+  if (a.cand.frame_count != b.cand.frame_count) {
+    return a.cand.frame_count > b.cand.frame_count;
+  }
+  if (chroma_rank(a.cand.format.pix) != chroma_rank(b.cand.format.pix)) {
+    return chroma_rank(a.cand.format.pix) < chroma_rank(b.cand.format.pix);
+  }
+  if ((a.cand.format.pix.bit_depth > 8) != (b.cand.format.pix.bit_depth > 8)) {
+    return b.cand.format.pix.bit_depth > 8;
+  }
+  return a.order < b.order;
+}
+
+// The pix_fmts to try: the ones named in the file name, else the common set narrowed by the bit-depth and chroma
+// hints.
+std::vector<PixFmt> formats_to_try(const NameHints& hints) {
+  std::vector<PixFmt> formats = hints.formats;
+  if (!formats.empty()) {
+    return formats;
+  }
+  for (const std::string_view name : kCommonFormats) {
+    auto p = parse_pix_fmt(name);
+    if (p && (!hints.depth || p->bit_depth == *hints.depth) && (!hints.chroma || p->chroma_format == *hints.chroma)) {
+      formats.push_back(std::move(*p));
+    }
+  }
+  return formats;
+}
+
+}  // namespace
+
+std::vector<Candidate> candidates(std::string_view display_name, uint64_t file_size, uint32_t fps_num, uint32_t fps_den,
+                                  uint64_t header_bytes) {
+  const NameHints hints = hints_of(display_name);
+  if (hints.fps) {
+    fps_num = hints.fps->first;
+    fps_den = hints.fps->second;
+  }
+
+  std::vector<std::pair<uint32_t, uint32_t>> sizes;
+  if (hints.geometry) {
+    sizes.push_back(*hints.geometry);
+  } else {
+    sizes.assign(kCommonSizes.begin(), kCommonSizes.end());
+  }
+  const std::vector<PixFmt> formats = formats_to_try(hints);
+
+  std::vector<Ranked> found;
+  for (const auto& [w, h] : sizes) {
+    for (const PixFmt& p : formats) {
+      RawFormat f;
+      f.width = w;
+      f.height = h;
+      f.pix = p;
+      f.fps_num = fps_num;
+      f.fps_den = fps_den;
+      f.header_bytes = header_bytes;
+      if (!finalize(f)) {
+        continue;
+      }
+      const uint64_t count = frame_count_of(f, file_size);
+      if (count < 1 || (file_size - header_bytes) % f.frame_bytes != 0) {
+        continue;
+      }
+      found.push_back({Candidate{std::move(f), count, hints.geometry.has_value()}, found.size()});
+    }
+  }
+  std::stable_sort(found.begin(), found.end(), ranks_before);
+  std::vector<Candidate> out;
+  out.reserve(found.size());
+  for (Ranked& r : found) {
+    out.push_back(std::move(r.cand));
+  }
+  return out;
+}
+
+Resolution resolve(const io::RandomAccessFile& file, std::string_view explicit_format, const Overrides& overrides) {
+  Resolution r;
+  const std::string name = file.info().display_name;
+  const auto apply = [&](RawFormat& f) {
+    if (overrides.header_bytes) {
+      f.header_bytes = *overrides.header_bytes;
+    }
+    if (overrides.fps) {
+      f.fps_num = overrides.fps->first;
+      f.fps_den = overrides.fps->second;
+    }
+  };
+
+  if (auto side = read_sidecar(name)) {  // 1. sidecar; an invalid one is ignored
+    apply(*side);
+    r.source = Source::Sidecar;
+    r.format = std::move(side);
+    return r;
+  }
+  if (!explicit_format.empty()) {  // 2. explicit string
+    auto f = parse_format_string(explicit_format);
+    if (!f) {
+      r.status = OVT_E_INVALID_ARG;
+      return r;
+    }
+    apply(*f);
+    r.source = Source::Explicit;
+    r.format = std::move(f);
+    return r;
+  }
+  // 3.–4. heuristics
+  uint32_t fps_num = 25;
+  uint32_t fps_den = 1;
+  if (overrides.fps) {
+    fps_num = overrides.fps->first;
+    fps_den = overrides.fps->second;
+  }
+  r.candidates = candidates(name, file.size(), fps_num, fps_den, overrides.header_bytes.value_or(0));
+  if (overrides.fps) {  // the override beats a rate read from the file name
+    for (Candidate& c : r.candidates) {
+      c.format.fps_num = fps_num;
+      c.format.fps_den = fps_den;
+    }
+  }
+  if (r.candidates.size() == 1) {
+    r.source = Source::Heuristic;
+    r.format = r.candidates.front().format;
+    return r;
+  }
+  std::string list;
+  for (size_t i = 0; i < std::min(r.candidates.size(), kMaxListedCandidates); ++i) {
+    const RawFormat& f = r.candidates[i].format;
+    list += (i == 0 ? "" : ", ") + std::to_string(f.width) + "x" + std::to_string(f.height) + ":" + f.pix.name;
+  }
+  r.diagnostics.push_back({DiagCode::CNT_RAW_0002,
+                           "raw format undetermined; `" + std::to_string(r.candidates.size()) + "` candidates (`" +
+                               list + "`); supply `--raw-format` or a sidecar",
+                           0});
+  r.status = OVT_E_INVALID_ARG;
+  return r;
+}
+
+// ------------------------------------------------------------------------------------------------- reader
 
 namespace {
 
@@ -239,10 +758,10 @@ class RawReader final : public Reader {
     treefb::Fbb fbb;
     ovt_ColorDescription color{};
     color.struct_size = sizeof(ovt_ColorDescription);
-    color.primaries = 2;  // SPEC-ASSUMPTION(#366): unspecified until the sidecar (part b) can say otherwise
-    color.transfer = 2;
-    color.matrix = 2;
-    color.full_range = 0;
+    color.primaries = f_.color.primaries;
+    color.transfer = f_.color.transfer;
+    color.matrix = f_.color.matrix;
+    color.full_range = f_.color.full_range ? 1 : 0;
     color.chroma_siting = 0;
     color.chroma_format = f_.pix.chroma_format;
     color.bit_depth = f_.pix.bit_depth;
