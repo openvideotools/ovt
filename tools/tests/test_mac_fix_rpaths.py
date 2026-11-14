@@ -28,11 +28,13 @@ e = db[path]
 archs = e.get("archs")
 for arch in archs or [None]:
     print(path + (f" (architecture {arch}):" if arch else ":"))
+    # "slice_deps" / "slice_rpaths" {arch: [...]}: a slice that differs (a lipo-merged file); the fake
+    # install_name_tool does not edit them, like a name the fix never saw.
     if flag == "-L":
-        for d in e["deps"]:
+        for d in e.get("slice_deps", {}).get(arch, e["deps"]):
             print("\\t" + d + " (compatibility version 1.0.0, current version 1.0.0)")
     else:
-        for r in e["rpaths"]:
+        for r in e.get("slice_rpaths", {}).get(arch, e["rpaths"]):
             print("Load command 9\\n          cmd LC_RPATH\\n      cmdsize 32\\n         path " + r + " (offset 12)")
 """
 
@@ -248,6 +250,22 @@ def test_universal_files_are_read_one_slice_at_a_time(tmp_path):
     plugin = db[str(app / "Contents/PlugIns/platforms/libqcocoa.dylib")]
     assert plugin["deps"][0] == "@rpath/libqcocoa.dylib"
     assert plugin["rpaths"] == ["@loader_path/../../Frameworks"]
+
+
+def test_a_slice_that_differs_fails_the_check(tmp_path):
+    """Review of #464: the check covers every slice, so a build-tree path only in the x86_64 slice is not missed."""
+    e = clean_entries()
+    plug = e["PlugIns/ovt/libovt_plugin_aom.dylib"]
+    plug["archs"] = ["arm64", "x86_64"]
+    plug["slice_deps"] = {"x86_64": [plug["deps"][0], "/Users/x/build-x86_64/lib/libovt_core.1.dylib"]}
+    plug["slice_rpaths"] = {"x86_64": ["@loader_path/../../Frameworks", "@loader_path/../../Frameworks"]}
+    app, dbp = make_bundle(tmp_path, e)
+    for extra in ((), ("--fix",)):
+        r = run(tmp_path, dbp, app, *extra)
+        assert r.returncode == 1
+        assert "forbidden reference /Users/x/build-x86_64/lib/libovt_core.1.dylib (only in x86_64)" in r.stderr
+        assert "duplicate LC_RPATH @loader_path/../../Frameworks (only in x86_64)" in r.stderr
+        assert "arm64" not in r.stderr
 
 
 def test_fix_cannot_invent_a_missing_library(tmp_path):
