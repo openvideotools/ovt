@@ -43,7 +43,9 @@ jobs:
       vars.OVT_HOSTED_RUNNERS != 'off' || github.event_name != 'pull_request' ||
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ vars.OVT_HOSTED_RUNNERS == 'off' && fromJSON('["self-hosted", "macos-arm64"]') || 'macos-15' }}
-    timeout-minutes: 60 # the PR run on changed lines must stay under 10 minutes once the build cache is warm
+    # The PR run on changed lines must stay under 10 minutes once the build cache is warm. The whole-tree run (nightly,
+    # manual) takes about 40 minutes of clang-tidy at -j3 on top of the build, on the Mini and on hosted macos-15 alike.
+    timeout-minutes: ${{ github.event_name == 'pull_request' && 60 || 120 }}
     env:
       # 3 jobs: the hosted macos-15 arm64 image has 3 cores; the Mini's 3 runners share 10 cores, so 3 jobs each keeps
       # the machine at about its core count.
