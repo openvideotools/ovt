@@ -11,7 +11,8 @@ Automated tests (binary `ovt_tests_metrics`, label `metrics`; source `core/tests
 | 3a. ref == dist: `identity.all == 1`, `sha256_match == 1` | `identity of an identical pair is 1, the sequence verdict is 1` (8-bit and 10-bit, different row padding for the two pictures) |
 | 3b. `syn_metrics_1080p_bitflip_f37`: `all < 1`, `sha256_match == 0`, `VQ-DIFF-0001` names the recorded sample | `identity finds the flipped sample of syn_metrics_1080p_bitflip_f37` ([needs-corpus]; reads `tests/corpora/compare_expected.json`). **Not run on the real 1080p corpus here**; run locally against a small stand-in corpus laid out like the real one (64 × 48, 40 frames, flipped sample in frame 37), 203 assertions pass. The same logic is covered without corpus by `identity counts differing samples and reports the first one once` |
 
-Further cases: descriptor and registration of `identity` in `register_builtin_kernels()`, option and input rejection, block maps (fraction identical with partial edge blocks), 4:0:0, 10-bit high-byte flip, `finish()` without frames.
+Further cases: descriptor and registration of `identity` in `register_builtin_kernels()`, option and input rejection,
+block maps (fraction identical with partial edge blocks), 4:0:0, 10-bit high-byte flip, `finish()` without frames.
 
 ## Informational throughput
 
@@ -29,4 +30,5 @@ benchmark binary exists yet, WI-0.560).
 ## Deviations (all in the PR body and issue #419)
 
 * No SHA-256 code: `sha256_match` is derived from the sample comparison (#419 point 1).
-* `VQ-DIFF-0001` leaves `identity` through a process-wide `DiagSink`, as the maps leave through the `MapSink` (#419 point 2).
+* `VQ-DIFF-0001` leaves `identity` through a process-wide `DiagSink`, as the maps leave through the `MapSink` (#419
+  point 2).
