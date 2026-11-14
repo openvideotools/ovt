@@ -1,16 +1,18 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.108a: H.264 NAL header and SPS (VUI, HRD, scaling lists) parsers (chapter 7 §7.3.4 rows 1–5).
-// WI-1.108b adds the PPS tests (row 6) to this file.
+// WI-1.108: H.264 NAL header, SPS (VUI, HRD, scaling lists) and PPS parsers (chapter 7 §7.3.4 rows 1–6).
+// Part a (#379) brought rows 1–5; WI-1.108b adds the PPS tests (row 6, acceptance tests 2 and 3).
 //
 // Fixtures: the SPS/PPS NAL units of streams encoded with x264 (FFmpeg 6.1 libx264, 2026-11-08) from an
 // lavfi testsrc2 source; the expected values are hard-coded from `ffmpeg -i <stream> -c copy -bsf:v
 // trace_headers -f null -` of the same files and cited per test. The acceptance-test streams of the WI
-// (`syn_h264_gop60_1080p`) are read from the corpus cache when present ([needs-corpus], skipped otherwise).
-// The error paths use hand-written bit strings.
+// (`syn_h264_gop60_1080p`, `CAPAMA3_Sand_F`, `HPCV_BRCM_A`) are read from the corpus cache when present
+// ([needs-corpus], skipped otherwise; the JVT streams may not be mirrored). FMO map types and the error paths
+// use hand-written bit strings.
 
 #include "ovt/cxx/syntax/h264/nal_header.hpp"
+#include "ovt/cxx/syntax/h264/pps.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -42,20 +44,27 @@ using ovt::syntax::SyntaxBuilder;
 using ovt::syntax::SyntaxNodeBuffer;
 using ovt::syntax::SyntaxNodeData;
 using ovt::syntax::h264::NalHeader;
+using ovt::syntax::h264::Pps;
 using ovt::syntax::h264::Sps;
+using ovt::syntax::h264::SpsTable;
 
 // ---- fixtures (NAL units with their emulation prevention bytes, as found in the Annex B streams) -----------
 
 // x264 --preset medium --crf 24 --keyint 60 --min-keyint 60 --no-scenecut --bframes 3, 1920x1080 yuv420p 25 fps
 // (chapter 14 recipe 26 parameters; High profile, level 4.0). The SPS carries two emulation prevention bytes.
 constexpr std::string_view kGop60Sps = "67640028acd940780227e5c044000003000400000300f03c60c658";
+constexpr std::string_view kGop60Pps = "68ebe2cb22c0";
 // x264 yuv444p (High 4:4:4 Predictive), 352x288 29.97 fps, cqm=jvt, nal-hrd=vbr vbv-maxrate=5000 vbv-bufsize=10000,
 // BT.709 colour description.
 constexpr std::string_view k444Sps = "67f40015919b282c12d80b5010101400000fa40003a9818180004c4b40002625a9a8c01e2c5b2c";
+constexpr std::string_view k444Pps = "68ebe2c44c000440";
 // x264 interlaced (tff, MBAFF) 720x480 yuv420p, no B frames, SAR 8:9.
 constexpr std::string_view kIntSps = "6764001eace402d1edff800400048800001f4800075300f8a15240";
-// x264 yuv420p10 (High 10), 176x144 15 fps, --level 1b: level_idc 9, pic_order_cnt_type 2.
+constexpr std::string_view kIntPps = "68fb82cb22c0";
+// x264 yuv420p10 (High 10), 176x144 15 fps, --level 1b, custom cqm4iy / cqm4pc: level_idc 9, pic_order_cnt_type 2,
+// PPS scaling lists.
 constexpr std::string_view kCqmSps = "676e0009a6cb20589d8088000003000800000300f078913240";
+constexpr std::string_view kCqmPps = "68ebc2cb3951841ce8c63239c41942008508021843fff1084010c20084b0";
 
 std::vector<uint8_t> from_hex(std::string_view hex) {
   std::vector<uint8_t> out;
@@ -108,11 +117,12 @@ struct Parsed {
   std::vector<uint8_t> rbsp;
   NalHeader header;
   std::optional<Sps> sps;
+  std::optional<Pps> pps;
   SyntaxNodeBuffer tree;
   std::optional<ParseError> error;
 };
 
-Parsed parse_nal(const std::vector<uint8_t>& nal, bool recording = true) {
+Parsed parse_nal(const std::vector<uint8_t>& nal, const SpsTable& table = {}, bool recording = true) {
   Parsed p;
   p.rbsp = ovt::rbsp_from_nal(nal).rbsp;
   BitReader br(p.rbsp);
@@ -122,6 +132,8 @@ Parsed parse_nal(const std::vector<uint8_t>& nal, bool recording = true) {
     p.header = ovt::syntax::h264::parse_nal_header(br, b);
     if (p.header.nal_unit_type == 7) {
       p.sps = ovt::syntax::h264::parse_sps(br, b);
+    } else if (p.header.nal_unit_type == 8) {
+      p.pps = ovt::syntax::h264::parse_pps(br, b, table);
     }
   } catch (const ParseError& e) {
     p.error = e;
@@ -251,6 +263,49 @@ TEST_CASE("h264_sps_unit", "[syntax][h264][fast]") {
   CHECK_THAT(trace, Catch::Matchers::ContainsSubstring("191 max_dec_frame_buffering 00101 = 4\n"));
 }
 
+// trace_headers: pic_parameter_set_id 0, entropy_coding_mode_flag 1, num_ref_idx_l0_default_active_minus1 2,
+// weighted_pred_flag 1, weighted_bipred_idc 2, pic_init_qp_minus26 -2, chroma_qp_index_offset -2,
+// transform_8x8_mode_flag 1 (bit 34), pic_scaling_matrix_present_flag 0, second_chroma_qp_index_offset -2 (bit 36).
+TEST_CASE("h264_pps_high_tail", "[syntax][h264][fast]") {
+  const auto sps = parse_nal(from_hex(kGop60Sps));
+  REQUIRE(sps.sps.has_value());
+  SpsTable table;
+  table.entries[0] = &*sps.sps;
+  const auto p = parse_nal(from_hex(kGop60Pps), table);
+  REQUIRE_FALSE(p.error.has_value());
+  REQUIRE(p.pps.has_value());
+  const Pps& pps = *p.pps;
+  CHECK(pps.pic_parameter_set_id == 0);
+  CHECK(pps.seq_parameter_set_id == 0);
+  CHECK(pps.entropy_coding_mode_flag);
+  CHECK_FALSE(pps.bottom_field_pic_order_in_frame_present_flag);
+  CHECK(pps.num_slice_groups_minus1 == 0);
+  CHECK(pps.num_ref_idx_l0_default_active_minus1 == 2);
+  CHECK(pps.num_ref_idx_l1_default_active_minus1 == 0);
+  CHECK(pps.weighted_pred_flag);
+  CHECK(pps.weighted_bipred_idc == 2);
+  CHECK(pps.pic_init_qp_minus26 == -2);
+  CHECK(pps.pic_init_qs_minus26 == 0);
+  CHECK(pps.chroma_qp_index_offset == -2);
+  CHECK(pps.deblocking_filter_control_present_flag);
+  CHECK(pps.has_tail);
+  CHECK(pps.transform_8x8_mode_flag);
+  CHECK_FALSE(pps.pic_scaling_matrix_present_flag);
+  CHECK(pps.second_chroma_qp_index_offset == -2);
+  CHECK_FALSE(pps.provisional);
+  const auto* t8 = find_node(p.tree.root(), "transform_8x8_mode_flag");
+  REQUIRE(t8 != nullptr);
+  CHECK(t8->span.bit_offset == 34);
+  const auto* sc = find_node(p.tree.root(), "second_chroma_qp_index_offset");
+  REQUIRE(sc != nullptr);
+  CHECK(sc->span.bit_offset == 36);
+  CHECK(sc->ivalue == -2);
+  const auto* ec = find_node(p.tree.root(), "entropy_coding_mode_flag");
+  REQUIRE(ec != nullptr);
+  CHECK(ec->enum_name == "CABAC");
+  CHECK(diag_codes(p.tree.root()).empty());
+}
+
 // trace_headers: profile_idc 244, level_idc 21, chroma_format_idc 3 (bit 33), separate_colour_plane_flag 0,
 // video_format 5, colour_primaries/transfer/matrix 1, num_units_in_tick 1001, time_scale 60000, cpb_cnt_minus1 0,
 // bit_rate_scale 0, cpb_size_scale 3, bit_rate_value_minus1[0] 78124 (bit 193), cpb_size_value_minus1[0] 78124,
@@ -320,8 +375,49 @@ TEST_CASE("h264_sps_444_hrd", "[syntax][h264][fast]") {
   CHECK(cf->span.bit_offset == 33);
 }
 
+// trace_headers: transform_8x8_mode_flag 1, pic_scaling_matrix_present_flag 1, pic_scaling_list_present_flag[0..11]
+// all 0 (bits 38..49: 12 flags because chroma_format_idc == 3), second_chroma_qp_index_offset 4 at bit 50,
+// chroma_qp_index_offset 4. Without its SPS the count would be 8 (row 6 pitfall).
+TEST_CASE("h264_pps_444_scaling_list_count", "[syntax][h264][fast]") {
+  const auto sps = parse_nal(from_hex(k444Sps));
+  REQUIRE(sps.sps.has_value());
+  SpsTable table;
+  table.entries[0] = &*sps.sps;
+  SECTION("with its SPS: 12 pic_scaling_list_present_flag") {
+    const auto p = parse_nal(from_hex(k444Pps), table);
+    REQUIRE_FALSE(p.error.has_value());
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->num_scaling_lists == 12);
+    CHECK(p.pps->chroma_qp_index_offset == 4);
+    CHECK(p.pps->second_chroma_qp_index_offset == 4);
+    CHECK_FALSE(p.pps->provisional);
+    for (const auto& l : p.pps->scaling_list) {
+      CHECK_FALSE(l.present);
+    }
+    const auto* flag11 = find_node(p.tree.root(), "pic_scaling_list_present_flag", 11);
+    REQUIRE(flag11 != nullptr);
+    CHECK(flag11->span.bit_offset == 49);
+    const auto* sc = find_node(p.tree.root(), "second_chroma_qp_index_offset");
+    REQUIRE(sc != nullptr);
+    CHECK(sc->span.bit_offset == 50);
+    CHECK(sc->ivalue == 4);
+    CHECK(diag_codes(p.tree.root()).empty());
+  }
+  SECTION("provisional parse without the SPS assumes 8 and warns SYN-H264-0020") {
+    const auto p = parse_nal(from_hex(k444Pps));
+    REQUIRE(p.pps.has_value());  // parse_pps returned (the tail is misread, but nothing throws on this fixture)
+    CHECK(p.pps->provisional);
+    CHECK(p.pps->num_scaling_lists == 8);
+    const auto codes = diag_codes(p.tree.root());
+    CHECK(std::ranges::find(codes, "SYN-H264-0020") != codes.end());
+    const auto* prov = find_node(p.tree.root(), "provisional");
+    REQUIRE(prov != nullptr);
+  }
+}
+
 // trace_headers: level_idc 30, frame_mbs_only_flag 0 (bit 67), mb_adaptive_frame_field_flag 1, pic_width_in_mbs_minus1
-// 44, pic_height_in_map_units_minus1 14, aspect_ratio_idc 255, sar_width 8, sar_height 9, pic_struct_present_flag 1.
+// 44, pic_height_in_map_units_minus1 14, aspect_ratio_idc 255, sar_width 8, sar_height 9, pic_struct_present_flag 1;
+// PPS bottom_field_pic_order_in_frame_present_flag 1.
 TEST_CASE("h264_sps_interlaced_mbaff", "[syntax][h264][fast]") {
   const auto p = parse_nal(from_hex(kIntSps));
   REQUIRE_FALSE(p.error.has_value());
@@ -350,6 +446,11 @@ TEST_CASE("h264_sps_interlaced_mbaff", "[syntax][h264][fast]") {
   const auto* fmo = find_node(p.tree.root(), "frame_mbs_only_flag");
   REQUIRE(fmo != nullptr);
   CHECK(fmo->span.bit_offset == 67);
+  const auto pps = parse_nal(from_hex(kIntPps));
+  REQUIRE(pps.pps.has_value());
+  CHECK(pps.pps->bottom_field_pic_order_in_frame_present_flag);
+  CHECK_FALSE(pps.pps->weighted_pred_flag);
+  CHECK(pps.pps->weighted_bipred_idc == 0);
 }
 
 // trace_headers: profile_idc 110, level_idc 9 (level 1b), bit_depth_luma_minus8 2, bit_depth_chroma_minus8 2,
@@ -455,6 +556,57 @@ TEST_CASE("h264_sps_scaling_lists", "[syntax][h264][fast]") {
   CHECK_THAT(trace, Catch::Matchers::ContainsSubstring(" delta_scale[1][1] 00000100001 = -16\n"));
   CHECK_THAT(trace, Catch::Matchers::ContainsSubstring(" delta_scale[6][0] 000010001 = -8\n"));
   CHECK(diag_codes(p.tree.root()).empty());
+}
+
+// trace_headers (kCqmPps, with kCqmSps): pic_scaling_list_present_flag[0..7] = 1 1 0 1 1 0 1 1 (bits 36, 113, 134,
+// 135, 156, 187, 188, 209); delta_scale of list 0: -2 1 3 4 -3 -3 1 3 3 3 1 -3 -3 4 3 1; list 1: 8 -16; list 3: 8 -16;
+// list 4: 8, 0 x 14, 4; lists 6 and 7: 8 -16; second_chroma_qp_index_offset -2 at bit 230.
+TEST_CASE("h264_pps_high10_scaling_lists", "[syntax][h264][fast]") {
+  const auto sp = parse_nal(from_hex(kCqmSps));
+  REQUIRE(sp.sps.has_value());
+  SpsTable table;
+  table.entries[0] = &*sp.sps;
+  const auto pp = parse_nal(from_hex(kCqmPps), table);
+  REQUIRE_FALSE(pp.error.has_value());
+  REQUIRE(pp.pps.has_value());
+  const Pps& p = *pp.pps;
+  CHECK(p.transform_8x8_mode_flag);
+  CHECK(p.pic_scaling_matrix_present_flag);
+  CHECK(p.num_scaling_lists == 8);
+  const std::array<bool, 8> present{true, true, false, true, true, false, true, true};
+  for (size_t i = 0; i < present.size(); ++i) {
+    CHECK(p.scaling_list.at(i).present == present.at(i));
+  }
+  CHECK(p.scaling_list[0].size == 16);
+  CHECK(p.scaling_list[6].size == 64);
+  const std::array<uint8_t, 16> list0{6, 7, 10, 14, 11, 8, 9, 12, 15, 18, 19, 16, 13, 17, 20, 21};
+  for (size_t j = 0; j < list0.size(); ++j) {
+    CHECK(p.scaling_list[0].list.at(j) == list0.at(j));
+    CHECK(p.scaling_list[1].list.at(j) == 16);  // 8 then -16: nextScale 0 → the rest repeats lastScale 16
+  }
+  CHECK(p.scaling_list[0].delta_scale[0] == -2);
+  CHECK(p.scaling_list[0].delta_scale[15] == 1);
+  CHECK_FALSE(p.scaling_list[0].UseDefaultScalingMatrixFlag);
+  CHECK_FALSE(p.scaling_list[1].UseDefaultScalingMatrixFlag);
+  CHECK(p.scaling_list[4].list[14] == 16);
+  CHECK(p.scaling_list[4].list[15] == 20);
+  for (size_t j = 0; j < 64; ++j) {
+    CHECK(p.scaling_list[6].list.at(j) == 16);
+  }
+  CHECK(p.second_chroma_qp_index_offset == -2);
+  const auto* f7 = find_node(pp.tree.root(), "pic_scaling_list_present_flag", 7);
+  REQUIRE(f7 != nullptr);
+  CHECK(f7->span.bit_offset == 209);
+  const auto* sc = find_node(pp.tree.root(), "second_chroma_qp_index_offset");
+  REQUIRE(sc != nullptr);
+  CHECK(sc->span.bit_offset == 230);
+  const auto* ds = find_node(pp.tree.root(), "delta_scale", 15);  // first list's 16th entry
+  REQUIRE(ds != nullptr);
+  CHECK(ds->ivalue == 1);
+  const std::string trace = ovt::syntax::to_trace(pp.tree, pp.rbsp);
+  CHECK_THAT(trace, Catch::Matchers::ContainsSubstring(" delta_scale[0][0] "));
+  CHECK_THAT(trace, Catch::Matchers::ContainsSubstring(" delta_scale[4][15] 0001000 = 4\n"));
+  CHECK(diag_codes(pp.tree.root()).empty());
 }
 
 TEST_CASE("h264_sps_pic_order_cnt_type1_and_defaults", "[syntax][h264][fast]") {
@@ -570,6 +722,119 @@ TEST_CASE("h264_sps_level_1b_constraint_set3_and_unknown_profile", "[syntax][h26
   }
 }
 
+namespace {
+
+std::vector<uint8_t> fmo_pps(uint32_t num_slice_groups_minus1, uint32_t map_type, const std::vector<uint32_t>& fields,
+                             bool direction_flag = false) {
+  BitWriter w;
+  w.u(8, 0x68);  // nal header: ref_idc 3, type 8
+  w.ue(1);       // pic_parameter_set_id
+  w.ue(0);       // seq_parameter_set_id
+  w.u(1, 0);     // entropy_coding_mode_flag
+  w.u(1, 0);     // bottom_field_pic_order_in_frame_present_flag
+  w.ue(num_slice_groups_minus1);
+  if (num_slice_groups_minus1 > 0) {
+    w.ue(map_type);
+    if (map_type == 6) {
+      w.ue(fields.at(0));  // pic_size_in_map_units_minus1
+      unsigned bits = 0;
+      while ((1U << bits) < num_slice_groups_minus1 + 1) {
+        ++bits;
+      }
+      for (size_t i = 1; i < fields.size(); ++i) {
+        w.u(bits, fields[i]);
+      }
+    } else if (map_type >= 3 && map_type <= 5) {
+      w.u(1, direction_flag ? 1 : 0);
+      w.ue(fields.at(0));  // slice_group_change_rate_minus1
+    } else {
+      for (const uint32_t f : fields) {
+        w.ue(f);
+      }
+    }
+  }
+  w.ue(0);    // num_ref_idx_l0_default_active_minus1
+  w.ue(0);    // num_ref_idx_l1_default_active_minus1
+  w.u(1, 0);  // weighted_pred_flag
+  w.u(2, 0);  // weighted_bipred_idc
+  w.se(0);    // pic_init_qp_minus26
+  w.se(0);    // pic_init_qs_minus26
+  w.se(0);    // chroma_qp_index_offset
+  w.u(1, 1);  // deblocking_filter_control_present_flag
+  w.u(1, 0);  // constrained_intra_pred_flag
+  w.u(1, 0);  // redundant_pic_cnt_present_flag
+  w.trailing();
+  return w.bytes();
+}
+
+}  // namespace
+
+// Acceptance test 2 on a hand-made PPS (CAPAMA3_Sand_F itself is checked below when the corpus is present):
+// slice_group_map_type 6 with 3 slice groups → slice_group_id is u(2) and has pic_size_in_map_units_minus1 + 1 entries.
+TEST_CASE("h264_pps_fmo_types", "[syntax][h264][fast]") {
+  SECTION("type 6 explicit") {
+    const auto p = parse_nal(fmo_pps(2, 6, {5, 0, 1, 2, 2, 1, 0}));
+    REQUIRE_FALSE(p.error.has_value());
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->num_slice_groups_minus1 == 2);
+    CHECK(p.pps->slice_group_map_type == 6);
+    CHECK(p.pps->pic_size_in_map_units_minus1 == 5);
+    CHECK(p.pps->slice_group_id_bits == 2);
+    CHECK(p.pps->slice_group_id == std::vector<uint8_t>{0, 1, 2, 2, 1, 0});
+    CHECK(p.pps->slice_group_id.size() == p.pps->pic_size_in_map_units_minus1 + 1);
+    CHECK_FALSE(p.pps->has_tail);
+    CHECK_FALSE(p.pps->transform_8x8_mode_flag);
+    CHECK(p.pps->second_chroma_qp_index_offset == 0);
+    const auto* id5 = find_node(p.tree.root(), "slice_group_id", 5);
+    REQUIRE(id5 != nullptr);
+    CHECK(id5->descriptor == "u(v)");
+    CHECK(id5->span.bit_length == 2);
+    const auto* mt = find_node(p.tree.root(), "slice_group_map_type");
+    REQUIRE(mt != nullptr);
+    CHECK(mt->enum_name == "explicit");
+    CHECK(find_node(p.tree.root(), "transform_8x8_mode_flag") != nullptr);  // inferred, as derived text
+    CHECK(diag_codes(p.tree.root()).empty());
+  }
+  SECTION("type 6 against an SPS whose PicSizeInMapUnits differs is a Diagnostic, not an error") {
+    const auto sps = parse_nal(from_hex(kGop60Sps));
+    SpsTable table;
+    table.entries[0] = &*sps.sps;
+    const auto p = parse_nal(fmo_pps(1, 6, {3, 0, 1, 1, 0}), table);
+    REQUIRE_FALSE(p.error.has_value());
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->slice_group_id.size() == 4);
+    const auto codes = diag_codes(p.tree.root());
+    CHECK(std::ranges::count(codes, "SYN-H264-0002") == 1);
+  }
+  SECTION("type 0 interleaved: one run_length_minus1 per slice group") {
+    const auto p = parse_nal(fmo_pps(3, 0, {10, 20, 30, 40}));
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->run_length_minus1 == std::vector<uint32_t>{10, 20, 30, 40});
+  }
+  SECTION("type 2 foreground: num_slice_groups_minus1 rectangles") {
+    const auto p = parse_nal(fmo_pps(2, 2, {1, 7, 9, 15}));
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->top_left == std::vector<uint32_t>{1, 9});
+    CHECK(p.pps->bottom_right == std::vector<uint32_t>{7, 15});
+  }
+  SECTION("types 3..5: change direction and rate") {
+    const uint32_t t = GENERATE(3U, 4U, 5U);
+    const auto p = parse_nal(fmo_pps(1, t, {4}, true));
+    REQUIRE(p.pps.has_value());
+    CHECK(p.pps->slice_group_change_direction_flag);
+    CHECK(p.pps->slice_group_change_rate_minus1 == 4);
+    CHECK(p.pps->SliceGroupChangeRate == 5);
+  }
+  SECTION("num_slice_groups_minus1 > 7 throws before the loop (SYN-H264-0002)") {
+    const auto p = parse_nal(fmo_pps(8, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}));
+    REQUIRE(p.error.has_value());
+    CHECK(p.error->code == "SYN-H264-0002");
+    CHECK_FALSE(p.pps.has_value());
+    CHECK(find_node(p.tree.root(), "num_slice_groups_minus1") != nullptr);  // partial tree kept
+    CHECK(find_node(p.tree.root(), "slice_group_map_type") == nullptr);
+  }
+}
+
 TEST_CASE("h264_sps_range_errors", "[syntax][h264][fast]") {
   auto sps_with_id = [](uint32_t id) {
     BitWriter w;
@@ -599,7 +864,7 @@ TEST_CASE("h264_sps_range_errors", "[syntax][h264][fast]") {
     const auto tree = b.finish();
     CHECK(find_node(tree.root(), "cpb_cnt_minus1") != nullptr);
   }
-  SECTION("delta_scale below -128 (fuzz regression ubsan_scaling_delta_max)") {
+  SECTION("delta_scale at the se(v) extreme (fuzz regression ubsan_scaling_delta_max)") {
     // High profile SPS whose first scaling list starts with delta_scale at the se(v) extreme; before the #388 bound
     // the nextScale arithmetic overflowed int32.
     const auto p = parse_nal(from_hex("6764001fad8000000300fffffffefffe02d0589c80"));
@@ -756,43 +1021,66 @@ TEST_CASE("h264_nal_header_extensions", "[syntax][h264][fast]") {
 }
 
 TEST_CASE("h264_ps_deterministic_and_non_recording", "[syntax][h264][fast]") {
-  const auto fixture = GENERATE(kGop60Sps, k444Sps, kIntSps, kCqmSps);
-  const auto a = parse_nal(from_hex(fixture));
-  const auto b = parse_nal(from_hex(fixture));
+  const auto fixture = GENERATE(kGop60Sps, k444Sps, kIntSps, kCqmSps, kCqmPps);
+  // The PPS fixture needs its SPS: without it the provisional-parse Warning would (rightly) create a tree.
+  const auto sps_for_pps = parse_nal(from_hex(kCqmSps));
+  SpsTable table;
+  table.entries[0] = &*sps_for_pps.sps;
+  const auto a = parse_nal(from_hex(fixture), table);
+  const auto b = parse_nal(from_hex(fixture), table);
   REQUIRE_FALSE(a.error.has_value());
   CHECK(a.tree.to_flatbuffer() == b.tree.to_flatbuffer());
   CHECK(ovt::syntax::to_json(a.tree) == ovt::syntax::to_json(b.tree));
-  const auto quiet = parse_nal(from_hex(fixture), /*recording=*/false);
+  const auto quiet = parse_nal(from_hex(fixture), table, /*recording=*/false);
   REQUIRE_FALSE(quiet.error.has_value());
   CHECK(quiet.tree.empty());
-  REQUIRE(quiet.sps.has_value());
-  CHECK(quiet.sps->profile_idc == a.sps->profile_idc);
-  CHECK(quiet.sps->crop_width == a.sps->crop_width);
-  CHECK(quiet.sps->MaxDpbFrames == a.sps->MaxDpbFrames);
-  CHECK(quiet.sps->span.bit_length == a.sps->span.bit_length);
+  if (a.sps) {
+    REQUIRE(quiet.sps.has_value());
+    CHECK(quiet.sps->profile_idc == a.sps->profile_idc);
+    CHECK(quiet.sps->crop_width == a.sps->crop_width);
+    CHECK(quiet.sps->MaxDpbFrames == a.sps->MaxDpbFrames);
+    CHECK(quiet.sps->span.bit_length == a.sps->span.bit_length);
+  } else {
+    REQUIRE(quiet.pps.has_value());
+    CHECK(quiet.pps->second_chroma_qp_index_offset == a.pps->second_chroma_qp_index_offset);
+    CHECK(quiet.pps->scaling_list[0].list == a.pps->scaling_list[0].list);
+  }
 }
 
 // ---- corpus-backed acceptance tests (skipped when the corpus cache lacks the stream) ------------------------
 
 namespace {
 
-std::vector<uint8_t> first_sps(std::string_view corpus_id) {
+struct FirstParameterSets {
+  std::vector<uint8_t> sps;
+  std::vector<uint8_t> pps;
+};
+
+FirstParameterSets first_parameter_sets(std::string_view corpus_id) {
   const auto path = ovt::test::corpus_or_skip(corpus_id);
   const auto file = ovt::io::RandomAccessFile::open(path.string());
-  std::vector<uint8_t> sps;
+  FirstParameterSets out;
   ovt::syntax::scan_annexb(*file, [&](const ovt::syntax::ScannedUnit& u) {
-    if (!u.bytes.empty() && (u.bytes[0] & 0x1FU) == 7 && sps.empty()) {
-      sps.assign(u.bytes.begin(), u.bytes.end());
+    if (u.bytes.empty()) {
+      return;
+    }
+    const unsigned type = u.bytes[0] & 0x1FU;
+    if (type == 7 && out.sps.empty()) {
+      out.sps.assign(u.bytes.begin(), u.bytes.end());
+    } else if (type == 8 && out.pps.empty()) {
+      out.pps.assign(u.bytes.begin(), u.bytes.end());
     }
   });
-  REQUIRE_FALSE(sps.empty());
-  return sps;
+  REQUIRE_FALSE(out.sps.empty());
+  REQUIRE_FALSE(out.pps.empty());
+  return out;
 }
 
 }  // namespace
 
 TEST_CASE("h264_sps_unit_corpus_gop60", "[syntax][h264][fast][needs-corpus]") {
-  const auto p = parse_nal(first_sps("syn_h264_gop60_1080p"));
+  const auto ps = first_parameter_sets("syn_h264_gop60_1080p");
+  const auto p = parse_nal(ps.sps);
   REQUIRE_FALSE(p.error.has_value());
   REQUIRE(p.sps.has_value());
   CHECK(p.sps->profile_idc == 100);
@@ -805,4 +1093,39 @@ TEST_CASE("h264_sps_unit_corpus_gop60", "[syntax][h264][fast][needs-corpus]") {
   const auto* id = find_node(p.tree.root(), "seq_parameter_set_id");
   REQUIRE(id != nullptr);
   CHECK(id->span.bit_offset == 32);
+}
+
+// Acceptance test 2: CAPAMA3_Sand_F uses FMO map type 6.
+TEST_CASE("h264_pps_corpus_capama3_fmo", "[syntax][h264][fast][needs-corpus]") {
+  const auto ps = first_parameter_sets("jvt_CAPAMA3_Sand_F");
+  const auto sps = parse_nal(ps.sps);
+  REQUIRE(sps.sps.has_value());
+  SpsTable table;
+  table.entries.at(sps.sps->seq_parameter_set_id) = &*sps.sps;
+  const auto p = parse_nal(ps.pps, table);
+  REQUIRE_FALSE(p.error.has_value());
+  REQUIRE(p.pps.has_value());
+  CHECK(p.pps->slice_group_map_type == 6);
+  CHECK(p.pps->slice_group_id.size() == p.pps->pic_size_in_map_units_minus1 + 1);
+  CHECK(p.pps->slice_group_id.size() == sps.sps->PicSizeInMapUnits);
+}
+
+// Acceptance test 3: HPCV_BRCM_A (High, 8x8 transform) has transform_8x8_mode_flag = 1 and reads 8 scaling lists
+// when pic_scaling_matrix_present_flag is set.
+TEST_CASE("h264_pps_corpus_hpcv_8x8", "[syntax][h264][fast][needs-corpus]") {
+  const auto ps = first_parameter_sets("jvt_HPCV_BRCM_A");
+  const auto sps = parse_nal(ps.sps);
+  REQUIRE(sps.sps.has_value());
+  CHECK(sps.sps->profile_idc == 100);
+  SpsTable table;
+  table.entries.at(sps.sps->seq_parameter_set_id) = &*sps.sps;
+  const auto p = parse_nal(ps.pps, table);
+  REQUIRE_FALSE(p.error.has_value());
+  REQUIRE(p.pps.has_value());
+  CHECK(p.pps->has_tail);
+  CHECK(p.pps->transform_8x8_mode_flag);
+  if (p.pps->pic_scaling_matrix_present_flag) {
+    CHECK(p.pps->num_scaling_lists == 8);
+  }
+  CHECK(diag_codes(p.tree.root()).empty());
 }
