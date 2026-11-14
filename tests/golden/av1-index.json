@@ -633,11 +633,6 @@
  "max_bytes": 2000000,
  "max_raw_bytes": 40000000,
  "skipped_entries": {
-  "aom_av1_1_b8_16_intra_only": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "aom_av1c_vs_00": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "aom_av1c_vs_01": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "aom_av1c_vs_02": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "aom_av1c_vs_03": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
   "syn_av1_10min_1080p": "local_only perf stream: not generated in CI",
   "syn_av1_4k_2min": "local_only perf stream: not generated in CI"
  }
