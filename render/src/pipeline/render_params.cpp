@@ -151,6 +151,12 @@ void RenderParamSet::build(const ViewState& view, DisplayTarget::OutputEncoding 
   // §10.3.2 target frame.
   target.repr = pl_color_repr_rgb;
   target.repr.bits.color_depth = target_color_depth(encoding);
+  // libplacebo infers sample_depth from the texture only for UNORM formats; left 0 on a float target,
+  // pl_color_repr_normalize defaults it to 8 and scales the output by (2^16 - 1) / (2^8 - 1) = 257. A float target
+  // holds normalised values directly, so sample and colour depth must match.
+  if (is_float_encoding(encoding)) {
+    target.repr.bits.sample_depth = target.repr.bits.color_depth;
+  }
   if (view.target_peak_override > 0.0F) {
     target.color.hdr.max_luma = view.target_peak_override;
   }

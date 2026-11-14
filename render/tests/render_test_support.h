@@ -79,6 +79,22 @@ struct OwnedPicture {
   }
 };
 
+// A 4:4:4 8-bit full-range sRGB ramp (matrix 0, planes G/B/R) of w x h <= 64 x 16 (WI-1.404 interop tests).
+inline OwnedPicture rgb_ramp(uint32_t w, uint32_t h) {
+  OwnedPicture p(w, h, 8, 3, 1);
+  p.pic.color.matrix = 0;
+  p.pic.color.full_range = 1;
+  p.pic.color.transfer = 13;  // sRGB
+  for (uint32_t y = 0; y < h; ++y) {
+    for (uint32_t x = 0; x < w; ++x) {
+      p.set(0, x, y, 40 + (x * 3));   // G
+      p.set(1, x, y, 30 + (y * 8));   // B
+      p.set(2, x, y, 230 - (x * 3));  // R
+    }
+  }
+  return p;
+}
+
 #if defined(__linux__)
 // Marks every loaded Vulkan ICD (libvulkan_<driver>.so) RTLD_NODELETE. Rendering makes lavapipe JIT shaders on its own
 // threads; when the loader unloads the ICD at vkDestroyInstance, LeakSanitizer can no longer see the ICD's (and
