@@ -220,7 +220,7 @@ jobs:
             --report build/linux-x64-release/license_gate_report.json || {
               status=$?
               # The text above names only the target; the report's messages name the library behind each finding.
-              python -I -c 'import json,sys; [print(f["code"], f["where"], f["license"], "|", f.get("message", "")) for f in json.load(open(sys.argv[1]))["findings"]]' \
+              python -I -c 'import json,sys; [print(f.get("code"), f.get("where"), f.get("license"), "|", f.get("message", "")) for f in json.load(open(sys.argv[1]))["findings"]]' \
                 build/linux-x64-release/license_gate_report.json
               exit $status
             }

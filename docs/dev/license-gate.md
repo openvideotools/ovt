@@ -34,6 +34,10 @@ input). Warnings (`W-*`) never change the exit code.
   the built tree, because a transitive vcpkg port can carry a licence `vcpkg.json` does not list. The report is
   uploaded as `license-gate-report-linux-x64`.
 
+A target whose manifest `directory` has a `tests` or `test` component is not shipped, so it needs no `[targets]`
+row: the gate still checks its own licence and its whole link graph (an LGPL test must not link GPL). Everything else
+needs a row, or it is `E-TARGET`.
+
 An unknown SPDX id is `E-UNKNOWN`; it fails the job and is never a warning.
 
 ## Corpora mode

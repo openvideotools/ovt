@@ -43,7 +43,7 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python -I` drops the script directory
 
@@ -511,6 +511,11 @@ def read_pip(path: Path, rep: Report, policy: dict, strict_or: bool) -> None:
         )
 
 
+def is_test_target(tgt: dict) -> bool:
+    """True for a target defined under a `tests` or `test` directory of the repository (manifest `directory`)."""
+    return bool({"tests", "test"} & set(PurePosixPath(tgt.get("directory", "")).parts))
+
+
 def vcpkg_file_ports(root: Path) -> dict[str, str]:
     """Installed file (relative to the directory that holds the triplet directories) -> vcpkg port, from the `.list`
     files vcpkg keeps in `<installed>/vcpkg/info/`."""
@@ -551,8 +556,11 @@ def read_manifest(path: Path, rep: Report, policy: dict, strict_or: bool, vcpkg_
     for tgt in data.get("targets", []):
         name, own = tgt["name"], tgt["spdx"]
         plugin = name.startswith("ovt_plugin_")
+        # SPEC-ASSUMPTION(#432): a target built under a `tests/` directory is not shipped, so it needs no [targets] row
+        # (§15.4.2 step 1 asks for one per target). Its own licence and its whole link graph are still checked.
         if name not in declared:
-            rep.add("E-TARGET", name, own, f"target {name} is not in policy [targets]")
+            if not is_test_target(tgt):
+                rep.add("E-TARGET", name, own, f"target {name} is not in policy [targets]")
         elif declared[name] != own:
             rep.add("E-TARGET", name, own, f"{name} is declared {own} but policy [targets] says {declared[name]}")
         allowed = class_allowed(own, policy, plugin)

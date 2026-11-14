@@ -696,3 +696,51 @@ def test_manifest_library_file_takes_the_licence_of_its_vcpkg_port(tmp_path: Pat
     assert code == 1 and codes(data) == ["E-UNKNOWN"]
     # without --vcpkg nothing resolves it
     assert run("--manifest", str(manifest(lib)), report=tmp_path / "novcpkg.json")[0] == 1
+
+
+def _target_manifest(tmp_path: Path, name: str, directory: str, own: str, link_spdx: str = "MIT") -> Path:
+    m = tmp_path / f"{name}.json"
+    m.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "preset": "x",
+                "options": {},
+                "targets": [
+                    {
+                        "name": name,
+                        "type": "EXECUTABLE",
+                        "spdx": own,
+                        "directory": directory,
+                        "links": [
+                            {
+                                "name": "libx",
+                                "source": "vcpkg",
+                                "version": "1",
+                                "spdx": link_spdx,
+                                "linkage": "static",
+                                "patched": False,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+    )
+    return m
+
+
+def test_test_targets_need_no_policy_row_but_are_still_link_checked(tmp_path: Path) -> None:
+    # WI-0.032 review: a target under tests/ is not shipped, so no [targets] row; a target elsewhere still needs one.
+    ok = _target_manifest(tmp_path, "ovt_tests_brand_new", "core/tests/brand_new/", "LGPL-2.1-or-later")
+    assert run("--manifest", str(ok), report=tmp_path / "a.json")[0] == 0
+    shipped = _target_manifest(tmp_path, "ovt_brand_new", "core/src/", "LGPL-2.1-or-later")
+    code, data, _ = run("--manifest", str(shipped), report=tmp_path / "b.json")
+    assert code == 1 and codes(data) == ["E-TARGET"]
+    # the link rules still apply to a test target: an LGPL test must not link a GPL library
+    bad = _target_manifest(tmp_path, "ovt_tests_gpl_link", "core/tests/x/", "LGPL-2.1-or-later", "GPL-3.0-only")
+    code, data, _ = run("--manifest", str(bad), report=tmp_path / "c.json")
+    assert code == 1 and "E-LINK" in codes(data)
+    # an own licence that is not allowed is still reported
+    odd = _target_manifest(tmp_path, "ovt_tests_odd", "core/tests/x/", "Frobnicate-1.0")
+    assert run("--manifest", str(odd), report=tmp_path / "d.json")[0] == 1

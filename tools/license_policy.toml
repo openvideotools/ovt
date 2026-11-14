@@ -82,37 +82,12 @@ ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
 
-# Test, fuzz-regression and helper targets of the release build tree (WI-0.032: the gate checks every target the
-# manifest lists, so each must be declared here with the licence its ovt_set_license call gives it).
+# Targets built under a `tests/` directory need no row here: the gate checks their own licence and link graph without one
+# (SPEC-ASSUMPTION(#432), WI-0.032). Rows are for what ships or is built outside such a directory:
 ovt_core_objects = "LGPL-2.1-or-later"
-ovt_core_tests = "LGPL-2.1-or-later"
-ovt_fuzz_bitreader_regress = "LGPL-2.1-or-later"
-ovt_fuzz_rbsp_regress = "LGPL-2.1-or-later"
-ovt_fuzz_unit_scan_regress = "LGPL-2.1-or-later"
-ovt_fuzz_user_data_regress = "LGPL-2.1-or-later"
-ovt_golden_box_tree = "LGPL-2.1-or-later"
-ovt_golden_run = "LGPL-2.1-or-later"
-ovt_test_support = "LGPL-2.1-or-later"
-ovt_tests_app_models = "GPL-3.0-or-later"
-ovt_tests_app_qml = "GPL-3.0-or-later"
-ovt_tests_bitreader = "LGPL-2.1-or-later"
-ovt_tests_cli = "GPL-3.0-or-later"
-ovt_tests_dav1d_probe = "LGPL-2.1-or-later"
-ovt_tests_io = "LGPL-2.1-or-later"
-ovt_tests_jobs = "LGPL-2.1-or-later"
-ovt_tests_log = "LGPL-2.1-or-later"
-ovt_tests_model = "LGPL-2.1-or-later"
-ovt_tests_model_c_api = "LGPL-2.1-or-later"
-ovt_tests_placebo_probe = "LGPL-2.1-or-later"
-ovt_tests_result = "LGPL-2.1-or-later"
-ovt_tests_schema_smoke = "LGPL-2.1-or-later"
-ovt_tests_syntax_unit_scan = "LGPL-2.1-or-later"
-ovt_tests_syntax_user_data = "LGPL-2.1-or-later"
-ovt_tests_version = "LGPL-2.1-or-later"
-ovt_tests_vmaf_probe = "LGPL-2.1-or-later"
-test_container_schema = "LGPL-2.1-or-later"
-test_metrics_schema = "LGPL-2.1-or-later"
-test_model_schema = "LGPL-2.1-or-later"
+ovt_gen_completions = "GPL-3.0-or-later"
+ovt_tests_cli = "GPL-3.0-or-later"       # defined in cli/CMakeLists.txt, outside a tests/ directory
+ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level directory
 
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
