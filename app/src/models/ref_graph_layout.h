@@ -27,9 +27,10 @@ enum class RefAxis : std::uint8_t { Decode, Display };
 // The window is `columns` columns of the x axis starting at `first_column` (§11.3.11: ±64 frames).
 inline constexpr int kRefGraphHalfWindow = 64;
 
-// HEVC allows temporal ids 0..6 (and AV1 up to 7 layers). `temporal_id` is a byte read from the stream, so a hostile
-// one can be up to 255: rows are clamped to this so the geometry stays bounded. RefNode::temporal_id keeps the value.
-inline constexpr int kMaxTemporalRow = 6;
+// Temporal ids are 3 bits in AV1 and H.264 SVC (0..7) and 0..6 in HEVC. `temporal_id` is a byte read from the stream,
+// so a hostile one can be up to 255: rows are clamped to the largest valid id so the geometry stays bounded.
+// RefNode::temporal_id keeps the stream value.
+inline constexpr int kMaxTemporalRow = 7;
 
 struct RefGraphParams {
   RefRowMode mode = RefRowMode::TemporalLayers;
