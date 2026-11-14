@@ -148,6 +148,9 @@ void read_long_header(Section& s) {
 
 // Interprets the body of a section whose CRC is good; sets `decoded`.
 void decode_section(Section& s) {
+  if (!s.syntax_indicator) {  // PAT, PMT and CAT are long-form sections with a CRC_32; nothing to read otherwise
+    return;
+  }
   const size_t end = s.bytes.size() - kCrcBytes;
   if (s.table_id == 0x00) {
     s.decoded = decode_pat(s, end);

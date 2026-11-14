@@ -421,3 +421,25 @@ TEST_CASE("corpus: tsduck-test PMT lists the program streams that ffprobe report
   CHECK(p.streams[5].stream_type == 0x06);
   CHECK(p.streams[5].pid == 0x42C);
 }
+
+TEST_CASE("psi: a short-form section on a PSI PID is malformed, not decoded", "[container][mpegts][psi][fast]") {
+  // section_syntax_indicator 0 with table_id 0x00 / 0x02 / 0x01 and 1..5 body bytes: no CRC_32 to subtract.
+  for (const uint8_t table_id : {uint8_t{0x00}, uint8_t{0x02}, uint8_t{0x01}}) {
+    for (uint8_t len = 0; len <= 5; ++len) {
+      uint8_t cc0 = 0;
+      uint8_t cc1 = 0;
+      Bytes data;
+      append(data, packetize(0, section(0x00, 7, 0, pat_body({{1, 0x100}})), cc0));
+      Bytes sec{table_id, 0x30, len};
+      sec.resize(3 + len, 0x55);
+      append(data, packetize(table_id == 0x01 ? 1 : (table_id == 0x00 ? 0 : 0x100), sec, table_id == 0x00 ? cc0 : cc1));
+      uint8_t cc2 = 0;
+      append(data, filler(0x101, 2, cc2));
+      const auto f = parse_bytes(data);
+      REQUIRE(f);
+      for (const auto& s : f->psi.sections) {
+        CHECK((s.syntax_indicator || !s.decoded));
+      }
+    }
+  }
+}
