@@ -5,9 +5,10 @@
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
-// dithering (WI-1.403), interop (WI-1.404), compare modes, overlays, measurements and export arrive with their own work
-// items; until then those entry points are inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface
-// of a platform NativeOutput (src/platform/), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1.
+// dithering (WI-1.403), interop (WI-1.404), compare modes, overlays, measurements (WI-4.452, render/src/measure/) and
+// export arrive with their own work items; until then those entry points are inert. WI-1.406 adds NATIVE targets: a
+// libplacebo swapchain on the surface of a platform NativeOutput (src/platform/), retarget() EMBEDDED <-> NATIVE and
+// the headroom poll of §10.4.1.
 
 #include <algorithm>
 #include <array>
@@ -27,6 +28,7 @@
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/overlay_set_impl.h"
+#include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
@@ -149,6 +151,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+
+    // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
+    static_cast<void>(measurer_.init(log_, vk_->gpu));
 
     target_ = target;
     if (native_ != nullptr) {
@@ -280,6 +285,11 @@ class VideoSurfaceImpl final : public VideoSurface {
       target.color = detail::target_color(target_, active_);
       draw_slot_a(view, target, target_.kind == DisplayTarget::Kind::OffscreenTexture);
     }
+    // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
+    // being called.
+    if (measurer_.due()) {
+      measurer_.run(slot_a_);
+    }
     pl_gpu_flush(vk_->gpu);
   }
 
@@ -298,7 +308,10 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
-  Measurements measure() override { return Measurements{}; }                         // §10.7.9
+  Measurements measure() override {                                                  // §10.7.9: never blocks
+    measurer_.request();
+    return measurer_.poll();
+  }
 
   bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
     error_ = "export_png is not implemented yet (chapter 10 §10.8)";
@@ -387,6 +400,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     if (slot_a_.valid) {
       draw_slot_a(view, target, false);
+    }
+    if (measurer_.due()) {  // §10.7.9, as in render()
+      measurer_.run(slot_a_);
     }
     if (!pl_swapchain_submit_frame(sw_)) {
       error_ = "RND-0002 renderer init failed: render: pl_swapchain_submit_frame failed";
@@ -599,6 +615,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    measurer_.destroy();
     if (vk_ != nullptr) {
       detail::destroy_slot(vk_->gpu, slot_a_);
       pl_tex_destroy(vk_->gpu, &tex_);
@@ -624,6 +641,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
+  detail::Measurer measurer_;  // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;

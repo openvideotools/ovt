@@ -243,10 +243,19 @@ class Walker {
         break;
       }
     }
+    uint64_t scrambled_elsewhere = 0;
     for (const PidStats& st : stats_) {
       if (st.packets > 0) {
         f_.pids.push_back(st);
       }
+      if (st.pid != kPatPid && st.pid != kCatPid) {
+        scrambled_elsewhere += st.scrambled_packets;
+      }
+    }
+    psi_.finish([this](uint16_t pid) { return stats_[pid].packets; }, scrambled_elsewhere);
+    f_.psi = std::move(psi_.tables());
+    for (const PsiDiagnostic& d : f_.psi.diagnostics) {  // the PSI diagnostics join the file list (same cap)
+      add_diag(f_, d.code, d.message, d.offset);
     }
   }
 
@@ -258,6 +267,7 @@ class Walker {
   uint64_t size_;
   std::vector<PidStats> stats_;
   std::vector<CcState> cc_;
+  PsiParser psi_;
   uint64_t pos_;        // file offset of the next sync byte slot
   uint64_t last_good_;  // sync offset of the last packet taken
   bool in_run_ = false;
@@ -289,6 +299,11 @@ class Walker {
     }
     ++f_.runs.back().count;
     account(*h);
+    if (psi_.wants(h->pid) && h->has_payload() && !h->transport_error_indicator) {
+      psi_.feed(h->pid, h->payload_unit_start_indicator, h->transport_scrambling_control != 0,
+                std::span<const uint8_t>(buf).subspan(h->payload_offset, h->payload_size), f_.packet_count,
+                pos_ + h->payload_offset);
+    }
     ++f_.packet_count;
     last_good_ = pos_;
     pos_ += stride_;
@@ -338,6 +353,7 @@ class Walker {
                pos_);
       c.last = h.continuity_counter;
       c.dup_used = false;
+      psi_.discontinuity(h.pid);  // a section that was being collected is incomplete
     }
   }
 

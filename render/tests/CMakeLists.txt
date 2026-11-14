@@ -59,6 +59,9 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
 
+# WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
+target_sources(ovt_tests_render PRIVATE test_measure.cpp)
+
 # WI-1.406: NATIVE targets (§10.4.1): encoding choice, CAMetalLayer table, headroom rule, and the swapchain path on a
 # headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
 # CAMetalLayer through MoltenVK.
