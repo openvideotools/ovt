@@ -444,8 +444,8 @@ TEST_CASE("av1_tile_info_uniform_720p_sb128", "[syntax][av1][fast]") {
   w.put(1, 1).put(1, 1).put(1, 1).put(0, 1).put(1, 1).put(0, 1).put(6, 3).put(1, 2).trailing();
   TileInfo t;
   uint64_t bits = 0;
-  const SyntaxNodeBuffer tree = with_tree(
-      w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { t = parse_tile_info(br, b, seq, 320, 180); }, &bits);
+  const SyntaxNodeBuffer tree =
+      with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { t = parse_tile_info(br, b, seq, 320, 180); }, &bits);
   CHECK(bits == 11);
   CHECK(t.uniform_tile_spacing_flag);
   CHECK(t.sbCols == 10);
@@ -505,8 +505,8 @@ TEST_CASE("av1_tile_info_explicit_spacing_720p_sb128", "[syntax][av1][fast]") {
   w.put(0, 1).ns(1, 10).ns(4, 8).ns(2, 3).ns(5, 6).put(2, 2).put(3, 2).trailing();
   TileInfo t;
   uint64_t bits = 0;
-  const SyntaxNodeBuffer tree = with_tree(
-      w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { t = parse_tile_info(br, b, seq, 320, 180); }, &bits);
+  const SyntaxNodeBuffer tree =
+      with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { t = parse_tile_info(br, b, seq, 320, 180); }, &bits);
   // 1 + ns(10) 3 bits + ns(8) 3 bits + ns(3) 2 bits + ns(6) 3 bits + 2 + 2.
   CHECK(bits == 16);
   CHECK_FALSE(t.uniform_tile_spacing_flag);
@@ -611,8 +611,7 @@ TEST_CASE("av1_tile_info_recording_off_returns_same_values", "[syntax][av1][fast
   TileInfo off;
   (void)with_tree(w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { on = parse_tile_info(br, b, seq, 320, 180); });
   (void)with_tree(
-      w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { off = parse_tile_info(br, b, seq, 320, 180); }, nullptr,
-      false);
+      w.bytes(), [&](BitReader& br, SyntaxBuilder& b) { off = parse_tile_info(br, b, seq, 320, 180); }, nullptr, false);
   CHECK(on.MiColStarts == off.MiColStarts);
   CHECK(on.MiRowStarts == off.MiRowStarts);
   CHECK(on.NumTiles == off.NumTiles);

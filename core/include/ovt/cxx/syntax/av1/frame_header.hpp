@@ -140,7 +140,7 @@ struct TileInfo {
   // Derived tile counts
   uint32_t TileCols = 0;
   uint32_t TileRows = 0;
-  uint32_t NumTiles = 0;  // TileCols * TileRows
+  uint32_t NumTiles = 0;                // TileCols * TileRows
   uint32_t context_update_tile_id = 0;  // f(TileRowsLog2 + TileColsLog2), or 0
   uint8_t TileColsLog2 = 0;
   uint8_t TileRowsLog2 = 0;

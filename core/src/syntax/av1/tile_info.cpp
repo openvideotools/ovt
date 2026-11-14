@@ -170,10 +170,10 @@ TileInfo parse_tile_info(BitReader& br, SyntaxBuilder& b, const SequenceHeader& 
   t.maxLog2TileCols = tile_log2(1, std::min(t.sbCols, kMaxTileCols));
   t.maxLog2TileRows = tile_log2(1, std::min(t.sbRows, kMaxTileRows));
   t.minLog2Tiles = std::max(t.minLog2TileCols, tile_log2(maxTileAreaSb, t.sbRows * t.sbCols));
-  b.derived("superblocks", fmt::format("sbCols = {}, sbRows = {}, minLog2TileCols = {}, maxLog2TileCols = {}, "
-                                       "maxLog2TileRows = {}, minLog2Tiles = {}",
-                                       t.sbCols, t.sbRows, t.minLog2TileCols, t.maxLog2TileCols, t.maxLog2TileRows,
-                                       t.minLog2Tiles));
+  b.derived("superblocks",
+            fmt::format("sbCols = {}, sbRows = {}, minLog2TileCols = {}, maxLog2TileCols = {}, "
+                        "maxLog2TileRows = {}, minLog2Tiles = {}",
+                        t.sbCols, t.sbRows, t.minLog2TileCols, t.maxLog2TileCols, t.maxLog2TileRows, t.minLog2Tiles));
 
   t.uniform_tile_spacing_flag = b.read_flag("uniform_tile_spacing_flag");
   if (t.uniform_tile_spacing_flag) {
