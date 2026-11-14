@@ -74,10 +74,14 @@ struct Instance {
     REQUIRE(out.data != nullptr);
     return decode_score(out);
   }
-  [[nodiscard]] Scored finish() const {
+  // finish() output: the sequence values, and whether the score carries a per-frame record (it must not).
+  [[nodiscard]] Scored finish(bool* has_frame = nullptr) const {
     ovt_Buffer out{};
     REQUIRE(api->finish(m, &out) == OVT_OK);
     REQUIRE(out.data != nullptr);
+    if (has_frame != nullptr) {
+      *has_frame = flatbuffers::GetRoot<ovt::fb::FrameScore>(out.data)->frame() != nullptr;
+    }
     return decode_score(out);
   }
 };
@@ -130,8 +134,9 @@ TEST_CASE("identity of an identical pair is 1, the sequence verdict is 1", "[met
       REQUIRE(s.values.size() == 4);
       CHECK(s.values == std::vector<double>{1.0, 1.0, 1.0, 1.0});
     }
-    const Scored fin = inst.finish();
-    CHECK(!fin.has_frame);
+    bool has_frame = true;
+    const Scored fin = inst.finish(&has_frame);
+    CHECK(!has_frame);
     CHECK(fin.values == std::vector<double>{3.0, 3.0, 1.0});
     CHECK(diag.diag.entries.empty());
   }
@@ -144,7 +149,7 @@ TEST_CASE("identity counts differing samples and reports the first one once", "[
   Instance inst;
   // Frame 0 is identical; frame 1 differs in one U sample and (later in raster order) two Y samples; frame 2 in Y.
   Pic d(40, 30, 1, 8, 2);
-  d.copy_from(r);
+  d.buf = r.buf;
   CHECK(inst.score(r, d, 0).values == std::vector<double>{1.0, 1.0, 1.0, 1.0});
   d.set(1, 7, 3, r.get(1, 7, 3) ^ 1U);
   d.set(0, 30, 20, r.get(0, 30, 20) + 1U);
@@ -165,7 +170,7 @@ TEST_CASE("identity counts differing samples and reports the first one once", "[
   CHECK(diag.diag.entries[0].message == "first differing sample: frame 1, plane 0, (30,20): ref " +
                                             std::to_string(r.get(0, 30, 20)) + " dist " +
                                             std::to_string(r.get(0, 30, 20) + 1U));
-  d.copy_from(r);
+  d.buf = r.buf;
   d.set(0, 0, 0, r.get(0, 0, 0) + 1U);
   (void)inst.score(r, d, 2);
   CHECK(diag.diag.entries.size() == 1);  // reported once per instance
@@ -178,7 +183,7 @@ TEST_CASE("identity reports 10-bit samples and a flip in the high byte", "[metri
   Pic r(33, 17, 3, 10);
   ovt::test::fill_synth(r, 0, false);
   Pic d(33, 17, 3, 10);
-  d.copy_from(r);
+  d.buf = r.buf;
   d.set(2, 32, 16, r.get(2, 32, 16) ^ 0x100U);
   Instance inst;
   const Scored s = inst.score(r, d, 9);
@@ -211,7 +216,7 @@ TEST_CASE("identity maps hold the fraction identical per block", "[metrics][iden
   Pic r(20, 12, 1, 8);
   ovt::test::fill_synth(r, 0, false);
   Pic d(20, 12, 1, 8);
-  d.copy_from(r);
+  d.buf = r.buf;
   d.set(0, 1, 1, r.get(0, 1, 1) + 1U);    // block (0, 0) of 8 x 8: 63 / 64
   d.set(0, 17, 9, r.get(0, 17, 9) + 1U);  // block (2, 1), an edge block of 4 x 4 samples: 15 / 16
   Instance inst(R"({"map_block":8})");
@@ -320,9 +325,9 @@ TEST_CASE("identity 1080p single-thread throughput", "[.][bench][metrics][identi
   Pic r(1920, 1080, 1, 8);
   ovt::test::fill_synth(r, 0, false);
   Pic same(1920, 1080, 1, 8);
-  same.copy_from(r);
+  same.buf = r.buf;
   Pic differ(1920, 1080, 1, 8);
-  differ.copy_from(r);
+  differ.buf = r.buf;
   differ.set(0, 1900, 1070, r.get(0, 1900, 1070) + 1U);
   for (const auto& [name, dist] :
        {std::pair<const char*, const Pic*>{"identical", &same}, {"one sample off", &differ}}) {

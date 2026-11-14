@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Picture and score helpers of the ssim_x264 and identity tests (WI-3.308): a planar picture in the layout of
-// ovt_MetricPlanes, the FrameScore decoder, a MapSink that keeps the blobs, and the deterministic synthetic planes of
-// tests/oracles/run_x264_ssim.py (`synth_plane` mirrors `synth_luma` of run_libvmaf_ssim.py sample for sample).
+// Picture and score helpers of the ssim_x264 tests (WI-3.308a; WI-3.308b reuses them): a planar picture in the layout
+// of ovt_MetricPlanes, the FrameScore decoder, a MapSink that keeps the blobs, and the deterministic synthetic planes
+// of tests/oracles/run_x264_ssim.py (`synth_plane` mirrors `synth_luma` of run_libvmaf_ssim.py sample for sample).
 
 #ifndef OVT_TESTS_METRICS_METRICS_TEST_PIC_H
 #define OVT_TESTS_METRICS_METRICS_TEST_PIC_H
@@ -62,16 +62,10 @@ struct Pic {
                ? (static_cast<uint32_t>(buf[p][off]) | (static_cast<uint32_t>(buf[p][off + 1]) << 8U))
                : buf[p][off];
   }
-  void copy_from(const Pic& o) {
-    for (size_t p = 0; p < planes.planes; ++p) {
-      buf[p] = o.buf[p];
-    }
-  }
 };
 
 struct Scored {
   std::vector<double> values;
-  bool has_frame = false;
   std::string map_blob_id;
   uint16_t map_block_size = 0;
 };
@@ -82,7 +76,6 @@ inline Scored decode_score(const ovt_Buffer& b) {
   if (fs->values() != nullptr) {
     s.values.assign(fs->values()->begin(), fs->values()->end());
   }
-  s.has_frame = fs->frame() != nullptr;
   if (fs->map_blob_id() != nullptr) {
     s.map_blob_id = fs->map_blob_id()->str();
   }
