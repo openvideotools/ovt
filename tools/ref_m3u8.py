@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
-"""Reference parse of an HLS master or media playlist (chapter 8 WI-4.209).
+"""Reference parse of an HLS playlist (chapter 8 WI-4.209) with the `m3u8` PyPI package (m3u8==6.0.0).
 
-Uses the `m3u8` PyPI package (pip install m3u8==6.0.0) for the line and attribute parsing, then does the
-arithmetic the package leaves to the player: absolute URIs, byte-range offsets that continue from the previous
-segment (RFC 8216 §4.3.2.2), running start times in microseconds, media sequence numbers and the init segments of
-#EXT-X-MAP. It produces the expected JSON of core/tests/data/hls/*.expected.json that core/tests/container/
-m3u8_test.cpp compares against.
+The package does the line and attribute parsing; this script adds the arithmetic it leaves to players: absolute URIs,
+byte-range offsets continuing from the previous segment (RFC 8216 §4.3.2.2), start times in microseconds, media
+sequence numbers, #EXT-X-MAP init segments and variants in file order. Output is core/tests/data/hls/*.expected.json.
 
 Usage: tools/ref_m3u8.py <playlist.m3u8> --url <playlist url>   (JSON on stdout)
 """
@@ -46,9 +44,21 @@ def variant_json(playlist, is_iframe, base):
     }
 
 
-def master_json(playlist, base):
-    variants = [variant_json(p, False, base) for p in playlist.playlists]
-    variants += [variant_json(p, True, base) for p in playlist.iframe_playlists]
+def file_order(text):
+    """One bool per variant tag in file order: True for #EXT-X-I-FRAME-STREAM-INF."""
+    return [
+        line.startswith("#EXT-X-I-FRAME-STREAM-INF")
+        for line in text.splitlines()
+        if line.startswith(("#EXT-X-STREAM-INF", "#EXT-X-I-FRAME-STREAM-INF"))
+    ]
+
+
+def master_json(playlist, base, text):
+    streams = iter(playlist.playlists)
+    iframes = iter(playlist.iframe_playlists)
+    variants = []
+    for kind in file_order(text):  # the package groups the two lists; the file interleaves them
+        variants.append(variant_json(next(iframes), True, base) if kind else variant_json(next(streams), False, base))
     renditions = [
         {
             "type": m.type,
@@ -130,7 +140,7 @@ def main():
         text = f.read()
     playlist = m3u8.loads(text)
     base = args.url
-    result = master_json(playlist, base) if playlist.is_variant else media_json(playlist, base)
+    result = master_json(playlist, base, text) if playlist.is_variant else media_json(playlist, base)
     json.dump(result, sys.stdout, indent=1, sort_keys=True)
     sys.stdout.write("\n")
 

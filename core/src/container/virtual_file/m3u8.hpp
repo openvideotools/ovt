@@ -1,13 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The HLS M3U8 parser (chapter 08 §8.6.7 / §8.10, WI-4.209). parse() turns the text of a master or media playlist
-// (RFC 8216 plus the Apple extensions CODECS, SUPPLEMENTAL-CODECS and VIDEO-RANGE) into variants, renditions or a
-// segment list, and write_manifest() serialises that into the `Manifest` table of ovt_container.fbs with
-// kind "hls-m3u8". Nothing is fetched and nothing is decrypted.
-// SPEC-ASSUMPTION(#416): the CNT-HLS-nnnn diagnostic family; times are microseconds (timescale 1000000), start_time
-// is the running sum of the preceding #EXTINF durations; one period, one adaptation set per media type; #EXT-X-MAP
-// is an is_init segment inserted where the map changes.
+// The HLS M3U8 parser (chapter 08 §8.10, WI-4.209): master and media playlists (RFC 8216 plus Apple CODECS,
+// SUPPLEMENTAL-CODECS, VIDEO-RANGE) into variants, renditions or a segment list, serialised into the `Manifest`
+// table with kind "hls-m3u8". Nothing is fetched or decrypted.
+// SPEC-ASSUMPTION(#416): CNT-HLS-nnnn diagnostics; times in microseconds (timescale 1000000), start_time the running
+// sum of #EXTINF; one period, one adaptation set per media type; #EXT-X-MAP is an is_init segment where it changes.
 
 #ifndef OVT_CONTAINER_VIRTUAL_FILE_M3U8_HPP
 #define OVT_CONTAINER_VIRTUAL_FILE_M3U8_HPP

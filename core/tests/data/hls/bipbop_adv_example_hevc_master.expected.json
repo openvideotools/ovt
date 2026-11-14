@@ -49,6 +49,17 @@
  ],
  "variants": [
   {
+   "average_bandwidth": 0,
+   "bandwidth": 186522,
+   "codecs": "hvc1.2.4.L93.B0",
+   "frame_rate": 0.0,
+   "height": 540,
+   "is_iframe": true,
+   "uri": "https://example.invalid/hls/v5/iframe_index.m3u8",
+   "video_range": "SDR",
+   "width": 960
+  },
+  {
    "average_bandwidth": 2168183,
    "bandwidth": 2177116,
    "codecs": "hvc1.2.4.L93.B0,mp4a.40.2",
@@ -80,6 +91,17 @@
    "uri": "https://example.invalid/hls/v7/prog_index.m3u8",
    "video_range": "SDR",
    "width": 1920
+  },
+  {
+   "average_bandwidth": 0,
+   "bandwidth": 842117,
+   "codecs": "hvc1.2.4.L150.B0",
+   "frame_rate": 0.0,
+   "height": 2160,
+   "is_iframe": true,
+   "uri": "https://example.invalid/hls/v8/iframe_index.m3u8",
+   "video_range": "PQ",
+   "width": 3840
   },
   {
    "average_bandwidth": 8541022,
@@ -124,28 +146,6 @@
    "uri": "https://example.invalid/hls/a1/prog_index.m3u8",
    "video_range": "",
    "width": 0
-  },
-  {
-   "average_bandwidth": 0,
-   "bandwidth": 186522,
-   "codecs": "hvc1.2.4.L93.B0",
-   "frame_rate": 0.0,
-   "height": 540,
-   "is_iframe": true,
-   "uri": "https://example.invalid/hls/v5/iframe_index.m3u8",
-   "video_range": "SDR",
-   "width": 960
-  },
-  {
-   "average_bandwidth": 0,
-   "bandwidth": 842117,
-   "codecs": "hvc1.2.4.L150.B0",
-   "frame_rate": 0.0,
-   "height": 2160,
-   "is_iframe": true,
-   "uri": "https://example.invalid/hls/v8/iframe_index.m3u8",
-   "video_range": "PQ",
-   "width": 3840
   }
  ]
 }
