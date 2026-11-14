@@ -128,7 +128,8 @@ def ffmpeg_trace(path: Path) -> list[tuple[int, list[int]]]:
     ]
     res = run(cmd)
     if res.returncode != 0:
-        raise StepError(f"ffmpeg trace_headers failed: {res.stderr.strip()[-300:]}")
+        tail = re.sub(r"0x[0-9a-f]+", "0x0", res.stderr.strip()[-300:])  # addresses differ between runs
+        raise StepError(f"ffmpeg trace_headers failed: {tail}")
     return parse_trace(res.stderr)
 
 
