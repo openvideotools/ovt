@@ -4,6 +4,8 @@
 // WI-4.101: the AV_FRAME_DATA_VIDEO_BLOCK_PARAMS export of the patched FFmpeg h264 decoder against the JM trace
 // goldens (tests/golden/h264/<id>.jm-trace.json.gz, chapter 14 §14.4.3), through ovt_plugin_ffmpeg_blockparams.
 // WI-4.102: the plugin's AvcMb tables (through the plugin ABI) against the same export and the same goldens.
+// WI-4.595: the full key set on every JVT golden, MBAFF pairs included (intra modes by 6.4.12.2), and the cell grid in
+// frame coordinates.
 //
 // JM traces the syntax as signalled: the mb_type / sub_mb_type numbers of the slice type, intra4x4_pred_mode as
 // -1 (prev_intra4x4_pred_mode_flag) or rem_intra4x4_pred_mode, mvd_l0 in read order. The export carries the
@@ -293,39 +295,111 @@ int cell_mode(const Mb& m, int bx, int by) {
                    : m.i4.at(static_cast<size_t>(blk_of(bx, by)));
 }
 
-// The mode a neighbouring 4x4 cell (bx, by) of `m` contributes to the prediction (H.264 8.3.1.1): its mode when
-// it lies in an I_NxN macroblock, 2 for other macroblocks; `dc` is set when it is unavailable (other slice, outside the
-// picture, not decoded) or inter under constrained_intra_pred_flag, which makes the prediction 2.
-int neighbour_mode(const Frame& f, const Mb& m, int bx, int by, int step, bool constrained_intra, bool& dc) {
-  int mx = m.x;
-  int my = m.y;
-  if (bx < 0) {
-    mx -= 1;
-    bx += 4;
+// A neighbouring 4x4 cell: the macroblock that holds it and the cell's position inside that macroblock.
+struct Located {
+  const Mb* mb = nullptr;
+  int cx = 0;
+  int cy = 0;
+};
+
+// The cell left of (a) or above (not a) the cell (bx, by) of `m` in an MBAFF frame (H.264 6.4.12.2, Table 6-4, for the
+// luma location (-1, 4 * by) or (4 * bx, -1)). The pairs are in frame coordinates: the top macroblock of a pair is at
+// an even y and the bottom one below it, whether the pair is a frame or a field pair.
+Located locate_mbaff(const Frame& f, const Mb& m, int bx, int by, bool a) {
+  if (a && bx > 0) {
+    return Located{&m, bx - 1, by};
   }
-  if (by < 0) {
-    my -= step;
-    by += 4;
+  if (!a && by > 0) {
+    return Located{&m, bx, by - 1};
   }
-  const Mb* n = (mx == m.x && my == m.y) ? &m : f.at(mx, my);
-  if (n == nullptr || n->cls == 255 || n->slice != m.slice || (constrained_intra && n->cls >= 3)) {
+  const bool top = (m.y & 1) == 0;
+  const bool frame_mb = m.field == 0;
+  const int pair_y = m.y & ~1;
+  if (a) {
+    const Mb* x_top = f.at(m.x - 1, pair_y);
+    const Mb* x_bottom = f.at(m.x - 1, pair_y + 1);
+    if (x_top == nullptr || x_bottom == nullptr) {
+      return {};
+    }
+    const bool x_frame = x_top->field == 0;
+    const int y_n = by * 4;
+    bool bottom = false;
+    int y_m = y_n;
+    if (frame_mb) {
+      if (!x_frame) {
+        bottom = y_n % 2 != 0;  // never with y_n a multiple of 4; kept as the table reads
+        y_m = top ? y_n >> 1 : (y_n + 16) >> 1;
+      } else {
+        bottom = !top;
+      }
+    } else if (x_frame) {
+      bottom = y_n >= 8;
+      y_m = (top ? y_n << 1 : (y_n << 1) + 1) - (bottom ? 16 : 0);
+    } else {
+      bottom = !top;
+    }
+    return Located{bottom ? x_bottom : x_top, 3, y_m >> 2};
+  }
+  if (frame_mb && !top) {
+    return Located{f.at(m.x, m.y - 1), bx, 3};  // the top macroblock of the same pair
+  }
+  const Mb* above_top = f.at(m.x, pair_y - 2);
+  const Mb* above_bottom = f.at(m.x, pair_y - 1);
+  if (above_top == nullptr || above_bottom == nullptr) {
+    return {};
+  }
+  // A frame macroblock or the bottom field macroblock takes the bottom macroblock of the pair above; the top field
+  // macroblock takes its top macroblock when that pair is a field pair, and its bottom one (row 14) when it is not.
+  const bool use_top = !frame_mb && top && above_top->field != 0;
+  return Located{use_top ? above_top : above_bottom, bx, 3};
+}
+
+// The cell left of (a) or above (not a) the cell (bx, by) of `m`, in a frame without MBAFF pairs. `step` is 2 in field
+// pictures (rows of one field interleaved).
+Located locate_plain(const Frame& f, const Mb& m, int bx, int by, bool a, int step) {
+  if (a && bx > 0) {
+    return Located{&m, bx - 1, by};
+  }
+  if (!a && by > 0) {
+    return Located{&m, bx, by - 1};
+  }
+  return a ? Located{f.at(m.x - 1, m.y), 3, by} : Located{f.at(m.x, m.y - step), bx, 3};
+}
+
+// The mode a neighbouring 4x4 cell of the I_NxN macroblock `m` at (bx, by) contributes to the prediction (H.264
+// 8.3.1.1, 8.3.2.1): its mode when it lies in an I_NxN macroblock, 2 for other macroblocks; `dc` is set when it is
+// unavailable (other slice, outside the picture, not decoded) or inter under constrained_intra_pred_flag, which makes
+// the prediction 2. An 8x8 block takes, from a 4x4-transform neighbour, the mode of the neighbour's 8x8 block's
+// 4x4 block 1 (A) or 2 (B).
+int neighbour_mode(const Frame& f, const Mb& m, int bx, int by, bool a, int step, bool constrained_intra, bool mbaff,
+                   bool& dc) {
+  const Located n = mbaff ? locate_mbaff(f, m, bx, by, a) : locate_plain(f, m, bx, by, a, step);
+  if (n.mb == nullptr || n.mb->cls == 255 || n.mb->slice != m.slice || (constrained_intra && n.mb->cls >= 3)) {
     dc = true;
     return 2;
   }
-  return n->cls == 0 ? cell_mode(*n, bx, by) : 2;
+  if (n.mb->cls != 0) {
+    return 2;
+  }
+  if (m.t8 != 0 && n.mb->t8 == 0) {
+    // 4x4 block 1 (top right) of A's 8x8 block, 4x4 block 2 (bottom left) of B's.
+    return a ? cell_mode(*n.mb, 3, (n.cy >> 1) * 2) : cell_mode(*n.mb, (n.cx >> 1) * 2, 3);
+  }
+  return cell_mode(*n.mb, n.cx, n.cy);
 }
 
-// The signalled form of each Intra4x4/8x8 mode of the I_NxN macroblock `m` in a non-MBAFF picture: -1 when it equals
-// the predicted mode, otherwise rem_intra_pred_mode. `step` is 2 in field pictures (rows of one field interleaved).
-std::vector<int> expected_intra_modes(const Frame& f, const Mb& m, int step, bool constrained_intra) {
+// The signalled form of each Intra4x4/8x8 mode of the I_NxN macroblock `m`: -1 when it equals the predicted mode,
+// otherwise rem_intra_pred_mode. `step` is 2 in field pictures; `mbaff`: the frame holds MBAFF pairs.
+std::vector<int> expected_intra_modes(const Frame& f, const Mb& m, int step, bool constrained_intra,
+                                      bool mbaff = false) {
   std::vector<int> out;
   const bool t8 = m.t8 != 0;
   for (int i = 0; i < (t8 ? 4 : 16); ++i) {
     const int bx = t8 ? (i & 1) * 2 : (i & 1) | ((i >> 1) & 2);
     const int by = t8 ? (i >> 1) * 2 : ((i >> 1) & 1) | ((i >> 2) & 2);
     bool dc = false;
-    const int a = neighbour_mode(f, m, bx - 1, by, step, constrained_intra, dc);
-    const int b = neighbour_mode(f, m, bx, by - 1, step, constrained_intra, dc);
+    const int a = neighbour_mode(f, m, bx, by, true, step, constrained_intra, mbaff, dc);
+    const int b = neighbour_mode(f, m, bx, by, false, step, constrained_intra, mbaff, dc);
     const int pred = dc ? 2 : std::min(a, b);
     const int mode = cell_mode(m, bx, by);
     out.push_back(mode == pred ? -1 : mode < pred ? mode : mode - 1);
@@ -341,7 +415,9 @@ struct Counts {
   int mvds = 0;
   int sub_mb_types = 0;
   int ref_idx = 0;
-  int inferred_ref_idx = 0;  // partitions whose ref_idx JM does not trace (one active reference): 0 (7.4.5.1)
+  int field_flags = 0;        // macroblocks whose mb_field_decoding_flag JM traced
+  int field_macroblocks = 0;  // of them, field macroblocks
+  int inferred_ref_idx = 0;   // partitions whose ref_idx JM does not trace (one active reference): 0 (7.4.5.1)
   std::vector<std::string> bad;
 };
 
@@ -393,6 +469,10 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
                                                                {"intra_chroma_pred_mode", m->chroma},
                                                                {"transform_size_8x8_flag", m->t8},
                                                                {"mb_field_decoding_flag", m->field}}};
+  if (g.contains("mb_field_decoding_flag")) {
+    ++c.field_flags;
+    c.field_macroblocks += g.at("mb_field_decoding_flag").get<int>() != 0 ? 1 : 0;
+  }
   for (const auto& [key, value] : scalars) {
     if (g.contains(key)) {
       expect_eq(c, where, key, value, g.at(key));
@@ -413,10 +493,11 @@ void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, co
       expect_eq(c, where, (ref_key + " (inferred)").c_str(), refs, json(std::vector<int>(refs.size(), 0)));
     }
   }
-  // The neighbour derivation of MBAFF pairs (6.4.12.2) is not modelled here, so MBAFF intra modes are not compared.
-  if (g.contains("intra4x4_pred_mode") && m->cls == 0 && !pic.mbaff) {
+  // MBAFF pairs use the neighbour derivation of 6.4.12.2 (WI-4.595).
+  if (g.contains("intra4x4_pred_mode") && m->cls == 0) {
     c.intra_modes += static_cast<int>(g.at("intra4x4_pred_mode").size());
-    expect_eq(c, where, "intra4x4_pred_mode", expected_intra_modes(f, *m, pic.field ? 2 : 1, pic.constrained_intra),
+    expect_eq(c, where, "intra4x4_pred_mode",
+              expected_intra_modes(f, *m, pic.field ? 2 : 1, pic.constrained_intra, pic.mbaff),
               g.at("intra4x4_pred_mode"));
   }
 }
@@ -624,6 +705,47 @@ json avc_view(const Mb& m) {
   return j;
 }
 
+// WI-4.595 AT2: the cell grid is in coded-picture (frame) coordinates (backbone §0.1.9): 4x4 cells, `cells_w =
+// ceil(coded_w / 4)`, and macroblock n of the frame's raster order (the Block of index n + 1, whose rect is the 16x16
+// at its frame position, also for a field macroblock of an MBAFF pair) owns the 16 cells at its position. Each of
+// them carries the macroblock's block_id and QP, its transform size and (I_NxN) the mode of its 4x4 block.
+// SPEC-ASSUMPTION(#395): the 16x32 pair rects and AvcMb.pair_parity of chapter 06 §6.2.4 wait for WI-4.110.
+void check_grid_in_frame_coordinates(const ovt::fb::FrameAnalysis& fa, const Frame& f) {
+  const ovt::fb::CellGrid* g = fa.grid();
+  REQUIRE(g != nullptr);
+  const auto cells_w = static_cast<size_t>(g->cells_w());
+  CHECK(g->cells_w() == static_cast<uint32_t>((fa.frame()->coded_size()->w() + 3) / 4));
+  CHECK(g->cells_h() == static_cast<uint32_t>((fa.frame()->coded_size()->h() + 3) / 4));
+  size_t bad = 0;
+  std::string first;
+  for (size_t i = 0; i < f.mbs.size(); ++i) {
+    const Mb& m = f.mbs[i];
+    const ovt::fb::Block* b = fa.blocks()->Get(static_cast<flatbuffers::uoffset_t>(i + 1));
+    const bool placed = b->rect()->w() == 16 && b->rect()->h() == 16 && b->rect()->x() % 16 == 0 &&
+                        b->rect()->y() % 16 == 0 &&
+                        (static_cast<size_t>(m.y) * static_cast<size_t>(f.w)) + static_cast<size_t>(m.x) == i;
+    for (int by = 0; by < 4; ++by) {
+      for (int bx = 0; bx < 4; ++bx) {
+        const size_t cell = (static_cast<size_t>((m.y * 4) + by) * cells_w) + static_cast<size_t>((m.x * 4) + bx);
+        bool ok = placed && get_at(g->block_id(), cell, -1) == static_cast<int>(i + 1) &&
+                  get_at(g->qp(), cell, -1000) == b->qp();
+        if (ok && m.cls != 255 && g->tx_log2_w() != nullptr) {
+          const int tx = get_at(g->tx_log2_w(), cell, 255);
+          ok = tx == 255 || tx == (m.t8 != 0 ? 3 : 2);
+        }
+        if (ok && m.cls == 0 && g->intra_mode_y() != nullptr) {
+          ok = get_at(g->intra_mode_y(), cell, -2) == cell_mode(m, bx, by);
+        }
+        if (!ok && bad++ == 0) {
+          first = "macroblock " + std::to_string(i) + " cell " + std::to_string(bx) + "," + std::to_string(by);
+        }
+      }
+    }
+  }
+  INFO("first cell out of place: " << first);
+  CHECK(bad == 0);
+}
+
 // The frames the plugin reports for @p path (decoding order), checking on the way that every reference of the grid
 // and of each vector names the slot "L<list>[ref_idx]" of the AvcMb of its 8x8 (acceptance test 2's slot part).
 std::vector<Frame> frames_from_plugin(const std::filesystem::path& path, int threads, int* checked_refs) {
@@ -646,6 +768,7 @@ std::vector<Frame> frames_from_plugin(const std::filesystem::path& path, int thr
     }
     const ovt::fb::CellGrid* g = fa->grid();
     const uint32_t cells_w = g->cells_w();
+    check_grid_in_frame_coordinates(*fa, f);
     size_t bad = 0;
     for (const auto& [vec, list] : {std::pair{g->ref0(), 0}, std::pair{g->ref1(), 1}}) {
       for (uint32_t c = 0; vec != nullptr && c < vec->size(); ++c) {
@@ -799,6 +922,97 @@ TEST_CASE("ffmpeg plugin: block-params intra modes turn back into prev flag / re
   CHECK(expected_intra_modes(f, cur, 1, false)[2] == -1);  // otherwise an inter neighbour counts as DC (2)
 }
 
+namespace {
+
+// A frame of 2 x 2 macroblock pairs (2 macroblocks wide, 4 high) whose pair at column 0 / row 1 (left of the current
+// pair) is a field pair when `left_field`, and whose current pair (column 1, row 1) is a field pair when `cur_field`.
+Frame mbaff_frame(bool left_field, bool cur_field, bool above_field) {
+  Frame f;
+  f.w = 2;
+  f.h = 4;
+  f.mbs.resize(8);
+  for (int y = 0; y < 4; ++y) {
+    for (int x = 0; x < 2; ++x) {
+      Mb& m = f.mbs[(static_cast<size_t>(y) * 2) + static_cast<size_t>(x)];
+      m.x = x;
+      m.y = y;
+      m.cls = 3;  // inter unless a test says otherwise
+      const bool field = y < 2 ? above_field : (x == 0 ? left_field : cur_field);
+      m.field = field ? 1 : 0;
+    }
+  }
+  return f;
+}
+
+}  // namespace
+
+TEST_CASE("ffmpeg plugin: MBAFF neighbours follow Table 6-4 of H.264", "[fast][third_party]") {
+  // Left neighbour A of the cells (0, by), by = 0..3, i.e. luma rows 0, 4, 8, 12 of the current macroblock.
+  const auto left = [](bool left_field, bool cur_field, int cur_y) {
+    const Frame f = mbaff_frame(left_field, cur_field, false);
+    std::vector<std::array<int, 3>> out;  // {macroblock y, cell row} per by
+    for (int by = 0; by < 4; ++by) {
+      const Located n = locate_mbaff(f, *f.at(1, cur_y), 0, by, true);
+      REQUIRE(n.mb != nullptr);
+      CHECK(n.mb->x == 0);
+      CHECK(n.cx == 3);
+      out.push_back({n.mb->y, n.cy, 0});
+    }
+    return out;
+  };
+  using Rows = std::vector<std::array<int, 3>>;
+  CHECK(left(false, false, 2) == Rows{{2, 0, 0}, {2, 1, 0}, {2, 2, 0}, {2, 3, 0}});  // frame / frame, top
+  CHECK(left(false, false, 3) == Rows{{3, 0, 0}, {3, 1, 0}, {3, 2, 0}, {3, 3, 0}});  // frame / frame, bottom
+  CHECK(left(true, false, 2) == Rows{{2, 0, 0}, {2, 0, 0}, {2, 1, 0}, {2, 1, 0}});   // frame, field pair left: top MB
+  CHECK(left(true, false, 3) == Rows{{2, 2, 0}, {2, 2, 0}, {2, 3, 0}, {2, 3, 0}});   // bottom frame MB: rows 8..15
+  CHECK(left(false, true, 2) == Rows{{2, 0, 0}, {2, 2, 0}, {3, 0, 0}, {3, 2, 0}});   // top field MB, frame pair left
+  CHECK(left(false, true, 3) == Rows{{2, 0, 0}, {2, 2, 0}, {3, 0, 0}, {3, 2, 0}});   // bottom field MB: rows 1, 9, 1, 9
+  CHECK(left(true, true, 2) == Rows{{2, 0, 0}, {2, 1, 0}, {2, 2, 0}, {2, 3, 0}});    // field / field: same parity
+  CHECK(left(true, true, 3) == Rows{{3, 0, 0}, {3, 1, 0}, {3, 2, 0}, {3, 3, 0}});
+
+  // Above neighbour B (always the last cell row: luma row 15, or 14 of a frame pair above a top field macroblock).
+  const auto above = [](bool above_field, bool cur_field, int cur_y) {
+    const Frame f = mbaff_frame(false, cur_field, above_field);
+    const Located n = locate_mbaff(f, *f.at(1, cur_y), 2, 0, false);
+    REQUIRE(n.mb != nullptr);
+    CHECK(n.cx == 2);
+    CHECK(n.cy == 3);
+    return std::array<int, 2>{n.mb->x, n.mb->y};
+  };
+  CHECK(above(false, false, 2) == std::array<int, 2>{1, 1});  // top frame MB: bottom MB of the pair above
+  CHECK(above(true, false, 2) == std::array<int, 2>{1, 1});   // also above a field pair
+  CHECK(above(false, false, 3) == std::array<int, 2>{1, 2});  // bottom frame MB: the top MB of its own pair
+  CHECK(above(true, true, 2) == std::array<int, 2>{1, 0});    // top field MB, field pair above: its top MB
+  CHECK(above(false, true, 2) == std::array<int, 2>{1, 1});   // top field MB, frame pair above: its bottom MB
+  CHECK(above(true, true, 3) == std::array<int, 2>{1, 1});    // bottom field MB: bottom MB of the pair above
+  CHECK(above(false, true, 3) == std::array<int, 2>{1, 1});
+
+  // Unavailable: left of the first column, above the first pair row.
+  const Frame f = mbaff_frame(false, false, false);
+  CHECK(locate_mbaff(f, *f.at(0, 2), 0, 0, true).mb == nullptr);
+  CHECK(locate_mbaff(f, *f.at(1, 0), 0, 0, false).mb == nullptr);
+  CHECK(locate_mbaff(f, *f.at(1, 1), 0, 0, false).mb != nullptr);  // bottom frame MB of the first pair row
+}
+
+TEST_CASE("ffmpeg plugin: MBAFF intra modes are predicted from the left pair's right macroblock",
+          "[fast][third_party]") {
+  // A top frame macroblock whose left pair is a field pair predicts its first column from the left pair's top
+  // macroblock (Table 6-4), not from the bottom one.
+  Frame f = mbaff_frame(true, false, false);
+  Mb& top_left = f.mbs[(2 * 2) + 0];
+  Mb& bottom_left = f.mbs[(3 * 2) + 0];
+  Mb& cur = f.mbs[(2 * 2) + 1];
+  top_left.cls = 0;
+  top_left.i4.fill(5);
+  bottom_left.cls = 0;
+  bottom_left.i4.fill(0);
+  cur.cls = 0;
+  cur.i4.fill(5);
+  const std::vector<int> got = expected_intra_modes(f, cur, 1, false, true);
+  CHECK(got[0] == 4);   // A = 5, B = the inter macroblock above (2): predicted 2, mode 5 -> rem 4
+  CHECK(got[2] == -1);  // A = top macroblock cell row 0 (5), B = block 0 (5): predicted 5
+}
+
 TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm", "[fast][third_party][needs-corpus]") {
   compare_with_jm(GENERATE(as<std::string>{}, "jvt_BA1_Sony_D", "jvt_BA_MW_D", "jvt_CABA1_SVA_B", "jvt_CI1_FT_B",
                            "jvt_CVPCMNL1_SVA_C", "jvt_CVSE2_Sony_B", "jvt_CVSE3_Sony_H", "jvt_CVWP1_TOSHIBA_E",
@@ -843,4 +1057,16 @@ TEST_CASE("ffmpeg plugin: ffmpeg_mbparams_vs_jm ref_idx on CAPAMA3_Sand_F", "[sl
     SKIP("no JM golden for " << id);
   }
   compare_with_jm(id, true);
+}
+
+TEST_CASE("ffmpeg plugin: ffmpeg_avcmb_vs_jm on the MBAFF streams", "[slow][third_party][needs-corpus]") {
+  // WI-4.595 AT2: the plugin's AvcMb of an MBAFF stream equals the export and JM's trace, including every
+  // mb_field_decoding_flag and (6.4.12.2 neighbours) every intra mode; the grid is in frame coordinates (checked on
+  // every frame by frames_from_plugin). CAMA1_Sony_C is the stream the WI names; CAPAMA3_Sand_F adds P and B
+  // pictures with several references and PAFF.
+  const std::string id = GENERATE(as<std::string>{}, "jvt_CAMA1_Sony_C", "jvt_CAPAMA3_Sand_F");
+  const Counts c = compare_plugin_with_jm(id);
+  CHECK(c.field_flags > 0);
+  CHECK(c.field_macroblocks > 0);  // a golden without a single field macroblock would not exercise the flag
+  CHECK(c.intra_modes > 0);        // MBAFF intra modes are compared now
 }
