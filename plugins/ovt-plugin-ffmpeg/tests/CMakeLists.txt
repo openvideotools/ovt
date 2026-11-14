@@ -6,6 +6,7 @@
 # flavour, so it lives in its own executable: the smoke test links the host (ovt_core_objects), whose core flavour
 # defines the same av* symbols (chapter 13 §13.3.3).
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
+ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
 
 add_executable(ovt_plugin_ffmpeg_framemd5 ffmpeg_framemd5.cpp)
 target_link_libraries(ovt_plugin_ffmpeg_framemd5 PRIVATE tp::ffmpeg_plugin ovt::flags)
@@ -29,10 +30,13 @@ target_link_libraries(ovt_plugin_ffmpeg_internal_tests PRIVATE tp::ffmpeg_plugin
 ovt_set_license(ovt_plugin_ffmpeg_internal_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_ffmpeg_internal_tests)
 
+# WI-2.583: test_ffmpeg_h264_goldens.cpp compares the plugin with the committed H.264 goldens (MVs, QP); it works against
+# a system FFmpeg too, as the side data it needs is public API.
 add_executable(ovt_plugin_ffmpeg_smoke_tests test_ffmpeg_plugin_smoke.cpp test_ffmpeg_map_sidedata.cpp
-                                             test_ffmpeg_map_blockparams.cpp)
-target_link_libraries(ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
-                                                            ovt_test_support ovt::flags ${Catch2_TARGET})
+                                             test_ffmpeg_map_blockparams.cpp test_ffmpeg_h264_goldens.cpp)
+target_link_libraries(
+  ovt_plugin_ffmpeg_smoke_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas ovt_test_support ovt::flags
+                                        ${nlohmann_json_TARGET} ${Catch2_TARGET})
 target_compile_definitions(ovt_plugin_ffmpeg_smoke_tests PRIVATE "OVT_FFMPEG_SYSTEM=$<BOOL:${OVT_SYSTEM_FFMPEG}>"
                                                                  "OVT_FFMPEG_HW_DECODE=$<BOOL:${OVT_ENABLE_HW_DECODE}>")
 target_compile_definitions(
@@ -54,7 +58,6 @@ if(NOT OVT_SYSTEM_FFMPEG)
   target_link_libraries(ovt_plugin_ffmpeg_blockparams PRIVATE tp::ffmpeg_plugin ovt::flags)
   ovt_set_license(ovt_plugin_ffmpeg_blockparams "LGPL-2.1-or-later")
 
-  ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
   add_executable(ovt_plugin_ffmpeg_blockparams_tests test_ffmpeg_blockparams.cpp)
   # WI-4.102: it also loads the plugin (host registry, core FFmpeg flavour) to compare its AvcMb tables.
   target_link_libraries(

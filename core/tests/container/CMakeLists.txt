@@ -12,6 +12,7 @@ add_executable(
   ivf_test.cpp
   mpd_test.cpp
   obu_test.cpp
+  rawyuv_test.cpp
   sniff_test.cpp
   ts_packets_test.cpp
   y4m_test.cpp)

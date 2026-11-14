@@ -25,12 +25,18 @@
 #include <string>
 #include <vector>
 
+#include "h264_golden.inc"
 #include "plugin_test_util.inc"
 #include "test_support/corpus.h"
 
 namespace {
 
 using nlohmann::json;
+using ovt_ffmpeg_test::header_pictures;
+using ovt_ffmpeg_test::mb_position;
+using ovt_ffmpeg_test::Picture;
+using ovt_ffmpeg_test::read_golden;
+using ovt_ffmpeg_test::read_pipe;
 
 struct Mb {
   int x = 0;
@@ -65,24 +71,6 @@ struct Frame {
     return &mbs.at((static_cast<size_t>(y) * static_cast<size_t>(w)) + static_cast<size_t>(x));
   }
 };
-
-std::string read_pipe(const std::string& cmd) {
-  FILE* p = popen(cmd.c_str(), "r");  // NOLINT(cert-env33-c): gzip or the oracle executable of this build
-  REQUIRE(p != nullptr);
-  std::string text;
-  std::array<char, 65536> buf{};
-  size_t n = 0;
-  while ((n = std::fread(buf.data(), 1, buf.size(), p)) > 0) {
-    text.append(buf.data(), n);
-  }
-  REQUIRE(pclose(p) == 0);
-  return text;
-}
-
-json read_golden(const std::string& name) {
-  const std::filesystem::path file = std::filesystem::path(OVT_JM_GOLDEN_DIR) / name;
-  return json::parse(read_pipe("gzip -dc \"" + file.string() + "\""));
-}
 
 template <size_t N>
 void read_into(std::istringstream& in, std::array<int, N>& out) {
@@ -130,77 +118,6 @@ std::vector<Frame> parse_dump(const std::string& text) {
   }
   std::sort(frames.begin(), frames.end(), [](const Frame& a, const Frame& b) { return a.idx < b.idx; });
   return frames;
-}
-
-// ---- the stream structure, from the trace_headers golden -------------------------------------------------------
-
-struct Slice {
-  int first_mb = 0;  // in macroblocks (pairs already doubled for MBAFF)
-  int type = 0;      // slice_type % 5: 0 P, 1 B, 2 I, 3 SP, 4 SI
-};
-
-struct Picture {
-  bool field = false;
-  bool bottom = false;
-  bool mbaff = false;
-  bool constrained_intra = false;
-  bool cabac = false;
-  std::vector<Slice> slices;
-
-  [[nodiscard]] int slice_type(int addr) const {
-    int type = -1;
-    for (const Slice& s : slices) {
-      if (s.first_mb <= addr) {
-        type = s.type;
-      }
-    }
-    return type;
-  }
-};
-
-// Pictures in decoding order; a picture starts at first_mb_in_slice = 0 (no ASO in the golden streams).
-std::vector<Picture> header_pictures(const json& elements) {
-  std::vector<std::map<std::string, int>> units;
-  int64_t unit = -1;
-  for (const json& e : elements) {
-    if (e.at("unit").get<int64_t>() != unit) {
-      unit = e.at("unit").get<int64_t>();
-      units.emplace_back();
-    }
-    units.back().emplace(e.at("name").get<std::string>(), e.at("value").get<int>());  // first occurrence wins
-  }
-  const auto get = [](const std::map<std::string, int>& u, const std::string& k) {
-    const auto it = u.find(k);
-    return it != u.end() ? it->second : 0;
-  };
-  std::vector<Picture> pictures;
-  int sps_mbaff = 0;
-  std::map<int, bool> pps_constrained;
-  std::map<int, bool> pps_cabac;
-  for (const auto& u : units) {
-    const int type = get(u, "nal_unit_type");
-    if (type == 7) {
-      sps_mbaff = get(u, "mb_adaptive_frame_field_flag");
-    } else if (type == 8) {
-      pps_constrained[get(u, "pic_parameter_set_id")] = get(u, "constrained_intra_pred_flag") != 0;
-      pps_cabac[get(u, "pic_parameter_set_id")] = get(u, "entropy_coding_mode_flag") != 0;
-    } else if (type == 1 || type == 5) {
-      const bool field = get(u, "field_pic_flag") != 0;
-      const bool mbaff = sps_mbaff != 0 && !field;
-      const int first = get(u, "first_mb_in_slice") * (mbaff ? 2 : 1);
-      if (first == 0 || pictures.empty()) {
-        Picture p;
-        p.field = field;
-        p.bottom = get(u, "bottom_field_flag") != 0;
-        p.mbaff = mbaff;
-        p.constrained_intra = pps_constrained[get(u, "pic_parameter_set_id")];
-        p.cabac = pps_cabac[get(u, "pic_parameter_set_id")];
-        pictures.push_back(p);
-      }
-      pictures.back().slices.push_back(Slice{first, get(u, "slice_type") % 5});
-    }
-  }
-  return pictures;
 }
 
 // ---- the export turned back into JM's signalled values ----------------------------------------------------------
@@ -451,10 +368,8 @@ json expected_jm_mb_type(const Mb& m, const Picture& pic, int slice_type, const 
 
 // The macroblock of `f` that JM's address `addr` in picture `pic` names, or nullptr.
 const Mb* mb_at(const Frame& f, const Picture& pic, int addr) {
-  if (pic.mbaff) {
-    return f.at((addr / 2) % f.w, (2 * ((addr / 2) / f.w)) + (addr % 2));
-  }
-  return f.at(addr % f.w, pic.field ? (2 * (addr / f.w)) + (pic.bottom ? 1 : 0) : addr / f.w);
+  const auto [x, y] = mb_position(pic, addr, f.w);
+  return f.at(x, y);
 }
 
 void compare_mb(Counts& c, const Frame& f, const Picture& pic, const json& g, const std::string& where) {
@@ -515,20 +430,7 @@ Counts check_against_jm(const std::string& id, const std::vector<Frame>& frames)
   }
   const std::vector<Picture> pictures = header_pictures(read_golden(id + ".trace_headers.json.gz"));
 
-  // JM pictures: the macroblocks of the golden, split where the address stops increasing.
-  std::vector<std::vector<json>> jm;
-  int last = -1;
-  const json golden = read_golden(id + ".jm-trace.json.gz");
-  for (const json& frame : golden.at("frames")) {
-    for (const json& mb : frame.value("mbs", json::array())) {
-      const int addr = mb.at("mb_addr").get<int>();
-      if (addr <= last || jm.empty()) {
-        jm.emplace_back();
-      }
-      jm.back().push_back(mb);
-      last = addr;
-    }
-  }
+  const std::vector<std::vector<json>> jm = ovt_ffmpeg_test::jm_pictures(read_golden(id + ".jm-trace.json.gz"));
   REQUIRE_FALSE(jm.empty());
   REQUIRE(pictures.size() >= jm.size());
 
