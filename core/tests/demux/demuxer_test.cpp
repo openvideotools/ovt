@@ -451,6 +451,29 @@ bool check_parity(const std::filesystem::path& path, std::string_view hint, bool
   return ok;
 }
 
+// The Demuxer hint for a corpus entry's single container, or std::nullopt when the parity set leaves it out.
+std::optional<std::string> parity_hint(const std::string& container) {
+  if (container == "isobmff" || container == "mp4") {
+    return "isobmff";
+  }
+  if (container == "ivf" || container == "y4m" || container == "annexb" || container == "mpegts") {
+    return container;
+  }
+  if (container == "obu") {
+    return "";  // Section 5 ("obu") or Annex B ("av1"): libavformat probes, as ffprobe does
+  }
+  return std::nullopt;
+}
+
+// "a, b, c".
+std::string join(const std::vector<std::string>& items) {
+  std::string out;
+  for (const auto& item : items) {
+    out += (out.empty() ? "" : ", ") + item;
+  }
+  return out;
+}
+
 // A RandomAccessFile whose reads throw IoError past `limit` bytes.
 class FailingFile final : public ovt::io::RandomAccessFile {
  public:
@@ -743,14 +766,8 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
       continue;
     }
     const std::string& c = containers.front();
-    std::string hint;
-    if (c == "isobmff" || c == "mp4") {
-      hint = "isobmff";
-    } else if (c == "ivf" || c == "y4m" || c == "annexb" || c == "mpegts") {
-      hint = c;
-    } else if (c == "obu") {
-      hint = "";  // Section 5 ("obu") or Annex B ("av1"): libavformat probes, as ffprobe does
-    } else {
+    const auto hint = parity_hint(c);
+    if (!hint) {
       continue;
     }
     const std::string id = entry.at("id");
@@ -772,17 +789,13 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
       continue;
     }
     INFO("corpus " << id);
-    if (!check_parity(*path, hint, c == "annexb" || c == "mpegts")) {
+    if (!check_parity(*path, *hint, c == "annexb" || c == "mpegts")) {
       failed.push_back(id);
     }
     ++compared;
   }
   if (!failed.empty()) {
-    std::string list;
-    for (const auto& id : failed) {
-      list += (list.empty() ? "" : ", ") + id;
-    }
-    WARN(failed.size() << " of " << compared << " corpus files differ from ffprobe: " << list);
+    WARN(failed.size() << " of " << compared << " corpus files differ from ffprobe: " << join(failed));
   }
   if (compared == 0) {
     SKIP("no corpus MP4/IVF/ES/Y4M file is present");
