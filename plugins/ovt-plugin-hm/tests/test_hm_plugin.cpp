@@ -290,7 +290,7 @@ class StreamFeeder {
   // Pushes the next NAL unit and pulls what is ready.
   void step() {
     const Nal& n = nals_[next_++];
-    if (n.size < 3) {
+    if (n.size < 2) {
       return;
     }
     const int type = (n.data[0] >> 1) & 0x3F;
@@ -298,7 +298,7 @@ class StreamFeeder {
     if (type == 36) {  // EOS_NUT
       after_eos_ = true;
     }
-    if (type < 32 && layer == 0 && (n.data[2] & 0x80) != 0) {
+    if (type < 32 && layer == 0 && n.size > 2 && (n.data[2] & 0x80) != 0) {
       ++pic_;
       if (type >= 16 && type <= 23) {  // IRAP
         skip_rasl_ = type != 21 || pic_ == 0 || after_eos_;
@@ -391,8 +391,8 @@ void check_stream(const StreamResult& r, bool expect_hashes) {
 }
 
 // AT1: every HEVC_v1 entry of tests/corpora/manifest.json with a fetchable, verified file (source jctvc, codec h265,
-// no rext/scc feature). These carry no SEI at all (issue #255), so for them AT1 checks only that every picture comes
-// out: RPS_A, RPS_F, POC_A, AMP_A, AMP_D, CONFWIN_A, MAXBINS_A, STRUCT_B, TILES_B.
+// no rext/scc feature). These carry no picture hash SEI (#255), so for them AT1 checks only that every picture comes
+// out: RPS_A, RPS_F, POC_A, AMP_A, AMP_D, CONFWIN_A, MAXBINS_A, STRUCT_B, TILES_B, RAP_A, FILLER_A.
 struct At1Stream {
   std::string_view id;
   bool hashes;
@@ -405,7 +405,7 @@ constexpr std::array<At1Stream, 40> kAt1Streams = {{
     {"jctvc_DSLICE_A_HHI_5", true},
     {"jctvc_ENTP_A_QUALCOMM_1", true},
     {"jctvc_EXT_A_ericsson_4", true},
-    {"jctvc_FILLER_A_Sony_1", true},
+    {"jctvc_FILLER_A_Sony_1", false},
     {"jctvc_HRD_A_Fujitsu_3", true},
     {"jctvc_MAXBINS_A_TI_5", false},
     {"jctvc_MERGE_B_TI_3", true},
@@ -415,7 +415,7 @@ constexpr std::array<At1Stream, 40> kAt1Streams = {{
     {"jctvc_PMERGE_A_TI_3", true},
     {"jctvc_POC_A_Bossen_3", false},
     {"jctvc_PPS_A_qualcomm_7", true},
-    {"jctvc_RAP_A_docomo_6", true},
+    {"jctvc_RAP_A_docomo_6", false},
     {"jctvc_RPS_A_docomo_5", false},
     {"jctvc_SAO_A_MediaTek_4", true},
     {"jctvc_SDH_A_Orange_4", true},
