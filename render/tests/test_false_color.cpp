@@ -5,8 +5,11 @@
 // with the band fractions and out-of-gamut counts of Measurements. The patterns are synthesised from their
 // expected.json (tests/corpora/patterns/, WI-1.413) with the generator's limited-range codes, as in test_measure.cpp.
 // The image goldens are tests/golden/render/false_color_patches.png and gamut_clip_p3.png (§10.9.2 items 4 and 6:
-// OVT_UPDATE_GOLDEN=1 rewrites them, never on CI); both use the patterns at a quarter of their size, so each golden is
-// 480 x 270 with the same patch layout.
+// OVT_UPDATE_GOLDEN=1 rewrites them, never on CI). The false-colour golden uses the PQ patches at a quarter of their
+// size (480 x 270, same layout; neutral chroma, so no edge depends on chroma interpolation). The gamut-clip golden is
+// full size: the luma column on each side of a P3 stripe edge mixes two stripes' 4:2:0 chroma, and whether that mixed
+// colour lands just inside or just outside P3 differs between libplacebo versions (6.338 vs the pinned 7.349). One
+// such column is 0.05 % of a 1920 x 1080 frame, inside the 0.1 % budget, but 0.2 % of a 480 x 270 one.
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -366,7 +369,7 @@ TEST_CASE("render_test_false_color: AT2 P3 saturation counts outside BT.709 (§1
 
 TEST_CASE("render_test_false_color: gamut-clip overlay of the P3 stripes (golden)", "[fast][render][vulkan][golden]") {
   const nlohmann::json exp = expected("p3_saturation");
-  constexpr uint32_t kDiv = 4;
+  constexpr uint32_t kDiv = 1;  // full size, see the file comment
   OwnedPicture op = p3_saturation(exp, kDiv);
   auto surface = surface_or_skip(static_cast<int>(op.pic.coded_width), static_cast<int>(op.pic.coded_height));
   set_frame(*surface, op, 0, 1);
@@ -404,9 +407,25 @@ TEST_CASE("render_test_false_color: BT.2020 green is outside P3 and tinted cyan 
   set_frame(*surface, op, 0, 1);
   ViewState view = one_to_one(op);
   view.gamut_clip_overlay = true;
+  // Whole frame: the green half, give or take the luma column on each side of the edge, where 4:2:0 chroma is
+  // interpolated across it (version-dependent in libplacebo).
   const Measurements m = measure_frame(*surface, view, op.pic.id);
-  CHECK(m.out_of_gamut_p3 == 64U * 64U);
-  CHECK(m.out_of_gamut_709 == 64U * 64U);
+  CHECK(m.out_of_gamut_p3 >= 63U * 64U);
+  CHECK(m.out_of_gamut_p3 <= 65U * 64U);
+  CHECK(m.out_of_gamut_709 == m.out_of_gamut_p3);  // BT.709 lies inside P3 here
+  // The green half without its last 2 columns, and the neutral half without its first 2: exact.
+  op.pic.crop = ovt::fb::Rect(0, 0, 62, 64);
+  set_frame(*surface, op, 1, 2);
+  const Measurements green_only = measure_frame(*surface, view, op.pic.id);
+  CHECK(green_only.out_of_gamut_p3 == 62U * 64U);
+  CHECK(green_only.out_of_gamut_709 == 62U * 64U);
+  op.pic.crop = ovt::fb::Rect(66, 0, 62, 64);
+  set_frame(*surface, op, 2, 3);
+  const Measurements neutral_only = measure_frame(*surface, view, op.pic.id);
+  CHECK(neutral_only.out_of_gamut_p3 == 0);
+  CHECK(neutral_only.out_of_gamut_709 == 0);
+  op.pic.crop = ovt::fb::Rect();
+  set_frame(*surface, op, 3, 4);
 
   const RgbImage img = render_rgb(*surface, view);
   const std::array<int, 3> green = rgb_at(img, 32, 32);
