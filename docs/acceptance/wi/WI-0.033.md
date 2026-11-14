@@ -1,7 +1,7 @@
 # WI-0.033 acceptance record
 
 Machine: cloud container, Ubuntu 24.04 x86_64, clang 18.1.3 (libFuzzer), Python 3.x. Date: 2026-11-07.
-Spec version: 1.0-rc25. Commit: the head of the WI-0.033 pull request.
+Spec version: see the PR body. Commit: the head of the WI-0.033 pull request.
 
 The container cannot download FFmpeg, so the full `linux-x64-fuzz` build was not possible locally; the canary
 target and the nightly shell steps were exercised on stand-alone binaries. The CI runs below are the authority.
