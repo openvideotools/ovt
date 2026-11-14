@@ -6,7 +6,7 @@
 # (installed to share/doc/hm/) grants no patent rights and HEVC is patent-encumbered, so the plugin is optional and
 # tools/license_policy.toml keeps it out of the default downloads. HM's headers are system headers (WI-4.104 pitfall).
 
-add_library(ovt_plugin_hm MODULE src/plugin.cpp src/decoder.cpp)
+add_library(ovt_plugin_hm MODULE src/plugin.cpp src/decoder.cpp src/analysis.cpp src/map_cu.cpp)
 target_include_directories(ovt_plugin_hm PRIVATE "${PROJECT_SOURCE_DIR}/core/include")
 get_target_property(_ovt_hm_common_includes tp::hm_common INTERFACE_INCLUDE_DIRECTORIES)
 get_target_property(_ovt_hm_decoder_includes tp::hm INTERFACE_INCLUDE_DIRECTORIES)

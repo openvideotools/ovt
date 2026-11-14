@@ -30,13 +30,15 @@ set_tests_properties(ovt_plugin_hm_smoke_wpp_a PROPERTIES LABELS "third_party;ne
 # Loads libovt_plugin_hm through the host's PluginRegistry (LGPL-2.1-or-later, so the test is too, as for
 # ovt_plugin_aom_smoke_tests); MD5 comes from HM's public-domain libmd5 in tp::hm_common.
 ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
+ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
 add_executable(ovt_plugin_hm_tests test_hm_plugin.cpp)
 target_link_libraries(ovt_plugin_hm_tests PRIVATE ovt_core_objects ovt_schemas ovt_test_support tp::hm_common
-                                                  ovt::flags ${Catch2_TARGET})
+                                                  ovt::flags nlohmann_json::nlohmann_json ${Catch2_TARGET})
 get_target_property(_ovt_hm_includes tp::hm_common INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(ovt_plugin_hm_tests SYSTEM PRIVATE ${_ovt_hm_includes})
 unset(_ovt_hm_includes)
-target_compile_definitions(ovt_plugin_hm_tests PRIVATE "OVT_HM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_hm>\"")
+target_compile_definitions(ovt_plugin_hm_tests PRIVATE "OVT_HM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_hm>\""
+                                                   "OVT_HM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h265\"")
 add_dependencies(ovt_plugin_hm_tests ovt_plugin_hm)
 ovt_set_license(ovt_plugin_hm_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_hm_tests)

@@ -79,7 +79,8 @@ void release_pictures(TComList<TComPic*>* pic_list) {
 }
 
 // TAppDecTop::xFlushOutput minus the writes, at an IDR or BLA picture and at the end of the stream.
-void flush_pictures(TComList<TComPic*>* pic_list, Int* poc_last_display) {
+void flush_pictures(TComList<TComPic*>* pic_list, Int* poc_last_display, PicIndex* index) {
+  index->clear();
   if (pic_list == nullptr || pic_list->empty()) {
     return;
   }
@@ -156,6 +157,7 @@ struct Decoder::Impl {
   int32_t cur_index = -1;
   int64_t cur_pts = 0;
   int32_t next_index = 0;  // decode index when the host gave none
+  PicIndex pic_index;      // decode index of every exported picture HM still holds
   std::deque<Frame> frames;
   std::vector<Diag> pending_diags;  // attached to the next frame that comes out
 
@@ -247,6 +249,8 @@ void Decoder::Impl::export_picture(TComPic* pic) {
     const auto comp = static_cast<ComponentID>(c);
     copy_plane(*rec, comp, sps->getBitDepth(toChannelType(comp)), &f.planes[c]);
   }
+  map_cu(*pic, pic_index, &f.analysis);
+  pic_index[pic] = f.decode_index;
   f.diagnostics = std::move(pending_diags);
   pending_diags.clear();
   frames.push_back(std::move(f));
@@ -284,7 +288,7 @@ void Decoder::Impl::manage_buffer(NalUnitType type, bool new_picture) {
     dec.setNoOutputPriorPicsFlag(false);
   }
   if (new_picture && is_idr_or_bla(type)) {
-    flush_pictures(pic_list, &poc_last_display);
+    flush_pictures(pic_list, &poc_last_display, &pic_index);
     cur_pic = nullptr;  // destroyed; HM's m_pcPic dangles until the IDR or BLA is fed again
     cur_slice0 = nullptr;
   }
@@ -342,7 +346,7 @@ Decoder::~Decoder() {
     return;
   }
   const std::lock_guard<std::mutex> lock(g_hm_mutex);
-  flush_pictures(impl_->pic_list, &impl_->poc_last_display);
+  flush_pictures(impl_->pic_list, &impl_->poc_last_display, &impl_->pic_index);
   if (g_live_instances > 1) {
     // deletePicBuffer() ends with destroyROM(): hide the shared tables from it, so the other instances keep them.
     ScanOrder saved;
@@ -430,7 +434,7 @@ ovt_status Decoder::flush() {
   d.flushed = true;
   d.restore_tables();
   d.finish_picture(false);  // TAppDecTop at the end of the bitstream file
-  flush_pictures(d.pic_list, &d.poc_last_display);
+  flush_pictures(d.pic_list, &d.poc_last_display, &d.pic_index);
   if (!d.pending_diags.empty()) {
     // Diagnostics after the last picture travel in a diagnostics-only FrameAnalysis (chapter 07 §7.6, #249).
     Frame f;
