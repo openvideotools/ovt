@@ -197,15 +197,15 @@ Definitions: a *box header* is `size (u32) + type (4CC)`, optionally `largesize 
 
 `walk_children(parent_offset, parent_payload_begin, parent_end, depth, ctx) → vector<BoxNode>`:
 
-1. Set `pos = parent_payload_begin`. If `depth > 32` → emit `CNT-0105` (Error, "box nesting deeper than 32") on the parent and return.
+1. Set `pos = parent_payload_begin`. If `depth > 32` → emit `CNT-0105` (Error, "box nesting deeper than 32") on the parent and return. **Node bound:** one walk (the whole file, or one lazy expansion of §8.2.4) creates at most 1 000 000 `BoxNode`s; when the bound is reached, emit `CNT-0111` (Error, "more than 1000000 boxes; remaining bytes not walked") on the current parent and turn `[pos, parent_end)` of every open parent into a "trailing bytes" node as in 2.1, so the sum of child spans still equals the parent size (#323).
 2. **Loop while** `pos < parent_end`:
    1. `remaining = parent_end - pos`. If `remaining < 8`: if `remaining > 0` emit `CNT-0101` (Warning, "N trailing bytes in <parent> that cannot hold a box header") with span `[pos, parent_end)` recorded as a `BoxNode` with `fourcc = ""` and `description = "trailing bytes"`; break.
    2. Read 8 bytes at `pos`: `size32 = u32`, `type = fourcc`. `header_length = 8`.
    3. **QuickTime `wide` quirk:** if `type == 'wide'` and `size32 == 8`, record a `BoxNode{fourcc:"wide", file_span:[pos,pos+8)}` and set `pos += 8`; continue the loop. (`wide` is a placeholder preceding a `mdat` that may need to grow to 64-bit; QTFF "Atoms → wide".)
    4. If `size32 == 1`: require `remaining ≥ 16`, else `CNT-0102` (Error, truncated largesize) and break. `size = u64 at pos+8`, `header_length = 16`. If `size < 16` → `CNT-0103` (Error, "largesize smaller than header"), break.
    5. Else if `size32 == 0`: `size = parent_end - pos` ("box extends to end of file", 14496-12 §4.2.2). Allowed **only** at depth 0 (top level); at depth > 0 emit `CNT-0104` (Warning) and still use `parent_end` (this is what libavformat and GPAC do).
-   6. Else `size = size32`. If `size < 8` → `CNT-0106` (Error, "box size N < 8 at offset pos"); **recovery:** if `type` is a printable fourcc that is in the registry, treat `size = 8` and continue; else break (the remaining bytes become a "trailing bytes" node as in 2.1).
-   7. If `type == 'uuid'`: require `size ≥ header_length + 16`, else `CNT-0107` (Error) and break. Read 16 bytes `usertype`; `header_length += 16`.
+   6. Else `size = size32`. If `size < 8` → `CNT-0106` (Error, "box size N < 8 at offset pos"); **recovery:** if `type` is a printable fourcc that is in the registry **and is not `'uuid'`** (a `uuid` box is never 8 bytes), treat `size = 8` and continue; else break (the remaining bytes become a "trailing bytes" node as in 2.1). (#323)
+   7. If `type == 'uuid'`: require `size ≥ header_length + 16`, else `CNT-0107` (Error, for `8 ≤ size < header_length + 16`) and break. Read 16 bytes `usertype`; `header_length += 16`.
    **Every `break` above** (2.1, 2.4, 2.6, 2.7) turns `[pos, parent_end)` into one node with `fourcc = ""` and `description = "trailing bytes"` that carries the finding, so the child spans always sum to the parent size (WI-1.201 acceptance test 1).
    8. **Overflow / end checks** (all in `uint64_t` with `__builtin_add_overflow`): `end = pos + size`. If the addition overflows, or `end > parent_end`: emit `CNT-0108` (Error, "box <type> at pos claims size S, exceeds parent end by D bytes"); set `end = parent_end` and mark the node `truncated = true` (recorded in `description` suffix " [truncated]" and as a diagnostic). Do not break — decode what is there.
    9. Check `type` bytes: each byte MUST be in `0x20..0x7E` or the box is a QuickTime `©xxx` (first byte `0xA9`) or a numeric iTunes key (`ilst` children named `0x00000001..`). Otherwise emit `CNT-0109` (Warning, "non-printable box type") and set `fourcc` to the four-escape form `"\xNN\xNN\xNN\xNN"` (for example `\x00\x00\x00\x01`) for display; decoding is skipped.
@@ -865,6 +865,7 @@ All codes are stable identifiers (backbone §0.7.6). Format of the ISOBMFF famil
 | CNT-0108 | Error | box exceeds parent/file end (truncated) | §8.2.3 box walk / §8.2.4 lazy expansion | 14496-12 §4.2 |
 | CNT-0109 | Warning | non-printable box type | §8.2.3 box walk / §8.2.4 lazy expansion | — |
 | CNT-0110 | Error | FullBox shorter than 4 bytes | §8.2.3 box walk / §8.2.4 lazy expansion | 14496-12 §4.2 |
+| CNT-0111 | Error | more than 1 000 000 boxes in one walk (node bound; rest not walked) | §8.2.3 box walk / §8.2.4 lazy expansion | — |
 | CNT-1001 | Info | unknown fourcc (not in MP4RA/conformance/extra registry) | §8.3 hand decoders, §8.5 validation driver (Standard level) | — |
 | CNT-1002 | Error | decoder hit end of box while reading field (truncated payload) | §8.3 hand decoders, §8.5 validation driver (Standard level) | per box |
 | CNT-1003 | Warning | unknown FullBox version | §8.3 hand decoders, §8.5 validation driver (Standard level) | per box |
@@ -1419,7 +1420,7 @@ The manifest shape is chapter 14 §14.2.4 (`entries[]` with `id`, `source`, `url
 | WebM/Matroska (phase 4) | https://github.com/webmproject/libwebm/tree/main/testing/testdata ; https://github.com/Matroska-Org/matroska-test-files | EBML reader |
 | MPEG-TS (phase 4) | https://github.com/tsduck/tsduck-test (`input/*.ts`) ; https://streams.videolan.org/ | PSI/PES/PCR, TR 101 290 |
 | HEIF/AVIF | https://github.com/nokiatech/heif_conformance ; https://github.com/AOMediaCodec/av1-avif/tree/master/testFiles | `meta`/`iinf`/`iloc`/`ipco`/`ipma`/`iref` |
-| Broken/fuzzed files (own, committed, tiny) | `tests/corpora/synthetic/isobmff-broken/` generated by `tools/make_broken.py` (invoked from `tests/corpora/synthetic/generate.py`, WI-0.553) from a 20 KiB base file: truncated at 37 offsets, size 0/1/7/0xFFFFFFFF injected, `moov` after `mdat`, overlapping boxes, `stsc` descending, `stco` beyond EOF, `ctts` v0 negative, duplicate `tkhd`, 33-deep nesting, `uuid` short, non-printable types | FR-CNT-101 (§8.1.2) and `CNT-*` code coverage; every code in §8.5 MUST be triggered by at least one file (`ctest -R diag_coverage`) |
+| Broken/fuzzed files (own, committed, tiny) | `tests/corpora/synthetic/isobmff-broken/` generated by `tools/make_broken.py` (invoked from `tests/corpora/synthetic/generate.py`, WI-0.553) from a 20 KiB base file: truncated at 37 offsets, size 0/1/7/0xFFFFFFFF injected, `moov` after `mdat`, overlapping boxes, `stsc` descending, `stco` beyond EOF, `ctts` v0 negative, duplicate `tkhd`, 33-deep nesting, `uuid` short, `uuid` with `size < 8` (`CNT-0106`, no recovery), non-printable types; the `CNT-0111` node-bound case (a generated file of 1 000 001 `free` boxes) runs in memory and is not committed | FR-CNT-101 (§8.1.2) and `CNT-*` code coverage; every code in §8.5 MUST be triggered by at least one file (`ctest -R diag_coverage`) |
 
 ### 8.9.4 Fuzzing targets (`core/tests/fuzz/`, libFuzzer, `OVT_ENABLE_FUZZ`)
 
