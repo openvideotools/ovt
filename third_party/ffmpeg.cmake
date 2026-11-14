@@ -436,6 +436,9 @@ _ovt_ffmpeg_flavour(core)
 if(OVT_BUILD_PLUGIN_FFMPEG)
   _ovt_ffmpeg_flavour(plugin)
 endif()
+# There is no tp_ffmpeg: cmake/OvtNotices.cmake stages the LICENSE_FILES of ovt_tp_declare(ffmpeg) from the core
+# flavour's tree (both flavours extract the same archive).
+set_property(GLOBAL PROPERTY OVT_TP_EP_ffmpeg tp_ffmpeg_core)
 
 if(OVT_FFMPEG_CORE_STATIC)
   set(_ovt_ff_core_kind static)

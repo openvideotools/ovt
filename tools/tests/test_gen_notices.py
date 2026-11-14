@@ -206,6 +206,30 @@ def test_fence_longer_than_text_backticks() -> None:
         ("ONNX Runtime osx-arm64", "onnxruntime"),
         ("ONNX Runtime linux-aarch64", "onnxruntime"),
         ("ONNX Runtime osx-x86_64", "onnxruntime"),
+        # names of the macOS bundle's manifest (Mac Mini run of WI-0.063) -> the VERSIONS.md row or vcpkg port
+        ("tp::aom", "libaom"),
+        ("tp::aom_inspection", "libaom"),
+        ("libaom", "libaom"),
+        ("tp::de265", "libde265"),
+        ("tp::placebo", "libplacebo"),
+        ("tp::vmaf", "libvmaf"),
+        ("tp::hm_common", "hm"),
+        ("tp::ffmpeg_core", "ffmpeg"),
+        ("tp::ffmpeg_plugin_avcodec", "ffmpeg"),
+        ("FFmpeg", "ffmpeg"),
+        ("Qt6::Core", "qt"),
+        ("Qt::Gui", "qt"),
+        ("WrapOpenGL::WrapOpenGL", "qt"),
+        ("Qt", "qt"),
+        ("/v/arm64-osx-ovt/lib/libGenericCodeGen.a", "glslang"),
+        ("/v/arm64-osx-ovt/lib/libglslang-default-resource-limits.a", "glslang"),
+        ("/v/arm64-osx-ovt/lib/libSPIRV.a", "glslang"),
+        ("/v/arm64-osx-ovt/lib/libSPIRV-Tools-opt.a", "spirv_tools"),
+        ("/v/arm64-osx-ovt/lib/liblcms2.a", "lcms"),
+        ("z", "zlib"),
+        ("pugixml::static", "pugixml"),
+        ("nlohmann_json_schema_validator::validator", "json_schema_validator"),
+        ("Catch2::Catch2WithMain", "catch2"),
     ],
 )
 def test_manifest_names_map_to_one_key(name: str, key: str) -> None:
@@ -223,3 +247,28 @@ def test_hyphenated_vcpkg_port_is_found(tree: dict, tmp_path: Path) -> None:
     code, err = run(tree, out, "--vcpkg-share", str(tmp_path / "share"))
     assert code == 0, err
     assert "json MIT" in out.read_text()
+
+
+def test_system_zlib_and_qt_texts(tree: dict, tmp_path: Path) -> None:
+    """`z` (system zlib, FFmpeg's link) takes its text from third_party/system-licenses/ (cmake/OvtNotices.cmake)."""
+    report = json.loads((tree["root"] / "report.json").read_text())
+    report["inventory"].append(entry("z", "", "Zlib", ["ovt_core"]))
+    report["inventory"].append(entry("zstd::libzstd_static", "1.5.6", "BSD-3-Clause OR GPL-2.0-only", ["ovt_core"]))
+    report["inventory"].append(entry("Qt6::Core", "6.8.3", "LGPL-3.0-only", ["ovt_studio"]))
+    report["inventory"].append(entry("Qt6::Gui", "6.8.3", "LGPL-3.0-only", ["ovt_studio"]))
+    (tree["root"] / "report.json").write_text(json.dumps(report))
+    share = tmp_path / "share" / "zstd"
+    share.mkdir(parents=True)
+    (share / "copyright").write_text("zstd BSD\n")
+    qt = tmp_path / "qt"
+    qt.mkdir()
+    (qt / "LGPL-3.0.txt").write_text("GNU LESSER GENERAL PUBLIC LICENSE\n")
+    system = TOOLS.parent / "third_party" / "system-licenses"
+    out = tmp_path / "N.md"
+    code, err = run(
+        tree, out, "--licenses-dir", str(system), "--vcpkg-share", str(tmp_path / "share"), "--qt-licenses", str(qt)
+    )
+    assert code == 0, err
+    text = out.read_text()
+    assert "Jean-loup Gailly and Mark Adler" in text and "zstd BSD" in text
+    assert text.count("### Qt6::") == 1  # one component, one copy of the text

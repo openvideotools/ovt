@@ -39,6 +39,11 @@ dbp = os.environ["FAKE_DB"]
 db = json.load(open(dbp))
 a = sys.argv[1:]
 e = db[a[-1]]
+# Like the real tool: the same -delete_rpath twice in one call is an error, and one -delete_rpath removes one
+# LC_RPATH (the first), or every copy with FAKE_DELETE_ALL=1.
+deleted = [a[i + 1] for i in range(len(a) - 1) if a[i] == "-delete_rpath"]
+if len(set(deleted)) != len(deleted):
+    sys.exit("install_name_tool: more than one -delete_rpath option specified")
 i = 0
 while i < len(a) - 1:
     if a[i] == "-id":
@@ -48,7 +53,13 @@ while i < len(a) - 1:
     elif a[i] == "-add_rpath":
         e["rpaths"].append(a[i + 1]); i += 2
     elif a[i] == "-delete_rpath":
-        e["rpaths"].remove(a[i + 1]); i += 2
+        if a[i + 1] not in e["rpaths"]:
+            sys.exit("install_name_tool: no LC_RPATH load command with path: " + a[i + 1])
+        if os.environ.get("FAKE_DELETE_ALL") == "1":
+            e["rpaths"] = [r for r in e["rpaths"] if r != a[i + 1]]
+        else:
+            e["rpaths"].remove(a[i + 1])
+        i += 2
     else:
         sys.exit("bad arg " + a[i])
 json.dump(db, open(dbp, "w"))
@@ -74,7 +85,7 @@ def make_bundle(tmp: Path, entries: dict[str, dict]) -> tuple[Path, Path]:
     return app, dbp
 
 
-def run(tmp: Path, dbp: Path, app: Path, *extra: str) -> subprocess.CompletedProcess:
+def run(tmp: Path, dbp: Path, app: Path, *extra: str, env: dict | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
             sys.executable,
@@ -89,7 +100,7 @@ def run(tmp: Path, dbp: Path, app: Path, *extra: str) -> subprocess.CompletedPro
         ],
         capture_output=True,
         text=True,
-        env={"FAKE_DB": str(dbp)},
+        env={"FAKE_DB": str(dbp), **(env or {})},
         check=False,
     )
 
@@ -182,6 +193,28 @@ def test_fix_repairs_plugin_references_and_rpaths(tmp_path):
     assert fixed["rpaths"] == ["@loader_path/../../Frameworks"]
     qt = db[str(app / "Contents/Frameworks/QtCore.framework/Versions/A/QtCore")]
     assert qt["rpaths"] == ["@loader_path/../../.."]
+
+
+@pytest.mark.parametrize("delete_all", ["0", "1"])
+def test_fix_removes_duplicate_rpaths(tmp_path, delete_all):
+    """QtCore carries one LC_RPATH twice (found on the Mac Mini for WI-0.063): each path is named once per call."""
+    e = clean_entries()
+    e["Frameworks/QtCore.framework/Versions/A/QtCore"] = {
+        "deps": ["@rpath/QtCore.framework/Versions/A/QtCore"],
+        "rpaths": ["@loader_path/../../../", "@loader_path/../../../", "/Users/qt/lib", "@loader_path/../../.."],
+    }
+    e["MacOS/OVT Studio"]["rpaths"] = ["@executable_path/../Frameworks"] * 3
+    app, dbp = make_bundle(tmp_path, e)
+    r = run(tmp_path, dbp, app)
+    assert r.returncode == 1
+    assert "duplicate LC_RPATH @executable_path/../Frameworks" in r.stderr
+    r = run(tmp_path, dbp, app, "--fix", env={"FAKE_DELETE_ALL": delete_all})
+    assert r.returncode == 0, r.stderr
+    db = json.loads(dbp.read_text())
+    assert db[str(app / "Contents/Frameworks/QtCore.framework/Versions/A/QtCore")]["rpaths"] == [
+        "@loader_path/../../.."
+    ]
+    assert db[str(app / "Contents/MacOS/OVT Studio")]["rpaths"] == ["@loader_path/../Frameworks"]
 
 
 def test_fix_cannot_invent_a_missing_library(tmp_path):

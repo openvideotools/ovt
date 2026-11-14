@@ -158,6 +158,21 @@ set_target_properties(
   tp::aom_inspection PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LIBAOM_SOURCE_DIR};${LIBAOM_BINARY_DIR}"
                                 INTERFACE_LINK_LIBRARIES tp::aom)
 add_dependencies(tp::aom_inspection tp_libaom)
+# libaom's own headers, so libaom's licence (the licence manifest lists every imported target it walks through).
+get_property(_ovt_aom_spdx GLOBAL PROPERTY OVT_TP_LICENSE_tp_libaom)
+get_property(_ovt_aom_version GLOBAL PROPERTY OVT_TP_VERSION_tp_libaom)
+ovt_set_dependency_license(
+  tp::aom_inspection
+  SOURCE
+  third_party
+  SPDX
+  "${_ovt_aom_spdx}"
+  VERSION
+  "${_ovt_aom_version}"
+  LINKAGE
+  header-only)
+unset(_ovt_aom_spdx)
+unset(_ovt_aom_version)
 unset(SOURCE_DIR)
 unset(BINARY_DIR)
 

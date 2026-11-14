@@ -77,8 +77,12 @@ function(_ovt_license_normalise_item item out_var)
       set(result "")
     endif()
     # Platform libraries of the C runtime (pthread, libm, libdl) are system libraries under the GPL's
-    # system-library exception; they are neither built nor distributed by OVT, so they are not listed.
+    # system-library exception; they are neither built nor distributed by OVT, so they are not listed. The same
+    # holds for Apple's system frameworks, whether written `-framework X` (dropped above as a flag) or as the path
+    # of the framework in the SDK (Qt's WrapOpenGL, cmake/OvtOptions.cmake).
     if(result MATCHES "^(Threads::Threads|pthread|m|dl|rt)$")
+      set(result "")
+    elseif(result MATCHES "/System/Library/Frameworks/[^/]+\\.framework$")
       set(result "")
     endif()
   endif()

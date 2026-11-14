@@ -14,7 +14,8 @@ Without --fix the script only reports. Exit status: 0 clean, 1 violations remain
 --fix first (a) gives every library in Contents/Frameworks the install name @rpath/<path relative to Frameworks>,
 (b) rewrites every reference to a library that lives in Contents/Frameworks (matched by file name, or by the
 `X.framework/...` tail) to @rpath/..., and (c) replaces the LC_RPATH entries by the single one that reaches
-Contents/Frameworks from the file's location. It then verifies. `macdeployqt` does (a) to (c) for what it copies;
+Contents/Frameworks from the file's location, removing duplicate LC_RPATH entries one copy at a time. It then
+verifies; a duplicate LC_RPATH is a problem too. `macdeployqt` does (a) to (c) for what it copies;
 this covers what it misses, namely libraries that are only loaded through `dlopen` (the plugins in
 Contents/PlugIns/ovt/) and our own build-tree libraries.
 
@@ -135,6 +136,8 @@ def check_file(app: Path, file: Path, otool: str) -> list[str]:
     for rp in rpaths:
         if rp not in ("@loader_path", "@executable_path") and not rp.startswith(("@executable_path/", "@loader_path/")):
             problems.append(f"{rel}: LC_RPATH outside the bundle: {rp}")
+    for rp in dict.fromkeys(rp for rp in rpaths if rpaths.count(rp) > 1):
+        problems.append(f"{rel}: duplicate LC_RPATH {rp}")  # recent dyld versions reject it
     return problems
 
 
@@ -200,13 +203,34 @@ def fix_file(app: Path, file: Path, otool: str, int_tool: str, index: dict[str, 
             cmd += ["-change", dep, new]
     existing = list_rpaths(otool, file)
     want = rpath_for(app, file)
-    for rp in existing:
+    # install_name_tool rejects the same -delete_rpath twice in one call, and one -delete_rpath removes one LC_RPATH.
+    # Qt's frameworks carry some LC_RPATH twice, so name each path once here and remove the extra copies below.
+    for rp in dict.fromkeys(existing):
         if rp != want:
             cmd += ["-delete_rpath", rp]
     if want not in existing:
         cmd += ["-add_rpath", want]
     if len(cmd) > 1:
         run(cmd + [str(file)])
+    if len(set(existing)) != len(existing):
+        drop_duplicate_rpaths(file, want, otool, int_tool, len(existing))
+
+
+def drop_duplicate_rpaths(file: Path, want: str, otool: str, int_tool: str, bound: int) -> None:
+    """Delete LC_RPATH copies one call at a time until only `want` is left, once.
+
+    Re-reading after each call keeps this right whether install_name_tool removes the first copy or every copy.
+    """
+    for _ in range(bound):
+        current = list_rpaths(otool, file)
+        extra = next((rp for rp in current if rp != want), None)
+        if extra is None and current.count(want) > 1:
+            extra = want
+        if extra is None:
+            break
+        run([int_tool, "-delete_rpath", extra, str(file)])
+    if want not in list_rpaths(otool, file):
+        run([int_tool, "-add_rpath", want, str(file)])
 
 
 def main(argv: list[str] | None = None) -> int:
