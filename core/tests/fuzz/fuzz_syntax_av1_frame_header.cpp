@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Fuzz target of the AV1 uncompressed_header() sub-structure parsers (chapter 7 §7.3.6 rows 12–15, chapter 14
-// §14.7.1, WI-1.117a): frame_size / superres_params / render_size, frame_size_with_refs and tile_info (rows 16–19
-// join in WI-1.117b). Byte 0 selects the parser and the sequence header shape (superblock size, superres, frame
-// size bits, chroma layout), byte 1 the frame-level inputs (override flag, MiCols/MiRows scale, slot validity);
-// the rest is the bit stream. Both
+// Fuzz target of the AV1 uncompressed_header() sub-structure parsers (chapter 7 §7.3.6 rows 12–19, chapter 14
+// §14.7.1, WI-1.117): frame_size / superres_params / render_size, frame_size_with_refs, tile_info,
+// quantization_params, segmentation_params, delta_q_params and delta_lf_params. Byte 0 selects the parser and the
+// sequence header shape (superblock size, superres, frame size bits, chroma layout), byte 1 the frame-level
+// inputs (override flag, primary_ref_frame, MiCols/MiRows scale, slot validity); the rest is the bit stream. Both
 // recording modes run and must return the same typed values. A ParseError is the expected answer to malformed
 // bytes; any other exception, a crash or a sanitizer report is a finding.
 
@@ -75,6 +75,7 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
   const SequenceHeader seq = make_sequence(sel);
   const DecoderState state = make_state(ctl);
   const bool override_flag = (ctl & 0x01U) != 0;
+  const auto primary_ref_frame = static_cast<uint8_t>((ctl & 0x02U) != 0 ? kPrimaryRefNone : (ctl >> 2U) & 7U);
   const uint32_t MiCols = ((ctl & 0x0FU) + 1U) * 16U * ((sel & 0x40U) != 0 ? 8U : 1U);
   const uint32_t MiRows = (static_cast<uint32_t>(ctl >> 4U) + 1U) * 8U;
   ovt::BitReader br(input.subspan(2));
@@ -82,7 +83,7 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
   b.set_recording(recording);
   uint64_t summary = 0;
   try {
-    switch (sel & 0x01U) {
+    switch (sel & 0x03U) {
       case 0: {
         FrameSize fs = parse_frame_size(br, b, seq, override_flag);
         const RenderSize rs = parse_render_size(br, b, fs);
@@ -96,13 +97,29 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
         summary = mix(summary, mix(static_cast<uint64_t>(r.found_ref_index + 1), mix(fs.MiRows, rs2.RenderHeight)));
         break;
       }
-      default: {
+      case 1: {
         const TileInfo t = parse_tile_info(br, b, seq, MiCols, MiRows);
         require(t.MiColStarts.size() == t.TileCols + 1U);
         require(t.MiRowStarts.size() == t.TileRows + 1U);
         summary = mix(mix(t.NumTiles, t.context_update_tile_id), mix(t.MiColStarts.back(), t.MiRowStarts.back()));
         (void)t.tile_rect(0, 0);
         (void)t.tile_rect(t.TileRows, t.TileCols);
+        break;
+      }
+      case 2: {
+        const QuantizationParams q = parse_quantization_params(br, b, seq.color_config);
+        const SegmentationParams seg =
+            parse_segmentation_params(br, b, primary_ref_frame, FeatureEnabledTable{}, FeatureDataTable{});
+        const Lossless l = compute_lossless(q, seg, override_flag);
+        summary = mix(mix(q.base_q_idx, static_cast<uint64_t>(q.DeltaQVAc + 64)),
+                      mix(seg.LastActiveSegId, l.CodedLossless ? 1U : 0U));
+        break;
+      }
+      default: {
+        const DeltaQParams dq = parse_delta_q_params(br, b, ctl);
+        const DeltaLfParams dlf = parse_delta_lf_params(br, b, dq.delta_q_present, override_flag);
+        summary =
+            mix(mix(dq.delta_q_res, dq.delta_q_present ? 1U : 0U), mix(dlf.delta_lf_res, dlf.delta_lf_multi ? 1U : 0U));
         break;
       }
     }
