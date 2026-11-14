@@ -65,6 +65,7 @@ X(CNT_0107, "CNT-0107", Error, "`uuid` box too short for usertype", "14496-12 §
 X(CNT_0108, "CNT-0108", Error, "box exceeds parent/file end (truncated)", "14496-12 §4.2")
 X(CNT_0109, "CNT-0109", Warning, "non-printable box type", "")
 X(CNT_0110, "CNT-0110", Error, "FullBox shorter than 4 bytes", "14496-12 §4.2")
+X(CNT_0111, "CNT-0111", Error, "more than 1000000 boxes; remaining bytes not walked", "")
 X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "QTFF")
 
 // WI-1.228 (Y4M reader, §8.6.5).
