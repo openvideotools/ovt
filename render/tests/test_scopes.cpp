@@ -348,7 +348,7 @@ TEST_CASE("render_test_scopes: AT2 BT.2020 red lands on the red primary point (F
 
   // Vectorscope: the BT.2020 colour-bar red of gamut_tables.cpp, +- 2 px.
   const detail::CbCr red = detail::vectorscope_targets(detail::Gamut::Bt2020)[0];
-  const auto uv = detail::vectorscope_uv(red.cb, red.cr, 1.0F);
+  const auto uv = detail::vectorscope_uv(static_cast<double>(red.cb), static_cast<double>(red.cr), 1.0F);
   const auto at = detail::scope_texel(uv[0], uv[1], detail::kScopeSize);
   const Scope vs = download(*surface, ScopeKind::Vectorscope);
   const auto box = energy_box(vs, 0);
@@ -364,7 +364,7 @@ TEST_CASE("render_test_scopes: AT2 BT.2020 red lands on the red primary point (F
 
   // CIE xy: the BT.2020 red primary (0.708, 0.292), +- 2 px.
   const auto xy = detail::gamut_primaries_xy(detail::Gamut::Bt2020)[0];
-  const auto cuv = detail::cie_uv(xy.x, xy.y);
+  const auto cuv = detail::cie_uv(static_cast<double>(xy.x), static_cast<double>(xy.y));
   const auto cbox = energy_box(download(*surface, ScopeKind::CieXy), 0);
   CHECK(cbox[0] >= static_cast<int>(cuv[0]) - 2);
   CHECK(cbox[2] <= static_cast<int>(cuv[0]) + 2);
