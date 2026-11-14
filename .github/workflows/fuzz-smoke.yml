@@ -4,10 +4,11 @@
 # Fuzz smoke (chapter 13 §13.7.1 `fuzz-smoke`, chapter 14 §14.7.3, WI-0.557): build the linux-x64-fuzz preset
 # and run every ovt_fuzz_* target for 60 s from its committed seeds. Four shards split the targets (target i
 # runs in shard i mod 4); a crash, timeout or OOM fails the shard and uploads the reproducer.
-# One `fuzz-build` job builds only the fuzz and fuzz-regress targets, replays the regressions and hands the binaries
-# (with the shared libraries and the plugin module they load from the build tree) to the four `fuzz-smoke` shards as an
-# artifact. Each shard used to rebuild the whole tree, all unit tests included; from cold caches that alone took
-# about 38 minutes, which pushed shards past the 45-minute timeout.
+# One `fuzz-build` job builds only the fuzz and fuzz-regress targets, replays the regressions and hands the
+# binaries (with the shared libraries and the plugin module they load from the build tree) to the four `fuzz-smoke`
+# shards through the Actions cache (never an artifact: the repository is public). Each shard used to rebuild the
+# whole tree, all unit tests included; from cold caches that alone took about 38 minutes, which pushed shards past
+# the 45-minute timeout.
 # The nightly 20-minute run is WI-0.033's. Third-party actions are pinned by commit SHA, never by tag.
 name: fuzz-smoke
 
@@ -118,13 +119,15 @@ jobs:
           tar -C fuzz-stage -cf - . | zstd -T0 -6 -q -o fuzz-binaries.tar.zst
           ls -l fuzz-binaries.tar.zst
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      # Handed to the shards through the Actions cache, not an artifact: the repository is public and built binaries
+      # must not be published as downloadable artifacts (binary distribution without notices; same rule as the
+      # Android smoke APKs). The cache is not downloadable by others; the key is this commit, so a shard never runs
+      # another commit's build.
+      - name: Save fuzz binaries for the shards
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          name: fuzz-binaries
           path: fuzz-binaries.tar.zst
-          compression-level: 0
-          retention-days: 1
-          if-no-files-found: error
+          key: fuzz-binaries-${{ github.sha }}
 
   fuzz-smoke:
     needs: fuzz-build
@@ -138,9 +141,12 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      - name: Restore fuzz binaries
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
-          name: fuzz-binaries
+          path: fuzz-binaries.tar.zst
+          key: fuzz-binaries-${{ github.sha }}
+          fail-on-cache-miss: true
 
       - name: Unpack fuzz binaries
         shell: bash
