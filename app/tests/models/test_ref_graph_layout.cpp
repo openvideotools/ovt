@@ -3,7 +3,7 @@
 //
 // Tests of the Reference / GOP graph layout (chapter 11 §11.3.11; WI-2.484). Acceptance test 1 names the fixture
 // `syn_h265_bpyramid` (chapter 14 §14.3.3 recipe 43), which the oracle image produces; until its index is available
-// to the GUI tests, SPEC-ASSUMPTION(#240) the tests build the same shape in memory: a closed GOP of 8 with a
+// to the GUI tests, SPEC-ASSUMPTION(#457) the tests build the same shape in memory: a closed GOP of 8 with a
 // hierarchical B pyramid (temporal ids 0..3), decode order POC 0 8 4 2 1 3 6 5 7, and the references an HEVC encoder
 // writes for it. The assertions compare the layout with the index columns, not with numbers copied from the layout.
 
