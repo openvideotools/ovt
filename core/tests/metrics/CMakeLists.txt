@@ -17,6 +17,7 @@ add_executable(
   test_metrics_psnr.cpp
   test_metrics_ssim.cpp
   test_metrics_ssim_x264.cpp
+  test_metrics_identity.cpp
   test_metrics_vmaf.cpp
   test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
@@ -26,7 +27,8 @@ target_compile_definitions(
   ovt_tests_metrics
   PRIVATE "OVT_EXAMPLE_METRIC_ROOT=\"${OVT_EXAMPLE_METRIC_ROOT}\""
           "OVT_METRICS_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden\""
-          "OVT_GOLDEN_METRICS_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/metrics\"")
+          "OVT_GOLDEN_METRICS_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/metrics\""
+          "OVT_CORPORA_COMPARE_EXPECTED=\"${PROJECT_SOURCE_DIR}/tests/corpora/compare_expected.json\"")
 set_source_files_properties(abi_header_c.c PROPERTIES LANGUAGE C)
 set_target_properties(ovt_tests_metrics PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 get_property(_ovt_example_metrics GLOBAL PROPERTY OVT_EXAMPLE_METRIC_TARGETS)

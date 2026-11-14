@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Input checks shared by the in-tree integer-domain kernels (ssim_x264; WI-3.308a, identity follows in WI-3.308b): what
-// the host may hand to score() for a code-value metric, and what makes a reference/distorted pair comparable.
+// Input checks shared by the in-tree integer-domain kernels (ssim_x264, identity; WI-3.308a/b): what the host may hand
+// to score() for a code-value metric, and what makes a reference/distorted pair comparable.
 
 #ifndef OVT_SRC_METRICS_KERNELS_PLANE_CHECK_H
 #define OVT_SRC_METRICS_KERNELS_PLANE_CHECK_H
