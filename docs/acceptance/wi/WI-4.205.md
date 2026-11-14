@@ -54,6 +54,9 @@ The first run of the `[slow]` test found three oracle-reading gaps, fixed in the
 `PCR_PID` when it is 0x1FFF (test-072), writes an empty file when no table is complete (test-125, 2 KB), and lists
 a PMT only for the services whose PMT is in the file (test-137: 5 PAT services, 1 PMT).
 
+Rerun at 4724bf1 (clang-tidy refactor of the oracle test), same machine, corpora and wrapper, 2026-11-14: All tests passed
+(139 assertions in 2 test cases).
+
 ## Test 2: corrupted CRC
 
 Automated: `psi: a corrupted CRC reports CNT-TS-2002 and the table is not applied`
