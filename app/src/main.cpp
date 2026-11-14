@@ -19,6 +19,7 @@
 #include <QQuickWindow>
 #include <QString>
 #include <QStringList>
+#include <QSurfaceFormat>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantMap>
@@ -110,6 +111,12 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   // only prepares the application and runs the event loop; a window of its own would compete with QtQuickView for the
   // Activity.
   static_cast<void>(self_testing);
+  // WI-0.052 (chapter 13 §13.4.4 item 1): the Qt window is translucent, so that HdrSurfaceView below QtQuickView shows
+  // through wherever the QML root draws nothing. Set before QtQuickView creates its window.
+  QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+  format.setAlphaBufferSize(8);
+  QSurfaceFormat::setDefaultFormat(format);
+  QQuickWindow::setDefaultAlphaBuffer(true);
   return QGuiApplication::exec();
 #else
   QQmlApplicationEngine engine;
