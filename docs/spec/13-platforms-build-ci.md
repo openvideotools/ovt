@@ -574,6 +574,8 @@ Decision: use the **Qt Gradle plugin** (`org.qtproject.qt.gradleplugin`, shipped
 jstring  ovt_jni_version(JNIEnv*, jclass);                                   /* ovt_version_string() + build info json */
 jlong    ovt_jni_open_fd(JNIEnv*, jclass, jint fd, jlong size, jstring display_name);   /* fd from ParcelFileDescriptor.detachFd() → ovt_file_open_fd(fd, size, take_ownership = 1, name) → ovt_container_open; returns a session handle, 0 on error (ovt_last_error_json logged) */
 void     ovt_jni_close(JNIEnv*, jclass, jlong session);
+jlong    ovt_jni_file_size(JNIEnv*, jclass, jlong session);                  /* ovt_file_size() of the session's file (64-bit); 0 for no session */
+jstring  ovt_jni_info_json(JNIEnv*, jclass, jlong session);                  /* debug overlay JSON: name, size, container format, tracks (index + TrackInfo FlatBuffer size until WI-1.500's printer exists, #417); null for no session */
 jboolean ovt_jni_surface_attach(JNIEnv*, jclass, jlong session, jobject surface);   /* ANativeWindow_fromSurface → libovt-render DisplayTarget (chapter 10 §10.4.3) */
 void     ovt_jni_surface_detach(JNIEnv*, jclass, jlong session);
 void     ovt_jni_set_headroom(JNIEnv*, jclass, jlong session, jfloat hdr_sdr_ratio);  /* Display.hdrSdrRatio → DisplayTarget.headroom */
