@@ -69,3 +69,16 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
+
+# WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
+# plugin module from its output directory, so it follows the plugin's own option.
+if(OVT_BUILD_PLUGIN_FFMPEG)
+  set(_ffmpeg_plugin_tests "${PROJECT_SOURCE_DIR}/plugins/ovt-plugin-ffmpeg/tests")
+  ovt_add_fuzz_target(plugin_push_ffmpeg "${_ffmpeg_plugin_tests}/fuzz/fuzz_plugin_push_ffmpeg.cpp")
+  foreach(_target ovt_fuzz_plugin_push_ffmpeg_regress ovt_fuzz_plugin_push_ffmpeg)
+    if(TARGET ${_target})
+      target_compile_definitions(${_target} PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\"")
+      add_dependencies(${_target} ovt_plugin_ffmpeg)
+    endif()
+  endforeach()
+endif()
