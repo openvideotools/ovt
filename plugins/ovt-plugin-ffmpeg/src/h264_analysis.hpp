@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 
+#include "map_h264_blockparams.hpp"
 #include "map_h264_sidedata.hpp"
 #include "map_hevc_sidedata.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
@@ -54,6 +55,7 @@ struct Frame {
   uint8_t bit_depth_chroma = 8;
   std::array<Plane, 3> planes;  // filled only when pop() is asked for them; planes 1 and 2 are empty for 4:0:0
   SideData side;                // the grid, blocks, motion vectors and references mapped from the side data (WI-2.170)
+  BlockParams blocks;           // AvcMb and the phase-4 grid fields, from the block params when present (WI-4.102)
   std::vector<Diag> diagnostics;
 };
 

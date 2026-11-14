@@ -37,14 +37,23 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/dialogs/KeymapDialog.qml"
       "${app_dir}/qml/dialogs/OpenAsDialog.qml"
       "${app_dir}/qml/dialogs/RawFormatDialog.qml"
+      "${app_dir}/qml/dialogs/SampleStreamsDialog.qml"
+      "${app_dir}/qml/WelcomePage.qml"
+      "${app_dir}/qml/FirstRunBanner.qml"
+      "${app_dir}/qml/controls/EmptyState.qml"
       "${app_dir}/qml/panels/DiagnosticsPanel.qml"
-      "${app_dir}/qml/panels/UnitListPanel.qml")
+      "${app_dir}/qml/panels/UnitListPanel.qml"
+      "${app_dir}/qml/panels/TimelinePanel.qml")
   # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
   foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
     list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
   endforeach()
   if(NOT ANDROID)
     list(APPEND qml_files "${app_dir}/qml/dock/DockFloatingWindow.qml")
+  endif()
+  # The root item that QtQuickView loads on Android (WI-0.050), which cannot take the desktop ApplicationWindow.
+  if(ANDROID)
+    list(APPEND qml_files "${app_dir}/qml/AndroidShell.qml")
   endif()
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
@@ -83,6 +92,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/keymap.cpp"
     "${app_dir}/src/goto_parser.h"
     "${app_dir}/src/goto_parser.cpp"
+    "${app_dir}/src/models/sample_streams.h"
+    "${app_dir}/src/models/sample_streams.cpp"
     "${app_dir}/src/models/jobs_model.h"
     "${app_dir}/src/models/jobs_model.cpp"
     "${app_dir}/src/models/log_sink.h"
@@ -97,6 +108,12 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/stream_index_adapter.cpp"
     "${app_dir}/src/models/stream_index_model.h"
     "${app_dir}/src/models/stream_index_model.cpp"
+    "${app_dir}/src/models/timeline_viewport.h"
+    "${app_dir}/src/models/timeline_viewport.cpp"
+    "${app_dir}/src/models/timeline_geometry.h"
+    "${app_dir}/src/models/timeline_geometry.cpp"
+    "${app_dir}/src/items/timeline_chart.h"
+    "${app_dir}/src/items/timeline_chart.cpp"
     "${app_dir}/src/models/unit_list_model.h"
     "${app_dir}/src/models/unit_list_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
@@ -107,7 +124,7 @@ function(ovt_studio_add_qml_module target)
     "${project_schema}")
   # src/platform too: the generated type registration includes the headers by file name.
   target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
-                                               "${app_dir}/src/dock")
+                                               "${app_dir}/src/dock" "${app_dir}/src/items")
   # ovt::core for ovt/jobs.h and ovt/log.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).
@@ -210,6 +227,25 @@ if(APPLE)
 elseif(ANDROID)
   # Qt names the library libovt_studio_<ABI>.so; androiddeployqt looks for exactly that name.
   # SPEC-ASSUMPTION(#71): this is the `libovt_studio.so` of §13.2.1 and WI-0.019 acceptance test 3.
+  #
+  # The Gradle build (android/app/build.gradle.kts, WI-0.050) runs this project through the Qt Gradle plugin, which
+  # finds the target by the name of android-<target>-deployment-settings.json at the top of the build tree; Qt writes
+  # it next to the target unless told otherwise. androiddeployqt then builds the AAR with Gradle inside
+  # android-build-ovt_studio/, which lies below android/ and would otherwise be taken for a subproject of
+  # android/settings.gradle.kts: an empty settings.gradle makes it a build of its own (the plugin does the same for
+  # the top-level directory). SPEC-ASSUMPTION(#355).
+  set_target_properties(ovt_studio PROPERTIES QT_ANDROID_DEPLOYMENT_SETTINGS_FILE
+                                              "${CMAKE_BINARY_DIR}/android-ovt_studio-deployment-settings.json")
+  set(_ovt_aar_settings "${CMAKE_CURRENT_BINARY_DIR}/android-build-ovt_studio/settings.gradle")
+  if(NOT EXISTS "${_ovt_aar_settings}")
+    file(WRITE "${_ovt_aar_settings}" "")
+  endif()
+  unset(_ovt_aar_settings)
+  # The JNI glue (chapter 13 §13.4.4) and the shared core it links: androiddeployqt packages only Qt's libraries
+  # and the ones listed here.
+  add_subdirectory("${PROJECT_SOURCE_DIR}/android/app/src/main/cpp" "${CMAKE_CURRENT_BINARY_DIR}/android_jni")
+  set_property(TARGET ovt_studio APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "$<TARGET_FILE:ovt_core>"
+                                                 "$<TARGET_FILE:ovt_jni>")
 else()
   set_target_properties(ovt_studio PROPERTIES OUTPUT_NAME "ovt-studio")
 endif()
