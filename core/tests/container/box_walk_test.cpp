@@ -205,6 +205,34 @@ TEST_CASE("a uuid box too short for its usertype is CNT-0107", "[container][isob
   CHECK(span_sum(r.top_level) == data.size());
 }
 
+TEST_CASE("a uuid box with size < 8 is CNT-0106 and is not recovered to 8", "[container][isobmff][walk][fast]") {
+  Bytes bad;
+  put32(bad, 7);
+  put_str(bad, "uuid");
+  const Bytes data = cat({box("ftyp", Bytes(8, 'a')), bad, Bytes(40, 0)});
+  const auto r = walk_bytes(data);
+  CHECK(any_code(r, "CNT-0106"));
+  CHECK_FALSE(any_code(r, "CNT-0107"));
+  REQUIRE(r.top_level.size() == 2);  // ftyp, then everything from the uuid on as one trailing-bytes node
+  CHECK(r.top_level[1]->description == "trailing bytes");
+  CHECK(span_sum(r.top_level) == data.size());
+}
+
+TEST_CASE("a walk creates at most 1000000 boxes and then reports CNT-0111", "[container][isobmff][walk][fast]") {
+  Bytes data = box("ftyp", Bytes(8, 'a'));
+  for (uint64_t i = 0; i < iso::kMaxBoxNodes;
+       ++i) {  // ftyp + 999999 free boxes reach the bound; the last free box is not walked
+    put32(data, 8);
+    put_str(data, "free");
+  }
+  data.insert(data.end(), 100, 0);  // not walked
+  const auto r = walk_bytes(data);
+  CHECK(has_code(r.diagnostics, "CNT-0111"));
+  REQUIRE(r.top_level.size() == iso::kMaxBoxNodes + 1);  // the bound, plus one trailing-bytes node
+  CHECK(r.top_level.back()->description == "trailing bytes");
+  CHECK(span_sum(r.top_level) == data.size());
+}
+
 TEST_CASE("wide is a bare 8-byte node", "[container][isobmff][walk][fast]") {
   Bytes wide;
   put32(wide, 8);
@@ -431,7 +459,7 @@ struct CorpusCase {
 
 TEST_CASE("the committed broken corpus yields its expected codes and tiles the file",
           "[container][isobmff][walk][corpus][fast]") {
-  constexpr std::array<CorpusCase, 13> kCases = {{
+  constexpr std::array<CorpusCase, 14> kCases = {{
       {"size7_in_moov.mp4", "CNT-0106"},
       {"size0_in_moov.mp4", "CNT-0104"},
       {"largesize_lt16_in_moov.mp4", "CNT-0103"},
@@ -441,6 +469,7 @@ TEST_CASE("the committed broken corpus yields its expected codes and tiles the f
       {"moov_after_mdat.mp4", "CNT-0003"},
       {"trak_overlaps_end_of_moov.mp4", "CNT-0108"},
       {"nesting_33_deep.mp4", "CNT-0105"},
+      {"uuid_size7.mp4", "CNT-0106"},
       {"uuid_short.mp4", "CNT-0107"},
       {"nonprintable_type.mp4", "CNT-0109"},
       {"trailing_5_bytes.mp4", "CNT-0101"},

@@ -50,6 +50,7 @@ ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(y4m fuzz_y4m.cpp)
+ovt_add_fuzz_target(raw_format_string fuzz_raw_format_string.cpp) # WI-1.229: raw YUV format string, sidecar, heuristics
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
