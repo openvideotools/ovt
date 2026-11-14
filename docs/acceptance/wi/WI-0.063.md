@@ -68,3 +68,12 @@ signature is reproducible but a timestamped one is not.
   tag-signing secrets from WI-0.061. It belongs in the WI-0.061 tag workflow, or a follow-up once that exists.
 - `OVT_UNIVERSAL` stays a configure option with no build effect: a universal build is two builds plus this script
   (§13.5.1), which a single CMake build tree cannot drive.
+- The x86_64 slice could not configure libaom on the Mini. Homebrew NASM 3.02 no longer lists `-Ox` in `nasm -hf`,
+  which libaom's `test_nasm()` requires ("Unsupported nasm: multipass optimization not supported"). NASM has
+  optimised multipass by default since 2.09. A new step in `third_party/libaom.cmake`
+  (`third_party/libaom/nasm3_check.cmake`, run between patch and configure) also lets that check accept a NASM whose
+  `nasm -v` reports version 3 or later. The object-format checks are unchanged, and NASM 2.x without `-Ox` is still
+  refused. This is in this PR because the WI's acceptance run needs an x86_64 bundle; covered by
+  `tools/tests/test_libaom_patches.py::test_missing_patch_dir_builds_upstream_and_exports_source_dir`.
+- `tools/mac/bundle.sh` runs the licence gate, which currently fails on the shipped targets until PR #202 adds their
+  rows. For the acceptance run, `--skip-notices-build` is acceptable; that is #202's fix, not this WI's.
