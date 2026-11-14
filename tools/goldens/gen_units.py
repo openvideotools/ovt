@@ -34,7 +34,7 @@ from typing import Any
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path.insert(0, str(REPO / "tools"))
-import ref_annexb
+import ref_annexb  # noqa: E402
 
 MAX_BYTES = 1_900_000  # CLAUDE.md caps goldens at 2 MB gzip-compressed; the plain JSON stays below that
 EXIT_OK, EXIT_STEP, EXIT_USAGE, EXIT_MISSING = 0, 1, 2, 4

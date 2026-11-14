@@ -15,7 +15,7 @@ import pytest
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "goldens"))
 
-import gen_units as gen
+import gen_units as gen  # noqa: E402
 
 LOG = """\
 [trace_headers @ 0x1] Extradata
