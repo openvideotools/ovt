@@ -48,7 +48,7 @@ inline constexpr size_t kMaxSections = 4096;  // recorded sections per file; the
 [[nodiscard]] const char* stream_type_name(uint8_t stream_type) noexcept;
 
 // "YYYY-MM-DD hh:mm:ss" for the 40-bit MJD + BCD time of EN 300 468 Annex C; "invalid" for a malformed value.
-[[nodiscard]] std::string format_dvb_time(uint64_t mjd_bcd) noexcept;
+[[nodiscard]] std::string format_dvb_time(uint64_t mjd_bcd);
 
 struct Descriptor {
   uint8_t tag = 0;
