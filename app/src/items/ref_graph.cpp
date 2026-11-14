@@ -323,10 +323,10 @@ QVariantList RefGraph::dpbChips(int decode_index) const {
   if (model_.isNull() || decode_index < 0) {
     return out;
   }
-  for (const int d : model_->frames().dpb_after(decode_index)) {
+  for (const int frame : model_->frames().dpb_after(decode_index)) {
     QVariantMap m;
-    m.insert(QStringLiteral("decodeIndex"), d);
-    m.insert(QStringLiteral("label"), QStringLiteral("#%1").arg(d));
+    m.insert(QStringLiteral("decodeIndex"), frame);
+    m.insert(QStringLiteral("label"), QStringLiteral("#%1").arg(frame));
     out.push_back(m);
   }
   return out;
@@ -363,19 +363,19 @@ void RefGraph::geometryChange(const QRectF& new_geometry, const QRectF& old_geom
 }
 
 void RefGraph::mousePressEvent(QMouseEvent* event) {
-  const int d = frameAt(event->position().x(), event->position().y());
-  if (d >= 0 && !model_.isNull()) {
-    Q_EMIT frameClicked(d, model_->frames().display_index_of(d));
+  const int hit = frameAt(event->position().x(), event->position().y());
+  if (hit >= 0 && !model_.isNull()) {
+    Q_EMIT frameClicked(hit, model_->frames().display_index_of(hit));
   }
-  event->setAccepted(d >= 0);
+  event->setAccepted(hit >= 0);
 }
 
 void RefGraph::hoverMoveEvent(QHoverEvent* event) {
-  const int d = frameAt(event->position().x(), event->position().y());
-  if (d != hover_frame_) {
-    hover_frame_ = d;
+  const int hit = frameAt(event->position().x(), event->position().y());
+  if (hit != hover_frame_) {
+    hover_frame_ = hit;
     update();
-    Q_EMIT frameHovered(d);
+    Q_EMIT frameHovered(hit);
   }
 }
 

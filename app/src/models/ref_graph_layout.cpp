@@ -59,7 +59,7 @@ std::string hex_color(Rgba c) {
 
 // A number with two decimals ("12.50"), without printf.
 std::string num(double v) {
-  const auto scaled = static_cast<long long>(std::llround(std::abs(v) * 100.0));
+  const long long scaled = std::llround(std::abs(v) * 100.0);
   std::string out = v < 0 && scaled != 0 ? "-" : "";
   out += std::to_string(scaled / 100) + ".";
   const long long frac = scaled % 100;
