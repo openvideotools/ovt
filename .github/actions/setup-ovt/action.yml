@@ -19,6 +19,12 @@ inputs:
   python-version:
     description: Python used by configure-time tools (needs >= 3.11).
     default: "3.12"
+  ffmpeg-container:
+    description: >-
+      'true' (Linux only) puts an `ffmpeg` wrapper first on PATH that runs Ubuntu 24.04's ffmpeg 6.1 in a container
+      (tools/ci/ffmpeg-container), after the corpora fetch. tools_pytest needs it: its byte-exact check of the committed
+      pattern streams cannot pass with ubuntu-22.04's ffmpeg 4.4.
+    default: "false"
   corpora:
     description: >-
       Test corpora (chapter 14 §14.2.4): 'fast' fetches the PR-lane subset (tools/fetch_corpora.py --tags fast, at most
@@ -79,6 +85,9 @@ runs:
         for py in python3.13 python3.12 python3.11 python3; do
           if command -v "$py" >/dev/null && "$py" -c 'import sys; sys.exit(sys.version_info < (3, 11))'; then
             dirname "$(command -v "$py")" >> "$GITHUB_PATH" # FindPython3 searches PATH
+            # The venv below must use this interpreter: a bare `python3` can resolve to another one (a 3.15 pre-release
+            # on one Mini runner), for which the pinned test packages (scikit-image) have no wheels.
+            echo "OVT_PYTHON=$(command -v "$py")" >> "$GITHUB_ENV"
             "$py" --version
             exit 0
           fi
@@ -86,14 +95,21 @@ runs:
         echo "::error::no Python >= 3.11 on this runner (brew install python@3.12)"
         exit 1
 
-    - name: Python tools (meson for the third_party Meson builds)
+    - name: Python tools (meson for the third_party Meson builds; test dependencies)
       shell: bash
       run: |
         # A venv works on the hosted images and on the self-hosted Mac (whose Homebrew Python refuses
-        # system-wide pip installs). tools/requirements.txt pins meson (chapter 13 §13.3.5).
-        python3 -m venv "${RUNNER_TEMP}/ovt-venv"
-        "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt
+        # system-wide pip installs). tools/requirements.txt pins meson (chapter 13 §13.3.5) and jsonschema;
+        # tools/requirements-test.txt pins pytest, numpy and the flatbuffers runtime. Without them the CTest suites
+        # tools_pytest, cli_schema_validate, schema_python_import and test_fb_python_import are not registered or
+        # skip, and CI would pass without running them. The venv is first on PATH, so FindPython3 picks it.
+        "${OVT_PYTHON:-python3}" -m venv "${RUNNER_TEMP}/ovt-venv"
+        "${RUNNER_TEMP}/ovt-venv/bin/python" -m pip install --quiet -r tools/requirements.txt -r tools/requirements-test.txt
         echo "${RUNNER_TEMP}/ovt-venv/bin" >> "$GITHUB_PATH"
+        # setup-python exports Python3_ROOT_DIR, which FindPython3 prefers over PATH, so the hosted jobs would
+        # configure against the bare interpreter and not see these packages. VIRTUAL_ENV and a root dir that points at the venv make it the interpreter.
+        echo "VIRTUAL_ENV=${RUNNER_TEMP}/ovt-venv" >> "$GITHUB_ENV"
+        echo "Python3_ROOT_DIR=${RUNNER_TEMP}/ovt-venv" >> "$GITHUB_ENV"
 
     - name: vcpkg checkout and bootstrap
       shell: bash
@@ -123,11 +139,44 @@ runs:
         key: tp-${{ runner.os }}-${{ runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
 
     - name: third_party downloads cache
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      id: tpdl
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: build/third_party/downloads
-        key: tpdl-${{ hashFiles('third_party/VERSIONS.md') }}
-        restore-keys: tpdl-
+        key: tpdl-${{ runner.os }}-${{ hashFiles('third_party/VERSIONS.md') }}
+        restore-keys: tpdl-${{ runner.os }}-
+
+    - name: third_party downloads pre-fetch
+      id: tpfetch
+      if: steps.tpdl.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        # Pre-fetch the archives the configure step downloads, with retries and backoff, so that a flaky upstream
+        # (ffmpeg.org timeouts, SSL connect errors) is absorbed here and saved to the cache at once, instead of
+        # failing configure and leaving the cache empty (actions/cache only saves after a green job). Every archive
+        # is verified against its VERSIONS.md SHA-256 (tools/third_party_offline.py). Best effort: if this still
+        # fails, configure downloads (and retries) by itself and gives the authoritative error. The cache is saved
+        # only when every archive was fetched, so a partial set never becomes the entry for this key.
+        deps="ffmpeg libaom dav1d libde265 libvmaf libplacebo"
+        case "$RUNNER_OS" in
+          Linux) deps="$deps onnx_runtime" ;;
+          macOS) deps="$deps moltenvk onnx_runtime_osx_arm64" ;;
+        esac
+        # shellcheck disable=SC2086
+        if python -I tools/third_party_offline.py --out build/third_party/downloads --only $deps; then
+          echo "complete=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "complete=false" >> "$GITHUB_OUTPUT"
+          echo "::warning::third_party pre-fetch incomplete; configure will retry the missing archives"
+        fi
+
+    - name: third_party downloads cache (save)
+      if: steps.tpdl.outputs.cache-hit != 'true' && steps.tpfetch.outputs.complete == 'true'
+      continue-on-error: true
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: build/third_party/downloads
+        key: tpdl-${{ runner.os }}-${{ hashFiles('third_party/VERSIONS.md') }}
 
     - name: ccache
       uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # v1.2.18
@@ -191,3 +240,23 @@ runs:
         # shellcheck disable=SC2086
         python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --verify-only
         echo "OVT_CORPORA_DIR=${GITHUB_WORKSPACE}/build/corpora" >> "$GITHUB_ENV"
+
+    - name: ffmpeg 6.1 in a container (tools_pytest)
+      if: inputs.ffmpeg-container == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        # After the corpora fetch on purpose: the corpus post steps keep using the archive's ffmpeg.
+        docker build -t ovt-ffmpeg-container tools/ci/ffmpeg-container
+        wrapper="${RUNNER_TEMP}/ffmpeg-container/ffmpeg"
+        mkdir -p "$(dirname "$wrapper")"
+        cat > "$wrapper" <<EOF
+        #!/bin/sh
+        # Same paths inside and outside: the workspace, the runner temp dir and /tmp are mounted at their own names.
+        case "\$PWD" in "${GITHUB_WORKSPACE}"*|"${RUNNER_TEMP}"*|/tmp*) wd="\$PWD" ;; *) wd=/tmp ;; esac
+        exec docker run --rm -i --user "\$(id -u):\$(id -g)" -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}" \\
+          -v "${RUNNER_TEMP}:${RUNNER_TEMP}" -v /tmp:/tmp -w "\$wd" ovt-ffmpeg-container ffmpeg "\$@"
+        EOF
+        chmod +x "$wrapper"
+        "$wrapper" -hide_banner -version | head -1
+        "$wrapper" -hide_banner -encoders | grep libx265
+        echo "$(dirname "$wrapper")" >> "$GITHUB_PATH"

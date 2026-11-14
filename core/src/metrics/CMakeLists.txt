@@ -1,5 +1,46 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Placeholder for the `metrics` module of libovt-core (chapter 0 §0.3). Its work items add sources to
-# ovt_core here with target_sources(ovt_core PRIVATE ...).
+# The `metrics` module of libovt-core (chapter 0 §0.3, chapter 9 §9.2.1). WI-3.300: the plugin registry, the
+# MetricJob state machine, the NormalizationConfig resolver, the JobSpec parser and the ovt/metrics.h entry
+# points. Sources go into ovt_core_objects, which ovt_core absorbs. Later work items add their directories here
+# (normalize/, align/, kernels/, vmaf/, uvq/, sidecar/, pool/, bd/, export/).
+
+# The NormalizationConfig JSON Schema (core/schema/normalization_config.schema.json) is embedded as a string
+# literal, written below ${OVT_GENERATED_DIR} at configure time; an edit of the schema re-runs configure.
+set(_ovt_norm_schema "${PROJECT_SOURCE_DIR}/core/schema/normalization_config.schema.json")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_ovt_norm_schema}")
+file(READ "${_ovt_norm_schema}" OVT_NORMALIZATION_SCHEMA_TEXT)
+configure_file(normalize/normalization_schema.inc.in "${OVT_GENERATED_DIR}/metrics/normalize/normalization_schema.inc"
+               @ONLY)
+unset(_ovt_norm_schema)
+unset(OVT_NORMALIZATION_SCHEMA_TEXT)
+
+target_sources(
+  ovt_core_objects
+  PRIVATE host/c_api.cpp
+          host/metric_job.cpp
+          host/plugin_registry.cpp
+          jobspec_json.cpp
+          kernels/psnr_hwy.cpp
+          kernels/psnr_metric.cpp
+          kernels/psnr_scalar.cpp
+          kernels/ssim_hwy.cpp
+          kernels/ssim_metric.cpp
+          kernels/ssim_scalar.cpp
+          normalize/normalization_config.cpp)
+# The ssim kernels promise bit-identical scalar and SIMD results: no fused multiply-add (WI-3.307).
+set_source_files_properties(kernels/ssim_hwy.cpp kernels/ssim_scalar.cpp TARGET_DIRECTORY ovt_core_objects
+                            PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+# Google Highway (Apache-2.0, vcpkg port highway, found in core/CMakeLists.txt) for the SIMD kernels (WI-3.306).
+target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${hwy_TARGET}>")
+# nlohmann_json (the module headers expose nlohmann::json in their signatures, core-objects rule 1, #62) and
+# the JSON Schema validator (WI-3.300 step 5; vcpkg port json-schema-validator, MIT). Both found by
+# core/CMakeLists.txt; BUILD_INTERFACE keeps them out of the export set.
+target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:${nlohmann_json_TARGET}>"
+                      PRIVATE "$<BUILD_INTERFACE:${nlohmann_json_schema_validator_TARGET}>")
+# MetricsReport.ovt_version (§9.9.3) carries the product version. ovt_version_string() lives in ovt_core only
+# (version.cpp is not part of ovt_core_objects), so the report takes the value from the same definition.
+set_source_files_properties(
+  host/c_api.cpp TARGET_DIRECTORY ovt_core_objects
+  PROPERTIES COMPILE_DEFINITIONS "OVT_VERSION_STRING_VALUE=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\"")

@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "model": "uvq",
+  "version": "1.5",
+  "versions": [
+    "1.5",
+    "1.0"
+  ],
+  "source": "https://github.com/google/uvq",
+  "commit": "c204ecc04f093e90c941cb126c7ac3d5beca0414",
+  "license": "Apache-2.0",
+  "opset": 17,
+  "labels": "labels_yt8m.txt",
+  "files": [
+    {
+      "name": "uvq15_content_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_content_fp32.onnx",
+      "bytes": 15842636,
+      "sha256": "fc0a413c693e14571a06215b283f8b143a09eb40118983d5c72a965ccf0c0a37",
+      "precision": "fp32",
+      "uvq_version": "1.5",
+      "role": "content",
+      "inputs": {
+        "rgb": [1, 3, 1080, 1920]
+      },
+      "outputs": [
+        "features"
+      ]
+    },
+    {
+      "name": "uvq15_content_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_content_fp16.onnx",
+      "bytes": 8676666,
+      "sha256": "6c10b33f1a6fac9f8e78ead6ab024b54fb8d2c1241529ac696f1702d32d93eec",
+      "precision": "fp16",
+      "uvq_version": "1.5",
+      "role": "content",
+      "inputs": {
+        "rgb": [1, 3, 1080, 1920]
+      },
+      "outputs": [
+        "features"
+      ]
+    },
+    {
+      "name": "uvq15_distortion_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_distortion_fp32.onnx",
+      "bytes": 15843032,
+      "sha256": "e643c526a147efbf11f27c592861314e105b66521d3985d6a2f454151e3f1030",
+      "precision": "fp32",
+      "uvq_version": "1.5",
+      "role": "distortion",
+      "inputs": {
+        "rgb": [1, 3, 1080, 1920]
+      },
+      "outputs": [
+        "features"
+      ]
+    },
+    {
+      "name": "uvq15_distortion_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_distortion_fp16.onnx",
+      "bytes": 8676879,
+      "sha256": "eae92c66dcfacbba9c39ed34c6bc053a5e72556a18d20486bd82870610e8b5c7",
+      "precision": "fp16",
+      "uvq_version": "1.5",
+      "role": "distortion",
+      "inputs": {
+        "rgb": [1, 3, 1080, 1920]
+      },
+      "outputs": [
+        "features"
+      ]
+    },
+    {
+      "name": "uvq15_aggregation_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_aggregation_fp32.onnx",
+      "bytes": 300000,
+      "sha256": "01ff01e42f4dacaf86a687d3d8ba825f2ed34274b8f2ddcf142caace5536407a",
+      "precision": "fp32",
+      "uvq_version": "1.5",
+      "role": "aggregation",
+      "inputs": {
+        "content": [1, 8, 8, 128],
+        "distortion": [1, 24, 24, 128]
+      },
+      "outputs": [
+        "mos"
+      ]
+    },
+    {
+      "name": "uvq15_aggregation_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq15_aggregation_fp16.onnx",
+      "bytes": 153030,
+      "sha256": "45f7c6aefe4425f0eb0bd6f53c70ec5ac13e90a9a34d203ee11fc5e27343a130",
+      "precision": "fp16",
+      "uvq_version": "1.5",
+      "role": "aggregation",
+      "inputs": {
+        "content": [1, 8, 8, 128],
+        "distortion": [1, 24, 24, 128]
+      },
+      "outputs": [
+        "mos"
+      ]
+    },
+    {
+      "name": "uvq10_content_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_content_fp32.onnx",
+      "bytes": 49451520,
+      "sha256": "1f175725f227bd0c87cf91a9a20f9d5d759e78883fc2a438a8d76561d68c5017",
+      "precision": "fp32",
+      "uvq_version": "1.0",
+      "role": "content",
+      "inputs": {
+        "rgb": [1, 3, 496, 496]
+      },
+      "outputs": [
+        "features",
+        "label_probs"
+      ]
+    },
+    {
+      "name": "uvq10_content_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_content_fp16.onnx",
+      "bytes": 25429799,
+      "sha256": "f5a3ad624343707826013b11d7411ba1d0776e1404eaf5f6cab64428686dccf9",
+      "precision": "fp16",
+      "uvq_version": "1.0",
+      "role": "content",
+      "inputs": {
+        "rgb": [1, 3, 496, 496]
+      },
+      "outputs": [
+        "features",
+        "label_probs"
+      ]
+    },
+    {
+      "name": "uvq10_compression_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_compression_fp32.onnx",
+      "bytes": 46889165,
+      "sha256": "5ee655fcbff415dceec5f9d9a1d8c47fe73fc49377597dc0c31100ee73ce50a1",
+      "precision": "fp32",
+      "uvq_version": "1.0",
+      "role": "compression",
+      "inputs": {
+        "rgb": [1, 3, 5, 720, 1280]
+      },
+      "outputs": [
+        "features",
+        "compression_level"
+      ]
+    },
+    {
+      "name": "uvq10_compression_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_compression_fp16.onnx",
+      "bytes": 25035959,
+      "sha256": "1b8ead3709646be4f620929adb5019df3483c09abfbf136a0bca423b99c6c3e5",
+      "precision": "fp16",
+      "uvq_version": "1.0",
+      "role": "compression",
+      "inputs": {
+        "rgb": [1, 3, 5, 720, 1280]
+      },
+      "outputs": [
+        "features",
+        "compression_level"
+      ]
+    },
+    {
+      "name": "uvq10_distortion_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_distortion_fp32.onnx",
+      "bytes": 59006632,
+      "sha256": "7e4437dc2e92408c834d46f1cea7e2c3aad4ddb77eb79e83e2ca7c8a53e589e7",
+      "precision": "fp32",
+      "uvq_version": "1.0",
+      "role": "distortion",
+      "inputs": {
+        "rgb": [1, 3, 720, 1280]
+      },
+      "outputs": [
+        "features",
+        "distortion_probs"
+      ]
+    },
+    {
+      "name": "uvq10_distortion_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_distortion_fp16.onnx",
+      "bytes": 30207272,
+      "sha256": "6e7a1a40ebaceeb03774125e8e8b2ab5c6bf9e2182b71b6ee215ae75ccabc73c",
+      "precision": "fp16",
+      "uvq_version": "1.0",
+      "role": "distortion",
+      "inputs": {
+        "rgb": [1, 3, 720, 1280]
+      },
+      "outputs": [
+        "features",
+        "distortion_probs"
+      ]
+    },
+    {
+      "name": "uvq10_aggregation_fp32.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_aggregation_fp32.onnx",
+      "bytes": 6261795,
+      "sha256": "0e3203262f04316f76cd374331af463800b4c38ce357e12d9101fbc408fb1aaa",
+      "precision": "fp32",
+      "uvq_version": "1.0",
+      "role": "aggregation",
+      "inputs": {
+        "compression": [1, 16, 16, 100],
+        "content": [1, 16, 16, 100],
+        "distortion": [1, 16, 16, 100]
+      },
+      "outputs": [
+        "scores"
+      ]
+    },
+    {
+      "name": "uvq10_aggregation_fp16.onnx",
+      "url": "https://github.com/openvideotools/ovt/releases/download/uvq-models-c204ecc0/uvq10_aggregation_fp16.onnx",
+      "bytes": 3169075,
+      "sha256": "7a9601c68d1b7a0711dfa7d09fe4d49e78403f450494b1ad73e656c37f2ca092",
+      "precision": "fp16",
+      "uvq_version": "1.0",
+      "role": "aggregation",
+      "inputs": {
+        "compression": [1, 16, 16, 100],
+        "content": [1, 16, 16, 100],
+        "distortion": [1, 16, 16, 100]
+      },
+      "outputs": [
+        "scores"
+      ]
+    }
+  ]
+}

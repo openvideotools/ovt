@@ -266,7 +266,7 @@ A WI MAY be split when (a) its estimated diff exceeds the PR size limit, (b) two
 ### 16.2.7 Daily mechanics
 
 - Run `ctest --preset pr` locally before pushing; run `ctest -L golden` when touching any parser, decoder plugin, exporter or metric.
-- Never commit corpus media, goldens > 2 MB uncompressed (use `.gz`/zstd as chapter 14 §14.4 prescribes), or generated FlatBuffers code.
+- Never commit corpus media, goldens > 2 MB gzip-compressed, measured on the file as committed (use `.gz`/zstd as chapter 14 §14.4 prescribes), or generated FlatBuffers code.
 - Determinism: run the WI's output twice; if bytes differ, the WI is not Done (chapter 0 §0.7.5).
 - When a third-party pin must move, that is a separate PR touching only `third_party/VERSIONS.md` and the affected script, with the golden suites re-run (chapter 13 §13.3.7).
 

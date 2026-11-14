@@ -23,6 +23,13 @@ target_include_directories(
   ovt_core PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                   "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE "${OVT_GENERATED_DIR}")
 target_link_libraries(ovt_core PRIVATE ovt::flags)
+# A sanitized libovt_core calls into the sanitizer runtime, which Clang on Linux links only into executables, not
+# into shared libraries. An installed consumer must therefore link with the same -fsanitize flags, so the exported
+# target carries them as a usage requirement (OVT_INSTALL_SANITIZER_LINK_FLAGS, cmake/OvtTesting.cmake). In-tree
+# targets get the plain flags from ovt::flags already.
+if(OVT_INSTALL_SANITIZER_LINK_FLAGS)
+  target_link_options(ovt_core INTERFACE "$<INSTALL_INTERFACE:${OVT_INSTALL_SANITIZER_LINK_FLAGS}>")
+endif()
 add_dependencies(ovt_core ovt_version_header)
 
 # Platform id in the preset spelling (linux-x64, macos-arm64, macos-x86_64, android-arm64, ...).
@@ -82,14 +89,44 @@ ovt_set_license(ovt_core "${OVT_CORE_LICENSE}")
 ovt_find_package(fmt SPDX "MIT" TARGETS fmt::fmt)
 ovt_find_package(spdlog SPDX "MIT" TARGETS spdlog::spdlog)
 ovt_find_package(flatbuffers SPDX "Apache-2.0" TARGETS flatbuffers::flatbuffers NAMES FlatBuffers)
-ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS zstd::libzstd_static zstd::libzstd)
+# The vcpkg triplets build zstd as a PIC static library that ovt_core absorbs. A distribution's static libzstd is
+# usually not PIC and cannot go into a shared library, so a system build (OVT_USE_VCPKG=OFF) links the shared one.
+if(OVT_USE_VCPKG)
+  set(_ovt_zstd_targets zstd::libzstd_static zstd::libzstd)
+else()
+  set(_ovt_zstd_targets zstd::libzstd zstd::libzstd_shared zstd::libzstd_static)
+endif()
+ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS ${_ovt_zstd_targets})
+unset(_ovt_zstd_targets)
 ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+# JSON Schema validation of NormalizationConfig (chapter 9 §9.2.4, WI-3.300); 2.4.0 exports ::validator, older
+# releases the bare name.
+ovt_find_package(nlohmann_json_schema_validator SPDX "MIT" TARGETS nlohmann_json_schema_validator::validator
+                 nlohmann_json_schema_validator)
 ovt_find_package(hwy SPDX "Apache-2.0" TARGETS hwy::hwy)
 ovt_find_package(xxHash SPDX "BSD-2-Clause" TARGETS xxHash::xxhash PKG_CONFIG libxxhash)
+# XML reader of the DASH MPD parser (WI-4.208, chapter 8 §8.10). The vcpkg triplets build it as a PIC static
+# library; a distribution's static libpugixml.a is usually not PIC, so a system build links the shared one.
+if(OVT_USE_VCPKG)
+  set(_ovt_pugixml_targets pugixml::static pugixml::pugixml)
+else()
+  set(_ovt_pugixml_targets pugixml::shared pugixml::pugixml pugixml::static)
+endif()
+ovt_find_package(pugixml SPDX "MIT" TARGETS ${_ovt_pugixml_targets})
+unset(_ovt_pugixml_targets)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
-foreach(_dep ${fmt_TARGET} ${spdlog_TARGET} ${flatbuffers_TARGET} ${zstd_TARGET} ${nlohmann_json_TARGET} ${hwy_TARGET}
-             ${xxHash_TARGET})
+foreach(
+  _dep
+  ${fmt_TARGET}
+  ${spdlog_TARGET}
+  ${flatbuffers_TARGET}
+  ${zstd_TARGET}
+  ${nlohmann_json_TARGET}
+  ${hwy_TARGET}
+  ${xxHash_TARGET}
+  ${nlohmann_json_schema_validator_TARGET}
+  ${pugixml_TARGET})
   target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
 endforeach()
 unset(_dep)

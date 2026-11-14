@@ -14,6 +14,10 @@ runs:
       with:
         preset: macos-arm64-debug
         triplet: arm64-osx-ovt
+        # The fast tests that walk the corpora (container smoke, IVF/Annex B/OBU entries, the H.265 parameter-set and
+        # decoder-plugin oracle tests) skip without OVT_CORPORA_DIR, which leaves container/ and syntax/ under the
+        # 90 % gate. Fetch the same PR-lane subset build-macos-arm64 uses, so coverage measures the tests CI runs.
+        corpora: fast
 
     - name: Configure and build with coverage
       shell: bash

@@ -9,11 +9,12 @@
 #   is included here. It defines OVT_TP_<dep>_{VERSION,URL,SHA256,LICENSE,PATCHES,ROW} per VERSIONS.md row and
 #   OVT_TP_DEPS. Editing VERSIONS.md re-runs configure. A version or hash is never written anywhere else.
 #
-#   ovt_tp_declare(<dep> [URL <url>] [SHA256 <hex>] [LICENSE <spdx>] [LICENSE_FILES <file>...] [NO_DOWNLOAD])
+#   ovt_tp_declare(<dep> [URL <url>] [SHA256 <hex>] [LICENSE <spdx>] [NO_DOWNLOAD] [LICENSE_FILES <file>...])
 #       Declares the use of the VERSIONS.md row <dep> (the lower-cased id: libaom, ffmpeg, ...). URL, SHA256
 #       and LICENSE default to the row's values and, when given, must equal them. Fails when the row is
 #       missing or has no SHA-256 yet. Downloads the archive into OVT_TP_DOWNLOADS at configure time and
 #       verifies its SHA-256; a mismatch fails configure naming the row (§13.3.7: every hash is verified).
+#       LICENSE_FILES comes last: every word after it is a file of the archive (LICENSE, PATENTS, COPYING, ...).
 #       Sets OVT_TP_<dep>_ARCHIVE to the local archive path. NO_DOWNLOAD skips the fetch (prebuilt kits
 #       verified by their own installer). Records the licence for ovt_tp_import_static().
 #
@@ -134,9 +135,23 @@ endif()
 
 # ---- ovt_tp_declare ---------------------------------------------------------------------------------
 function(ovt_tp_declare dep)
-  cmake_parse_arguments(PARSE_ARGV 1 arg "NO_DOWNLOAD" "URL;SHA256;LICENSE" "LICENSE_FILES")
+  # Every word after LICENSE_FILES is a file name, even one spelled like a keyword: most archives ship a file
+  # called LICENSE, which cmake_parse_arguments would take for the LICENSE keyword.
+  set(args ${ARGN})
+  set(arg_LICENSE_FILES "")
+  list(FIND args LICENSE_FILES files_at)
+  if(NOT files_at EQUAL -1)
+    math(EXPR first_file "${files_at} + 1")
+    list(SUBLIST args ${first_file} -1 arg_LICENSE_FILES)
+    list(SUBLIST args 0 ${files_at} args)
+  endif()
+  cmake_parse_arguments(arg "NO_DOWNLOAD" "URL;SHA256;LICENSE" "" ${args})
   if(arg_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "ovt_tp_declare(${dep}): unknown arguments ${arg_UNPARSED_ARGUMENTS}")
+  endif()
+  if(arg_KEYWORDS_MISSING_VALUES)
+    message(FATAL_ERROR "ovt_tp_declare(${dep}): ${arg_KEYWORDS_MISSING_VALUES} has no value. A licence file named "
+                        "LICENSE must be written ./LICENSE, or it is read as the LICENSE keyword.")
   endif()
   if(NOT DEFINED OVT_TP_${dep}_ROW)
     message(FATAL_ERROR "ovt_tp_declare(${dep}): third_party/VERSIONS.md has no row with id '${dep}' "
@@ -178,13 +193,34 @@ function(ovt_tp_declare dep)
     endif()
   else()
     message(STATUS "Downloading ${dep} ${OVT_TP_${dep}_VERSION}: ${url}")
-    file(DOWNLOAD "${url}" "${archive}.part" STATUS status TLS_VERIFY ON)
-    list(GET status 0 code)
-    if(NOT code EQUAL 0)
+    # Transient network failures (timeouts, TLS handshakes, 5xx) are retried with exponential backoff; the
+    # SHA-256 check below is unchanged and a mismatch is never retried.
+    set(max_attempts 5)
+    set(delay 5)
+    foreach(attempt RANGE 1 ${max_attempts})
+      file(
+        DOWNLOAD "${url}" "${archive}.part"
+        STATUS status
+        TLS_VERIFY ON
+        TIMEOUT 900
+        INACTIVITY_TIMEOUT 60)
+      list(GET status 0 code)
+      if(code EQUAL 0)
+        break()
+      endif()
       list(GET status 1 msg)
       file(REMOVE "${archive}.part")
-      message(FATAL_ERROR "ovt_tp_declare(${dep}): download of ${url} (${row}) failed: ${msg}. "
-                          "Offline builds pre-fetch with tools/third_party_offline.py --out ${OVT_TP_DOWNLOADS}.")
+      if(attempt LESS max_attempts)
+        message(
+          STATUS "Download of ${url} failed (${msg}); attempt ${attempt} of ${max_attempts}, retrying in ${delay} s")
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep ${delay})
+        math(EXPR delay "${delay} * 2")
+      endif()
+    endforeach()
+    if(NOT code EQUAL 0)
+      message(
+        FATAL_ERROR "ovt_tp_declare(${dep}): download of ${url} (${row}) failed after ${max_attempts} attempts: "
+                    "${msg}. Offline builds pre-fetch with tools/third_party_offline.py --out ${OVT_TP_DOWNLOADS}.")
     endif()
     file(SHA256 "${archive}.part" have)
     if(NOT have STREQUAL sha)

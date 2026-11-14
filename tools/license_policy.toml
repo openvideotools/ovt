@@ -54,18 +54,33 @@ ovt_render = "LGPL-2.1-or-later"
 ovt_cli = "GPL-3.0-or-later"
 ovt_cli_lib = "GPL-3.0-or-later"
 ovt_studio = "GPL-3.0-or-later"
+# The JNI glue of the Android app (WI-0.050, android/app/src/main/cpp); Android builds only.
+ovt_jni = "GPL-3.0-or-later"
 ovt_py = "GPL-3.0-or-later"
 ovt_plugin_aom = "BSD-2-Clause"
 ovt_plugin_de265 = "LGPL-3.0-or-later"
 # Probe test of the patched libde265 build (WI-0.014); the ovt_plugin_ prefix gives it the plugin rules, which allow
 # the LGPL-3.0-or-later link.
 ovt_plugin_de265_probe_tests = "LGPL-3.0-or-later"
+# The libde265 MV/QP grid oracle of WI-4.107 (same rules as the probe test).
+ovt_plugin_de265_grid_dump = "LGPL-3.0-or-later"
+# The plugin smoke test (WI-2.163) loads the plugin through the LGPL-2.1-or-later host registry.
+ovt_plugin_de265_smoke_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
+# The optional H.265 motion vector / QP plugin (WI-4.107), built from the ovt_plugin_ffmpeg sources.
+ovt_plugin_ffmpeg_hevc = "LGPL-2.1-or-later"
 ovt_plugin_hm = "BSD-3-Clause"
+# Smoke program of the HM build (WI-4.104); links only HM.
+ovt_plugin_hm_smoke = "BSD-3-Clause"
 # Test targets of the FFmpeg flavours (WI-0.012): the two probe executables and the plugin symbol-leak fixture.
 ovt_tests_ffmpeg_probe = "LGPL-2.1-or-later"
 ovt_tests_ffmpeg_plugin_probe = "LGPL-2.1-or-later"
 ovt_ffmpeg_symbol_leak_fixture = "LGPL-2.1-or-later"
+# The plugin smoke test (WI-2.169) and its framemd5 oracle.
+ovt_plugin_ffmpeg_smoke_tests = "LGPL-2.1-or-later"
+ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
+# Render tests (WI-1.400 onward): the VideoSurface init test.
+ovt_tests_render = "LGPL-2.1-or-later"
 
 # Test, fuzz-regression and helper targets of the release build tree (WI-0.032: the gate checks every target the
 # manifest lists, so each must be declared here with the licence its ovt_set_license call gives it).
@@ -113,6 +128,9 @@ test_model_schema = "LGPL-2.1-or-later"
 "plugins/ovt-plugin-ffmpeg" = "LGPL-2.1-or-later"
 "plugins/ovt-plugin-hm" = "BSD-3-Clause"
 "tools" = "LGPL-2.1-or-later"
+# WI-0.565: x264's SSIM kernel, vendored unmodified for the ssim_x264 oracle (chapter 14 §14.4.12). Built only into the
+# oracle image executable, never linked into OVT or released.
+"tests/oracles/x264_ssim" = "GPL-2.0-or-later"
 "tests" = "LGPL-2.1-or-later"
 "cmake" = "LGPL-2.1-or-later"
 "third_party" = "LGPL-2.1-or-later"

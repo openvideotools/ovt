@@ -4,7 +4,7 @@ OVT gets its libraries from three places (chapter 13 §13.3.1):
 
 | Source | What | Pinned by |
 |---|---|---|
-| vcpkg manifest (`vcpkg.json`) | fmt, spdlog, flatbuffers (library and the `flatc` host tool), zstd, nlohmann-json, highway, cli11, xxhash, catch2; later zimg, Vulkan, glslang, lcms, libpng, pybind11, benchmark, onnxruntime | `builtin-baseline` in `vcpkg.json` and the `third_party/vcpkg` submodule commit |
+| vcpkg manifest (`vcpkg.json`) | fmt, spdlog, flatbuffers (library and the `flatc` host tool), zstd, nlohmann-json, highway, cli11, xxhash, pugixml, catch2; later zimg, Vulkan, glslang, lcms, libpng, pybind11, benchmark, onnxruntime | `builtin-baseline` in `vcpkg.json` and the `third_party/vcpkg` submodule commit |
 | `third_party/*.cmake` ExternalProject scripts | FFmpeg, libaom, dav1d, libde265, HM, libvmaf, libplacebo, MoltenVK, ONNX Runtime (prebuilt fallback, `OVT_ONNXRUNTIME_PREBUILT=ON`) | `third_party/VERSIONS.md` |
 | Prebuilt | Qt 6.8.3 (aqtinstall), Android SDK/NDK | `tools/install_qt.py`, `tools/bootstrap_android.sh` |
 
@@ -49,6 +49,7 @@ stops with a message that says so.
 | nlohmann-json | `nlohmann_json` | `nlohmann_json::nlohmann_json` | `ovt_core` |
 | highway | `hwy` | `hwy::hwy` | `ovt_core` |
 | xxhash | `xxHash` (pkg-config `libxxhash` without vcpkg) | `xxHash::xxhash` | `ovt_core` |
+| pugixml | `pugixml` | `pugixml::static` (vcpkg), `pugixml::pugixml` (system) | `ovt_core` (DASH MPD parser, WI-4.208) |
 | cli11 | `CLI11` | `CLI11::CLI11` | `ovt_cli` |
 | catch2 | `Catch2` | `Catch2::Catch2WithMain` | test executables |
 
@@ -84,7 +85,7 @@ when a field was removed or retyped (chapter 6 principle P7). It reports nothing
 
 ```sh
 sudo apt install libfmt-dev libspdlog-dev libflatbuffers-dev flatbuffers-compiler libzstd-dev \
-  nlohmann-json3-dev libhwy-dev libcli11-dev libxxhash-dev catch2
+  nlohmann-json3-dev libhwy-dev libcli11-dev libxxhash-dev libpugixml-dev catch2
 cmake --preset linux-x64-debug -DOVT_USE_VCPKG=OFF
 ```
 

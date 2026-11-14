@@ -4,16 +4,24 @@
 # FFmpeg, two flavours from one pinned source (chapter 13 §13.3.3, WI-0.012). Included by cmake/OvtThirdParty.cmake
 # unless OVT_SYSTEM_FFMPEG=ON. The pin (version, URL, SHA-256) is the FFmpeg row of third_party/VERSIONS.md.
 #
-#   tp::ffmpeg_core     INTERFACE IMPORTED: the shared `core` flavour, linked by ovt_core. LGPL (never --enable-gpl
+#   tp::ffmpeg_core     INTERFACE IMPORTED: the shared `core` flavour, linked by ovt_core (static archives instead
+#                       with OVT_FFMPEG_CORE_STATIC=ON, which only the OSS-Fuzz build sets). LGPL (never --enable-gpl
 #                       unless OVT_FFMPEG_GPL_CORE_ACK), libraries renamed by --build-suffix=_ovt (libavcodec_ovt.so,
-#                       libavcodec_ovt.pc) so a system FFmpeg in the same process does not clash. No h264/hevc
-#                       decoders or hwaccels unless OVT_PATENT_CODECS_IN_CORE=ON. Per library:
+#                       libavcodec_ovt.pc) so a system FFmpeg in the same process does not clash. Keeps the h264/hevc
+#                       decoders, their hwaccels and the other pool-covered decoders unless
+#                       OVT_PATENT_CODECS_IN_CORE=OFF (the split build; ON is the default). Per library:
 #                       tp::ffmpeg_core_<lib> (SHARED IMPORTED) for <lib> in avformat avcodec swscale swresample avutil.
 #   tp::ffmpeg_plugin   STATIC-archive INTERFACE IMPORTED: the `plugin` flavour, linked only by ovt_plugin_ffmpeg.
 #                       h264/hevc decoders and the platform h264/hevc hwaccels, nothing else decodes. The shared
 #                       object linking it calls ovt_ffmpeg_hide_symbols() so no av* symbol leaves the plugin.
 #                       Per library: tp::ffmpeg_plugin_<lib> (STATIC IMPORTED). Built only with
 #                       OVT_BUILD_PLUGIN_FFMPEG=ON.
+#
+# Patches: the plugin flavour applies the series plugins/ovt-plugin-ffmpeg/patches/series (chapter 07 §7.6.3, the
+# block-params side data of WI-4.100/4.101) through tools/apply_patches.py (§13.3.6), which records them in
+# ffmpeg-plugin/share/ovt/patches.json; the core flavour applies third_party/patches/ffmpeg (none). A changed series
+# or patch re-extracts the pristine tarball. SPEC-ASSUMPTION(#331): the plugin flavour is patched whatever
+# OVT_FFMPEG_GPL is (the patch is LGPL-2.1-or-later), never the core flavour.
 #
 # Each flavour is its own ExternalProject (tp_ffmpeg_core, tp_ffmpeg_plugin) extracting the archive into its own
 # SOURCE_DIR: two configures in one tree overwrite each other's config.h (WI-0.012 pitfall). Both install into
@@ -28,6 +36,10 @@
 include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
 include("${CMAKE_CURRENT_LIST_DIR}/ffmpeg/configure_flags.cmake")
+
+set(OVT_FFMPEG_PLUGIN_PATCH_SERIES "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-ffmpeg/patches/series"
+    CACHE FILEPATH "Series of the patches applied to the FFmpeg plugin flavour (chapter 13 §13.3.6)")
+cmake_path(NORMAL_PATH OVT_FFMPEG_PLUGIN_PATCH_SERIES)
 
 # LICENSE stays the row's prose cell; each imported target below records its own SPDX id.
 ovt_tp_declare(ffmpeg LICENSE_FILES COPYING.LGPLv2.1 COPYING.GPLv2 LICENSE.md)
@@ -225,12 +237,22 @@ function(_ovt_ffmpeg_flavour flavour)
   set(prefix "${OVT_THIRD_PARTY_PREFIX}/ffmpeg-${flavour}")
   set(src "${prefix}/src/ffmpeg")
   set(bin "${prefix}/src/build")
+  set(static OFF)
+  if(flavour STREQUAL "plugin" OR OVT_FFMPEG_CORE_STATIC)
+    set(static ON)
+  endif()
   if(flavour STREQUAL "core")
     set(gpl ${_ovt_ff_core_gpl})
     set(depends ${_ovt_ff_core_depends})
+    set(patch_command ${OVT_TP_PATCH} ${CMAKE_SOURCE_DIR}/third_party/patches/ffmpeg)
+    set(patch_files "")
   else()
     set(gpl ${_ovt_ff_plugin_gpl})
     set(depends "")
+    ovt_tp_apply_patches(patch_command SERIES "${OVT_FFMPEG_PLUGIN_PATCH_SERIES}" INSTALL_DIR "${prefix}")
+    cmake_path(GET OVT_FFMPEG_PLUGIN_PATCH_SERIES PARENT_PATH patch_dir)
+    file(GLOB patch_files CONFIGURE_DEPENDS "${patch_dir}/*.patch")
+    list(APPEND patch_files "${OVT_FFMPEG_PLUGIN_PATCH_SERIES}")
   endif()
 
   ovt_ffmpeg_configure_flags(
@@ -246,7 +268,9 @@ function(_ovt_ffmpeg_flavour flavour)
     GPL
     ${gpl}
     DAV1D
-    ${_ovt_ff_dav1d})
+    ${_ovt_ff_dav1d}
+    STATIC
+    ${static})
 
   set(cflags "-ffile-prefix-map=${src}=ffmpeg -ffile-prefix-map=${bin}=ffmpeg-build ${_ovt_ff_cflags}")
   string(STRIP "${cflags}" cflags)
@@ -254,7 +278,7 @@ function(_ovt_ffmpeg_flavour flavour)
   if(_ovt_ff_ldflags)
     list(APPEND configure_args "--extra-ldflags=${_ovt_ff_ldflags}")
   endif()
-  if(flavour STREQUAL "core" AND _ovt_ff_platform STREQUAL "linux")
+  if(flavour STREQUAL "core" AND NOT static AND _ovt_ff_platform STREQUAL "linux")
     # libavcodec_ovt.so needs libswresample_ovt.so etc. from its own directory. An executable's DT_RUNPATH does not
     # apply to the dependencies of its libraries, so each library carries RUNPATH $ORIGIN (relocatable, no build
     # path). configure and make both re-evaluate `$`, so the flag travels in a compiler response file instead.
@@ -266,7 +290,9 @@ function(_ovt_ffmpeg_flavour flavour)
 
   set(byproducts "")
   foreach(lib IN LISTS OVT_FFMPEG_LIBS)
-    if(flavour STREQUAL "core")
+    if(flavour STREQUAL "core" AND static)
+      list(APPEND byproducts "${prefix}/lib/lib${lib}_ovt.a")
+    elseif(flavour STREQUAL "core")
       list(APPEND byproducts "${prefix}/lib/lib${lib}_ovt${CMAKE_SHARED_LIBRARY_SUFFIX}")
     else()
       list(APPEND byproducts "${prefix}/lib/lib${lib}.a")
@@ -317,7 +343,7 @@ function(_ovt_ffmpeg_flavour flavour)
     BINARY_DIR ${bin}
     INSTALL_DIR ${prefix}
     DEPENDS ${depends}
-    PATCH_COMMAND ${OVT_TP_PATCH} ${CMAKE_SOURCE_DIR}/third_party/patches/ffmpeg
+    PATCH_COMMAND ${patch_command}
     CONFIGURE_COMMAND sh ${script}
     BUILD_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} -j${_ovt_ff_jobs}
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env "GIT_CEILING_DIRECTORIES=${prefix}/src" ${OVT_MAKE} install
@@ -326,6 +352,9 @@ function(_ovt_ffmpeg_flavour flavour)
     LOG_OUTPUT_ON_FAILURE ON)
 
   externalproject_add_stepdependencies(tp_ffmpeg_${flavour} configure "${script}")
+  if(patch_files)
+    externalproject_add_stepdependencies(tp_ffmpeg_${flavour} download ${patch_files})
+  endif()
 
   # INTERFACE_INCLUDE_DIRECTORIES must exist at generate time, before the build installs anything.
   file(MAKE_DIRECTORY "${prefix}/include")
@@ -336,6 +365,9 @@ function(_ovt_ffmpeg_flavour flavour)
       set(spdx "GPL-2.0-or-later")
     endif()
     set(linkage shared)
+    if(static)
+      set(linkage static)
+    endif()
   else()
     set(spdx "LGPL-2.1-or-later")
     if(gpl)
@@ -348,7 +380,10 @@ function(_ovt_ffmpeg_flavour flavour)
   set(components "")
   foreach(lib IN LISTS OVT_FFMPEG_LIBS)
     set(t tp::ffmpeg_${flavour}_${lib})
-    if(flavour STREQUAL "core")
+    if(flavour STREQUAL "core" AND static)
+      add_library(${t} STATIC IMPORTED GLOBAL)
+      set(location "${prefix}/lib/lib${lib}_ovt.a")
+    elseif(flavour STREQUAL "core")
       add_library(${t} SHARED IMPORTED GLOBAL)
       set(location "${prefix}/lib/lib${lib}_ovt${CMAKE_SHARED_LIBRARY_SUFFIX}")
     else()
@@ -371,7 +406,14 @@ function(_ovt_ffmpeg_flavour flavour)
     list(APPEND components ${t})
   endforeach()
 
-  if(flavour STREQUAL "core")
+  if(flavour STREQUAL "core" AND static)
+    # The archives carry no DT_NEEDED: name what libavcodec_ovt.so would have pulled in (libdav1d, zlib, libm, ...).
+    set(extra "")
+    if(_ovt_ff_dav1d)
+      list(APPEND extra tp::dav1d)
+    endif()
+    target_link_libraries(tp::ffmpeg_core INTERFACE ${components} ${extra} ${_ovt_ff_platform_libs})
+  elseif(flavour STREQUAL "core")
     target_link_libraries(tp::ffmpeg_core INTERFACE ${components})
   else()
     # Static archives need the platform libraries; the symbol hiding of §13.3.3 is applied by the shared object
@@ -395,6 +437,12 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
   _ovt_ffmpeg_flavour(plugin)
 endif()
 
-message(STATUS "OVT: FFmpeg ${OVT_TP_ffmpeg_VERSION} core (shared, _ovt) and plugin (static) flavours for "
-               "${_ovt_ff_platform}; patent codecs in core: ${OVT_PATENT_CODECS_IN_CORE}; hwaccels: "
-               "${OVT_ENABLE_HW_DECODE}; GPL core/plugin: ${_ovt_ff_core_gpl}/${_ovt_ff_plugin_gpl}")
+if(OVT_FFMPEG_CORE_STATIC)
+  set(_ovt_ff_core_kind static)
+else()
+  set(_ovt_ff_core_kind shared)
+endif()
+message(
+  STATUS "OVT: FFmpeg ${OVT_TP_ffmpeg_VERSION} core (${_ovt_ff_core_kind}, _ovt) and plugin (static) flavours for "
+         "${_ovt_ff_platform}; patent codecs in core: ${OVT_PATENT_CODECS_IN_CORE}; hwaccels: "
+         "${OVT_ENABLE_HW_DECODE}; GPL core/plugin: ${_ovt_ff_core_gpl}/${_ovt_ff_plugin_gpl}")

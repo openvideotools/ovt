@@ -68,3 +68,45 @@ A tolerance applies only when one number is a double (integers are exact). Witho
 `isobmff/ovt_min_structural.mp4` (2 KiB) is walked into a `ContainerTree` by `isobmff/box_tree_main.cpp`, converted by
 `to_canonical` and compared with `isobmff/ovt_min_structural.pybox.json`, written by the independent walker
 `isobmff/gen_min_mp4.py` (`--check` verifies both files). It moves to `ovt probe` when the container parser exists.
+
+## H.264/HEVC oracle goldens (WI-0.567)
+
+`h264/`, `h265/` and `epb/` are written by `tools/goldens/gen_h26x.py` in the oracle image (workflow `goldens-h26x`), never
+by hand. They are stored **gzip-compressed** (`<id>.<tool>.json.gz`, no name or time in the gzip header, so the bytes are
+reproducible): the repository keeps every version for ever, and the plain JSON of 250 goldens is about 38 MB. A test
+reads them with `gzip.open` / zlib; the canonical JSON inside is exactly what §14.4.0 describes. Each golden covers the first
+pictures of its stream (`h26x-index.json` records how many, the SHA-256 of the corpus file used, and every skipped oracle
+with the reason). `KNOWN_DIFFS.md` lists documented disagreements between `trace_headers` and `gstparse`.
+
+## Metric oracle goldens (WI-0.565)
+
+`metrics/` is written by `tools/goldens/gen_metrics.py` in the oracle image (workflow `goldens-metrics`), never by hand.
+Each pair is the reference and the distorted Y4M file cut to its first N pictures (48 for the Netflix pair, 60 for the
+two 1080p `syn_metrics_*` pairs; `metrics-index.json` records N, the SHA-256 of the cut inputs, the oracle versions and
+every skipped step). Files, all `scores` JSON, gzip-compressed like the WI-0.567 goldens:
+
+| File | Oracle | Spec |
+|---|---|---|
+| `<pair>.ffpsnr.json.gz` | FFmpeg `psnr` filter (values printed with `%0.2f`) | §14.4.10 |
+| `<pair>.ffvmaf.json.gz` | FFmpeg `libvmaf` filter, `vmaf_v0.6.1` + `psnr`, `float_ssim` | §14.4.10 |
+| `<pair>.<model>.vmaf.json.gz` | `vmaf` CLI, every bundled model, features `psnr float_ssim float_ms_ssim psnr_hvs ciede cambi`; `<pair>.vmaf_v0.6.1-sub5.vmaf.json.gz` is `--subsample 5` | §14.4.11 |
+| `<pair>.x264ssim.json.gz` | `x264_ssim` (`tests/oracles/x264_ssim`: x264's own SSIM kernel, built from the repository by the generator) | §14.4.12 |
+| `<pair>.psnrhvs.json.gz`, `<pair>.ciede.json.gz` | Daala `dump_psnrhvs -y`, `dump_ciede2000` (8-bit pairs; skipped for the 10-bit pair when the tools refuse it) | §14.4.13 |
+| `bd/<set>.bd.json` | `bjontegaard` for every `rd_points/<set>.json` (`jvet4_*`: four points, `cubic` included; `aom6_*`: six points, no `cubic`; `*_partial`: partly overlapping curves) | §14.4.13 |
+
+The pairs are `netflix_src01_576x324`, `syn_metrics_1080p` and `syn_metrics_pq_1080p` (10-bit). The generator fails when
+the pooled `vmaf_v0.6.1` mean of the Netflix pair is not Netflix's published 76.6689 (acceptance test 1) or when
+`x264_ssim` on the x264 reconstruction of the Netflix reference differs from the `SSIM Mean Y` of `x264 --ssim` by more
+than 1e-4 (acceptance test 3). Acceptance test 2 (determinism) is the workflow's second run: both runs must be
+byte-identical. UVQ goldens are WI-0.565b (below). Spec questions: #306.
+
+## UVQ goldens (WI-0.565b)
+
+`metrics/<clip>.uvq-<ver>.json.gz` (`ver` is `1.5` or `1.0`) for the `ytugc` `fast` clips `ytugc_clip01` to `03`,
+written by `tools/goldens/gen_uvq.py` in the oracle image (workflow `goldens-uvq`), never by hand. The oracle is
+google/uvq (PyTorch, the revision pinned in `tests/oracles/Dockerfile`) as `uvq_inference.py --model_version <ver>
+--device cpu --threads 1 --fps 1`, normalised by `tests/oracles/normalize/uvq.py` (`scores`, gzip like the other
+metric goldens). UVQ 1.5 has one `frames` entry per sampled frame (`i` is the source frame index) and
+`pooled.uvq.mean`; UVQ 1.0 has no per-frame values and keeps its sub-network scores in `pooled.uvq`. `uvq-index.json`
+records the clip hashes and the oracle revision. The workflow runs the generator twice and the outputs must be
+byte-identical (acceptance test 2). Spec questions: #306.

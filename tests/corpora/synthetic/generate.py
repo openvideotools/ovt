@@ -13,7 +13,7 @@ defaults to the fetcher's cache dir (``$OVT_CORPORA_DIR`` or the platform cache 
 
 Every command is an argv list (no shell). Placeholders: ``{python}`` (this interpreter), ``{repo}``,
 ``{hm_cfg}`` / ``{jm_cfg}`` (HM and JM encoder config dirs of the oracle image, overridable with
-``$OVT_HM_CFG_DIR`` / ``$OVT_JM_CFG_DIR``), ``{corpus:ID}`` (a fetched or generated corpus file),
+``$OVT_HM_CFG_DIR`` / ``$OVT_JM_CFG_DIR``), ``{corpus:ID}`` (a fetched or generated corpus's primary file; ``{corpus:ID:NAME}`` picks the file NAME of that corpus),
 ``{glob:PATTERN}`` (the matching work-dir files in natural order, one argument each) and ``{out}`` (fixture
 path). Intermediates live in ``<out>/.work``. Every step runs with ``SOURCE_DATE_EPOCH=0``, ``TZ=UTC`` and
 stdin closed.
@@ -23,11 +23,13 @@ Before anything is written, the version probe of every tool the selected recipes
 
 ``--check`` compares every produced hash with ``tests/corpora/manifest.json`` and exits 5 on a difference
 or on an entry whose hash is not recorded yet; ``--update-manifest`` writes the produced hashes into the
-manifest instead (the maintainer's regeneration mode). ``--sync-manifest`` rewrites the ``syn`` stream entries
-of the manifest from ``recipes.json`` (ids, features, tags, aliases), keeping recorded hashes. ``local_only`` recipes (the perf files) run only with
-``--local-only`` or when named by ``--only``. A recipe whose ``{corpus:ID}`` input is a ``manual_download``
-corpus missing from the cache is skipped, with the reason logged, unless ``--only`` names it. ``--fixtures`` runs the non-stream fixture generators instead of
-the stream recipes.
+manifest instead (the maintainer's regeneration mode). ``--sync-manifest`` rewrites the ``syn`` stream and
+fixture entries of the manifest from ``recipes.json`` (ids, features, tags, aliases, paths), keeping recorded
+hashes. ``local_only`` recipes (the perf files) run only with ``--local-only`` or when named by ``--only``.
+A recipe whose ``{corpus:ID}`` input is a ``manual_download`` corpus missing from the cache is skipped, with the
+reason logged, unless ``--only`` names it. ``--fixtures`` runs the non-stream fixture generators instead of the
+stream recipes and writes each fixture to its repository path (``kind: "fixture"`` entries; ``--check`` and
+``--update-manifest`` apply to them too).
 
 Exit codes: 0 success; 1 a step failed; 2 usage; 4 invalid recipes, unknown id, missing tool or helper;
 5 pin mismatch or hash mismatch.
@@ -200,6 +202,12 @@ def load_recipes(path: Path) -> dict[str, Any]:
         if not rec.get("files"):
             raise GenError(EXIT_INVALID, f"recipes.json: {rid} has no files")
         ids[rid] = rec
+    fixture_ids: set[str] = set()
+    for fixture in doc.get("fixtures", []):
+        fid = fixture.get("id", "")
+        if not re.fullmatch(r"fixture_[A-Za-z0-9_]{1,56}", fid) or fid in fixture_ids or not fixture.get("path"):
+            raise GenError(EXIT_INVALID, f"recipes.json: invalid or duplicate fixture id {fid!r}")
+        fixture_ids.add(fid)
     for item in [*doc["sources"], *doc["recipes"]]:
         for need in item.get("needs", []):
             if need not in sources and need not in ids:
@@ -322,9 +330,9 @@ class Runner:
             return names
 
         def corpus(m: re.Match[str]) -> str:
-            return str(corpus_file(self.out, m.group(1)))
+            return str(corpus_file(self.out, m.group(1), m.group(2)))
 
-        arg = re.sub(r"\{corpus:([A-Za-z0-9_]+)\}", corpus, arg)
+        arg = CORPUS_REF.sub(corpus, arg)
         subst = {
             "{python}": sys.executable,
             "{repo}": str(REPO),
@@ -410,14 +418,20 @@ class Runner:
         return record
 
 
-def corpus_file(out: Path, cid: str) -> Path:
-    """The primary file of a generated or fetched corpus id (its .ok record)."""
+CORPUS_REF = re.compile(r"\{corpus:([A-Za-z0-9_]+)(?::([A-Za-z0-9_][A-Za-z0-9_.-]*))?\}")
+
+
+def corpus_file(out: Path, cid: str, name: str | None = None) -> Path:
+    """The primary file of a generated or fetched corpus id (its .ok record), or its file ``name`` when given."""
     for root in (out, Path(os.environ.get("OVT_CORPORA_DIR", out))):
         try:
             record = json.loads((root / cid / ".ok").read_text(encoding="utf-8"))
-            return root / cid / record["primary"]
+            picked = root / cid / (name or record["primary"])
         except (OSError, ValueError, KeyError):
             continue
+        if name is None or picked.is_file():
+            return picked
+        raise GenError(EXIT_STEP, f"corpus {cid} has no file {name} (its files: {sorted(record.get('files', []))})")
     raise GenError(EXIT_STEP, f"corpus {cid} is not available (fetch it with tools/fetch_corpora.py --ids {cid})")
 
 
@@ -435,7 +449,7 @@ def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path,
         for step in rec["steps"]:
             for argv in step_argvs(step):
                 for arg in argv:
-                    for cid in re.findall(r"\{corpus:([A-Za-z0-9_]+)\}", arg):
+                    for cid, _name in CORPUS_REF.findall(arg):
                         if cid not in manual or rid in gaps:
                             continue
                         try:
@@ -449,12 +463,13 @@ def manual_corpus_gaps(doc: dict[str, Any], manifest: dict[str, Any], out: Path,
 
 
 def missing_helpers(items: list[dict[str, Any]]) -> list[str]:
+    """Repo files a recipe reads (helper scripts, data files). Output directories (``--out-dir X``) are created, not read."""
     missing = set()
     for item in items:
         for step in item["steps"]:
             for argv in step_argvs(step):
-                for arg in argv:
-                    if arg.startswith("{repo}/"):
+                for prev, arg in zip(["", *argv], argv):
+                    if arg.startswith("{repo}/") and prev != "--out-dir":
                         path = REPO / arg[len("{repo}/") :]
                         if not path.exists():
                             missing.add(arg[len("{repo}/") :])
@@ -465,13 +480,19 @@ def missing_helpers(items: list[dict[str, Any]]) -> list[str]:
 
 
 def manifest_entry(rec: dict[str, Any]) -> dict[str, Any]:
-    """The manifest entry of a recipe id, without hashes (``unverified`` until generated in the oracle image)."""
-    entry: dict[str, Any] = {"id": rec["id"], "source": "syn", "kind": "stream", "recipe": rec["recipe"]}
+    """The manifest entry of a recipe id or fixture, without hashes (``unverified`` until generated)."""
+    entry: dict[str, Any] = {"id": rec["id"], "source": "syn"}
+    if "path" in rec:
+        entry.update(kind="fixture", path=rec["path"])
+    else:
+        entry.update(kind="stream", recipe=rec["recipe"])
     entry.update(rec.get("licence_override", SYN_LICENCE))
     entry["unverified"] = True
     for key in ("features", "tags", "aliases"):
         if rec.get(key):
             entry[key] = list(rec[key])
+    if rec.get("expected"):
+        entry["expected"] = dict(rec["expected"])  # container tests (WI-1.237)
     if rec.get("local_only"):
         entry["local_only"] = True
     return entry
@@ -498,8 +519,8 @@ def sync_manifest(path: Path, doc: dict[str, Any]) -> None:
     """
     manifest = json.loads(path.read_text(encoding="utf-8"))
     old = {e["id"]: e for e in manifest["entries"]}
-    kept = [e for e in manifest["entries"] if not (e["source"] == "syn" and e.get("kind") == "stream")]
-    for rec in doc["recipes"]:
+    kept = [e for e in manifest["entries"] if not (e["source"] == "syn" and e.get("kind") in ("stream", "fixture"))]
+    for rec in [*doc["recipes"], *doc["fixtures"]]:
         prev = old.get(rec["id"], {})
         if prev and "kind" not in prev:
             continue  # written by the WI that owns the generator (recipe 73: WI-1.413); kept as it is
@@ -546,20 +567,53 @@ def default_out() -> Path:
     return cache_dir_for(None)
 
 
-def run_fixtures(doc: dict[str, Any], out: Path) -> int:
-    items = [{"steps": [{"cmd": f["cmd"]}]} for f in doc["fixtures"]]
+def run_fixtures(doc: dict[str, Any], out: Path, local_only: bool) -> dict[str, dict[str, Any]]:
+    """Run the non-stream fixture generators; returns ``{id: record}`` like the stream recipes.
+
+    A ``local_only`` fixture (the perf inputs) runs only with ``--local-only``. A fixture made by ``ovt`` itself
+    is skipped, with a note, while no ``ovt`` binary is on PATH (``ovt analyze`` arrives with WI-2.174).
+    """
+    chosen = []
+    for fixture in doc["fixtures"]:
+        if fixture.get("local_only") and not local_only:
+            continue
+        if fixture["cmd"][0] == "ovt" and shutil.which("ovt") is None:
+            log(f"skip {fixture['id']}: needs the ovt CLI on PATH")
+            continue
+        chosen.append(fixture)
+    items = [{"steps": [{"cmd": f["cmd"]}]} for f in chosen]
     if missing := missing_helpers(items):
         raise GenError(EXIT_INVALID, "missing fixture generator(s): " + ", ".join(missing))
     check_pins(doc, tools_of(items))
     work = out / ".work"
     work.mkdir(parents=True, exist_ok=True)
     runner = Runner(out, work)
+    results: dict[str, dict[str, Any]] = {}
     with (work / "fixtures.log").open("wb") as logf:
-        for fixture in doc["fixtures"]:
+        for fixture in chosen:
             target = REPO / fixture["path"]
             target.parent.mkdir(parents=True, exist_ok=True)
             runner.run_step({"cmd": fixture["cmd"]}, logf, {"{out}": str(target)})
-            print(f"{sha256_file(target)}  {fixture['path']}")
+            files = {Path(p).name: sha256_file(REPO / p) for p in [fixture["path"], *fixture.get("outputs", [])]}
+            results[fixture["id"]] = {
+                "sha256": files[target.name],
+                "files": files,
+                "size_bytes": target.stat().st_size,
+            }
+            print(f"{results[fixture['id']]['sha256']}  {fixture['id']}")
+    return results
+
+
+def finish(
+    args: argparse.Namespace, manifest: dict[str, Any], results: dict[str, Any], versions: dict[str, str]
+) -> int:
+    if args.update_manifest:
+        update_manifest(args.manifest, manifest, results)
+    if args.check and (problems := compare(manifest, results)):
+        log("hash mismatch against the manifest:\n  " + "\n  ".join(problems))
+        if versions:
+            log("encoder versions:\n  " + "\n  ".join(f"{t}: {v}" for t, v in versions.items()))
+        return EXIT_MISMATCH
     return EXIT_OK
 
 
@@ -572,7 +626,9 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_OK
         out = (args.out or default_out()).resolve()
         if args.fixtures:
-            return run_fixtures(doc, out)
+            manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+            results = run_fixtures(doc, out, args.local_only)
+            return finish(args, manifest, results, {})
         only = [i for i in args.only.split(",") if i]
         wanted = select(doc, only, args.local_only)
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -592,20 +648,14 @@ def main(argv: list[str] | None = None) -> int:
         shutil.rmtree(work, ignore_errors=True)
         work.mkdir(parents=True)
         runner = Runner(out, work)
-        results: dict[str, dict[str, Any]] = {}
+        results = {}
         for item in items:
             log(f"generate {item.get('id', item.get('file'))}")
             runner.run_item(item)
             if "id" in item:
                 results[item["id"]] = runner.collect(item)
                 print(f"{results[item['id']]['sha256']}  {item['id']}")
-        if args.update_manifest:
-            update_manifest(args.manifest, manifest, results)
-        if args.check and (problems := compare(manifest, results)):
-            log("hash mismatch against the manifest:\n  " + "\n  ".join(problems))
-            log("encoder versions:\n  " + "\n  ".join(f"{t}: {v}" for t, v in versions.items()))
-            return EXIT_MISMATCH
-        return EXIT_OK
+        return finish(args, manifest, results, versions)
     except GenError as exc:
         log(f"error: {exc}")
         return exc.code

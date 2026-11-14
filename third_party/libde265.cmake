@@ -15,6 +15,8 @@
 # kept out of the default downloads (tools/license_policy.toml [distribution]). The archive's COPYING is
 # kept with the build. ENABLE_ENCODER=OFF drops the enc265 tool; ENABLE_DECODER=OFF drops the dec265 tool;
 # these and ENABLE_SDL/BUILD_SHARED_LIBS are the only options of the pinned libde265 (chapter 07 §7.6.2).
+# DE265_INTERNALS is added by patch 0001 (WI-2.162): ON builds and installs the read-only internals API
+# libde265/de265_internals.h that the plugin reads per-block data through; OFF would build exactly upstream.
 
 include_guard(GLOBAL)
 include(OvtThirdPartyCommon)
@@ -23,7 +25,10 @@ set(OVT_DE265_PATCH_SERIES "${CMAKE_CURRENT_LIST_DIR}/../plugins/ovt-plugin-de26
     CACHE FILEPATH "Quilt-style series of the libde265 patches (chapter 13 §13.3.6)")
 cmake_path(NORMAL_PATH OVT_DE265_PATCH_SERIES)
 
-ovt_tp_declare(libde265 LICENSE_FILES COPYING)
+# libde265/md5.cc is public domain (Alexander Peslyak) with a fallback grant that COPYING does not carry:
+# third_party/licenses/libde265/.
+ovt_tp_declare(libde265 LICENSE_FILES COPYING
+               ${CMAKE_CURRENT_LIST_DIR}/licenses/libde265/md5-LicenseRef-Peslyak-md5-public-domain.txt)
 
 set(_ovt_de265_prefix "${OVT_THIRD_PARTY_PREFIX}/libde265")
 ovt_tp_apply_patches(_ovt_de265_patch SERIES "${OVT_DE265_PATCH_SERIES}" INSTALL_DIR "${_ovt_de265_prefix}")
@@ -32,6 +37,20 @@ ovt_tp_apply_patches(_ovt_de265_patch SERIES "${OVT_DE265_PATCH_SERIES}" INSTALL
 # step never meets a tree patched with another series. An unchanged series leaves every stamp as it is.
 cmake_path(GET OVT_DE265_PATCH_SERIES PARENT_PATH _ovt_de265_patch_dir)
 file(GLOB _ovt_de265_patch_files CONFIGURE_DEPENDS "${_ovt_de265_patch_dir}/*.patch")
+
+# UBSan: libde265 left-shifts negative coefficients on purpose (for example transform_skip_residual_fallback() in
+# fallback-dct.cc, still so in 1.0.16), which -fsanitize=shift-base reports as undefined behaviour in C++11 (C++20
+# defines it as the arithmetic shift every supported compiler emits). Suppression files cannot silence it under
+# -fno-sanitize-recover=all, so this one check is turned off for libde265 only; every other check stays on and OVT's
+# own code keeps shift-base. The flags repeat OVT_TP_SANITIZER_C_FLAGS, because this later -D replaces the one in
+# OVT_TP_CMAKE_TOOLCHAIN_ARGS. Tracked in https://github.com/openvideotools/ovt/issues/236; remove when the pin
+# includes an upstream fix.
+set(_ovt_de265_flag_args "")
+if(OVT_TP_SANITIZER_C_FLAGS MATCHES "-fsanitize=[^ ]*undefined")
+  set(_ovt_de265_cflags "${OVT_TP_SANITIZER_C_FLAGS} -fno-sanitize=shift-base")
+  set(_ovt_de265_flag_args "-DCMAKE_C_FLAGS=${_ovt_de265_cflags}" "-DCMAKE_CXX_FLAGS=${_ovt_de265_cflags}")
+  unset(_ovt_de265_cflags)
+endif()
 
 externalproject_add(
   tp_libde265
@@ -43,6 +62,7 @@ externalproject_add(
   INSTALL_DIR ${_ovt_de265_prefix}
   PATCH_COMMAND ${_ovt_de265_patch}
   CMAKE_ARGS ${OVT_TP_CMAKE_TOOLCHAIN_ARGS}
+             ${_ovt_de265_flag_args}
              -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
              # The pinned libde265 asks for CMake 3.3.2; CMake 4 refuses anything below 3.5 without this.
              -DCMAKE_POLICY_VERSION_MINIMUM=3.5
@@ -52,6 +72,7 @@ externalproject_add(
              -DENABLE_SDL=OFF
              -DENABLE_DECODER=OFF
              -DENABLE_ENCODER=OFF
+             -DDE265_INTERNALS=ON
   BUILD_BYPRODUCTS <INSTALL_DIR>/lib/libde265.a)
 externalproject_add_stepdependencies(tp_libde265 download "${OVT_DE265_PATCH_SERIES}" ${_ovt_de265_patch_files})
 
@@ -66,3 +87,4 @@ unset(_ovt_de265_prefix)
 unset(_ovt_de265_patch)
 unset(_ovt_de265_patch_dir)
 unset(_ovt_de265_patch_files)
+unset(_ovt_de265_flag_args)

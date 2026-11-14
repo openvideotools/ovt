@@ -20,14 +20,11 @@
 #include <string>
 #include <utility>
 
+#include "io/ovt_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/cxx/log.hpp"
 #include "ovt/io.h"
 #include "ovt/status.h"
-
-struct ovt_File {
-  std::unique_ptr<ovt::io::RandomAccessFile> file;
-};
 
 namespace {
 

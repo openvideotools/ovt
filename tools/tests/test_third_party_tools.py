@@ -116,6 +116,27 @@ def test_check_flags_a_script_that_spells_its_version(tmp_path: Path) -> None:
     assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 0
 
 
+def test_git_row_is_pinned_by_its_commit(tmp_path: Path) -> None:
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    row = vtc.parse(table(f"| Bar | BAR-2.0 (`{commit}`) | MIT | <https://e.org/bar.git> | – | – (git) | x | |"))[0]
+    assert row.commit == commit and row.sha256 == ""
+    assert f'set(OVT_TP_bar_COMMIT "{commit}")' in vtc.to_cmake([row], Path("VERSIONS.md"))
+    assert vtc.parse(table("| Foo | 1.0 | MIT | – | – | – | x | |"))[0].commit == ""
+    # The script of a git row reads OVT_TP_<dep>_COMMIT, not _SHA256, and never spells the commit.
+    (tmp_path / "third_party").mkdir()
+    script = tmp_path / "third_party" / "bar.cmake"
+    versions = tmp_path / "VERSIONS.md"
+    versions.write_text(
+        table(f"| bar | BAR-2.0 (`{commit}`) | MIT | <https://e.org/bar.git> | – | – | third_party/bar.cmake | |")
+    )
+    script.write_text("URL ${OVT_TP_bar_URL} SHA ${OVT_TP_bar_SHA256}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 1
+    script.write_text(f"URL ${{OVT_TP_bar_URL}} COMMIT ${{OVT_TP_bar_COMMIT}} {commit}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 1
+    script.write_text("URL ${OVT_TP_bar_URL} COMMIT ${OVT_TP_bar_COMMIT}\n")
+    assert vtc.main(["--versions", str(versions), "--check", "--source-dir", str(tmp_path)]) == 0
+
+
 def test_template_passes_the_script_check() -> None:
     rows = vtc.parse(table("| mydep | 1.0 | MIT | – | – | – | third_party/_template.cmake | |"))
     assert vtc.check_scripts(rows, REPO) == []
@@ -236,6 +257,33 @@ def test_failing_patch_is_named_and_nothing_is_applied(tmp_path: Path, capsys: p
     assert not (src / apply_patches.MARKER).exists()
 
 
+def test_check_is_cumulative_and_leaves_the_tree_alone_on_failure(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # 0002 changes the line 0001 wrote, as FFmpeg patch 0002 (WI-4.107) builds on 0001: --check applies the series
+    # in order to a scratch copy, so it passes; a later patch that fails is named and nothing is applied.
+    src = source_tree(tmp_path)
+    (src / "other.txt").write_text("untouched\n")
+    second = PATCH.replace("-hello\n+hello, patched\n", "-hello, patched\n+hello, patched twice\n")
+    d = patches_dir(tmp_path, ("0001-greeting.patch", PATCH), ("0002-on-top.patch", second))
+    assert apply_patches.main(["--check", "--dir", str(d), "--source", str(src)]) == 0
+    assert (src / "hello.txt").read_text() == "hello, patched twice\n"
+    assert (src / "other.txt").read_text() == "untouched\n"
+
+    src2 = tmp_path / "src2"
+    src2.mkdir()
+    (src2 / "hello.txt").write_text("hello\n")
+    bad = second.replace("-hello, patched\n", "-hello, broken\n")
+    d2 = tmp_path / "patches2"
+    d2.mkdir()
+    (d2 / "0001-greeting.patch").write_text(PATCH)
+    (d2 / "0002-bad.patch").write_text(bad)
+    assert apply_patches.main(["--check", "--dir", str(d2), "--source", str(src2)]) == 1
+    assert "0002-bad.patch" in capsys.readouterr().err
+    assert (src2 / "hello.txt").read_text() == "hello\n"
+    assert not (src2 / apply_patches.MARKER).exists()
+
+
 def test_series_order_and_missing_header(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     src = source_tree(tmp_path)
     d = patches_dir(tmp_path, ("a.patch", PATCH.replace("Upstream-Status: Pending\n", "")))
@@ -352,3 +400,41 @@ def test_third_party_builds_get_the_tsan_flags(tmp_path: Path) -> None:
 def test_third_party_builds_get_no_flags_without_sanitizers(tmp_path: Path) -> None:
     args = toolchain_args(tmp_path)
     assert not [a for a in args if a.startswith(("-DCMAKE_C_FLAGS", "-DCMAKE_EXE_LINKER_FLAGS"))]
+
+
+# ---- download retries -------------------------------------------------------------------------------------
+
+
+def test_download_retries_transient_errors_and_not_4xx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import io
+    import urllib.error
+
+    calls: list[str] = []
+
+    class Resp(io.BytesIO):
+        def __enter__(self) -> "Resp":
+            return self
+
+        def __exit__(self, *a: object) -> None:
+            self.close()
+
+    def flaky(url: str, timeout: float) -> Resp:
+        calls.append(url)
+        if len(calls) < 3:
+            raise TimeoutError("Timeout was reached")
+        return Resp(b"payload")
+
+    monkeypatch.setattr(vtc.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(vtc.time, "sleep", lambda s: None)
+    vtc.download("https://example.org/a.tar", tmp_path / "a.tar")
+    assert len(calls) == 3 and (tmp_path / "a.tar").read_bytes() == b"payload"
+
+    def gone(url: str, timeout: float) -> Resp:
+        calls.append(url)
+        raise urllib.error.HTTPError(url, 404, "Not Found", None, None)  # type: ignore[arg-type]
+
+    calls.clear()
+    monkeypatch.setattr(vtc.urllib.request, "urlopen", gone)
+    with pytest.raises(urllib.error.HTTPError):
+        vtc.download("https://example.org/b.tar", tmp_path / "b.tar")
+    assert len(calls) == 1 and not (tmp_path / "b.tar.part").exists()
