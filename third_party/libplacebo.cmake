@@ -86,6 +86,36 @@ foreach(
   endif()
 endforeach()
 
+# The licence manifest sees these libraries as plain paths in tp::placebo's interface, so describe each one: the
+# glslang family with the expression reviewed for the port in tools/license_policy.toml [vcpkg_overrides], SPIRV-Tools
+# Apache-2.0, lcms2 MIT (the ports' licences). tools/gen_notices.py maps the file names to the ports' copyright files.
+if(OVT_USE_VCPKG)
+  set(_ovt_pl_source vcpkg)
+else()
+  set(_ovt_pl_source system)
+endif()
+foreach(_lib IN LISTS _ovt_pl_libs)
+  get_filename_component(_name "${_lib}" NAME)
+  if(_name MATCHES "SPIRV-Tools")
+    set(_spdx "Apache-2.0")
+  elseif(_name MATCHES "lcms2")
+    set(_spdx "MIT")
+  else()
+    set(_spdx "BSD-3-Clause AND BSD-2-Clause AND MIT AND Apache-2.0")
+  endif()
+  if(_name MATCHES "\\.(a|lib)$")
+    set(_linkage static)
+  else()
+    set(_linkage shared)
+  endif()
+  ovt_set_dependency_license("${_lib}" SOURCE ${_ovt_pl_source} SPDX "${_spdx}" LINKAGE ${_linkage})
+endforeach()
+unset(_lib)
+unset(_name)
+unset(_spdx)
+unset(_linkage)
+unset(_ovt_pl_source)
+
 # meson's find_library() does not search the vcpkg tree; patch 0002 reads these directories from the environment.
 list(REMOVE_DUPLICATES _ovt_pl_libdirs)
 list(JOIN _ovt_pl_libdirs ":" _ovt_pl_libdirs_env)

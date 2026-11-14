@@ -43,6 +43,7 @@ endfunction()
 
 ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
+ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / structural_diff
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
@@ -86,3 +87,6 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
     endif()
   endforeach()
 endif()
+
+# WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
+ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)

@@ -15,7 +15,6 @@ the licence gate fails when this file is stale.
 | aom_av1_1_b8_00_quantizer_30 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_00_quantizer_63 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x16 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
-| aom_av1_1_b8_01_size_16x16_annexb | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x18 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x32 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
 | aom_av1_1_b8_01_size_16x34 | aom | AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom) | BSD-2-Clause-Patent | yes |
@@ -404,15 +403,15 @@ the licence gate fails when this file is stale.
 | jctvc_Bitdepth_A_RExt_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_CAINIT_A_SHARP_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_CONFWIN_A_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
-| jctvc_DBLK_A_SONY_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_DBLK_A_SONY_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_DSLICE_A_HHI_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_ENTP_A_QUALCOMM_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_EXT_A_ericsson_4 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_FILLER_A_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_GENERAL_444_8bit_RExt_Sony_2 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_HRD_A_Fujitsu_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
-| jctvc_INITQP_B_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
-| jctvc_LTRPSPS_A_FJ_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_INITQP_B_Main10_Sony_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
+| jctvc_LTRPSPS_A_Qualcomm_1 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_MAXBINS_A_TI_5 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_MERGE_B_TI_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jctvc_MVCLIP_A_qualcomm_3 | jctvc | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
@@ -457,7 +456,6 @@ the licence gate fails when this file is stale.
 | jvt_CAPM3_Sony_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CAQP1_Sony_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CI1_FT_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
-| jvt_CVFC1_SVA_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CVFC1_Sony_C | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CVFI1_Sony_D | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_CVPA1_TOSHIBA_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
@@ -484,7 +482,6 @@ the licence gate fails when this file is stale.
 | jvt_aud_mw_e | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_cvmp_mot_frm_L31_B | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | jvt_sp1_bt_a | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
-| jvt_src19td_IBP_264 | jvt | ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror | LicenseRef-ITU-Conformance | no |
 | misc_iphone_hevc_mov | misc | OVT-owned capture, CC0 | CC0-1.0 | yes |
 | misc_pixel_motion_photo | misc | OVT-owned capture, CC0 | CC0-1.0 | yes |
 | mkv_test1 | mkv | Matroska test files, public test material without a licence file; treated as not redistributable | LicenseRef-Matroska-Test-Files | no |
@@ -846,6 +843,7 @@ the licence gate fails when this file is stale.
 | syn_mp4_frag_cmaf | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_mp4_nero_chapters | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_mp4_piff | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_mxf_op1a_xdcam | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_pat_hlg_patches | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_p3_saturation | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
 | syn_pat_pq_patches_1000 | syn | OVT-owned generated test pattern (tools/gen_hdr_patterns.py), CC0 per chapter 14 section 14.3.2 | CC0-1.0 | yes |
