@@ -26,6 +26,7 @@ WI-1.201 adds the box-header modes the walk of §8.2.3 is tested with (each file
 * ``--moov-after-mdat``: ``ftyp``, ``mdat``, ``moov`` (``CNT-0003``);
 * ``--overlap``: a ``trak`` whose size field runs past the end of its ``moov`` (``CNT-0108``);
 * ``--nest N``: N nested ``udta`` boxes inside ``moov`` (``CNT-0105`` for N above 32);
+* ``--uuid-size7``: a ``uuid`` box with size word 7 inside ``moov`` (``CNT-0106``, no recovery to 8);
 * ``--uuid-short``: a ``uuid`` box of 20 bytes inside ``moov`` (``CNT-0107``);
 * ``--nonprintable``: a box with type ``00 00 00 01`` inside ``moov`` (``CNT-0109``);
 * ``--trailing N``: N stray bytes after the last top-level box (``CNT-0101``).
@@ -178,6 +179,8 @@ def walk_variant(args: argparse.Namespace) -> bytes:
         for _ in range(args.nest):
             inner = box(b"udta", inner)
         inject = inner
+    elif args.uuid_size7:
+        inject = struct.pack(">I", 7) + b"uuid"
     elif args.uuid_short:
         inject = struct.pack(">I", 20) + b"uuid" + bytes(12)
     elif args.nonprintable:
@@ -248,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--moov-after-mdat", action="store_true")
     mode.add_argument("--overlap", action="store_true")
     mode.add_argument("--nest", type=int, metavar="N")
+    mode.add_argument("--uuid-size7", action="store_true")
     mode.add_argument("--uuid-short", action="store_true")
     mode.add_argument("--nonprintable", action="store_true")
     mode.add_argument("--trailing", type=int, metavar="N")
@@ -267,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
             args.moov_after_mdat,
             args.overlap,
             args.nest,
+            args.uuid_size7,
             args.uuid_short,
             args.nonprintable,
             args.trailing,
