@@ -123,6 +123,7 @@ TEST_CASE("ssim_x264 is registered with a valid descriptor", "[metrics][ssim_x26
       .ovt_metric_path = "", .ovt_plugin_path = "", .defaults = std::vector<std::string>{}});
   ovt::metrics::register_builtin_kernels(reg);
   CHECK(reg.find("ssim_x264") != nullptr);
+  CHECK(reg.find("identity") != nullptr);
   CHECK(reg.find("ssim") != nullptr);
   CHECK(reg.find("psnr") != nullptr);
 }
@@ -333,7 +334,7 @@ TEST_CASE("ssim_x264 maps hold the mean of the windows centred in each block", "
   CHECK(std::fabs(static_cast<double>(first) - (sum / n)) <= 1e-6);
 }
 
-// WI-3.308 acceptance test 2, run by hand (docs/acceptance/wi/WI-3.308.md): the mean luma ssim_x264 of a source and
+// WI-3.308 acceptance test 2, run by hand (docs/acceptance/wi/WI-3.308a.md): the mean luma ssim_x264 of a source and
 // its x264 reconstruction equals the `SSIM Mean Y` of x264's own log within 1e-4 (the log prints 7 digits).
 //   OVT_AT2_REF=src.y4m OVT_AT2_DIST=recon.y4m OVT_AT2_LOG_MEAN_Y=0.9876543 ovt_tests_metrics "[manual]"
 TEST_CASE("ssim_x264 mean Y equals the SSIM Mean Y of the x264 log", "[.][manual][metrics][ssim_x264]") {

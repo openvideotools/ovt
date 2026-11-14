@@ -94,3 +94,17 @@ non-reference pictures before deblocking and the numbers differ (issue #306).
 
 Do not compare: FFmpeg's `ssim` has no 2-sample offset and different constants, libvpx's `tiny_ssim` uses `64²`
 constants without the offset and weights the planes `0.8/0.1/0.1`.
+
+## `identity` (WI-3.308b, chapter 9 §9.4.6)
+
+`identity` reports the fraction of equal samples per plane and over all planes (sample-weighted: `all`), and at the end
+the number of identical frames, the number of frames and `sha256_match`. FFmpeg's `identity` filter (checked with
+FFmpeg 6.1) prints only sequence figures: `identity Y:<mean> U:<mean> V:<mean> average:<mean> min:<min>` with six
+decimals, where `average` and `min` are taken over the unweighted mean of the three plane fractions, not over all
+samples as `all` is. The per-plane fractions agree (the means of OVT's per-frame values equal the printed `Y/U/V`),
+`all` differs from FFmpeg's `average` for any picture with subsampled chroma, and there is no per-frame output to
+compare against at full precision: the exact oracle of the tests is the sample-by-sample comparison.
+`sha256_match` is `1.0` exactly when every frame was identical: two
+byte streams have the same SHA-256 digest exactly when they are the same stream (issue #419 point 1), so the kernel
+does not hash. The first differing sample is reported as `VQ-DIFF-0001` once per metric instance, with the plane as
+0 (Y), 1 (U) or 2 (V) and `(x, y)` in samples of that plane.
