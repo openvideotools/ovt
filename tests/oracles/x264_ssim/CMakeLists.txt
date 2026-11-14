@@ -12,15 +12,35 @@
 cmake_minimum_required(VERSION 3.25)
 project(x264_ssim LANGUAGES C)
 
+# OVT_X264_SSIM_DOUBLE_ACCUM=ON builds from a copy patched by double_accum.patch: the per-window quotient, the row sums
+# and the plane mean in double, which is the definition of chapter 9 §9.4.4 (x264 itself does all three in float and
+# is off by up to ~1.5e-6 per frame on the Netflix pair). Used only for the Netflix golden (docs/acceptance/wi/
+# WI-3.308a.md); the default build is the verbatim x264 kernel.
+option(OVT_X264_SSIM_DOUBLE_ACCUM "Patch the vendored kernel to accumulate in double (double_accum.patch)" OFF)
+set(_src "${CMAKE_CURRENT_SOURCE_DIR}")
+if(OVT_X264_SSIM_DOUBLE_ACCUM)
+  set(_src "${CMAKE_CURRENT_BINARY_DIR}/patched")
+  file(REMOVE_RECURSE "${_src}")
+  file(COPY pixel_ssim.c ssim_functions.c x264_shim.h main.c DESTINATION "${_src}")
+  find_program(PATCH_EXECUTABLE patch REQUIRED)
+  execute_process(
+    COMMAND "${PATCH_EXECUTABLE}" -p1 -i "${CMAKE_CURRENT_SOURCE_DIR}/double_accum.patch"
+    WORKING_DIRECTORY "${_src}"
+    RESULT_VARIABLE _patch_rc)
+  if(NOT _patch_rc EQUAL 0)
+    message(FATAL_ERROR "double_accum.patch does not apply")
+  endif()
+endif()
+
 foreach(depth 8 10)
-  add_library(x264_ssim_k${depth} OBJECT ssim_functions.c)
+  add_library(x264_ssim_k${depth} OBJECT "${_src}/ssim_functions.c")
   target_compile_definitions(x264_ssim_k${depth} PRIVATE BIT_DEPTH=${depth} SSIM_SUFFIX=${depth}
                                                          x264_pixel_ssim_wxh=x264_pixel_ssim_wxh_${depth})
 endforeach()
 
-add_executable(x264_ssim main.c)
+add_executable(x264_ssim "${_src}/main.c")
 target_sources(x264_ssim PRIVATE $<TARGET_OBJECTS:x264_ssim_k8> $<TARGET_OBJECTS:x264_ssim_k10>)
-target_include_directories(x264_ssim PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(x264_ssim PRIVATE "${_src}")
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()

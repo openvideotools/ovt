@@ -13,7 +13,8 @@ core/tests/metrics/golden/ssim_x264_netflix_src01_576x324.json.
 
 ``netflix-run`` runs the ``x264_ssim`` executable on the Netflix pair itself and keeps the nine decimals it prints;
 the checked-in golden comes from here, because the six-decimal golden above is too coarse for a 1e-6 comparison (the
-rounding alone is up to 5e-7).
+rounding alone is up to 5e-7). Build the oracle with ``-DOVT_X264_SSIM_DOUBLE_ACCUM=ON`` for this golden: x264's float
+accumulation alone is off from the §9.4.4 double definition by up to ~1.5e-6 per frame on the Netflix pair.
 
 ``synth`` writes the small deterministic Y4M pairs of ``CASES``, runs the ``x264_ssim`` executable
 (tests/oracles/x264_ssim, built with ``cmake -S tests/oracles/x264_ssim -B build/x264_ssim``) on each and writes
