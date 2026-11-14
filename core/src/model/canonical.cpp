@@ -44,6 +44,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "json_rules.hpp"
 #include "reflect_access.hpp"
 #include "verifier_options.hpp"
 
@@ -234,6 +235,20 @@ const reflection::Field* nested_type_field(const reflection::Object& object, con
 std::string_view string_field(const flatbuffers::Table& table, const reflection::Field& field) {
   const auto* str = table.GetPointer<const flatbuffers::String*>(field.offset());
   return str == nullptr ? std::string_view{} : str->string_view();
+}
+
+/// The table that the nested buffer in vector @p field of @p table holds: the one its `_type` sibling names,
+/// or the fixed one of a palette field (chapter 06 §6.8.1, rule V-022). Null when the field is plain data.
+const reflection::Object* nested_object(const reflection::Schema& schema, const reflection::Object& object,
+                                        const reflection::Field& field, const flatbuffers::Table& table) {
+  if (const auto* type_field = nested_type_field(object, field); type_field != nullptr) {
+    return lookup_table(schema, object, string_field(table, *type_field));
+  }
+  if (type_of(field).base_type() != BaseType::Vector || type_of(field).element() != BaseType::UByte) {
+    return nullptr;
+  }
+  const std::string_view fixed = detail::fixed_nested_table(name_of(object), name_of(field));
+  return fixed.empty() ? nullptr : lookup_table(schema, object, fixed);
 }
 
 template <class T>
@@ -545,16 +560,14 @@ class Canonicalizer {
     }
     const std::size_t elem = flatbuffers::GetTypeSize(type.element());
     const auto src = vector_bytes(table, field, elem);
-    if (const auto* type_field = nested_type_field(object, field); type_field != nullptr && count != 0) {
-      if (const auto* nested = lookup_table(schema_, object, string_field(table, *type_field)); nested != nullptr) {
-        if (nesting_ == kMaxNesting) {
-          too_deep("canonicalize", path);
-        }
-        ++nesting_;
-        const auto bytes = finish(*nested, AlignedCopy(src), nullptr, path);  // §6.3.3: no identifier
-        --nesting_;
-        return copy_bytes(builder, bytes, 1);
+    if (const auto* nested = count == 0 ? nullptr : nested_object(schema_, object, field, table); nested != nullptr) {
+      if (nesting_ == kMaxNesting) {
+        too_deep("canonicalize", path);
       }
+      ++nesting_;
+      const auto bytes = finish(*nested, AlignedCopy(src), nullptr, path);  // §6.3.3: no identifier
+      --nesting_;
+      return copy_bytes(builder, bytes, 1);
     }
     return copy_bytes(builder, src, elem);
   }
@@ -932,10 +945,10 @@ class Differ {
   bool nested(const reflection::Object& object, const reflection::Field& field, const flatbuffers::Table& a,
               const flatbuffers::Table& b, const std::string& path) {
     const auto* type_field = nested_type_field(object, field);
-    if (type_field == nullptr || string_field(a, *type_field) != string_field(b, *type_field)) {
+    if (type_field != nullptr && string_field(a, *type_field) != string_field(b, *type_field)) {
       return false;  // a differing `_type` is reported by its own field; the bytes are compared as they are
     }
-    const auto* table_object = lookup_table(schema_, object, string_field(a, *type_field));
+    const auto* table_object = nested_object(schema_, object, field, a);
     if (table_object == nullptr) {
       return false;
     }
