@@ -16,13 +16,20 @@ Automated tests (binary `ovt_tests_metrics`, label `metrics`; `core/tests/metric
 | 1b. same, 10-bit float path | same test, `10bit_330x194`, `10bit_342x226` pass. The corpus has no 10-bit re-encode of `syn_metrics_10bit_8bit_pair` (#419 point 5), so synthetic 10-bit pairs stand in. **This narrows the corpus clip of the acceptance line; flagged for the owner** |
 | 1c. Netflix pair, 48 frames | `ssim_x264 equals the x264 kernel oracle on the Netflix pair` ([needs-corpus]; golden `golden/ssim_x264_netflix_src01_576x324.json` copied out of `tests/golden/metrics/netflix_src01_576x324.x264ssim.json.gz` by `run_x264_ssim.py netflix`; six decimals, so tolerance 1e-6). **Not run in this container** (corpus not downloadable); runs in CI with `--tags fast` |
 | 1d. `ssim_db_y == 100` for an identical pair | `ssim_x264 on an identical pair is 1 and ssim_db_y is exactly 100` (8-bit and 10-bit) |
-| 2. Mean `ssim_x264/y` of source vs x264 reconstruction equals the log's `SSIM Mean Y` within 1e-4 | Manual (hidden test `[manual]`), below; synthetic clip, not the Netflix reference |
+| 2. Mean `ssim_x264/y` of source vs x264 reconstruction equals the log's `SSIM Mean Y` within 1e-4 | Manual (hidden test `[manual]`), below: Netflix reference run on the Mac Mini, and a synthetic clip here |
 
 Further cases: registration in `register_builtin_kernels()`, option and input rejection (a plane with no window),
 a per-window double reference at 8, 9, 10 and 12 bits with padded strides and odd sizes, the `planes` option with NaN
 for planes not computed, and block maps (mean of the windows whose centre falls in the block).
 
 ## Manual record: acceptance test 2
+
+**Netflix reference (Mac Mini, 2026-11-14, commit e6cbb34):** `src01_hrc00_576x324`, pinned x264 0.164.3191,
+`--qp 20 --ssim --bframes 0 --dump-yuv`. x264 logged `SSIM Mean Y 0.9841438` over 48 frames; OVT's `ssim_x264/y`
+mean of source vs reconstruction matched exactly (hidden test `[manual]`, 101 assertions passed). Run by the Mini
+thread, relayed by the coordinator.
+
+Synthetic-clip run in the cloud container (same mechanism):
 
 ```console
 $ ffmpeg -f lavfi -i "testsrc2=size=352x288:rate=25,format=yuv420p" -frames:v 30 src.y4m
@@ -35,8 +42,7 @@ All tests passed (65 assertions in 1 test case)
 ```
 
 FFmpeg 6.1.1 with libx264, 30 frames, no B-frames. The `x264_ssim` oracle prints the same mean (0.998832). The Netflix
-reference run (`x264 --qp 20 --ssim --bframes 0 --dump-yuv`, #306) is owed to the Mac Mini / CI image; the mechanism
-is the same.
+reference run is the Mac Mini record above.
 
 ## Informational throughput
 

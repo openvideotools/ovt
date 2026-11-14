@@ -18,14 +18,16 @@ add_executable(
   test_metrics_ssim.cpp
   test_metrics_ssim_x264.cpp
   test_metrics_identity.cpp
+  test_metrics_vmaf.cpp
   test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(ovt_tests_metrics PRIVATE ovt_core_objects ovt_test_support ovt::flags ${flatbuffers_TARGET}
-                                                ${Catch2_TARGET})
+                                                ${nlohmann_json_TARGET} ${Catch2_TARGET})
 target_compile_definitions(
   ovt_tests_metrics
   PRIVATE "OVT_EXAMPLE_METRIC_ROOT=\"${OVT_EXAMPLE_METRIC_ROOT}\""
           "OVT_METRICS_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/golden\""
+          "OVT_GOLDEN_METRICS_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/metrics\""
           "OVT_CORPORA_COMPARE_EXPECTED=\"${PROJECT_SOURCE_DIR}/tests/corpora/compare_expected.json\"")
 set_source_files_properties(abi_header_c.c PROPERTIES LANGUAGE C)
 set_target_properties(ovt_tests_metrics PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
@@ -60,3 +62,16 @@ set_tests_properties(metrics_abi_status_copies_match metrics_abi_frame_id_copies
                      PROPERTIES LABELS "fast;unit;metrics")
 unset(_ovt_inc)
 unset(_ovt_copies)
+
+# ---- core/src/metrics/vmaf/vmaf_models.inc is what tools/gen_vmaf_ids.py makes of the pinned libvmaf tree --------
+# (WI-3.309 step 2). Needs the libvmaf sources, so only when third_party/libvmaf.cmake builds them (not with
+# OVT_SYSTEM_LIBVMAF=ON).
+if(TARGET tp_libvmaf)
+  include(ExternalProject)
+  externalproject_get_property(tp_libvmaf SOURCE_DIR)
+  add_test(NAME metrics_vmaf_models_inc_current
+           COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/gen_vmaf_ids.py" --libvmaf-src
+                   "${SOURCE_DIR}" --check "${PROJECT_SOURCE_DIR}/core/src/metrics/vmaf/vmaf_models.inc")
+  set_tests_properties(metrics_vmaf_models_inc_current PROPERTIES LABELS "fast;unit;metrics")
+  unset(SOURCE_DIR)
+endif()

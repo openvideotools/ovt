@@ -24,7 +24,7 @@
 #include "metrics/kernels/diag_sink.h"
 #include "metrics/kernels/identity.h"
 #include "metrics/kernels/map_sink.h"
-#include "metrics_test_pic.h"
+#include "metrics_test_pic.hpp"
 #include "ovt_metrics_generated.h"
 #include "test_support/corpus.h"
 
