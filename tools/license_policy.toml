@@ -133,6 +133,7 @@ vulkan-loader = "Apache-2.0"
 [gradle_license_names]      # free-text licence names of the Gradle report -> SPDX id
 "The Apache Software License, Version 2.0" = "Apache-2.0"
 "Apache License, Version 2.0" = "Apache-2.0"
+"The Apache License, Version 2.0" = "Apache-2.0"   # kotlin-stdlib, -common, -jdk7, -jdk8 (WI-0.034 gate step)
 "Apache-2.0" = "Apache-2.0"
 
 [pip_overrides]             # Python packages whose installed metadata has no usable licence field
