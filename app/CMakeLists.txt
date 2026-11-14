@@ -25,6 +25,10 @@ function(ovt_studio_add_qml_module target)
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
   set(qml_files
       "${app_dir}/qml/Main.qml"
+      "${app_dir}/qml/AppShell.qml"
+      "${app_dir}/qml/MainToolBar.qml"
+      "${app_dir}/qml/StatusBar.qml"
+      "${app_dir}/qml/AndroidShell.qml"
       "${app_dir}/qml/Actions.qml"
       "${app_dir}/qml/OvtMenu.qml"
       "${app_dir}/qml/OvtMenuBar.qml"
@@ -50,10 +54,6 @@ function(ovt_studio_add_qml_module target)
   endforeach()
   if(NOT ANDROID)
     list(APPEND qml_files "${app_dir}/qml/dock/DockFloatingWindow.qml")
-  endif()
-  # The root item that QtQuickView loads on Android (WI-0.050), which cannot take the desktop ApplicationWindow.
-  if(ANDROID)
-    list(APPEND qml_files "${app_dir}/qml/AndroidShell.qml")
   endif()
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
