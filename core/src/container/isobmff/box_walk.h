@@ -17,7 +17,8 @@
 
 namespace ovt::container::isobmff {
 
-inline constexpr unsigned kMaxBoxDepth = 32;  // §8.2.3 step 1
+inline constexpr unsigned kMaxBoxDepth = 32;         // §8.2.3 step 1
+inline constexpr uint64_t kMaxBoxNodes = 1'000'000;  // §8.2.3 node bound per walk (CNT-0111)
 
 using BoxNodes = std::vector<std::unique_ptr<fb::BoxNodeT>>;
 using DiagList = std::vector<std::unique_ptr<fb::DiagnosticT>>;
@@ -34,6 +35,8 @@ struct WalkState {
   bool saw_mdat = false;
   bool mdat_before_moov = false;
   bool saw_moof = false;
+  uint64_t nodes = 0;           // BoxNodes created so far in this walk
+  bool node_bound_hit = false;  // CNT-0111 already emitted
 };
 
 // §8.2.3 `walk_children`. `parent_offset` is the file offset of the enclosing box (0 for the root); diagnostics that
