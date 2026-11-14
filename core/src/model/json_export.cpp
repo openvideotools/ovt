@@ -177,6 +177,75 @@ class Budget {
   std::size_t spent_ = 0;
 };
 
+/// The significant digits of the decimal number @p text (an optional sign, digits, an optional fraction and
+/// exponent, as fmt prints a finite value) without leading or trailing zeros, and in @p point the position of
+/// the decimal point: the magnitude is 0.<digits> x 10^point.
+std::string decimal_digits(std::string_view text, int& point) {
+  std::string digits;
+  bool fraction = false;
+  std::size_t at = text.starts_with('-') ? 1 : 0;
+  point = 0;
+  for (; at < text.size() && text[at] != 'e'; ++at) {
+    if (text[at] == '.') {
+      fraction = true;
+    } else if (!digits.empty() || text[at] != '0') {
+      digits += text[at];
+      point += fraction ? 0 : 1;
+    } else if (fraction) {
+      --point;  // a zero between the point and the first digit
+    }
+  }
+  if (at + 1 < text.size()) {
+    int exponent = 0;
+    const std::string_view rest = text.substr(at + 1 + (text[at + 1] == '+' ? 1U : 0U));
+    std::from_chars(rest.data(), rest.data() + rest.size(), exponent);  // NOLINT(*-pointer-arithmetic)
+    point += exponent;
+  }
+  while (!digits.empty() && digits.back() == '0') {
+    digits.pop_back();
+  }
+  return digits;
+}
+
+/// Appends the decimal number @p text to @p out in one fixed layout, that of ECMAScript's Number::toString:
+/// plain digits while the decimal point lies within 21 digits to the right of the first digit or 6 zeros to
+/// its left, and `d.ddde±x` otherwise. The digits themselves are kept.
+void append_decimal(std::string& out, std::string_view text) {
+  int point = 0;
+  const std::string digits = decimal_digits(text, point);
+  if (text.starts_with('-')) {
+    out += '-';
+  }
+  if (digits.empty()) {
+    out += '0';
+    return;
+  }
+  const int count = static_cast<int>(digits.size());
+  constexpr int kMaxFixed = 21;
+  constexpr int kMinFixed = -6;
+  if (count <= point && point <= kMaxFixed) {
+    out += digits;
+    out.append(static_cast<std::size_t>(point - count), '0');
+  } else if (0 < point && point <= kMaxFixed) {
+    out.append(digits, 0, static_cast<std::size_t>(point));
+    out += '.';
+    out.append(digits, static_cast<std::size_t>(point));
+  } else if (kMinFixed < point && point <= 0) {
+    out += "0.";
+    out.append(static_cast<std::size_t>(-point), '0');
+    out += digits;
+  } else {
+    out += digits.front();
+    if (count > 1) {
+      out += '.';
+      out.append(digits, 1);
+    }
+    out += 'e';
+    out += point > 0 ? '+' : '-';
+    out += std::to_string(point > 0 ? point - 1 : 1 - point);
+  }
+}
+
 // The walk recurses along the object tree. The depth is bounded: every buffer passes the reflection verifier
 // (max_depth 64) before it is walked, nested buffers are verified the same way and at most kMaxNestedBuffers
 // deep. The width is bounded by the Budget.
@@ -269,9 +338,12 @@ class Printer {
   template <class T>
   void real(T value) {
     if (std::isfinite(value)) {
-      // fmt's default float format: the shortest decimal that reads back to the same value, locale-independent
-      // (floating-point std::to_chars needs macOS 13.3; the deployment target is 13.0).
-      fmt::format_to(std::back_inserter(out_), "{}", value);
+      // fmt gives the shortest decimal digits that read back to the same value, locale-independent
+      // (floating-point std::to_chars needs macOS 13.3; the deployment target is 13.0). Where fmt switches
+      // between fixed and exponent notation differs between its versions, so the layout is done here.
+      std::array<char, 64> text{};
+      const auto end = fmt::format_to_n(text.begin(), text.size(), "{}", value).out;
+      append_decimal(out_, std::string_view(text.data(), static_cast<std::size_t>(end - text.begin())));
       return;
     }
     const std::string_view text = std::isnan(value) ? "nan" : value < 0 ? "-inf" : "inf";

@@ -306,7 +306,7 @@ TEST_CASE("an index and a metrics report match their goldens (WI-0.088 step 4)",
   check_golden(metrics_text, "tiny_metrics");
   // Shortest round-trip doubles (WI-0.081 pitfall): no digits lost, none invented.
   const Json values = parse_strict(metrics_text)["results"][0];
-  CHECK(metrics_text.find("\n            41.25,\n            0.1,\n            1e-07\n") != std::string::npos);
+  CHECK(metrics_text.find("\n            41.25,\n            0.1,\n            1e-7\n") != std::string::npos);
   CHECK(metrics_text.find("\n        0.30000000000000004,\n        1e+21,\n        -0\n") != std::string::npos);
   CHECK(values["distorted_source_hash"] == "000fa0ff");
   CHECK(values["descriptor"]["kind"] == "FullReference");
@@ -349,6 +349,25 @@ TEST_CASE("to_json writes values, not layout", "[model][json]") {
   const std::string float_text = to_json(float_measure(), SchemaId::Model, kHdrFrameMeasure, kCompact);
   CHECK(float_text.find("\"max_nits\": 203,\"fall_nits\": 0.1,\"p99_nits\": 1e-10,\"min_nits\": 16777216,") !=
         std::string::npos);
+
+  // One layout whatever the fmt version: plain digits from 1e-6 up to 21 integer digits, an exponent beyond.
+  const auto score = [](double value) {
+    return to_json(tiny_metrics(value), SchemaId::Metrics, kMetricsReport, kCompact);
+  };
+  for (const auto& [value, want] :
+       std::vector<std::pair<double, const char*>>{{1e20, "100000000000000000000"},
+                                                   {1.5e21, "1.5e+21"},
+                                                   {1e21, "1e+21"},
+                                                   {0.000001, "0.000001"},
+                                                   {1.5e-7, "1.5e-7"},
+                                                   {-2.5e-10, "-2.5e-10"},
+                                                   {123.456, "123.456"},
+                                                   {-0.0, "-0"},
+                                                   {5e-324, "5e-324"},
+                                                   {1.7976931348623157e308, "1.7976931348623157e+308"}}) {
+    CAPTURE(want);
+    CHECK(score(value).find(std::string("[") + want + ",0.1,1e-7]") != std::string::npos);
+  }
 }
 
 TEST_CASE("strings are escaped as JSON and must be UTF-8", "[model][json]") {

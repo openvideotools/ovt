@@ -33,8 +33,9 @@ struct JsonOptions {
 ///    table is left out; a present empty vector is `[]`;
 ///  - enums are their value names, an unknown value is its integer; bools are true/false (a stored byte
 ///    above 1 is its integer);
-///  - integers beyond ±2^53 are decimal strings; floats and doubles use the shortest text that reads back to
-///    the same value;
+///  - integers beyond ±2^53 are decimal strings; floats and doubles use the shortest digits that read back to
+///    the same value, laid out as ECMAScript does (plain up to 21 integer digits and down to 1e-6, `1.5e+21`
+///    and `1e-7` beyond);
 ///  - strings are UTF-8 with the JSON escapes (control characters as \u00XX);
 ///  - a `[ubyte]` field is an array of numbers, except the hash-like fields (`source_hash`, `uuid`, `kid`, ...,
 ///    the list of §6.8.1), which are lowercase hex strings, and a nested buffer (a `[ubyte]` field `X` next to

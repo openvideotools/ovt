@@ -21,7 +21,7 @@
           "values": [
             41.25,
             0.1,
-            1e-07
+            1e-7
           ],
           "map_block_size": 0
         },
@@ -33,7 +33,7 @@
           "values": [
             38.5,
             0.1,
-            1e-07
+            1e-7
           ],
           "map_block_size": 0
         }
