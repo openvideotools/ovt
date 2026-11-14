@@ -83,6 +83,10 @@ class FrameTable {
   // The decode indices this frame references per its headers (`declared_refs`); empty for intra frames.
   [[nodiscard]] std::span<const int> declared_refs(int decode_index) const;
   [[nodiscard]] bool shown(int decode_index) const { return shown_.at(static_cast<std::size_t>(decode_index)) != 0; }
+  // The decode index of the frame in display slot `display_index`, or -1 (the inverse of display_index_of()).
+  [[nodiscard]] int decode_index_of_display(int display_index) const;
+  // The decode indices in the DPB after decoding this frame (`dpb_after`); empty when the plugin cannot derive it.
+  [[nodiscard]] std::span<const int> dpb_after(int decode_index) const;
 
   // The positions (in the current order) of the random access points, ascending: the GOP markers.
   [[nodiscard]] std::vector<std::size_t> rap_positions() const;
@@ -113,6 +117,8 @@ class FrameTable {
   std::vector<std::uint8_t> shown_;
   std::vector<int> refs_;               // all declared_refs, frame after frame
   std::vector<std::size_t> ref_begin_;  // size n + 1: refs_[ref_begin_[d], ref_begin_[d + 1]) belong to frame d
+  std::vector<int> dpb_;                // all dpb_after, frame after frame
+  std::vector<std::size_t> dpb_begin_;  // size n + 1, like ref_begin_
   std::int64_t timebase_num_ = 0;
   std::int64_t timebase_den_ = 0;
 
