@@ -5,7 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
+#include <string_view>
 
 #include "models/timeline_geometry.h"
 
@@ -48,9 +48,24 @@ RefNode make_node(const FrameTable& table, int decode, int column, int row, bool
 }
 
 std::string hex_color(Rgba c) {
-  char buf[8];
-  std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", c.r, c.g, c.b);
-  return buf;
+  constexpr std::string_view digits = "0123456789ABCDEF";
+  std::string out = "#";
+  for (const std::uint8_t v : {c.r, c.g, c.b}) {
+    out += digits[v >> 4U];
+    out += digits[v & 0x0FU];
+  }
+  return out;
+}
+
+// A number with two decimals ("12.50"), without printf.
+std::string num(double v) {
+  const auto scaled = static_cast<long long>(std::llround(std::abs(v) * 100.0));
+  std::string out = v < 0 && scaled != 0 ? "-" : "";
+  out += std::to_string(scaled / 100) + ".";
+  const long long frac = scaled % 100;
+  out += frac < 10 ? "0" : "";
+  out += std::to_string(frac);
+  return out;
 }
 
 }  // namespace
@@ -209,13 +224,8 @@ std::string ref_graph_svg(const RefGraphLayout& layout, double width, double hei
   const RefGraphGeometry g = geometry_of(layout, width, height);
   const int first = layout.params.first_column;
   const double size = std::min({g.cell_width() * 0.8, g.row_height() * 0.8, kMaxNodeSize});
-  auto num = [](double v) {
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "%.2f", v);
-    return std::string(buf);
-  };
-  std::string svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"" + num(width) + "\" height=\"" + num(height) +
-                    "\" viewBox=\"0 0 " + num(width) + " " + num(height) + "\">\n";
+  std::string svg = R"(<svg xmlns="http://www.w3.org/2000/svg" width=")" + num(width) + R"(" height=")" + num(height) +
+                    R"(" viewBox="0 0 )" + num(width) + " " + num(height) + "\">\n";
   for (const RefArrow& a : layout.arrows) {
     const RefNode* from = layout.find(a.from_decode);
     const RefNode* to = layout.find(a.to_decode);
@@ -227,16 +237,16 @@ std::string ref_graph_svg(const RefGraphLayout& layout, double width, double hei
     const double x1 = g.x_of(to->column, first);
     const double y1 = g.y_of(to->row);
     const double lift = std::min(std::abs(x1 - x0) * 0.35 + 6.0, g.row_height());
-    svg += "<path d=\"M" + num(x0) + " " + num(y0) + " Q" + num((x0 + x1) / 2) + " " + num(std::min(y0, y1) - lift) +
-           " " + num(x1) + " " + num(y1) + "\" fill=\"none\" stroke=\"#FB8C00\" stroke-width=\"1\"/>\n";
+    svg += R"(<path d="M)" + num(x0) + " " + num(y0) + " Q" + num((x0 + x1) / 2) + " " + num(std::min(y0, y1) - lift) +
+           " " + num(x1) + " " + num(y1) + R"(" fill="none" stroke="#FB8C00" stroke-width="1"/>)" + "\n";
   }
   for (const RefNode& n : layout.nodes) {
     const double cx = g.x_of(n.column, first);
     const double cy = g.y_of(n.row);
-    svg += "<rect x=\"" + num(cx - size / 2) + "\" y=\"" + num(cy - size / 2) + "\" width=\"" + num(size) +
-           "\" height=\"" + num(size) + "\" rx=\"2\" fill=\"" +
-           (n.refs_unknown ? std::string("none") : hex_color(frame_type_color(n.type))) + "\" stroke=\"" +
-           hex_color(frame_type_color(n.type)) + "\"><title>#" + std::to_string(n.decode_index) + " " +
+    const std::string type_hex = hex_color(frame_type_color(n.type));
+    svg += R"(<rect x=")" + num(cx - size / 2) + R"(" y=")" + num(cy - size / 2) + R"(" width=")" + num(size) +
+           R"(" height=")" + num(size) + R"(" rx="2" fill=")" + (n.refs_unknown ? std::string("none") : type_hex) +
+           R"(" stroke=")" + type_hex + R"("><title>#)" + std::to_string(n.decode_index) + " " +
            frame_type_label(n.type) + " POC " + std::to_string(n.poc) + "</title></rect>\n";
   }
   svg += "</svg>\n";

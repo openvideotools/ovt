@@ -26,7 +26,116 @@ constexpr QRgb kArrowHoverColor = 0xFFFFFFFF;  // the hovered frame's in and out
 constexpr int kWheelStep = 8;                  // columns per wheel notch
 
 QColor to_qcolor(Rgba c) {
-  return QColor(c.r, c.g, c.b, c.a);
+  return {c.r, c.g, c.b, c.a};
+}
+
+// Everything the paint helpers share.
+struct PaintContext {
+  QPainter* painter;
+  const RefGraphLayout& layout;
+  RefGraphGeometry g;
+  int first;
+  double size;
+  QColor text;
+  QColor outline;
+  int hover;
+  int selected;
+  double item_height;
+  [[nodiscard]] QPointF centre(const RefNode& n) const { return {g.x_of(n.column, first), g.y_of(n.row)}; }
+};
+
+// Row labels (T0, T1, ... or Decode / Display).
+void draw_row_labels(const PaintContext& c) {
+  c.painter->setPen(c.text);
+  for (int r = 0; r < c.layout.rows; ++r) {
+    QString label;
+    if (c.layout.params.mode == RefRowMode::TemporalLayers) {
+      label = QStringLiteral("T%1").arg(r);
+    } else if (c.layout.params.mode == RefRowMode::DecodeVsDisplay) {
+      label = r == 0 ? QObject::tr("Dec") : QObject::tr("Disp");
+    }
+    c.painter->drawText(QRectF(2, c.g.y_of(r) - 8, c.g.margin_left - 4, 16), Qt::AlignVCenter | Qt::AlignLeft, label);
+  }
+}
+
+// Decode-vs-display links between a frame's two nodes.
+void draw_links(const PaintContext& c) {
+  if (c.layout.params.mode != RefRowMode::DecodeVsDisplay) {
+    return;
+  }
+  c.painter->setPen(QPen(QColor(c.outline.red(), c.outline.green(), c.outline.blue(), 70), 1));
+  for (const RefNode& n : c.layout.nodes) {
+    const RefNode* primary = n.mirror ? c.layout.find(n.decode_index) : nullptr;
+    if (primary != nullptr) {
+      c.painter->drawLine(c.centre(*primary), c.centre(n));
+    }
+  }
+}
+
+void draw_arrows(const PaintContext& c) {
+  const bool dim = c.hover >= 0;
+  for (const RefArrow& a : c.layout.arrows) {
+    const RefNode* from = c.layout.find(a.from_decode);
+    const RefNode* to = c.layout.find(a.to_decode);
+    if (from == nullptr || to == nullptr) {
+      continue;
+    }
+    const bool hot = a.from_decode == c.hover || a.to_decode == c.hover;
+    QColor color(hot ? kArrowHoverColor : kArrowColor);
+    color.setAlpha(hot || !dim ? 230 : 90);
+    c.painter->setPen(QPen(color, hot ? 2 : 1));
+    const QPointF p0 = c.centre(*from);
+    const QPointF p1 = c.centre(*to);
+    const double lift = std::min(std::abs(p1.x() - p0.x()) * 0.35 + 6.0, c.g.row_height());
+    QPainterPath path(p0);
+    path.quadTo(QPointF((p0.x() + p1.x()) / 2, std::min(p0.y(), p1.y()) - lift), p1);
+    c.painter->setBrush(Qt::NoBrush);
+    c.painter->drawPath(path);
+  }
+}
+
+// Nodes: filled by frame type; an open node has no known references; a hidden frame is drawn at half opacity.
+void draw_nodes(const PaintContext& c) {
+  QFont small = c.painter->font();
+  small.setPixelSize(std::max(8, static_cast<int>(c.size * 0.6)));
+  c.painter->setFont(small);
+  for (const RefNode& n : c.layout.nodes) {
+    const QPointF centre = c.centre(n);
+    const QRectF box(centre.x() - c.size / 2, centre.y() - c.size / 2, c.size, c.size);
+    const QColor type_color = to_qcolor(frame_type_color(n.type));
+    c.painter->setOpacity(n.shown ? 1.0 : 0.55);
+    if (n.refs_unknown) {
+      c.painter->setPen(QPen(type_color, 1.5, Qt::DashLine));
+      c.painter->setBrush(Qt::NoBrush);
+    } else {
+      c.painter->setPen(Qt::NoPen);
+      c.painter->setBrush(type_color);
+    }
+    c.painter->drawRoundedRect(box, 2, 2);
+    c.painter->setOpacity(1.0);
+    if (c.size >= 11) {
+      c.painter->setPen(n.refs_unknown ? c.text : QColor(Qt::white));
+      c.painter->drawText(box, Qt::AlignCenter, QString::fromLatin1(frame_type_label(n.type)));
+    }
+    if (n.decode_index == c.selected) {
+      c.painter->setPen(QPen(c.outline, 2));
+      c.painter->setBrush(Qt::NoBrush);
+      c.painter->drawRoundedRect(box.adjusted(-2, -2, 2, 2), 3, 3);
+    }
+  }
+}
+
+// Column labels: POC every few columns that fit.
+void draw_column_labels(const PaintContext& c) {
+  c.painter->setPen(c.text);
+  const int stride = std::max(1, static_cast<int>(std::ceil(26.0 / c.g.cell_width())));
+  for (const RefNode& n : c.layout.nodes) {
+    if (n.mirror || (n.column - c.first) % stride != 0) {
+      continue;
+    }
+    c.painter->drawText(QRectF(c.g.x_of(n.column, c.first) - 14, c.item_height - c.g.margin_bottom + 2, 28, 16),
+                        Qt::AlignCenter, QString::number(n.poc));
+  }
 }
 
 }  // namespace
@@ -237,95 +346,15 @@ void RefGraph::copySvg() const {
 
 void RefGraph::paint(QPainter* painter) {
   painter->setRenderHint(QPainter::Antialiasing);
-  const RefGraphGeometry g = geometry();
-  const int first = layout_.params.first_column;
-  const double size = std::min({g.cell_width() * 0.8, g.row_height() * 0.8, 18.0});
-  auto centre = [&](const RefNode& n) { return QPointF(g.x_of(n.column, first), g.y_of(n.row)); };
-
-  // Row labels (T0, T1, ... or Decode / Display).
-  painter->setPen(text_color_);
-  for (int r = 0; r < layout_.rows; ++r) {
-    QString label;
-    if (layout_.params.mode == RefRowMode::TemporalLayers) {
-      label = QStringLiteral("T%1").arg(r);
-    } else if (layout_.params.mode == RefRowMode::DecodeVsDisplay) {
-      label = r == 0 ? tr("Dec") : tr("Disp");
-    }
-    painter->drawText(QRectF(2, g.y_of(r) - 8, g.margin_left - 4, 16), Qt::AlignVCenter | Qt::AlignLeft, label);
-  }
-
-  // Decode-vs-display links.
-  if (layout_.params.mode == RefRowMode::DecodeVsDisplay) {
-    painter->setPen(QPen(QColor(outline_color_.red(), outline_color_.green(), outline_color_.blue(), 70), 1));
-    for (const RefNode& n : layout_.nodes) {
-      if (n.mirror) {
-        if (const RefNode* p = layout_.find(n.decode_index)) {
-          painter->drawLine(centre(*p), centre(n));
-        }
-      }
-    }
-  }
-
-  // Arrows.
-  const bool dim = hover_frame_ >= 0;
-  for (const RefArrow& a : layout_.arrows) {
-    const RefNode* from = layout_.find(a.from_decode);
-    const RefNode* to = layout_.find(a.to_decode);
-    if (from == nullptr || to == nullptr) {
-      continue;
-    }
-    const bool hot = a.from_decode == hover_frame_ || a.to_decode == hover_frame_;
-    QColor color(hot ? kArrowHoverColor : kArrowColor);
-    color.setAlpha(hot || !dim ? 230 : 90);
-    painter->setPen(QPen(color, hot ? 2 : 1));
-    const QPointF p0 = centre(*from);
-    const QPointF p1 = centre(*to);
-    const double lift = std::min(std::abs(p1.x() - p0.x()) * 0.35 + 6.0, g.row_height());
-    QPainterPath path(p0);
-    path.quadTo(QPointF((p0.x() + p1.x()) / 2, std::min(p0.y(), p1.y()) - lift), p1);
-    painter->setBrush(Qt::NoBrush);
-    painter->drawPath(path);
-  }
-
-  // Nodes: filled by frame type; an open node has no known references; a hidden frame is drawn at half opacity.
-  QFont small = painter->font();
-  small.setPixelSize(std::max(8, static_cast<int>(size * 0.6)));
-  painter->setFont(small);
-  for (const RefNode& n : layout_.nodes) {
-    const QPointF c = centre(n);
-    const QRectF box(c.x() - size / 2, c.y() - size / 2, size, size);
-    const QColor type_color = to_qcolor(frame_type_color(n.type));
-    painter->setOpacity(n.shown ? 1.0 : 0.55);
-    if (n.refs_unknown) {
-      painter->setPen(QPen(type_color, 1.5, Qt::DashLine));
-      painter->setBrush(Qt::NoBrush);
-    } else {
-      painter->setPen(Qt::NoPen);
-      painter->setBrush(type_color);
-    }
-    painter->drawRoundedRect(box, 2, 2);
-    painter->setOpacity(1.0);
-    if (size >= 11) {
-      painter->setPen(n.refs_unknown ? text_color_ : QColor(Qt::white));
-      painter->drawText(box, Qt::AlignCenter, QString::fromLatin1(frame_type_label(n.type)));
-    }
-    if (n.decode_index == selected_frame_) {
-      painter->setPen(QPen(outline_color_, 2));
-      painter->setBrush(Qt::NoBrush);
-      painter->drawRoundedRect(box.adjusted(-2, -2, 2, 2), 3, 3);
-    }
-  }
-
-  // Column labels: POC every few columns that fit.
-  painter->setPen(text_color_);
-  const int stride = std::max(1, static_cast<int>(std::ceil(26.0 / g.cell_width())));
-  for (const RefNode& n : layout_.nodes) {
-    if (n.mirror || (n.column - first) % stride != 0) {
-      continue;
-    }
-    painter->drawText(QRectF(g.x_of(n.column, first) - 14, height() - g.margin_bottom + 2, 28, 16), Qt::AlignCenter,
-                      QString::number(n.poc));
-  }
+  PaintContext ctx{
+      painter,      layout_,         geometry(), layout_.params.first_column, 0.0, text_color_, outline_color_,
+      hover_frame_, selected_frame_, height()};
+  ctx.size = std::min({ctx.g.cell_width() * 0.8, ctx.g.row_height() * 0.8, 18.0});
+  draw_row_labels(ctx);
+  draw_links(ctx);
+  draw_arrows(ctx);
+  draw_nodes(ctx);
+  draw_column_labels(ctx);
 }
 
 void RefGraph::geometryChange(const QRectF& new_geometry, const QRectF& old_geometry) {
