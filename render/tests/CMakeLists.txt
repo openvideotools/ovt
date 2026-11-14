@@ -68,3 +68,6 @@ if(APPLE)
   set_source_files_properties(test_interop_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   target_link_libraries(ovt_tests_render PRIVATE "-framework Metal" "-framework Foundation")
 endif()
+
+# WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
+target_sources(ovt_tests_render PRIVATE test_measure.cpp)
