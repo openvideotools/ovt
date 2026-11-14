@@ -5,11 +5,12 @@
 # add their jobs (license-gate, asan-ubsan, clang-tidy, android-build, gui, coverage, ...) to this file.
 # Third-party actions are pinned by commit SHA, never by tag; Renovate keeps the pins fresh.
 #
-# Runners: lint and build-macos-arm64 run on the owner's Mac Mini (self-hosted, label macos-arm64). Jobs that
-# need Linux stay on GitHub-hosted runners and skip when the repository variable OVT_HOSTED_RUNNERS is `off`
-# (Settings > Secrets and variables > Actions > Variables), the owner's switch for when hosted Actions are
-# unavailable. Skipping them drops Linux coverage, so only the owner sets it. Self-hosted jobs never run for
-# pull requests from forks (SELF_HOSTED_OK below).
+# Runners: build-macos-arm64 (and the sanitizer and coverage jobs) run on the owner's Mac Mini (self-hosted, label
+# macos-arm64). lint and license-gate run on GitHub-hosted ubuntu-22.04, which keeps the Mini's three runners for the
+# builds; when the repository variable OVT_HOSTED_RUNNERS is `off` (Settings > Secrets and variables > Actions >
+# Variables), the owner's switch for when hosted Actions are unavailable, they fall back to the Mini. Jobs that need
+# Linux skip under that switch. Skipping them drops Linux coverage, so only the owner sets it. Self-hosted jobs never
+# run for pull requests from forks (SELF_HOSTED_OK below); lint and license-gate run for forks only on hosted runners.
 name: ci
 
 on:
@@ -29,9 +30,12 @@ permissions:
 
 jobs:
   lint:
-    # SELF_HOSTED_OK: never run a fork's code on the Mini.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macos-arm64]
+    # Hosted ubuntu-22.04; the Mini only under the owner's OVT_HOSTED_RUNNERS=off switch (see the header).
+    # SELF_HOSTED_OK: a fork's code runs only on the hosted runner, never on the Mini.
+    if: >-
+      vars.OVT_HOSTED_RUNNERS != 'off' || github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.OVT_HOSTED_RUNNERS == 'off' && fromJSON('["self-hosted", "macos-arm64"]') || 'ubuntu-22.04' }}
     timeout-minutes: 30
     steps:
       - name: Hosted jobs switched off
@@ -48,8 +52,15 @@ jobs:
         with:
           node-version: "22"
 
-      # The runner's own Python (setup-python writes to /Users/runner, which exists only on GitHub's images),
-      # in a venv: Homebrew's Python refuses system-wide pip installs. The same search as setup-ovt.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        # ubuntu-22.04's own python3 is 3.10. On the Mini setup-python cannot install (it writes to /Users/runner,
+        # which exists only on GitHub's images); the search below takes the runner's own Python there.
+        if: runner.environment == 'github-hosted'
+        with:
+          python-version: "3.12"
+
+      # The first Python >= 3.11 (setup-python's on hosted runners), in a venv: Homebrew's Python refuses system-wide
+      # pip installs. The same search as setup-ovt.
       - name: Tools
         run: |
           for py in python3.13 python3.12 python3.11 python3; do
@@ -139,16 +150,25 @@ jobs:
 
   # Licence gate (chapter 15 §15.4.2, chapter 14 §14.3.4; WI-0.032). The inputs that need no build (corpora,
   # third_party/VERSIONS.md, sources headers, the pip and Gradle reports when their producers exist) run here, on the
-  # Mini like lint. The built-tree input (license_manifest.json plus the vcpkg SPDX files) runs as the last step of
+  # same runner as lint. The built-tree input (license_manifest.json plus the vcpkg SPDX files) runs as the last step of
   # build-linux-x64, which owns the build tree. `--strict-or` deny-checks every OR alternative; a missing input flag
   # is an error (`--require-all`). Never downgrade a finding to a warning.
   license-gate:
-    # SELF_HOSTED_OK: never run a fork's code on the Mini.
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: [self-hosted, macos-arm64]
+    # Hosted ubuntu-22.04; the Mini only under the owner's OVT_HOSTED_RUNNERS=off switch (see the header).
+    # SELF_HOSTED_OK: a fork's code runs only on the hosted runner, never on the Mini.
+    if: >-
+      vars.OVT_HOSTED_RUNNERS != 'off' || github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ${{ vars.OVT_HOSTED_RUNNERS == 'off' && fromJSON('["self-hosted", "macos-arm64"]') || 'ubuntu-22.04' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        # ubuntu-22.04's own python3 is 3.10; the Mini fallback uses its own Python (see the lint job).
+        if: runner.environment == 'github-hosted'
+        with:
+          python-version: "3.12"
 
       - name: Licence gate inputs
         run: |
@@ -501,3 +521,28 @@ jobs:
           path: |
             android/app/build/outputs/apk/foss/**/*.apk
             android/app/build/outputs/bundle/playRelease/*.aab
+
+      # Licence gate for the Gradle dependencies (chapter 15 §15.4.2, WI-0.034 follow-up): the jk1 report of the two
+      # release runtime classpaths (android/app/build.gradle.kts, licenseReport) goes through license_gate.py --gradle.
+      # Read-only: the report stays in the workspace and the job summary; nothing is uploaded.
+      - name: Gradle licence report
+        working-directory: android
+        run: ./gradlew --no-daemon --stacktrace :app:generateLicenseReport
+
+      - name: Licence gate (Gradle dependencies)
+        run: |
+          # setup-ovt put a Python >= 3.11 on PATH (tomllib).
+          status=0
+          python -I tools/license_gate.py --policy tools/license_policy.toml \
+            --gradle android/app/build/reports/dependency-license/index.json --require-all \
+            --report "${RUNNER_TEMP}/gradle_license_gate_report.json" || status=$?
+          python -I - "${RUNNER_TEMP}/gradle_license_gate_report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY' || true
+          import json, sys
+          rep = json.load(open(sys.argv[1]))
+          print(f"### Gradle licence gate: {rep['status']}")
+          for row in rep["inventory"]:
+              print(f"- {row['component']} {row['version']}: {row['license']}")
+          for f in rep["findings"]:
+              print(f"- **{f['code']}** {f['where']} {f.get('license') or f['message']}")
+          PY
+          exit "$status"

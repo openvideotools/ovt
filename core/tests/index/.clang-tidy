@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
-# Syntax unit tests (user-data registry WI-1.120, SyntaxBuilder WI-1.106). Catch2's CHECK/REQUIRE macros expand to
+# Index module unit tests (AV1 slot model and frame boundaries, WI-1.119). Catch2's CHECK/REQUIRE macros expand to
 # branches, so a table-driven test case trips readability-function-cognitive-complexity on code that has almost no
 # control flow of its own. Count only the test's own branches.
 InheritParentConfig: true
