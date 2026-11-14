@@ -12,6 +12,7 @@
 #   OVT_NOTICES_REQUIRED  ON in release jobs: `cmake --install` fails if the notices file is missing (default OFF, so a
 #                         plain install works without building ovt_notices; WI-0.036 turns it on)
 #   OVT_NOTICES_OUT       output file
+#   OVT_NOTICES_TARGETS   targets whose licences the notices cover (default: the shipping targets)
 #
 # Licence texts come from the dependencies' install prefixes, never from the network:
 #   * ExternalProject dependencies: the LICENSE_FILES of ovt_tp_declare() are staged from the dependency's source
@@ -36,6 +37,20 @@ set(OVT_NOTICES_ARTIFACT "core" CACHE STRING "Artefact id for THIRD_PARTY_NOTICE
 option(OVT_NOTICES_REQUIRED "Release jobs: cmake --install fails when the notices file was not generated" OFF)
 option(OVT_NOTICES_PATENT "Codec pack: add the patent statement and write PATENT_NOTICE.md" OFF)
 set(OVT_NOTICES_OUT "${CMAKE_BINARY_DIR}/THIRD_PARTY_NOTICES.md" CACHE FILEPATH "Generated notices file")
+# The targets whose licences the notices cover: what the install rules ship (cmake/OvtInstall.cmake, app/). Test, fuzz
+# and fixture targets of the same build tree are not distributed, so they are neither gated nor listed here; the
+# gate in CI still checks every target. A target named here is checked in full, so this list cannot hide a shipped one.
+set(OVT_NOTICES_TARGETS
+    ovt_core
+    ovt_render
+    ovt_cli_lib
+    ovt_cli
+    ovt_studio
+    ovt_plugin_aom
+    ovt_plugin_ffmpeg
+    ovt_plugin_de265
+    ovt_plugin_hm
+    CACHE STRING "Targets covered by THIRD_PARTY_NOTICES.md")
 get_filename_component(_ovt_notices_dir "${OVT_NOTICES_OUT}" DIRECTORY)
 
 set(_ovt_notices_staging "${CMAKE_BINARY_DIR}/notices/licenses")
@@ -112,7 +127,7 @@ add_custom_target(
   COMMAND
     "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/license_gate.py" --policy
     "${CMAKE_SOURCE_DIR}/tools/license_policy.toml" --versions "${CMAKE_SOURCE_DIR}/third_party/VERSIONS.md" --manifest
-    "${OVT_LICENSE_MANIFEST}" --report "${_ovt_notices_report}"
+    "${OVT_LICENSE_MANIFEST}" --only-targets ${OVT_NOTICES_TARGETS} --report "${_ovt_notices_report}"
   COMMAND "${Python3_EXECUTABLE}" -I "${CMAKE_SOURCE_DIR}/tools/gen_notices.py" ${_ovt_notices_args}
   COMMENT "Generating ${OVT_NOTICES_OUT}"
   VERBATIM)

@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 """Verify (and optionally repair) the dynamic-library references of a macOS .app bundle.
 
-Chapter 13 §13.5.2, WI-0.060. Every Mach-O file inside the bundle may reference only `@rpath/`, `@executable_path/`
-or `@loader_path/` paths, `/usr/lib/` and `/System/`; every `@rpath/` reference must resolve through the file's own
+Chapter 13 §13.5.2, WI-0.060. Every Mach-O file inside the bundle may reference only `@rpath/` and `@executable_path/`
+paths, `/usr/lib/` and `/System/` (`@loader_path` may appear in LC_RPATH entries, which are checked separately); every `@rpath/` reference must resolve through the file's own
 LC_RPATH entries to a file that exists inside the bundle.
 
     fix_rpaths.py <OVT Studio.app> [--fix] [--otool P] [--install-name-tool P]
@@ -29,7 +29,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ALLOWED_PREFIXES = ("@rpath/", "@executable_path/", "@loader_path/", "/usr/lib/", "/System/")
+ALLOWED_PREFIXES = ("@rpath/", "@executable_path/", "/usr/lib/", "/System/")
 MACHO_MAGICS = {
     b"\xfe\xed\xfa\xce",
     b"\xfe\xed\xfa\xcf",
@@ -148,7 +148,11 @@ def frameworks_index(app: Path) -> dict[str, str]:
         dirs.sort()
         for name in sorted(files):
             p = Path(root) / name
-            if not is_macho(p):
+            if p.is_symlink():
+                # libfoo.1.dylib -> libfoo.1.2.3.dylib: an absolute reference may use either name.
+                if not is_macho(p.resolve()):
+                    continue
+            elif not is_macho(p):
                 continue
             rel = p.relative_to(fw).as_posix()
             index.setdefault(name, "@rpath/" + rel)

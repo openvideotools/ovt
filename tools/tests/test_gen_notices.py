@@ -223,3 +223,15 @@ def test_hyphenated_vcpkg_port_is_found(tree: dict, tmp_path: Path) -> None:
     code, err = run(tree, out, "--vcpkg-share", str(tmp_path / "share"))
     assert code == 0, err
     assert "json MIT" in out.read_text()
+
+
+def test_key_of_maps_bundle_components_to_their_staging_directories() -> None:
+    """Names from a macOS GUI build's licence manifest (WI-0.060): Qt modules, FFmpeg flavours, libaom, libplacebo."""
+    for name in ("Qt6::Core", "Qt6::QuickControls2", "WrapOpenGL::WrapOpenGL", "WrapAtomic::WrapAtomic"):
+        assert gn.key_of(name) == "qt"
+    for name in ("tp::ffmpeg_plugin", "tp::ffmpeg_plugin_avcodec", "tp::ffmpeg_core_swscale"):
+        assert gn.key_of(name) == "ffmpeg"
+    assert gn.key_of("tp::aom") == "libaom"
+    assert gn.key_of("tp::placebo") == "libplacebo"
+    assert gn.key_of("/x/vcpkg_installed/arm64-osx-ovt/lib/libGenericCodeGen.a") == "glslang"
+    assert gn.key_of("/x/vcpkg_installed/arm64-osx-ovt/lib/liblcms2.a") == "lcms"
