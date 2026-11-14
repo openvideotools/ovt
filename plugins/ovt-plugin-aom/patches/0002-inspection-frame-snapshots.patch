@@ -1,0 +1,223 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-14
+Subject: [PATCH 2/2] inspection: snapshot the frame before each in-loop filter
+
+While an inspection callback is set, av1_decode_tg_tiles_and_wrapup()
+copies the frame buffer before deblocking, before CDEF and before loop
+restoration (after super-resolution). insp_frame_data.snapshots[] points
+at the copies, which the decoder owns and reuses for the next frame.
+Frames whose filters are skipped (IntraBC, single-tile decoding) get the
+same picture in all three snapshots.
+
+The copies are tight (stride = width * bytes per sample) and are made only
+when inspect_cb != NULL, so a decoder without an inspection callback does
+no extra work; without CONFIG_INSPECTION the snapshot points compile to
+nothing.
+
+Upstream-Status: Pending [to be submitted to aomedia-review.googlesource.com by OVT WI-2.160]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: BSD-2-Clause
+Rationale: the decoder filters the frame in place, so the pre-filter pictures exist only inside
+  av1_decode_tg_tiles_and_wrapup(); no API or control returns them.
+---
+  av1/decoder/decodeframe.c | 58 +++++++++++++++++++++++++++++++++++++++++++++++
+  av1/decoder/decoder.c     |  6 +++++
+  av1/decoder/decoder.h     |  3 +++
+  av1/decoder/inspection.c  |  2 ++
+  av1/decoder/inspection.h  | 28 +++++++++++++++++++++++
+  5 files changed, 97 insertions(+)
+
+diff --git a/av1/decoder/decodeframe.c b/av1/decoder/decodeframe.c
+index cbf5e91..d1018a2 100644
+--- a/av1/decoder/decodeframe.c
++++ b/av1/decoder/decodeframe.c
+@@ -5273,6 +5273,56 @@ static inline void setup_frame_info(AV1Decoder *pbi) {
+   }
+ }
+ 
++#if CONFIG_INSPECTION
++// Copies the current frame buffer into snapshot @stage when an inspection
++// callback is set; a no-op otherwise.
++static void inspection_snapshot(AV1Decoder *pbi, int stage) {
++  if (pbi->inspect_cb == NULL) return;
++  const AV1_COMMON *const cm = &pbi->common;
++  const YV12_BUFFER_CONFIG *const src = &cm->cur_frame->buf;
++  const int num_planes = av1_num_planes(cm);
++  const int hbd = (src->flags & YV12_FLAG_HIGHBITDEPTH) != 0;
++  const int bps = hbd ? 2 : 1;
++  for (int p = 0; p < 3; ++p) {
++    insp_plane *const dst = &pbi->insp_snapshots[stage][p];
++    if (p >= num_planes) {
++      dst->width = dst->height = 0;
++      continue;
++    }
++    const int is_uv = p > 0;
++    const int w = src->crop_widths[is_uv];
++    const int h = src->crop_heights[is_uv];
++    const size_t row_bytes = (size_t)w * bps;
++    const size_t size = row_bytes * h;
++    if (dst->capacity < size) {
++      aom_free(dst->buf);
++      dst->buf = (uint8_t *)aom_malloc(size);
++      dst->capacity = dst->buf != NULL ? size : 0;
++      if (dst->buf == NULL) {
++        aom_internal_error(cm->error, AOM_CODEC_MEM_ERROR,
++                           "Failed to allocate an inspection snapshot");
++      }
++    }
++    const uint8_t *s =
++        hbd ? (const uint8_t *)CONVERT_TO_SHORTPTR(src->buffers[p])
++            : src->buffers[p];
++    const size_t src_stride = (size_t)src->strides[is_uv] * bps;
++    for (int y = 0; y < h; ++y) {
++      memcpy(dst->buf + y * row_bytes, s + y * src_stride, row_bytes);
++    }
++    dst->width = w;
++    dst->height = h;
++    dst->stride = (int)row_bytes;
++    dst->bytes_per_sample = bps;
++  }
++}
++#define INSPECTION_SNAPSHOT(pbi, stage) inspection_snapshot(pbi, stage)
++#else
++#define INSPECTION_SNAPSHOT(pbi, stage) \
++  do {                                  \
++  } while (0)
++#endif
++
+ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
+                                     const uint8_t *data_end,
+                                     const uint8_t **p_data_end, int start_tile,
+@@ -5309,12 +5359,14 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
+                          pbi->num_workers, 1);
+   av1_alloc_cdef_sync(cm, &pbi->cdef_sync, pbi->num_workers);
+ 
++  INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_DEBLOCK);
+   if (!cm->features.allow_intrabc && !tiles->single_tile_decoding) {
+     if (cm->lf.filter_level[0] || cm->lf.filter_level[1]) {
+       av1_loop_filter_frame_mt(&cm->cur_frame->buf, cm, &pbi->dcb.xd, 0,
+                                num_planes, 0, pbi->tile_workers,
+                                pbi->num_workers, &pbi->lf_row_sync, 0);
+     }
++    INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_CDEF);
+ 
+     const int do_cdef =
+         !pbi->skip_loop_filter && !cm->features.coded_lossless &&
+@@ -5347,6 +5399,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
+       }
+ 
+       superres_post_decode(pbi);
++      INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_LR);
+ 
+       if (do_loop_restoration) {
+         av1_loop_restoration_save_boundary_lines(&pbi->common.cur_frame->buf,
+@@ -5363,6 +5416,7 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
+         }
+       }
+     } else {
++      INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_LR);
+       // In no cdef and no superres case. Provide an optimized version of
+       // loop_restoration_filter.
+       if (do_loop_restoration) {
+@@ -5378,6 +5432,10 @@ void av1_decode_tg_tiles_and_wrapup(AV1Decoder *pbi, const uint8_t *data,
+         }
+       }
+     }
++  } else {
++    // IntraBC frames and single-tile decoding skip the in-loop filters.
++    INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_CDEF);
++    INSPECTION_SNAPSHOT(pbi, INSP_SNAPSHOT_PRE_LR);
+   }
+ 
+   if (!pbi->dcb.corrupted) {
+diff --git a/av1/decoder/decoder.c b/av1/decoder/decoder.c
+index 0ae0b86..e6d5289 100644
+--- a/av1/decoder/decoder.c
++++ b/av1/decoder/decoder.c
+@@ -180,6 +180,12 @@ void av1_decoder_remove(AV1Decoder *pbi) {
+   // Free the tile list output buffer.
+   aom_free_frame_buffer(&pbi->tile_list_outbuf);
+ 
++#if CONFIG_INSPECTION
++  for (int k = 0; k < INSP_SNAPSHOTS; k++) {
++    for (int p = 0; p < 3; p++) aom_free(pbi->insp_snapshots[k][p].buf);
++  }
++#endif
++
+   aom_get_worker_interface()->end(&pbi->lf_worker);
+   aom_free(pbi->lf_worker.data1);
+ 
+diff --git a/av1/decoder/decoder.h b/av1/decoder/decoder.h
+index d6610cd..36ec38f 100644
+--- a/av1/decoder/decoder.h
++++ b/av1/decoder/decoder.h
+@@ -287,6 +287,9 @@ typedef struct AV1Decoder {
+ #if CONFIG_INSPECTION
+   aom_inspect_cb inspect_cb;
+   void *inspect_ctx;
++  // Frame snapshots before each in-loop filter, taken only while inspect_cb
++  // is set (av1/decoder/inspection.h).
++  insp_plane insp_snapshots[INSP_SNAPSHOTS][3];
+ #endif
+   int operating_point;
+   int current_operating_point;
+diff --git a/av1/decoder/inspection.c b/av1/decoder/inspection.c
+index 9585cd9..e28d1fd 100644
+--- a/av1/decoder/inspection.c
++++ b/av1/decoder/inspection.c
+@@ -206,6 +206,8 @@ int ifd_inspect(insp_frame_data *fd, void *decoder, int skip_not_transform) {
+   fd->accounting = &pbi->accounting;
+ #endif
+   ifd_inspect_frame_filters(fd, cm);
++  for (int k = 0; k < INSP_SNAPSHOTS; k++)
++    fd->snapshots[k] = pbi->insp_snapshots[k];
+   int i, j;
+   for (i = 0; i < MAX_SEGMENTS; i++) {
+     for (j = 0; j < 2; j++) {
+diff --git a/av1/decoder/inspection.h b/av1/decoder/inspection.h
+index 68e374d..617d787 100644
+--- a/av1/decoder/inspection.h
++++ b/av1/decoder/inspection.h
+@@ -92,6 +92,31 @@ struct insp_mi_data {
+ 
+ #define INSPECTION_MVD_NONE (-32768)
+ 
++// Frame snapshots (INSPECTION_FRAME_SNAPSHOTS): copies of the frame buffer
++// taken while the inspection callback is set, before each in-loop filter.
++#define INSPECTION_FRAME_SNAPSHOTS 1
++
++enum {
++  INSP_SNAPSHOT_PRE_DEBLOCK,    // reconstruction before the deblocking filter
++  INSP_SNAPSHOT_PRE_CDEF,       // after deblocking, before CDEF
++  INSP_SNAPSHOT_PRE_LR,         // after CDEF and super-resolution, before LR
++  INSP_SNAPSHOTS
++};
++
++typedef struct insp_plane insp_plane;
++
++// One plane of a snapshot: height rows of width samples, stride bytes apart,
++// bytes_per_sample 1 (8-bit buffers) or 2 (uint16, native endianness).
++// Width 0: the plane is absent (monochrome chroma, or no snapshot taken).
++struct insp_plane {
++  uint8_t *buf;
++  size_t capacity;
++  int width;
++  int height;
++  int stride;
++  int bytes_per_sample;
++};
++
+ typedef struct insp_lr_unit insp_lr_unit;
+ 
+ // One loop restoration unit: RestorationUnitInfo of the frame.
+@@ -149,6 +174,9 @@ struct insp_frame_data {
+   int lr_vert_units[3];
+   insp_lr_unit *lr_units[3];
+   int lr_units_alloc[3];
++  // Snapshots of the frame (INSPECTION_FRAME_SNAPSHOTS), owned by the
++  // decoder and valid until the next frame is decoded.
++  const insp_plane *snapshots[INSP_SNAPSHOTS];  // [stage] -> 3 planes
+ };
+ 
+ void ifd_init(insp_frame_data *fd, int frame_width, int frame_height);

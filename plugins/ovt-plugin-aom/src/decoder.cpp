@@ -15,9 +15,19 @@
 #include "av1/decoder/decoder.h"
 #include "av1/decoder/inspection.h"
 
+// The extension patches of plugins/ovt-plugin-aom/patches (WI-2.159) announce themselves in inspection.h.
+// SPEC-ASSUMPTION(#480): §7.6.1 has third_party/libaom.cmake define OVT_AOM_SNAPSHOTS when the patch applied; the
+// patched header's own macro says the same thing without a build-system flag, and cannot disagree with the header
+// the plugin is compiled against.
+#if defined(INSPECTION_FRAME_SNAPSHOTS)
+#define OVT_AOM_SNAPSHOTS 1
+#endif
+
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <memory>
 #include <span>
 #include <string>
@@ -95,6 +105,80 @@ uint8_t chroma_format_of(aom_img_fmt_t fmt, bool monochrome) {
   }
 }
 
+#if defined(INSPECTION_EXT_VERSION)
+// The insp_mi_data fields of extension patch 0001.
+void copy_mi_ext(const insp_mi_data& s, MiInfo* out) {
+  MiInfo& m = *out;
+  m.tx_type = s.tx_type;
+  m.partition = s.partition;
+  m.angle_delta = {s.angle_delta[0], s.angle_delta[1]};
+  m.filter_intra_mode = s.filter_intra_mode;
+  m.interintra_mode = s.interintra_mode;
+  m.wedge_interintra = s.wedge_interintra;
+  m.interintra_wedge_index = s.interintra_wedge_index;
+  m.wedge_index = s.wedge_index;
+  m.wedge_sign = s.wedge_sign;
+  m.mask_type = s.mask_type;
+  m.comp_group_idx = s.comp_group_idx;
+  m.compound_idx = s.compound_idx;
+  m.ref_mv_idx = s.ref_mv_idx;
+  m.skip_mode = s.skip_mode;
+  m.seg_id_predicted = s.seg_id_predicted;
+  m.wm_type = s.wm_type;
+  m.wm_invalid = s.wm_invalid;
+  std::copy_n(std::begin(s.wm_params), m.wm_params.size(), m.wm_params.begin());
+  m.delta_lf_from_base = s.delta_lf_from_base;
+  std::copy_n(std::begin(s.delta_lf), m.delta_lf.size(), m.delta_lf.begin());
+  m.cdef_idx = s.cdef_idx;
+  for (size_t k = 0; k < 2; ++k) {
+    m.mvd.at(k) = {s.mvd[k][0], s.mvd[k][1]};
+    m.mv_joint.at(k) = s.mv_joint[k];
+  }
+  for (size_t p = 0; p < 3; ++p) {
+    std::copy_n(std::begin(s.palette_colors[p]), m.palette_colors.at(p).size(), m.palette_colors.at(p).begin());
+  }
+}
+
+// The frame-level filter data of extension patch 0001.
+void copy_filters_ext(const insp_frame_data& fd, BlockData* out) {
+  FilterExt& f = out->filters;
+  out->ext = true;
+  std::copy_n(std::begin(fd.lf_filter_level), f.lf_level.size(), f.lf_level.begin());
+  f.lf_sharpness = fd.lf_sharpness_level;
+  f.lf_delta_enabled = fd.lf_mode_ref_delta_enabled != 0;
+  for (size_t i = 0; i < f.lf_ref_deltas.size(); ++i) {
+    f.lf_ref_deltas.at(i) = static_cast<int8_t>(fd.lf_ref_deltas[i]);
+  }
+  for (size_t i = 0; i < f.lf_mode_deltas.size(); ++i) {
+    f.lf_mode_deltas.at(i) = static_cast<int8_t>(fd.lf_mode_deltas[i]);
+  }
+  f.delta_lf_present = fd.delta_lf_present_flag != 0;
+  f.delta_lf_res = fd.delta_lf_res;
+  f.delta_lf_multi = fd.delta_lf_multi != 0;
+  for (size_t p = 0; p < 3; ++p) {
+    f.lr_type.at(p) = fd.lr_frame_type[p];
+    f.lr_unit_size.at(p) = fd.lr_unit_size[p];
+    f.lr_horz.at(p) = fd.lr_horz_units[p];
+    f.lr_vert.at(p) = fd.lr_vert_units[p];
+    const auto n = static_cast<size_t>(std::max(0, fd.lr_horz_units[p] * fd.lr_vert_units[p]));
+    std::vector<LrUnit>& units = f.lr_units.at(p);
+    units.clear();
+    if (fd.lr_units[p] == nullptr) {
+      continue;
+    }
+    const std::span<const insp_lr_unit> src(fd.lr_units[p], n);
+    units.reserve(n);
+    for (const insp_lr_unit& u : src) {
+      units.push_back(LrUnit{u.restoration_type,
+                             {u.wiener_vfilter[0], u.wiener_vfilter[1], u.wiener_vfilter[2]},
+                             {u.wiener_hfilter[0], u.wiener_hfilter[1], u.wiener_hfilter[2]},
+                             u.sgrproj_ep,
+                             {u.sgrproj_xqd[0], u.sgrproj_xqd[1]}});
+    }
+  }
+}
+#endif
+
 // Copies the inspection MI grid and the frame-header values the block mapping needs (chapter 07 §7.6.1). Runs inside
 // the inspection callback: it only reads the decoder's frame state, as ifd_inspect() does.
 // SPEC-ASSUMPTION(#360): superblock size, ref_frame_idx[], tile layout, CDEF strengths and global-motion types come
@@ -141,10 +225,15 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
     m.intrabc = s.intrabc;
     m.palette = s.palette;
     m.uv_palette = s.uv_palette;
+#if defined(INSPECTION_EXT_VERSION)
+    copy_mi_ext(s, &m);
+#endif
   }
   const SequenceHeader& seq = *cm.seq_params;
   d.sb_mi = seq.sb_size == BLOCK_128X128 ? 32 : 16;
   d.monochrome = seq.monochrome != 0;
+  d.ss_x = seq.subsampling_x;
+  d.ss_y = seq.subsampling_y;
   d.intra_frame = frame_is_intra_only(&cm) != 0;
   if (!d.intra_frame) {
     for (size_t t = 0; t < d.ref_frame_idx.size(); ++t) {
@@ -179,7 +268,9 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
   }
   // Super-resolution (AV1 §5.9.8): cm.width is FrameWidth, the coded (downscaled) width the MI grid covers; by the
   // time the callback runs, superres_post_decode() has upscaled the frame buffer to superres_upscaled_width.
-  d.superres_denom = cm.superres_scale_denominator;
+  // setup_superres() writes superres_scale_denominator only when the sequence enables super-resolution; it keeps
+  // its zero initial value otherwise.
+  d.superres_denom = seq.enable_superres != 0 ? cm.superres_scale_denominator : 8;
   d.frame_width = cm.width;
   d.upscaled_width = cm.superres_upscaled_width;
   d.base_qindex = fd.base_qindex;
@@ -188,7 +279,50 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
   for (size_t s = 0; s < d.y_dequant.size(); ++s) {
     d.y_dequant.at(s) = {fd.y_dequant[s][0], fd.y_dequant[s][1]};
   }
+#if defined(INSPECTION_EXT_VERSION)
+  copy_filters_ext(fd, &d);
+#endif
 }
+
+#if defined(OVT_AOM_SNAPSHOTS)
+// Copies one snapshot of patch 0002 (decoder-owned, overwritten by the next frame) into a Picture of its own.
+Picture copy_snapshot(const insp_plane* planes, int num_planes, uint8_t bit_depth) {
+  Picture pic;
+  if (planes == nullptr) {
+    return pic;
+  }
+  const std::span<const insp_plane> src(planes, 3);
+  size_t total = 0;
+  for (int p = 0; p < num_planes; ++p) {
+    const insp_plane& sp = src[static_cast<size_t>(p)];
+    total += sp.width > 0 ? static_cast<size_t>(sp.stride) * static_cast<size_t>(sp.height) : 0;
+  }
+  if (total == 0) {
+    return pic;
+  }
+  auto buf = std::make_shared<std::vector<uint8_t>>(total);
+  size_t off = 0;
+  for (int p = 0; p < num_planes; ++p) {
+    const insp_plane& sp = src[static_cast<size_t>(p)];
+    if (sp.width <= 0 || sp.buf == nullptr) {
+      return Picture{};
+    }
+    const size_t n = static_cast<size_t>(sp.stride) * static_cast<size_t>(sp.height);
+    std::copy_n(sp.buf, n, buf->begin() + static_cast<std::ptrdiff_t>(off));
+    PlaneView& v = pic.planes.at(static_cast<size_t>(p));
+    v.data = std::span<uint8_t>(*buf).subspan(off).data();
+    v.width = static_cast<uint32_t>(sp.width);
+    v.height = static_cast<uint32_t>(sp.height);
+    v.stride_bytes = static_cast<uint32_t>(sp.stride);
+    v.bit_depth = bit_depth;
+    v.sample_bytes = static_cast<uint8_t>(sp.bytes_per_sample);
+    off += n;
+  }
+  pic.num_planes = num_planes;
+  pic.owner = std::move(buf);
+  return pic;
+}
+#endif
 
 }  // namespace
 
@@ -204,8 +338,9 @@ struct Decoder::Impl {
   bool show_frame = false;
   int base_qindex = 0;
   bool apply_grain = false;
-  bool monochrome = false;  // sequence-level, from the last output image
-  BlockData blocks;         // filled by the callback
+  bool monochrome = false;           // sequence-level, from the last output image
+  BlockData blocks;                  // filled by the callback
+  std::array<Picture, 3> snapshots;  // filled by the callback (patch 0002)
 
   Impl() = default;
   ~Impl() {
@@ -260,6 +395,8 @@ struct Decoder::Impl {
     f.chroma_format = have_fmt ? chroma_format_of(fmt, monochrome) : 1;
     f.blocks = std::move(blocks);
     blocks = BlockData{};
+    f.snapshots = std::move(snapshots);
+    snapshots = {};
     return f;
   }
 
@@ -283,11 +420,34 @@ struct Decoder::Impl {
     const auto* pbi = static_cast<const AV1Decoder*>(decoder);
     self->apply_grain = pbi->common.film_grain_params.apply_grain != 0;
     copy_blocks(self->fd, *pbi, &self->blocks);
+#if defined(OVT_AOM_SNAPSHOTS)
+    const SequenceHeader& seq = *pbi->common.seq_params;
+    const int num_planes = seq.monochrome != 0 ? 1 : 3;
+    for (size_t k = 0; k < self->snapshots.size(); ++k) {
+      self->snapshots.at(k) = copy_snapshot(self->fd.snapshots[k], num_planes, static_cast<uint8_t>(seq.bit_depth));
+    }
+#endif
     self->fired = true;
   }
 };
 
 Decoder::~Decoder() = default;
+
+bool Decoder::has_mi_extension() {
+#if defined(INSPECTION_EXT_VERSION)
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool Decoder::has_snapshots() {
+#if defined(OVT_AOM_SNAPSHOTS)
+  return true;
+#else
+  return false;
+#endif
+}
 
 ovt_status Decoder::create(int threads, std::unique_ptr<Decoder>* out, std::string* error) {
   auto dec = std::make_unique<Decoder>();

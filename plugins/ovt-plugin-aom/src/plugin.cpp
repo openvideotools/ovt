@@ -20,13 +20,17 @@
 #include "decoder.hpp"
 #include "fb_builder.hpp"
 #include "map_mi.hpp"
+#include "map_mi_ext.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "planes.hpp"
 
 namespace {
 
-constexpr uint8_t kCodecAv1 = 3;     // ovt.fb.Codec.AV1
-constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
+constexpr uint8_t kCodecAv1 = 3;          // ovt.fb.Codec.AV1
+constexpr uint32_t kStageRecon = 0;       // ovt.fb.PlaneStage.Reconstruction
+constexpr uint32_t kStagePreDeblock = 3;  // ovt.fb.PlaneStage.PreDeblock
+constexpr uint32_t kStagePreCdef = 4;     // ovt.fb.PlaneStage.PreSaoOrCdef
+constexpr uint32_t kStagePreLr = 5;       // ovt.fb.PlaneStage.PreLoopRestoration
 
 }  // namespace
 
@@ -55,7 +59,13 @@ struct Info {
     caps.codec = kCodecAv1;
     caps.plane_stages = 1U << kStageRecon;     // stock libaom: Reconstruction only (§7.6.1 Caps row)
     caps.grid_fields = ovt::aom::kGridFields;  // §7.6.1 Caps row with stock libaom, before accounting (WI-2.157)
-    caps.has_symbol_accounting = 0;            // WI-2.157
+    if (ovt::aom::Decoder::has_mi_extension()) {
+      caps.grid_fields |= ovt::aom::kGridFieldsExt;  // tx_type, with extension patch 0001 (WI-2.159)
+    }
+    if (ovt::aom::Decoder::has_snapshots()) {  // extension patch 0002: the three pre-filter stages
+      caps.plane_stages |= (1U << kStagePreDeblock) | (1U << kStagePreCdef) | (1U << kStagePreLr);
+    }
+    caps.has_symbol_accounting = 0;  // WI-2.157
     caps.bit_exact = 1;
     caps.supports_threads = 1;  // safe; libaom runs on one thread while accounting is on (decoder.cpp)
     caps.id = "aom";

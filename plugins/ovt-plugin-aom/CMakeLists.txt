@@ -13,7 +13,7 @@ if(NOT TARGET tp::aom_inspection)
   return()
 endif()
 
-set(OVT_AOM_PLUGIN_SOURCES src/plugin.cpp src/decoder.cpp src/fb_builder.cpp src/map_mi.cpp
+set(OVT_AOM_PLUGIN_SOURCES src/plugin.cpp src/decoder.cpp src/fb_builder.cpp src/map_mi.cpp src/map_mi_ext.cpp
                            src/partition_reconstruct.cpp src/planes.cpp)
 add_library(ovt_plugin_aom MODULE ${OVT_AOM_PLUGIN_SOURCES})
 target_include_directories(ovt_plugin_aom PRIVATE "${PROJECT_SOURCE_DIR}/core/include")

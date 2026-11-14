@@ -8,6 +8,7 @@
 #ifndef OVT_PLUGIN_AOM_DECODER_HPP
 #define OVT_PLUGIN_AOM_DECODER_HPP
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -44,7 +45,10 @@ struct Frame {
   uint8_t bit_depth = 8;
   bool apply_grain = false;  // film grain is signalled for this frame; Reconstruction is before grain synthesis
   Picture recon;             // Reconstruction of a shown frame, in place in libaom's frame buffer; empty for hidden
-  BlockData blocks;          // libaom's MI grid and the frame-header values its mapping needs (WI-2.156)
+  // Copies of the frame before deblocking, CDEF and loop restoration (PreDeblock, PreSaoOrCdef,
+  // PreLoopRestoration), shown and hidden frames alike; empty without extension patch 0002 (WI-2.159).
+  std::array<Picture, 3> snapshots;
+  BlockData blocks;  // libaom's MI grid and the frame-header values its mapping needs (WI-2.156)
   std::vector<Diag> diagnostics;
 };
 
@@ -73,6 +77,11 @@ class Decoder {
   ovt_status flush();
   /// Moves the next frame (decode order) into @p out; false when there is none.
   bool pop(Frame* out);
+  /// True when the linked libaom carries extension patch 0001 (extended insp_mi_data, WI-2.159).
+  static bool has_mi_extension();
+  /// True when the linked libaom carries extension patch 0002 (frame snapshots before each in-loop filter).
+  static bool has_snapshots();
+
   /// The message of the last OVT_E_PLUGIN, for logs and tests.
   [[nodiscard]] const std::string& last_error() const { return last_error_; }
 
