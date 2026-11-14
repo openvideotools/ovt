@@ -24,13 +24,18 @@ import json, os, sys
 db = json.load(open(os.environ["FAKE_DB"]))
 flag, path = sys.argv[1], sys.argv[2]
 e = db[path]
-if flag == "-L":
-    print(path + ":")
-    for d in e["deps"]:
-        print("\\t" + d + " (compatibility version 1.0.0, current version 1.0.0)")
-else:
-    for r in e["rpaths"]:
-        print("Load command 9\\n          cmd LC_RPATH\\n      cmdsize 32\\n         path " + r + " (offset 12)")
+# A universal file ("archs") prints one block per architecture, each with its own header, as the real otool does.
+archs = e.get("archs")
+for arch in archs or [None]:
+    print(path + (f" (architecture {arch}):" if arch else ":"))
+    # "slice_deps" / "slice_rpaths" {arch: [...]}: a slice that differs (a lipo-merged file); the fake
+    # install_name_tool does not edit them, like a name the fix never saw.
+    if flag == "-L":
+        for d in e.get("slice_deps", {}).get(arch, e["deps"]):
+            print("\\t" + d + " (compatibility version 1.0.0, current version 1.0.0)")
+    else:
+        for r in e.get("slice_rpaths", {}).get(arch, e["rpaths"]):
+            print("Load command 9\\n          cmd LC_RPATH\\n      cmdsize 32\\n         path " + r + " (offset 12)")
 """
 
 FAKE_INT = """#!/usr/bin/env python3
@@ -39,6 +44,11 @@ dbp = os.environ["FAKE_DB"]
 db = json.load(open(dbp))
 a = sys.argv[1:]
 e = db[a[-1]]
+# Like the real tool: the same -delete_rpath twice in one call is an error, and one -delete_rpath removes one
+# LC_RPATH (the first), or every copy with FAKE_DELETE_ALL=1.
+deleted = [a[i + 1] for i in range(len(a) - 1) if a[i] == "-delete_rpath"]
+if len(set(deleted)) != len(deleted):
+    sys.exit("install_name_tool: more than one -delete_rpath option specified")
 i = 0
 while i < len(a) - 1:
     if a[i] == "-id":
@@ -48,7 +58,13 @@ while i < len(a) - 1:
     elif a[i] == "-add_rpath":
         e["rpaths"].append(a[i + 1]); i += 2
     elif a[i] == "-delete_rpath":
-        e["rpaths"].remove(a[i + 1]); i += 2
+        if a[i + 1] not in e["rpaths"]:
+            sys.exit("install_name_tool: no LC_RPATH load command with path: " + a[i + 1])
+        if os.environ.get("FAKE_DELETE_ALL") == "1":
+            e["rpaths"] = [r for r in e["rpaths"] if r != a[i + 1]]
+        else:
+            e["rpaths"].remove(a[i + 1])
+        i += 2
     else:
         sys.exit("bad arg " + a[i])
 json.dump(db, open(dbp, "w"))
@@ -74,7 +90,7 @@ def make_bundle(tmp: Path, entries: dict[str, dict]) -> tuple[Path, Path]:
     return app, dbp
 
 
-def run(tmp: Path, dbp: Path, app: Path, *extra: str) -> subprocess.CompletedProcess:
+def run(tmp: Path, dbp: Path, app: Path, *extra: str, env: dict | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
             sys.executable,
@@ -89,7 +105,7 @@ def run(tmp: Path, dbp: Path, app: Path, *extra: str) -> subprocess.CompletedPro
         ],
         capture_output=True,
         text=True,
-        env={"FAKE_DB": str(dbp)},
+        env={"FAKE_DB": str(dbp), **(env or {})},
         check=False,
     )
 
@@ -182,6 +198,74 @@ def test_fix_repairs_plugin_references_and_rpaths(tmp_path):
     assert fixed["rpaths"] == ["@loader_path/../../Frameworks"]
     qt = db[str(app / "Contents/Frameworks/QtCore.framework/Versions/A/QtCore")]
     assert qt["rpaths"] == ["@loader_path/../../.."]
+
+
+@pytest.mark.parametrize("delete_all", ["0", "1"])
+def test_fix_removes_duplicate_rpaths(tmp_path, delete_all):
+    """QtCore carries one LC_RPATH twice (found on the Mac Mini for WI-0.063): each path is named once per call."""
+    e = clean_entries()
+    e["Frameworks/QtCore.framework/Versions/A/QtCore"] = {
+        "deps": ["@rpath/QtCore.framework/Versions/A/QtCore"],
+        "rpaths": ["@loader_path/../../../", "@loader_path/../../../", "/Users/qt/lib", "@loader_path/../../.."],
+    }
+    e["MacOS/OVT Studio"]["rpaths"] = ["@executable_path/../Frameworks"] * 3
+    app, dbp = make_bundle(tmp_path, e)
+    r = run(tmp_path, dbp, app)
+    assert r.returncode == 1
+    assert "duplicate LC_RPATH @executable_path/../Frameworks" in r.stderr
+    r = run(tmp_path, dbp, app, "--fix", env={"FAKE_DELETE_ALL": delete_all})
+    assert r.returncode == 0, r.stderr
+    db = json.loads(dbp.read_text())
+    assert db[str(app / "Contents/Frameworks/QtCore.framework/Versions/A/QtCore")]["rpaths"] == [
+        "@loader_path/../../.."
+    ]
+    assert db[str(app / "Contents/MacOS/OVT Studio")]["rpaths"] == ["@loader_path/../Frameworks"]
+
+
+def test_universal_files_are_read_one_slice_at_a_time(tmp_path):
+    """Qt's frameworks are arm64 + x86_64: the second block header is no reference, and each slice's LC_RPATH counts
+    once (Mac Mini run of #428: 105 "forbidden reference" and 99 "duplicate LC_RPATH" findings before this)."""
+    e = clean_entries()
+    e["Frameworks/QtCore.framework/Versions/A/QtCore"] = {
+        "archs": ["x86_64", "arm64"],
+        "deps": ["@rpath/QtCore.framework/Versions/A/QtCore", "/usr/lib/libc++.1.dylib"],
+        "rpaths": ["@loader_path/../../.."],
+    }
+    e["PlugIns/platforms/libqcocoa.dylib"] = {
+        "archs": ["x86_64", "arm64"],
+        "deps": [
+            "/Users/qt/6.8.3/macos/plugins/platforms/libqcocoa.dylib",
+            "@rpath/QtCore.framework/Versions/A/QtCore",
+        ],
+        "rpaths": ["@loader_path/../../../../lib", "@loader_path/../../../../lib", "@loader_path/../../Frameworks"],
+    }
+    app, dbp = make_bundle(tmp_path, e)
+    r = run(tmp_path, dbp, app)
+    assert r.returncode == 1
+    assert "architecture" not in r.stderr
+    assert "QtCore" not in r.stderr  # clean apart from the plugin
+    r = run(tmp_path, dbp, app, "--fix")
+    assert r.returncode == 0, r.stderr
+    db = json.loads(dbp.read_text())
+    plugin = db[str(app / "Contents/PlugIns/platforms/libqcocoa.dylib")]
+    assert plugin["deps"][0] == "@rpath/libqcocoa.dylib"
+    assert plugin["rpaths"] == ["@loader_path/../../Frameworks"]
+
+
+def test_a_slice_that_differs_fails_the_check(tmp_path):
+    """Review of #464: the check covers every slice, so a build-tree path only in the x86_64 slice is not missed."""
+    e = clean_entries()
+    plug = e["PlugIns/ovt/libovt_plugin_aom.dylib"]
+    plug["archs"] = ["arm64", "x86_64"]
+    plug["slice_deps"] = {"x86_64": [plug["deps"][0], "/Users/x/build-x86_64/lib/libovt_core.1.dylib"]}
+    plug["slice_rpaths"] = {"x86_64": ["@loader_path/../../Frameworks", "@loader_path/../../Frameworks"]}
+    app, dbp = make_bundle(tmp_path, e)
+    for extra in ((), ("--fix",)):
+        r = run(tmp_path, dbp, app, *extra)
+        assert r.returncode == 1
+        assert "forbidden reference /Users/x/build-x86_64/lib/libovt_core.1.dylib (only in x86_64)" in r.stderr
+        assert "duplicate LC_RPATH @loader_path/../../Frameworks (only in x86_64)" in r.stderr
+        assert "arm64" not in r.stderr
 
 
 def test_fix_cannot_invent_a_missing_library(tmp_path):
