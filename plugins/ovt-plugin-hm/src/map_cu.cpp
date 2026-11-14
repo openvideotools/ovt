@@ -532,8 +532,7 @@ class Mapper {
       m.mv_y = neutral_mv(mv.getVer(), &clamped);
       m.mvd_x = merge ? int16_t{0} : neutral_mv(mvd.getHor(), &clamped);
       m.mvd_y = merge ? int16_t{0} : neutral_mv(mvd.getVer(), &clamped);
-      // SPEC-ASSUMPTION(#495): HM does not keep which candidate a merge index or mvp flag selected, so the
-      // ":<source>" suffix of chapter 06 §6.3.1 is left out.
+      // HM does not keep which candidate a merge index or mvp flag selected: no ":<source>" (chapter 06 §6.3.1).
       m.predictor = merge ? "merge[" + std::to_string(cu.getMergeIndex(pz)) + "]" : "amvp[" + std::to_string(mvp) + "]";
       m.flags = static_cast<uint16_t>((dir == 3 ? kMvBi : 0U) | (weighted ? kMvWeighted : 0U));
       out_.mvs.push_back(std::move(m));
