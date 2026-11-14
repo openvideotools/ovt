@@ -18,6 +18,7 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QString>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 #include <QVariantMap>
@@ -32,11 +33,12 @@
 #include "ovt/ovt.h"
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
 #include "platform/platform.h"
+#include "project.h"
 
 namespace {
 
 constexpr int kExitOk = 0;
-constexpr int kExitFailure = 1;
+[[maybe_unused]] constexpr int kExitFailure = 1;  // unused on Android, where QtQuickView owns the window
 
 // The watchdog turns a hang (no frame, no event) into a failure with a message instead of a CTest timeout. The
 // budget is measured from the start of main(). WI-0.019 acceptance test 1 asks for < 5 s on Linux CI, so the
@@ -45,10 +47,10 @@ constexpr int kExitFailure = 1;
 #ifndef OVT_SELF_TEST_WATCHDOG_MS
 #define OVT_SELF_TEST_WATCHDOG_MS 4000
 #endif
-constexpr int kSelfTestWatchdogMs = OVT_SELF_TEST_WATCHDOG_MS;
+[[maybe_unused]] constexpr int kSelfTestWatchdogMs = OVT_SELF_TEST_WATCHDOG_MS;
 
 // Diagnostics go to stderr with the product name; there is no logger in the GUI yet (WI-1.512 brings ovt::log).
-void report(const QString& message) {
+[[maybe_unused]] void report(const QString& message) {
   const QByteArray line = (QStringLiteral(OVT_PRODUCT_NAME_VALUE ": ") + message + QLatin1Char('\n')).toLocal8Bit();
   static_cast<void>(std::fputs(line.constData(), stderr));  // best effort: nothing to do if stderr is closed
 }
@@ -92,14 +94,30 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   const QCommandLineOption self_test(QStringLiteral("self-test"),
                                      QStringLiteral("Open the main window, exit 0 after the first rendered frame."));
   parser.addOption(self_test);
+  parser.addPositionalArgument(QStringLiteral("file"),
+                               QStringLiteral("A video, elementary stream or .ovtproj to open."),
+                               QStringLiteral("[file]"));
   parser.process(app);  // exits on --help and unknown options; --version was handled above
   const bool self_testing = parser.isSet(self_test);
 
+  static_cast<void>(ovt::app::Platform::isFirstRun());  // decided before anything can create settings.json
   ovt::app::Platform::selectGraphicsApi();
   QQuickStyle::setStyle(QStringLiteral("Fusion"));  // OvtStyle.qml supplies the palette (§11.4.5)
 
+#if defined(Q_OS_ANDROID)
+  // SPEC-ASSUMPTION(#356), Android (chapter 13 §13.4.3; WI-0.050): MainActivity embeds Qt through QtQuickView, which
+  // loads this library, runs main() and then creates its own view of qrc:/qt/qml/OvtStudio/AndroidShell.qml. main()
+  // only prepares the application and runs the event loop; a window of its own would compete with QtQuickView for the
+  // Activity.
+  static_cast<void>(self_testing);
+  return QGuiApplication::exec();
+#else
   QQmlApplicationEngine engine;
-  engine.setInitialProperties({{QStringLiteral("title"), QStringLiteral(OVT_PRODUCT_NAME_VALUE)}});
+  engine.addImageProvider(QStringLiteral("rawpreview"), new ovt::app::RawPreviewProvider);  // owned by the engine
+  const QStringList positional = parser.positionalArguments();
+  engine.setInitialProperties(
+      {{QStringLiteral("title"), QStringLiteral(OVT_PRODUCT_NAME_VALUE)},
+       {QStringLiteral("initialFile"), positional.isEmpty() ? QString() : positional.constFirst()}});
   engine.load(QUrl(QStringLiteral("qrc:/qt/qml/OvtStudio/Main.qml")));
   if (engine.rootObjects().isEmpty()) {
     report(QStringLiteral("could not load the main window"));
@@ -137,4 +155,5 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   }
 
   return QGuiApplication::exec();
+#endif
 }

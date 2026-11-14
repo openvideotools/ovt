@@ -3,3 +3,18 @@
 # Fuzz seeds and crash regressions are binary inputs (WI-0.557).
 core/tests/fuzz/corpus/** binary
 core/tests/fuzz/regressions/** binary
+
+# WI-0.093 golden fixtures: raw FlatBuffers and YUV bytes must never be line-ending normalised.
+core/tests/golden/*.fa binary
+core/tests/golden/*.yuv binary
+
+# WI-1.201 broken-ISOBMFF corpus: raw bytes, never line-ending normalised.
+tests/corpora/synthetic/isobmff-broken/** binary
+
+# WI-0.089: YUView CSV importer samples; ovt_mixed_poc.csv keeps its CRLF line endings on purpose.
+core/tests/data/yuview/*.csv -text
+
+# WI-0.050: the Gradle 8.10 wrapper (Apache-2.0) stays as Gradle publishes it: Windows batch
+# file with CRLF, binary jar.
+android/gradlew.bat text eol=crlf
+android/gradle/wrapper/gradle-wrapper.jar binary

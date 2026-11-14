@@ -23,7 +23,24 @@ if(NOT OVT_XXD)
                       "library. Install it (macOS ships it; Debian/Ubuntu: apt install xxd; tools/bootstrap.sh).")
 endif()
 
-ovt_tp_declare(libvmaf LICENSE_FILES LICENSE)
+# "./LICENSE", not LICENSE: a bare LICENSE is read as ovt_tp_declare()'s LICENSE keyword and records no file.
+# The archive compiles in third-party code whose licence text sits only in source-file headers (libsvm, Xiph
+# psnr_hvs, Tom Distler's IQA, ciede2000, mkdirp, pdjson, dav1d-derived files, x86inc); third_party/licenses/libvmaf/
+# holds those texts, one file per component (tools/tests/test_bundled_licences.py checks the list).
+set(_ovt_vmaf_licdir "${CMAKE_CURRENT_LIST_DIR}/licenses/libvmaf")
+ovt_tp_declare(
+  libvmaf
+  LICENSE_FILES
+  ./LICENSE
+  ${_ovt_vmaf_licdir}/libsvm-BSD-3-Clause.txt
+  ${_ovt_vmaf_licdir}/xiph-psnr_hvs-BSD-2-Clause.txt
+  ${_ovt_vmaf_licdir}/iqa-tdistler-BSD-3-Clause.txt
+  ${_ovt_vmaf_licdir}/ciede2000-MIT.txt
+  ${_ovt_vmaf_licdir}/dav1d-derived-BSD-2-Clause.txt
+  ${_ovt_vmaf_licdir}/x86inc-ISC.txt
+  ${_ovt_vmaf_licdir}/mkdirp-MIT.txt
+  ${_ovt_vmaf_licdir}/pdjson-Unlicense.txt)
+unset(_ovt_vmaf_licdir)
 
 ovt_tp_meson(
   libvmaf

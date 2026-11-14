@@ -21,6 +21,8 @@
 namespace ovt::model {
 
 const std::string_view kModelSchemaSha256 = kOvtModelSchemaSha256Text;
+const std::string_view kContainerSchemaSha256 = kOvtContainerSchemaSha256Text;
+const std::string_view kMetricsSchemaSha256 = kOvtMetricsSchemaSha256Text;
 
 std::span<const std::uint8_t> bfbs(SchemaId id) noexcept {
   switch (id) {

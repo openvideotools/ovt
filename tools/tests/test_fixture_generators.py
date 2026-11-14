@@ -243,3 +243,38 @@ def test_make_broken_structure_modes(tmp_path: Path) -> None:
     assert data[8:12] == b"msix" and b"sidx" not in data and [k for k, _, _ in boxes(data)][2] == b"moof"
     with pytest.raises(SystemExit):
         make_broken.main(["--box-size", "7", "-o", str(tmp_path / "x")])
+
+
+def test_make_broken_walk_modes(tmp_path: Path) -> None:
+    """WI-1.201: each header-level mode changes exactly one thing in the base file."""
+    base = make_broken.progressive("none")
+    moov_at = struct.unpack(">I", base[:4])[0]
+    ftyp_len = moov_at
+
+    data = broken(tmp_path, "--truncate", "1000")
+    assert data == base[:1000]
+    data = broken(tmp_path, "--moov-oversize", "1000")
+    assert struct.unpack_from(">I", data, moov_at)[0] == len(data) - moov_at + 1000
+    assert data[:moov_at] == base[:moov_at] and data[moov_at + 4 :] == base[moov_at + 4 :]
+    data = broken(tmp_path, "--trailing", "5")
+    assert data == base + bytes([1, 2, 3, 4, 5])
+    data = broken(tmp_path, "--moov-after-mdat")
+    assert data.index(b"mdat") < data.index(b"moov") and len(data) == len(base)
+    data = broken(tmp_path, "--box-size", "0xFFFFFFFF", "--in", "moov")
+    assert b"\xff\xff\xff\xfffree" in data
+    data = broken(tmp_path, "--box-size", "0", "--in", "top")
+    assert data[ftyp_len : ftyp_len + 8] == b"\x00\x00\x00\x00free"
+    data = broken(tmp_path, "--box-size", "1", "--in", "moov")
+    assert b"\x00\x00\x00\x01free\x00\x00\x00\x00\x00\x00\x00\x08" in data
+    data = broken(tmp_path, "--nest", "33")
+    assert data.count(b"udta") == 33
+    data = broken(tmp_path, "--uuid-short")
+    assert b"\x00\x00\x00\x14uuid" in data
+    data = broken(tmp_path, "--nonprintable")
+    assert b"\x00\x00\x00\x0c\x00\x00\x00\x01" in data
+    data = broken(tmp_path, "--overlap")
+    assert b"\x00\x00\x10\x00udta" in data
+
+
+def test_make_broken_walk_modes_are_deterministic(tmp_path: Path) -> None:
+    assert broken(tmp_path, "--nest", "5") == broken(tmp_path, "--nest", "5")

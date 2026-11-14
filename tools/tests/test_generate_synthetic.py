@@ -140,6 +140,38 @@ def test_av1_resize_times_superres_over_2x_is_rejected(tmp_path):
     assert err.value.code == 4
 
 
+def test_corpus_reference_can_select_a_non_primary_file(tmp_path, monkeypatch):
+    cdir = tmp_path / "corpora" / "two_files"
+    cdir.mkdir(parents=True)
+    (cdir / "a.mp4").write_bytes(b"mp4")
+    (cdir / "a.265").write_bytes(b"annexb")
+    (cdir / ".ok").write_text(json.dumps({"primary": "a.mp4", "files": {"a.mp4": "x", "a.265": "y"}}))
+    monkeypatch.setenv("OVT_CORPORA_DIR", str(tmp_path / "corpora"))
+    out = tmp_path / "elsewhere"
+    assert generate.corpus_file(out, "two_files") == cdir / "a.mp4"
+    assert generate.corpus_file(out, "two_files", "a.265") == cdir / "a.265"
+    with pytest.raises(generate.GenError, match="has no file nope.bin"):
+        generate.corpus_file(out, "two_files", "nope.bin")
+    assert generate.CORPUS_REF.findall("{corpus:two_files:a.265}") == [("two_files", "a.265")]
+    assert generate.CORPUS_REF.findall("{corpus:two_files}") == [("two_files", "")]
+
+
+def test_hdr10plus_fixture_reads_the_annex_b_file():
+    doc = generate.load_recipes(generate.DEFAULT_RECIPES)
+    fixture = next(f for f in doc["fixtures"] if f["id"] == "fixture_hdr10plus_t35")
+    # sei_inject.py --extract reads Annex B only, and the corpus's primary file is the .mp4
+    assert "{corpus:syn_h265_hdr10plus:syn_h265_hdr10plus.265}" in fixture["cmd"]
+
+
+def test_missing_helpers_ignores_out_dir_arguments():
+    out = "{repo}/tests/corpora/not_yet_created_dir"
+    step = {"cmd": ["{python}", "{repo}/tools/sei_inject.py", "--out-dir", out, "in.265"]}
+    assert generate.missing_helpers([{"steps": [step]}]) == []
+    step = {"cmd": ["{python}", "{repo}/tools/no_such_helper.py", "--out-dir", out]}
+    assert generate.missing_helpers([{"steps": [step]}]) == ["tools/no_such_helper.py"]
+    assert generate.missing_helpers([{"steps": [{"cmd": ["x", "{repo}/tests/missing_dir"]}]}]) == ["tests/missing_dir"]
+
+
 def test_bento4_clock_without_pin_step_is_rejected(tmp_path):
     doc = json.loads(generate.DEFAULT_RECIPES.read_text(encoding="utf-8"))
     rec = next(r for r in doc["recipes"] if r["id"] == "syn_mp4_piff")
@@ -330,3 +362,39 @@ def test_check_fast_subset_flags_unknown_names(tmp_path, capsys):
     found = sorted(re.findall(r"unknown (?:corpus id|fixture file|fixture) (\S+)", out))
     assert found == ["bogus_grid.fb", "corpus/jvt_NOT_A_STREAM", "mystery_clip.mp4", "syn_h264_nonexistent"]
     assert all(line.startswith("99-test.md:2:") for line in out.splitlines())
+
+
+def test_fixtures_run_hash_and_register(env, tmp_path, monkeypatch):
+    """--fixtures writes each fixture to its path, skips ovt-made and local_only ones, and records hashes."""
+    manifest = env()
+    monkeypatch.setattr(generate, "REPO", tmp_path)
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools" / "gen.py").write_text("import sys; open(sys.argv[1], 'wb').write(b'fx')\n")
+    fixtures = [
+        {"id": "fixture_t_a", "path": "fx/a.bin", "cmd": ["{python}", "{repo}/tools/gen.py", "{out}"]},
+        {
+            "id": "fixture_t_perf",
+            "path": "fx/p.bin",
+            "cmd": ["{python}", "{repo}/tools/gen.py", "{out}"],
+            "local_only": True,
+        },
+        {"id": "fixture_t_ovt", "path": "fx/o.fb", "cmd": ["ovt", "analyze", "x", "-o", "{out}"]},
+    ]
+    doc = json.loads(generate.DEFAULT_RECIPES.read_text()) | {"fixtures": fixtures}
+    path = tmp_path / "recipes.json"
+    path.write_text(json.dumps(doc))
+    monkeypatch.setattr(generate.shutil, "which", lambda name: None)
+    assert generate.main(["--recipes", str(path), "--manifest", str(manifest), "--sync-manifest"]) == 0
+    entry = {e["id"]: e for e in json.loads(manifest.read_text())["entries"]}["fixture_t_a"]
+    assert entry["kind"] == "fixture" and entry["path"] == "fx/a.bin" and entry["unverified"]
+    base = ["--recipes", str(path), "--manifest", str(manifest), "--out", str(tmp_path / "out"), "--fixtures"]
+    assert generate.main([*base, "--check"]) == 5  # hash not recorded yet
+    assert generate.main([*base, "--update-manifest"]) == 0
+    assert (tmp_path / "fx" / "a.bin").read_bytes() == b"fx"
+    assert not (tmp_path / "fx" / "p.bin").exists() and not (tmp_path / "fx" / "o.fb").exists()
+    entry = {e["id"]: e for e in json.loads(manifest.read_text())["entries"]}["fixture_t_a"]
+    assert entry["sha256"] == generate.sha256_file(tmp_path / "fx" / "a.bin") and "unverified" not in entry
+    assert generate.main([*base, "--check"]) == 0
+    doc["fixtures"].append(dict(fixtures[0]))
+    path.write_text(json.dumps(doc))
+    assert generate.main(["--recipes", str(path), "--list"]) == 4  # duplicate fixture id

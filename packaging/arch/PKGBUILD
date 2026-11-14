@@ -1,0 +1,44 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# shellcheck shell=bash disable=SC2034,SC2154
+# (makepkg sources this file: the variables are read by makepkg, and $pkgdir is set by it)
+#
+# Arch / AUR skeleton for OVT (chapter 13 section 13.6.3, WI-0.072). Not published to the AUR.
+# Arch's ffmpeg carries H.264/HEVC, so the linux-x64-distro preset (OVT_PATENT_CODECS_IN_CORE=ON) is right here;
+# publishing the package is distribution of a patent-encumbered build and needs Karl's legal check first.
+# An `ovt-git` variant differs only in pkgver(), source and makedepends (git).
+# Maintainer: Open Video Tools contributors <packaging@openvideotools.invalid>
+
+pkgname=ovt
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Video bitstream, container and quality analysis for H.264, H.265 and AV1'
+arch=(x86_64)
+url='https://github.com/openvideotools/ovt'
+license=(LGPL-2.1-or-later GPL-3.0-or-later BSD-2-Clause LGPL-3.0-or-later)
+depends=(ffmpeg dav1d libplacebo libvmaf zimg libde265 vulkan-icd-loader zstd flatbuffers
+         qt6-base qt6-declarative python)
+makedepends=(cmake ninja nasm pybind11 vulkan-headers qt6-tools)
+optdepends=('mesa: Vulkan renderer (lavapipe/radv/anv)')
+# The libaom tarball (static, CONFIG_INSPECTION=1) is pinned in third_party/VERSIONS.md.
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP') # skeleton: fill in when v0.1.0 is tagged
+
+build() {
+  cd "$pkgname-$pkgver" || return 1
+  cmake --preset linux-x64-distro \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DOVT_BUILD_PYTHON=ON \
+    -DOVT_BUILD_TESTS=OFF \
+    -DOVT_NOTICES_REQUIRED=ON
+  cmake --build --preset linux-x64-distro
+}
+
+package() {
+  cd "$pkgname-$pkgver" || return 1
+  DESTDIR="$pkgdir" cmake --install build/linux-x64-distro
+  install -Dm644 plugins/ovt-plugin-aom/PATENTS -t "$pkgdir/usr/share/licenses/$pkgname/"
+  install -Dm644 LICENSES/*.txt -t "$pkgdir/usr/share/licenses/$pkgname/"
+}

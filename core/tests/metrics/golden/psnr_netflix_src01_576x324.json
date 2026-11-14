@@ -1,0 +1,869 @@
+{
+ "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5",
+ "frames": [
+  {
+   "ffmpeg": {
+    "mse_avg": 16.57,
+    "mse_u": 7.76,
+    "mse_v": 4.77,
+    "mse_y": 21.73,
+    "psnr_avg": 35.94,
+    "psnr_u": 39.23,
+    "psnr_v": 41.35,
+    "psnr_y": 34.76
+   },
+   "i": 0,
+   "libvmaf": {
+    "psnr_cb": 39.229987,
+    "psnr_cr": 41.349703,
+    "psnr_y": 34.760779
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 30.28,
+    "mse_u": 8.22,
+    "mse_v": 4.87,
+    "mse_y": 42.15,
+    "psnr_avg": 33.32,
+    "psnr_u": 38.98,
+    "psnr_v": 41.26,
+    "psnr_y": 31.88
+   },
+   "i": 1,
+   "libvmaf": {
+    "psnr_cb": 38.981421,
+    "psnr_cr": 41.256426,
+    "psnr_y": 31.883227
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 36.73,
+    "mse_u": 8.52,
+    "mse_v": 4.98,
+    "mse_y": 51.72,
+    "psnr_avg": 32.48,
+    "psnr_u": 38.83,
+    "psnr_v": 41.16,
+    "psnr_y": 30.99
+   },
+   "i": 2,
+   "libvmaf": {
+    "psnr_cb": 38.827851,
+    "psnr_cr": 41.159144,
+    "psnr_y": 30.993823
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 34.54,
+    "mse_u": 8.3,
+    "mse_v": 5.23,
+    "mse_y": 48.43,
+    "psnr_avg": 32.75,
+    "psnr_u": 38.94,
+    "psnr_v": 40.95,
+    "psnr_y": 31.28
+   },
+   "i": 3,
+   "libvmaf": {
+    "psnr_cb": 38.939897,
+    "psnr_cr": 40.946781,
+    "psnr_y": 31.279285
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 45.13,
+    "mse_u": 8.69,
+    "mse_v": 5.29,
+    "mse_y": 64.2,
+    "psnr_avg": 31.59,
+    "psnr_u": 38.74,
+    "psnr_v": 40.9,
+    "psnr_y": 30.06
+   },
+   "i": 4,
+   "libvmaf": {
+    "psnr_cb": 38.739692,
+    "psnr_cr": 40.899877,
+    "psnr_y": 30.055737
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 45.6,
+    "mse_u": 8.69,
+    "mse_v": 5.21,
+    "mse_y": 64.93,
+    "psnr_avg": 31.54,
+    "psnr_u": 38.74,
+    "psnr_v": 40.96,
+    "psnr_y": 30.01
+   },
+   "i": 5,
+   "libvmaf": {
+    "psnr_cb": 38.742284,
+    "psnr_cr": 40.961368,
+    "psnr_y": 30.006161
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 37.43,
+    "mse_u": 8.8,
+    "mse_v": 5.03,
+    "mse_y": 52.69,
+    "psnr_avg": 32.4,
+    "psnr_u": 38.68,
+    "psnr_v": 41.11,
+    "psnr_y": 30.91
+   },
+   "i": 6,
+   "libvmaf": {
+    "psnr_cb": 38.683775,
+    "psnr_cr": 41.112583,
+    "psnr_y": 30.91374
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 46.39,
+    "mse_u": 9.08,
+    "mse_v": 5.05,
+    "mse_y": 66.06,
+    "psnr_avg": 31.47,
+    "psnr_u": 38.55,
+    "psnr_v": 41.1,
+    "psnr_y": 29.93
+   },
+   "i": 7,
+   "libvmaf": {
+    "psnr_cb": 38.5487,
+    "psnr_cr": 41.101611,
+    "psnr_y": 29.931491
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 47.33,
+    "mse_u": 9.0,
+    "mse_v": 5.02,
+    "mse_y": 67.48,
+    "psnr_avg": 31.38,
+    "psnr_u": 38.59,
+    "psnr_v": 41.12,
+    "psnr_y": 29.84
+   },
+   "i": 8,
+   "libvmaf": {
+    "psnr_cb": 38.587582,
+    "psnr_cr": 41.120543,
+    "psnr_y": 29.838758
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 40.52,
+    "mse_u": 8.82,
+    "mse_v": 5.17,
+    "mse_y": 57.28,
+    "psnr_avg": 32.05,
+    "psnr_u": 38.68,
+    "psnr_v": 40.99,
+    "psnr_y": 30.55
+   },
+   "i": 9,
+   "libvmaf": {
+    "psnr_cb": 38.678577,
+    "psnr_cr": 40.993604,
+    "psnr_y": 30.550816
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 46.16,
+    "mse_u": 8.98,
+    "mse_v": 5.07,
+    "mse_y": 65.73,
+    "psnr_avg": 31.49,
+    "psnr_u": 38.6,
+    "psnr_v": 41.08,
+    "psnr_y": 29.95
+   },
+   "i": 10,
+   "libvmaf": {
+    "psnr_cb": 38.596153,
+    "psnr_cr": 41.082026,
+    "psnr_y": 29.953156
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.05,
+    "mse_u": 8.92,
+    "mse_v": 5.01,
+    "mse_y": 62.59,
+    "psnr_avg": 31.69,
+    "psnr_u": 38.63,
+    "psnr_v": 41.13,
+    "psnr_y": 30.17
+   },
+   "i": 11,
+   "libvmaf": {
+    "psnr_cb": 38.627286,
+    "psnr_cr": 41.129001,
+    "psnr_y": 30.165768
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 33.65,
+    "mse_u": 8.9,
+    "mse_v": 5.04,
+    "mse_y": 46.99,
+    "psnr_avg": 32.86,
+    "psnr_u": 38.64,
+    "psnr_v": 41.1,
+    "psnr_y": 31.41
+   },
+   "i": 12,
+   "libvmaf": {
+    "psnr_cb": 38.635914,
+    "psnr_cr": 41.104952,
+    "psnr_y": 31.410789
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 43.53,
+    "mse_u": 9.11,
+    "mse_v": 5.08,
+    "mse_y": 61.74,
+    "psnr_avg": 31.74,
+    "psnr_u": 38.54,
+    "psnr_v": 41.07,
+    "psnr_y": 30.22
+   },
+   "i": 13,
+   "libvmaf": {
+    "psnr_cb": 38.536694,
+    "psnr_cr": 41.0741,
+    "psnr_y": 30.224877
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 47.84,
+    "mse_u": 9.47,
+    "mse_v": 5.25,
+    "mse_y": 68.08,
+    "psnr_avg": 31.33,
+    "psnr_u": 38.37,
+    "psnr_v": 40.93,
+    "psnr_y": 29.8
+   },
+   "i": 14,
+   "libvmaf": {
+    "psnr_cb": 38.366216,
+    "psnr_cr": 40.931463,
+    "psnr_y": 29.800525
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 40.8,
+    "mse_u": 9.29,
+    "mse_v": 5.23,
+    "mse_y": 57.57,
+    "psnr_avg": 32.02,
+    "psnr_u": 38.45,
+    "psnr_v": 40.95,
+    "psnr_y": 30.53
+   },
+   "i": 15,
+   "libvmaf": {
+    "psnr_cb": 38.450178,
+    "psnr_cr": 40.947244,
+    "psnr_y": 30.528864
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 49.61,
+    "mse_u": 9.79,
+    "mse_v": 5.31,
+    "mse_y": 70.63,
+    "psnr_avg": 31.18,
+    "psnr_u": 38.22,
+    "psnr_v": 40.88,
+    "psnr_y": 29.64
+   },
+   "i": 16,
+   "libvmaf": {
+    "psnr_cb": 38.22296,
+    "psnr_cr": 40.880163,
+    "psnr_y": 29.640688
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 46.72,
+    "mse_u": 10.03,
+    "mse_v": 5.47,
+    "mse_y": 66.2,
+    "psnr_avg": 31.44,
+    "psnr_u": 38.12,
+    "psnr_v": 40.75,
+    "psnr_y": 29.92
+   },
+   "i": 17,
+   "libvmaf": {
+    "psnr_cb": 38.118747,
+    "psnr_cr": 40.75097,
+    "psnr_y": 29.921965
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 36.85,
+    "mse_u": 9.83,
+    "mse_v": 5.49,
+    "mse_y": 51.45,
+    "psnr_avg": 32.47,
+    "psnr_u": 38.21,
+    "psnr_v": 40.74,
+    "psnr_y": 31.02
+   },
+   "i": 18,
+   "libvmaf": {
+    "psnr_cb": 38.205803,
+    "psnr_cr": 40.738412,
+    "psnr_y": 31.017053
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 47.39,
+    "mse_u": 9.78,
+    "mse_v": 5.42,
+    "mse_y": 67.29,
+    "psnr_avg": 31.37,
+    "psnr_u": 38.23,
+    "psnr_v": 40.79,
+    "psnr_y": 29.85
+   },
+   "i": 19,
+   "libvmaf": {
+    "psnr_cb": 38.22863,
+    "psnr_cr": 40.790768,
+    "psnr_y": 29.851104
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 47.41,
+    "mse_u": 10.26,
+    "mse_v": 5.53,
+    "mse_y": 67.17,
+    "psnr_avg": 31.37,
+    "psnr_u": 38.02,
+    "psnr_v": 40.7,
+    "psnr_y": 29.86
+   },
+   "i": 20,
+   "libvmaf": {
+    "psnr_cb": 38.019979,
+    "psnr_cr": 40.701292,
+    "psnr_y": 29.859097
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 35.72,
+    "mse_u": 9.63,
+    "mse_v": 5.49,
+    "mse_y": 49.79,
+    "psnr_avg": 32.6,
+    "psnr_u": 38.29,
+    "psnr_v": 40.74,
+    "psnr_y": 31.16
+   },
+   "i": 21,
+   "libvmaf": {
+    "psnr_cb": 38.293181,
+    "psnr_cr": 40.737852,
+    "psnr_y": 31.159144
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 40.38,
+    "mse_u": 9.92,
+    "mse_v": 5.5,
+    "mse_y": 56.72,
+    "psnr_avg": 32.07,
+    "psnr_u": 38.16,
+    "psnr_v": 40.73,
+    "psnr_y": 30.59
+   },
+   "i": 22,
+   "libvmaf": {
+    "psnr_cb": 38.164932,
+    "psnr_cr": 40.725282,
+    "psnr_y": 30.593808
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 35.73,
+    "mse_u": 10.04,
+    "mse_v": 5.6,
+    "mse_y": 49.69,
+    "psnr_avg": 32.6,
+    "psnr_u": 38.12,
+    "psnr_v": 40.65,
+    "psnr_y": 31.17
+   },
+   "i": 23,
+   "libvmaf": {
+    "psnr_cb": 38.115064,
+    "psnr_cr": 40.649266,
+    "psnr_y": 31.168162
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 20.62,
+    "mse_u": 9.48,
+    "mse_v": 5.54,
+    "mse_y": 27.18,
+    "psnr_avg": 34.99,
+    "psnr_u": 38.36,
+    "psnr_v": 40.7,
+    "psnr_y": 33.79
+   },
+   "i": 24,
+   "libvmaf": {
+    "psnr_cb": 38.363632,
+    "psnr_cr": 40.698853,
+    "psnr_y": 33.788213
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 34.06,
+    "mse_u": 9.57,
+    "mse_v": 5.33,
+    "mse_y": 47.37,
+    "psnr_avg": 32.81,
+    "psnr_u": 38.32,
+    "psnr_v": 40.86,
+    "psnr_y": 31.38
+   },
+   "i": 25,
+   "libvmaf": {
+    "psnr_cb": 38.320828,
+    "psnr_cr": 40.863907,
+    "psnr_y": 31.375744
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 38.96,
+    "mse_u": 9.85,
+    "mse_v": 5.48,
+    "mse_y": 54.6,
+    "psnr_avg": 32.23,
+    "psnr_u": 38.19,
+    "psnr_v": 40.74,
+    "psnr_y": 30.76
+   },
+   "i": 26,
+   "libvmaf": {
+    "psnr_cb": 38.194614,
+    "psnr_cr": 40.741841,
+    "psnr_y": 30.758853
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 34.74,
+    "mse_u": 9.15,
+    "mse_v": 5.23,
+    "mse_y": 48.51,
+    "psnr_avg": 32.72,
+    "psnr_u": 38.52,
+    "psnr_v": 40.94,
+    "psnr_y": 31.27
+   },
+   "i": 27,
+   "libvmaf": {
+    "psnr_cb": 38.515875,
+    "psnr_cr": 40.944859,
+    "psnr_y": 31.272553
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 43.55,
+    "mse_u": 9.48,
+    "mse_v": 5.28,
+    "mse_y": 61.63,
+    "psnr_avg": 31.74,
+    "psnr_u": 38.36,
+    "psnr_v": 40.91,
+    "psnr_y": 30.23
+   },
+   "i": 28,
+   "libvmaf": {
+    "psnr_cb": 38.362022,
+    "psnr_cr": 40.908445,
+    "psnr_y": 30.232691
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.12,
+    "mse_u": 9.64,
+    "mse_v": 5.2,
+    "mse_y": 62.47,
+    "psnr_avg": 31.68,
+    "psnr_u": 38.29,
+    "psnr_v": 40.97,
+    "psnr_y": 30.17
+   },
+   "i": 29,
+   "libvmaf": {
+    "psnr_cb": 38.290099,
+    "psnr_cr": 40.971669,
+    "psnr_y": 30.173846
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 35.1,
+    "mse_u": 9.33,
+    "mse_v": 5.07,
+    "mse_y": 49.06,
+    "psnr_avg": 32.68,
+    "psnr_u": 38.43,
+    "psnr_v": 41.08,
+    "psnr_y": 31.22
+   },
+   "i": 30,
+   "libvmaf": {
+    "psnr_cb": 38.430157,
+    "psnr_cr": 41.080098,
+    "psnr_y": 31.223899
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.5,
+    "mse_u": 9.84,
+    "mse_v": 5.15,
+    "mse_y": 63.0,
+    "psnr_avg": 31.65,
+    "psnr_u": 38.2,
+    "psnr_v": 41.01,
+    "psnr_y": 30.14
+   },
+   "i": 31,
+   "libvmaf": {
+    "psnr_cb": 38.20232,
+    "psnr_cr": 41.012522,
+    "psnr_y": 30.137113
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 45.97,
+    "mse_u": 9.78,
+    "mse_v": 5.3,
+    "mse_y": 65.19,
+    "psnr_avg": 31.51,
+    "psnr_u": 38.23,
+    "psnr_v": 40.89,
+    "psnr_y": 29.99
+   },
+   "i": 32,
+   "libvmaf": {
+    "psnr_cb": 38.227155,
+    "psnr_cr": 40.888902,
+    "psnr_y": 29.989326
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 39.02,
+    "mse_u": 9.53,
+    "mse_v": 5.21,
+    "mse_y": 54.85,
+    "psnr_avg": 32.22,
+    "psnr_u": 38.34,
+    "psnr_v": 40.96,
+    "psnr_y": 30.74
+   },
+   "i": 33,
+   "libvmaf": {
+    "psnr_cb": 38.33784,
+    "psnr_cr": 40.962976,
+    "psnr_y": 30.739083
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.77,
+    "mse_u": 9.96,
+    "mse_v": 5.53,
+    "mse_y": 63.28,
+    "psnr_avg": 31.62,
+    "psnr_u": 38.15,
+    "psnr_v": 40.71,
+    "psnr_y": 30.12
+   },
+   "i": 34,
+   "libvmaf": {
+    "psnr_cb": 38.149124,
+    "psnr_cr": 40.706814,
+    "psnr_y": 30.117943
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 42.24,
+    "mse_u": 9.73,
+    "mse_v": 5.53,
+    "mse_y": 59.54,
+    "psnr_avg": 31.87,
+    "psnr_u": 38.25,
+    "psnr_v": 40.7,
+    "psnr_y": 30.38
+   },
+   "i": 35,
+   "libvmaf": {
+    "psnr_cb": 38.24844,
+    "psnr_cr": 40.699677,
+    "psnr_y": 30.383038
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 32.09,
+    "mse_u": 8.82,
+    "mse_v": 5.0,
+    "mse_y": 44.68,
+    "psnr_avg": 33.07,
+    "psnr_u": 38.68,
+    "psnr_v": 41.14,
+    "psnr_y": 31.63
+   },
+   "i": 36,
+   "libvmaf": {
+    "psnr_cb": 38.67656,
+    "psnr_cr": 41.144363,
+    "psnr_y": 31.629771
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 41.87,
+    "mse_u": 9.29,
+    "mse_v": 4.89,
+    "mse_y": 59.25,
+    "psnr_avg": 31.91,
+    "psnr_u": 38.45,
+    "psnr_v": 41.23,
+    "psnr_y": 30.4
+   },
+   "i": 37,
+   "libvmaf": {
+    "psnr_cb": 38.449627,
+    "psnr_cr": 41.234648,
+    "psnr_y": 30.403832
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.0,
+    "mse_u": 9.62,
+    "mse_v": 5.16,
+    "mse_y": 62.31,
+    "psnr_avg": 31.7,
+    "psnr_u": 38.3,
+    "psnr_v": 41.01,
+    "psnr_y": 30.19
+   },
+   "i": 38,
+   "libvmaf": {
+    "psnr_cb": 38.301189,
+    "psnr_cr": 41.007933,
+    "psnr_y": 30.185542
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 38.1,
+    "mse_u": 9.14,
+    "mse_v": 5.07,
+    "mse_y": 53.59,
+    "psnr_avg": 32.32,
+    "psnr_u": 38.52,
+    "psnr_v": 41.08,
+    "psnr_y": 30.84
+   },
+   "i": 39,
+   "libvmaf": {
+    "psnr_cb": 38.519181,
+    "psnr_cr": 41.080539,
+    "psnr_y": 30.839901
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 44.62,
+    "mse_u": 9.8,
+    "mse_v": 5.07,
+    "mse_y": 63.22,
+    "psnr_avg": 31.64,
+    "psnr_u": 38.22,
+    "psnr_v": 41.08,
+    "psnr_y": 30.12
+   },
+   "i": 40,
+   "libvmaf": {
+    "psnr_cb": 38.220384,
+    "psnr_cr": 41.083698,
+    "psnr_y": 30.122279
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 43.5,
+    "mse_u": 9.54,
+    "mse_v": 4.98,
+    "mse_y": 61.62,
+    "psnr_avg": 31.75,
+    "psnr_u": 38.34,
+    "psnr_v": 41.16,
+    "psnr_y": 30.23
+   },
+   "i": 41,
+   "libvmaf": {
+    "psnr_cb": 38.335859,
+    "psnr_cr": 41.162398,
+    "psnr_y": 30.233596
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 33.38,
+    "mse_u": 8.99,
+    "mse_v": 5.01,
+    "mse_y": 46.57,
+    "psnr_avg": 32.9,
+    "psnr_u": 38.59,
+    "psnr_v": 41.14,
+    "psnr_y": 31.45
+   },
+   "i": 42,
+   "libvmaf": {
+    "psnr_cb": 38.594558,
+    "psnr_cr": 41.135002,
+    "psnr_y": 31.449998
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 40.86,
+    "mse_u": 9.65,
+    "mse_v": 5.0,
+    "mse_y": 57.63,
+    "psnr_avg": 32.02,
+    "psnr_u": 38.29,
+    "psnr_v": 41.14,
+    "psnr_y": 30.52
+   },
+   "i": 43,
+   "libvmaf": {
+    "psnr_cb": 38.287097,
+    "psnr_cr": 41.140303,
+    "psnr_y": 30.524639
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 41.66,
+    "mse_u": 9.52,
+    "mse_v": 4.99,
+    "mse_y": 58.86,
+    "psnr_avg": 31.93,
+    "psnr_u": 38.34,
+    "psnr_v": 41.15,
+    "psnr_y": 30.43
+   },
+   "i": 44,
+   "libvmaf": {
+    "psnr_cb": 38.344064,
+    "psnr_cr": 41.153501,
+    "psnr_y": 30.432252
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 32.15,
+    "mse_u": 9.06,
+    "mse_v": 4.94,
+    "mse_y": 44.73,
+    "psnr_avg": 33.06,
+    "psnr_u": 38.56,
+    "psnr_v": 41.2,
+    "psnr_y": 31.62
+   },
+   "i": 45,
+   "libvmaf": {
+    "psnr_cb": 38.561159,
+    "psnr_cr": 41.197392,
+    "psnr_y": 31.624852
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 35.19,
+    "mse_u": 9.33,
+    "mse_v": 4.83,
+    "mse_y": 49.25,
+    "psnr_avg": 32.67,
+    "psnr_u": 38.43,
+    "psnr_v": 41.29,
+    "psnr_y": 31.21
+   },
+   "i": 46,
+   "libvmaf": {
+    "psnr_cb": 38.43276,
+    "psnr_cr": 41.293076,
+    "psnr_y": 31.206677
+   }
+  },
+  {
+   "ffmpeg": {
+    "mse_avg": 30.33,
+    "mse_u": 8.84,
+    "mse_v": 4.76,
+    "mse_y": 42.09,
+    "psnr_avg": 33.31,
+    "psnr_u": 38.67,
+    "psnr_v": 41.35,
+    "psnr_y": 31.89
+   },
+   "i": 47,
+   "libvmaf": {
+    "psnr_cb": 38.667124,
+    "psnr_cr": 41.353846,
+    "psnr_y": 31.888613
+   }
+  }
+ ]
+}

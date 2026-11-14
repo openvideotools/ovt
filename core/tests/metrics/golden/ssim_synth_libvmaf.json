@@ -1,0 +1,35 @@
+{
+ "cases": [
+  {
+   "bit_depth": 8,
+   "float_ssim": [
+    0.98454,
+    0.984786
+   ],
+   "height": 384,
+   "name": "scale2_640x384_8bit",
+   "width": 640
+  },
+  {
+   "bit_depth": 8,
+   "float_ssim": [
+    0.994237,
+    0.99424
+   ],
+   "height": 701,
+   "name": "scale3_705x701_8bit",
+   "width": 705
+  },
+  {
+   "bit_depth": 10,
+   "float_ssim": [
+    0.984477,
+    0.984719
+   ],
+   "height": 384,
+   "name": "scale2_640x384_10bit",
+   "width": 640
+  }
+ ],
+ "libvmaf": "3.0.0"
+}
