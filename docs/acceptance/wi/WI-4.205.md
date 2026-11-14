@@ -29,6 +29,21 @@ The file carries packets for only three of the six PIDs, so `CNT-TS-1007` is rep
 WI-4.204 corpus test now expects exactly those five diagnostics instead of none.
 **Owed:** the `tstables` run on a machine that has TSDuck, for this file and the other `input/*.ts` entries.
 
+**Run on the Mac Mini, 2026-11-14** (Apple M4, macOS 15.8.2, `macos-arm64-release`), `tstables` from TSDuck 3.45-4798 in
+the `ovt-oracles` image (linux/amd64, through a wrapper on `PATH` that runs the image's `tstables`), corpus
+`ts_h264_dvb` (`test-012.ts`, sha256 `2e3a280b…c4d50b`):
+
+```console
+$ OVT_CORPORA_DIR=… OVT_REQUIRE_CORPORA=1 ovt_tests_container "[needs-oracle:tstables]"
+All tests passed (20 assertions in 1 test case)
+```
+
+TSDuck 3.45 rejects `--all-sections` together with `--xml-output` ("filtering sections (--all-sections or
+--all-once) is incompatible with XML or JSON output"), so the test first skipped. The test now runs
+`tstables --xml-output` (each table version once). The XML attribute names were right: `PAT`/`service`
+(`service_id`, `program_map_PID`), `PMT` (`service_id`, `PCR_PID`) and `component` (`elementary_PID`, `stream_type`).
+The other `input/*.ts` entries are still owed.
+
 ## Test 2: corrupted CRC
 
 Automated: `psi: a corrupted CRC reports CNT-TS-2002 and the table is not applied`

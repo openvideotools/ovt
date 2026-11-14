@@ -666,8 +666,10 @@ TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections
           "[container][mpegts][psi][needs-corpus][needs-oracle:tstables][fast]") {
   const auto path = ovt::test::corpus_or_skip("ts_h264_dvb");
   const auto xml = std::filesystem::temp_directory_path() / "ovt_psi_test_tstables.xml";
-  const std::string cmd =
-      "tstables --all-sections --xml-output '" + xml.string() + "' '" + path.string() + "' >/dev/null 2>&1";
+  // TSDuck 3.45 (the oracle image's pin) refuses --all-sections together with --xml-output ("filtering sections
+  // ... is incompatible with XML or JSON output"); without it tstables writes each table version once, which holds
+  // every program, PID and stream type the test compares.
+  const std::string cmd = "tstables --xml-output '" + xml.string() + "' '" + path.string() + "' >/dev/null 2>&1";
   // NOLINTNEXTLINE(cert-env33-c): test-only; the command is fixed and the path comes from the corpus cache
   FILE* pipe = popen(cmd.c_str(), "r");
   if (pipe == nullptr || pclose(pipe) != 0) {
