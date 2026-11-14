@@ -22,9 +22,10 @@ inline constexpr unsigned kMaxBoxDepth = 32;  // §8.2.3 step 1
 using BoxNodes = std::vector<std::unique_ptr<fb::BoxNodeT>>;
 using DiagList = std::vector<std::unique_ptr<fb::DiagnosticT>>;
 
-// What the registry will say about a fourcc (WI-1.203 replaces this table).
-enum class BoxKind : uint8_t { Unknown, Leaf, Container, Opaque };
-[[nodiscard]] BoxKind box_kind(const FourCC& type) noexcept;
+// What the walk needs to know about a fourcc until WI-1.203 wires the generated registry (box_registry.h) in. Named
+// WalkKind so it does not clash with the registry's BoxKind (§8.2.9).
+enum class WalkKind : uint8_t { Unknown, Leaf, Container, Opaque };
+[[nodiscard]] WalkKind box_kind(const FourCC& type) noexcept;
 
 // The state the walk shares between siblings and across levels (what the spec keeps in `ctx`).
 struct WalkState {

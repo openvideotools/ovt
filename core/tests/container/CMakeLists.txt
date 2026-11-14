@@ -9,9 +9,11 @@ add_executable(
   annexb_test.cpp
   box_walk_test.cpp
   c_api_test.cpp
+  field_builder_test.cpp
   ivf_test.cpp
   mpd_test.cpp
   obu_test.cpp
+  registry_lookup_test.cpp
   sniff_test.cpp
   ts_packets_test.cpp
   y4m_test.cpp)
