@@ -43,7 +43,7 @@ import subprocess
 import sys
 import tomllib
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # `python -I` drops the script directory
 
@@ -304,7 +304,12 @@ def check_expression(
         if code == "E-LINK" and known:
             rep.add("E-LINK", f"{where} {link}" if link else where, expr, f"{expr} is not allowed here")
         else:
-            rep.add("E-UNKNOWN", where, expr if known else msg, f"licence not in any allow list: {msg}")
+            rep.add(
+                "E-UNKNOWN",
+                f"{where} {link}" if link else where,
+                expr if known else msg,
+                f"licence not in any allow list: {msg}",
+            )
         return None
 
 
@@ -506,16 +511,56 @@ def read_pip(path: Path, rep: Report, policy: dict, strict_or: bool) -> None:
         )
 
 
-def read_manifest(path: Path, rep: Report, policy: dict, strict_or: bool) -> None:
-    """Link-graph rules of §15.4.2 step 4 on `license_manifest.json` (chapter 13 §13.2.3)."""
+def is_test_target(tgt: dict) -> bool:
+    """True for a target defined under a `tests` or `test` directory of the repository (manifest `directory`)."""
+    return bool({"tests", "test"} & set(PurePosixPath(tgt.get("directory", "")).parts))
+
+
+def vcpkg_file_ports(root: Path) -> dict[str, str]:
+    """Installed file (relative to the directory that holds the triplet directories) -> vcpkg port, from the `.list`
+    files vcpkg keeps in `<installed>/vcpkg/info/`."""
+    ports: dict[str, str] = {}
+    for lst in sorted((root.parent / "vcpkg" / "info").glob("*.list")):
+        port = lst.name.split("_", 1)[0]
+        for line in lst.read_text(encoding="utf-8", errors="replace").splitlines():
+            ports[line.strip()] = port
+    return ports
+
+
+def vcpkg_port_licence(root: Path, port: str, policy: dict) -> str | None:
+    """The licence of an installed vcpkg port: its vcpkg.spdx.json, else the reviewed [vcpkg_overrides] entry."""
+    spdx_file = root / "share" / port / "vcpkg.spdx.json"
+    if spdx_file.is_file():
+        try:
+            packages = json.loads(spdx_file.read_text(encoding="utf-8")).get("packages", [])
+        except json.JSONDecodeError:
+            packages = []
+        for pkg in packages:
+            for key in ("licenseConcluded", "licenseDeclared"):
+                val = pkg.get(key)
+                if val and val not in NO_LICENCE_VALUES:
+                    return str(val)
+    return policy.get("vcpkg_overrides", {}).get(port)
+
+
+def read_manifest(path: Path, rep: Report, policy: dict, strict_or: bool, vcpkg_root: Path | None = None) -> None:
+    """Link-graph rules of §15.4.2 step 4 on `license_manifest.json` (chapter 13 §13.2.3).
+
+    A link that names an installed vcpkg file by absolute path (libglslang.a behind tp::placebo) and has no licence of
+    its own takes the licence of the port that installed the file; this needs --vcpkg."""
     data = json.loads(path.read_text(encoding="utf-8"))
     declared = policy["targets"]
+    vcpkg_root = vcpkg_root.resolve() if vcpkg_root else None
+    file_ports = vcpkg_file_ports(vcpkg_root) if vcpkg_root else {}
     seen: dict[tuple[str, str, str], dict] = {}
     for tgt in data.get("targets", []):
         name, own = tgt["name"], tgt["spdx"]
         plugin = name.startswith("ovt_plugin_")
+        # SPEC-ASSUMPTION(#432): a target built under a `tests/` directory is not shipped, so it needs no [targets] row
+        # (§15.4.2 step 1 asks for one per target). Its own licence and its whole link graph are still checked.
         if name not in declared:
-            rep.add("E-TARGET", name, own, f"target {name} is not in policy [targets]")
+            if not is_test_target(tgt):
+                rep.add("E-TARGET", name, own, f"target {name} is not in policy [targets]")
         elif declared[name] != own:
             rep.add("E-TARGET", name, own, f"{name} is declared {own} but policy [targets] says {declared[name]}")
         allowed = class_allowed(own, policy, plugin)
@@ -524,6 +569,13 @@ def read_manifest(path: Path, rep: Report, policy: dict, strict_or: bool) -> Non
             continue
         for lib in tgt.get("links", []):
             lname, expr = lib["name"], lib["spdx"]
+            if vcpkg_root and expr in NO_LICENCE_VALUES and lname.startswith("/"):
+                try:
+                    rel = Path(lname).relative_to(vcpkg_root.parent).as_posix()
+                except ValueError:
+                    rel = ""
+                port = file_ports.get(rel)
+                expr = (vcpkg_port_licence(vcpkg_root, port, policy) if port else None) or expr
             chosen = check_expression(rep, policy, name, expr, allowed, strict_or, code="E-LINK", link=lname)
             key = (lname, str(lib.get("version", "")), lib.get("source", ""))
             row = seen.setdefault(
@@ -736,7 +788,7 @@ def run(args: argparse.Namespace) -> tuple[dict, Report]:
     inputs = [
         ("versions", args.versions, lambda p: read_versions(p, rep, policy, args.strict_or)),
         ("vcpkg", args.vcpkg, lambda p: read_vcpkg(p, rep, policy, args.strict_or)),
-        ("manifest", args.manifest, lambda p: read_manifest(p, rep, policy, args.strict_or)),
+        ("manifest", args.manifest, lambda p: read_manifest(p, rep, policy, args.strict_or, args.vcpkg)),
         ("gradle", args.gradle, lambda p: read_gradle(p, rep, policy, args.strict_or)),
         ("pip", args.pip, None),
         ("release-manifest", args.release_manifest, lambda p: read_release_manifest(p, rep, policy)),
