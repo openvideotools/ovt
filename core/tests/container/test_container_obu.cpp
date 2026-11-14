@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Oracle tests of the AV1 OBU stream walker (WI-1.570, chapter 08 §8.6.4): the temporal units of a raw OBU file equal
-// the packets of `ffprobe -show_packets` (goldens `tests/golden/av1/<id>.ovt-units.json`, framing "obu"). In a
-// Section 5 stream a temporal unit is exactly one FFmpeg packet (same position and size); an Annex B stream is
-// converted to Section 5 by FFmpeg, so only the count is compared there.
+// the packets of `ffprobe -show_packets` (goldens `tests/golden/av1/<id>.ovt-units.json`, framing "obu"). A Section 5
+// temporal unit is one FFmpeg packet (position and size); FFmpeg converts Annex B, so only the count is compared.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -16,7 +15,6 @@
 #include <vector>
 
 #include "container/obu.hpp"
-#include "io/memory_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "test_support/corpus.h"
 #include "units_oracle.hpp"
@@ -50,13 +48,15 @@ void check_against_golden(const Bytes& data, const Golden& g) {
   v.on_temporal_unit = [&](const TemporalUnitNode& t) { tus.push_back(t); };
   ovt::container::obu_walk(data, 0, detect.framing, v);
   REQUIRE(tus.size() == g.packets.size());
+  uint64_t offset = 0;  // the temporal units tile the stream; ffprobe on some builds reports no position
   for (size_t k = 0; k < tus.size(); ++k) {
     INFO("temporal unit " << k);
     REQUIRE(first_types.at(k).front() == ovt::container::kObuTemporalDelimiter);
     if (detect.framing == ObuFraming::Section5) {
-      REQUIRE(g.packets[k].pos.has_value());
-      CHECK(tus[k].file_span.offset == *g.packets[k].pos);
+      CHECK(tus[k].file_span.offset == g.packets[k].pos.value_or(offset));
+      CHECK(tus[k].file_span.offset == offset);
       CHECK(tus[k].file_span.length == g.packets[k].size);
+      offset += g.packets[k].size;
     }
   }
 }
