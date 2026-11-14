@@ -113,10 +113,11 @@ jobs:
           echo "packing $(wc -l < fuzz-files.txt) files (${#bins[@]} fuzzers, ${#modules[@]} plugin modules)"
           # -h stores the file behind each soname symlink at the soname path the loader asks for.
           tar -C "$ws" -h -cf - -T fuzz-files.txt | tar -C fuzz-stage -xf -
-          # Keep the debug info (symbolized crash reports) but compress it.
+          # Drop the DWARF (most of the ~590 MB the pack had with it) but keep the symbol tables, so that stack frames
+          # still name functions. Line numbers come from re-running the uploaded reproducer on a local build.
           find fuzz-stage -type f \( -perm -u+x -o -name '*.so*' \) -print0 \
-            | xargs -0 -n1 -P"$(nproc)" objcopy --compress-debug-sections=zlib 2>/dev/null || true
-          tar -C fuzz-stage -cf - . | zstd -T0 -6 -q -o fuzz-binaries.tar.zst
+            | xargs -0 -n1 -P"$(nproc)" strip --strip-debug 2>/dev/null || true
+          tar -C fuzz-stage -cf - . | zstd -T0 -12 -q -o fuzz-binaries.tar.zst
           ls -l fuzz-binaries.tar.zst
 
       # Handed to the shards through the Actions cache, not an artifact: the repository is public and built binaries
@@ -132,8 +133,9 @@ jobs:
   fuzz-smoke:
     needs: fuzz-build
     runs-on: ubuntu-22.04
-    # Six targets of 60 s each per shard, plus the download.
-    timeout-minutes: 20
+    # Six targets of 60 s each per shard, plus the restore; the fallback build below fits in the same budget as the
+    # build job's.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -142,13 +144,43 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Restore fuzz binaries
+        id: bins
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: fuzz-binaries.tar.zst
           key: fuzz-binaries-${{ github.sha }}
-          fail-on-cache-miss: true
+
+      # Fallback when the pack is gone: the cache is LRU under a 10 GB repository cap, and a shard can sit queued for
+      # hours while other branches evict it. Then this shard builds the fuzzers itself, as every shard did before.
+      - uses: ./.github/actions/setup-ovt
+        if: steps.bins.outputs.cache-hit != 'true'
+        with:
+          preset: linux-x64-fuzz
+          triplet: x64-linux-ovt
+
+      - name: Clang 16 (fallback build)
+        if: steps.bins.outputs.cache-hit != 'true'
+        run: |
+          echo "::warning::fuzz-binaries-${{ github.sha }} not in the cache (evicted); building the fuzzers in this shard"
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-16.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
+
+      - name: Build fuzzers (fallback build)
+        if: steps.bins.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -eo pipefail
+          cmake --preset "$PRESET"
+          mapfile -t targets < <(ninja -C "build/$PRESET" -t targets all \
+            | sed -n 's/^\(ovt_fuzz_[A-Za-z0-9_]*\): phony$/\1/p' | grep -v '_regress$' | sort -u)
+          cmake --build --preset "$PRESET" --target "${targets[@]}"
 
       - name: Unpack fuzz binaries
+        if: steps.bins.outputs.cache-hit == 'true'
         shell: bash
         run: |
           set -eo pipefail
