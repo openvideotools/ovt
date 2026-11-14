@@ -1,8 +1,8 @@
 # WI-0.063 acceptance record
 
-Spec version: 1.0-rc24. Written 2026-11-14 in a Linux cloud container (no macOS, no `lipo`, no `codesign`), so the
-macOS-only part is **pending**: it runs on a Mac with Rosetta 2 (the Mac Mini) and the output is pasted into this
-file. Nothing below has been run on a Mac yet.
+Spec version: 1.0-rc24. The automated part was written and run on 2026-11-14 in a Linux cloud container (no macOS,
+no `lipo`, no `codesign`). The macOS part ran the same day on the project's Mac Mini (Apple silicon, Rosetta 2); its
+output is below.
 
 ## Test 1: every Mach-O reports `x86_64 arm64`, and the universal app launches on both architectures
 
@@ -25,7 +25,7 @@ $ python3 -m pytest -q -p no:cacheprovider tools/tests/test_mac_make_universal.p
 | bundles from different commits or Qt versions are refused and no output is left | `test_differing_resource_fails_and_leaves_no_output`, `test_file_in_one_bundle_only_fails`, `test_wrong_architecture_input_fails`, `test_allow_differing_keeps_the_arm64_copy` |
 | usage and tool errors exit 2 | `test_existing_output_and_non_bundle_are_usage_errors`, `test_tool_failure_is_exit_2` |
 
-Pending, on a Mac (real `lipo`, real `codesign`). Both bundles must come from the same commit and the same Qt. The
+On a Mac (real `lipo`, real `codesign`). Both bundles must come from the same commit and the same Qt. The
 x86_64 build can run on Apple silicon (cross-compiled with the `macos-x86_64-release` preset), or come from the
 `macos-15-intel` CI job's artefact for the same commit:
 
@@ -48,10 +48,46 @@ arch -arm64  "build/universal/OVT Studio.app/Contents/MacOS/ovt" --version
 arch -x86_64 "build/universal/OVT Studio.app/Contents/MacOS/ovt" --version
 arch -arm64  "build/universal/OVT Studio.app/Contents/MacOS/OVT Studio" --version
 arch -x86_64 "build/universal/OVT Studio.app/Contents/MacOS/OVT Studio" --version
-arch -x86_64 "build/universal/OVT Studio.app/Contents/MacOS/ovt" plugins   # aom loads in the x86_64 slice
+# every bundled plugin dlopens in both slices (`ovt plugins` does not exist yet, CLI-0001):
+for a in arm64 x86_64; do for p in "build/universal/OVT Studio.app/Contents/PlugIns/ovt/"*.dylib; do
+  arch -$a /usr/bin/python3 -c 'import ctypes, sys; ctypes.CDLL(sys.argv[1])' "$p" && echo "$a ok $(basename "$p")"
+done; done
 ```
 
-Record: command output, date, machine (to fill in).
+### Record: 2026-11-14, Mac Mini (Apple silicon, macOS, Rosetta 2)
+
+Run by the project's Mac Mini session on this PR at 14f1064 merged locally with the bundling fixes of #464 at 5c0b221
+(local merge commit `af2fe00`). Both slices were built with the `macos-arm64-release` and `macos-x86_64-release`
+presets and bundled with `tools/mac/bundle.sh --skip-notices-build`; libplacebo's x86_64 build needed
+`-DOVT_MESON=<repo>/.venv/bin/meson` on that machine. Output:
+
+```console
+make_universal.py: build/universal/OVT Studio.app: 115 Mach-O files merged (x86_64 arm64), signed ad hoc
+make_universal rc=0
+Mach-O files: 115, without both slices: 0
+Architectures in the fat file: build/universal/OVT Studio.app/Contents/MacOS/ovt are: x86_64 arm64
+Architectures in the fat file: build/universal/OVT Studio.app/Contents/MacOS/OVT Studio are: x86_64 arm64
+codesign rc=0
+-- arch arm64
+{"ovt":"0.1.0","core":"0.1.0","api":"1.0.0","build":{"commit":"af2fe00","profile":"relwithdebinfo","platform":"macos-arm64"},"features":[]}
+ovt rc=0
+core 0.1.0
+Qt 6.8.3 (built with 6.8.3)
+studio rc=0
+-- arch x86_64
+{"ovt":"0.1.0","core":"0.1.0","api":"1.0.0","build":{"commit":"af2fe00","profile":"relwithdebinfo","platform":"macos-x86_64"},"features":[]}
+ovt rc=0
+core 0.1.0
+Qt 6.8.3 (built with 6.8.3)
+studio rc=0
+```
+
+The Mini session also reported that all 4 bundled plugins `dlopen` under both `arch -arm64` and `arch -x86_64`, and
+that two `--no-sign` merges were byte-identical (determinism). Those lines are not in the log above. A first attempt
+at the plugin check through `ovt plugins` failed with `CLI-0001 unknown subcommand 'plugins'` (that subcommand comes
+later), so the record lists the `dlopen` loop instead.
+
+Result: test 1 passes. Every Mach-O reports `x86_64 arm64`, and the universal app launches on both architectures.
 
 Determinism: run `make_universal.py` twice into two output paths and compare the file lists and the
 `lipo -archs` output. The merged Mach-O bytes are compared only before signing (`--no-sign`), because an ad-hoc
