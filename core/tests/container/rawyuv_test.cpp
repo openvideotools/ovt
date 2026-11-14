@@ -254,7 +254,7 @@ TEST_CASE("raw: sidecar parse, write and round trip", "[container][raw][fast]") 
   CHECK(s->color.transfer == 16);
   CHECK(s->color.matrix == 9);
   CHECK(s->color.full_range);
-  CHECK(s->frame_bytes == 2 * (64 * 48 + 2 * 32 * 48));
+  CHECK(s->frame_bytes == 2ULL * (64 * 48 + 2 * 32 * 48));
 
   const auto min = raw::parse_sidecar(R"({"width":16,"height":16,"pix_fmt":"gray"})");
   REQUIRE(min);
@@ -361,7 +361,8 @@ TEST_CASE("raw: candidates from name tokens", "[container][raw][fast]") {
   CHECK(raw::candidates("clip.yuv", 0).empty());
   CHECK(raw::candidates("clip.yuv", 7).empty());
   // Rank: 4:2:0 before 4:2:2 before 4:4:4 at equal frame count, 8-bit before 10-bit.
-  const auto eq = raw::candidates("clip_16x16.yuv", 16 * 16 * 6);  // several formats divide it; counts never increase
+  const auto eq =
+      raw::candidates("clip_16x16.yuv", 16ULL * 16 * 6);  // several formats divide it; counts never increase
   REQUIRE(eq.size() >= 2);
   for (size_t i = 1; i < eq.size(); ++i) {
     CHECK(eq[i - 1].frame_count >= eq[i].frame_count);
@@ -369,7 +370,7 @@ TEST_CASE("raw: candidates from name tokens", "[container][raw][fast]") {
 }
 
 TEST_CASE("raw: frame rate from the file name", "[container][raw][fast]") {
-  const uint64_t size = 16 * 16 * 3 / 2 * 4;
+  const uint64_t size = 16ULL * 16 * 3 / 2 * 4;
   const auto rate = [&](const std::string& name) {
     const auto c = raw::candidates(name, size);
     REQUIRE(!c.empty());
@@ -387,7 +388,7 @@ TEST_CASE("raw: frame rate from the file name", "[container][raw][fast]") {
 
 TEST_CASE("raw: resolve priority list", "[container][raw][fast]") {
   const ScratchDir dir;
-  const std::string path = dir.make("clip.yuv", 64 * 48 * 3 / 2 * 6);  // 6 frames of 64x48 4:2:0
+  const std::string path = dir.make("clip.yuv", 64ULL * 48 * 3 / 2 * 6);  // 6 frames of 64x48 4:2:0
   const auto file = ovt::io::RandomAccessFile::open(path);
 
   // Heuristics alone: ambiguous or not unique, so CNT-RAW-0002 with the candidates and OVT_E_INVALID_ARG.
@@ -528,11 +529,11 @@ TEST_CASE("raw: reader sample table, tree, RawVideoFormat and trailing bytes", "
   CHECK(raw_of(empty->raw_format())->frame_count() == 0);
   const Bytes empty_table = empty->sample_table(0, 0, 0);
   CHECK(table_of(empty_table)->count() == 0);
-  const Bytes exact(768 * 2, 0);
+  const Bytes exact(768ULL * 2, 0);
   const ovt::io::MemoryFile exact_file(exact);
   const Bytes exact_tree = raw::make_reader(exact_file, fmt)->tree();
   const auto* exact_diags = tree_of(exact_tree)->diagnostics();
-  CHECK((exact_diags == nullptr || exact_diags->size() == 0));
+  CHECK((exact_diags == nullptr || exact_diags->empty()));
 }
 
 TEST_CASE("raw: ovt_container_open_format(\"raw\")", "[container][raw][fast]") {
