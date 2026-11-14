@@ -15,6 +15,16 @@ target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
+# WI-1.406: NATIVE targets (§10.4.1). The portable rules build everywhere; the macOS CAMetalLayer target is
+# Objective-C++ with ARC and links the frameworks it calls (system frameworks, no licence entry).
+target_sources(ovt_render PRIVATE src/platform/native_target.cpp)
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(ovt_render PRIVATE src/platform/macos_metal.mm)
+  set_source_files_properties(src/platform/macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
+endif()
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
