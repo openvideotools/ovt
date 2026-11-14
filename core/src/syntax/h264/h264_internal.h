@@ -57,8 +57,8 @@ inline bool check_range(SyntaxBuilder& b, std::string_view name, int64_t value, 
   if (value >= lo && value <= hi) {
     return true;
   }
-  b.diag(Severity::Error, kRangeCode, fmt::format("{} out of range ({} = {}, allowed [{},{}])", name, name, value, lo, hi),
-         spec_ref, true);
+  b.diag(Severity::Error, kRangeCode,
+         fmt::format("{} out of range ({} = {}, allowed [{},{}])", name, name, value, lo, hi), spec_ref, true);
   return false;
 }
 
