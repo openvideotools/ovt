@@ -8,8 +8,9 @@
 # app/CMakeLists.txt also lists the library in QT_ANDROID_EXTRA_LIBS so that androiddeployqt packages it.
 
 add_library(ovt_jni SHARED ovt_jni.cpp hdr_surface.cpp hdr_pattern.cpp)
-# The C API only (ovt/version.h); the NDK's liblog (__android_log_print), libandroid (ANativeWindow), EGL and GLESv3
+# The C API only (ovt/version.h); the NDK's liblog (__android_log_print), libandroid (ANativeWindow_fromSurface),
+# libnativewindow (ANativeWindow_setBuffersDataSpace, API 28), EGL and GLESv3
 # for HdrSurfaceView's PQ test pattern (WI-0.052). hdr_pattern.cpp is also built on the host by
 # android/app/src/test/cpp for its unit test.
-target_link_libraries(ovt_jni PRIVATE ovt::core ovt::flags log android EGL GLESv3)
+target_link_libraries(ovt_jni PRIVATE ovt::core ovt::flags log android nativewindow EGL GLESv3)
 ovt_set_license(ovt_jni "GPL-3.0-or-later")
