@@ -16,6 +16,7 @@ on:
       - "tools/goldens/**"
       - "tests/oracles/normalize/**"
       - "tests/golden/KNOWN_DIFFS.md"
+      - "tests/corpora/manifest.json" # a changed corpus input changes the goldens
       - ".github/workflows/goldens-h26x.yml"
   workflow_dispatch:
 

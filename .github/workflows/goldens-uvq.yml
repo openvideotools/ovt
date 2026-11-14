@@ -15,6 +15,7 @@ on:
     paths:
       - "tools/goldens/gen_uvq.py"
       - "tests/oracles/normalize/**"
+      - "tests/corpora/manifest.json" # a changed corpus input changes the goldens
       - ".github/workflows/goldens-uvq.yml"
   workflow_dispatch:
 
