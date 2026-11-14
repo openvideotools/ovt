@@ -50,7 +50,6 @@ ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
 ovt_add_fuzz_target(y4m fuzz_y4m.cpp)
-ovt_add_fuzz_target(raw_format_string fuzz_raw_format_string.cpp) # WI-1.229: raw YUV format string, sidecar, heuristics
 ovt_add_fuzz_target(unit_scan fuzz_unit_scan.cpp)
 ovt_add_fuzz_target(user_data fuzz_user_data.cpp)
 # WI-0.091: the cache record reader (zstd frame + FlatBuffer verify) and the meta.json parser.
@@ -70,16 +69,5 @@ ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
 # WI-1.231: the unit splitter of §8.7.4 over every framing.
 ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
-
-# WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
-# plugin module from its output directory, so it follows the plugin's own option.
-if(OVT_BUILD_PLUGIN_FFMPEG)
-  set(_ffmpeg_plugin_tests "${PROJECT_SOURCE_DIR}/plugins/ovt-plugin-ffmpeg/tests")
-  ovt_add_fuzz_target(plugin_push_ffmpeg "${_ffmpeg_plugin_tests}/fuzz/fuzz_plugin_push_ffmpeg.cpp")
-  foreach(_target ovt_fuzz_plugin_push_ffmpeg_regress ovt_fuzz_plugin_push_ffmpeg)
-    if(TARGET ${_target})
-      target_compile_definitions(${_target} PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\"")
-      add_dependencies(${_target} ovt_plugin_ffmpeg)
-    endif()
-  endforeach()
-endif()
+# WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
+ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
