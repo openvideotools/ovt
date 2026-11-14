@@ -38,7 +38,7 @@ get_target_property(_ovt_hm_includes tp::hm_common INTERFACE_INCLUDE_DIRECTORIES
 target_include_directories(ovt_plugin_hm_tests SYSTEM PRIVATE ${_ovt_hm_includes})
 unset(_ovt_hm_includes)
 target_compile_definitions(ovt_plugin_hm_tests PRIVATE "OVT_HM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_hm>\""
-                                                   "OVT_HM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h265\"")
+                                                       "OVT_HM_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h265\"")
 add_dependencies(ovt_plugin_hm_tests ovt_plugin_hm)
 ovt_set_license(ovt_plugin_hm_tests "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_plugin_hm_tests)
