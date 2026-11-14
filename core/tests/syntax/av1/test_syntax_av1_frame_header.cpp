@@ -1232,7 +1232,8 @@ TEST_CASE("av1_fh1_sizeup_frame_sizes_follow_sequence_change", "[syntax][av1][fa
   // Matroska: pulling the OBUs out of the SimpleBlocks is container work (WI-1.231); the test walks the file for
   // sequence header OBUs and frame OBUs through the OBU scanner and would need the demuxer. The oracle values of the
   // Matroska fixture are recorded in docs/acceptance/wi/WI-1.117.md (DoD 6). Use the IVF form when available.
-  if (file.size() < 4 || !(file[0] == 'D' && file[1] == 'K' && file[2] == 'I' && file[3] == 'F')) {
+  const bool is_ivf = file.size() >= 4 && file[0] == 'D' && file[1] == 'K' && file[2] == 'I' && file[3] == 'F';
+  if (!is_ivf) {
     SKIP("av1-1-b8-03-sizeup is Matroska; the frame-header walk needs the IVF form (demuxer: WI-1.231)");
   }
   size_t headers = 0;
