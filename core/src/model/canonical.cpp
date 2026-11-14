@@ -31,8 +31,11 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <iomanip>
 #include <limits>
+#include <locale>
 #include <span>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -62,19 +65,16 @@ constexpr int kMaxNesting = 4;
                               " levels at " + path);
 }
 
-/// Work budget against shared offsets. A buffer that verifies may point many offsets at one table, string or
-/// vector (or at one nested buffer), so the canonical output and the work of both walkers can grow far beyond
-/// the input. Every byte the walkers write, copy, verify or compare is charged; past 16 x input + 1 MiB, capped
-/// below 2 GiB (the FlatBuffers size limit), the call throws std::invalid_argument.
+/// Work budget against shared offsets: a valid buffer may point many offsets at one table, string, vector or
+/// nested buffer, so the output and the walk can grow far beyond the input. Every byte written, copied, verified
+/// or compared is charged; past 16 x input + 1 MiB, capped below the 2 GiB FlatBuffers limit, the call throws.
 class Budget {
  public:
   Budget(std::size_t input, const char* caller) : caller_(caller) {
     constexpr std::size_t kCap = (std::size_t{1} << 31U) - 1;
     constexpr std::size_t kSlack = std::size_t{1} << 20U;
-    constexpr std::size_t kFactor = 16;
-    limit_ = input >= (kCap - kSlack) / kFactor ? kCap : kFactor * input + kSlack;
+    limit_ = input >= (kCap - kSlack) / 16 ? kCap : 16 * input + kSlack;
   }
-
   void charge(std::size_t bytes) {
     if (bytes > limit_ - spent_) {
       throw std::invalid_argument(std::string(caller_) + ": work exceeds the budget of " + std::to_string(limit_) +
@@ -126,23 +126,16 @@ const flatbuffers::Vector<flatbuffers::Offset<reflection::Object>>& objects_of(c
   return *objects;
 }
 
-/// The fields of @p object in field-id order (= declaration order; the .bfbs stores them sorted by name).
-std::vector<const reflection::Field*> fields_by_id(const reflection::Object& object) {
-  const auto& all = fields_of(object);
-  std::vector<const reflection::Field*> fields(all.begin(), all.end());
-  std::sort(fields.begin(), fields.end(),
-            [](const reflection::Field* lhs, const reflection::Field* rhs) { return lhs->id() < rhs->id(); });
-  return fields;
-}
-
-/// fields_by_id() per object, computed once per call: shared offsets make the walkers visit a table type
-/// millions of times.
+/// The fields of an object in field-id order (= declaration order; the .bfbs stores them sorted by name),
+/// sorted once per object and call: shared offsets can make a walker visit one table type millions of times.
 class FieldOrder {
  public:
   const std::vector<const reflection::Field*>& operator()(const reflection::Object& object) {
     auto [it, inserted] = cache_.try_emplace(&object);
     if (inserted) {
-      it->second = fields_by_id(object);
+      const auto& all = fields_of(object);
+      it->second.assign(all.begin(), all.end());
+      std::ranges::sort(it->second, {}, [](const reflection::Field* field) { return field->id(); });
     }
     return it->second;
   }
@@ -697,10 +690,23 @@ std::string format_number(T value) {
     if (std::isinf(value)) {
       return value < 0 ? "-inf" : "inf";
     }
+    std::ostringstream out;  // shortest exact form: floating-point std::to_chars needs macOS 13.3 (target 13.0)
+    out.imbue(std::locale::classic());
+    for (int digits = 1; digits <= std::numeric_limits<T>::max_digits10; ++digits) {
+      out.str({});
+      out << std::setprecision(digits) << value;
+      std::istringstream in(out.str());
+      in.imbue(std::locale::classic());
+      if (T back{}; in >> back && back == value) {
+        break;
+      }
+    }
+    return out.str();
+  } else {
+    std::array<char, 64> text{};
+    const auto result = std::to_chars(text.begin(), text.end(), value);
+    return {text.begin(), result.ptr};
   }
-  std::array<char, 64> text{};
-  const auto result = std::to_chars(text.begin(), text.end(), value);
-  return {text.begin(), result.ptr};
 }
 
 /// One scalar read from a table field or a struct/vector element, kept wide enough to compare exactly.
