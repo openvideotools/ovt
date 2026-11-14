@@ -277,6 +277,11 @@ UriParts split_uri(std::string_view u) {
 }
 
 std::string remove_dot_segments(std::string_view path) {
+  // A dot segment is either at the start of the path or right after a '/': a path with neither is returned as is
+  // (the common case, taken once per expanded segment).
+  if (!path.starts_with('.') && path.find("/.") == std::string_view::npos) {
+    return std::string(path);
+  }
   std::string out;
   while (!path.empty()) {
     if (path.starts_with("../")) {
@@ -358,19 +363,17 @@ std::optional<size_t> parse_format_tag(std::string_view fmt) {
 
 }  // namespace
 
-std::string resolve_url(std::string_view base, std::string_view ref) {
+namespace {
+
+// RFC 3986 §5.2.2 against an already split base (`base_empty` when there is no base at all). The segment loops split
+// the representation's base once instead of once per segment.
+std::string resolve_against(const UriParts& b, bool base_empty, std::string_view ref) {
   const UriParts r = split_uri(ref);
-  if (r.has_scheme) {
+  if (r.has_scheme || base_empty) {
     UriParts t = r;
     t.path = remove_dot_segments(r.path);
     return recompose(t);
   }
-  if (base.empty()) {
-    UriParts t = r;
-    t.path = remove_dot_segments(r.path);
-    return recompose(t);
-  }
-  const UriParts b = split_uri(base);
   UriParts t;
   t.scheme = b.scheme;
   t.has_scheme = b.has_scheme;
@@ -396,8 +399,16 @@ std::string resolve_url(std::string_view base, std::string_view ref) {
   return recompose(t);
 }
 
-std::optional<std::string> expand_template(std::string_view tmpl, const TemplateValues& values) {
-  std::string out;
+}  // namespace
+
+std::string resolve_url(std::string_view base, std::string_view ref) {
+  return resolve_against(split_uri(base), base.empty(), ref);
+}
+
+namespace {
+
+// Appends the expansion of `tmpl` to `out`; false (with `out` partly written) when the template is invalid.
+bool expand_template_into(std::string& out, std::string_view tmpl, const TemplateValues& values) {
   size_t i = 0;
   while (i < tmpl.size()) {
     const size_t dollar = tmpl.find('$', i);
@@ -408,7 +419,7 @@ std::optional<std::string> expand_template(std::string_view tmpl, const Template
     out.append(tmpl.substr(i, dollar - i));
     const size_t close = tmpl.find('$', dollar + 1);
     if (close == std::string_view::npos) {
-      return std::nullopt;
+      return false;
     }
     const std::string_view token = tmpl.substr(dollar + 1, close - dollar - 1);
     i = close + 1;
@@ -421,7 +432,7 @@ std::optional<std::string> expand_template(std::string_view tmpl, const Template
     const std::string_view fmt = pct == std::string_view::npos ? std::string_view() : token.substr(pct);
     if (name == "RepresentationID") {
       if (!fmt.empty()) {
-        return std::nullopt;  // no format tag allowed (23009-1 Table 16)
+        return false;  // no format tag allowed (23009-1 Table 16)
       }
       out.append(values.representation_id);
       continue;
@@ -434,13 +445,23 @@ std::optional<std::string> expand_template(std::string_view tmpl, const Template
     } else if (name == "Time") {
       value = values.time;
     } else {
-      return std::nullopt;
+      return false;
     }
     const auto width = parse_format_tag(fmt);
     if (!width) {
-      return std::nullopt;
+      return false;
     }
     append_padded(out, value, *width);
+  }
+  return true;
+}
+
+}  // namespace
+
+std::optional<std::string> expand_template(std::string_view tmpl, const TemplateValues& values) {
+  std::string out;
+  if (!expand_template_into(out, tmpl, values)) {
+    return std::nullopt;
   }
   return out;
 }
@@ -607,8 +628,11 @@ int64_t repeat_count(Context& ctx, const pugi::xml_node& s, const pugi::xml_node
              : 0;
 }
 
-// SegmentTimeline -> one entry per segment (S@r expanded, r = -1 filled to the next S@t or the period end).
-std::vector<TimelineEntry> expand_timeline(Context& ctx, const pugi::xml_node& timeline, const Timing& t) {
+// SegmentTimeline -> one entry per segment (S@r expanded, r = -1 filled to the next S@t or the period end), at most
+// `limit` of them. `limit` is the remaining segment budget, or less when the caller needs fewer entries; reaching it
+// is reported as a truncation only when `report_limit` is set.
+std::vector<TimelineEntry> expand_timeline(Context& ctx, const pugi::xml_node& timeline, const Timing& t, size_t limit,
+                                           bool report_limit) {
   std::vector<TimelineEntry> out;
   const std::vector<pugi::xml_node> items = children(timeline, "S");
   int64_t cursor = 0;
@@ -626,8 +650,10 @@ std::vector<TimelineEntry> expand_timeline(Context& ctx, const pugi::xml_node& t
     for (int64_t k = 0; k < count; ++k) {
       const bool overflow =
           cursor > std::numeric_limits<int64_t>::max() - d || number == std::numeric_limits<int64_t>::max();
-      if (out.size() >= ctx.segments_left || overflow) {
-        diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted or 64-bit range)", s);
+      if (out.size() >= limit || overflow) {
+        if (overflow || report_limit) {
+          diag(ctx, DiagCode::CNT_DASH_0004, "segment list truncated (segment budget exhausted or 64-bit range)", s);
+        }
         return out;
       }
       out.push_back({cursor, d, number});
@@ -638,14 +664,68 @@ std::vector<TimelineEntry> expand_timeline(Context& ctx, const pugi::xml_node& t
   return out;
 }
 
-std::string segment_url(Context& ctx, const std::string& base, std::string_view tmpl, const TemplateValues& values,
+// The representation's base URL, split once for all of its segments. `dir_prefix` is the resolution of any plain
+// relative reference without its own path: scheme, authority and the base directory with its dot segments removed.
+// A plain reference (no scheme, authority, query or fragment; a relative path without dot segments) resolves to
+// dir_prefix + reference, which is what RFC 3986 §5.2 gives, without re-splitting and re-composing per segment.
+struct SplitBase {
+  explicit SplitBase(const std::string& base) : parts(split_uri(base)), empty(base.empty()) {
+    if (!empty) {
+      UriParts dir = parts;
+      dir.path = remove_dot_segments(merge_paths(parts, ""));
+      dir.query.clear();
+      dir.has_query = false;
+      dir_prefix = recompose(dir);
+    }
+  }
+  UriParts parts;
+  bool empty;
+  std::string dir_prefix;
+};
+
+bool plain_relative(std::string_view ref) {
+  if (ref.empty() || ref.front() == '/' || ref.front() == '.' || ref.find_first_of("?#") != std::string_view::npos ||
+      ref.find("/.") != std::string_view::npos) {
+    return false;
+  }
+  const size_t colon = ref.find(':');
+  return colon == std::string_view::npos || ref.find('/') < colon;  // a ':' before any '/' may end a scheme
+}
+
+std::string resolve_segment(const SplitBase& base, std::string_view ref) {
+  if (!base.empty && plain_relative(ref)) {
+    std::string out;
+    out.reserve(base.dir_prefix.size() + ref.size());
+    out.append(base.dir_prefix).append(ref);
+    return out;
+  }
+  return resolve_against(base.parts, base.empty, ref);
+}
+
+// Whether a template expands at all. Validity depends only on the identifiers and format tags, never on the values,
+// so a media template is checked (and an invalid one reported) once per representation, not once per segment.
+bool template_valid(std::string_view tmpl) {
+  return expand_template(tmpl, TemplateValues{}).has_value();
+}
+
+std::string segment_url(Context& ctx, const SplitBase& base, std::string_view tmpl, const TemplateValues& values,
                         const pugi::xml_node& at) {
+  if (!base.empty) {
+    // Expand straight behind the base directory; keep it when the expansion is a plain relative reference.
+    std::string out;
+    out.reserve(base.dir_prefix.size() + tmpl.size() + 24);  // room for a 20-digit identifier: one allocation
+    out.append(base.dir_prefix);
+    if (expand_template_into(out, tmpl, values)) {
+      const std::string_view ref = std::string_view(out).substr(base.dir_prefix.size());
+      return plain_relative(ref) ? out : resolve_against(base.parts, base.empty, ref);
+    }
+  }
   const auto expanded = expand_template(tmpl, values);
   if (!expanded) {
     diag(ctx, DiagCode::CNT_DASH_0005, "invalid template `" + std::string(tmpl) + "`; used as written", at);
-    return resolve_url(base, tmpl);
+    return resolve_segment(base, tmpl);
   }
-  return resolve_url(base, *expanded);
+  return resolve_segment(base, *expanded);
 }
 
 // Reads an optional byte-range attribute into `out`; a malformed one is reported and leaves `out` alone.
@@ -682,11 +762,12 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
   const Timing t = read_timing(ctx, chain, period_duration_ms);
   rep.timescale = t.timescale;
   TemplateValues values{rep.id, 0, rep.bandwidth, 0};
+  const SplitBase base(rep_base);
 
   if (const char* init = chain_attr(chain, "initialization")) {
     Segment seg;
     seg.is_init = true;
-    seg.url = segment_url(ctx, rep_base, init, values, chain.front());
+    seg.url = segment_url(ctx, base, init, values, chain.front());
     rep.segments.push_back(std::move(seg));
   } else if (const pugi::xml_node init_el = chain_child(chain, "Initialization")) {
     rep.segments.push_back(init_from_element(ctx, init_el, rep_base));
@@ -700,7 +781,7 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
 
   std::vector<TimelineEntry> entries;
   if (const pugi::xml_node timeline = chain_child(chain, "SegmentTimeline")) {
-    entries = expand_timeline(ctx, timeline, t);
+    entries = expand_timeline(ctx, timeline, t, ctx.segments_left, true);
   } else {
     const auto d = parse_int(chain_attr(chain, "duration") != nullptr ? chain_attr(chain, "duration") : "");
     if (!d || *d <= 0) {
@@ -732,11 +813,16 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
 
   spend(ctx, entries.size());
   rep.segments.reserve(rep.segments.size() + entries.size());
+  // An invalid media template is used as written for every segment: report it once and resolve it once.
+  std::optional<std::string> as_written;
+  if (!entries.empty() && !template_valid(media)) {
+    as_written = segment_url(ctx, base, media, values, chain.front());
+  }
   for (const TimelineEntry& e : entries) {
     values.number = e.number;
     values.time = e.time;
     Segment seg;
-    seg.url = segment_url(ctx, rep_base, media, values, chain.front());
+    seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, chain.front());
     seg.start_time = e.time;
     seg.duration = e.duration;
     seg.number = e.number;
@@ -759,21 +845,26 @@ void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& 
       break;
     }
   }
-  std::vector<TimelineEntry> entries;
-  if (const pugi::xml_node timeline = chain_child(chain, "SegmentTimeline")) {
-    entries = expand_timeline(ctx, timeline, t);
-    if (entries.size() != urls.size()) {
-      diag(ctx, DiagCode::CNT_DASH_0008,
-           "SegmentList has " + std::to_string(urls.size()) + " SegmentURL elements but its SegmentTimeline has " +
-               std::to_string(entries.size()) + " segments",
-           chain.front());
-    }
-  }
-  const auto d = parse_int(chain_attr(chain, "duration") != nullptr ? chain_attr(chain, "duration") : "");
   if (urls.size() > ctx.segments_left) {
     diag(ctx, DiagCode::CNT_DASH_0004, "SegmentList truncated (segment budget exhausted)", chain.front());
     urls.resize(ctx.segments_left);
   }
+  std::vector<TimelineEntry> entries;
+  if (const pugi::xml_node timeline = chain_child(chain, "SegmentTimeline")) {
+    // Only the first urls.size() entries are used; one more shows a longer timeline. Expanding the whole timeline
+    // would cost up to the full segment budget per representation without spending any of it, so a short MPD with
+    // many representations under one SegmentList could build millions of entries per representation.
+    entries = expand_timeline(ctx, timeline, t, urls.size() + 1, false);
+    if (entries.size() != urls.size()) {
+      const bool longer = entries.size() > urls.size();
+      diag(ctx, DiagCode::CNT_DASH_0008,
+           "SegmentList has " + std::to_string(urls.size()) + " SegmentURL elements but its SegmentTimeline has " +
+               (longer ? "more" : std::to_string(entries.size())) + " segments",
+           chain.front());
+      entries.resize(std::min(entries.size(), urls.size()));
+    }
+  }
+  const auto d = parse_int(chain_attr(chain, "duration") != nullptr ? chain_attr(chain, "duration") : "");
   spend(ctx, urls.size());
   for (size_t k = 0; k < urls.size(); ++k) {
     const pugi::xml_node u = urls[k];
