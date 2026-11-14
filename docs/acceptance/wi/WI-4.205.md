@@ -42,7 +42,17 @@ TSDuck 3.45 rejects `--all-sections` together with `--xml-output` ("filtering se
 --all-once) is incompatible with XML or JSON output"), so the test first skipped. The test now runs
 `tstables --xml-output` (each table version once). The XML attribute names were right: `PAT`/`service`
 (`service_id`, `program_map_PID`), `PMT` (`service_id`, `PCR_PID`) and `component` (`elementary_PID`, `stream_type`).
-The other `input/*.ts` entries are still owed.
+**All tsduck-test streams, Mac Mini, 2026-11-14** (same machine and `tstables` wrapper; corpora `ts_h264_dvb` and
+`ts_test_025`, `026`, `052`, `064`, `072`, `097`, `100_1`, `125`, `137`, `139`), both oracle tests:
+
+```console
+$ OVT_CORPORA_DIR=… OVT_REQUIRE_CORPORA=1 ovt_tests_container "[needs-oracle:tstables]"
+All tests passed (139 assertions in 2 test cases)
+```
+
+The first run of the `[slow]` test found three oracle-reading gaps, fixed in the test only: `tstables` omits
+`PCR_PID` when it is 0x1FFF (test-072), writes an empty file when no table is complete (test-125, 2 KB), and lists
+a PMT only for the services whose PMT is in the file (test-137: 5 PAT services, 1 PMT).
 
 ## Test 2: corrupted CRC
 
