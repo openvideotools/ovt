@@ -70,12 +70,12 @@ that the handles are released when the Activity finishes. SPEC-ASSUMPTION(#444):
 
 Manual cross-check:
 
-```console
-$ adb shell settings put global always_finish_activities 1
-$ adb shell am start -a android.intent.action.VIEW -t video/mp4 -d <content URI as in test 2>
-$ adb shell input keyevent KEYCODE_HOME && adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity
-$ adb logcat -d -s OVT | grep -c 'opened fd size='     # 1: the file was opened once
-$ adb shell settings put global always_finish_activities 0
+```sh
+adb shell settings put global always_finish_activities 1
+adb shell am start -a android.intent.action.VIEW -t video/mp4 -d <content URI as in test 2>
+adb shell input keyevent KEYCODE_HOME && adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity
+adb logcat -d -s OVT | grep -c 'opened fd size='   # prints 1: the file was opened once
+adb shell settings put global always_finish_activities 0
 ```
 
 Output: NOT YET RECORDED.
