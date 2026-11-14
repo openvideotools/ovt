@@ -11,9 +11,13 @@ Each LUT is 256 RGBA8 entries (sRGB-encoded bytes, alpha 255), index 0 = minimum
 colour map evaluated at x = i / 255, each channel rounded half away from zero to 0..255.
 
 Sources (§10.5.1):
-- viridis, cividis: the 256-entry tables of matplotlib's `_cm_listed.py` (viridis by Smith, van der Walt and
-  Firing, released CC0 in github.com/BIDS/colormap; cividis by Nunez, Anderton and Renslow, PLOS ONE 2018).
-- jet, hot: matplotlib's linear segment definitions (`_cm.py` `_jet_data`, `_hot_data`), interpolated linearly.
+- viridis: the 256-entry table by Smith, van der Walt and Firing, released CC0 in github.com/BIDS/colormap (read
+  from matplotlib's `_cm_listed.py`, which carries the same data).
+- jet, hot: written here from their plain piecewise-linear definitions (no third-party data):
+  jet  r = clamp(1.5 - |4x - 3|), g = clamp(1.5 - |4x - 2|), b = clamp(1.5 - |4x - 1|);
+  hot  r = clamp(8x / 3), g = clamp(8x / 3 - 1), b = clamp(4x - 3).
+- cividis is not generated yet: its data (pnnl/cmaputil) has a licence the policy does not list (spec question
+  #471); Lut::Cividis falls back to viridis until then.
 - turbo: Google's polynomial approximation of Turbo (Apache-2.0,
   https://gist.github.com/mikhailov-work/0d177465a8151eb6ede1768d51d476c7), coefficients below.
 
@@ -24,11 +28,8 @@ checked-in header differs from what this script generates, 2 when matplotlib is 
 from __future__ import annotations
 
 import argparse
-import itertools
 import sys
 from pathlib import Path
-
-NAMES = ("viridis", "cividis", "turbo", "jet", "hot")  # order of the Lut enum (§10.2.5) is Viridis, Turbo, ...
 
 # Turbo polynomial approximation: rgb(x) = k4 . (1, x, x^2, x^3) + k2 . (x^4, x^5), clamped to [0, 1].
 TURBO_K4 = (
@@ -41,9 +42,7 @@ TURBO_K2 = ((-152.94239396, 59.28637943), (4.27729857, 2.82956604), (-89.9031091
 
 DEFAULT_COPYRIGHT = "2026 The Open Video Tools contributors"
 # Headers whose colour data carries its upstream licence (tools/license_policy.toml [directories] lists each file).
-# viridis: github.com/BIDS/colormap LICENSE.txt (CC0); turbo: the Google gist (Apache-2.0). cividis (Battelle
-# BSD-style licence, pnnl/cmaputil), jet and hot (matplotlib segment data) keep the directory licence until the owner
-# decides how to record them.
+# viridis: github.com/BIDS/colormap LICENSE.txt (CC0); turbo: the Google gist (Apache-2.0). jet and hot are our own.
 LICENCES = {
     "viridis": ("2015 Nathaniel J. Smith, Stefan van der Walt, Eric Firing", "CC0-1.0"),
     "turbo": ("2019 Google LLC", "Apache-2.0"),
@@ -64,31 +63,26 @@ def turbo(x: float) -> tuple[float, float, float]:
     )
 
 
-def segment(points: tuple[tuple[float, float, float], ...], x: float) -> float:
-    """matplotlib LinearSegmentedColormap channel: rows (x, y_left, y_right), linear between rows."""
-    for (x0, _, y0), (x1, y1, _) in itertools.pairwise(points):
-        if x0 <= x <= x1:
-            if x1 == x0:
-                return y1
-            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
-    return points[-1][2]
+def jet(x: float) -> tuple[float, float, float]:
+    return (1.5 - abs(4.0 * x - 3.0), 1.5 - abs(4.0 * x - 2.0), 1.5 - abs(4.0 * x - 1.0))
+
+
+def hot(x: float) -> tuple[float, float, float]:
+    return (8.0 * x / 3.0, 8.0 * x / 3.0 - 1.0, 4.0 * x - 3.0)
 
 
 def tables() -> dict[str, list[tuple[int, int, int]]]:
     try:
-        from matplotlib import _cm, _cm_listed  # only needed to regenerate
+        from matplotlib import _cm_listed  # only needed to regenerate (viridis)
     except ImportError:
         print("gen_luts.py: matplotlib is required (pip install matplotlib)", file=sys.stderr)
         sys.exit(2)
     out: dict[str, list[tuple[int, int, int]]] = {}
-    for name, data in (("viridis", _cm_listed._viridis_data), ("cividis", _cm_listed._cividis_data)):
-        assert len(data) == 256
-        out[name] = [(to_byte(r), to_byte(g), to_byte(b)) for r, g, b in data]
-    for name, seg in (("jet", _cm._jet_data), ("hot", _cm._hot_data)):
-        out[name] = [
-            tuple(to_byte(segment(seg[ch], i / 255.0)) for ch in ("red", "green", "blue"))  # type: ignore[misc]
-            for i in range(256)
-        ]
+    data = _cm_listed._viridis_data
+    assert len(data) == 256
+    out["viridis"] = [(to_byte(r), to_byte(g), to_byte(b)) for r, g, b in data]
+    out["jet"] = [tuple(to_byte(c) for c in jet(i / 255.0)) for i in range(256)]  # type: ignore[misc]
+    out["hot"] = [tuple(to_byte(c) for c in hot(i / 255.0)) for i in range(256)]  # type: ignore[misc]
     out["turbo"] = [tuple(to_byte(c) for c in turbo(i / 255.0)) for i in range(256)]  # type: ignore[misc]
     return out
 

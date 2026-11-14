@@ -16,7 +16,6 @@
 #include <libplacebo/gpu.h>
 #include <libplacebo/renderer.h>
 
-#include "luts/cividis.h"
 #include "luts/hot.h"
 #include "luts/jet.h"
 #include "luts/turbo.h"
@@ -106,7 +105,9 @@ bool OverlayLayerGpu::ensure_static(std::string& err) {
       return false;
     }
   }
-  const std::array<const std::array<uint8_t, 1024>*, 5> tables = {&luts::kViridis, &luts::kTurbo, &luts::kCividis,
+  // SPEC-ASSUMPTION(#471): the cividis data's licence is not in the licence policy yet, so Lut::Cividis draws with
+  // viridis (the other colour-blind-safe map) until the owner decides.
+  const std::array<const std::array<uint8_t, 1024>*, 5> tables = {&luts::kViridis, &luts::kTurbo, &luts::kViridis,
                                                                   &luts::kJet, &luts::kHot};
   for (size_t i = 0; i < luts_.size(); ++i) {
     if (luts_.at(i) == nullptr) {

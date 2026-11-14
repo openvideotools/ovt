@@ -55,7 +55,7 @@ class OverlayLayerGpu {
   pl_gpu gpu_;
   pl_tex layer_ = nullptr;
   pl_tex palette_ = nullptr;
-  std::array<pl_tex, 5> luts_{};  // Lut enum order: Viridis, Turbo, Cividis, Jet, Hot
+  std::array<pl_tex, 5> luts_{};  // Lut enum order: Viridis, Turbo, Cividis (= viridis, #471), Jet, Hot
   pl_tex attr_ = nullptr;
   pl_tex heat_ = nullptr;
   pl_tex heat_valid_ = nullptr;
