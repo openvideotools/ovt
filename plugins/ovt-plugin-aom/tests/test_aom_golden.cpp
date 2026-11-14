@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
-// SPDX-License-Identifier: LGPL-2.1-or-later
+// SPDX-License-Identifier: BSD-2-Clause
 //
 // Golden suite of ovt-plugin-aom against libaom `inspect -A -a` (WI-2.581, chapter 14 §14.4.5,
 // test_xplugin_av1_aom_vs_inspect). The goldens are tests/golden/av1/<id>.aom-inspect.json.gz (WI-0.566): the

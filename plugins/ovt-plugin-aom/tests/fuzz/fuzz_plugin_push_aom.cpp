@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
-// SPDX-License-Identifier: LGPL-2.1-or-later
+// SPDX-License-Identifier: BSD-2-Clause
 //
 // fuzz_plugin_push_aom (WI-2.581, chapter 14 §14.7.1): push() of ovt-plugin-aom. Input byte 0 picks the thread count
 // (1..4) and whether pull() asks for the reconstruction planes; the rest is a Section 5 OBU stream. It is cut into OBUs
