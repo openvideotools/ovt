@@ -15,8 +15,8 @@
 
 #include <algorithm>
 #include <cerrno>
-#include <charconv>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <exception>
 #include <iterator>
@@ -57,13 +57,20 @@ static_assert(!kModels.empty());
 
 // The feature ids of §9.5.3. Output names are those of the `vmaf --feature <extractor>` JSON; keys are the names the
 // libvmaf feature collector holds them under (default options).
+// The ranges are libvmaf 3.0.0 cambi.c's option table.
 constexpr std::array kCambiOptions = {
-    FeatureOption{"enc_bitdepth", OptionType::Int},     FeatureOption{"enc_height", OptionType::Int},
-    FeatureOption{"enc_width", OptionType::Int},        FeatureOption{"eotf", OptionType::String},
-    FeatureOption{"full_ref", OptionType::Bool},        FeatureOption{"heatmaps_path", OptionType::String},
-    FeatureOption{"max_log_contrast", OptionType::Int}, FeatureOption{"src_height", OptionType::Int},
-    FeatureOption{"src_width", OptionType::Int},        FeatureOption{"topk", OptionType::Double},
-    FeatureOption{"tvi_threshold", OptionType::Double}, FeatureOption{"window_size", OptionType::Int},
+    FeatureOption{"enc_bitdepth", OptionType::Int, 6, 16},
+    FeatureOption{"enc_height", OptionType::Int, 150, 7680},
+    FeatureOption{"enc_width", OptionType::Int, 180, 7680},
+    FeatureOption{"eotf", OptionType::String},
+    FeatureOption{"full_ref", OptionType::Bool},
+    FeatureOption{"heatmaps_path", OptionType::String},
+    FeatureOption{"max_log_contrast", OptionType::Int, 0, 5},
+    FeatureOption{"src_height", OptionType::Int, 200, 4320},
+    FeatureOption{"src_width", OptionType::Int, 320, 7680},
+    FeatureOption{"topk", OptionType::Double, 0.0001, 1.0},
+    FeatureOption{"tvi_threshold", OptionType::Double, 0.0001, 1.0},
+    FeatureOption{"window_size", OptionType::Int, 15, 127},
 };
 constexpr std::array<std::array<const char*, 2>, 2> kVmafPsnrFixed = {
     {{"enable_chroma", "true"}, {"enable_apsnr", "true"}}};
@@ -314,9 +321,11 @@ int init_context(Instance& inst) {
   return vmaf_init(&inst.ctx, cfg);
 }
 
-// The libvmaf dictionary value of one option, or nullopt-like false when the JSON type does not match.
-bool option_value(const nlohmann::json& v, OptionType type, std::string& out) {
-  switch (type) {
+// The libvmaf dictionary value of one option, or false when the JSON type does not match or a number is outside
+// the option's range (libvmaf would reject it too, but leaks its extractor context on that path).
+bool option_value(const nlohmann::json& v, const FeatureOption& opt, std::string& out) {
+  const auto in_range = [&opt](double x) { return x >= opt.min && x <= opt.max; };
+  switch (opt.type) {
     case OptionType::Bool:
       if (!v.is_boolean()) {
         return false;
@@ -324,18 +333,20 @@ bool option_value(const nlohmann::json& v, OptionType type, std::string& out) {
       out = v.get<bool>() ? "true" : "false";
       return true;
     case OptionType::Int:
-      if (!v.is_number_integer()) {
+      if (!v.is_number_integer() || !in_range(v.get<double>())) {
         return false;
       }
       out = std::to_string(v.get<int64_t>());
       return true;
     case OptionType::Double: {
-      if (!v.is_number()) {
+      if (!v.is_number() || !in_range(v.get<double>())) {
         return false;
       }
+      // %.17g round-trips a double; std::to_chars(double) needs macOS 13.3, above the deployment target.
       std::array<char, 32> buf{};
-      const auto r = std::to_chars(buf.data(), buf.data() + buf.size(), v.get<double>());
-      out.assign(buf.data(), r.ptr);
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::snprintf(buf.data(), buf.size(), "%.17g", v.get<double>());
+      out = buf.data();
       return true;
     }
     case OptionType::String:
@@ -368,7 +379,7 @@ ovt_status parse_feature_options(const char* options_json, const FeatureInfo& in
     const auto opt = std::find_if(info.options.begin(), info.options.end(),
                                   [&key](const FeatureOption& o) { return key == o.name; });
     std::string text;
-    if (opt == info.options.end() || !option_value(value, opt->type, text)) {
+    if (opt == info.options.end() || !option_value(value, *opt, text)) {
       return OVT_E_INVALID_ARG;
     }
     if (key == "full_ref" && text == "true") {
@@ -413,7 +424,7 @@ ovt_status create_feature_instance(const FeatureInfo& info, const char* options_
     }
     // libvmaf takes the dictionary (it copies and frees it).
     if (const int err = vmaf_use_feature(inst->ctx, extractor, dict); err != 0) {
-      return from_errno(err);  // out-of-range option values (libvmaf checks them) are -EINVAL
+      return from_errno(err);
     }
     *out = reinterpret_cast<ovt_Metric*>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast): opaque handle
         inst.release());

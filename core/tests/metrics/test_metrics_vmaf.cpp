@@ -640,7 +640,13 @@ TEST_CASE("vmaf feature ids check their options", "[metrics][vmaf][fast]") {
                         R"("enc_width":1920,"enc_height":1080,"enc_bitdepth":10,"full_ref":false})") == OVT_OK);
   CHECK(create("cambi", R"({"full_ref":true})") == OVT_E_UNSUPPORTED);  // SPEC-ASSUMPTION(#460)
   CHECK(create("cambi", R"({"eotf":"hlg"})") == OVT_E_INVALID_ARG);
-  CHECK(create("cambi", R"({"window_size":5})") == OVT_E_INVALID_ARG);  // libvmaf range 15..127
+  // Out of libvmaf's ranges; rejected before libvmaf sees them (it leaks its extractor context on that path).
+  CHECK(create("cambi", R"({"window_size":5})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"window_size":128})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"topk":0})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"enc_bitdepth":17})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"src_height":4321})") == OVT_E_INVALID_ARG);
+  CHECK(create("cambi", R"({"window_size":15,"topk":1,"max_log_contrast":0,"src_height":4320})") == OVT_OK);
   CHECK(create("cambi", R"({"window_size":31.5})") == OVT_E_INVALID_ARG);
   CHECK(create("cambi", R"({"topk":"0.5"})") == OVT_E_INVALID_ARG);
   CHECK(create("cambi", R"({"float":true})") == OVT_E_INVALID_ARG);

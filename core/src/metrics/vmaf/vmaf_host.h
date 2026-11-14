@@ -61,6 +61,8 @@ enum class OptionType : uint8_t { Bool, Int, Double, String };
 struct FeatureOption {
   const char* name;
   OptionType type;
+  double min = 0.0;  // Int and Double: the range libvmaf accepts (checked here: libvmaf 3.0.0 leaks the extractor
+  double max = 0.0;  // context when it rejects an option value)
 };
 
 // One libvmaf feature id (chapter 9 §9.5.3): a single libvmaf feature extractor whose per-frame features are the
