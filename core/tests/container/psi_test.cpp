@@ -662,9 +662,11 @@ unsigned long number_of(const pugi::xml_node& n, const char* attr) {
 
 }  // namespace
 
-TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections --xml",
-          "[container][mpegts][psi][needs-corpus][needs-oracle:tstables][fast]") {
-  const auto path = ovt::test::corpus_or_skip("ts_h264_dvb");
+namespace {
+
+// Compares the parser's programs, PMT PIDs, PCR PIDs, elementary PIDs and stream types for @p path with
+// `tstables --xml-output`. Returns false when tstables is not available.
+bool compare_with_tstables(const std::filesystem::path& path) {
   const auto xml = std::filesystem::temp_directory_path() / "ovt_psi_test_tstables.xml";
   // TSDuck 3.45 (the oracle image's pin) refuses --all-sections together with --xml-output ("filtering sections
   // ... is incompatible with XML or JSON output"); without it tstables writes each table version once, which holds
@@ -673,7 +675,7 @@ TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections
   // NOLINTNEXTLINE(cert-env33-c): test-only; the command is fixed and the path comes from the corpus cache
   FILE* pipe = popen(cmd.c_str(), "r");
   if (pipe == nullptr || pclose(pipe) != 0) {
-    SKIP("tstables is not available");
+    return false;
   }
   pugi::xml_document doc;
   REQUIRE(doc.load_file(xml.c_str()));
@@ -707,6 +709,41 @@ TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections
       CHECK(p.streams[i].pid == pmts[p.number].second[i].first);
       CHECK(p.streams[i].stream_type == pmts[p.number].second[i].second);
     }
+  }
+  return true;
+}
+
+}  // namespace
+
+TEST_CASE("oracle: programs, PIDs and stream types equal tstables --all-sections --xml",
+          "[container][mpegts][psi][needs-corpus][needs-oracle:tstables][fast]") {
+  if (!compare_with_tstables(ovt::test::corpus_or_skip("ts_h264_dvb"))) {
+    SKIP("tstables is not available");
+  }
+}
+
+// The remaining tsduck-test input streams of the corpus manifest (acceptance test 1 names "tsduck-test streams").
+TEST_CASE("oracle: every tsduck-test stream's programs, PIDs and stream types equal tstables",
+          "[container][mpegts][psi][needs-corpus][needs-oracle:tstables][slow]") {
+  size_t compared = 0;
+  for (const char* id : {"ts_test_025", "ts_test_026", "ts_test_052", "ts_test_064", "ts_test_072", "ts_test_097",
+                         "ts_test_100_1", "ts_test_125", "ts_test_137", "ts_test_139"}) {
+    const auto path = ovt::test::corpus_path(id);
+    if (!path) {
+      if (ovt::test::require_corpora()) {
+        FAIL("corpus file missing: " << id);
+      }
+      continue;
+    }
+    DYNAMIC_SECTION(id) {
+      if (!compare_with_tstables(*path)) {
+        SKIP("tstables is not available");
+      }
+      ++compared;
+    }
+  }
+  if (compared == 0) {
+    SKIP("no tsduck-test corpus file is available");
   }
 }
 
