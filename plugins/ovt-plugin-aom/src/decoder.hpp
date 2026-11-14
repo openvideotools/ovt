@@ -8,7 +8,6 @@
 #ifndef OVT_PLUGIN_AOM_DECODER_HPP
 #define OVT_PLUGIN_AOM_DECODER_HPP
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -18,6 +17,7 @@
 
 #include "block_data.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
+#include "planes.hpp"
 
 namespace ovt::aom {
 
@@ -26,16 +26,6 @@ struct Diag {
   uint8_t severity = 0;
   std::string code;
   std::string message;
-};
-
-/// One plane of the output image, copied out of libaom: rows of width × sample_bytes bytes, no padding,
-/// little-endian 16-bit samples when sample_bytes == 2.
-struct Plane {
-  std::vector<uint8_t> data;
-  uint32_t width = 0;
-  uint32_t height = 0;
-  uint8_t bit_depth = 8;
-  uint8_t sample_bytes = 1;
 };
 
 /// Everything the plugin reports for one frame that had tile data (shown or hidden). show_existing_frame
@@ -52,8 +42,9 @@ struct Frame {
   int32_t render_h = 0;
   uint8_t chroma_format = 1;  // 0 = 4:0:0, 1 = 4:2:0, 2 = 4:2:2, 3 = 4:4:4
   uint8_t bit_depth = 8;
-  std::array<Plane, 3> planes;  // Reconstruction of shown frames; empty for hidden frames and 4:0:0 chroma
-  BlockData blocks;             // libaom's MI grid and the frame-header values its mapping needs (WI-2.156)
+  bool apply_grain = false;  // film grain is signalled for this frame; Reconstruction is before grain synthesis
+  Picture recon;             // Reconstruction of a shown frame, in place in libaom's frame buffer; empty for hidden
+  BlockData blocks;          // libaom's MI grid and the frame-header values its mapping needs (WI-2.156)
   std::vector<Diag> diagnostics;
 };
 
