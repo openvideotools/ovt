@@ -59,5 +59,15 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
 
+# WI-1.404: offscreen interop export (§10.2.2). The shared-device test plays the Vulkan host on any desktop with a
+# Vulkan 1.2 device; the Metal test (Objective-C++) reads the exported MTLTexture on macOS.
+target_sources(ovt_tests_render PRIVATE test_interop_vulkan.cpp)
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(ovt_tests_render PRIVATE test_interop_metal.mm)
+  set_source_files_properties(test_interop_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_link_libraries(ovt_tests_render PRIVATE "-framework Metal" "-framework Foundation")
+endif()
+
 # WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
 target_sources(ovt_tests_render PRIVATE test_measure.cpp)
