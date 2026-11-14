@@ -76,6 +76,8 @@ class TimelineChart : public QQuickItem {
   Q_INVOKABLE [[nodiscard]] QString frameTooltip(int position) const;
   // The frame position (current order) under an x in item coordinates.
   Q_INVOKABLE [[nodiscard]] int positionAt(double x) const;
+  // The x (item coordinates) of the middle of a frame, or -1 when it is not in the visible range (bookmark markers).
+  Q_INVOKABLE [[nodiscard]] double xOfFrame(int decode_index) const;
   Q_INVOKABLE void fit();
   Q_INVOKABLE void zoomAbout(double notches, double x);
   Q_INVOKABLE void pan(double frames);

@@ -146,6 +146,31 @@ Item {
                 }
             }
 
+            // Bookmark markers (§11.3.17): a coloured notch at the top edge of the chart.
+            Repeater {
+                model: Bookmarks.markers
+
+                Rectangle {
+                    required property var modelData
+                    // Re-evaluated when the view scrolls or zooms (xOfFrame itself has no change signal).
+                    readonly property double markerX: {
+                        chart.viewFirst
+                        chart.viewCount
+                        chart.width
+                        return chart.xOfFrame(modelData.decodeIndex)
+                    }
+
+                    objectName: "bookmarkMarker"
+                    visible: markerX >= 0
+                    x: chart.x + markerX - width / 2
+                    y: chart.y
+                    width: 6
+                    height: 8
+                    color: modelData.color
+                    Accessible.name: "Bookmark " + modelData.name
+                }
+            }
+
             ToolTip {
                 id: hoverTip
 
