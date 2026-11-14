@@ -3,7 +3,7 @@
 //
 // Helpers of test_container_{annexb,obu,ivf,y4m}.cpp (WI-1.570): the `<id>.ovt-units.json` goldens of
 // tools/goldens/gen_units.py, a runner of that generator and a maker of small FFmpeg-encoded streams. Tests that need
-// an external tool skip when it is missing.
+// an external tool skip when it is missing. SPEC-ASSUMPTION(#437): the units golden format and its oracles.
 
 #ifndef OVT_TESTS_CONTAINER_UNITS_ORACLE_HPP
 #define OVT_TESTS_CONTAINER_UNITS_ORACLE_HPP
