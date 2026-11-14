@@ -1096,7 +1096,7 @@ TEST_CASE("h264_sps_unit_corpus_gop60", "[syntax][h264][fast][needs-corpus]") {
 }
 
 // Acceptance test 2: CAPAMA3_Sand_F uses FMO map type 6.
-TEST_CASE("h264_pps_corpus_capama3_fmo", "[syntax][h264][fast][needs-corpus]") {
+TEST_CASE("h264_pps_corpus_capama3_fmo", "[syntax][h264][slow][needs-corpus]") {
   const auto ps = first_parameter_sets("jvt_CAPAMA3_Sand_F");
   const auto sps = parse_nal(ps.sps);
   REQUIRE(sps.sps.has_value());
@@ -1112,7 +1112,7 @@ TEST_CASE("h264_pps_corpus_capama3_fmo", "[syntax][h264][fast][needs-corpus]") {
 
 // Acceptance test 3: HPCV_BRCM_A (High, 8x8 transform) has transform_8x8_mode_flag = 1 and reads 8 scaling lists
 // when pic_scaling_matrix_present_flag is set.
-TEST_CASE("h264_pps_corpus_hpcv_8x8", "[syntax][h264][fast][needs-corpus]") {
+TEST_CASE("h264_pps_corpus_hpcv_8x8", "[syntax][h264][slow][needs-corpus]") {
   const auto ps = first_parameter_sets("jvt_HPCV_BRCM_A");
   const auto sps = parse_nal(ps.sps);
   REQUIRE(sps.sps.has_value());
