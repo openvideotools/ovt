@@ -24,13 +24,16 @@ import json, os, sys
 db = json.load(open(os.environ["FAKE_DB"]))
 flag, path = sys.argv[1], sys.argv[2]
 e = db[path]
-if flag == "-L":
-    print(path + ":")
-    for d in e["deps"]:
-        print("\\t" + d + " (compatibility version 1.0.0, current version 1.0.0)")
-else:
-    for r in e["rpaths"]:
-        print("Load command 9\\n          cmd LC_RPATH\\n      cmdsize 32\\n         path " + r + " (offset 12)")
+# A universal file ("archs") prints one block per architecture, each with its own header, as the real otool does.
+archs = e.get("archs")
+for arch in archs or [None]:
+    print(path + (f" (architecture {arch}):" if arch else ":"))
+    if flag == "-L":
+        for d in e["deps"]:
+            print("\\t" + d + " (compatibility version 1.0.0, current version 1.0.0)")
+    else:
+        for r in e["rpaths"]:
+            print("Load command 9\\n          cmd LC_RPATH\\n      cmdsize 32\\n         path " + r + " (offset 12)")
 """
 
 FAKE_INT = """#!/usr/bin/env python3
@@ -215,6 +218,36 @@ def test_fix_removes_duplicate_rpaths(tmp_path, delete_all):
         "@loader_path/../../.."
     ]
     assert db[str(app / "Contents/MacOS/OVT Studio")]["rpaths"] == ["@loader_path/../Frameworks"]
+
+
+def test_universal_files_are_read_one_slice_at_a_time(tmp_path):
+    """Qt's frameworks are arm64 + x86_64: the second block header is no reference, and each slice's LC_RPATH counts
+    once (Mac Mini run of #428: 105 "forbidden reference" and 99 "duplicate LC_RPATH" findings before this)."""
+    e = clean_entries()
+    e["Frameworks/QtCore.framework/Versions/A/QtCore"] = {
+        "archs": ["x86_64", "arm64"],
+        "deps": ["@rpath/QtCore.framework/Versions/A/QtCore", "/usr/lib/libc++.1.dylib"],
+        "rpaths": ["@loader_path/../../.."],
+    }
+    e["PlugIns/platforms/libqcocoa.dylib"] = {
+        "archs": ["x86_64", "arm64"],
+        "deps": [
+            "/Users/qt/6.8.3/macos/plugins/platforms/libqcocoa.dylib",
+            "@rpath/QtCore.framework/Versions/A/QtCore",
+        ],
+        "rpaths": ["@loader_path/../../../../lib", "@loader_path/../../../../lib", "@loader_path/../../Frameworks"],
+    }
+    app, dbp = make_bundle(tmp_path, e)
+    r = run(tmp_path, dbp, app)
+    assert r.returncode == 1
+    assert "architecture" not in r.stderr
+    assert "QtCore" not in r.stderr  # clean apart from the plugin
+    r = run(tmp_path, dbp, app, "--fix")
+    assert r.returncode == 0, r.stderr
+    db = json.loads(dbp.read_text())
+    plugin = db[str(app / "Contents/PlugIns/platforms/libqcocoa.dylib")]
+    assert plugin["deps"][0] == "@rpath/libqcocoa.dylib"
+    assert plugin["rpaths"] == ["@loader_path/../../Frameworks"]
 
 
 def test_fix_cannot_invent_a_missing_library(tmp_path):

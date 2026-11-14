@@ -76,11 +76,28 @@ def run(cmd: list[str]) -> str:
     return r.stdout
 
 
+def first_slice(out: str, path: Path) -> list[str]:
+    """The lines `otool` prints for the first architecture of `path`, without the header line.
+
+    For a universal file (Qt's frameworks and plugins are arm64 + x86_64) otool prints one block per architecture,
+    each headed `<path> (architecture <arch>):`. install_name_tool edits every slice alike, so reading the first block
+    is enough; reading them all would count each LC_RPATH once per slice and take the second header for a reference.
+    """
+    lines = out.splitlines()
+    header = str(path)
+    blocks: list[list[str]] = []
+    for line in lines:
+        if line == f"{header}:" or line.startswith(f"{header} (architecture "):
+            blocks.append([])
+        elif blocks:
+            blocks[-1].append(line)
+    return blocks[0] if blocks else lines
+
+
 def list_deps(otool: str, path: Path) -> list[str]:
     """`otool -L`: the install name of a library first (when it has one), then the dependencies."""
-    out = run([otool, "-L", str(path)]).splitlines()
     deps = []
-    for line in out[1:]:  # line 0 is "<path>:"
+    for line in first_slice(run([otool, "-L", str(path)]), path):
         line = line.strip()
         if not line:
             continue
@@ -90,7 +107,7 @@ def list_deps(otool: str, path: Path) -> list[str]:
 
 
 def list_rpaths(otool: str, path: Path) -> list[str]:
-    out = run([otool, "-l", str(path)]).splitlines()
+    out = first_slice(run([otool, "-l", str(path)]), path)
     rpaths = []
     for i, line in enumerate(out):
         if line.strip() == "cmd LC_RPATH":
