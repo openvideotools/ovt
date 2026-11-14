@@ -87,8 +87,7 @@ internal class FilePicker(
         worker.shutdown()
     }
 
-    private fun firstUri(clip: ClipData): Uri? =
-        (0 until clip.itemCount).firstNotNullOfOrNull { clip.getItemAt(it).uri }
+    private fun firstUri(clip: ClipData): Uri? = (0 until clip.itemCount).firstNotNullOfOrNull { clip.getItemAt(it).uri }
 
     private fun open(
         uri: Uri,
