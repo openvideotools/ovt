@@ -15,6 +15,8 @@ target_sources(
           ivf.cpp
           mpegts/ts_packets.cpp
           obu.cpp
+          pix_fmt_grammar.cpp
+          rawyuv.cpp
           virtual_file/m3u8.cpp
           virtual_file/mpd.cpp
           y4m.cpp)
