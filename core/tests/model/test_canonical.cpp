@@ -290,3 +290,30 @@ TEST_CASE("test_canonical: shared offsets cannot expand past the work budget", "
   CHECK(ovt::model::canonicalize(few, SchemaId::Model, kRoot).size() > 8 * kExt);
   CHECK(ovt::model::structural_diff(few, few, SchemaId::Model, kRoot).empty());
 }
+
+namespace {
+
+/// A buffer whose root table has one scalar field, @p field (a vtable offset), set to @p value.
+template <class T>
+Bytes one_field(flatbuffers::voffset_t field, T value) {
+  flatbuffers::FlatBufferBuilder builder;
+  const auto start = builder.StartTable();
+  builder.AddElement<T>(field, value, T{});
+  builder.Finish(flatbuffers::Offset<flatbuffers::Table>(builder.EndTable(start)));
+  return {builder.GetBufferPointer(), builder.GetBufferPointer() + builder.GetSize()};
+}
+
+}  // namespace
+
+TEST_CASE("test_canonical: subnormal values print the same with every standard library", "[model][fast]") {
+  // libc++ sets failbit when it reads a subnormal back (ERANGE); the shortest form must not depend on it.
+  const auto media_rate = [](double value) { return one_field(flatbuffers::FieldIndexToOffset(2), value); };
+  const auto edit = [&](double value) {
+    return ovt::model::structural_diff(media_rate(1.0), media_rate(value), SchemaId::Container, "ovt.fb.EditSegment");
+  };
+  CHECK(edit(1e-310) == std::vector<std::string>{"media_rate: 1 != 1e-310"});
+  CHECK(edit(5e-324) == std::vector<std::string>{"media_rate: 1 != 5e-324"});
+  CHECK(ovt::model::structural_diff(one_field(fb::HdrReport::VT_THRESHOLD_NITS, 1.0F),
+                                    one_field(fb::HdrReport::VT_THRESHOLD_NITS, 1e-40F), SchemaId::Model,
+                                    "ovt.fb.HdrReport") == std::vector<std::string>{"threshold_nits: 1 != 1e-40"});
+}

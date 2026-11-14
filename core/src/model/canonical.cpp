@@ -148,6 +148,38 @@ bool is_scalar(BaseType type) {
   return type >= BaseType::UType && type <= BaseType::Double;
 }
 
+/// Calls @p visit with a zero of the C++ type of scalar @p type (bool and union types read as uint8_t).
+/// Returns false, without calling it, for a non-scalar type.
+template <class Visit>
+bool visit_scalar(BaseType type, Visit&& visit) {
+  switch (type) {
+    case BaseType::Bool:
+    case BaseType::UType:
+    case BaseType::UByte:
+      return visit(std::uint8_t{}), true;
+    case BaseType::Byte:
+      return visit(std::int8_t{}), true;
+    case BaseType::Short:
+      return visit(std::int16_t{}), true;
+    case BaseType::UShort:
+      return visit(std::uint16_t{}), true;
+    case BaseType::Int:
+      return visit(std::int32_t{}), true;
+    case BaseType::UInt:
+      return visit(std::uint32_t{}), true;
+    case BaseType::Long:
+      return visit(std::int64_t{}), true;
+    case BaseType::ULong:
+      return visit(std::uint64_t{}), true;
+    case BaseType::Float:
+      return visit(float{}), true;
+    case BaseType::Double:
+      return visit(double{}), true;
+    default:
+      return false;
+  }
+}
+
 /// Size class of a field in the Pack add order: scalars by width, offsets and structs 4.
 std::size_t add_size(const reflection::Field& field) {
   const BaseType type = type_of(field).base_type();
@@ -280,17 +312,10 @@ class SafeVerifier {
   const reflection::Schema& schema_;
   flatbuffers::Verifier verifier_;
 
-  bool scalar(const flatbuffers::Table& table, flatbuffers::voffset_t offset, std::size_t size) const {
-    switch (size) {
-      case 1:
-        return table.VerifyField<std::uint8_t>(verifier_, offset, 1);
-      case 2:
-        return table.VerifyField<std::uint16_t>(verifier_, offset, 2);
-      case 4:
-        return table.VerifyField<std::uint32_t>(verifier_, offset, 4);
-      default:
-        return table.VerifyField<std::uint64_t>(verifier_, offset, 8);
-    }
+  bool scalar(const flatbuffers::Table& table, flatbuffers::voffset_t offset, BaseType type) const {
+    bool ok = false;
+    visit_scalar(type, [&](auto zero) { ok = table.VerifyField<decltype(zero)>(verifier_, offset, sizeof(zero)); });
+    return ok;
   }
 
   bool vector(const flatbuffers::Table& table, const reflection::Field& field, const reflection::Type& type) {
@@ -324,7 +349,7 @@ class SafeVerifier {
     const auto& type = type_of(field);
     const auto offset = field.offset();
     if (is_scalar(type.base_type())) {
-      return scalar(table, offset, flatbuffers::GetTypeSize(type.base_type()));
+      return scalar(table, offset, type.base_type());
     }
     if (field.required() && !table.CheckField(offset)) {
       return false;
@@ -614,47 +639,14 @@ class Canonicalizer {
 
   void add_field(flatbuffers::FlatBufferBuilder& builder, const reflection::Field& field,
                  const flatbuffers::Table& table, flatbuffers::uoffset_t child) const {
-    switch (type_of(field).base_type()) {
-      case BaseType::Bool:
-      case BaseType::UType:
-      case BaseType::UByte:
-        add_scalar<std::uint8_t>(builder, field, table);
-        break;
-      case BaseType::Byte:
-        add_scalar<std::int8_t>(builder, field, table);
-        break;
-      case BaseType::Short:
-        add_scalar<std::int16_t>(builder, field, table);
-        break;
-      case BaseType::UShort:
-        add_scalar<std::uint16_t>(builder, field, table);
-        break;
-      case BaseType::Int:
-        add_scalar<std::int32_t>(builder, field, table);
-        break;
-      case BaseType::UInt:
-        add_scalar<std::uint32_t>(builder, field, table);
-        break;
-      case BaseType::Long:
-        add_scalar<std::int64_t>(builder, field, table);
-        break;
-      case BaseType::ULong:
-        add_scalar<std::uint64_t>(builder, field, table);
-        break;
-      case BaseType::Float:
-        add_scalar<float>(builder, field, table);
-        break;
-      case BaseType::Double:
-        add_scalar<double>(builder, field, table);
-        break;
-      default:
-        if (const auto& type = type_of(field);
-            type.base_type() == BaseType::Obj && object_at(schema_, type.index()).is_struct()) {
-          add_struct(builder, object_at(schema_, type.index()), field, table);
-        } else if (child != 0) {  // string, vector, sub-table: created in pass 1
-          builder.AddOffset(field.offset(), flatbuffers::Offset<void>(child));
-        }
-        break;
+    const auto& type = type_of(field);
+    if (visit_scalar(type.base_type(), [&](auto zero) { add_scalar<decltype(zero)>(builder, field, table); })) {
+      return;
+    }
+    if (type.base_type() == BaseType::Obj && object_at(schema_, type.index()).is_struct()) {
+      add_struct(builder, object_at(schema_, type.index()), field, table);
+    } else if (child != 0) {  // string, vector, sub-table: created in pass 1
+      builder.AddOffset(field.offset(), flatbuffers::Offset<void>(child));
     }
   }
 };
@@ -697,7 +689,9 @@ std::string format_number(T value) {
       out << std::setprecision(digits) << value;
       std::istringstream in(out.str());
       in.imbue(std::locale::classic());
-      if (T back{}; in >> back && back == value) {
+      T back{};
+      in >> back;  // libc++ sets failbit for a subnormal (ERANGE) but stores it: compare the value only
+      if (back == value) {
         break;
       }
     }
@@ -732,48 +726,22 @@ bool is_unsigned_type(BaseType type) {
 
 /// Reads one little-endian scalar of @p type from the start of @p bytes.
 Scalar read_scalar(BaseType type, ByteView bytes) {
-  const std::uint8_t* p = bytes.data();
   Scalar s;
   s.is_unsigned = is_unsigned_type(type);
-  switch (type) {
-    case BaseType::Bool:
-    case BaseType::UType:
-    case BaseType::UByte:
-      s.u = flatbuffers::ReadScalar<std::uint8_t>(p);
-      break;
-    case BaseType::Byte:
-      // NOLINTNEXTLINE(bugprone-signed-char-misuse,cert-str34-c): a signed 8-bit field, sign extension intended
-      s.i = flatbuffers::ReadScalar<std::int8_t>(p);
-      break;
-    case BaseType::Short:
-      s.i = flatbuffers::ReadScalar<std::int16_t>(p);
-      break;
-    case BaseType::UShort:
-      s.u = flatbuffers::ReadScalar<std::uint16_t>(p);
-      break;
-    case BaseType::Int:
-      s.i = flatbuffers::ReadScalar<std::int32_t>(p);
-      break;
-    case BaseType::UInt:
-      s.u = flatbuffers::ReadScalar<std::uint32_t>(p);
-      break;
-    case BaseType::Long:
-      s.i = flatbuffers::ReadScalar<std::int64_t>(p);
-      break;
-    case BaseType::ULong:
-      s.u = flatbuffers::ReadScalar<std::uint64_t>(p);
-      break;
-    case BaseType::Float:
-      s.is_real = true;
-      s.d = static_cast<double>(flatbuffers::ReadScalar<float>(p));
-      break;
-    case BaseType::Double:
-      s.is_real = true;
-      s.d = flatbuffers::ReadScalar<double>(p);
-      break;
-    default:
-      break;
-  }
+  visit_scalar(type, [&](auto zero) {
+    using T = decltype(zero);
+    const T value = flatbuffers::ReadScalar<T>(bytes.data());
+    s.is_real = std::is_floating_point_v<T>;
+    if constexpr (std::is_same_v<T, float>) {
+      s.d = static_cast<double>(value);
+    } else if constexpr (std::is_same_v<T, double>) {
+      s.d = value;
+    } else if constexpr (std::is_unsigned_v<T>) {
+      s.u = value;
+    } else {
+      s.i = value;  // NOLINT(bugprone-signed-char-misuse,cert-str34-c): signed 8-bit fields sign-extend
+    }
+  });
   return s;
 }
 
