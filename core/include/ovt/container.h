@@ -41,7 +41,9 @@ OVT_API ovt_status ovt_container_open(ovt_File* file, ovt_Container** out);
 
 /**
  * Opens @p file as @p format ("isobmff", "ivf", "annexb", "obu", "y4m", "raw"; phase 4: "ts", "mkv") without
- * sniffing. @p raw_format ("WxH:pix_fmt[:num/den]") is required for "raw" and ignored otherwise; @p codec_hint
+ * sniffing. @p raw_format ("WxH:pix_fmt[:num/den]") is the explicit format of "raw" and ignored otherwise; NULL for
+ * "raw" runs the sidecar and the filename/size heuristics (chapter 08 §8.6.6) and fails with OVT_E_INVALID_ARG unless
+ * exactly one format remains; @p codec_hint
  * ("h264", "h265", "av1") may be NULL. Strings are borrowed for the call.
  */
 OVT_API ovt_status ovt_container_open_format(ovt_File* file, const char* format, const char* raw_format,
