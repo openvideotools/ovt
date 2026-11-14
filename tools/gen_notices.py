@@ -82,22 +82,52 @@ ALIASES = {
     "onnx_runtime_linux_aarch64": "onnxruntime",
     "onnx_runtime_osx_arm64": "onnxruntime",
     "onnx_runtime_osx_x86_64": "onnxruntime",
+    # Imported targets of the third_party/<dep>.cmake scripts, whose ExternalProject (and staging directory) is named
+    # after the VERSIONS.md row.
+    "aom": "libaom",
+    "aom_inspection": "libaom",
+    "de265": "libde265",
+    "placebo": "libplacebo",
+    "vmaf": "libvmaf",
+    "hm_common": "hm",
+    "hm_utilities": "hm",
+    # The libraries third_party/libplacebo.cmake finds by path in the vcpkg tree -> their ports.
+    "glslang_default_resource_limits": "glslang",
+    "genericcodegen": "glslang",
+    "machineindependent": "glslang",
+    "osdependent": "glslang",
+    "spirv": "glslang",
+    "spirv_tools_opt": "spirv_tools",
+    "lcms2": "lcms",
+    # System zlib, linked by the FFmpeg flavours; its text is kept in third_party/system-licenses/zlib/.
+    "z": "zlib",
+    "catch2withmain": "catch2",
+    "nlohmann_json_schema_validator": "json_schema_validator",
 }
 
 
 def key_of(name: str) -> str:
     """The <dep> id of a component (`versions_to_cmake.dep_id`), also the staging directory name.
 
-    Rows of third_party/VERSIONS.md give `ONNX Runtime` -> `onnx_runtime`. Names from license_manifest.json are CMake
+    Rows of third_party/VERSIONS.md give `ONNX Runtime` -> `onnx_runtime`. Imported targets map to their row's id
+    (`tp::aom` -> `libaom`, `Qt6::Core` -> `qt`, `tp::ffmpeg_core_avcodec` -> `ffmpeg`). Names from license_manifest.json are CMake
     targets or libraries: `fmt::fmt` -> `fmt`, `PkgConfig::_ovt_pc_xxHash` and `/usr/lib/libxxhash.so` -> `xxhash`,
     `zstd::libzstd_static` -> `zstd`, so one component reached by several spellings is one key.
     """
     n = name
+    # Qt's targets (Qt6::Core, versionless Qt::Gui, Qt's Wrap* helpers) are one component, the `Qt` row.
+    if re.match(r"(Qt6?|Wrap[A-Za-z0-9]*)::", n):
+        return "qt"
+    # tp::ffmpeg_core, tp::ffmpeg_plugin_avcodec, ...: the two flavours of the `FFmpeg` row (third_party/ffmpeg.cmake).
+    if re.match(r"tp::ffmpeg_(core|plugin)(_\w+)?$", n):
+        return "ffmpeg"
     if n.startswith("/"):  # a library file
         n = re.sub(r"\.(so|a|dylib|lib)(\.[\d.]+)?$", "", n.rsplit("/", 1)[1])
         n = re.sub(r"^lib", "", n)
     elif "::" in n:
-        n = n.rsplit("::", 1)[1]
+        ns, n = n.rsplit("::", 1)
+        if n in ("static", "shared", "validator"):  # pugixml::static, nlohmann_json_schema_validator::validator
+            n = ns
         n = re.sub(r"^_ovt_pc_", "", n)
         n = re.sub(r"^lib(?=\w+_(static|shared)$)", "", n)
         n = re.sub(r"_(static|shared)$", "", n)

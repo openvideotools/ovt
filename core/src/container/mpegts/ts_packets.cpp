@@ -243,10 +243,19 @@ class Walker {
         break;
       }
     }
+    uint64_t scrambled_elsewhere = 0;
     for (const PidStats& st : stats_) {
       if (st.packets > 0) {
         f_.pids.push_back(st);
       }
+      if (st.pid != kPatPid && st.pid != kCatPid) {
+        scrambled_elsewhere += st.scrambled_packets;
+      }
+    }
+    psi_.finish([this](uint16_t pid) { return stats_[pid].packets; }, scrambled_elsewhere);
+    f_.psi = std::move(psi_.tables());
+    for (const PsiDiagnostic& d : f_.psi.diagnostics) {  // the PSI diagnostics join the file list (same cap)
+      add_diag(f_, d.code, d.message, d.offset);
     }
   }
 
@@ -258,6 +267,7 @@ class Walker {
   uint64_t size_;
   std::vector<PidStats> stats_;
   std::vector<CcState> cc_;
+  PsiParser psi_;
   uint64_t pos_;        // file offset of the next sync byte slot
   uint64_t last_good_;  // sync offset of the last packet taken
   bool in_run_ = false;
@@ -289,6 +299,11 @@ class Walker {
     }
     ++f_.runs.back().count;
     account(*h);
+    if (psi_.wants(h->pid) && h->has_payload() && !h->transport_error_indicator) {
+      psi_.feed(h->pid, h->payload_unit_start_indicator, h->transport_scrambling_control != 0,
+                std::span<const uint8_t>(buf).subspan(h->payload_offset, h->payload_size), f_.packet_count,
+                pos_ + h->payload_offset);
+    }
     ++f_.packet_count;
     last_good_ = pos_;
     pos_ += stride_;
@@ -338,6 +353,7 @@ class Walker {
                pos_);
       c.last = h.continuity_counter;
       c.dup_used = false;
+      psi_.discontinuity(h.pid);  // a section that was being collected is incomplete
     }
   }
 
@@ -623,7 +639,7 @@ class MpegtsReader final : public Reader {
                                               0));
     }
     const fb::ByteSpan root_span(0, f_.file_size);
-    const auto root =
+    const auto packets_root =
         fb::CreateBoxNode(fbb, fbb.CreateString("MPTS"), 0, &root_span, 0, -1, -1, fbb.CreateVector(fields), nullptr,
                           fbb.CreateVector(packets), fbb.CreateString("ISO/IEC 13818-1 §2.4.3"),
                           fbb.CreateString("MPEG transport stream"), fbb.CreateVector(root_diags));
@@ -633,7 +649,12 @@ class MpegtsReader final : public Reader {
     for (const Diagnostic& d : f_.diagnostics) {
       tree_diags.push_back(treefb::diagnostic(fbb, d.code, d.message, d.offset));
     }
-    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(&root, 1), 0,
+    // A second root `PSIT` carries the PSI/SI sections once any was found (WI-4.205).
+    std::vector<flatbuffers::Offset<fb::BoxNode>> roots = {packets_root};
+    if (f_.psi.section_count > 0) {
+      roots.push_back(build_psi_node(fbb, f_.psi, f_.file_size));
+    }
+    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(roots), 0,
                                        fbb.CreateVector(tree_diags)));
     const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
     return {bytes.begin(), bytes.end()};

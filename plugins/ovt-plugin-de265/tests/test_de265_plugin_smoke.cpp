@@ -363,8 +363,8 @@ TEST_CASE("de265 plugin: caps and ABI table", "[fast][third_party]") {
   CHECK(caps->codec == 2);  // ovt.fb.Codec.H265
   CHECK(std::string_view(caps->id) == "de265");
   CHECK(std::string_view(caps->license) == "LGPL-3.0-or-later");
-  CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == 0U);  // WI-2.164 announces the grid vectors it fills
+  CHECK(caps->plane_stages == 0x5FU);  // Reconstruction + the patch-0003 stages (WI-2.166, test_de265_planes.cpp)
+  CHECK(caps->grid_fields == 0U);      // WI-2.164 announces the grid vectors it fills
   CHECK(caps->bit_exact == 1);
   CHECK(caps->supports_threads == 1);
 }

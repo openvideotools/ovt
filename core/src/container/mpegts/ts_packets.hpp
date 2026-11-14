@@ -3,7 +3,7 @@
 //
 // The MPEG-TS packet layer (chapter 08 §8.6.7, WI-4.204): packet size detection (188 / 192 / 204), sync and resync,
 // header and adaptation-field decoding (ISO/IEC 13818-1 §2.4.3), per-PID statistics and the lazy packet tree.
-// PSI, PES and the timing table are the work items that follow (WI-4.205 to WI-4.207).
+// PSI/SI tables are decoded by psi.hpp (WI-4.205); PES and the timing table follow (WI-4.206, WI-4.207).
 //
 // SPEC-ASSUMPTION(#337): resync rule, node names, continuity-counter rule and the M2TS prefix are not fixed by
 // §8.6.7; the proposed answers are in the issue and in the comments below.
@@ -21,6 +21,7 @@
 
 #include "container/container.hpp"
 #include "container/diagnostics.h"
+#include "container/mpegts/psi.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 
 namespace ovt::container::mpegts {
@@ -121,6 +122,7 @@ struct File {
   std::vector<Run> runs;
   std::vector<PidStats> pids;  // PIDs with at least one packet, ascending
   std::vector<Diagnostic> diagnostics;
+  PsiTables psi;  // programs, descriptors and the distinct PSI/SI sections (WI-4.205)
 
   // File offset of the first byte of packet `index` (the prefix of an M2TS packet included), index < packet_count.
   [[nodiscard]] uint64_t packet_offset(uint64_t index) const noexcept;
