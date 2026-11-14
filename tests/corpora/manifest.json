@@ -390,8 +390,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/professional_profiles/ALPHACONFORMANCEG.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/alphaconformanceG.zip",
       "codecs": [
         "h264"
       ],
@@ -409,7 +408,13 @@
       "tags": [
         "fast",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "a0a853f1b280b5d86e9d9f0834dec150488faad31ab26fe59a7ca1fa74ca71cd",
+      "size_bytes": 29204499,
+      "extract": {
+        "archive": "zip",
+        "member": "alphaconformanceG/alphaconformanceG.264"
+      }
     },
     {
       "id": "jvt_sp1_bt_a",
@@ -1205,8 +1210,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/MVC/MVCNV-1.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/MVC/MVCNV1.264",
       "codecs": [
         "h264"
       ],
@@ -1224,7 +1228,9 @@
         "slow",
         "h264-slice-golden",
         "mvc"
-      ]
+      ],
+      "sha256": "91589955e0b4f7b3ac254ee62ea0262e2c791b1c376162593f7c0c782df4e1cc",
+      "size_bytes": 3187769
     },
     {
       "id": "jvt_SVCBST_1",
@@ -2236,8 +2242,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/GENERAL_444_8bit_RExt_Sony_2.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/GENERAL_8b_444_RExt_Sony_2.zip",
       "codecs": [
         "h265"
       ],
@@ -2256,7 +2261,13 @@
       "tags": [
         "fast",
         "rext"
-      ]
+      ],
+      "sha256": "dd810f2b7e47e2dd4f516599b2a366084ad47f1af01fe2763caa9ab9ca1233c0",
+      "size_bytes": 260079,
+      "extract": {
+        "archive": "zip",
+        "member": "GENERAL_8b_444_RExt_Sony_2/GENERAL_8b_444_RExt_Sony_2.bit"
+      }
     },
     {
       "id": "jctvc_WPP_A_ericsson_MAIN_2",
