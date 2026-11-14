@@ -49,10 +49,19 @@ X(CNT_OBU_0004, "CNT-OBU-0004", Error,
 X(CNT_TS_1001, "CNT-TS-1001", Error,
   "TS_sync_loss: `N` consecutive packets without `0x47` at offset `o`", "TR 101 290 §5.2.1 (1.1)")
 X(CNT_TS_1002, "CNT-TS-1002", Error, "Sync_byte_error at packet `k`", "TR 101 290 §5.2.1 (1.2)")
+// WI-4.205 (PSI/SI, §8.6.7).
+X(CNT_TS_1003, "CNT-TS-1003", Error, "PAT_error_2: PID 0 absent for > 0.5 s / `table_id ≠ 0x00` / scrambled",
+  "TR 101 290 §5.2.1 (1.3)")
+X(CNT_TS_1005, "CNT-TS-1005", Error, "PMT_error_2: PMT PID absent for > 0.5 s / scrambled", "TR 101 290 §5.2.1 (1.5)")
 X(CNT_TS_1006, "CNT-TS-1006", Warning,
   "Continuity_count_error on PID `pid` at packet `k` (`expected`/`got`)", "TR 101 290 §5.2.1 (1.4)")
+X(CNT_TS_1007, "CNT-TS-1007", Warning, "PID_error: PID `pid` referenced by PMT but no packets for `T` s",
+  "TR 101 290 §5.2.1 (1.6)")
 X(CNT_TS_2001, "CNT-TS-2001", Warning,
   "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
+X(CNT_TS_2002, "CNT-TS-2002", Error, "CRC_error in `table` section on PID `pid`", "TR 101 290 §5.2.2 (2.2)")
+X(CNT_TS_2007, "CNT-TS-2007", Warning, "CAT_error: scrambled packets present but no CAT (PID 1)",
+  "TR 101 290 §5.2.2 (2.6)")
 
 // WI-1.201 (ISOBMFF box header walk, §8.2.3).
 X(CNT_0101, "CNT-0101", Warning, "trailing bytes in a container that cannot hold a box header", "14496-12 §4.2")

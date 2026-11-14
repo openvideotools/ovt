@@ -79,6 +79,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     require(!tree.empty());
     const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(tree.data());
     require(t->root()->size() == 1 && t->root()->Get(0)->children()->size() == a->packet_count);
+    require(a->psi.sections.size() <= ts::kMaxSections && a->psi.programs.size() <= 1024);
+    require(a->psi.section_count == b->psi.section_count && a->psi.crc_errors == b->psi.crc_errors);
     require(reader->expand(a->packet_offset(0)) == OVT_OK);
   } catch (...) {
     std::abort();
