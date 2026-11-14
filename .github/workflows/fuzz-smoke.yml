@@ -8,7 +8,20 @@
 name: fuzz-smoke
 
 on:
+  # Pull requests that touch only files the linux-x64-fuzz preset never builds or reads (it sets OVT_BUILD_GUI,
+  # OVT_BUILD_CLI and OVT_BUILD_RENDER off) skip the run, to save hosted runners. Every push to main runs it.
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "*.md" # top level only: third_party/VERSIONS.md pins the fuzz build
+      - "android/**"
+      - "app/**"
+      - "cli/**"
+      - "render/**"
+      - "python/**"
+      - "tests/golden/**"
+      - "tests/oracles/**"
+      - "tools/goldens/**"
   push:
     branches: [main]
 

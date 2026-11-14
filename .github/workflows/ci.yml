@@ -28,6 +28,43 @@ permissions:
   contents: read
 
 jobs:
+  # Decides whether android-build runs on a pull request: it is skipped when every changed file is documentation,
+  # golden or oracle data, or a workflow other than this one, to save hosted runners. Pushes and manual runs always
+  # build Android. The checkout is the PR's merge commit, whose first parent is the base.
+  changes:
+    if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    outputs:
+      android: ${{ steps.diff.outputs.android }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 2
+          filter: blob:none
+          sparse-checkout: .github
+
+      - name: Changed files
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "android=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --no-renames --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          cat "$RUNNER_TEMP/changed.txt"
+          # A file outside the list below (or an empty diff) means Android must build.
+          if [ -s "$RUNNER_TEMP/changed.txt" ] && ! grep -qvE \
+              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image)\.yml$' \
+              "$RUNNER_TEMP/changed.txt"; then
+            echo "android=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "android=true" >> "$GITHUB_OUTPUT"
+          fi
+
   lint:
     # SELF_HOSTED_OK: never run a fork's code on the Mini.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -322,7 +359,12 @@ jobs:
   asan-ubsan:
     # chapter 13 §13.7.1 (WI-0.031): Clang 16 and the Linux sanitizer runtimes, so Linux-only; skipped when the
     # owner has switched hosted runners off. asan-ubsan-macos below covers the gap on the Mini meanwhile.
-    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    # On a pull request it waits for build-linux-x64 and runs only when that passed, so a broken build does not hold
+    # a second hosted runner; on main and manual runs it runs whatever build-linux-x64's result.
+    needs: build-linux-x64
+    if: >-
+      !cancelled() && vars.OVT_HOSTED_RUNNERS != 'off' &&
+      (github.event_name != 'pull_request' || needs.build-linux-x64.result == 'success')
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -408,7 +450,8 @@ jobs:
   # android/app/build.gradle.kts (WI-0.050). GitHub's ubuntu-22.04 image carries the Android SDK, JDK 17, CMake and
   # ninja; tools/bootstrap_android.sh adds the pinned SDK packages and writes android/local.properties.
   android-build:
-    if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
+    needs: changes # skipped on pull requests that change no file Android builds from (the changes job)
+    if: vars.OVT_HOSTED_RUNNERS != 'off' && needs.changes.outputs.android == 'true' # the owner's switch; see the header
     runs-on: ubuntu-22.04
     timeout-minutes: 150 # cold caches: vcpkg and third_party for two ABIs plus the Qt kits
     env:
