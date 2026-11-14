@@ -5823,116 +5823,6 @@
       "sha256": "fca8b392ce3edd1303469ed10e2613deb2a89de44128755a0b900133829e8318"
     },
     {
-      "id": "aom_av1_1_b8_16_intra_only",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "ivf"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_00",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_01",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_02",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_03",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
       "id": "mpegff_female_amr67DTX_hinted",
       "source": "mpegff",
       "licence": "BSD-3-Clause-Clear repository; MPEG conformance media, not redistributable outside the repo",
@@ -17831,13 +17721,14 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "slow",
+        "needs-corpus"
       ],
       "features": [
         "hlg"
       ],
       "manual_download": true,
-      "note": "BBC R&D HLG test clip (BT.2020, transfer 18); no stable direct URL known"
+      "note": "BBC R&D HLG test clip (BT.2020, transfer 18); no stable direct URL known; nightly-only, skipped when absent (#517)"
     },
     {
       "id": "hdr_dovi_p5",
@@ -17906,81 +17797,6 @@
       ],
       "manual_download": true,
       "note": "4kmedia.org Sony Camp HDR10 clip; trim to 10 s"
-    },
-    {
-      "id": "bento4_cenc_subsample",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "cenc",
-        "subsample"
-      ],
-      "note": "no such file in Bento4 Test/Data (#160)"
-    },
-    {
-      "id": "bento4_playready",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "playready"
-      ],
-      "note": "no such file in Bento4 Test/Data (#160)"
-    },
-    {
-      "id": "bento4_frag_cenc",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "cenc",
-        "fragmented"
-      ],
-      "note": "Test/Data/frag-cenc.mp4 does not exist upstream (the earlier URL returns 404); see #160"
-    },
-    {
-      "id": "gpac_eac3_atmos",
-      "source": "gpac",
-      "licence": "GPAC test suite media; per-file notices in media/README",
-      "licence_spdx": "LicenseRef-GPAC-Testsuite-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "slow"
-      ],
-      "features": [
-        "eac3",
-        "joc"
-      ],
-      "note": "no E-AC-3 JOC file in gpac/testsuite media (#160)"
     },
     {
       "id": "misc_pixel_motion_photo",

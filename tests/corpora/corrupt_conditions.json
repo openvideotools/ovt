@@ -34,6 +34,7 @@
     {"code": "SYN-CONF-0001", "input": "syn_h264_multislice_cavlc", "input_file": "syn_h264_multislice_cavlc.264", "edit": ["--set-bits", "sps", "--bit", "24", "--width", "8", "--value", "10"], "why": "level_idc = 10 (Level 1, MaxFS 99) on a 1280x720 stream"}
   ],
   "not_in_table": {
+    "SYN-AV1-0103": "Info on a stream with enable_order_hint = 0, not a corruption; covered by the WI-1.119 unit tests",
     "SYN-H265-0011": "needs a PPS NAL removed from the stream, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-H265-0061": "needs the independent slice segment removed before a dependent one, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-GEN-0103": "a cancelled or partial index is a run-time condition, not a property of the file",
@@ -53,6 +54,7 @@
     "SYN-AV1-0012": "needs an intra_only frame header rewrite; not in this table yet",
     "SYN-AV1-0013": "needs a show_existing_frame of a slot that the edit empties; not in this table yet",
     "SYN-AV1-0014": "libaom does not use frame_refs_short_signaling",
+    "SYN-AV1-0015": "frame size above the sequence maximum, found_ref into an empty slot or more than 64 tile columns need a hand-assembled frame header; covered by the WI-1.117 unit tests",
     "SYN-AV1-0020": "needs the tile size fields, which follow a fully parsed frame header; not in this table yet",
     "SYN-AV1-0031": "libaom writes OBU_FRAME units, so there is no separate tile group to orphan",
     "SYN-HRD-0001": "true of every recipe stream encoded without HRD; not an edit",
