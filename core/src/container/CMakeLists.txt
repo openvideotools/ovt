@@ -16,7 +16,10 @@ target_sources(
           mpegts/descriptors.cpp
           mpegts/psi.cpp
           mpegts/ts_packets.cpp
+          mxf_placeholder.cpp
           obu.cpp
+          pix_fmt_grammar.cpp
+          rawyuv.cpp
           virtual_file/mpd.cpp
           y4m.cpp)
 # ovt_schemas orders the build after flatc and puts ovt_container_generated.h on the include path.

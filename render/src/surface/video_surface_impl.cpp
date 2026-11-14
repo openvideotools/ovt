@@ -6,7 +6,7 @@
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
 // dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
-// and export arrive with their own work items; until then those entry points are inert.
+// (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are inert.
 
 #include <algorithm>
 #include <cstdint>
@@ -24,9 +24,11 @@
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/overlay_set_impl.h"
+#include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "pipeline/render_params.h"
 #include "vk_no_timestamps.h"
 
 namespace ovt::render {
@@ -58,30 +60,6 @@ const char* offscreen_format_name(DisplayTarget::OffscreenFormat f) {
       return "rgb10a2";
   }
   return "rgba8";
-}
-
-// §10.3.2 target colour per offscreen format (Rgba8Srgb -> Srgb8 row, Rgba16F -> ScRgbLinear16F row,
-// Rgb10A2 -> Pq10 row).
-struct pl_color_space target_color(const DisplayTarget& t) {
-  struct pl_color_space c = pl_color_space_unknown;
-  switch (t.offscreen_format) {
-    case DisplayTarget::OffscreenFormat::Rgba8Srgb:
-      c.primaries = PL_COLOR_PRIM_BT_709;
-      c.transfer = PL_COLOR_TRC_SRGB;
-      c.hdr.max_luma = PL_COLOR_SDR_WHITE;
-      break;
-    case DisplayTarget::OffscreenFormat::Rgba16F:
-      c.primaries = PL_COLOR_PRIM_BT_709;
-      c.transfer = PL_COLOR_TRC_LINEAR;
-      c.hdr.max_luma = t.headroom * t.sdr_white_nits;
-      break;
-    case DisplayTarget::OffscreenFormat::Rgb10A2:
-      c.primaries = PL_COLOR_PRIM_BT_2020;
-      c.transfer = PL_COLOR_TRC_PQ;
-      c.hdr.max_luma = 1000.0F;  // display max from DisplayCaps when known (WI-1.403/1.407)
-      break;
-  }
-  return c;
 }
 
 class VideoSurfaceImpl final : public VideoSurface {
@@ -138,6 +116,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+
+    // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
+    static_cast<void>(measurer_.init(log_, vk_->gpu));
 
     target_ = target;
     return create_texture(target.width, target.height);
@@ -209,6 +190,11 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (slot_a_.valid) {
       draw_slot_a(view);
     }
+    // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
+    // being called.
+    if (measurer_.due()) {
+      measurer_.run(slot_a_);
+    }
     pl_gpu_flush(vk_->gpu);
   }
 
@@ -227,14 +213,19 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
-  Measurements measure() override { return Measurements{}; }                         // §10.7.9
+  Measurements measure() override {                                                  // §10.7.9: never blocks
+    measurer_.request();
+    return measurer_.poll();
+  }
 
   bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
     error_ = "export_png is not implemented yet (chapter 10 §10.8)";
     return false;
   }
 
-  [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override { return target_.encoding; }
+  [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override {
+    return detail::target_encoding(target_);
+  }
   [[nodiscard]] const char* last_error() const override { return error_.c_str(); }
 
   bool chroma_shift(float& sx, float& sy) const {
@@ -285,40 +276,11 @@ class VideoSurfaceImpl final : public VideoSurface {
     for (int c = 0; c < 4; ++c) {
       target.planes[0].component_mapping[c] = c;
     }
-    target.repr = pl_color_repr_rgb;
-    target.color = target_color(target_);
-    // §10.2.3 viewport mapping: device = (image - pan) * zoom + viewport / 2.
-    const double zoom = view.zoom > 0.0 ? view.zoom : 1.0;
-    const double half_w = target_.width / 2.0;
-    const double half_h = target_.height / 2.0;
-    target.crop.x0 = static_cast<float>(((static_cast<double>(image.crop.x0) - view.pan_x) * zoom) + half_w);
-    target.crop.y0 = static_cast<float>(((static_cast<double>(image.crop.y0) - view.pan_y) * zoom) + half_h);
-    target.crop.x1 = static_cast<float>(((static_cast<double>(image.crop.x1) - view.pan_x) * zoom) + half_w);
-    target.crop.y1 = static_cast<float>(((static_cast<double>(image.crop.y1) - view.pan_y) * zoom) + half_h);
-
-    struct pl_render_params params = {};
-    params.upscaler = zoom >= 1.0 ? &pl_filter_nearest : nullptr;
-    switch (view.downscale) {
-      case Downscale::Box:
-        params.downscaler = &pl_filter_box;
-        break;
-      case Downscale::Lanczos:
-        params.downscaler = &pl_filter_lanczos;
-        break;
-      case Downscale::Bilinear:
-        params.downscaler = &pl_filter_bilinear;
-        break;
-    }
-    params.plane_upscaler = view.chroma_upscale == ChromaUpscale::Nearest ? &pl_filter_nearest : &pl_filter_bilinear;
-    params.skip_anti_aliasing = zoom >= 1.0;
-    params.antiringing_strength = 0.0F;
-    // The target was cleared to background_rgba above; keep libplacebo from clearing the border again.
-#if PL_API_VER >= 346
-    params.border = PL_CLEAR_SKIP;
-#else
-    params.skip_target_clearing = true;
-#endif
-    if (!pl_render_image(renderer_, &image, &target, &params)) {
+    const DisplayTarget::OutputEncoding encoding = detail::target_encoding(target_);
+    target.color = detail::target_color(target_, encoding);
+    target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
+    params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
+    if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
@@ -447,6 +409,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    measurer_.destroy();
     if (vk_ != nullptr) {
       detail::destroy_slot(vk_->gpu, slot_a_);
       pl_tex_destroy(vk_->gpu, &tex_);
@@ -466,9 +429,11 @@ class VideoSurfaceImpl final : public VideoSurface {
   pl_tex tex_ = nullptr;
   pl_renderer renderer_ = nullptr;
   detail::FrameSlot slot_a_;
+  detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
+  detail::Measurer measurer_;  // §10.7 (WI-4.452)
 };
 
 }  // namespace

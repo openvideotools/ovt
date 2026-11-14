@@ -209,6 +209,7 @@ std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot, H273
   slot.coded_width = pic.coded_width;
   slot.coded_height = pic.coded_height;
   slot.crop = pic.crop;
+  slot.id = pic.id;
   slot.generation = pic.generation;
   slot.valid = true;
   return "";

@@ -124,6 +124,16 @@ if(_ovt_aom_patch_files)
   externalproject_add_stepdependencies(tp_libaom download ${_ovt_aom_patch_files})
 endif()
 
+# NASM 3.x drops "-Ox" from `nasm -hf`, which libaom's test_nasm() requires (third_party/libaom/
+# nasm3_check.cmake). The step re-runs whenever the source tree is re-extracted.
+externalproject_add_step(
+  tp_libaom nasm3_check
+  COMMAND ${CMAKE_COMMAND} -DSRC=<SOURCE_DIR> -P ${CMAKE_CURRENT_LIST_DIR}/libaom/nasm3_check.cmake
+  DEPENDEES patch
+  DEPENDERS configure
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/libaom/nasm3_check.cmake
+  COMMENT "Letting libaom's test_nasm() accept NASM 3.x")
+
 if(OVT_BUILD_AOM_INSPECT)
   # libaom installs aomdec with its examples but not inspect, which it builds in the top of its binary tree.
   set(_ovt_aom_inspect "inspect${CMAKE_EXECUTABLE_SUFFIX}")
