@@ -8,7 +8,7 @@
 # LGPL-3.0-or-later (chapter 15 §15.2); HEVC is patent-encumbered, so tools/license_policy.toml keeps the plugin out
 # of the default downloads.
 
-add_library(ovt_plugin_de265 MODULE src/plugin.cpp src/decoder.cpp)
+add_library(ovt_plugin_de265 MODULE src/plugin.cpp src/decoder.cpp src/planes.cpp)
 target_include_directories(ovt_plugin_de265 PRIVATE "${PROJECT_SOURCE_DIR}/core/include")
 target_link_libraries(ovt_plugin_de265 PRIVATE tp::de265 ovt_schemas ovt::flags)
 if(NOT OVT_SYSTEM_DE265)
