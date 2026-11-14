@@ -95,7 +95,7 @@ if [ -n "$cli" ]; then
   printf '%s\n' "$ver" | grep -q '^EXIT=0$' || fail "ovt --version did not exit 0"
   help="$(run_ovt --help)"
   if printf '%s\n' "$help" | grep -Eq '^[[:space:]]+info([[:space:]]|$)'; then
-    [ -n "$sample" ] && [ -f "$sample" ] || fail "ovt has an info subcommand but --sample <mini.mp4> is missing"
+    if [ ! -f "$sample" ]; then fail "ovt has an info subcommand but --sample <mini.mp4> is missing"; fi
     adb push "$sample" "$REMOTE_DIR/mini.mp4" > /dev/null
     info="$(run_ovt info mini.mp4)"
     echo "$info"
