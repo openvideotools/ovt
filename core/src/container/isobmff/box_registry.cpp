@@ -103,10 +103,10 @@ bool context_matches(std::string_view pattern, const std::vector<FourCC>& ancest
 unsigned pattern_specificity(std::string_view pattern) noexcept {
   unsigned n = 0;
   while (!pattern.empty()) {
-    const size_t slash = pattern.find('/');
-    const std::string_view seg = pattern.substr(0, slash);
+    const size_t len = std::min(pattern.find('/'), pattern.size());  // substr() would be potentially throwing
+    const std::string_view seg(pattern.data(), len);
     n += (seg.empty() || seg == "*") ? 0U : 1U;
-    pattern.remove_prefix(slash == std::string_view::npos ? pattern.size() : slash + 1);
+    pattern.remove_prefix(std::min(len + 1, pattern.size()));
   }
   return n;
 }
