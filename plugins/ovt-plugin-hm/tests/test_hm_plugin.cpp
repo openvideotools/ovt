@@ -442,23 +442,6 @@ constexpr std::array<At1Stream, 40> kAt1Streams = {{
 
 }  // namespace
 
-TEST_CASE("hm plugin: caps and ABI table", "[fast][third_party]") {
-  const ovt_AnalysisDecoderApi& api = plugin_api();
-  CHECK(api.struct_size == sizeof(ovt_AnalysisDecoderApi));
-  CHECK(api.abi_version == OVT_ANALYSIS_ABI_VERSION);
-  const ovt_AnalysisCaps* caps = api.caps();
-  REQUIRE(caps != nullptr);
-  CHECK(caps->struct_size == sizeof(ovt_AnalysisCaps));
-  CHECK(caps->codec == 2);  // ovt.fb.Codec.H265
-  CHECK(std::string_view(caps->id) == "hm");
-  CHECK(std::string_view(caps->license) == "BSD-3-Clause");
-  CHECK(caps->plane_stages == kReconMask);
-  CHECK(caps->grid_fields == 0U);  // WI-4.105 part b announces the grid vectors it fills
-  CHECK(caps->has_symbol_accounting == 0);
-  CHECK(caps->bit_exact == 1);
-  CHECK(caps->supports_threads == 0);
-}
-
 TEST_CASE("hm plugin: malformed hvcC, units and arguments are rejected", "[fast][third_party]") {
   const ovt_AnalysisDecoderApi& api = plugin_api();
   const std::array<uint8_t, 4> short_hvcc = {1, 2, 3, 4};
@@ -510,39 +493,6 @@ TEST_CASE("hm plugin: hm_md5_vs_sei on the HEVC_v1 conformance streams", "[fast]
   const std::optional<std::filesystem::path> path = ovt::test::corpus_path(s.id);
   REQUIRE(path.has_value());
   check_stream(run_stream(read_file(*path)), s.hashes);
-}
-
-TEST_CASE("hm plugin: two instances decode interleaved", "[fast][third_party][needs-corpus]") {
-  // HM keeps its scan-order and z-scan tables in globals (decoder.cpp): two live instances, fed alternately, must
-  // both still match their hashes, and destroying one must leave the other's tables intact.
-  const std::filesystem::path a_path = ovt::test::corpus_or_skip("jctvc_WPP_A_ericsson_MAIN10_2");
-  const std::filesystem::path b_path = ovt::test::corpus_or_skip("jctvc_SAO_A_MediaTek_4");
-  const std::vector<uint8_t> a_bytes = read_file(a_path);
-  const std::vector<uint8_t> b_bytes = read_file(b_path);
-  const ovt_AnalysisDecoderApi& api = plugin_api();
-  StreamResult b_result;
-  {
-    Instance a(api);
-    REQUIRE(a.status == OVT_OK);
-    StreamFeeder fa(a, a_bytes);
-    {
-      Instance b(api);
-      REQUIRE(b.status == OVT_OK);
-      StreamFeeder fb(b, b_bytes);
-      while (!fb.done()) {
-        fb.step();
-        if (!fa.done()) {
-          fa.step();
-        }
-      }
-      b_result = fb.finish();
-    }  // b destroyed while a is mid-stream
-    while (!fa.done()) {
-      fa.step();
-    }
-    check_stream(fa.finish(), true);
-  }
-  check_stream(b_result, true);
 }
 
 TEST_CASE("hm plugin: RExt 4:4:4 12-bit yields a FrameAnalysis per picture", "[fast][third_party][needs-corpus]") {

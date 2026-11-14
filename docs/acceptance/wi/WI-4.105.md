@@ -42,7 +42,5 @@ directory (and `OVT_REQUIRE_CORPORA` unset): the only failures were the two miss
 missing file (`39/40 AT1 streams present`; 88470 assertions, 3 failed). So the other 37 streams, including the ten
 after RAP_B (TSKIP_A, MVCLIP_A, MVEDGE_A, NoOutPrior_A, ipcm_A, RPS_B to RPS_F), pass.
 
-**Fixed after this run (2026-11-14):** finding 3 was the test's feeder, not the plugin: it dropped NAL units shorter
-than 3 bytes, so the 2-byte EOS_NUT never reached HM, the CRA after it decoded as a mid-sequence CRA and HM's
-leading-picture assert fired (HM's `CommonDef.h` undefines `NDEBUG`, so its asserts are always on, as in
-TAppDecoder). Findings 1 and 2: both entries are now `false`. AT1 needs a rerun on the Mini.
+**Fixed after this run (c717fd7):** RAP_B was the test feeder dropping the 2-byte EOS_NUT (HM's asserts are always
+on: `CommonDef.h` undefines `NDEBUG`); FILLER_A and RAP_A are now `false`. AT1 needs a rerun.

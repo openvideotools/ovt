@@ -65,7 +65,7 @@ struct Frame {
 class Decoder {
  public:
   /// Creates an HM decoder and pushes the parameter sets of an hvcC record when @p codec_private is not NULL.
-  /// OVT_E_CORRUPT for a malformed hvcC. HM decodes on the calling thread only; @p threads is ignored.
+  /// OVT_E_CORRUPT for a malformed hvcC.
   static ovt_status create(const uint8_t* codec_private, size_t len, std::unique_ptr<Decoder>* out);
 
   Decoder();

@@ -19,9 +19,8 @@ if(OVT_BUILD_PLUGIN_DE265 AND TARGET tp::de265)
   add_subdirectory(ovt-plugin-de265)
 endif()
 
-# ---- HEVC oracle plugin (HM) ----------------------------------------------------------------------------------------
-# WI-4.104 builds HM's decoder libraries (tp::hm); ovt-plugin-hm/ holds the plugin (WI-4.105), its tests and the smoke
-# test of the HM build.
+# ---- HM oracle (WI-4.104) -------------------------------------------------------------------------------------------
+# WI-4.104 builds HM's decoder libraries (tp::hm); ovt-plugin-hm/ holds the plugin (WI-4.105) and its tests.
 if(OVT_BUILD_PLUGIN_HM AND TARGET tp::hm)
   add_subdirectory(ovt-plugin-hm)
 endif()
