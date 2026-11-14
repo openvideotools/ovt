@@ -1,8 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// A bare AppKit window for the manual EDR tool (manual_edr_pattern.cpp, WI-1.406 step 5): a layer-backed view whose
-// layer is a CAMetalLayer, above a strip of plain system-UI white for comparison. macOS only; not part of ctest.
+// AppKit window of the manual EDR tool (manual_edr_pattern.cpp): a CAMetalLayer view above a strip of UI white.
 
 #ifndef OVT_RENDER_TESTS_MANUAL_EDR_WINDOW_H
 #define OVT_RENDER_TESTS_MANUAL_EDR_WINDOW_H
@@ -16,12 +15,9 @@ struct EdrWindow {
   float potential_headroom = 1.0F;  // NSScreen maximumPotentialExtendedDynamicRangeColorComponentValue
 };
 
-// Opens the window (points), centred on the main screen. Returns false without a window server.
-bool open_edr_window(int width_pt, int height_pt, EdrWindow& out);
-// Runs the AppKit event loop for `seconds` (the EDR headroom poll of the surface needs the main run loop).
-void pump_events(double seconds);
-// NSScreen maximumExtendedDynamicRangeColorComponentValue of the window's screen, now.
-float current_headroom();
+bool open_edr_window(int width_pt, int height_pt, EdrWindow& out);  // false without a window server
+void pump_events(double seconds);  // AppKit event loop (the surface's headroom poll needs the main run loop)
+float current_headroom();          // maximumExtendedDynamicRangeColorComponentValue of the window's screen
 
 }  // namespace ovt::render::manual
 

@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.406 NATIVE targets (chapter 10 §10.4.1): the encoding choice from surface formats, the CAMetalLayer property
-// table, the headroom threshold, and the swapchain path of VideoSurface on a real VkSurfaceKHR. Off macOS the surface
-// is a VK_EXT_headless_surface (lavapipe) behind the test seam set_native_provider_for_tests(); the CAMetalLayer itself
-// is exercised by test_macos_metal.mm on macOS.
+// WI-1.406 NATIVE targets (§10.4.1): encoding rules, layer table, headroom rule, and the swapchain path on a
+// VK_EXT_headless_surface behind set_native_provider_for_tests() (the CAMetalLayer itself: test_macos_metal.mm).
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -28,8 +26,7 @@ using ovt::render::ViewState;
 using ovt::render::detail::MetalLayerConfig;
 using Encoding = DisplayTarget::OutputEncoding;
 
-// The surface formats MoltenVK 1.2.11 reports on macOS 11+ (MVKPhysicalDevice::getSurfaceFormats(): every format
-// crossed with every colour space; abridged to the formats and spaces that matter here).
+// MoltenVK 1.2.11's surface formats on macOS 11+ (every format x every colour space), abridged.
 std::vector<VkSurfaceFormatKHR> moltenvk_formats() {
   const std::array<VkFormat, 4> formats = {VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT,
                                            VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_FORMAT_A2R10G10B10_UNORM_PACK32};
@@ -85,7 +82,6 @@ TEST_CASE("render_test_native: encoding choice from the surface formats (§10.4.
   CHECK_FALSE(fallback.no_hdr_format);
   CHECK(fallback.hint.transfer == PL_COLOR_TRC_SRGB);
 
-  // Srgb8 requested stays Srgb8.
   CHECK(choose_native_encoding(hdr_target(Encoding::Srgb8), mvk).encoding == Encoding::Srgb8);
 
   // A surface with only SDR pairs, or with the scRGB space only on an 8-bit format: RND-0040, Srgb8.
@@ -238,17 +234,24 @@ TEST_CASE("render_test_native: SDR display falls back to Srgb8 on a NATIVE swapc
   CHECK(std::string(surface->last_error()).empty());
 }
 
-TEST_CASE("render_test_native: HDR requested on a surface without an HDR pair reports RND-0040",
+TEST_CASE("render_test_native: HDR on a headless surface gets its pair, or RND-0040 without one",
           "[fast][render][vulkan]") {
   const HeadlessProvider seam;
   auto surface = native_or_skip(headless_target(Encoding::Pq10, true));
+#if defined(__APPLE__)
+  // MoltenVK's headless surface offers every format x colour space pair, the PQ pair included.
+  CHECK(surface->active_encoding() == Encoding::Pq10);
+  CHECK(std::string(surface->last_error()).empty());
+#else
   // Mesa's headless WSI offers sRGB pairs only.
   CHECK(surface->active_encoding() == Encoding::Srgb8);
   CHECK(std::string(surface->last_error()) == "RND-0040 no HDR surface format; falling back to Srgb8");
-  // The headroom poll does not apply to an SDR output.
+#endif
+  // A polled headroom > 5 % away retargets without changing the encoding.
+  const Encoding chosen = surface->active_encoding();
   g_log.headroom = 8.0F;
   surface->render(ViewState{});
-  CHECK(surface->active_encoding() == Encoding::Srgb8);
+  CHECK(surface->active_encoding() == chosen);
   // resize() reconfigures the platform object with the new drawable size.
   CHECK(surface->resize(48, 32));
   CHECK(g_log.widths.back() == 48);

@@ -5,7 +5,7 @@
 // (six BT.2020 PQ grey patches: 1, 100, 203, 1000, 4000, 10000 nits) into a NATIVE CAMetalLayer target and prints what
 // the operator records in docs/acceptance/wi/WI-1.406.md. Not part of ctest (it needs a display).
 //
-//   manual_edr_pattern [--encoding scrgb|pq|hlg|srgb] [--seconds N] [--patterns DIR]
+//   manual_edr_pattern [--encoding scrgb|pq|hlg|srgb] [--seconds N]
 //
 // Pass: with HDR on an XDR display, active_encoding() == ScRgbLinear16F and the 1000-nit patch (4th from the left)
 // measures >= 4x the 203-nit patch (3rd) with a colorimeter, or is visibly brighter than the white strip below.
@@ -96,7 +96,7 @@ bool load_pattern(const std::string& dir, Pattern& out) {
 int main(int argc, char** argv) try {
   Encoding requested = Encoding::ScRgbLinear16F;
   double seconds = 60.0;
-  std::string patterns = OVT_PATTERNS_DIR;
+  const std::string patterns = OVT_PATTERNS_DIR;
   for (int i = 1; i + 1 < argc; i += 2) {
     const std::string key = argv[i];
     const std::string value = argv[i + 1];
@@ -107,8 +107,6 @@ int main(int argc, char** argv) try {
                                     : Encoding::ScRgbLinear16F;
     } else if (key == "--seconds") {
       seconds = std::strtod(value.c_str(), nullptr);
-    } else if (key == "--patterns") {
-      patterns = value;
     }
   }
 
@@ -148,9 +146,7 @@ int main(int argc, char** argv) try {
   std::printf("potential headroom: %.3f, current headroom: %.3f, device pixel ratio: %.1f\n",
               static_cast<double>(win.potential_headroom), static_cast<double>(ovt::render::manual::current_headroom()),
               static_cast<double>(win.device_pixel_ratio));
-  std::printf("patches left to right: 1, 100, 203, 1000, 4000, 10000 nits; white strip below = system UI white\n");
-  std::printf(
-      "measure the 1000-nit (4th) and 203-nit (3rd) patches; pass if 4th >= 4x 3rd or clearly above UI white\n");
+  std::printf("patches: 1, 100, 203, 1000, 4000, 10000 nits; pass if the 4th >= 4x the 3rd or above the white strip\n");
 
   float last = -1.0F;
   const auto end = std::chrono::steady_clock::now() + std::chrono::duration<double>(seconds);

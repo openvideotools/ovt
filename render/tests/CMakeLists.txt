@@ -67,7 +67,8 @@ if(APPLE)
   target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
   set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
   set_target_properties(ovt_tests_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
-  target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal")
+  target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
+                                                 "-framework CoreFoundation")
 endif()
 
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).

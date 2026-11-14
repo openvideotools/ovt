@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.406 on macOS: VideoSurface on a real CAMetalLayer through MoltenVK (§10.4.1). The layer is not in a window, so
-// this checks the layer properties, the chosen encoding and that frames present; what the display shows is the manual
-// record of acceptance test 1 (render/tests/manual_edr_pattern.cpp, docs/acceptance/wi/WI-1.406.md).
+// WI-1.406 on macOS: VideoSurface on a real, windowless CAMetalLayer through MoltenVK (§10.4.1): layer properties,
+// encoding and presentation. What the display shows is the manual record (docs/acceptance/wi/WI-1.406.md).
 
 #import <QuartzCore/QuartzCore.h>
 
@@ -33,6 +32,14 @@ DisplayTarget layer_target(CAMetalLayer* layer, Encoding encoding, bool hdr_capa
   t.headroom = hdr_capable ? 2.0F : 1.0F;
   t.encoding = encoding;
   return t;
+}
+
+// MoltenVK takes the surface extent from the layer's bounds x contentsScale; a fresh layer is 0x0.
+CAMetalLayer* sized_layer() {
+  CAMetalLayer* layer = [CAMetalLayer layer];
+  layer.frame = CGRectMake(0, 0, 64, 32);
+  layer.contentsScale = 1.0;
+  return layer;
 }
 
 bool layer_space_is(CAMetalLayer* layer, CFStringRef name) {
@@ -65,7 +72,7 @@ std::unique_ptr<VideoSurface> layer_surface_or_skip(const DisplayTarget& t) {
 
 TEST_CASE("render_test_macos_metal: NATIVE ScRgbLinear16F on an EDR CAMetalLayer (acceptance test 1, automated part)",
           "[fast][render][vulkan]") {
-  CAMetalLayer* layer = [CAMetalLayer layer];
+  CAMetalLayer* layer = sized_layer();
   auto surface = layer_surface_or_skip(layer_target(layer, Encoding::ScRgbLinear16F, true));
   CHECK(surface->active_encoding() == Encoding::ScRgbLinear16F);
   CHECK(std::string(surface->last_error()).empty());
@@ -87,13 +94,23 @@ TEST_CASE("render_test_macos_metal: NATIVE ScRgbLinear16F on an EDR CAMetalLayer
 }
 
 TEST_CASE("render_test_macos_metal: SDR display falls back to Srgb8 (acceptance test 2)", "[fast][render][vulkan]") {
-  CAMetalLayer* layer = [CAMetalLayer layer];
+  CAMetalLayer* layer = sized_layer();
   auto surface = layer_surface_or_skip(layer_target(layer, Encoding::ScRgbLinear16F, false));
   CHECK(surface->active_encoding() == Encoding::Srgb8);
   CHECK(std::string(surface->last_error()).empty());
   CHECK_FALSE(layer.wantsExtendedDynamicRangeContent);
   CHECK(layer_space_is(layer, kCGColorSpaceSRGB));
   surface->render(ViewState{});
+  CHECK(std::string(surface->last_error()).empty());
+}
+
+TEST_CASE("render_test_macos_metal: a 0x0 layer initialises and draws nothing until it has a size", "[fast][render]") {
+  CAMetalLayer* layer = [CAMetalLayer layer];  // not laid out: the surface extent is 0x0
+  auto surface = layer_surface_or_skip(layer_target(layer, Encoding::Srgb8, false));
+  surface->render(ViewState{});
+  CHECK(std::string(surface->last_error()).empty());
+  layer.frame = CGRectMake(0, 0, 64, 32);
+  surface->render(ViewState{});  // the first frame with an extent creates the swapchain
   CHECK(std::string(surface->last_error()).empty());
 }
 

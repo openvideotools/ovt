@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// NATIVE display targets (chapter 10 §10.2.2, §10.4.1; WI-1.406): the platform side that turns a DisplayTarget into a
-// VkSurfaceKHR, and the portable rules that pick the swapchain's output encoding from the surface's formats. The
-// VideoSurface owns the swapchain (src/surface/video_surface_impl.cpp); a platform file (macos_metal.mm) owns the
-// window-system object. Internal to libovt-render.
+// NATIVE display targets (chapter 10 §10.4.1; WI-1.406): the platform seam that turns a DisplayTarget into a
+// VkSurfaceKHR, and the portable rules of the output encoding. Internal to libovt-render.
 
 #ifndef OVT_RENDER_SRC_PLATFORM_NATIVE_TARGET_H
 #define OVT_RENDER_SRC_PLATFORM_NATIVE_TARGET_H
@@ -69,11 +67,9 @@ struct NativeChoice {
 // §10.4.5) -> Srgb8. Otherwise the requested encoding when the surface offers a pair libplacebo can drive for it,
 // else Srgb8 with no_hdr_format.
 //
-// SPEC-ASSUMPTION(#470): ScRgbLinear16F uses the pair {R16G16B16A16_SFLOAT, BT2020_LINEAR_EXT}, not
-// {R16G16B16A16_SFLOAT, EXTENDED_SRGB_LINEAR_EXT}: the pinned libplacebo 7.349 refuses EXTENDED_SRGB_LINEAR in its
-// swapchain (map_color_space(): "TODO") and has no surface_format parameter, while MoltenVK maps BT2020_LINEAR_EXT to
-// kCGColorSpaceExtendedLinearITUR_2020, the same extended-range linear EDR encoding (1.0 = SDR white) with BT.2020
-// primaries.
+// SPEC-ASSUMPTION(#470): ScRgbLinear16F uses {R16G16B16A16_SFLOAT, BT2020_LINEAR_EXT}: libplacebo 7.349's swapchain
+// refuses EXTENDED_SRGB_LINEAR_EXT; MoltenVK maps BT2020_LINEAR_EXT to kCGColorSpaceExtendedLinearITUR_2020, the same
+// extended-range linear EDR encoding (1.0 = SDR white) with BT.2020 primaries.
 OVT_RENDER_API NativeChoice choose_native_encoding(const DisplayTarget& target,
                                                    const std::vector<VkSurfaceFormatKHR>& formats);
 
@@ -88,12 +84,8 @@ OVT_RENDER_API bool headroom_changed(float current, float polled);
 // §10.4.1 layer properties per encoding, as portable names (macos_metal.mm maps them to Metal / Core Graphics).
 struct MetalLayerConfig {
   enum class PixelFormat : uint8_t { BGRA8Unorm, RGBA16Float, BGR10A2Unorm } pixel_format = PixelFormat::BGRA8Unorm;
-  enum class ColorSpace : uint8_t {
-    SRGB,
-    ExtendedLinearITUR_2020,
-    ITUR_2100_PQ,
-    ITUR_2100_HLG
-  } color_space = ColorSpace::SRGB;
+  enum class ColorSpace : uint8_t { SRGB, ExtendedLinearITUR_2020, ITUR_2100_PQ, ITUR_2100_HLG };
+  ColorSpace color_space = ColorSpace::SRGB;
   enum class EdrMetadata : uint8_t { None, HDR10, HLG } edr_metadata = EdrMetadata::None;
   bool wants_edr = false;
 };

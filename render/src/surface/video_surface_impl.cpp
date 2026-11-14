@@ -6,10 +6,8 @@
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
 // dithering (WI-1.403), interop (WI-1.404), compare modes, overlays, measurements and export arrive with their own work
-// items; until then those entry points are inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the
-// VkSurfaceKHR of a platform NativeOutput (macOS: the host's CAMetalLayer, src/platform/macos_metal.mm), with the
-// output encoding picked from the surface's formats (src/platform/native_target.cpp), retarget() between EMBEDDED and
-// NATIVE on the same pl_gpu, and the headroom poll of §10.4.1.
+// items; until then those entry points are inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface
+// of a platform NativeOutput (src/platform/), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1.
 
 #include <algorithm>
 #include <array>
@@ -427,13 +425,13 @@ class VideoSurfaceImpl final : public VideoSurface {
     pl_swapchain_colorspace_hint(sw_, &choice.hint);
   }
 
+  // Not an error when it fails: libplacebo cannot size a swapchain on a 0x0 extent (hidden window, layer not laid out)
+  // and creates it at the first pl_swapchain_start_frame() with an extent; render() draws nothing until then.
   bool resize_swapchain() {
     native_->configure(active_, target_.width, target_.height);
     int w = target_.width;
     int h = target_.height;
-    if (!pl_swapchain_resize(sw_, &w, &h)) {
-      return fail("swapchain", "pl_swapchain_resize failed");
-    }
+    static_cast<void>(pl_swapchain_resize(sw_, &w, &h));
     return true;
   }
 
