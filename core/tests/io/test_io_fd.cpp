@@ -38,6 +38,9 @@ using ovt::io::OpenMode;
 using ovt::io::RandomAccessFile;
 
 constexpr size_t kMiB = size_t{1} << 20U;
+// 3 GB: above 2^31, the limit of a 32-bit off_t or jint (WI-0.051 acceptance test 2). Namespace scope, because
+// GENERATE captures its arguments in a lambda.
+constexpr uint64_t k3GB = uint64_t{3} * 1000 * 1000 * 1000;
 
 // A file under the test binary directory (tests read no environment, chapter 14 §14.1.3), removed on
 // destruction. The pid keeps parallel ctest runs apart.
@@ -300,7 +303,6 @@ TEST_CASE("capi_file_open_fd_borrowed", "[io][fast]") {
 // the caller passes getStatSize() and when it passes 0 and the library asks fstat(2). The same call chain runs on
 // the emulator through ovt_jni_open_fd.
 TEST_CASE("capi_file_open_fd_3gb_sparse", "[io][fast]") {
-  constexpr uint64_t k3GB = uint64_t{3} * 1000 * 1000 * 1000;
   const TempPath path("capi_fd_3gb");
   {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
