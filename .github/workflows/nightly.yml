@@ -176,7 +176,7 @@ jobs:
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: build/syn
-          key: syn-${{ hashFiles('tests/corpora/synthetic/**', 'tests/corpora/manifest.json') }}
+          key: syn-v2-${{ hashFiles('tests/corpora/synthetic/**', 'tests/corpora/manifest.json') }}
           enableCrossOsArchive: true
 
       - name: Add the generated syn_* streams to the corpora
@@ -230,7 +230,7 @@ jobs:
         uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: build/syn
-          key: syn-${{ hashFiles('tests/corpora/synthetic/**', 'tests/corpora/manifest.json') }}
+          key: syn-v2-${{ hashFiles('tests/corpora/synthetic/**', 'tests/corpora/manifest.json') }}
           enableCrossOsArchive: true
 
       - if: steps.syn-cache.outputs.cache-hit != 'true'
@@ -248,10 +248,28 @@ jobs:
         env:
           IMAGE: ghcr.io/openvideotools/ovt-oracles:main
         run: |
+          # The encoded streams only (about 140 MB): the syn_metrics_* and syn_raw_* YUV files are 6.4 GB and no
+          # test of this job cites them. Recipes that read a corpus the fetcher cannot download are left out too.
+          ids="$(python3 -I - <<'PY'
+          import json, re
+          entries = {e["id"]: e for e in json.load(open("tests/corpora/manifest.json"))["entries"]}
+          def fetchable(cid):
+              e = entries.get(cid, {})
+              return e.get("source") == "syn" or (
+                  ("url" in e or "vcs" in e) and not e.get("unverified") and not e.get("manual_download"))
+          ids = []
+          for r in json.load(open("tests/corpora/synthetic/recipes.json"))["recipes"]:
+              if r.get("local_only") or r["id"].startswith(("syn_metrics_", "syn_raw_")):
+                  continue
+              if all(fetchable(c) for c in re.findall(r"\{corpus:([A-Za-z0-9_]+)", json.dumps(r))):
+                  ids.append(r["id"])
+          print(",".join(ids))
+          PY
+          )"
           docker pull "${IMAGE}"
           rc=0
           docker run --rm --user "$(id -u):$(id -g)" -v "${PWD}:/repo:ro" -v "${PWD}/build/corpora:/corpora" -w /repo \
-            -e HOME=/tmp "${IMAGE}" python3 -I tests/corpora/synthetic/generate.py --out /corpora || rc=$?
+            -e HOME=/tmp "${IMAGE}" python3 -I tests/corpora/synthetic/generate.py --out /corpora --only "${ids}" || rc=$?
           rm -rf build/corpora/.work build/syn
           mkdir -p build/syn
           for d in build/corpora/syn_*; do
