@@ -454,7 +454,7 @@ TEST_CASE("hm plugin: malformed hvcC, units and arguments are rejected", "[fast]
   CHECK(api.create(truncated.data(), truncated.size(), 0, &dec) == OVT_E_CORRUPT);
   CHECK(api.create(nullptr, 0, 0, nullptr) == OVT_E_INVALID_ARG);
 
-  Instance in(api);
+  const Instance in(api);
   REQUIRE(in.status == OVT_OK);
   CHECK(api.push(in.dec, nullptr, 0, 0, 0) == OVT_E_INVALID_ARG);
   const std::array<uint8_t, 1> one = {0x40};
