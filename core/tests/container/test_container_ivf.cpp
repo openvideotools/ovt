@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Oracle tests of the IVF frame walk (WI-1.570, chapter 08 §8.6.2): frame count, frame positions and payload sizes
-// equal `ffprobe -show_packets` (goldens `tests/golden/av1/<id>.ovt-units.json`, framing "ivf"). FFmpeg reports the
-// position of the 12-byte frame header (ivfdec.c: `pkt->pos -= 12`).
+// equal `ffprobe -show_packets` (goldens `tests/golden/av1/`); FFmpeg's position is the frame header.
 
 #include <catch2/catch_test_macros.hpp>
 

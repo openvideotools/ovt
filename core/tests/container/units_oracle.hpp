@@ -9,7 +9,6 @@
 #define OVT_TESTS_CONTAINER_UNITS_ORACLE_HPP
 
 #include <nlohmann/json.hpp>
-
 #include "test_support/corpus.h"
 
 #include <unistd.h>

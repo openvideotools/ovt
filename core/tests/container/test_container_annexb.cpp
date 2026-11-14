@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Oracle tests of the Annex B splitter and the EPB mapping (WI-1.570, chapter 08 §8.6.3): unit counts, types and
-// access-unit sizes equal `ffprobe -show_packets` + `trace_headers` (goldens `tests/golden/<codec>/<id>.ovt-units.json`
-// written by tools/goldens/gen_units.py), and raw.size - rbsp.size == epb_positions.size() for every NAL unit.
+// Oracle tests of the Annex B splitter and EPB mapping (WI-1.570, chapter 08 §8.6.3): access units equal `ffprobe` +
+// `trace_headers` (tools/goldens/gen_units.py); raw.size - rbsp.size == epb_positions.size() for every NAL unit.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -137,6 +136,9 @@ TEST_CASE("units annexb: raw minus RBSP equals the number of EPBs in every corpu
     }
   }
   if (checked == 0) {
+    if (ovt::test::units::corpora_required()) {
+      FAIL("no Annex B corpus file has a units golden");
+    }
     SKIP("no Annex B corpus file with a units golden is available");
   }
 }

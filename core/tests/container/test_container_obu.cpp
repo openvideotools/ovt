@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Oracle tests of the AV1 OBU stream walker (WI-1.570, chapter 08 §8.6.4): the temporal units of a raw OBU file equal
-// the packets of `ffprobe -show_packets` (goldens `tests/golden/av1/<id>.ovt-units.json`, framing "obu"). A Section 5
-// temporal unit is one FFmpeg packet (position and size); FFmpeg converts Annex B, so only the count is compared.
+// the packets of `ffprobe -show_packets`. A Section 5 temporal unit is one FFmpeg packet (position and size); FFmpeg
+// converts Annex B, so only the count is compared.
 
 #include <catch2/catch_test_macros.hpp>
 
