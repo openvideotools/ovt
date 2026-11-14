@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include "analysis.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 namespace ovt::hm {
@@ -59,6 +60,7 @@ struct Frame {
   int16_t qp_base = 0;
   uint16_t slice_count = 0;
   std::array<Plane, 3> planes;  // planes 1 and 2 are empty for 4:0:0
+  Analysis analysis;            // grid, blocks, motion vectors and references (map_cu.cpp)
   std::vector<Diag> diagnostics;
 };
 
@@ -79,7 +81,8 @@ class Decoder {
   ovt_status push(const uint8_t* unit, size_t len, int32_t decode_index_hint, int64_t pts);
   /// End of input: loop-filters and outputs the picture still being decoded.
   ovt_status flush();
-  /// Moves the next finished frame (decode order) into @p out; false when there is none.
+  /// Moves the next finished frame (decode order) into @p out; false when there is none. Takes no lock: a frame
+  /// queue is touched only by the thread that owns the instance, as with the other plugins.
   bool pop(Frame* out);
 
   struct Impl;  // HM state; defined in decoder.cpp
