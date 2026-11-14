@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -227,6 +228,7 @@ struct GridOut {
   uint32_t h4 = 0;
   std::map<std::string, std::vector<int>> fields;
   std::vector<std::size_t> cu_origin;
+  bool mv_clamp_reported = false;  // FrameAnalysis.diagnostics holds MDL-GEN-0003
 };
 
 int ref_idx(const ovt::fb::FrameAnalysis& fa, int slot) {
@@ -264,6 +266,11 @@ std::shared_ptr<const GridOut> grid_of(const ovt::fb::FrameAnalysis& fa) {
   copy("ref1", g.ref1(), [&](int v) { return ref_idx(fa, v); });
   copy("tx_log2_w", g.tx_log2_w(), same);
   copy("cbf", g.cbf(), same);
+  if (fa.diagnostics() != nullptr) {
+    for (const ovt::fb::Diagnostic* d : *fa.diagnostics()) {
+      out->mv_clamp_reported = out->mv_clamp_reported || (d->code() != nullptr && d->code()->str() == "MDL-GEN-0003");
+    }
+  }
   for (const uint32_t id : *g.block_id()) {
     const ovt::fb::Rect* r = fa.blocks()->Get(id)->rect();
     out->cu_origin.push_back((static_cast<std::size_t>(r->y() / 4) * out->w4) + static_cast<std::size_t>(r->x() / 4));
@@ -650,24 +657,35 @@ constexpr int kPredPcm = 5;
 constexpr int kTxNone = 0xFF;
 constexpr int kDmChroma = 36;  // HM's DM_CHROMA_IDX, kept raw by hm_cu_dump
 
+constexpr int kNeutralMvMax = 32767;
+
+bool is_mv(const std::string& name) {
+  return name.starts_with("mv");
+}
+
 // The value the plugin must report for cell i of field `name`, given the golden's raw readings (chapter 06 §6.3.1):
 // PCM luma mode 64; chroma DM resolved to the luma mode of the CU's first partition; no transform (0xFF) for skip,
-// PCM and inter CUs without a transform tree (rqt_root_cbf = 0, so cbf 0).
-bool cell_matches(const std::string& name, const nlohmann::json& want, const GridOut& got, std::size_t i) {
+// PCM and inter CUs without a transform tree (rqt_root_cbf = 0, so cbf 0); MVs (already x4) clamped to ±32767
+// (chapter 06 §6.2.3).
+int expected_cell(const std::string& name, const nlohmann::json& want, const GridOut& got, std::size_t i) {
   const auto w = [&](const char* f) { return want.at(f).at(i).get<int>(); };
-  const int value = got.fields.at(name)[i];
   if (name == "intra_mode_y") {
-    return value == (w("pred") == kPredPcm ? 64 : w(name.c_str()));
+    return w("pred") == kPredPcm ? 64 : w(name.c_str());
   }
   if (name == "intra_mode_c") {
     const int c = w(name.c_str());
-    return value == (c == kDmChroma ? want.at("intra_mode_y").at(got.cu_origin[i]).get<int>() : c);
+    return c == kDmChroma ? want.at("intra_mode_y").at(got.cu_origin[i]).get<int>() : c;
   }
-  if (name == "tx_log2_w" && value == kTxNone) {
+  if (is_mv(name)) {
+    return std::clamp(w(name.c_str()), -kNeutralMvMax, kNeutralMvMax);
+  }
+  if (name == "tx_log2_w" && got.fields.at(name)[i] == kTxNone) {
     const int pred = w("pred");
-    return pred == kPredSkip || pred == kPredPcm || (pred == kPredInter && w("cbf") == 0);
+    if (pred == kPredSkip || pred == kPredPcm || (pred == kPredInter && w("cbf") == 0)) {
+      return kTxNone;
+    }
   }
-  return value == w(name.c_str());
+  return w(name.c_str());
 }
 
 void check_grids(std::string_view id, const StreamResult& r) {
@@ -687,22 +705,31 @@ void check_grids(std::string_view id, const StreamResult& r) {
     REQUIRE(out.grid != nullptr);
     REQUIRE(g.at("w4") == out.grid->w4);
     REQUIRE(g.at("h4") == out.grid->h4);
+    bool clamp_needed = false;
     for (const auto& [name, values] : g.at("fields").items()) {
       if (name == "tx_log2_h") {
         continue;  // equal to tx_log2_w on both sides
       }
       REQUIRE(out.grid->fields.contains(name));
+      const std::vector<int>& got = out.grid->fields.at(name);
       std::size_t bad = 0;
       std::size_t first = 0;
+      int first_want = 0;
       for (std::size_t i = 0; i < values.size(); ++i) {
-        if (!cell_matches(name, g.at("fields"), *out.grid, i)) {
-          first = bad++ == 0 ? i : first;
+        clamp_needed = clamp_needed || (is_mv(name) && std::abs(values.at(i).get<int>()) > kNeutralMvMax);
+        const int want = expected_cell(name, g.at("fields"), *out.grid, i);
+        if (got[i] != want && bad++ == 0) {
+          first = i;
+          first_want = want;
         }
       }
-      INFO(id << " decode index " << idx << " field " << name << ": " << bad << " cells differ, first at cell "
-              << first);
+      INFO(id << " decode index " << idx << " field " << name << ": " << bad << " cells differ, first at cell " << first
+              << " (x4 " << first % out.grid->w4 << ", y4 " << first / out.grid->w4 << "): got "
+              << (bad == 0 ? 0 : got[first]) << ", want " << first_want);
       CHECK(bad == 0);
     }
+    // A clamp is reported once per frame with MDL-GEN-0003 (chapter 06 §6.2.3), and only then.
+    CHECK(out.grid->mv_clamp_reported == clamp_needed);
   }
 }
 

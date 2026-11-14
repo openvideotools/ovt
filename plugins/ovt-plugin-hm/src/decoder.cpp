@@ -12,6 +12,7 @@
 #include <mutex>
 #include <new>
 #include <set>
+#include <string>
 #include <utility>
 
 // HM's headers (system includes: HM's warnings are not OVT's, WI-4.104).
@@ -31,6 +32,7 @@ namespace ovt::hm {
 namespace {
 
 constexpr uint8_t kInfo = 0;  // ovt.fb.Severity values
+constexpr uint8_t kWarning = 1;
 constexpr uint8_t kError = 2;
 
 // Diagnostics kept for the next frame; more are counted in one summary line.
@@ -251,6 +253,12 @@ void Decoder::Impl::export_picture(TComPic* pic) {
   }
   map_cu(*pic, pic_index, &f.analysis);
   pic_index[pic] = f.decode_index;
+  if (f.analysis.mv_clamped_cells > 0) {
+    add_diag(kWarning, "MDL-GEN-0003",
+             "motion vector clamped to \xC2\xB1"
+             "32767 (" +
+                 std::to_string(f.analysis.mv_clamped_cells) + " cells)");
+  }
   f.diagnostics = std::move(pending_diags);
   pending_diags.clear();
   frames.push_back(std::move(f));

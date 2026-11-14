@@ -80,6 +80,7 @@ struct Analysis {
   std::vector<BlockRec> blocks;
   std::vector<MvRec> mvs;
   std::vector<RefRec> refs;
+  uint32_t mv_clamped_cells = 0;  // cells with an MV component clamped to ±32767 (chapter 06 §6.2.3)
 };
 
 /// Decode indices of the pictures the plugin exported, for RefSlot.frame (cleared when HM destroys its pictures).

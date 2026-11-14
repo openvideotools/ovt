@@ -32,6 +32,17 @@ namespace {
 constexpr int16_t kModePcm = 64;  // CellGrid.intra_mode_y of a PCM CU (chapter 06 §6.3.1)
 constexpr uint16_t kMvBi = 1U << 0;
 constexpr uint16_t kMvWeighted = 1U << 1;
+constexpr int kNeutralMvMax = 32767;  // -32768 is the MVD sentinel (chapter 06 §6.2.3)
+
+// A quarter-sample HEVC MV component in 1/16 luma samples, clamped to ±32767 (chapter 06 §6.2.3); sets *clamped.
+int16_t neutral_mv(int quarter, bool* clamped) {
+  const int v = quarter * 4;  // |quarter| <= 2^15, so no int overflow
+  if (v > kNeutralMvMax || v < -kNeutralMvMax) {
+    *clamped = true;
+    return static_cast<int16_t>(std::clamp(v, -kNeutralMvMax, kNeutralMvMax));
+  }
+  return static_cast<int16_t>(v);
+}
 
 // z-scan index of the 4x4 unit (x4, y4) inside a CTU: even bits x, odd bits y.
 UInt zscan(UInt x4, UInt y4) {
@@ -410,6 +421,7 @@ class Mapper {
   // Grid motion of one 4x4 unit u of an inter CU at cell i.
   void motion_cell(const TComDataCU& cu, const std::array<std::vector<int8_t>, 2>& slots, UInt u, std::size_t i) {
     Grid& g = out_.grid;
+    bool clamped = false;
     for (int l = 0; l < 2; ++l) {
       const TComCUMvField* f = cu.getCUMvField(static_cast<RefPicList>(l));
       const int ref = f->getRefIdx(static_cast<Int>(u));
@@ -418,9 +430,12 @@ class Mapper {
         continue;
       }
       const TComMv& mv = f->getMv(static_cast<Int>(u));
-      (l == 0 ? g.mv0_x : g.mv1_x)[i] = static_cast<int16_t>(mv.getHor() * 4);  // 1/4 -> 1/16 luma sample
-      (l == 0 ? g.mv0_y : g.mv1_y)[i] = static_cast<int16_t>(mv.getVer() * 4);
+      (l == 0 ? g.mv0_x : g.mv1_x)[i] = neutral_mv(mv.getHor(), &clamped);  // 1/4 -> 1/16 luma sample
+      (l == 0 ? g.mv0_y : g.mv1_y)[i] = neutral_mv(mv.getVer(), &clamped);
       (l == 0 ? g.ref0 : g.ref1)[i] = list[static_cast<std::size_t>(ref)];
+    }
+    if (clamped) {
+      ++out_.mv_clamped_cells;
     }
   }
 
@@ -512,10 +527,11 @@ class Mapper {
       m.list = static_cast<uint8_t>(l);
       m.ref = slots.at(static_cast<std::size_t>(l))[static_cast<std::size_t>(ref)];
       m.rect = r;
-      m.mv_x = static_cast<int16_t>(mv.getHor() * 4);
-      m.mv_y = static_cast<int16_t>(mv.getVer() * 4);
-      m.mvd_x = merge ? int16_t{0} : static_cast<int16_t>(mvd.getHor() * 4);
-      m.mvd_y = merge ? int16_t{0} : static_cast<int16_t>(mvd.getVer() * 4);
+      bool clamped = false;  // counted per cell in motion_cell
+      m.mv_x = neutral_mv(mv.getHor(), &clamped);
+      m.mv_y = neutral_mv(mv.getVer(), &clamped);
+      m.mvd_x = merge ? int16_t{0} : neutral_mv(mvd.getHor(), &clamped);
+      m.mvd_y = merge ? int16_t{0} : neutral_mv(mvd.getVer(), &clamped);
       // SPEC-ASSUMPTION(#495): HM does not keep which candidate a merge index or mvp flag selected, so the
       // ":<source>" suffix of chapter 06 §6.3.1 is left out.
       m.predictor = merge ? "merge[" + std::to_string(cu.getMergeIndex(pz)) + "]" : "amvp[" + std::to_string(mvp) + "]";
