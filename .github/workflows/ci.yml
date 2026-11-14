@@ -501,3 +501,89 @@ jobs:
           path: |
             android/app/build/outputs/apk/foss/**/*.apk
             android/app/build/outputs/bundle/playRelease/*.aab
+
+      # Inputs of android-emulator-smoke (WI-0.035): the x86_64 CLI of §13.4.5 item 8 (the Gradle build has
+      # OVT_BUILD_CLI=OFF) and the NDK's libc++_shared.so it needs at run time. The third_party prefix of the
+      # setup-ovt cache is reused through OVT_THIRD_PARTY_PREFIX.
+      - name: CLI for the emulator smoke (x86_64)
+        run: |
+          export JAVA_HOME="$JAVA_HOME_17_X64" PATH="$JAVA_HOME_17_X64/bin:$PATH"
+          ndk="$(sed -n 's/^ndk.dir=//p' android/local.properties)"
+          export ANDROID_NDK_ROOT="$ndk" QT_HOST_KIT=gcc_64
+          cmake --preset android-x86_64-release -DOVT_BUILD_GUI=OFF -DOVT_BUILD_TESTS=OFF \
+            -DOVT_THIRD_PARTY_PREFIX="$PWD/build/third_party/android-x86_64"
+          cmake --build --preset android-x86_64-release --target ovt_cli
+          mkdir -p build/smoke-inputs
+          cp build/android-x86_64-release/cli/ovt build/smoke-inputs/ovt
+          cp "$ndk"/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so build/smoke-inputs/
+          apk="$(find android/app/build/outputs/apk/foss/debug -name '*-x86_64-*.apk' | head -n 1)"
+          cp "$apk" build/smoke-inputs/ovt-studio-x86_64.apk
+
+      # Handed to android-emulator-smoke through the Actions cache, not through an artefact: the repository is public
+      # and APKs must not be uploaded (binary distribution without notices). The cache is not downloadable by
+      # others; the key is this commit, so a smoke run never sees another commit's build.
+      - name: Save smoke inputs
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/smoke-inputs
+          key: android-smoke-inputs-${{ github.sha }}
+
+  # Emulator smoke test (§13.7.1 row android-emulator-smoke, WI-0.035): installs the x86_64 debug APK on an API 36
+  # google_apis x86_64 emulator, asserts the main window through uiautomator, runs the Android CLI and checks
+  # logcat; tools/android/smoke.sh does the work. Read-only: no secrets, no APK upload, only logcat and a screenshot
+  # are kept as artefacts. Cold runs spend most of the time in the emulator image download; the AVD snapshot cache
+  # of the runner action is not used, so a run does not depend on a cache written by another run.
+  android-emulator-smoke:
+    needs: android-build
+    if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch; see the header
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30 # WI-0.035 acceptance test 1: the job passes in <= 20 min
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Restore smoke inputs
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/smoke-inputs
+          key: android-smoke-inputs-${{ github.sha }}
+          fail-on-cache-miss: true
+
+      - name: Sample MP4
+        run: |
+          # The CC0 test pattern of recipe 29 needs the oracle encoders (tests/corpora/synthetic); the smoke test only
+          # needs a small baseline H.264 MP4 of the same shape.
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends ffmpeg
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=320x240:rate=30 -frames:v 30 \
+            -c:v libx264 -profile:v baseline -pix_fmt yuv420p -movflags +faststart build/smoke-inputs/mini.mp4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chown "$USER" /dev/kvm || true
+
+      - name: Smoke test on the emulator
+        uses: reactivecircus/android-emulator-runner@0a638108440efd5c7f980e6ba145dbcdd8f32009 # v2.37.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: true
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: tools/android/smoke.sh --apk build/smoke-inputs/ovt-studio-x86_64.apk --out build/smoke-out --cli build/smoke-inputs/ovt --libcxx build/smoke-inputs/libc++_shared.so --sample build/smoke-inputs/mini.mp4
+
+      # Logcat, window dump and screenshot (no APK). Also on failure: WI-0.035 acceptance test 2 wants the logcat excerpt.
+      - name: Upload logcat and screenshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: android-emulator-smoke
+          path: |
+            build/smoke-out/logcat.txt
+            build/smoke-out/excerpt.txt
+            build/smoke-out/window.xml
+            build/smoke-out/screenshot.png
+          if-no-files-found: warn
