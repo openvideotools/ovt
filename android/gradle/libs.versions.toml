@@ -18,12 +18,19 @@ buildTools = "36.0.0"
 androidxCore = "1.15.0"
 androidxAppcompat = "1.7.0"
 androidxActivity = "1.9.3"
+androidxTestCore = "1.6.1"
+androidxTestRunner = "1.6.2"
+androidxTestExtJunit = "1.2.1"
 licenseReport = "2.9"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidxAppcompat" }
 androidx-activity-ktx = { module = "androidx.activity:activity-ktx", version.ref = "androidxActivity" }
+# Instrumentation tests only (androidTestImplementation): never in an APK users install, nor in the licence report.
+androidx-test-core = { module = "androidx.test:core-ktx", version.ref = "androidxTestCore" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit-ktx", version.ref = "androidxTestExtJunit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

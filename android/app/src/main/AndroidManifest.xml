@@ -5,8 +5,9 @@
 
   Manifest of OVT Studio for Android and ChromeOS (chapter 13 §13.4.5; WI-0.050). extractNativeLibs=false is
   not written here: AGP 8 sets it in the merged manifest from packaging.jniLibs.useLegacyPackaging = false
-  (app/build.gradle.kts) and warns when the source manifest carries it. WI-A.450 adds the §11.5.1 entries (ACTION_SEND, file extensions,
-  free-form window preferences), WI-0.053 the codec-pack declarations.
+  (app/build.gradle.kts) and warns when the source manifest carries it. WI-A.450 added the chapter 11 §11.5.1 entries
+  (ACTION_SEND, the file extensions, the ChromeOS free-form window preferences); WI-0.053 adds the codec-pack
+  declarations.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
@@ -39,6 +40,9 @@
             android:colorMode="hdr"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|density|keyboard|keyboardHidden|navigation|uiMode"
             android:windowSoftInputMode="adjustResize">
+            <!-- ChromeOS free-form defaults (§11.5.1): open maximised, in landscape. -->
+            <meta-data android:name="WindowManagerPreference:FreeformWindowSize" android:value="maximize" />
+            <meta-data android:name="WindowManagerPreference:FreeformWindowOrientation" android:value="landscape" />
             <layout
                 android:defaultWidth="1280dp"
                 android:defaultHeight="800dp"
@@ -54,6 +58,47 @@
                 <data android:scheme="content" />
                 <data android:mimeType="video/*" />
                 <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <!-- Share-to (§11.5.1): a video or a raw stream sent from another app (FilePicker.handleIntent). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="video/*" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <!-- The extensions of §11.5.1, for providers that report another MIME type (text/plain for .y4m, application/json
+                 for .ovtproj). pathPattern only applies with a scheme and a host; ".*" matches lazily, so each extension
+                 also has a form for paths with an earlier dot. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.mp4" />
+                <data android:pathPattern=".*\\..*\\.mp4" />
+                <data android:pathPattern=".*\\.mov" />
+                <data android:pathPattern=".*\\..*\\.mov" />
+                <data android:pathPattern=".*\\.m4v" />
+                <data android:pathPattern=".*\\..*\\.m4v" />
+                <data android:pathPattern=".*\\.ivf" />
+                <data android:pathPattern=".*\\..*\\.ivf" />
+                <data android:pathPattern=".*\\.obu" />
+                <data android:pathPattern=".*\\..*\\.obu" />
+                <data android:pathPattern=".*\\.h264" />
+                <data android:pathPattern=".*\\..*\\.h264" />
+                <data android:pathPattern=".*\\.264" />
+                <data android:pathPattern=".*\\..*\\.264" />
+                <data android:pathPattern=".*\\.h265" />
+                <data android:pathPattern=".*\\..*\\.h265" />
+                <data android:pathPattern=".*\\.hevc" />
+                <data android:pathPattern=".*\\..*\\.hevc" />
+                <data android:pathPattern=".*\\.y4m" />
+                <data android:pathPattern=".*\\..*\\.y4m" />
+                <data android:pathPattern=".*\\.yuv" />
+                <data android:pathPattern=".*\\..*\\.yuv" />
+                <data android:pathPattern=".*\\.ovtproj" />
+                <data android:pathPattern=".*\\..*\\.ovtproj" />
             </intent-filter>
         </activity>
     </application>

@@ -105,6 +105,8 @@ android {
         versionCode = ovtVersionCodeBase // AAB: abiIndex 0; the per-ABI APKs get theirs in androidComponents below
         versionName = ovtVersion
         resValue("string", "app_name", ovtProductName)
+        // Instrumentation tests (src/androidTest, WI-A.450 on): ./gradlew :app:connectedFossDebugAndroidTest.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // No ndk.abiFilters: AGP rejects them next to splits.abi, and the Qt build produces only ovt.abis anyway.
     }
 
@@ -281,6 +283,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.activity.ktx)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
     // The AAR of the Qt build. Qt writes it next to the ovt_studio target, in app/android-build-ovt_studio/ of the
     // build tree, not at the top where the plugin's own dependency looks (SPEC-ASSUMPTION(#355)). A
     // fileTree is resolved when the classpath is, after preBuild -> QtBuildTask has produced the file.
