@@ -386,7 +386,7 @@ TEST_CASE("ssim_x264 equals the x264 kernel oracle on the Netflix pair", "[metri
     REQUIRE(n < golden.at("y").size());
     const Scored s = inst.score(r, d, static_cast<int32_t>(n));
     INFO("frame " << n);
-    // The golden prints six decimals (tests/oracles/normalize/canon.py), so 1e-6 is the tightest comparison it allows.
+    // The golden keeps the oracle's nine decimals (run_x264_ssim.py netflix-run), so 1e-6 compares kernel to oracle.
     CHECK(std::fabs(s.values[0] - golden.at("y")[n].get<double>()) <= 1e-6);
     CHECK(std::fabs(s.values[1] - golden.at("u")[n].get<double>()) <= 1e-6);
     CHECK(std::fabs(s.values[2] - golden.at("v")[n].get<double>()) <= 1e-6);
