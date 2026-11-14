@@ -120,6 +120,9 @@ class OVT_RENDER_API ScopeSet {
 // Sets the scope options of `surface` (the VideoSurface of create()) for its next measurements; false for another
 // implementation. Defined in render/src/surface/video_surface_impl.cpp.
 OVT_RENDER_API bool set_scope_config(VideoSurface& surface, const ScopeConfig& config);
+// Test hook (Measurer::hold_readbacks): while held, measure() collects no readback, as with a slow GPU. Defined in
+// render/src/surface/video_surface_impl.cpp.
+OVT_RENDER_API bool hold_readbacks(VideoSurface& surface, bool hold);
 // Waits for the GPU and copies the `kind` scope texture of the newest measure() result of `surface` (RGBA16F texels,
 // rows top first). Returns false when there is none. Defined in render/src/surface/video_surface_impl.cpp.
 OVT_RENDER_API bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width,

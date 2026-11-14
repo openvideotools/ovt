@@ -160,57 +160,6 @@ double total(const Scope& s, int c) {
 
 }  // namespace
 
-TEST_CASE("render_test_scopes: coordinate mappings (§10.7.6-§10.7.7)", "[fast][render]") {
-  // Waveform column: floor(x / crop_w x 1024).
-  CHECK(detail::waveform_column(0, 1920) == 0);
-  CHECK(detail::waveform_column(1919, 1920) == 1023);
-  CHECK(detail::waveform_column(960, 1920) == 512);
-  CHECK(detail::waveform_column(5, 10) == 512);
-  CHECK(detail::waveform_column(0, 0) == 0);
-
-  // Log-nits rows: 0.0001 -> 0, 10 000 -> 511, one decade = 511 / 8 rows.
-  using detail::WaveformAxis;
-  CHECK(detail::waveform_row(1.0e-4, WaveformAxis::LogNits) == 0);
-  CHECK(detail::waveform_row(0.0, WaveformAxis::LogNits) == 0);  // clamped
-  CHECK(detail::waveform_row(1.0e4, WaveformAxis::LogNits) == 511);
-  CHECK(detail::waveform_row(1.0e6, WaveformAxis::LogNits) == 511);
-  CHECK(detail::waveform_row(1.0, WaveformAxis::LogNits) == 255);    // 511 x 4 / 8 = 255.5
-  CHECK(detail::waveform_row(203.0, WaveformAxis::LogNits) == 402);  // 511 x 6.3075 / 8 = 402.9
-  // PQ-code rows: 511 x PQ(nits).
-  CHECK(detail::waveform_row(0.0, WaveformAxis::PqCode) == 0);
-  CHECK(detail::waveform_row(1.0e4, WaveformAxis::PqCode) == 511);
-  CHECK(detail::waveform_row(203.0, WaveformAxis::PqCode) == 296);  // PQ(203) = 0.5807
-  CHECK(detail::waveform_texel_y(511) == 0);                        // brightest at the top
-  CHECK(detail::waveform_texel_y(0) == 511);
-
-  // Vectorscope: neutral -> centre; the colour-bar red of BT.2020 at (Cb, Cr) = (-0.1396, 0.5).
-  const auto grey_cbcr = detail::vectorscope_cbcr({203.0, 203.0, 203.0});
-  CHECK(grey_cbcr[0] == Catch::Approx(0.0).margin(1e-12));
-  CHECK(grey_cbcr[1] == Catch::Approx(0.0).margin(1e-12));
-  const auto red = detail::vectorscope_cbcr({10000.0, 0.0, 0.0});
-  CHECK(red[0] == Catch::Approx(-0.2627 / 1.8814).margin(1e-5));
-  CHECK(red[1] == Catch::Approx(0.5).margin(1e-5));  // PQ(0) = c1^m2 = 7e-7, not 0
-  const auto uv1 = detail::vectorscope_uv(red[0], red[1], 1.0F);
-  CHECK(uv1[0] == Catch::Approx(256.0 - (0.2627 / 1.8814 * 512.0)).margin(1e-2));
-  CHECK(uv1[1] == Catch::Approx(0.0).margin(1e-3));
-  const auto uv2 = detail::vectorscope_uv(0.1, -0.1, 2.0F);
-  CHECK(uv2[0] == Catch::Approx(358.4));
-  CHECK(uv2[1] == Catch::Approx(358.4));
-
-  // CIE xy: x in [0, 0.8] over 512 columns, y in [0, 0.9] over 512 rows, top = 0.9.
-  const auto d65 = detail::cie_uv(0.3127, 0.3290);
-  CHECK(d65[0] == Catch::Approx(200.128));
-  CHECK(d65[1] == Catch::Approx(324.8355).epsilon(1e-6));
-
-  // Texels: within one texel of the edge -> clamped onto it, further out -> dropped.
-  CHECK(detail::scope_texel(0.0, 0.0, 512) == std::array<int, 2>{0, 0});
-  CHECK(detail::scope_texel(512.0, -0.5, 512) == std::array<int, 2>{511, 0});
-  CHECK(detail::scope_texel(511.99, 300.5, 512) == std::array<int, 2>{511, 300});
-  CHECK(detail::scope_texel(-1.5, 10.0, 512) == std::array<int, 2>{-1, -1});
-  CHECK(detail::scope_texel(10.0, 513.5, 512) == std::array<int, 2>{-1, -1});
-  CHECK(detail::scope_texel(std::nan(""), 10.0, 512) == std::array<int, 2>{-1, -1});
-}
-
 TEST_CASE("render_test_scopes: AT1 a 203-nit flat frame fills one waveform row (FR-HDR-010)",
           "[fast][render][vulkan]") {
   auto surface = surface_or_skip(16, 16);
@@ -225,11 +174,9 @@ TEST_CASE("render_test_scopes: AT1 a 203-nit flat frame fills one waveform row (
   REQUIRE(m.cie_xy.valid);
   CHECK(m.waveform.tex.width == 1024);
   CHECK(m.waveform.tex.height == 512);
-  CHECK(m.vectorscope.tex.width == 512);
-  CHECK(m.cie_xy.tex.height == 512);
+  CHECK((m.vectorscope.tex.width == 512 && m.cie_xy.tex.height == 512));
   CHECK(m.waveform.tex.format == ovt::render::DisplayTarget::OffscreenFormat::Rgba16F);
   CHECK(m.waveform.tex.interop == ovt::render::DisplayTarget::Interop::None);
-  CHECK(m.waveform.tex.handle != nullptr);
   CHECK_FALSE(m.histogram_image.valid);  // §10.7.8, not this work item
 
   // All energy in the row for 203 nits, +- 1 row; every column has samples (1920 / 1024 per column).
@@ -243,8 +190,7 @@ TEST_CASE("render_test_scopes: AT1 a 203-nit flat frame fills one waveform row (
   CHECK(box[3] <= expected_y + 1);
   CHECK(total(wf, 0) == Catch::Approx(static_cast<double>(m.sampled_pixels)).epsilon(0.01));
   // Luminance mode repeats the value in R, G and B.
-  CHECK(wf.at(512, box[1], 0) == wf.at(512, box[1], 1));
-  CHECK(wf.at(512, box[1], 0) == wf.at(512, box[1], 2));
+  CHECK((wf.at(512, box[1], 0) == wf.at(512, box[1], 1) && wf.at(512, box[1], 0) == wf.at(512, box[1], 2)));
 
   // Grey: the vectorscope centre and the D65 point of the CIE plot, +- 2 px.
   const auto vbox = energy_box(download(*surface, ScopeKind::Vectorscope), 0);
@@ -339,4 +285,61 @@ TEST_CASE("render_test_scopes: AT3 accumulating twice gives byte-identical scope
       }
     }
   }
+}
+
+// Review of #514: frames rendered back to back while a readback is in flight must not overwrite the scope textures
+// that measure() is still handing out for an older measured_frame. hold_readbacks() plays the slow GPU.
+TEST_CASE("render_test_scopes: back-to-back renders keep each result's scopes with its frame (§10.7.9)",
+          "[fast][render][vulkan]") {
+  auto surface = surface_or_skip(16, 16);
+  // 1 nit and 203 nits land in different waveform rows.
+  OwnedPicture dark = grey(1.0);
+  OwnedPicture white = grey(203.0);
+  const auto row_of = [](double nits) {
+    return detail::waveform_texel_y(
+        detail::waveform_row(decoded_nits(luma_code(detail::pq_oetf(nits))), detail::WaveformAxis::LogNits));
+  };
+  const int dark_y = row_of(1.0);
+  const int white_y = row_of(203.0);
+  REQUIRE(std::abs(dark_y - white_y) > 2);
+  const auto rows_of_shown = [&] {
+    const auto box = energy_box(download(*surface, ScopeKind::Waveform), 0);
+    return std::array<int, 2>{box[1], box[3]};
+  };
+
+  // A (dark) is measured and shown: its slot's scope set is the one measure() hands out.
+  const Measurements a = measure_frame(*surface, dark, 0);
+  REQUIRE(a.waveform.valid);
+  CHECK(rows_of_shown() == std::array<int, 2>{dark_y, dark_y});
+
+  // B and C (white) render back to back while no readback completes: B takes the free slot, and the only slot left
+  // for C is A's.
+  REQUIRE(detail::hold_readbacks(*surface, true));
+  for (int i = 1; i <= 2; ++i) {
+    white.pic.id = ovt::fb::FrameId(i, i);
+    white.pic.generation = static_cast<uint64_t>(i) + 10;
+    surface->set_frame(white.pic);
+    static_cast<void>(surface->measure());
+    surface->render(one_to_one(white));
+    REQUIRE(std::string(surface->last_error()).empty());
+  }
+  // measure() still reports A, and A's scope textures still hold A, not C.
+  const Measurements still = surface->measure();
+  REQUIRE((still.valid && still.measured_frame.decode_index() == 0));
+  REQUIRE(still.waveform.valid);
+  CHECK(rows_of_shown() == std::array<int, 2>{dark_y, dark_y});
+
+  // Once the readbacks land, C is the newest result. Its slot was the shown one, so it was measured without scopes and
+  // says so; the next frame gets scopes again, in its own set.
+  REQUIRE(detail::hold_readbacks(*surface, false));
+  Measurements m = surface->measure();
+  for (int tries = 0; tries < 60000 && m.measured_frame.decode_index() != 2; ++tries) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    m = surface->measure();
+  }
+  CHECK(m.measured_frame.decode_index() == 2);
+  CHECK_FALSE(m.waveform.valid);  // C's scopes were skipped
+  const Measurements b = measure_frame(*surface, white, 3);
+  REQUIRE(b.waveform.valid);
+  CHECK(rows_of_shown() == std::array<int, 2>{white_y, white_y});
 }

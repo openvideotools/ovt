@@ -218,6 +218,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
 
   // The `kind` scope texture of the newest measurement, downloaded (blocking).
   bool download_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
@@ -476,6 +477,15 @@ bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
     return false;
   }
   impl->set_scope_config(config);
+  return true;
+}
+
+bool hold_readbacks(VideoSurface& surface, bool hold) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->hold_readbacks(hold);
   return true;
 }
 

@@ -102,6 +102,9 @@ class OVT_RENDER_API Measurer {
   // Collects every completed readback without blocking and returns the newest result (valid = false until one).
   // Its scope textures are the ones accumulated for measured_frame.
   Measurements poll();
+  // Test hook: while held, completed readbacks are treated as still in flight (a slow GPU), so the slot rotation of
+  // run() can be exercised deterministically.
+  void hold_readbacks(bool hold) { hold_readbacks_ = hold; }
   // §10.7.6-§10.7.7 options for the next runs.
   void set_scope_config(const ScopeConfig& config) { scope_config_ = config; }
   // The pl_tex behind a scope texture of the newest result (nullptr when there is none).
@@ -144,7 +147,8 @@ class OVT_RENDER_API Measurer {
   Measurements last_{};
   ScopeSet scopes_;           // set i belongs to readbacks_[i]
   ScopeConfig scope_config_;  // §10.7.6-§10.7.7 options
-  int shown_set_ = -1;        // the scope set of last_, -1 when it has none
+  int shown_set_ = -1;
+  bool hold_readbacks_ = false;  // hold_readbacks()        // the scope set of last_, -1 when it has none
 };
 
 }  // namespace ovt::render::detail

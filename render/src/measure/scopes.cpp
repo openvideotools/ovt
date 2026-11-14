@@ -45,6 +45,14 @@ std::array<std::array<float, 3>, 3> split_rows(const std::array<float, 9>& m) {
   return {{{m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]}}};
 }
 
+struct pl_shader_var dyn_var(struct pl_var v, const void* data) {
+  struct pl_shader_var sv = {};
+  sv.var = v;
+  sv.data = data;
+  sv.dynamic = true;
+  return sv;
+}
+
 struct pl_buffer_var counts_var() {
   struct pl_buffer_var counts = {};
   counts.var = pl_var_uint("ovt_counts");
@@ -69,11 +77,8 @@ bool clear_pass(pl_dispatch dp, pl_buf counts, std::string& err) {
   const auto n = static_cast<int>(kCountsLength);
   struct pl_buffer_var var = counts_var();
   const struct pl_shader_desc desc = counts_desc(counts, &var, PL_DESC_ACCESS_WRITEONLY);
-  std::array<struct pl_shader_var, 2> vars = {};
-  vars[0].var = pl_var_int("ovt_n");
-  vars[0].data = &n;
-  vars[1].var = pl_var_int("ovt_row");
-  vars[1].data = &n;
+  const std::array<struct pl_shader_var, 2> vars = {dyn_var(pl_var_int("ovt_n"), &n),
+                                                    dyn_var(pl_var_int("ovt_row"), &n)};
 
   pl_shader sh = pl_dispatch_begin(dp);
   struct pl_custom_shader custom = {};
@@ -126,26 +131,18 @@ bool accumulate_pass(pl_dispatch dp, pl_tex m, enum pl_color_primaries primaries
   struct pl_buffer_var var = counts_var();
   descs[1] = counts_desc(counts, &var, PL_DESC_ACCESS_READWRITE);
 
-  std::array<struct pl_shader_var, 12> vars = {};
-  size_t n = 0;
-  const auto add = [&](struct pl_var v, const void* data, bool dynamic) {
-    vars.at(n).var = v;
-    vars.at(n).data = data;
-    vars.at(n).dynamic = dynamic;
-    ++n;
-  };
-  add(pl_var_int("ovt_step"), &step, true);
-  add(pl_var_ivec2("ovt_grid"), grid.data(), true);
-  add(pl_var_int("ovt_crop_w"), &crop_w, true);
-  add(pl_var_vec3("ovt_xyz_x"), xyz[0].data(), true);
-  add(pl_var_vec3("ovt_xyz_y"), xyz[1].data(), true);
-  add(pl_var_vec3("ovt_xyz_z"), xyz[2].data(), true);
-  add(pl_var_vec3("ovt_b2020_r"), b2020[0].data(), true);
-  add(pl_var_vec3("ovt_b2020_g"), b2020[1].data(), true);
-  add(pl_var_vec3("ovt_b2020_b"), b2020[2].data(), true);
-  add(pl_var_int("ovt_wf_axis"), &axis, true);
-  add(pl_var_int("ovt_wf_parade"), &parade, true);
-  add(pl_var_float("ovt_vs_gain"), &gain, true);
+  const std::array<struct pl_shader_var, 12> vars = {dyn_var(pl_var_int("ovt_step"), &step),
+                                                     dyn_var(pl_var_ivec2("ovt_grid"), grid.data()),
+                                                     dyn_var(pl_var_int("ovt_crop_w"), &crop_w),
+                                                     dyn_var(pl_var_vec3("ovt_xyz_x"), xyz[0].data()),
+                                                     dyn_var(pl_var_vec3("ovt_xyz_y"), xyz[1].data()),
+                                                     dyn_var(pl_var_vec3("ovt_xyz_z"), xyz[2].data()),
+                                                     dyn_var(pl_var_vec3("ovt_b2020_r"), b2020[0].data()),
+                                                     dyn_var(pl_var_vec3("ovt_b2020_g"), b2020[1].data()),
+                                                     dyn_var(pl_var_vec3("ovt_b2020_b"), b2020[2].data()),
+                                                     dyn_var(pl_var_int("ovt_wf_axis"), &axis),
+                                                     dyn_var(pl_var_int("ovt_wf_parade"), &parade),
+                                                     dyn_var(pl_var_float("ovt_vs_gain"), &gain)};
 
   pl_shader sh = pl_dispatch_begin(dp);
   struct pl_custom_shader custom = {};
@@ -156,7 +153,7 @@ bool accumulate_pass(pl_dispatch dp, pl_tex m, enum pl_color_primaries primaries
   custom.descriptors = descs.data();
   custom.num_descriptors = static_cast<int>(descs.size());
   custom.variables = vars.data();
-  custom.num_variables = static_cast<int>(n);
+  custom.num_variables = static_cast<int>(vars.size());
   custom.compute = true;
   custom.compute_group_size[0] = kGroupSize;
   custom.compute_group_size[1] = kGroupSize;
@@ -185,19 +182,9 @@ bool resolve_pass(pl_dispatch dp, pl_buf counts, uint32_t base, int planes, uint
   const auto stride_i = static_cast<int>(stride);
   struct pl_buffer_var var = counts_var();
   const struct pl_shader_desc desc = counts_desc(counts, &var, PL_DESC_ACCESS_READONLY);
-  std::array<struct pl_shader_var, 4> vars = {};
-  vars[0].var = pl_var_int("ovt_base");
-  vars[0].data = &base_i;
-  vars[0].dynamic = true;
-  vars[1].var = pl_var_int("ovt_width");
-  vars[1].data = &width;
-  vars[1].dynamic = true;
-  vars[2].var = pl_var_int("ovt_planes");
-  vars[2].data = &planes;
-  vars[2].dynamic = true;
-  vars[3].var = pl_var_int("ovt_stride");
-  vars[3].data = &stride_i;
-  vars[3].dynamic = true;
+  const std::array<struct pl_shader_var, 4> vars = {
+      dyn_var(pl_var_int("ovt_base"), &base_i), dyn_var(pl_var_int("ovt_width"), &width),
+      dyn_var(pl_var_int("ovt_planes"), &planes), dyn_var(pl_var_int("ovt_stride"), &stride_i)};
 
   pl_shader sh = pl_dispatch_begin(dp);
   struct pl_custom_shader custom = {};

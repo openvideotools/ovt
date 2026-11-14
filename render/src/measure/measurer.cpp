@@ -148,9 +148,13 @@ void Measurer::run(const FrameSlot& slot) {
   }
   // §10.7.6-§10.7.7 (WI-4.454): the scopes of the same samples into the texture set of this readback slot. A failure
   // leaves the numbers alone; the scope textures of this result are then not valid.
+  // The set that measure() currently hands out (shown_set_) is never written: when frames render back to back while
+  // the other slot's readback is in flight, the only free slot can be the shown one. This frame is then measured
+  // without scopes (§10.7.9 allows an unmeasured frame), so the textures always belong to measured_frame.
   const int set = static_cast<int>(rb - readbacks_.data());
   std::string scope_err;
-  const bool scopes = scopes_.run(dispatch_, m_, slot.frame.color.primaries, s, set, scope_config_, scope_err);
+  const bool scopes =
+      set != shown_set_ && scopes_.run(dispatch_, m_, slot.frame.color.primaries, s, set, scope_config_, scope_err);
   struct pl_tex_transfer_params tp = {};
   tp.tex = levels_.back();
   tp.buf = rb->buf;
@@ -165,7 +169,7 @@ void Measurer::run(const FrameSlot& slot) {
   rb->pixels = pixels;
   rb->sampled = sampled_extent(width, s) * sampled_extent(height, s);
   rb->scopes = scopes;
-  if (scopes) {
+  if (scope_err.empty()) {
     error_.clear();
   } else {
     report(scope_err);
@@ -173,7 +177,7 @@ void Measurer::run(const FrameSlot& slot) {
 }
 
 void Measurer::collect(Readback& rb) {
-  if (!rb.pending || pl_buf_poll(gpu_, rb.buf, 0)) {
+  if (!rb.pending || hold_readbacks_ || pl_buf_poll(gpu_, rb.buf, 0)) {
     return;  // nothing queued, or still in use by the GPU
   }
   rb.pending = false;
