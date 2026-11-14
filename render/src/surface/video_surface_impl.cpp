@@ -434,7 +434,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     return true;
   }
 
-  std::vector<VkSurfaceFormatKHR> surface_formats() const {
+  [[nodiscard]] std::vector<VkSurfaceFormatKHR> surface_formats() const {
     std::vector<VkSurfaceFormatKHR> formats;
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): Vulkan's generic PFN_vkVoidFunction
     const auto get_formats = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(  // unfiltered: the loader's
