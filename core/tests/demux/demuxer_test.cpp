@@ -691,9 +691,17 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
       continue;
     }
     const std::string id = entry.at("id");
+    // A sweep covers what tools/fetch_corpora.py can deliver (chapter 14 §14.2.4, #517): unverified placeholders are
+    // skipped, and a maintainer-recorded file (manual_download) is swept when present and skipped when absent, also
+    // under OVT_REQUIRE_CORPORA=1. A test that names such an id still fails there.
+    if (entry.value("unverified", false)) {
+      continue;
+    }
     const auto path = ovt::test::corpus_path(id);
     if (!path) {
-      CHECK_FALSE(ovt::test::require_corpora());
+      if (!entry.value("manual_download", false)) {
+        CHECK_FALSE(ovt::test::require_corpora());
+      }
       continue;
     }
     // Files the manifest marks as broken on purpose are not part of the parity set.

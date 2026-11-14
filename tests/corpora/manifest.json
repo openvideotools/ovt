@@ -390,8 +390,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/professional_profiles/ALPHACONFORMANCEG.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/FRExt/alphaconformanceG.zip",
       "codecs": [
         "h264"
       ],
@@ -407,9 +406,15 @@
         "md5"
       ],
       "tags": [
-        "fast",
+        "slow",
         "h264-slice-golden"
-      ]
+      ],
+      "sha256": "a0a853f1b280b5d86e9d9f0834dec150488faad31ab26fe59a7ca1fa74ca71cd",
+      "size_bytes": 29204499,
+      "extract": {
+        "archive": "zip",
+        "member": "alphaconformanceG/alphaconformanceG.264"
+      }
     },
     {
       "id": "jvt_sp1_bt_a",
@@ -507,30 +512,6 @@
         "archive": "zip",
         "member": "CVMP_MOT_FRM_L31_B.26l"
       }
-    },
-    {
-      "id": "jvt_src19td_IBP_264",
-      "source": "jvt",
-      "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
-      "licence_spdx": "LicenseRef-ITU-Conformance",
-      "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/src19td.IBP.264.zip",
-      "unverified": true,
-      "codecs": [
-        "h264"
-      ],
-      "containers": [
-        "annexb"
-      ],
-      "features": [],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast",
-        "h264-slice-golden"
-      ]
     },
     {
       "id": "jvt_NRF_MW_E",
@@ -647,6 +628,7 @@
       ],
       "tags": [
         "slow",
+        "h264-ps-golden",
         "h264-slice-golden"
       ],
       "sha256": "99aa2f1501cd1ca8af1a292bb1f1f1cb49e6189a3131bc5bc8168b3dd322905a",
@@ -1067,33 +1049,6 @@
       }
     },
     {
-      "id": "jvt_CVFC1_SVA_C",
-      "source": "jvt",
-      "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
-      "licence_spdx": "LicenseRef-ITU-Conformance",
-      "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/AVCv1/CVFC1_SVA_C.zip",
-      "unverified": true,
-      "codecs": [
-        "h264"
-      ],
-      "containers": [
-        "annexb"
-      ],
-      "features": [
-        "cropping"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast",
-        "h264-ps-golden",
-        "h264-slice-golden"
-      ]
-    },
-    {
       "id": "jvt_FRExt1_Panasonic_D",
       "source": "jvt",
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
@@ -1205,8 +1160,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/MVC/MVCNV-1.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jvt-site/draft_conformance/MVC/MVCNV1.264",
       "codecs": [
         "h264"
       ],
@@ -1224,7 +1178,9 @@
         "slow",
         "h264-slice-golden",
         "mvc"
-      ]
+      ],
+      "sha256": "91589955e0b4f7b3ac254ee62ea0262e2c791b1c376162593f7c0c782df4e1cc",
+      "size_bytes": 3187769
     },
     {
       "id": "jvt_SVCBST_1",
@@ -1385,13 +1341,12 @@
       }
     },
     {
-      "id": "jctvc_DBLK_A_SONY_4",
+      "id": "jctvc_DBLK_A_SONY_3",
       "source": "jctvc",
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/DBLK_A_SONY_4.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/DBLK_A_SONY_3.zip",
       "codecs": [
         "h265"
       ],
@@ -1407,7 +1362,13 @@
       "tags": [
         "fast",
         "h265-cu-golden"
-      ]
+      ],
+      "sha256": "ce18cd42375359b9ff293d12a95793cc6b56eb75d899ad012c68e25dfa54dfbf",
+      "size_bytes": 279218,
+      "extract": {
+        "archive": "zip",
+        "member": "DBLK_A_SONY_3.bit"
+      }
     },
     {
       "id": "jctvc_DSLICE_A_HHI_5",
@@ -1565,20 +1526,21 @@
       }
     },
     {
-      "id": "jctvc_INITQP_B_Sony_1",
+      "id": "jctvc_INITQP_B_Main10_Sony_1",
       "source": "jctvc",
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/INITQP_B_Sony_1.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/INITQP_B_Main10_Sony_1.zip",
       "codecs": [
         "h265"
       ],
       "containers": [
         "annexb"
       ],
-      "features": [],
+      "features": [
+        "main10"
+      ],
       "tests": [
         "syntax",
         "index",
@@ -1586,16 +1548,21 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "c3f87037640953691dee02d4c9f28cd6a3b99de43e30bdcfdf583888191fa23e",
+      "size_bytes": 406174,
+      "extract": {
+        "archive": "zip",
+        "member": "INITQP_B_Main10_Sony_1/INITQP_B_Main10_Sony_1.bit"
+      }
     },
     {
-      "id": "jctvc_LTRPSPS_A_FJ_1",
+      "id": "jctvc_LTRPSPS_A_Qualcomm_1",
       "source": "jctvc",
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/LTRPSPS_A_FJ_1.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/HEVC_v1/LTRPSPS_A_Qualcomm_1.zip",
       "codecs": [
         "h265"
       ],
@@ -1612,7 +1579,13 @@
       ],
       "tags": [
         "fast"
-      ]
+      ],
+      "sha256": "ddab4ef4b919ada1185a1abe0ac843077073bcdd7dc5b9380f8a8f50aebde2b0",
+      "size_bytes": 490893,
+      "extract": {
+        "archive": "zip",
+        "member": "LTRPSPS_A_Qualcomm_1.bit"
+      }
     },
     {
       "id": "jctvc_MAXBINS_A_TI_5",
@@ -2236,8 +2209,7 @@
       "licence": "ITU-T conformance bitstream; free to download; redistribution not permitted — do not mirror",
       "licence_spdx": "LicenseRef-ITU-Conformance",
       "redistributable": false,
-      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/GENERAL_444_8bit_RExt_Sony_2.zip",
-      "unverified": true,
+      "url": "https://www.itu.int/wftp3/av-arch/jctvc-site/bitstream_exchange/draft_conformance/RExt/GENERAL_8b_444_RExt_Sony_2.zip",
       "codecs": [
         "h265"
       ],
@@ -2256,7 +2228,13 @@
       "tags": [
         "fast",
         "rext"
-      ]
+      ],
+      "sha256": "dd810f2b7e47e2dd4f516599b2a366084ad47f1af01fe2763caa9ab9ca1233c0",
+      "size_bytes": 260079,
+      "extract": {
+        "archive": "zip",
+        "member": "GENERAL_8b_444_RExt_Sony_2/GENERAL_8b_444_RExt_Sony_2.bit"
+      }
     },
     {
       "id": "jctvc_WPP_A_ericsson_MAIN_2",
@@ -5843,138 +5821,6 @@
       ],
       "size_bytes": 482,
       "sha256": "fca8b392ce3edd1303469ed10e2613deb2a89de44128755a0b900133829e8318"
-    },
-    {
-      "id": "aom_av1_1_b8_01_size_16x16_annexb",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "annexb"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1_1_b8_16_intra_only",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "ivf"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_00",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_01",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_02",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
-    },
-    {
-      "id": "aom_av1c_vs_03",
-      "source": "aom",
-      "licence": "AOM test data: BSD-2-Clause + AOM Patent License 1.0 (same as libaom)",
-      "licence_spdx": "BSD-2-Clause-Patent",
-      "redistributable": true,
-      "unverified": true,
-      "codecs": [
-        "av1"
-      ],
-      "containers": [
-        "isobmff"
-      ],
-      "tests": [
-        "syntax",
-        "md5"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "note": "named in 14.3.2 but not present at https://storage.googleapis.com/aom-test-data/ (probed 2026-11-06); see #160"
     },
     {
       "id": "mpegff_female_amr67DTX_hinted",
@@ -17875,13 +17721,14 @@
         "isobmff"
       ],
       "tags": [
-        "fast"
+        "slow",
+        "needs-corpus"
       ],
       "features": [
         "hlg"
       ],
       "manual_download": true,
-      "note": "BBC R&D HLG test clip (BT.2020, transfer 18); no stable direct URL known"
+      "note": "BBC R&D HLG test clip (BT.2020, transfer 18); no stable direct URL known; nightly-only, skipped when absent (#517)"
     },
     {
       "id": "hdr_dovi_p5",
@@ -17950,81 +17797,6 @@
       ],
       "manual_download": true,
       "note": "4kmedia.org Sony Camp HDR10 clip; trim to 10 s"
-    },
-    {
-      "id": "bento4_cenc_subsample",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "cenc",
-        "subsample"
-      ],
-      "note": "no such file in Bento4 Test/Data (#160)"
-    },
-    {
-      "id": "bento4_playready",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "playready"
-      ],
-      "note": "no such file in Bento4 Test/Data (#160)"
-    },
-    {
-      "id": "bento4_frag_cenc",
-      "source": "bento4",
-      "licence": "Bento4 test media, freely downloadable; treated as non-redistributable",
-      "licence_spdx": "LicenseRef-Bento4-Test-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "fast"
-      ],
-      "features": [
-        "cenc",
-        "fragmented"
-      ],
-      "note": "Test/Data/frag-cenc.mp4 does not exist upstream (the earlier URL returns 404); see #160"
-    },
-    {
-      "id": "gpac_eac3_atmos",
-      "source": "gpac",
-      "licence": "GPAC test suite media; per-file notices in media/README",
-      "licence_spdx": "LicenseRef-GPAC-Testsuite-Media",
-      "redistributable": false,
-      "unverified": true,
-      "containers": [
-        "isobmff"
-      ],
-      "tags": [
-        "slow"
-      ],
-      "features": [
-        "eac3",
-        "joc"
-      ],
-      "note": "no E-AC-3 JOC file in gpac/testsuite media (#160)"
     },
     {
       "id": "misc_pixel_motion_photo",
