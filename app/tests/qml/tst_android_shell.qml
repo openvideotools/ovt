@@ -17,17 +17,20 @@ TestCase {
     name: "AndroidShell"
     when: windowShown
 
+    // QtQuickView's QQuickView plays this window's part on Android. The shell is created inside it, not under the
+    // TestCase and reparented, so that its popups use this window's overlay from the start.
+    Window {
+        id: host
+
+        width: 1280
+        height: 800
+        visible: true
+    }
+
     Component {
         id: shellComponent
 
         AndroidShell {
-            // A top-level item has no window of its own; QtQuickView's QQuickView plays this part on Android.
-            property Window host: Window {
-                width: 1280
-                height: 800
-                visible: true
-            }
-            parent: host.contentItem
             width: 1280
             height: 800
         }
@@ -57,7 +60,7 @@ TestCase {
     }
 
     function createShell() {
-        const shell = createTemporaryObject(shellComponent, testCase)
+        const shell = createTemporaryObject(shellComponent, host.contentItem)
         verify(shell !== null)
         // AndroidShell is an Item, not a Window: QtQuickView accepts nothing else.
         verify(shell instanceof Item)
@@ -90,7 +93,9 @@ TestCase {
         verify(!popover.opened)
         findChild(shell, "jobsButton").clicked()
         tryVerify(function () { return popover.opened })
-        verify(popover.y >= shell.header.height)
+        verify(popover.parent.Window.window === host)
+        const toolBarBottom = shell.header.mapToItem(popover.parent, 0, shell.header.height).y
+        verify(popover.y >= toolBarBottom, "popover y " + popover.y + " above the toolbar bottom " + toolBarBottom)
         popover.close()
     }
 }
