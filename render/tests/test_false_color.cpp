@@ -5,11 +5,11 @@
 // with the band fractions and out-of-gamut counts of Measurements. The patterns are synthesised from their
 // expected.json (tests/corpora/patterns/, WI-1.413) with the generator's limited-range codes, as in test_measure.cpp.
 // The image goldens are tests/golden/render/false_color_patches.png and gamut_clip_p3.png (§10.9.2 items 4 and 6:
-// OVT_UPDATE_GOLDEN=1 rewrites them, never on CI). The false-colour golden uses the PQ patches at a quarter of their
-// size (480 x 270, same layout; neutral chroma, so no edge depends on chroma interpolation). The gamut-clip golden is
-// full size: the luma column on each side of a P3 stripe edge mixes two stripes' 4:2:0 chroma, and whether that mixed
-// colour lands just inside or just outside P3 differs between libplacebo versions (6.338 vs the pinned 7.349). One
-// such column is 0.05 % of a 1920 x 1080 frame, inside the 0.1 % budget, but 0.2 % of a 480 x 270 one.
+// OVT_UPDATE_GOLDEN=1 rewrites them, never on CI). Both use the patterns at a quarter of their size (480 x 270, same
+// layout). The image tests with saturated colour edges use 4:4:4 pictures: with 4:2:0, the luma column next to a
+// stripe edge mixes two stripes' interpolated chroma, and whether that mix lands just inside or just outside P3
+// differs between libplacebo versions (6.338 vs the pinned 7.349). Chroma interpolation is not what these tests are
+// about, and the uniform stripes have the same colours in either format. The AT2 measurement keeps the corpus's 4:2:0.
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -51,9 +51,10 @@ nlohmann::json expected(const std::string& pattern) {
 }
 
 // A 10-bit limited 4:2:0 picture of w x h filled with (y, cb, cr).
+// chroma_format: 1 = 4:2:0, 3 = 4:4:4.
 OwnedPicture picture(uint32_t w, uint32_t h, uint8_t primaries, uint8_t transfer, uint8_t matrix,
-                     std::array<uint32_t, 3> fill) {
-  OwnedPicture op(w, h, 10, 1, 2);
+                     std::array<uint32_t, 3> fill, uint8_t chroma_format = 1) {
+  OwnedPicture op(w, h, 10, chroma_format, 2);
   op.pic.color.primaries = primaries;
   op.pic.color.transfer = transfer;
   op.pic.color.matrix = matrix;
@@ -63,12 +64,17 @@ OwnedPicture picture(uint32_t w, uint32_t h, uint8_t primaries, uint8_t transfer
   return op;
 }
 
-// Fills columns [x0, x1) of every row with (y, cb, cr); x0 and x1 are even, so the chroma columns are whole.
+// Fills columns [x0, x1) of every row with (y, cb, cr); for 4:2:0, x0 and x1 are even, so the chroma columns are
+// whole.
 void fill_columns(OwnedPicture& op, uint32_t x0, uint32_t x1, std::array<uint32_t, 3> ycc) {
+  const bool full_chroma = op.pic.color.chroma_format == 3;
   for (uint32_t y = 0; y < op.pic.coded_height; ++y) {
     for (uint32_t x = x0; x < x1; ++x) {
       op.set(0, x, y, ycc[0]);
-      if (x % 2 == 0 && y % 2 == 0) {
+      if (full_chroma) {
+        op.set(1, x, y, ycc[1]);
+        op.set(2, x, y, ycc[2]);
+      } else if (x % 2 == 0 && y % 2 == 0) {
         op.set(1, x / 2, y / 2, ycc[1]);
         op.set(2, x / 2, y / 2, ycc[2]);
       }
@@ -90,10 +96,10 @@ OwnedPicture pq_patches(const nlohmann::json& exp, uint32_t div) {
 }
 
 // tests/corpora/patterns/p3_saturation frame 0 at 1/`div` of its size: eight stripes, Display P3 primaries (H.273
-// code 12), sRGB transfer (13), BT.709 matrix, limited range.
-OwnedPicture p3_saturation(const nlohmann::json& exp, uint32_t div) {
-  OwnedPicture op =
-      picture(exp.at("width").get<uint32_t>() / div, exp.at("height").get<uint32_t>() / div, 12, 13, 1, {64, 512, 512});
+// code 12), sRGB transfer (13), BT.709 matrix, limited range; 4:2:0 like the corpus file unless chroma_format = 3.
+OwnedPicture p3_saturation(const nlohmann::json& exp, uint32_t div, uint8_t chroma_format = 1) {
+  OwnedPicture op = picture(exp.at("width").get<uint32_t>() / div, exp.at("height").get<uint32_t>() / div, 12, 13, 1,
+                            {64, 512, 512}, chroma_format);
   for (const auto& stripe : exp.at("stripes")) {
     const auto& c = stripe.at("codes_ycbcr_limited");
     fill_columns(op, stripe.at("columns")[0].get<uint32_t>() / div, stripe.at("columns")[1].get<uint32_t>() / div,
@@ -369,8 +375,8 @@ TEST_CASE("render_test_false_color: AT2 P3 saturation counts outside BT.709 (§1
 
 TEST_CASE("render_test_false_color: gamut-clip overlay of the P3 stripes (golden)", "[fast][render][vulkan][golden]") {
   const nlohmann::json exp = expected("p3_saturation");
-  constexpr uint32_t kDiv = 1;  // full size, see the file comment
-  OwnedPicture op = p3_saturation(exp, kDiv);
+  constexpr uint32_t kDiv = 4;
+  OwnedPicture op = p3_saturation(exp, kDiv, 3);  // 4:4:4, see the file comment
   auto surface = surface_or_skip(static_cast<int>(op.pic.coded_width), static_cast<int>(op.pic.coded_height));
   set_frame(*surface, op, 0, 1);
   ViewState view = one_to_one(op);
@@ -389,43 +395,27 @@ TEST_CASE("render_test_false_color: gamut-clip overlay of the P3 stripes (golden
     }
     const bool outside = stripe.at("outside_709").get<bool>();
     INFO("stripe " << stripe.at("name").get<std::string>() << " Y " << y << " nits");
-    // 3 codes: Y comes from the stripe's rounded 10-bit codes, not from the ideal P3 values used here. The columns next
-    // to a stripe edge mix two stripes' chroma (4:2:0) and are left to the golden.
-    check_uniform(img, (stripe.at("columns")[0].get<int>() / static_cast<int>(kDiv)) + 2,
-                  (stripe.at("columns")[1].get<int>() / static_cast<int>(kDiv)) - 2,
+    // 3 codes: Y comes from the stripe's rounded 10-bit codes, not from the ideal P3 values used here.
+    check_uniform(img, stripe.at("columns")[0].get<int>() / static_cast<int>(kDiv),
+                  stripe.at("columns")[1].get<int>() / static_cast<int>(kDiv),
                   detail::gamut_clip_rgb(y, outside, false), 3);
   }
   check_golden(img, "gamut_clip_p3.png");
 }
 
 TEST_CASE("render_test_false_color: BT.2020 green is outside P3 and tinted cyan (§10.7.8)", "[fast][render][vulkan]") {
-  // 128 x 64 BT.2020 PQ: left half the BT.2020 green primary at 100 nits (R'G'B' = (0, PQ(100), 0) through the
-  // BT.2020 NCL matrix, limited range), right half neutral 100 nits.
-  OwnedPicture op = picture(128, 64, 9, 16, 9, {509, 512, 512});
+  // 128 x 64 BT.2020 PQ 4:4:4 (no chroma interpolation across the edge, see the file comment): left half the BT.2020
+  // green primary at 100 nits (R'G'B' = (0, PQ(100), 0) through the BT.2020 NCL matrix, limited range), right half
+  // neutral 100 nits.
+  OwnedPicture op = picture(128, 64, 9, 16, 9, {509, 512, 512}, 3);
   fill_columns(op, 0, 64, {366, 348, 303});
   auto surface = surface_or_skip(128, 64);
   set_frame(*surface, op, 0, 1);
   ViewState view = one_to_one(op);
   view.gamut_clip_overlay = true;
-  // Whole frame: the green half, give or take the luma column on each side of the edge, where 4:2:0 chroma is
-  // interpolated across it (version-dependent in libplacebo).
   const Measurements m = measure_frame(*surface, view, op.pic.id);
-  CHECK(m.out_of_gamut_p3 >= 63U * 64U);
-  CHECK(m.out_of_gamut_p3 <= 65U * 64U);
-  CHECK(m.out_of_gamut_709 == m.out_of_gamut_p3);  // BT.709 lies inside P3 here
-  // The green half without its last 2 columns, and the neutral half without its first 2: exact.
-  op.pic.crop = ovt::fb::Rect(0, 0, 62, 64);
-  set_frame(*surface, op, 1, 2);
-  const Measurements green_only = measure_frame(*surface, view, op.pic.id);
-  CHECK(green_only.out_of_gamut_p3 == 62U * 64U);
-  CHECK(green_only.out_of_gamut_709 == 62U * 64U);
-  op.pic.crop = ovt::fb::Rect(66, 0, 62, 64);
-  set_frame(*surface, op, 2, 3);
-  const Measurements neutral_only = measure_frame(*surface, view, op.pic.id);
-  CHECK(neutral_only.out_of_gamut_p3 == 0);
-  CHECK(neutral_only.out_of_gamut_709 == 0);
-  op.pic.crop = ovt::fb::Rect();
-  set_frame(*surface, op, 3, 4);
+  CHECK(m.out_of_gamut_p3 == 64U * 64U);
+  CHECK(m.out_of_gamut_709 == 64U * 64U);
 
   const RgbImage img = render_rgb(*surface, view);
   const std::array<int, 3> green = rgb_at(img, 32, 32);
