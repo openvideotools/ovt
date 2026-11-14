@@ -1,17 +1,19 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// MPEG-TS PSI tables (chapter 08 §8.6.7, WI-4.205a): section reassembly per PID (ISO/IEC 13818-1 §2.4.4 with
-// `pointer_field`), CRC-32 check and PAT / PMT / CAT decoding into a program map. A table whose `version_number` or
-// content changes is recorded again and replaces the table in the program map; identical repetitions are only
-// counted. Descriptor decoding, the DVB tables and the section tree follow in WI-4.205b.
+// MPEG-TS PSI/SI tables (chapter 08 §8.6.7, WI-4.205): section reassembly per PID (ISO/IEC 13818-1 §2.4.4 with
+// `pointer_field`), CRC-32 check, PAT / PMT / CAT decoding into a program map, and read-only DVB SDT / EIT / TDT /
+// TOT decoding (ETSI EN 300 468 §5.2). A table whose `version_number` or content changes is recorded again and
+// replaces the table in the program map; identical repetitions are only counted.
 //
-// SPEC-ASSUMPTION(#434): the PID_error rule (an ES PID of the final program map without any packet in the file)
-// and the CAT_error rule (scrambled packets outside PID 0 and 1 but no valid CAT section) are the answers proposed
-// in that issue.
+// SPEC-ASSUMPTION(#434): the tree layout (second root `PSIT` with one node per distinct section), the PID_error
+// rule (an ES PID of the final program map without any packet in the file) and the CAT_error rule (scrambled
+// packets outside PID 1 but no valid CAT section) are the answers proposed in that issue.
 
 #ifndef OVT_CONTAINER_MPEGTS_PSI_HPP
 #define OVT_CONTAINER_MPEGTS_PSI_HPP
+
+#include <flatbuffers/flatbuffers.h>
 
 #include <cstddef>
 #include <cstdint>
@@ -23,19 +25,30 @@
 #include <vector>
 
 #include "container/diagnostics.h"
+#include "container/mpegts/descriptors.hpp"
+#include "ovt_container_generated.h"
 
 namespace ovt::container::mpegts {
 
 inline constexpr uint16_t kPatPid = 0x0000;
 inline constexpr uint16_t kCatPid = 0x0001;
+inline constexpr uint16_t kSdtPid = 0x0011;
+inline constexpr uint16_t kEitPid = 0x0012;
+inline constexpr uint16_t kTimePid = 0x0014;  // TDT and TOT
 inline constexpr size_t kMaxSections = 4096;  // recorded sections per file; the counters stay exact
 
 // CRC-32/MPEG-2 (poly 0x04C11DB7, init 0xFFFFFFFF, no reflection, no final XOR). The CRC of a section that
 // includes its own CRC_32 field is 0.
 [[nodiscard]] uint32_t crc32_mpeg2(std::span<const uint8_t> bytes) noexcept;
 
-// Name of a table by table_id ("PAT", "CAT", "PMT", "SEC" for any other).
+// Name of a table by PID and table_id ("PAT", "PMT", "CAT", "SDT", "BAT", "NIT", "EIT", "TDT", "TOT", "SEC").
 [[nodiscard]] const char* table_name(uint8_t table_id) noexcept;
+
+// ISO/IEC 13818-1 Table 2-34 stream_type names ("AVC video", "HEVC video", ...); "reserved" or "user private".
+[[nodiscard]] const char* stream_type_name(uint8_t stream_type) noexcept;
+
+// "YYYY-MM-DD hh:mm:ss" for the 40-bit MJD + BCD time of EN 300 468 Annex C; "invalid" for a malformed value.
+[[nodiscard]] std::string format_dvb_time(uint64_t mjd_bcd) noexcept;
 
 struct Descriptor {
   uint8_t tag = 0;
@@ -66,6 +79,26 @@ struct Program {
   std::vector<EsInfo> streams;
 };
 
+struct Service {  // SDT
+  uint16_t id = 0;
+  bool eit_schedule = false;
+  bool eit_present_following = false;
+  uint8_t running_status = 0;
+  bool free_ca = false;
+  uint32_t off = 0;
+  std::vector<Descriptor> descriptors;
+};
+
+struct Event {  // EIT
+  uint16_t id = 0;
+  uint64_t start_time = 0;  // 40 bits, MJD + BCD
+  uint32_t duration = 0;    // 24 bits, BCD hhmmss
+  uint8_t running_status = 0;
+  bool free_ca = false;
+  uint32_t off = 0;
+  std::vector<Descriptor> descriptors;
+};
+
 // One distinct section (first occurrence of its content). `bytes` holds the whole section including the CRC.
 struct Section {
   uint16_t pid = 0;
@@ -86,7 +119,14 @@ struct Section {
   // Decoded body, by table.
   std::vector<PatEntry> pat;
   Program pmt;
-  std::vector<Descriptor> descriptors;  // CAT
+  std::vector<Descriptor> descriptors;  // CAT, TOT
+  std::vector<Service> services;
+  std::vector<Event> events;
+  uint16_t original_network_id = 0;  // SDT, EIT
+  uint16_t transport_stream_id = 0;  // EIT
+  uint8_t segment_last_section_number = 0;
+  uint8_t last_table_id = 0;
+  uint64_t utc_time = 0;  // TDT, TOT; 40 bits
 };
 
 struct PsiDiagnostic {
@@ -159,6 +199,10 @@ class PsiParser {
   void rebuild_programs();
   void diag(DiagCode code, std::string message, uint64_t offset);
 };
+
+// Nodes of the section tree (root `PSIT`, one child per recorded section), appended to `fbb`.
+[[nodiscard]] flatbuffers::Offset<fb::BoxNode> build_psi_node(flatbuffers::FlatBufferBuilder& fbb,
+                                                              const PsiTables& tables, uint64_t file_size);
 
 }  // namespace ovt::container::mpegts
 
