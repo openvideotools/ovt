@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc29 — 2026-11-14
+
+PATCH-level: spec-amendment pass 9 folds in the accepted answers of `spec-question` issues #495 and #498 from the HM plugin work (WI-4.105 part b, PR #496). No public C header, FlatBuffers schema (`predictor` is already a free string), plugin ABI or CLI grammar change.
+
+- 6 §6.3.1 `MotionVector.predictor` HEVC row; 7 §7.6.4 HM mapping — the `:<source>` suffix is optional: a decoder that does not expose the merge/AMVP candidate's neighbour (HM) writes `merge[<idx>]` / `amvp[<flag>]` and says so in its README; consumers parse the prefix up to `:` — WI-4.105 (#495)
+- 6 §6.2.3 — the ±32767 clamp with `MDL-GEN-0003` is exercised by the conformance stream `MVCLIP_A_qualcomm_3` (the sentence "conformance streams never need this" was wrong); rule unchanged — WI-4.105 (#498)
+
 ## 1.0.0-rc28 — 2026-11-14
 
 MINOR-level: spec-amendment pass 8 folds in the accepted answers of `spec-question` issues #466 (owner OK 2026-11-14), #473 and #512 (internal to libovt-render), #513 (WI-1.117: new code `SYN-AV1-0015` registered, D2; an additive `parse_frame_header` overload in the semi-public C++ helper header, D22; AT2 oracle substitution listed for the owner's check-in) the #509 review nits, and the corpus placeholder answer #517 (follow-up of #507 and #160; ships with `tests/corpora/manifest.json`, `tests/golden/av1-index.json`, the regenerated `tests/corpora/LICENSES.md` and the one-condition demux sweep change, because `tools/check_fast_subset.py` ties the §14.3.2 names to manifest entries). No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; the `MeasureConfig` setter of #512 item 5 is recorded as a later work item that waits for the owner.
