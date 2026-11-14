@@ -208,7 +208,7 @@ int64_t sign_extend(uint64_t raw, unsigned n) {
     return static_cast<int64_t>(raw);
   }
   const uint64_t sign = uint64_t{1} << (n - 1U);
-  return (raw & sign) != 0 ? static_cast<int64_t>(raw) - static_cast<int64_t>(sign << 1U) : static_cast<int64_t>(raw);
+  return static_cast<int64_t>((raw & sign) != 0 ? raw - (sign << 1U) : raw);  // unsigned wrap-around, no overflow
 }
 
 // Writes one random descriptor with the independent encoder and returns what the reader must return.
