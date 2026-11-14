@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc26 — 2026-11-14
+
+PATCH-level corpus bookkeeping (#507, follow-up of #160): the five `tests/corpora/manifest.json` ITU entries that returned 404 at their origin are replaced by the real streams, the AV1 Annex B fixture that never existed is dropped, and the hashes of the three remaining `unverified` ITU entries are recorded. Nothing that passed before changes: none of the old ids was ever fetchable. Ships with the manifest, `tests/golden/h26x-index.json` and `tools/tests/test_manifest_add.py` in one PR, because `tools/check_fast_subset.py` ties the §14.3.2 names to manifest entries. No public interface change.
+
+- 14 §14.3.2 — `jvt`: `src19td.IBP.264` and `CVFC1_SVA_C` leave the list (`CVFC1_Sony_C` takes the `h264-ps-golden` tag; `h264-slice-golden` is 38); `ALPHACONFORMANCEG` moves to `slow` (29 MB zip, over the `fast` budget); `jctvc`: `DBLK_A_SONY_4` → `DBLK_A_SONY_3`, `INITQP_B_Sony_1` → `INITQP_B_Main10_Sony_1`, `LTRPSPS_A_FJ_1` → `LTRPSPS_A_Qualcomm_1`; `aom`: `av1-1-b8-01-size-16x16-annexb` removed, `syn_av1_annexb` (recipe 18) is the Annex B fixture — WI-0.552, WI-1.108, WI-1.109, WI-2.164 (#507, #160)
+- 4 FR lines 288 and 342, 7 WI-1.108 Produces — the same id renames — WI-1.108, WI-2.164 (#507)
+
 ## 1.0.0-rc25 — 2026-11-14
 
 MINOR-level: spec-amendment pass 6 folds in the accepted answers of `spec-question` issues #394 (libvmaf host, ruled 2026-11-13), #407 (SSIM, Reviewer A), #408 (AV1 accounting, ruled 2026-11-14), #402 (timeline arrows, Reviewer A), two follow-up rulings on the closed #323 (box walker) and the acceptance-test changes of #391 point 4 and #395 point 6 that the owner approved on 2026-11-13. One new diagnostic code is registered (D2: `CNT-0111`). No public header, schema or CLI grammar change; the `finish` doc comment in `core/include/ovt/abi/metric_v1.h` ("optional sequence-level FrameScore") is unchanged and rides the next comment-only header batch (owner's check-in list). Acceptance-test wording changes listed for the owner's check-in: WI-2.157 AT2 (oracle = libaom `Accounting` records + inspect.c printing rule, #408; stricter, not narrower) and the test-stream swap to `av1-1-b8-22-svc-L1T2` (#408 point 4).
