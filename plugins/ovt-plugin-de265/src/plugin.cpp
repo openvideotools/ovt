@@ -4,7 +4,8 @@
 // libovt_plugin_de265: the ABI glue of the HEVC analysis plugin (chapter 0 §0.6.2, chapter 07 §7.6.2, WI-2.163).
 // It exports only ovt_analysis_decoder_v1(); every entry point is noexcept and turns an exception into an error
 // status. This skeleton produces frame-level FrameAnalysis buffers (FrameInfo, the empty 4x4 cell grid size,
-// diagnostics) and the Reconstruction planes; the block data of the mapping table arrives with WI-2.164.
+// diagnostics) and the planes (planes.hpp: Reconstruction, and the patch-0003 stages of WI-2.166); the block data
+// of the mapping table arrives with WI-2.164.
 
 #include <flatbuffers/flatbuffers.h>
 #include <libde265/de265-version.h>
@@ -22,12 +23,11 @@
 #include "decoder.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt_model_generated.h"
+#include "planes.hpp"
 
 namespace {
 
-constexpr uint8_t kCodecH265 = 2;    // ovt.fb.Codec.H265
-constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
-constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
+constexpr uint8_t kCodecH265 = 2;  // ovt.fb.Codec.H265
 
 }  // namespace
 
@@ -47,27 +47,22 @@ namespace {
 const ovt_AnalysisCaps kCaps = {
     sizeof(ovt_AnalysisCaps),
     kCodecH265,
-    1U << kStageRecon,  // plane_stages: Reconstruction (patch 0003 adds the others, WI-2.166)
-    0U,                 // grid_fields: none yet; WI-2.164 fills the CellGrid vectors and announces them
-    0,                  // has_symbol_accounting
-    1,                  // bit_exact: conformance-exact for Main / Main 10
-    1,                  // supports_threads: libde265 worker threads
+    ovt::de265::kSupportedStageMask,  // plane_stages: Reconstruction, + the patch-0003 stages (WI-2.166)
+    0U,                               // grid_fields: none yet; WI-2.164 fills the CellGrid vectors and announces them
+    0,                                // has_symbol_accounting
+    1,                                // bit_exact: conformance-exact for Main / Main 10
+    1,                                // supports_threads: libde265 worker threads
     "de265",
     "0.1.0+libde265." LIBDE265_VERSION,
     "LGPL-3.0-or-later",
     "HEVC Main / Main 10 / Main Still Picture via libde265 " LIBDE265_VERSION
-    " (OVT patch 0001); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
+    " (OVT patches 0001, 0003); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
 };
-
-// The plugin-local blob id "<decode_index>/recon/<plane>". SPEC-ASSUMPTION(#250): the host prefixes the stream's
-// source hash to make the chapter 06 §6.6.2 blob_id; a plugin is never told the source hash.
-std::string blob_id(int32_t decode_index, int plane) {
-  return std::to_string(decode_index) + "/recon/" + kPlaneNames.at(static_cast<std::size_t>(plane));
-}
 
 std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint32_t plane_stage_mask) {
   auto out = std::make_unique<ovt_AnalysisDecoder::Pulled>();
   out->frame = std::move(frame);
+  ovt::de265::keep_stages(&out->frame, plane_stage_mask);
   const ovt::de265::Frame& f = out->frame;
   auto fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(1024);
 
@@ -85,28 +80,7 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   const auto diags_v = fbb->CreateVector(diags);
 
   std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>> planes;
-  if (f.picture && (plane_stage_mask & (1U << kStageRecon)) != 0) {
-    for (int c = 0; c < 3; ++c) {
-      const ovt::de265::Plane& p = f.planes[static_cast<std::size_t>(c)];
-      if (p.data.empty()) {
-        continue;
-      }
-      std::string id = blob_id(f.decode_index, c);
-      const auto id_off = fbb->CreateString(id);
-      ovt::fb::PlaneRefBuilder pb(*fbb);
-      pb.add_stage(ovt::fb::PlaneStage::Reconstruction);
-      pb.add_plane(static_cast<uint8_t>(c));
-      pb.add_width(p.width);
-      pb.add_height(p.height);
-      pb.add_stride_bytes(p.width * p.sample_bytes);
-      pb.add_bit_depth(p.bit_depth);
-      pb.add_sample_bytes(p.sample_bytes);
-      pb.add_is_signed(false);
-      pb.add_blob_id(id_off);
-      planes.push_back(pb.Finish());
-      out->blobs.emplace(std::move(id), &p);
-    }
-  }
+  ovt::de265::add_plane_refs(*fbb, f, plane_stage_mask, &planes, &out->blobs);
   const auto planes_v = fbb->CreateVector(planes);
 
   flatbuffers::Offset<ovt::fb::CellGrid> grid_off;
@@ -205,6 +179,7 @@ ovt_status de265_pull(ovt_AnalysisDecoder* dec, uint32_t plane_stage_mask, ovt_B
   }
   *out_fb = ovt_Buffer{nullptr, 0};
   try {
+    dec->decoder->request_stages(plane_stage_mask);
     ovt::de265::Frame frame;
     if (!dec->decoder->pop(&frame)) {
       return OVT_OK;

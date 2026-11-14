@@ -6,6 +6,8 @@
 
 #include "decoder.hpp"
 
+#include "planes.hpp"
+
 #include <libde265/de265.h>
 #ifdef OVT_DE265_INTERNALS
 #include <libde265/de265_internals.h>
@@ -313,6 +315,23 @@ ovt_status Decoder::flush() {
   return decode_loop();
 }
 
+// SPEC-ASSUMPTION(#449): the mask of any pull(), even one that returns no frame, is a standing request for the
+// pictures that start decoding afterwards; the host primes a new decoder with one pull before the first push.
+void Decoder::request_stages(uint32_t plane_stage_mask) {
+#ifdef OVT_DE265_INTERNALS
+  const uint32_t wanted = plane_stage_mask & kSnapshotStageMask;
+  if ((wanted & ~snapshot_stages_) == 0) {
+    return;
+  }
+  if (snapshot_stages_ == 0) {
+    de265_internals_set_plane_snapshots(as_ctx(ctx_), 1);
+  }
+  snapshot_stages_ |= wanted;
+#else
+  (void)plane_stage_mask;  // a system libde265 has no snapshots; caps announce Reconstruction only
+#endif
+}
+
 bool Decoder::pop(Frame* out) {
   if (frames_.empty()) {
     return false;
@@ -490,6 +509,10 @@ void Decoder::copy_picture(const de265_image* img, Frame* frame) {
   }
 #ifdef OVT_DE265_INTERNALS
   read_internals(img, frame);
+  if (!copy_snapshots(img, snapshot_stages_, frame)) {  // also frees libde265's snapshots of the picture
+    add_diag(kInfo, "",
+             "libde265: plane snapshots left out: only the cropped picture is available without worker threads");
+  }
 #endif
   frame->diagnostics = std::move(pending_diags_);
   pending_diags_.clear();

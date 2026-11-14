@@ -66,6 +66,8 @@ ovt_plugin_de265_probe_tests = "LGPL-3.0-or-later"
 ovt_plugin_de265_grid_dump = "LGPL-3.0-or-later"
 # The plugin smoke test (WI-2.163) loads the plugin through the LGPL-2.1-or-later host registry.
 ovt_plugin_de265_smoke_tests = "LGPL-3.0-or-later"
+# The plane snapshot tests (WI-2.166): the host registry plus a direct link of the patched libde265.
+ovt_plugin_de265_planes_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
 # The optional H.265 motion vector / QP plugin (WI-4.107), built from the ovt_plugin_ffmpeg sources.
 ovt_plugin_ffmpeg_hevc = "LGPL-2.1-or-later"
