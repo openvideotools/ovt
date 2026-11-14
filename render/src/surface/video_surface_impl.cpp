@@ -5,8 +5,9 @@
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
-// dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
-// and export arrive with their own work items; until then those entry points are inert.
+// dithering (WI-1.403), interop (WI-1.404, render/src/platform/offscreen.cpp), native targets (WI-1.406 and later),
+// compare modes, overlays, measurements (WI-4.452, render/src/measure/) and export arrive with their own work items;
+// until then those entry points are inert.
 
 #include <algorithm>
 #include <cstdint>
@@ -24,9 +25,12 @@
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/overlay_set_impl.h"
+#include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "pipeline/render_params.h"
+#include "platform/offscreen.h"
 #include "vk_no_timestamps.h"
 
 namespace ovt::render {
@@ -48,42 +52,6 @@ enum pl_log_level placebo_log_level() {
   return (debug != nullptr && std::strcmp(debug, "1") == 0) ? PL_LOG_DEBUG : PL_LOG_WARN;
 }
 
-const char* offscreen_format_name(DisplayTarget::OffscreenFormat f) {
-  switch (f) {
-    case DisplayTarget::OffscreenFormat::Rgba8Srgb:
-      return "rgba8";  // UNORM storage; the sRGB encoding is applied by the pipeline (§10.3.2), not the format
-    case DisplayTarget::OffscreenFormat::Rgba16F:
-      return "rgba16hf";  // IEEE half float ("rgba16f" is libplacebo's emulated 32-bit-host variant)
-    case DisplayTarget::OffscreenFormat::Rgb10A2:
-      return "rgb10a2";
-  }
-  return "rgba8";
-}
-
-// §10.3.2 target colour per offscreen format (Rgba8Srgb -> Srgb8 row, Rgba16F -> ScRgbLinear16F row,
-// Rgb10A2 -> Pq10 row).
-struct pl_color_space target_color(const DisplayTarget& t) {
-  struct pl_color_space c = pl_color_space_unknown;
-  switch (t.offscreen_format) {
-    case DisplayTarget::OffscreenFormat::Rgba8Srgb:
-      c.primaries = PL_COLOR_PRIM_BT_709;
-      c.transfer = PL_COLOR_TRC_SRGB;
-      c.hdr.max_luma = PL_COLOR_SDR_WHITE;
-      break;
-    case DisplayTarget::OffscreenFormat::Rgba16F:
-      c.primaries = PL_COLOR_PRIM_BT_709;
-      c.transfer = PL_COLOR_TRC_LINEAR;
-      c.hdr.max_luma = t.headroom * t.sdr_white_nits;
-      break;
-    case DisplayTarget::OffscreenFormat::Rgb10A2:
-      c.primaries = PL_COLOR_PRIM_BT_2020;
-      c.transfer = PL_COLOR_TRC_PQ;
-      c.hdr.max_luma = 1000.0F;  // display max from DisplayCaps when known (WI-1.403/1.407)
-      break;
-  }
-  return c;
-}
-
 class VideoSurfaceImpl final : public VideoSurface {
  public:
   explicit VideoSurfaceImpl(const char* log_prefix) : prefix_(log_prefix != nullptr ? log_prefix : "render") {}
@@ -99,9 +67,6 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (target.kind != DisplayTarget::Kind::OffscreenTexture) {
       return fail("target", "only DisplayTarget::Kind::OffscreenTexture is implemented");
     }
-    if (target.interop != DisplayTarget::Interop::None) {
-      return fail("target", "offscreen interop is not implemented (WI-1.404)");
-    }
     if (target.width <= 0 || target.height <= 0) {
       return fail("offscreen target", "width and height must be positive");
     }
@@ -115,6 +80,32 @@ class VideoSurfaceImpl final : public VideoSurface {
       return fail("pl_log", "pl_log_create failed");
     }
 
+    // Interop::None and MetalTexture render on the surface's own Vulkan device; VulkanSharedDevice and GlTexture on
+    // the host's device or GL share group, which offscreen.cpp wraps (§10.2.2).
+    if (target.interop == DisplayTarget::Interop::None || target.interop == DisplayTarget::Interop::MetalTexture) {
+      if (!create_vulkan_device()) {
+        return false;
+      }
+    }
+    std::string stage;
+    std::string reason;
+    if (!offscreen_.create(log_, target, vk_, stage, reason)) {
+      return fail(stage, reason);
+    }
+    gpu_ = offscreen_.gpu();
+    renderer_ = pl_renderer_create(log_, gpu_);
+    if (renderer_ == nullptr) {
+      return fail("pl_renderer", "pl_renderer_create failed");
+    }
+
+    // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
+    static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
+
+    target_ = target;
+    return create_texture(target.width, target.height);
+  }
+
+  bool create_vulkan_device() {
     const struct pl_vk_inst_params inst_params = pl_vk_inst_default_params;
     inst_ = pl_vk_inst_create(log_, &inst_params);
     if (inst_ == nullptr) {
@@ -129,28 +120,22 @@ class VideoSurfaceImpl final : public VideoSurface {
     vk_params.get_proc_addr = detail::no_timestamps_get_proc_addr(inst_->get_proc_addr);
     // Software rasterizers (lavapipe on GPU-less CI hosts) are accepted; libplacebo still prefers a hardware device.
     vk_params.allow_software = true;
+    // Interop::MetalTexture needs VK_EXT_metal_objects, which libplacebo enables when the device offers it.
     vk_ = pl_vulkan_create(log_, &vk_params);
     if (vk_ == nullptr) {
       return fail("pl_gpu", "pl_vulkan_create found no usable Vulkan device");
     }
-
-    renderer_ = pl_renderer_create(log_, vk_->gpu);
-    if (renderer_ == nullptr) {
-      return fail("pl_renderer", "pl_renderer_create failed");
-    }
-
-    target_ = target;
-    return create_texture(target.width, target.height);
+    return true;
   }
 
   bool resize(int width, int height) override {
-    if (vk_ == nullptr) {
+    if (gpu_ == nullptr) {
       return fail("resize", "surface is not initialised");
     }
     if (width <= 0 || height <= 0) {
       return fail("resize", "width and height must be positive");
     }
-    if (tex_ != nullptr && width == target_.width && height == target_.height) {
+    if (offscreen_.texture() != nullptr && width == target_.width && height == target_.height) {
       return true;
     }
     target_.width = width;
@@ -160,10 +145,10 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void retarget(const DisplayTarget& target) override {
     // Only OffscreenTexture exists so far (WI-1.406 adds NATIVE targets): a new size or format re-creates the output
-    // texture on the same pl_gpu.
-    if (vk_ == nullptr || target.kind != DisplayTarget::Kind::OffscreenTexture ||
-        target.interop != DisplayTarget::Interop::None) {
-      fail("retarget", "only OffscreenTexture without interop is implemented");
+    // texture on the same pl_gpu, which serves the interop of init() only.
+    if (gpu_ == nullptr || target.kind != DisplayTarget::Kind::OffscreenTexture ||
+        target.interop != offscreen_.interop()) {
+      fail("retarget", "only OffscreenTexture with the interop of init() is implemented");
       return;
     }
     target_ = target;
@@ -173,12 +158,12 @@ class VideoSurfaceImpl final : public VideoSurface {
   // SPEC-ASSUMPTION(#209): set_frame() is void (§10.2.7); a rejected picture leaves slot A empty and last_error()
   // reports RND-0001.
   void set_frame(const Picture& a) override {
-    if (vk_ == nullptr) {
+    if (gpu_ == nullptr) {
       error_ = "RND-0001 picture rejected: surface is not initialised";
       return;
     }
     std::vector<std::string> notices;
-    std::string err = detail::upload_picture(vk_->gpu, a, slot_a_, notice_log_, notices);
+    std::string err = detail::upload_picture(gpu_, a, slot_a_, notice_log_, notices);
     for (const std::string& line : notices) {
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
       (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), line.c_str());
@@ -195,9 +180,11 @@ class VideoSurfaceImpl final : public VideoSurface {
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
 
   void render(const ViewState& view) override {
-    if (tex_ == nullptr) {
+    pl_tex tex = offscreen_.texture();
+    if (tex == nullptr) {
       return;
     }
+    offscreen_.begin_frame();  // the host hands the texture back (§10.2.2 sync rules)
     // background_rgba is 0xRRGGBBAA in the output encoding (straight alpha).
     union pl_clear_color color = {};
     const uint32_t bg = view.background_rgba;
@@ -205,36 +192,45 @@ class VideoSurfaceImpl final : public VideoSurface {
     color.f[1] = static_cast<float>((bg >> 16U) & 0xFFU) / 255.0F;
     color.f[2] = static_cast<float>((bg >> 8U) & 0xFFU) / 255.0F;
     color.f[3] = static_cast<float>(bg & 0xFFU) / 255.0F;
-    pl_tex_clear_ex(vk_->gpu, tex_, color);
+    pl_tex_clear_ex(gpu_, tex, color);
     if (slot_a_.valid) {
-      draw_slot_a(view);
+      draw_slot_a(view, tex);
     }
-    pl_gpu_flush(vk_->gpu);
+    // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
+    // being called.
+    if (measurer_.due()) {
+      measurer_.run(slot_a_);
+    }
+    offscreen_.end_frame();  // submit and hand the texture to the host
   }
 
-  [[nodiscard]] ExternalTexture output_texture() const override {
-    // Interop::None: the handle is the pl_tex itself (only libovt-render dereferences it); WI-1.404 returns the
-    // platform handles.
-    ExternalTexture t{};
-    t.interop = DisplayTarget::Interop::None;
-    t.handle = const_cast<void*>(static_cast<const void*>(tex_));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
-    t.handle2 = nullptr;
-    t.width = tex_ != nullptr ? target_.width : 0;
-    t.height = tex_ != nullptr ? target_.height : 0;
-    t.format = target_.offscreen_format;
-    t.layout = 0;
-    return t;
-  }
+  [[nodiscard]] ExternalTexture output_texture() const override { return offscreen_.describe(target_); }
 
   [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
-  Measurements measure() override { return Measurements{}; }                         // §10.7.9
+  Measurements measure() override {                                                  // §10.7.9: never blocks
+    measurer_.request();
+    return measurer_.poll();
+  }
 
   bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
     error_ = "export_png is not implemented yet (chapter 10 §10.8)";
     return false;
   }
 
-  [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override { return target_.encoding; }
+  void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
+
+  // The `kind` scope texture of the newest measurement, downloaded (blocking).
+  bool download_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    offscreen_.begin_frame();  // textures held by the host come back for the read ...
+    const bool ok = read_scope(kind, texels, width, height);
+    offscreen_.end_frame();  // ... and go back to it, as after render()
+    return ok;
+  }
+
+  [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override {
+    return detail::target_encoding(target_);
+  }
   [[nodiscard]] const char* last_error() const override { return error_.c_str(); }
 
   bool chroma_shift(float& sx, float& sy) const {
@@ -248,21 +244,28 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   bool download(detail::OutputPixels& out) const {
     out = detail::OutputPixels{};
-    if (tex_ == nullptr) {
+    pl_tex tex = offscreen_.texture();
+    if (tex == nullptr || !tex->params.host_readable) {
       return false;
     }
-    const size_t texel = tex_->params.format->texel_size;
+    // A texture handed to the host comes back for the read and goes out again afterwards.
+    const bool handed_out = offscreen_.begin_frame();
+    const size_t texel = tex->params.format->texel_size;
     const auto w = static_cast<size_t>(target_.width);
     const auto h = static_cast<size_t>(target_.height);
     std::vector<uint8_t> bytes(w * h * texel);
     struct pl_tex_transfer_params tp = {};
-    tp.tex = tex_;
+    tp.tex = tex;
     tp.row_pitch = w * texel;
     tp.ptr = bytes.data();
-    if (!pl_tex_download(vk_->gpu, &tp)) {
+    const bool ok = pl_tex_download(gpu_, &tp);
+    pl_gpu_finish(gpu_);
+    if (handed_out) {
+      offscreen_.end_frame();
+    }
+    if (!ok) {
       return false;
     }
-    pl_gpu_finish(vk_->gpu);
     out.width = target_.width;
     out.height = target_.height;
     out.texel_bytes = texel;
@@ -274,75 +277,48 @@ class VideoSurfaceImpl final : public VideoSurface {
   // Draws slot A over the cleared target with a basic parameter set: nearest upscaling at zoom >= 1, the ViewState
   // chroma upscaler and downscaler, no dithering, no anti-ringing (§10.3.1 "Scaling filters"). WI-1.403 replaces this
   // with the full pl_render_params of §10.3.4/§10.3.5 and the target frames of every encoding.
-  void draw_slot_a(const ViewState& view) {
+  void draw_slot_a(const ViewState& view, pl_tex tex) {
     struct pl_frame image = slot_a_.frame;
     image.crop = detail::source_rect(slot_a_, view.show_cropped);
 
     struct pl_frame target = {};
     target.num_planes = 1;
-    target.planes[0].texture = tex_;
+    target.planes[0].texture = tex;
     target.planes[0].components = 4;
     for (int c = 0; c < 4; ++c) {
       target.planes[0].component_mapping[c] = c;
     }
-    target.repr = pl_color_repr_rgb;
-    target.color = target_color(target_);
-    // §10.2.3 viewport mapping: device = (image - pan) * zoom + viewport / 2.
-    const double zoom = view.zoom > 0.0 ? view.zoom : 1.0;
-    const double half_w = target_.width / 2.0;
-    const double half_h = target_.height / 2.0;
-    target.crop.x0 = static_cast<float>(((static_cast<double>(image.crop.x0) - view.pan_x) * zoom) + half_w);
-    target.crop.y0 = static_cast<float>(((static_cast<double>(image.crop.y0) - view.pan_y) * zoom) + half_h);
-    target.crop.x1 = static_cast<float>(((static_cast<double>(image.crop.x1) - view.pan_x) * zoom) + half_w);
-    target.crop.y1 = static_cast<float>(((static_cast<double>(image.crop.y1) - view.pan_y) * zoom) + half_h);
-
-    struct pl_render_params params = {};
-    params.upscaler = zoom >= 1.0 ? &pl_filter_nearest : nullptr;
-    switch (view.downscale) {
-      case Downscale::Box:
-        params.downscaler = &pl_filter_box;
-        break;
-      case Downscale::Lanczos:
-        params.downscaler = &pl_filter_lanczos;
-        break;
-      case Downscale::Bilinear:
-        params.downscaler = &pl_filter_bilinear;
-        break;
-    }
-    params.plane_upscaler = view.chroma_upscale == ChromaUpscale::Nearest ? &pl_filter_nearest : &pl_filter_bilinear;
-    params.skip_anti_aliasing = zoom >= 1.0;
-    params.antiringing_strength = 0.0F;
-    // The target was cleared to background_rgba above; keep libplacebo from clearing the border again.
-#if PL_API_VER >= 346
-    params.border = PL_CLEAR_SKIP;
-#else
-    params.skip_target_clearing = true;
-#endif
-    if (!pl_render_image(renderer_, &image, &target, &params)) {
+    const DisplayTarget::OutputEncoding encoding = detail::target_encoding(target_);
+    target.color = detail::target_color(target_, encoding);
+    target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
+    params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
+    if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
 
-  bool create_texture(int width, int height) {
-    pl_gpu gpu = vk_->gpu;
-    const char* name = offscreen_format_name(target_.offscreen_format);
-    pl_fmt fmt = pl_find_named_fmt(gpu, name);
-    constexpr auto kNeeded = static_cast<enum pl_fmt_caps>(PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE |
-                                                           PL_FMT_CAP_BLITTABLE | PL_FMT_CAP_HOST_READABLE);
-    if (fmt == nullptr || (fmt->caps & kNeeded) != kNeeded) {
-      pl_tex_destroy(gpu, &tex_);
-      return fail("offscreen target", std::string("texture format ") + name + " is not renderable/blittable/readable");
+  // Between offscreen_.begin_frame() and end_frame().
+  bool read_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    pl_tex tex = measurer_.scope_tex(kind);
+    if (tex == nullptr || !tex->params.host_readable) {
+      return false;
     }
-    struct pl_tex_params params = {};
-    params.w = width;
-    params.h = height;
-    params.format = fmt;
-    params.sampleable = true;
-    params.renderable = true;
-    params.blit_dst = true;
-    params.host_readable = true;
-    if (!pl_tex_recreate(gpu, &tex_, &params)) {
-      return fail("offscreen target", std::string("pl_tex_recreate failed for ") + name);
+    width = tex->params.w;
+    height = tex->params.h;
+    texels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    struct pl_tex_transfer_params tp = {};
+    tp.tex = tex;
+    tp.row_pitch = static_cast<size_t>(width) * 4 * sizeof(uint16_t);
+    tp.ptr = texels.data();
+    const bool ok = pl_tex_download(gpu_, &tp);
+    pl_gpu_finish(gpu_);
+    return ok;
+  }
+
+  bool create_texture(int /*width*/, int /*height*/) {
+    std::string reason;
+    if (!offscreen_.create_texture(target_, reason)) {
+      return fail("offscreen target", reason);
     }
     return true;
   }
@@ -447,11 +423,13 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
-    if (vk_ != nullptr) {
-      detail::destroy_slot(vk_->gpu, slot_a_);
-      pl_tex_destroy(vk_->gpu, &tex_);
+    measurer_.destroy();
+    if (gpu_ != nullptr) {
+      detail::destroy_slot(gpu_, slot_a_);
     }
     pl_renderer_destroy(&renderer_);
+    offscreen_.destroy();  // the output texture, and the host's device or GL context wrapper
+    gpu_ = nullptr;
     wait_device_idle();
     pl_vulkan_destroy(&vk_);
     pl_vk_inst_destroy(&inst_);
@@ -462,13 +440,18 @@ class VideoSurfaceImpl final : public VideoSurface {
   std::string error_;
   pl_log log_ = nullptr;
   pl_vk_inst inst_ = nullptr;
-  pl_vulkan vk_ = nullptr;
-  pl_tex tex_ = nullptr;
+  pl_vulkan vk_ = nullptr;  // own Vulkan device (Interop::None, MetalTexture)
+  // The output texture and the §10.2.2 interop. mutable: the const CPU download takes a texture held by the host back
+  // for the read (begin_frame/end_frame).
+  mutable detail::OffscreenGpu offscreen_;
+  pl_gpu gpu_ = nullptr;  // offscreen_.gpu()
   pl_renderer renderer_ = nullptr;
   detail::FrameSlot slot_a_;
+  detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
+  detail::Measurer measurer_;  // §10.7 (WI-4.452)
 };
 
 }  // namespace
@@ -486,6 +469,29 @@ bool download_output(const VideoSurface& surface, OutputPixels& out) {
     return false;
   }
   return impl->download(out);
+}
+
+bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->set_scope_config(config);
+  return true;
+}
+
+bool hold_readbacks(VideoSurface& surface, bool hold) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->hold_readbacks(hold);
+  return true;
+}
+
+bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width, int& height) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->download_scope(kind, rgba16hf, width, height);
 }
 
 bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {

@@ -1,0 +1,692 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-14
+Subject: [PATCH] Keep plane snapshots: pre-deblock, pre-SAO, prediction, coefficients
+
+Extends the DE265_INTERNALS build (patch 0001) with opt-in plane snapshots. A decoder context
+with de265_internals_set_plane_snapshots(ctx, 1) gives every picture it starts afterwards
+four extra planes per colour component, read with de265_internals_get_snapshot_plane():
+
+  - PRE_DEBLOCK: the picture once every slice segment is decoded, before the in-loop filters,
+  - PRE_SAO: the picture after deblocking, before SAO,
+  - PREDICTION: the prediction of every transform block, taken in scale_coefficients() just
+    before the residual is added in place; blocks without a residual take their
+    reconstruction, PCM and cu_transquant_bypass coding units take 0 by convention,
+  - COEFFICIENTS: int32 dequantised coefficients of every transform block at its sample
+    positions.
+
+The residual is PRE_DEBLOCK - PREDICTION and is not stored. The copies are taken at one point
+for the sequential and the threaded filter paths (decctx.cc decode_some(), after the WPP/tile
+tasks are waited for); with snapshots on, the threaded path lets deblocking finish before SAO
+tasks start, which changes scheduling only. Snapshots are freed with the picture or by
+de265_internals_release_snapshots() as soon as the consumer has copied them; with snapshots
+off nothing is allocated and each hook is one pointer test. Decoded pictures are identical
+with snapshots on and off.
+
+All hooks have C linkage and the de265_internals_ prefix (de265_internals_hooks.h, not
+installed), so the ON library still adds only de265_internals_* symbols; every change is
+compiled only when DE265_INTERNALS is defined, so the OFF library stays identical to
+upstream. Every modified upstream file carries a dated modification notice (GPL-3.0
+section 5(a), through LGPL-3.0); the new header is LGPL-3.0-or-later like libde265.
+
+Upstream-Status: Pending [to be offered to strukturag/libde265 after patch 0001, WI-2.167]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-3.0-or-later
+Rationale: libde265 filters pictures in place and adds residuals into the prediction in place,
+  so pre-filter planes, the prediction and the coefficients exist only transiently inside the
+  decoder (chapter 07 section 7.6.2, patch 0003).
+---
+ libde265/de265_internals.cc      | 248 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ libde265/de265_internals.h       |  43 ++++++++++-
+ libde265/de265_internals_hooks.h |  58 ++++++++++++++
+ libde265/decctx.cc               |  33 ++++++++
+ libde265/decctx.h                |  11 +++
+ libde265/image.cc                |  14 ++++
+ libde265/image.h                 |   9 +++
+ libde265/transform.cc            |  21 +++++
+ 8 files changed, 435 insertions(+), 2 deletions(-)
+
+diff --git a/libde265/de265_internals.cc b/libde265/de265_internals.cc
+index 0ce19fa..88a8720 100644
+--- a/libde265/de265_internals.cc
++++ b/libde265/de265_internals.cc
+@@ -20,15 +20,21 @@
+ 
+ /* Read-only internals API (OVT patch 0001). Reads the metadata arrays of a decoded
+    de265_image; changes nothing. The public functions take unit coordinates; the
+-   de265_image accessors take luma sample coordinates, so every function converts. */
++   de265_image accessors take luma sample coordinates, so every function converts.
++   Plane snapshots (OVT patch 0003): the de265_internals_hook_* functions that the decoder
++   calls while a picture is decoded, and the getters of their copies (end of this file). */
+ 
+ #include "de265_internals.h"
++#include "de265_internals_hooks.h"
++#include "decctx.h"
+ #include "image.h"
+ #include "slice.h"
+ #include "sps.h"
+ 
+ #include <string.h>
+ 
++#include <new>
++
+ 
+ struct de265_internals_access
+ {
+@@ -343,3 +349,243 @@ void de265_internals_get_sps_sizes(const struct de265_image* img, int* CtbLog2Si
+   if (PicWidthInCtbsY)  *PicWidthInCtbsY  = ok ? sps->PicWidthInCtbsY  : 0;
+   if (PicHeightInCtbsY) *PicHeightInCtbsY = ok ? sps->PicHeightInCtbsY : 0;
+ }
++
++
++/* --- Plane snapshots (OVT patch 0003) ---
++   Plain arrays and free functions only, so that the library's external symbols stay the
++   upstream ones plus de265_internals_* (no template instantiations, no member functions). */
++
++struct de265_internals_snapshot_component
++{
++  int width, height, bytes;      /* samples; bytes per pixel sample */
++  uint8_t* pre_deblock;          /* width*height*bytes each */
++  uint8_t* pre_sao;
++  uint8_t* prediction;
++  int32_t* coefficients;         /* width*height */
++  uint8_t* predicted;            /* one flag per 4x4 block: prediction captured */
++};
++
++/* The snapshots of one picture; de265_image::internals_snap points here. */
++struct de265_internals_snapshots
++{
++  de265_internals_snapshot_component comp[3];
++  int num_components;
++  int have_pre_deblock, have_pre_sao;
++  uint64_t bytes;
++};
++
++typedef de265_internals_snapshot_component snap_comp;
++
++namespace {
++
++void delete_snapshots(de265_internals_snapshots* snap)
++{
++  for (int cIdx = 0; cIdx < 3; cIdx++) {
++    snap_comp& c = snap->comp[cIdx];
++    delete[] c.pre_deblock;
++    delete[] c.pre_sao;
++    delete[] c.prediction;
++    delete[] c.coefficients;
++    delete[] c.predicted;
++  }
++  delete snap;
++}
++
++void free_snapshots(de265_image* img)
++{
++  de265_internals_snapshots* snap = img->internals_snap;
++  if (snap == NULL) return;
++  if (img->decctx != NULL) img->decctx->internals_snapshot_bytes -= snap->bytes;
++  img->internals_snap = NULL;
++  delete_snapshots(snap);
++}
++
++int blocks_wide(const snap_comp& c) { return (c.width + 3) / 4; }
++
++void copy_pixels(const de265_image* img, int cIdx, uint8_t* dst)
++{
++  const int bytes  = img->get_bytes_per_pixel(cIdx);
++  const size_t row = (size_t)img->get_width(cIdx) * bytes;
++  const size_t stride = (size_t)img->get_image_stride(cIdx) * bytes;
++  const uint8_t* src = img->get_image_plane(cIdx);
++  for (int y = 0; y < img->get_height(cIdx); y++) {
++    memcpy(dst + y * row, src + y * stride, row);
++  }
++}
++
++/* True when the n x n block at (x,y) lies inside the component. */
++bool inside_component(const snap_comp& c, int x, int y, int n)
++{
++  return x >= 0 && y >= 0 && n > 0 && x + n <= c.width && y + n <= c.height;
++}
++
++}  // namespace
++
++
++void de265_internals_set_plane_snapshots(de265_decoder_context* ctx, int enable)
++{
++  if (ctx != NULL) ((decoder_context*)ctx)->internals_snapshots = (enable != 0);
++}
++
++const void* de265_internals_get_snapshot_plane(const struct de265_image* img, int snapshot, int cIdx,
++                                               int* width, int* height, int* stride_bytes)
++{
++  if (width) *width = 0;
++  if (height) *height = 0;
++  if (stride_bytes) *stride_bytes = 0;
++  if (img == NULL || img->internals_snap == NULL) return NULL;
++  const de265_internals_snapshots* snap = img->internals_snap;
++  if (cIdx < 0 || cIdx >= snap->num_components) return NULL;
++  const snap_comp& c = snap->comp[cIdx];
++
++  const void* data = NULL;
++  int sample_bytes = c.bytes;
++  switch (snapshot) {
++  case DE265_INTERNALS_SNAPSHOT_PRE_DEBLOCK:  if (snap->have_pre_deblock) data = c.pre_deblock; break;
++  case DE265_INTERNALS_SNAPSHOT_PRE_SAO:      if (snap->have_pre_sao) data = c.pre_sao; break;
++  case DE265_INTERNALS_SNAPSHOT_PREDICTION:   if (snap->have_pre_deblock) data = c.prediction; break;
++  case DE265_INTERNALS_SNAPSHOT_COEFFICIENTS:
++    if (snap->have_pre_deblock) data = c.coefficients;
++    sample_bytes = (int)sizeof(int32_t);
++    break;
++  default: break;
++  }
++  if (data == NULL) return NULL;
++  if (width) *width = c.width;
++  if (height) *height = c.height;
++  if (stride_bytes) *stride_bytes = c.width * sample_bytes;
++  return data;
++}
++
++void de265_internals_release_snapshots(const struct de265_image* img)
++{
++  if (img != NULL) free_snapshots(const_cast<de265_image*>(img));
++}
++
++uint64_t de265_internals_get_snapshot_peak_bytes(const de265_decoder_context* ctx)
++{
++  return ctx != NULL ? ((const decoder_context*)ctx)->internals_snapshot_peak_bytes : 0;
++}
++
++
++void de265_internals_hook_picture_start(struct de265_image* img)
++{
++  free_snapshots(img);
++  decoder_context* ctx = img->decctx;
++  if (ctx == NULL || !ctx->internals_snapshots || !img->has_sps()) return;
++
++  de265_internals_snapshots* snap = new (std::nothrow) de265_internals_snapshots;
++  if (snap == NULL) return;   /* no snapshots for this picture; decoding goes on */
++  memset(snap, 0, sizeof(*snap));
++  snap->num_components = (img->get_chroma_format() == de265_chroma_mono) ? 1 : 3;
++  bool ok = true;
++  for (int cIdx = 0; cIdx < snap->num_components; cIdx++) {
++    snap_comp& c = snap->comp[cIdx];
++    c.width  = img->get_width(cIdx);
++    c.height = img->get_height(cIdx);
++    c.bytes  = img->get_bytes_per_pixel(cIdx);
++    const size_t samples = (size_t)c.width * c.height;
++    const size_t blocks  = (size_t)blocks_wide(c) * ((c.height + 3) / 4);
++    c.pre_deblock  = new (std::nothrow) uint8_t[samples * c.bytes];
++    c.pre_sao      = new (std::nothrow) uint8_t[samples * c.bytes];
++    c.prediction   = new (std::nothrow) uint8_t[samples * c.bytes];
++    c.coefficients = new (std::nothrow) int32_t[samples]();
++    c.predicted    = new (std::nothrow) uint8_t[blocks]();
++    ok = ok && c.pre_deblock && c.pre_sao && c.prediction && c.coefficients && c.predicted;
++    snap->bytes += samples * (3 * c.bytes + sizeof(int32_t)) + blocks;
++  }
++  if (!ok) {
++    delete_snapshots(snap);
++    return;
++  }
++  img->internals_snap = snap;
++  ctx->internals_snapshot_bytes += snap->bytes;
++  if (ctx->internals_snapshot_bytes > ctx->internals_snapshot_peak_bytes) {
++    ctx->internals_snapshot_peak_bytes = ctx->internals_snapshot_bytes;
++  }
++}
++
++void de265_internals_hook_free(struct de265_image* img)
++{
++  free_snapshots(img);
++}
++
++void de265_internals_hook_tb_prediction(struct de265_image* img, int cIdx, int xT, int yT, int nT,
++                                        const void* pred, int pred_stride)
++{
++  de265_internals_snapshots* snap = img->internals_snap;
++  if (snap == NULL || cIdx < 0 || cIdx >= snap->num_components) return;
++  snap_comp& c = snap->comp[cIdx];
++  if (!inside_component(c, xT, yT, nT)) return;
++
++  const size_t row = (size_t)nT * c.bytes;
++  const uint8_t* src = (const uint8_t*)pred;
++  for (int y = 0; y < nT; y++) {
++    memcpy(c.prediction + ((size_t)(yT + y) * c.width + xT) * c.bytes,
++           src + (size_t)y * pred_stride * c.bytes, row);
++  }
++  for (int by = yT / 4; by < (yT + nT) / 4; by++) {
++    memset(c.predicted + (size_t)by * blocks_wide(c) + xT / 4, 1, nT / 4);
++  }
++}
++
++void de265_internals_hook_tb_coefficients(struct de265_image* img, int cIdx, int xT, int yT, int nT,
++                                          const int16_t* coeff)
++{
++  de265_internals_snapshots* snap = img->internals_snap;
++  if (snap == NULL || cIdx < 0 || cIdx >= snap->num_components) return;
++  snap_comp& c = snap->comp[cIdx];
++  if (!inside_component(c, xT, yT, nT)) return;
++
++  for (int v = 0; v < nT; v++) {
++    int32_t* dst = c.coefficients + (size_t)(yT + v) * c.width + xT;
++    for (int u = 0; u < nT; u++) {
++      dst[u] = coeff[u + v * nT];
++    }
++  }
++}
++
++void de265_internals_hook_pre_deblock(struct de265_image* img)
++{
++  de265_internals_snapshots* snap = img->internals_snap;
++  if (snap == NULL) return;
++
++  const seq_parameter_set& sps = img->get_sps();
++  for (int cIdx = 0; cIdx < snap->num_components; cIdx++) {
++    snap_comp& c = snap->comp[cIdx];
++    copy_pixels(img, cIdx, c.pre_deblock);
++
++    /* Complete the prediction per 4x4 block: PCM and transquant-bypass coding units have
++       prediction 0 by convention; a block without a residual (cbf 0, skip) never reached
++       scale_coefficients(), so its prediction is its reconstruction. */
++    const int sub_w = cIdx ? sps.SubWidthC : 1;
++    const int sub_h = cIdx ? sps.SubHeightC : 1;
++    for (int by = 0; by < (c.height + 3) / 4; by++) {
++      for (int bx = 0; bx < blocks_wide(c); bx++) {
++        const int x = bx * 4;
++        const int y = by * 4;
++        const bool lossless = img->get_pcm_flag(x * sub_w, y * sub_h) ||
++                              img->get_cu_transquant_bypass(x * sub_w, y * sub_h);
++        if (!lossless && c.predicted[(size_t)by * blocks_wide(c) + bx]) continue;
++        const int w = (c.width - x < 4) ? c.width - x : 4;
++        const int h = (c.height - y < 4) ? c.height - y : 4;
++        for (int r = 0; r < h; r++) {
++          const size_t at = ((size_t)(y + r) * c.width + x) * c.bytes;
++          if (lossless) memset(c.prediction + at, 0, (size_t)w * c.bytes);
++          else          memcpy(c.prediction + at, c.pre_deblock + at, (size_t)w * c.bytes);
++        }
++      }
++    }
++  }
++  snap->have_pre_deblock = 1;
++}
++
++void de265_internals_hook_pre_sao(struct de265_image* img)
++{
++  de265_internals_snapshots* snap = img->internals_snap;
++  if (snap == NULL || !snap->have_pre_deblock) return;
++  for (int cIdx = 0; cIdx < snap->num_components; cIdx++) {
++    copy_pixels(img, cIdx, snap->comp[cIdx].pre_sao);
++  }
++  snap->have_pre_sao = 1;
++}
+diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
+index a38fd8a..6a60877 100644
+--- a/libde265/de265_internals.h
++++ b/libde265/de265_internals.h
+@@ -18,7 +18,8 @@
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-/* de265_internals.h -- read-only access to per-picture metadata (OVT patch 0001).
++/* de265_internals.h -- read-only access to per-picture metadata (OVT patch 0001) and
++ * plane snapshots (OVT patch 0003).
+  *
+  * Built only with the CMake option DE265_INTERNALS=ON. Every function reads the metadata
+  * that the decoder already keeps for a decoded picture (the image returned by
+@@ -167,6 +168,46 @@ LIBDE265_API int      de265_internals_get_picture_poc(const struct de265_image*)
+ LIBDE265_API void     de265_internals_get_sps_sizes(const struct de265_image*, int* CtbLog2SizeY, int* MinCbLog2SizeY,
+                                                     int* MinTbLog2SizeY, int* PicWidthInCtbsY, int* PicHeightInCtbsY);
+ 
++/* --- Plane snapshots (OVT patch 0003) ---
++ *
++ * With snapshots enabled on a decoder context, every picture decoded from then on keeps four
++ * extra planes per colour component, each covering the whole decoded picture
++ * (pic_width/height_in_luma_samples, chroma subsampled):
++ *
++ *   PRE_DEBLOCK   the reconstruction before the deblocking filter (pixels, like the picture),
++ *   PRE_SAO       the picture after deblocking, before SAO (pixels),
++ *   PREDICTION    the intra or inter prediction of every sample (pixels); by convention 0 for
++ *                 PCM and cu_transquant_bypass coding units,
++ *   COEFFICIENTS  int32 dequantised transform coefficients (scaled levels for transform-skip,
++ *                 the levels themselves for cu_transquant_bypass): coefficient (u,v) of the
++ *                 transform block at (x0,y0) sits at sample (x0+u, y0+v); zero elsewhere.
++ *
++ * The residual is PRE_DEBLOCK - PREDICTION for every sample (it is not stored twice).
++ * Pixel planes use the picture's sample size: one byte per sample at 8 bits, two bytes
++ * (native endian) above. Snapshots cost about (3 x pixel size + 4) bytes per sample of the
++ * picture, so a consumer releases them as soon as it has copied them out; they are freed with
++ * the picture otherwise. Disabled by default: with snapshots off nothing is allocated or copied.
++ */
++enum de265_internals_snapshot {
++  DE265_INTERNALS_SNAPSHOT_PRE_DEBLOCK  = 0,
++  DE265_INTERNALS_SNAPSHOT_PRE_SAO      = 1,
++  DE265_INTERNALS_SNAPSHOT_PREDICTION   = 2,
++  DE265_INTERNALS_SNAPSHOT_COEFFICIENTS = 3
++};
++
++/* Enables (1) or disables (0) snapshots for the pictures that start decoding afterwards. */
++LIBDE265_API void     de265_internals_set_plane_snapshots(de265_decoder_context*, int enable);
++/* The plane of one snapshot (enum de265_internals_snapshot) of colour component cIdx, or NULL
++   when the picture has none (snapshots off, released, out of memory, or not finished). Any
++   size pointer may be NULL. Valid until de265_internals_release_snapshots() or the release of
++   the picture. */
++LIBDE265_API const void* de265_internals_get_snapshot_plane(const struct de265_image*, int snapshot, int cIdx,
++                                                            int* width, int* height, int* stride_bytes);
++/* Frees the snapshots of a picture (it stays a valid picture). */
++LIBDE265_API void     de265_internals_release_snapshots(const struct de265_image*);
++/* The most snapshot memory, in bytes, that the context's pictures held at the same time. */
++LIBDE265_API uint64_t de265_internals_get_snapshot_peak_bytes(const de265_decoder_context*);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/libde265/de265_internals_hooks.h b/libde265/de265_internals_hooks.h
+new file mode 100644
+index 0000000..c5192a4
+--- /dev/null
++++ b/libde265/de265_internals_hooks.h
+@@ -0,0 +1,58 @@
++/*
++ * H.265 video codec.
++ * Copyright (c) 2026 The Open Video Tools contributors
++ *
++ * This file is part of libde265.
++ *
++ * libde265 is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, either version 3 of
++ * the License, or (at your option) any later version.
++ *
++ * libde265 is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* de265_internals_hooks.h -- the decoder's calls into the plane snapshots of OVT patch 0003.
++ * Internal (not installed); every caller is under #ifdef DE265_INTERNALS. Each hook returns at
++ * once when the picture has no snapshots, so pictures decoded with snapshots off pay one
++ * pointer test per call site. C linkage keeps the library's symbols to de265_internals_*. */
++
++#ifndef DE265_INTERNALS_HOOKS_H
++#define DE265_INTERNALS_HOOKS_H
++
++#include <stdint.h>
++
++struct de265_image;
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* A new picture starts decoding (after clear_metadata()): allocate its snapshots when the
++   decoder context has them enabled. */
++void de265_internals_hook_picture_start(struct de265_image* img);
++/* The picture's buffers are released (de265_image::release()). */
++void de265_internals_hook_free(struct de265_image* img);
++/* scale_coefficients(), before the residual is added: the prediction of the nT x nT transform
++   block at (xT,yT) of component cIdx (component sample coordinates), pred_stride in samples. */
++void de265_internals_hook_tb_prediction(struct de265_image* img, int cIdx, int xT, int yT, int nT,
++                                        const void* pred, int pred_stride);
++/* scale_coefficients(), after inverse quantisation: the nT x nT coefficient block. */
++void de265_internals_hook_tb_coefficients(struct de265_image* img, int cIdx, int xT, int yT, int nT,
++                                          const int16_t* coeff);
++/* Every slice segment is decoded, the in-loop filters have not run. */
++void de265_internals_hook_pre_deblock(struct de265_image* img);
++/* Deblocking has finished, SAO has not started. */
++void de265_internals_hook_pre_sao(struct de265_image* img);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/libde265/decctx.cc b/libde265/decctx.cc
+index 2e5fca5..d0514af 100644
+--- a/libde265/decctx.cc
++++ b/libde265/decctx.cc
+@@ -16,6 +16,12 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-14 by The Open Video Tools contributors (OVT patch 0003,
++ * plane snapshots): calls the snapshot hooks at the start of a picture
++ * and before each in-loop filter when DE265_INTERNALS is defined; with
++ * snapshots enabled, the parallel filter path lets deblocking finish before
++ * SAO starts.
+  */
+ 
+ #include "decctx.h"
+@@ -23,6 +29,9 @@
+ #include "sao.h"
+ #include "sei.h"
+ #include "deblock.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_hooks.h"
++#endif
+ 
+ #include <string.h>
+ #include <assert.h>
+@@ -214,6 +223,11 @@ decoder_context::decoder_context()
+ 
+   param_disable_deblocking = false;
+   param_disable_sao = false;
++#ifdef DE265_INTERNALS
++  internals_snapshots = false;
++  internals_snapshot_bytes = 0;
++  internals_snapshot_peak_bytes = 0;
++#endif
+   //param_disable_mc_residual_idct = false;
+   //param_disable_intra_residual_idct = false;
+ 
+@@ -770,6 +784,10 @@ de265_error decoder_context::decode_some(bool* did_work)
+ 
+     imgunit->img->mark_all_CTB_progress(CTB_PROGRESS_PREFILTER);
+ 
++#ifdef DE265_INTERNALS
++    // every slice segment is decoded (WPP and tile tasks have been waited for)
++    de265_internals_hook_pre_deblock(imgunit->img);
++#endif
+ 
+ 
+     // run post-processing filters (deblocking & SAO)
+@@ -1906,6 +1924,10 @@ void decoder_context::run_postprocessing_filters_sequential(de265_image* img)
+       apply_deblocking_filter(img);
+     }
+ 
++#ifdef DE265_INTERNALS
++    de265_internals_hook_pre_sao(img);
++#endif
++
+ #if SAVE_INTERMEDIATE_IMAGES
+     sprintf(buf,"pre-sao-%05d.yuv", img->PicOrderCntVal);
+     write_picture_to_file(img, buf);
+@@ -1934,6 +1956,14 @@ void decoder_context::run_postprocessing_filters_parallel(image_unit* imgunit)
+     saoWaitsForProgress = CTB_PROGRESS_DEBLK_H;
+   }
+ 
++#ifdef DE265_INTERNALS
++  if (img->internals_snap) {
++    // the pre-SAO snapshot needs the whole picture deblocked before SAO tasks start
++    img->wait_for_completion();
++    de265_internals_hook_pre_sao(img);
++  }
++#endif
++
+   if (!img->decctx->param_disable_sao) {
+     waitForCompletion |= add_sao_tasks(imgunit, saoWaitsForProgress);
+     //apply_sample_adaptive_offset(img);
+@@ -2052,6 +2082,9 @@ bool decoder_context::process_slice_segment_header(slice_segment_header* hdr,
+     img->decctx = this;
+ 
+     img->clear_metadata();
++#ifdef DE265_INTERNALS
++    de265_internals_hook_picture_start(img);
++#endif
+ 
+ 
+     if (isIRAP(nal_unit_type)) {
+diff --git a/libde265/decctx.h b/libde265/decctx.h
+index 8170b60..c598f51 100644
+--- a/libde265/decctx.h
++++ b/libde265/decctx.h
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-14 by The Open Video Tools contributors (OVT patch 0003,
++ * plane snapshots): adds the internals_snapshots flag and the snapshot
++ * memory counters, only when DE265_INTERNALS is defined.
+  */
+ 
+ #ifndef DE265_DECCTX_H
+@@ -352,6 +356,13 @@ class decoder_context : public base_context {
+ 
+   bool param_disable_deblocking;
+   bool param_disable_sao;
++#ifdef DE265_INTERNALS
++  // Plane snapshots (OVT patch 0003): pictures started while this is set keep copies of their
++  // pre-deblocking and pre-SAO planes, prediction and coefficients (de265_internals.h).
++  bool internals_snapshots;
++  uint64_t internals_snapshot_bytes;       // held by this context's pictures now
++  uint64_t internals_snapshot_peak_bytes;  // the most ever held at once
++#endif
+   //bool param_disable_mc_residual_idct;  // not implemented yet
+   //bool param_disable_intra_residual_idct;  // not implemented yet
+ 
+diff --git a/libde265/image.cc b/libde265/image.cc
+index fe45010..ebf6347 100644
+--- a/libde265/image.cc
++++ b/libde265/image.cc
+@@ -20,9 +20,16 @@
+  * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
+  * internals API): allocates and clears deblk_bS_v when DE265_INTERNALS is
+  * defined.
++ *
++ * Modified 2026-11-14 by The Open Video Tools contributors (OVT patch 0003,
++ * plane snapshots): initialises internals_snap and frees the snapshots in
++ * release() when DE265_INTERNALS is defined.
+  */
+ 
+ #include "image.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_hooks.h"
++#endif
+ #include "decctx.h"
+ #include "en265.h"
+ 
+@@ -232,6 +239,9 @@ de265_image::de265_image()
+ 
+   de265_mutex_init(&mutex);
+   de265_cond_init(&finished_cond);
++#ifdef DE265_INTERNALS
++  internals_snap = NULL;
++#endif
+ }
+ 
+ 
+@@ -501,6 +511,10 @@ de265_image::~de265_image()
+ 
+ void de265_image::release()
+ {
++#ifdef DE265_INTERNALS
++  de265_internals_hook_free(this);
++#endif
++
+   // free image memory
+ 
+   if (pixels[0])
+diff --git a/libde265/image.h b/libde265/image.h
+index de401ae..9b6d4a4 100644
+--- a/libde265/image.h
++++ b/libde265/image.h
+@@ -20,6 +20,10 @@
+  * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
+  * internals API): adds the deblk_bS_v array and the de265_internals_access
+  * friend, both only when DE265_INTERNALS is defined.
++ *
++ * Modified 2026-11-14 by The Open Video Tools contributors (OVT patch 0003,
++ * plane snapshots): adds the internals_snap pointer, only when DE265_INTERNALS
++ * is defined.
+  */
+ 
+ #ifndef DE265_IMAGE_H
+@@ -85,6 +89,7 @@ enum PictureState {
+ class decoder_context;
+ #ifdef DE265_INTERNALS
+ struct de265_internals_access;  // de265_internals.cc reads the metadata arrays
++struct de265_internals_snapshots;  // de265_internals.cc: plane snapshots of one picture
+ #endif
+ 
+ template <class DataUnit> class MetaDataArray
+@@ -428,6 +433,10 @@ public:
+   // Boundary strength of the vertical edge left of each 4x4 block. deblk_info keeps only one bS,
+   // which the horizontal-edge pass overwrites; deblock.cc copies the vertical value here.
+   MetaDataArray<uint8_t>     deblk_bS_v;
++
++  // Plane snapshots of this picture (OVT patch 0003), NULL unless the decoder context has them
++  // enabled. Owned here; freed by release() and by de265_internals_release_snapshots().
++  de265_internals_snapshots* internals_snap;
+ #endif
+ 
+ public:
+diff --git a/libde265/transform.cc b/libde265/transform.cc
+index cf07460..e2e8c05 100644
+--- a/libde265/transform.cc
++++ b/libde265/transform.cc
+@@ -16,10 +16,18 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-14 by The Open Video Tools contributors (OVT patch 0003,
++ * plane snapshots): hands the prediction and the dequantised
++ * coefficients of each transform block to the snapshot hooks when
++ * DE265_INTERNALS is defined.
+  */
+ 
+ #include "transform.h"
+ #include "util.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_hooks.h"
++#endif
+ 
+ #include <assert.h>
+ 
+@@ -406,6 +414,11 @@ void scale_coefficients_internal(thread_context* tctx,
+                        nT == 4 &&
+                        cuPredModeIntra);
+ 
++#ifdef DE265_INTERNALS
++  // the prediction, before the residual is added in place
++  de265_internals_hook_tb_prediction(tctx->img, cIdx, xT,yT, nT, pred, stride);
++#endif
++
+   if (tctx->cu_transquant_bypass_flag) {
+ 
+     int32_t residual_buffer[32*32];
+@@ -421,6 +434,10 @@ void scale_coefficients_internal(thread_context* tctx,
+       tctx->coeffBuf[ tctx->coeffPos[cIdx][i] ] = currCoeff;
+     }
+ 
++#ifdef DE265_INTERNALS
++    de265_internals_hook_tb_coefficients(tctx->img, cIdx, xT,yT, nT, coeff);
++#endif
++
+     if (rotateCoeffs) {
+       tctx->decctx->acceleration.rotate_coefficients(coeff, nT);
+     }
+@@ -518,6 +535,10 @@ void scale_coefficients_internal(thread_context* tctx,
+     }
+ 
+ 
++#ifdef DE265_INTERNALS
++    de265_internals_hook_tb_coefficients(tctx->img, cIdx, xT,yT, nT, coeff);
++#endif
++
+     // --- do transform or skip ---
+ 
+     logtrace(LogTransform,"coefficients OUT:\n");
