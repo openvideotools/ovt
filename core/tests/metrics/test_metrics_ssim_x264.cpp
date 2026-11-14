@@ -155,7 +155,8 @@ struct Instance {
   }
 };
 
-// §9.4.4 transcribed with doubles on the raw samples, one window at a time: no block sums, no rolling rows.
+// §9.4.4 transcribed with doubles on the raw samples, one window at a time: no block sums, no rolling rows. The windows
+// are added the way ssim_end4 and x264_pixel_ssim_wxh add them: in float, four at a time.
 double reference_plane(const Pic& r, const Pic& d, size_t p) {
   const uint32_t bits = r.planes.bit_depth;
   const auto peak = static_cast<double>((1U << bits) - 1U);
@@ -166,8 +167,9 @@ double reference_plane(const Pic& r, const Pic& d, size_t p) {
                                    : static_cast<double>(static_cast<float>(0.03 * 0.03 * peak * peak * 64.0 * 63.0));
   const uint32_t bx = (r.planes.width[p] - 2) / 4;
   const uint32_t by = (r.planes.height[p] - 2) / 4;
-  double total = 0;
+  float total = 0.0F;
   for (uint32_t wy = 0; wy + 1 < by; ++wy) {
+    float group = 0.0F;
     for (uint32_t wx = 0; wx + 1 < bx; ++wx) {
       double s1 = 0;
       double s2 = 0;
@@ -185,10 +187,15 @@ double reference_plane(const Pic& r, const Pic& d, size_t p) {
       }
       const double vars = (ss * 64) - (s1 * s1) - (s2 * s2);
       const double covar = (s12 * 64) - (s1 * s2);
-      total += (((2 * s1 * s2) + c1) * ((2 * covar) + c2)) / (((s1 * s1) + (s2 * s2) + c1) * (vars + c2));
+      group += static_cast<float>((((2 * s1 * s2) + c1) * ((2 * covar) + c2)) /
+                                  (((s1 * s1) + (s2 * s2) + c1) * (vars + c2)));
+      if ((wx & 3U) == 3U || wx + 2 == bx) {
+        total += group;
+        group = 0.0F;
+      }
     }
   }
-  return total / (static_cast<double>(bx - 1) * static_cast<double>(by - 1));
+  return static_cast<double>(total) / (static_cast<double>(bx - 1) * static_cast<double>(by - 1));
 }
 
 void fill_noise(Pic& pic, std::mt19937& rng, bool distort_of_ref = false, const Pic* ref = nullptr) {
@@ -386,8 +393,8 @@ TEST_CASE("ssim_x264 equals the x264 kernel oracle on the Netflix pair", "[metri
     REQUIRE(n < golden.at("y").size());
     const Scored s = inst.score(r, d, static_cast<int32_t>(n));
     INFO("frame " << n);
-    // The golden is the oracle built with OVT_X264_SSIM_DOUBLE_ACCUM, nine decimals (run_x264_ssim.py netflix-run), so
-    // 1e-6 compares kernel to oracle.
+    // The golden is the unmodified oracle at nine decimals (run_x264_ssim.py netflix-run); the kernel sums the windows
+    // in float like ssim_end4 does, so what is left is the per-window division (double vs float).
     CHECK(std::fabs(s.values[0] - golden.at("y")[n].get<double>()) <= 1e-6);
     CHECK(std::fabs(s.values[1] - golden.at("u")[n].get<double>()) <= 1e-6);
     CHECK(std::fabs(s.values[2] - golden.at("v")[n].get<double>()) <= 1e-6);

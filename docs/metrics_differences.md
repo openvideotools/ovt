@@ -74,10 +74,11 @@ acceptance test:
 
 * x264 turns its integer factors into `float` before multiplying and adds the windows of a row in `float`, then adds
   the rows in `float`. OVT forms the products from exact integers (8-bit and 9-bit branch) or from the same `float`
-  operations in the same order (10-bit and deeper), divides in `double` and sums the windows in `double`.
-* The plane score is `sum / count` in double; the oracle prints `float(sum) / float(count)` with nine digits.
+  operations in the same order (10-bit and deeper) and divides in `double` (§9.4.4 step 3). It then adds the windows as
+  `ssim_end4` and `x264_pixel_ssim_wxh` do, in `float`, four windows at a time and then the groups.
+* The plane score is `float(sum) / count` in double; the oracle prints `float(sum) / float(count)` with nine digits.
 * On the synthetic pairs of `core/tests/metrics/golden/ssim_x264_synth.json` (8-bit and 10-bit, 330 × 194 and
-  342 × 226) the largest difference is below 1e-7 on every plane.
+  342 × 226) the test holds every plane to 1e-6.
 
 Bit depths above 10 use the float branch with `peak = 2^b − 1` (x264 has no such build; 12-bit input agrees with an
 exact double evaluation within 1e-4 per plane). A plane with fewer than 2 × 2 blocks after the offset has no window
