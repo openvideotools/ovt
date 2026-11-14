@@ -58,3 +58,6 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # WI-1.403: ViewState -> pl_render_params, target frames, tone/gamut mapping, dithering (§10.3.2, §10.3.4, §10.3.5). The
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
+
+# WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
+target_sources(ovt_tests_render PRIVATE test_measure.cpp)

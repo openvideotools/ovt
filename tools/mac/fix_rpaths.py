@@ -14,7 +14,8 @@ Without --fix the script only reports. Exit status: 0 clean, 1 violations remain
 --fix first (a) gives every library in Contents/Frameworks the install name @rpath/<path relative to Frameworks>,
 (b) rewrites every reference to a library that lives in Contents/Frameworks (matched by file name, or by the
 `X.framework/...` tail) to @rpath/..., and (c) replaces the LC_RPATH entries by the single one that reaches
-Contents/Frameworks from the file's location. It then verifies. `macdeployqt` does (a) to (c) for what it copies;
+Contents/Frameworks from the file's location, removing duplicate LC_RPATH entries one copy at a time. It then
+verifies; a duplicate LC_RPATH is a problem too. `macdeployqt` does (a) to (c) for what it copies;
 this covers what it misses, namely libraries that are only loaded through `dlopen` (the plugins in
 Contents/PlugIns/ovt/) and our own build-tree libraries.
 
@@ -75,30 +76,63 @@ def run(cmd: list[str]) -> str:
     return r.stdout
 
 
-def list_deps(otool: str, path: Path) -> list[str]:
-    """`otool -L`: the install name of a library first (when it has one), then the dependencies."""
-    out = run([otool, "-L", str(path)]).splitlines()
+def slices(out: str, path: Path) -> list[tuple[str | None, list[str]]]:
+    """The blocks `otool` prints for `path`, one per architecture: (arch or None, lines without the header).
+
+    For a universal file (Qt's frameworks and plugins, the lipo-merged universal2 bundle of WI-0.063) otool prints one
+    block per architecture, each headed `<path> (architecture <arch>):`; a thin file has one block headed `<path>:`.
+    """
+    header = str(path)
+    blocks: list[tuple[str | None, list[str]]] = []
+    for line in out.splitlines():
+        if line == f"{header}:":
+            blocks.append((None, []))
+        elif line.startswith(f"{header} (architecture ") and line.endswith("):"):
+            blocks.append((line[len(header) + len(" (architecture ") : -2], []))
+        elif blocks:
+            blocks[-1][1].append(line)
+    return blocks or [(None, out.splitlines())]
+
+
+def parse_deps(lines: list[str]) -> list[str]:
+    """`otool -L` lines: the install name of a library first (when it has one), then the dependencies."""
     deps = []
-    for line in out[1:]:  # line 0 is "<path>:"
+    for line in lines:
         line = line.strip()
-        if not line:
-            continue
-        # "<name> (compatibility version 1.0.0, current version 1.2.3)"
-        deps.append(line.split(" (compatibility", 1)[0].strip())
+        if line:
+            # "<name> (compatibility version 1.0.0, current version 1.2.3)"
+            deps.append(line.split(" (compatibility", 1)[0].strip())
     return deps
 
 
-def list_rpaths(otool: str, path: Path) -> list[str]:
-    out = run([otool, "-l", str(path)]).splitlines()
+def parse_rpaths(lines: list[str]) -> list[str]:
     rpaths = []
-    for i, line in enumerate(out):
+    for i, line in enumerate(lines):
         if line.strip() == "cmd LC_RPATH":
-            for follow in out[i + 1 : i + 4]:
+            for follow in lines[i + 1 : i + 4]:
                 follow = follow.strip()
                 if follow.startswith("path "):
                     rpaths.append(follow[len("path ") :].rsplit(" (offset", 1)[0].strip())
                     break
     return rpaths
+
+
+def deps_by_arch(otool: str, path: Path) -> list[tuple[str | None, list[str]]]:
+    return [(arch, parse_deps(lines)) for arch, lines in slices(run([otool, "-L", str(path)]), path)]
+
+
+def rpaths_by_arch(otool: str, path: Path) -> list[tuple[str | None, list[str]]]:
+    return [(arch, parse_rpaths(lines)) for arch, lines in slices(run([otool, "-l", str(path)]), path)]
+
+
+def list_deps(otool: str, path: Path) -> list[str]:
+    """The first slice's references; --fix acts on these (install_name_tool edits every slice alike). The
+    verification checks every slice, so a slice that differs still fails."""
+    return deps_by_arch(otool, path)[0][1]
+
+
+def list_rpaths(otool: str, path: Path) -> list[str]:
+    return rpaths_by_arch(otool, path)[0][1]
 
 
 def expand(ref: str, file: Path, app: Path) -> Path:
@@ -120,10 +154,25 @@ def resolve_rpath_dep(dep: str, file: Path, app: Path, rpaths: list[str]) -> boo
 
 
 def check_file(app: Path, file: Path, otool: str) -> list[str]:
+    """Problems of every architecture slice. A problem that only some slices of a universal file have (a lipo-merged
+    tree where one build left an absolute path) names those architectures; one that all slices share is listed once."""
+    rpath_slices = dict(rpaths_by_arch(otool, file))
+    per_slice = [
+        (arch, check_slice(app, file, deps, rpath_slices.get(arch, []))) for arch, deps in deps_by_arch(otool, file)
+    ]
+    problems: list[str] = []
+    for _, found in per_slice:
+        for p in found:
+            archs = [a for a, f in per_slice if p in f]
+            line = p if len(archs) == len(per_slice) else f"{p} (only in {', '.join(str(a) for a in archs)})"
+            if line not in problems:
+                problems.append(line)
+    return problems
+
+
+def check_slice(app: Path, file: Path, deps: list[str], rpaths: list[str]) -> list[str]:
     problems = []
-    rpaths = list_rpaths(otool, file)
     rel = file.relative_to(app)
-    deps = list_deps(otool, file)
     is_lib = file.suffix == ".dylib" or ".framework/" in file.as_posix()
     for n, dep in enumerate(deps):
         if not dep.startswith(ALLOWED_PREFIXES):
@@ -135,6 +184,9 @@ def check_file(app: Path, file: Path, otool: str) -> list[str]:
     for rp in rpaths:
         if rp not in ("@loader_path", "@executable_path") and not rp.startswith(("@executable_path/", "@loader_path/")):
             problems.append(f"{rel}: LC_RPATH outside the bundle: {rp}")
+    # Within one slice only: each slice of a universal file carries its own copy of every LC_RPATH.
+    for rp in dict.fromkeys(rp for rp in rpaths if rpaths.count(rp) > 1):
+        problems.append(f"{rel}: duplicate LC_RPATH {rp}")  # recent dyld versions reject it
     return problems
 
 
@@ -200,13 +252,34 @@ def fix_file(app: Path, file: Path, otool: str, int_tool: str, index: dict[str, 
             cmd += ["-change", dep, new]
     existing = list_rpaths(otool, file)
     want = rpath_for(app, file)
-    for rp in existing:
+    # install_name_tool rejects the same -delete_rpath twice in one call, and one -delete_rpath removes one LC_RPATH.
+    # Qt's frameworks carry some LC_RPATH twice, so name each path once here and remove the extra copies below.
+    for rp in dict.fromkeys(existing):
         if rp != want:
             cmd += ["-delete_rpath", rp]
     if want not in existing:
         cmd += ["-add_rpath", want]
     if len(cmd) > 1:
         run(cmd + [str(file)])
+    if len(set(existing)) != len(existing):
+        drop_duplicate_rpaths(file, want, otool, int_tool, len(existing))
+
+
+def drop_duplicate_rpaths(file: Path, want: str, otool: str, int_tool: str, bound: int) -> None:
+    """Delete LC_RPATH copies one call at a time until only `want` is left, once.
+
+    Re-reading after each call keeps this right whether install_name_tool removes the first copy or every copy.
+    """
+    for _ in range(bound):
+        current = list_rpaths(otool, file)
+        extra = next((rp for rp in current if rp != want), None)
+        if extra is None and current.count(want) > 1:
+            extra = want
+        if extra is None:
+            break
+        run([int_tool, "-delete_rpath", extra, str(file)])
+    if want not in list_rpaths(otool, file):
+        run([int_tool, "-add_rpath", want, str(file)])
 
 
 def main(argv: list[str] | None = None) -> int:

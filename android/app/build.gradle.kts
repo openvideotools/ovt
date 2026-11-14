@@ -185,9 +185,9 @@ val qtCMakeArguments =
         "-DQT_ANDROID_ABIS=${ovtAbis.joinToString(";")}",
         // The QML root is loaded by URL in MainActivity, so no generated QtQuickViewContent classes are needed.
         "-DQT_ANDROID_GENERATE_JAVA_QTQUICKVIEW_CONTENTS=OFF",
-        // Toolchain chain of every ABI build: Qt's qt.toolchain.cmake -> vcpkg (the -ovt triplet is derived from
-        // ANDROID_ABI in the top-level CMakeLists.txt) -> the pinned NDK's android.toolchain.cmake.
-        "-DQT_CHAINLOAD_TOOLCHAIN_FILE=$ovtRoot/third_party/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        // Toolchain chain of every ABI build: Qt's qt.toolchain.cmake -> cmake/toolchains/android-vcpkg.cmake (the
+        // -ovt triplet from ANDROID_ABI) -> vcpkg -> the pinned NDK's android.toolchain.cmake.
+        "-DQT_CHAINLOAD_TOOLCHAIN_FILE=$ovtRoot/cmake/toolchains/android-vcpkg.cmake",
         "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ndkDir/build/cmake/android.toolchain.cmake",
         // §13.4.2: GUI shell on, CLI off. The renderer (WI-A.401), the aom plugin and the codec-pack plugins
         // (WI-0.053) join with the work items that put them in the APK; WI-0.050 ships the empty window only.
@@ -232,9 +232,12 @@ QtBuild {
     sdkDir?.let { "$it/cmake/${libs.versions.cmake.get()}/bin" }?.takeIf { file("$it/ninja").exists() }?.let {
         ninjaPath = it
     }
-    extraCMakeArguments =
-        (qtCMakeArguments + "-DQT_ANDROID_MULTI_ABI_FORWARD_VARS=${qtForwardedVariables.joinToString(";")}")
-            .toTypedArray()
+    // Groovy compiles the String[] property's setter as varargs (setExtraCMakeArguments(String...)), which Kotlin does
+    // not treat as a property setter: call it with the spread operator.
+    setExtraCMakeArguments(
+        *(qtCMakeArguments + "-DQT_ANDROID_MULTI_ABI_FORWARD_VARS=${qtForwardedVariables.joinToString(";")}")
+            .toTypedArray(),
+    )
 }
 
 // Fails early, with the fix, when the machine is not set up (otherwise the plugin stops with a bare null path).
@@ -265,6 +268,12 @@ val ovtCheckAndroidSetup by tasks.registering {
 // the foss/play flavours none of those exist, so every variant's preBuild waits for the Qt build instead.
 tasks.named("QtBuildTask") { dependsOn(ovtCheckAndroidSetup) }
 tasks.named("preBuild") { dependsOn("QtBuildTask") }
+// QtBuildTask declares projectPath (the repository root) as an @InputDirectory, and that tree holds this project's
+// build/ directory, so every task writing under build/ counts as a producer of its input. Gradle accepts that as long
+// as the two are ordered (MissingTaskDependencyDetector: any order in either direction), so the native build goes
+// first. Tasks that do not hang off preBuild, such as buildKotlinToolingMetadata, otherwise fail validation.
+val ovtNativeBuildDeps = setOf("QtBuildTask", ovtCheckAndroidSetup.name)
+tasks.matching { it.name !in ovtNativeBuildDeps }.configureEach { mustRunAfter("QtBuildTask") }
 
 // ---- Dependencies ------------------------------------------------------------------------------------------------
 

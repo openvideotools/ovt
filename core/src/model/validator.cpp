@@ -25,6 +25,7 @@
 #include "ovt/cxx/model/grid.hpp"
 #include "ovt/cxx/model/tree.hpp"
 #include "ovt_model_generated.h"
+#include "verifier_options.hpp"
 
 namespace ovt::model {
 
@@ -84,13 +85,7 @@ std::string rule_id(int rule) {
   return id;
 }
 
-// Verifier limits of WI-0.094 (a 4K HEVC block tree exceeds the default max_tables).
-flatbuffers::Verifier::Options verifier_options() {
-  flatbuffers::Verifier::Options opts;
-  opts.max_depth = 64;
-  opts.max_tables = 10'000'000;
-  return opts;
-}
+using detail::verifier_options;  // limits of WI-0.094
 
 // ---- small helpers ---------------------------------------------------------------------------------------------
 
