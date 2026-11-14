@@ -448,3 +448,28 @@ jobs:
           path: |
             android/app/build/outputs/apk/foss/**/*.apk
             android/app/build/outputs/bundle/playRelease/*.aab
+
+      # Licence gate for the Gradle dependencies (chapter 15 §15.4.2, WI-0.034 follow-up): the jk1 report of the two
+      # release runtime classpaths (android/app/build.gradle.kts, licenseReport) goes through license_gate.py --gradle.
+      # Read-only: the report stays in the workspace and the job summary; nothing is uploaded.
+      - name: Gradle licence report
+        working-directory: android
+        run: ./gradlew --no-daemon --stacktrace :app:generateLicenseReport
+
+      - name: Licence gate (Gradle dependencies)
+        run: |
+          # setup-ovt put a Python >= 3.11 on PATH (tomllib).
+          status=0
+          python -I tools/license_gate.py --policy tools/license_policy.toml \
+            --gradle android/app/build/reports/dependency-license/index.json --require-all \
+            --report "${RUNNER_TEMP}/gradle_license_gate_report.json" || status=$?
+          python -I - "${RUNNER_TEMP}/gradle_license_gate_report.json" >> "$GITHUB_STEP_SUMMARY" <<'PY' || true
+          import json, sys
+          rep = json.load(open(sys.argv[1]))
+          print(f"### Gradle licence gate: {rep['status']}")
+          for row in rep["inventory"]:
+              print(f"- {row['component']} {row['version']}: {row['license']}")
+          for f in rep["findings"]:
+              print(f"- **{f['code']}** {f['where']} {f.get('license') or f['message']}")
+          PY
+          exit "$status"
