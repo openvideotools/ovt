@@ -13,6 +13,8 @@ add_library(ovt::render ALIAS ovt_render)
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 # WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1).
+target_sources(ovt_render PRIVATE src/pipeline/plane_views.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
 

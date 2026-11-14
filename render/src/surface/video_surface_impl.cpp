@@ -4,9 +4,9 @@
 // The one concrete VideoSurface (chapter 10 §10.1.3, §10.2.7). WI-1.400 is the skeleton: an OffscreenTexture target
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
-// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
-// dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare modes, overlays, measurements
-// and export arrive with their own work items; until then those entry points are inert.
+// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402; WI-1.408 adds the plane modes. The full render
+// parameters, target frames and dithering (WI-1.403), interop (WI-1.404), native targets (WI-1.406 and later), compare
+// modes, overlays, measurements and export arrive with their own work items; until then those entry points are inert.
 
 #include <algorithm>
 #include <cstdint>
@@ -27,6 +27,7 @@
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/frame_upload.h"
+#include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
 #include "vk_no_timestamps.h"
 
@@ -254,8 +255,15 @@ class VideoSurfaceImpl final : public VideoSurface {
   // chroma upscaler and downscaler, no dithering, no anti-ringing (§10.3.1 "Scaling filters"). WI-1.403 replaces this
   // with the full pl_render_params of §10.3.4/§10.3.5 and the target frames of every encoding.
   void draw_slot_a(const ViewState& view) {
-    struct pl_frame image = slot_a_.frame;
-    image.crop = detail::source_rect(slot_a_, view.show_cropped);
+    // The view transform works in luma samples; plane modes U/V sample the chroma plane over the same picture area
+    // (WI-1.408, §10.6.1).
+    const pl_rect2df luma_rect = detail::source_rect(slot_a_, view.show_cropped);
+    struct pl_frame image = {};
+    std::string err = plane_views_.build_image(vk_->gpu, slot_a_, view, luma_rect, image);
+    if (!err.empty()) {
+      error_ = std::move(err);
+      return;
+    }
 
     struct pl_frame target = {};
     target.num_planes = 1;
@@ -266,9 +274,11 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     const DisplayTarget::OutputEncoding encoding = detail::target_encoding(target_);
     target.color = detail::target_color(target_, encoding);
-    target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
+    target.crop = detail::target_rect(luma_rect, view, target_.width, target_.height);
     params_.build(view, encoding, target_.kind == DisplayTarget::Kind::OffscreenTexture, image.color, target);
-    if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
+    struct pl_render_params params = params_.params();  // still points at params_'s members
+    plane_views_.apply(view, image, params, target);
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
@@ -399,6 +409,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     overlays_.reset();
     if (vk_ != nullptr) {
       detail::destroy_slot(vk_->gpu, slot_a_);
+      plane_views_.destroy(vk_->gpu);
       pl_tex_destroy(vk_->gpu, &tex_);
     }
     pl_renderer_destroy(&renderer_);
@@ -417,6 +428,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   pl_renderer renderer_ = nullptr;
   detail::FrameSlot slot_a_;
   detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
+  detail::PlaneViews plane_views_;    // plane modes 1-4 (§10.6.1)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   std::unique_ptr<OverlaySet> overlays_;
