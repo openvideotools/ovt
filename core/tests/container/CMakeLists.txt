@@ -14,6 +14,7 @@ add_executable(
   mpd_test.cpp
   obu_test.cpp
   registry_lookup_test.cpp
+  rawyuv_test.cpp
   sniff_test.cpp
   ts_packets_test.cpp
   y4m_test.cpp)
