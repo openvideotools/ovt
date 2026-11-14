@@ -23,10 +23,8 @@ if(OVT_X264_SSIM_DOUBLE_ACCUM)
   file(REMOVE_RECURSE "${_src}")
   file(COPY pixel_ssim.c ssim_functions.c x264_shim.h main.c DESTINATION "${_src}")
   find_program(PATCH_EXECUTABLE patch REQUIRED)
-  execute_process(
-    COMMAND "${PATCH_EXECUTABLE}" -p1 -i "${CMAKE_CURRENT_SOURCE_DIR}/double_accum.patch"
-    WORKING_DIRECTORY "${_src}"
-    RESULT_VARIABLE _patch_rc)
+  execute_process(COMMAND "${PATCH_EXECUTABLE}" -p1 -i "${CMAKE_CURRENT_SOURCE_DIR}/double_accum.patch"
+                  WORKING_DIRECTORY "${_src}" RESULT_VARIABLE _patch_rc)
   if(NOT _patch_rc EQUAL 0)
     message(FATAL_ERROR "double_accum.patch does not apply")
   endif()
