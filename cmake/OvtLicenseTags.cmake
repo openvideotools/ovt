@@ -142,8 +142,14 @@ function(_ovt_license_collect target out_var deps_var)
           continue()
         endif()
         get_target_property(imported ${real} IMPORTED)
+        get_target_property(real_type ${real} TYPE)
+        get_target_property(real_links ${real} INTERFACE_LINK_LIBRARIES)
         if(NOT lic AND imported)
-          list(APPEND external "${item}")
+          # tp::aom_inspection is include directories on top of tp::aom: an INTERFACE target of third_party/ that only
+          # forwards other libraries ships no code of its own, so its links are listed and it is not.
+          if(NOT ("${item}" MATCHES "^tp::" AND real_type STREQUAL "INTERFACE_LIBRARY" AND real_links))
+            list(APPEND external "${item}")
+          endif()
         endif()
         # A target of this project that carries no licence (the generated-code INTERFACE targets such as ovt_schemas) is
         # not a dependency: its own link items are walked and listed instead.
