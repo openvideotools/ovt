@@ -60,6 +60,7 @@ ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
+ovt_add_fuzz_target(json_export fuzz_json_export.cpp) # WI-0.088: the JSON exporter (untrusted stored records)
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
