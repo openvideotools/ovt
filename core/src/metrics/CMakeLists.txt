@@ -22,6 +22,7 @@ target_sources(
           host/metric_job.cpp
           host/plugin_registry.cpp
           jobspec_json.cpp
+          kernels/identity.cpp
           kernels/psnr_hwy.cpp
           kernels/psnr_metric.cpp
           kernels/psnr_scalar.cpp

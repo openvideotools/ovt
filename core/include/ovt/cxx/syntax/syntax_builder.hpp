@@ -13,7 +13,7 @@
 //
 // SPEC-ASSUMPTION(#96): §7.3.2 uses `Severity` without declaring a C++ type. It is declared here as
 // ovt::syntax::Severity with the values of ovt.fb.Severity (checked by a static_assert in syntax_builder.cpp).
-// SPEC-ASSUMPTION(#97): SyntaxNodeBuffer is only forward-declared here. Its definition is the module
+// SyntaxNodeBuffer is only forward-declared here (§7.3.2 builder details). Its definition is the module
 // header core/src/syntax/common/syntax_node_buffer.h (the WI-1.106 Produces line), which every caller of
 // finish() includes; the root node, the arena and the FlatBuffer conversion live there.
 

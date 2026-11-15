@@ -9,3 +9,11 @@ target_link_libraries(ovt_tests_syntax_h264_sps_pps PRIVATE ovt_core_objects ovt
                                                             ${Catch2_TARGET})
 ovt_set_license(ovt_tests_syntax_h264_sps_pps "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax_h264_sps_pps)
+
+# WI-1.109a: slice header with ref list modification, pred weight table and dec ref pic marking (WI-1.109b adds the
+# AUD, filler data and data partition tests to the same executable).
+add_executable(ovt_tests_syntax_h264_slice_header test_syntax_h264_slice_header.cpp)
+target_link_libraries(ovt_tests_syntax_h264_slice_header PRIVATE ovt_core_objects ovt_test_support ovt::flags
+                                                                 ${Catch2_TARGET})
+ovt_set_license(ovt_tests_syntax_h264_slice_header "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_syntax_h264_slice_header)
