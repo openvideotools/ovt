@@ -83,6 +83,8 @@ ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
 ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
 # WI-1.109a/b: H.264 slice header, AUD, end of sequence / stream, filler data and data partitions.
 ovt_add_fuzz_target(h264_slice fuzz_h264_slice.cpp)
+# WI-1.110: the H.264 SEI framing and payload parsers.
+ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
 
 # WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
 # plugin module from its output directory, so it follows the plugin's own option.
