@@ -2,6 +2,14 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc31 — 2026-11-14
+
+PATCH-level: spec-amendment pass 11 folds in the accepted answers of `spec-question` issues #528 from WI-1.110 part a (H.264 SEI, PR #530), #533 from WI-1.118 part a (AV1 film grain, PR #535) and #529 from WI-1.109 part a (H.264 slice header). Three diagnostic codes are registered and two widened (D2, additive); `parse_slice_header()` takes a `ParameterSets` instead of the not-yet-existing `ActiveSets` (D22 semi-public C++ helper header); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.4 rows 7 and 9, §7.9 table, WI-1.110 steps and AT2; `corrupt_conditions.json` — each SEI payload is parsed through a bounded view of the message's own `BitReader` (one reader per `sei_rbsp`, absolute node offsets) instead of a sub-BitReader; `SYN-H264-0031` Warning `"pic_timing SEI without an active SPS; parsed as bytes"` and `SYN-H264-0032` Info `"SEI payload has trailing bytes after its last element"` registered with `not_in_table` reasons; AT2 runs against `CVSE3_Sony_H` (committed golden) instead of `CVSEFDFT3_Sony_E` (`slow`, no golden), clock timestamps from `trace_headers` over crafted NAL units — WI-1.110 (#528)
+- 7 §7.3.6 row 27, §7.9 table, WI-1.118 AT2; `corrupt_conditions.json` — the film grain conformance checks of AV1 §6.8.20 (`film_grain_params_ref_idx` not in `ref_frame_idx[]`, `num_y_points` > 14, `num_cb_points`/`num_cr_points` > 10, point values not increasing, 4:2:0 with exactly one chroma list empty) raise `SYN-AV1-0015` and parsing continues with the values as read (point arrays sized by the f(4) range); `load_grain_params` copies every saved element including `apply_grain` but keeps `update_grain` and `film_grain_params_ref_idx` as read; AT2's slot-copy case runs on hand-assembled frame headers (no public vector) — WI-1.118 (#533)
+- 7 §7.3.7, §7.9 table, WI-1.109 interface and step 4; `corrupt_conditions.json` — `parse_slice_header(BitReader&, SyntaxBuilder&, const NalHeader&, const ParameterSets&)` with `ParameterSets {pps, sps, subset_sps, on_activate}` owned by WI-1.111's `ActiveSets` (mirrors the H.265 resolution of #391); `SYN-H264-0010` also covers a PPS whose SPS or subset SPS is missing; `slice_header_in_scalable_extension()` stays with WI-4.111, until then SVC/3D-AVC enhancement-layer slices are kept as bytes with Info `SYN-H264-0070` and `parse_slice_header()` throws `SYN-H264-0002` for them — WI-1.109 (#529)
+
 ## 1.0.0-rc30 — 2026-11-14
 
 PATCH-level: spec-amendment pass 10 folds in the accepted answer of `spec-question` issue #418 from WI-1.115 (H.265 activation). Two diagnostic codes are registered (D2, additive); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
