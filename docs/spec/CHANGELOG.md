@@ -2,6 +2,12 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc35 — 2026-11-15
+
+PATCH-level: spec-amendment pass 15 folds in the accepted answer of `spec-question` issue #558 from WI-1.230 (PR #518). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
+
+- 8 §8.7 WI-1.230 AT1 — for a manifest entry carrying `expected.demux = {packets, error}` the parity sweep asserts exactly that packet count, `file_pos` parity for those packets and then a read error of that class (`mpegff_FX_VY_9436R_3_qhd`: 216 of 483 samples, libavformat CENC/seig limitation); an acceptance-test narrowing for one entry, listed for the owner's check-in — WI-1.230 (#558)
+
 ## 1.0.0-rc34 — 2026-11-15
 
 PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548), #551 and #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
