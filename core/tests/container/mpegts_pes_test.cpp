@@ -103,7 +103,7 @@ Bytes psi_packets(uint16_t pcr_pid, const std::vector<std::pair<uint16_t, uint8_
 
 void put_ts(Bytes& b, uint8_t prefix, int64_t v) {
   const auto u = static_cast<uint64_t>(v);
-  b.push_back(static_cast<uint8_t>((prefix << 4U) | ((u >> 29U) & 0x0EU) | 1U));
+  b.push_back(static_cast<uint8_t>((uint64_t{prefix} << 4U) | ((u >> 29U) & 0x0EU) | 1U));
   b.push_back(static_cast<uint8_t>(u >> 22U));
   b.push_back(static_cast<uint8_t>(((u >> 14U) & 0xFEU) | 1U));
   b.push_back(static_cast<uint8_t>(u >> 7U));
