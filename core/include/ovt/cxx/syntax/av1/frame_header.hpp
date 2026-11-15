@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // AV1 uncompressed_header() (AV1 §5.9.2) and its sub-structures: chapter 7 §7.3.6 rows 11–19, WI-1.117 (part 1:
-// up to and including delta_lf_params()); rows 20–29 follow in WI-1.118. WI-1.117a delivers rows 12–19 (frame
-// size, render size, frame_size_with_refs, tile_info, quantization, segmentation, delta q / lf and the lossless
-// derivations) in two PRs (a = rows 12–15, b = rows 16–19); WI-1.117c adds the FrameHeader struct and
-// parse_frame_header() for row 11. C++ helper header (D22): semi-public, no ABI promise, never included from a C
-// header, not installed.
+// up to and including delta_lf_params()); rows 20–29 follow in WI-1.118. Rows 12–15 (frame size, render size,
+// frame_size_with_refs, tile_info) and rows 16–19 (quantization, segmentation, delta q / lf, the lossless
+// derivations) came in WI-1.117a/b; the FrameHeader struct and parse_frame_header() for row 11 in WI-1.117c. C++
+// helper header (D22): semi-public, no ABI promise, never included from a C header, not installed.
 //
 // The typed structs hold every syntax element under its spec name and every derived variable (§7.3.7); the
 // SyntaxNode tree is for display. Fields the syntax table infers instead of reading carry the inferred value.
@@ -24,6 +23,7 @@
 
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/av1/decoder_state.hpp"
+#include "ovt/cxx/syntax/av1/obu_header.hpp"
 #include "ovt/cxx/syntax/av1/sequence_header.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 
@@ -56,9 +56,20 @@ inline constexpr std::array<int16_t, kSegLvlMax> kSegmentationFeatureMax{
 /// "SEG_LVL_REF_FRAME", "SEG_LVL_SKIP", "SEG_LVL_GLOBALMV" (§7.3.6 row 17 feature names); "" otherwise.
 [[nodiscard]] std::string_view segmentation_feature_name(int feature) noexcept;
 
+/// interpolation_filter (AV1 §6.8.9). The values equal ovt.fb.Av1InterpFilter.
+enum class InterpolationFilter : uint8_t {
+  EightTap = 0,
+  EightTapSmooth = 1,
+  EightTapSharp = 2,
+  Bilinear = 3,
+  Switchable = 4,
+};
+/// "EIGHTTAP", "EIGHTTAP_SMOOTH", "EIGHTTAP_SHARP", "BILINEAR", "SWITCHABLE".
+[[nodiscard]] std::string_view interpolation_filter_name(InterpolationFilter f) noexcept;
+
 /// Diagnostic codes of rows 11–19 (§7.9). SYN-AV1-0015 (registered through #513) is the Error for frame-header
 /// values that violate a conformance requirement without being a reserved value (see frame_size.cpp /
-/// tile_info.cpp); SYN-AV1-0011 is raised by parse_frame_header() (WI-1.117c).
+/// tile_info.cpp); SYN-AV1-0011 is the Info parse_frame_header() raises for a ref_order_hint mismatch.
 inline constexpr std::string_view kDiagRefOrderHintMismatch = "SYN-AV1-0011";  // Info
 inline constexpr std::string_view kDiagFrameHeaderRange = "SYN-AV1-0015";      // Error
 
@@ -258,23 +269,42 @@ struct Lossless {
   bool AllLossless = false;  // CodedLossless && FrameWidth == UpscaledWidth
 };
 
-/// get_qindex(ignoreDeltaQ, segmentId) (AV1 §7.12.2) with CurrentQIndex = base_q_idx when ignoreDeltaQ (the only
-/// form the header derivations use): base_q_idx plus the clipped SEG_LVL_ALT_Q delta of the segment.
+/// get_qindex(ignoreDeltaQ, segmentId) (AV1 §7.12.2): base_q_idx (or, when !ignoreDeltaQ && delta_q_present,
+/// the caller's CurrentQIndex) plus the clipped SEG_LVL_ALT_Q delta of the segment. The header derivations call it
+/// with ignoreDeltaQ = true; chapter 7.6 passes the tile's CurrentQIndex and the frame's delta_q_present.
 [[nodiscard]] int32_t get_qindex(bool ignoreDeltaQ, int segmentId, const QuantizationParams& q,
-                                 const SegmentationParams& seg, int32_t CurrentQIndex) noexcept;
+                                 const SegmentationParams& seg, bool delta_q_present, int32_t CurrentQIndex) noexcept;
 
 /// CodedLossless, LosslessArray[], SegQMLevel[][] and AllLossless of AV1 §5.9.2 (§7.3.6 row 11).
 [[nodiscard]] Lossless compute_lossless(const QuantizationParams& q, const SegmentationParams& seg,
                                         bool frame_width_equals_upscaled_width) noexcept;
 
-// ==== WI-1.118: §7.3.6 rows 20–25 (part a; rows 26–27 follow in part b) ==============================
+// ---- row 11: uncompressed_header() ----------------------------------------------------------------------------
+
+/// temporal_point_info() (AV1 §5.9.31), read when decoder_model_info_present_flag && !equal_picture_interval.
+struct TemporalPointInfo {
+  BitSpan span{0, 0};
+  uint32_t frame_presentation_time = 0;  // f(frame_presentation_time_length_minus_1 + 1)
+  bool present = false;
+};
+
+// ==== WI-1.118: §7.3.6 rows 20–29 ===============================================================================
 // The parsers below take the frame-level inputs uncompressed_header() has derived by then (CodedLossless,
 // AllLossless, allow_intrabc, FrameIsIntra, ref_frame_idx[], OrderHint, the primary reference's saved values) as
 // arguments, so that each one can be tested and fuzzed on its own; parse_frame_header() (row 11) calls them in
 // syntax order.
 
-// AV1 §3 constants used by rows 20–25.
+// AV1 §3 constants used by rows 20–27.
 inline constexpr uint16_t kRestorationTileSizeMax = 256;  // RESTORATION_TILESIZE_MAX
+inline constexpr uint8_t kWarpedModelPrecBits = 16;       // WARPEDMODEL_PREC_BITS
+inline constexpr uint8_t kGmAbsTransBits = 12;            // GM_ABS_TRANS_BITS
+inline constexpr uint8_t kGmAbsTransOnlyBits = 9;         // GM_ABS_TRANS_ONLY_BITS
+inline constexpr uint8_t kGmAbsAlphaBits = 12;            // GM_ABS_ALPHA_BITS
+inline constexpr uint8_t kGmAlphaPrecBits = 15;           // GM_ALPHA_PREC_BITS
+inline constexpr uint8_t kGmTransPrecBits = 6;            // GM_TRANS_PREC_BITS
+inline constexpr uint8_t kGmTransOnlyPrecBits = 3;        // GM_TRANS_ONLY_PREC_BITS
+inline constexpr uint8_t kMaxNumYPoints = 14;             // num_y_points <= 14 (AV1 §6.8.20 conformance)
+inline constexpr uint8_t kMaxNumCbCrPoints = 10;          // num_cb_points / num_cr_points <= 10 (AV1 §6.8.20)
 
 /// The loop_filter_ref_deltas of setup_past_independence() and of the lossless / intrabc branch of
 /// loop_filter_params(): INTRA_FRAME 1, LAST..LAST3 0, GOLDEN -1, BWDREF 0, ALTREF2 -1, ALTREF -1.
@@ -403,6 +433,211 @@ struct SkipModeParams {
 [[nodiscard]] SkipModeParams parse_skip_mode_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
                                                     const DecoderState& state, const RefFrameIdx& ref_frame_idx,
                                                     uint32_t OrderHint, bool FrameIsIntra, bool reference_select);
+
+// ---- row 26: global_motion_params() -------------------------------------------------------------------------
+
+/// GmType (AV1 §6.8.17). The values equal ovt.fb.Av1GmType.
+enum class GlobalMotionType : uint8_t { Identity = 0, Translation = 1, RotZoom = 2, Affine = 3 };
+/// "IDENTITY", "TRANSLATION", "ROTZOOM", "AFFINE".
+[[nodiscard]] std::string_view gm_type_name(GlobalMotionType t) noexcept;
+
+struct GlobalMotionParams {
+  GmParams gm_params = identity_gm_params();                  // gm_params[ref][0..5], entry 0 (INTRA_FRAME) unused
+  std::array<GlobalMotionType, kTotalRefsPerFrame> GmType{};  // GmType[ref], IDENTITY when !is_global
+  BitSpan span{0, 0};
+  std::array<bool, kTotalRefsPerFrame> is_global{};  // f(1) per ref LAST_FRAME..ALTREF_FRAME (inter frames)
+};
+
+/// inverse_recenter(r, v) (AV1 §5.9.29).
+[[nodiscard]] int32_t inverse_recenter(int32_t r, int32_t v) noexcept;
+
+/// global_motion_params() (AV1 §5.9.24) with read_global_param(), decode_signed_subexp_with_ref(),
+/// decode_unsigned_subexp_with_ref(), decode_subexp() and inverse_recenter() (AV1 §5.9.25–§5.9.29) at the current
+/// position (node "global_motion_params"). `PrevGmParams` is the primary reference's SavedGmParams
+/// (load_previous()) or identity_gm_params() (setup_past_independence(), and every error-resilient frame).
+[[nodiscard]] GlobalMotionParams parse_global_motion_params(BitReader& br, SyntaxBuilder& b, bool FrameIsIntra,
+                                                            bool allow_high_precision_mv, const GmParams& PrevGmParams);
+
+// ---- row 27: film_grain_params() ----------------------------------------------------------------------------
+
+/// film_grain_params() (AV1 §5.9.30) at the current position (node "film_grain_params"). Returns the
+/// FilmGrainParams the frame uses (what the §7.20 update process saves): reset_grain_params() (all zero) without
+/// film_grain_params_present, for a frame that is neither shown nor showable, or with apply_grain = 0. With
+/// update_grain = 0, load_grain_params(film_grain_params_ref_idx) copies SavedFilmGrainParams of that slot of
+/// `state` (apply_grain included, as libaom does) and grain_seed is restored to the value read; update_grain and
+/// film_grain_params_ref_idx keep the values read (they only say where the parameters came from). A
+/// film_grain_params_ref_idx that is not one of ref_frame_idx[], num_y_points > 14, num_cb_points or num_cr_points
+/// > 10, point values that do not increase, or (4:2:0) exactly one of num_cb_points / num_cr_points zero are
+/// Diagnostic Error SYN-AV1-0015 (AV1 §6.8.20 conformance requirements; SPEC-ASSUMPTION(#533)); the values
+/// stand as read.
+[[nodiscard]] FilmGrainParams parse_film_grain_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                                      const DecoderState& state, const RefFrameIdx& ref_frame_idx,
+                                                      FrameType frame_type, bool show_frame, bool showable_frame);
+
+/// load_grain_params(idx) (AV1 §7.21 / §6.8.20): the SavedFilmGrainParams of slot `idx`.
+[[nodiscard]] FilmGrainParams load_grain_params(const DecoderState& state, uint8_t idx) noexcept;
+
+// ---- row 29: tile_group_obu() -------------------------------------------------------------------------------
+
+/// One tile of a tile group (AV1 §5.11.1 loop body). tile_data() is opaque: byte_offset / tileSize locate it,
+/// byte_offset counted from the first byte of the BitReader's data (the caller adds the OBU's file offset for the
+/// derived "tile byte range").
+struct TileGroupTile {
+  uint64_t byte_offset = 0;
+  uint64_t tileSize = 0;
+  uint32_t TileNum = 0;
+  uint32_t tileRow = 0;
+  uint32_t tileCol = 0;
+  uint32_t MiRowStart = 0;
+  uint32_t MiRowEnd = 0;
+  uint32_t MiColStart = 0;
+  uint32_t MiColEnd = 0;
+  uint32_t tile_size_minus_1 = 0;  // le(TileSizeBytes); not read (0) for the last tile of the group
+};
+
+struct TileGroup {
+  std::vector<TileGroupTile> tiles;  // tg_start .. tg_end
+  BitSpan span{0, 0};
+  uint32_t tg_start = 0;
+  uint32_t tg_end = 0;
+  uint32_t headerBytes = 0;  // bytes up to and including byte_alignment()
+  bool tile_start_and_end_present_flag = false;
+  bool frame_complete = false;  // tg_end == NumTiles - 1: SeenFrameHeader = 0, the reference update runs
+};
+
+/// tile_group_obu(sz) (AV1 §5.11.1) at the current position (node "tile_group_obu"), with `sz` the bytes left in
+/// the OBU and `ti` the frame's tile_info(). A tile size that overruns the group (or the reader's data) is
+/// ParseError SYN-AV1-0020; a tile range outside 0 .. NumTiles - 1 is ParseError SYN-GEN-0003. Either way the
+/// frame never reaches tg_end == NumTiles - 1 and the index reports it truncated (SYN-AV1-0101).
+[[nodiscard]] TileGroup parse_tile_group_obu(BitReader& br, SyntaxBuilder& b, const TileInfo& ti, uint32_t sz);
+
+/// buffer_removal_time[opNum] (AV1 §5.9.2), one entry per operating point whose decoder model applies to the
+/// OBU's temporal_id / spatial_id.
+struct BufferRemovalTime {
+  uint32_t opNum = 0;
+  uint32_t buffer_removal_time = 0;  // f(buffer_removal_time_length_minus_1 + 1)
+};
+
+/// §7.3.6 row 11: uncompressed_header() (WI-1.117 up to delta_lf_params() and the lossless derivations; WI-1.118
+/// rows 20–27: loop filter, CDEF, loop restoration, tx mode, reference mode, skip mode, allow_warped_motion,
+/// reduced_tx_set, global motion and film grain). The rows 20–27 results also land in `state` (loop filter deltas,
+/// gm_params, film_grain_params) for the §7.20 reference frame update process.
+struct FrameHeader {
+  // The §7.20 variables of this frame (sizes, frame_type, OrderHint, OrderHints, feature tables, loop filter
+  // deltas, gm_params, film grain): what the reference frame update process saves. For show_existing_frame it is
+  // the loaded slot (AV1 §7.21) as the slot model will restore it.
+  FrameState state;
+  TileInfo tile_info;
+  SegmentationParams segmentation_params;
+  std::vector<BufferRemovalTime> buffer_removal_time;  // empty unless buffer_removal_time_present_flag
+  QuantizationParams quantization_params;
+  Lossless lossless;
+  FrameSize frame_size;
+  RenderSize render_size;
+  FrameSizeWithRefs frame_size_with_refs;  // valid when frame_size_with_refs_present
+  TemporalPointInfo temporal_point_info;
+  DeltaQParams delta_q_params;
+  DeltaLfParams delta_lf_params;
+  LoopFilterParams loop_filter_params;
+  CdefParams cdef_params;
+  LrParams lr_params;
+  TxModeParams tx_mode;
+  SkipModeParams skip_mode_params;
+  GlobalMotionParams global_motion_params;  // gm_params also in state.gm_params
+  BitSpan span{0, 0};
+  // ref_order_hint[i] f(OrderHintBits), only with error_resilient_mode && enable_order_hint (ref_order_hint_present)
+  std::array<uint32_t, kNumRefFrames> ref_order_hint{};
+  // ref_frame_idx[0..6] (LAST_FRAME..ALTREF_FRAME): read, or from set_frame_refs(); -1 for an intra frame
+  RefFrameIdx ref_frame_idx{-1, -1, -1, -1, -1, -1, -1};
+  // delta_frame_id_minus_1[i] f(delta_frame_id_length_minus_2 + 2) and the derived expectedFrameId[i], only with
+  // frame_id_numbers_present_flag
+  std::array<uint32_t, kRefsPerFrame> delta_frame_id_minus_1{};
+  std::array<uint32_t, kRefsPerFrame> expectedFrameId{};
+  std::array<bool, kTotalRefsPerFrame> RefFrameSignBias{};  // derived with state.OrderHints (AV1 §5.9.2)
+  // Syntax order: show_existing_frame, frame_to_show_map_idx, temporal_point_info, display_frame_id | frame_type,
+  // show_frame, temporal_point_info, showable_frame, error_resilient_mode, disable_cdf_update,
+  // allow_screen_content_tools, force_integer_mv, current_frame_id, frame_size_override_flag, order_hint,
+  // primary_ref_frame, buffer_removal_time_present_flag, buffer_removal_time[], refresh_frame_flags,
+  // ref_order_hint[], frame_size/render_size/allow_intrabc | frame_refs_short_signaling, last_frame_idx,
+  // gold_frame_idx, ref_frame_idx[], delta_frame_id_minus_1[], frame_size_with_refs | frame_size, render_size,
+  // allow_high_precision_mv, is_filter_switchable, interpolation_filter, is_motion_mode_switchable,
+  // use_ref_frame_mvs; disable_frame_end_update_cdf; tile_info, quantization_params, segmentation_params,
+  // delta_q_params, delta_lf_params, loop_filter_params, cdef_params, lr_params, read_tx_mode, frame_reference_mode,
+  // skip_mode_params, allow_warped_motion, reduced_tx_set, global_motion_params, film_grain_params.
+  uint32_t display_frame_id = 0;
+  uint32_t current_frame_id = 0;  // also state.current_frame_id
+  uint32_t order_hint = 0;        // f(OrderHintBits); OrderHint = state.OrderHint
+  uint8_t frame_to_show_map_idx = 0;
+  uint8_t primary_ref_frame = kPrimaryRefNone;
+  uint8_t refresh_frame_flags = 0;
+  uint8_t last_frame_idx = 0;  // f(3), only with frame_refs_short_signaling
+  uint8_t gold_frame_idx = 0;
+  InterpolationFilter interpolation_filter = InterpolationFilter::EightTap;
+  FrameType frame_type = FrameType::Key;  // also state.frame_type; RefFrameType[slot] for show_existing_frame
+  bool show_existing_frame = false;
+  bool FrameIsIntra = true;
+  bool show_frame = true;
+  bool showable_frame = false;  // also state.showable_frame
+  bool error_resilient_mode = true;
+  bool disable_cdf_update = false;
+  bool allow_screen_content_tools = false;
+  bool force_integer_mv = true;
+  bool frame_size_override_flag = false;
+  bool buffer_removal_time_present_flag = false;
+  bool allow_high_precision_mv = false;
+  bool use_ref_frame_mvs = false;
+  bool allow_intrabc = false;
+  bool frame_refs_short_signaling = false;
+  bool is_filter_switchable = false;
+  bool is_motion_mode_switchable = false;
+  bool disable_frame_end_update_cdf = true;
+  bool ref_order_hint_present = false;
+  bool frame_size_with_refs_present = false;
+  bool reference_select = false;     // frame_reference_mode(): f(1) for inter frames
+  bool allow_warped_motion = false;  // f(1) unless FrameIsIntra || error_resilient_mode || !enable_warped_motion
+  bool reduced_tx_set = false;
+  // Derived summary for FrameInfo (§7.3.6 row 11 "Derived summary"): is_rap = KEY_FRAME && show_frame (a
+  // show_existing_frame of a KEY slot is is_rap in the slot model, §7.4.3); poc = state.OrderHint; qp_base =
+  // quantization_params.base_q_idx; coded_size = FrameWidth × FrameHeight; crop = RenderWidth × RenderHeight.
+  bool is_rap = false;
+};
+
+/// §7.3.7: uncompressed_header() at the current position (node "uncompressed_header") for the OBU `obu`
+/// (temporal_id / spatial_id decide which buffer_removal_time[opNum] are present). Reads the whole §5.9.2 syntax
+/// through film_grain_params() and derives the lossless flags; `state` is consulted for show_existing_frame,
+/// ref_order_hint[], frame_size_with_refs(), set_frame_refs(), load_previous(), skip_mode_params() and
+/// load_grain_params(), and changed only where §5.9.2 changes it inside the header (shown-KEY reset, mark_ref_frames(),
+/// RefValid cleared on a ref_order_hint mismatch, SYN-AV1-0011). The §7.20 / §7.21 processes stay with the slot model
+/// (index). With `is_redundant` (OBU_REDUNDANT_FRAME_HEADER, frame_header_copy()) the header is parsed against a copy
+/// of `state`. Throws ParseError (BR-0001) on a truncated header; conformance findings are diagnostics on the tree.
+[[nodiscard]] FrameHeader parse_frame_header(BitReader& br, SyntaxBuilder& b, const ObuHeader& obu,
+                                             const SequenceHeader& seq, DecoderState& state, bool is_redundant);
+/// The §7.3.7 signature: the same for an OBU without extension header (temporal_id = spatial_id = 0;
+/// SPEC-ASSUMPTION(#513)).
+[[nodiscard]] FrameHeader parse_frame_header(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                             DecoderState& state, bool is_redundant);
+
+/// mark_ref_frames(idLen) (AV1 §5.9.4): clears RefValid of every slot whose RefFrameId is too far from
+/// current_frame_id (diffLen = delta_frame_id_length_minus_2 + 2). A shown KEY frame has already cleared them.
+void mark_ref_frames(DecoderState& state, const SequenceHeader& seq, uint32_t current_frame_id, FrameType frame_type,
+                     bool show_frame) noexcept;
+
+// ---- row 28: frame_obu() --------------------------------------------------------------------------------------
+
+struct FrameObu {
+  FrameHeader frame_header;
+  TileGroup tile_group;  // empty (no tiles) for a show_existing_frame header
+  BitSpan span{0, 0};
+  uint32_t headerBytes = 0;  // frame_header_obu() plus byte_alignment()
+};
+
+/// frame_obu(sz) (AV1 §5.10) at the first payload bit of an OBU_FRAME (node "frame_obu"), sz = obu.obu_size:
+/// frame_header_obu() (uncompressed_header(), as parse_frame_header() with is_redundant = false), byte_alignment()
+/// and tile_group_obu(sz - headerBytes) over the header's tile_info(). AV1 §7.5 forbids show_existing_frame = 1 in
+/// an OBU_FRAME; such a header is returned without a tile group (the index completes the frame by itself). Throws
+/// what the two parts throw (BR-0001, SYN-AV1-0020, SYN-GEN-0003).
+[[nodiscard]] FrameObu parse_frame_obu(BitReader& br, SyntaxBuilder& b, const ObuHeader& obu, const SequenceHeader& seq,
+                                       DecoderState& state);
 
 }  // namespace ovt::syntax::av1
 

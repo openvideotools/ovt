@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 // The CellGrid half of the chapter 07 §7.6.2 mapping (WI-2.164): per-cell vectors read straight from libde265's
-// per-4x4 metadata, the reference slot table, and serialisation. The block-tree mapping (the next part of WI-2.164)
-// adds the fields that need the tree (block_id and the transform fields). Internal to the plugin.
+// per-4x4 metadata, the reference slot table, and serialisation. map_blocks.cpp adds the fields that need the block
+// tree (block_id and the transform fields). Internal to the plugin.
 #ifndef OVT_PLUGIN_DE265_MAP_GRID_HPP
 #define OVT_PLUGIN_DE265_MAP_GRID_HPP
 
@@ -101,7 +101,7 @@ class RefTable {
 /// transform fields) and counts the reference usage in @p refs. @p d must have passed the size checks.
 void fill_cells(GridCells& g, const BlockData& d, const PictureFormat& fmt, RefTable& refs);
 
-/// Serialises @p g with every vector present.
+/// Serialises @p g; every vector of kGridFields is present.
 flatbuffers::Offset<ovt::fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb, uint32_t cells_w,
                                                   uint32_t cells_h, const GridCells& g);
 

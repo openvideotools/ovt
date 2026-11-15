@@ -124,7 +124,7 @@ void parse_qp_offsets(SyntaxBuilder& b, Pps& p, uint32_t qp_bd_offset_y) {
 void parse_pic_scaling_matrix(BitReader& br, SyntaxBuilder& b, Pps& p, uint32_t chroma_format_idc) {
   p.num_scaling_lists = 6 + ((chroma_format_idc != 3) ? 2U : 6U) * (p.transform_8x8_mode_flag ? 1U : 0U);
   if (p.provisional && p.transform_8x8_mode_flag) {
-    // SPEC-ASSUMPTION(#320): raised only when the assumed count was used.
+    // Raised only when the assumed count was used (§7.3.4 row 6, §7.9.3).
     b.diag(Severity::Warning, "SYN-H264-0020", "PPS parsed before its SPS; scaling list count assumed",
            "H.264 7.3.2.2");
   }
@@ -171,7 +171,7 @@ Pps parse_pps(BitReader& br, SyntaxBuilder& b, const SpsTable& sps_table) {
   detail::require_range(br, "seq_parameter_set_id", p.seq_parameter_set_id, 0, 31);
   const Sps* sps = sps_table.find(p.seq_parameter_set_id);
   p.provisional = sps == nullptr;
-  // SPEC-ASSUMPTION(#320): the SPS is unknown → chroma_format_idc 1 for the scaling-list count (row 6 pitfall).
+  // The SPS is unknown → chroma_format_idc 1 for the scaling-list count (§7.3.4 row 6 pitfall).
   const uint32_t chroma_format_idc = (sps != nullptr) ? sps->chroma_format_idc : 1;
   const uint32_t qp_bd_offset_y = (sps != nullptr) ? sps->QpBdOffsetY : 0;
   p.entropy_coding_mode_flag = b.read_flag("entropy_coding_mode_flag");

@@ -28,8 +28,7 @@
 
 namespace {
 
-constexpr uint8_t kCodecH265 = 2;    // ovt.fb.Codec.H265
-constexpr uint32_t kStageRecon = 0;  // ovt.fb.PlaneStage.Reconstruction
+constexpr uint8_t kCodecH265 = 2;  // ovt.fb.Codec.H265
 constexpr std::array<const char*, 3> kPlaneNames = {"y", "u", "v"};
 
 }  // namespace
@@ -50,7 +49,7 @@ namespace {
 const ovt_AnalysisCaps kCaps = {
     sizeof(ovt_AnalysisCaps),
     kCodecH265,
-    1U << kStageRecon,     // plane_stages: Reconstruction (WI-4.105 part b adds Coefficients)
+    (1U << ovt::hm::kStageRecon) | (1U << ovt::hm::kStageCoefficients),  // plane_stages
     ovt::hm::kGridFields,  // grid_fields: all but partition_id, bits_x8 and deblock_bs (analysis.hpp)
     0,                     // has_symbol_accounting
     1,                     // bit_exact: the reference decoder
@@ -62,9 +61,36 @@ const ovt_AnalysisCaps kCaps = {
     "HM-18.0 decodes them; slow (verify runs, RExt). Pictures come out in decode order.",
 };
 
-// The plugin-local blob id "<decode_index>/recon/<plane>" (chapter 06 §6.6.2); the host prefixes the source hash.
-std::string blob_id(int32_t decode_index, int plane) {
-  return std::to_string(decode_index) + "/recon/" + kPlaneNames.at(static_cast<std::size_t>(plane));
+// The plugin-local blob id "<decode_index>/<stage>/<plane>" (chapter 06 §6.6.2); the host prefixes the source hash.
+std::string blob_id(int32_t decode_index, const char* stage, int plane) {
+  return std::to_string(decode_index) + "/" + stage + "/" + kPlaneNames.at(static_cast<std::size_t>(plane));
+}
+
+// The PlaneRefs of one stage (Reconstruction or Coefficients) of a frame, in plane order.
+void add_planes(flatbuffers::FlatBufferBuilder& fbb, const ovt::hm::Frame& f, ovt::fb::PlaneStage stage,
+                std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>* planes,
+                std::map<std::string, const ovt::hm::Plane*>* blobs) {
+  const bool coeff = stage == ovt::fb::PlaneStage::Coefficients;
+  for (int c = 0; c < 3; ++c) {
+    const ovt::hm::Plane& p = (coeff ? f.coeff : f.planes)[static_cast<std::size_t>(c)];
+    if (p.data.empty()) {
+      continue;
+    }
+    std::string id = blob_id(f.decode_index, coeff ? "coeff" : "recon", c);
+    const auto id_off = fbb.CreateString(id);
+    ovt::fb::PlaneRefBuilder pb(fbb);
+    pb.add_stage(stage);
+    pb.add_plane(static_cast<uint8_t>(c));
+    pb.add_width(p.width);
+    pb.add_height(p.height);
+    pb.add_stride_bytes(p.width * p.sample_bytes);
+    pb.add_bit_depth(p.bit_depth);
+    pb.add_sample_bytes(p.sample_bytes);
+    pb.add_is_signed(p.is_signed);
+    pb.add_blob_id(id_off);
+    planes->push_back(pb.Finish());
+    blobs->emplace(std::move(id), &p);
+  }
 }
 
 std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_t plane_stage_mask) {
@@ -87,27 +113,11 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
   const auto diags_v = fbb->CreateVector(diags);
 
   std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>> planes;
-  if (f.picture && (plane_stage_mask & (1U << kStageRecon)) != 0) {
-    for (int c = 0; c < 3; ++c) {
-      const ovt::hm::Plane& p = f.planes[static_cast<std::size_t>(c)];
-      if (p.data.empty()) {
-        continue;
-      }
-      std::string id = blob_id(f.decode_index, c);
-      const auto id_off = fbb->CreateString(id);
-      ovt::fb::PlaneRefBuilder pb(*fbb);
-      pb.add_stage(ovt::fb::PlaneStage::Reconstruction);
-      pb.add_plane(static_cast<uint8_t>(c));
-      pb.add_width(p.width);
-      pb.add_height(p.height);
-      pb.add_stride_bytes(p.width * p.sample_bytes);
-      pb.add_bit_depth(p.bit_depth);
-      pb.add_sample_bytes(p.sample_bytes);
-      pb.add_is_signed(false);
-      pb.add_blob_id(id_off);
-      planes.push_back(pb.Finish());
-      out->blobs.emplace(std::move(id), &p);
-    }
+  if (f.picture && (plane_stage_mask & (1U << ovt::hm::kStageRecon)) != 0) {
+    add_planes(*fbb, f, ovt::fb::PlaneStage::Reconstruction, &planes, &out->blobs);
+  }
+  if (f.picture && (plane_stage_mask & (1U << ovt::hm::kStageCoefficients)) != 0) {
+    add_planes(*fbb, f, ovt::fb::PlaneStage::Coefficients, &planes, &out->blobs);
   }
   const auto planes_v = fbb->CreateVector(planes);
 
@@ -136,6 +146,10 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
     info.add_bit_depth_chroma(f.bit_depth_chroma);
     info.add_qp_base(f.qp_base);
     info.add_slice_count(f.slice_count);
+    if (!mapped.ref_state.IsNull()) {
+      info.add_ref_state(mapped.ref_state);
+      info.add_ref_state_type(mapped.ref_state_type);
+    }
   }
   const auto info_off = info.Finish();
 
@@ -151,6 +165,11 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
     fa.add_blocks(mapped.blocks);
     fa.add_mvs(mapped.mvs);
     fa.add_refs(mapped.refs);
+    fa.add_partitions(mapped.partitions);
+    if (!mapped.filter_params.IsNull()) {
+      fa.add_filter_params(mapped.filter_params);
+      fa.add_filter_params_type(mapped.filter_params_type);
+    }
   }
   fa.add_planes(planes_v);
   fa.add_diagnostics(diags_v);
@@ -207,6 +226,7 @@ ovt_status hm_pull(ovt_AnalysisDecoder* dec, uint32_t plane_stage_mask, ovt_Buff
   }
   *out_fb = ovt_Buffer{nullptr, 0};
   try {
+    dec->decoder->request_stages(plane_stage_mask);
     ovt::hm::Frame frame;
     if (!dec->decoder->pop(&frame)) {
       return OVT_OK;

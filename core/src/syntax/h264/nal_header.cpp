@@ -141,12 +141,12 @@ NalHeader parse_nal_header(BitReader& br, SyntaxBuilder& b) {
         h.has_3davc_extension = true;
         parse_3davc_extension(b, h.avc_3d);
         h.temporal_id = h.avc_3d.temporal_id;
-        h.layer_id = h.avc_3d.view_idx;  // SPEC-ASSUMPTION(#320): view index until the subset SPS is active
+        h.layer_id = h.avc_3d.view_idx;  // view index until the subset SPS is active (§7.3.4 row 1)
       } else {
         h.has_mvc_extension = true;
         parse_mvc_extension(b, h.mvc);
         h.temporal_id = h.mvc.temporal_id;
-        h.layer_id = h.mvc.view_id;  // SPEC-ASSUMPTION(#320): view_id, mapped to VOIdx by the index module
+        h.layer_id = h.mvc.view_id;  // view_id, mapped to VOIdx by the index module (§7.3.4 row 1)
       }
     }
     h.IdrPicFlag = h.nal_unit_type == 5;

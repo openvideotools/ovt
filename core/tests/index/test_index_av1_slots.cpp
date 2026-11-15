@@ -648,6 +648,10 @@ TEST_CASE("av1_slots_diagnostics", "[index][av1][fast]") {
   // A shown KEY resets RefValid before its own refresh: slots not refreshed would be empty, but refresh is 0xFF.
   r = m.step(frame(FrameType::Key, true, 0, kAllFrames), 4, {}, collect(diags));
   CHECK(r.dpb_after == all_slots(4));
+  // AV1 §5.9.2 infers refresh_frame_flags = allFrames for a shown KEY; a peek that passes 0 is overridden.
+  r = m.step(frame(FrameType::Key, true, 0, 0x00), 5, {}, collect(diags));
+  CHECK(r.dpb_after == all_slots(5));
+  CHECK(diags.empty());
 }
 
 TEST_CASE("av1_slots_without_order_hints_poc_is_decode_index", "[index][av1][fast]") {
@@ -659,7 +663,7 @@ TEST_CASE("av1_slots_without_order_hints_poc_is_decode_index", "[index][av1][fas
       m.step(frame(FrameType::Inter, true, 0, 0x01, RefIdx{0, 0, 0, 0, 0, 0, 0}), 1, {}, collect(diags));
   CHECK(r0.poc == 0);
   CHECK(r1.poc == 1);
-  CHECK(codes_of(diags) == std::vector<std::string>{"SYN-AV1-0103", "SYN-AV1-0103"});
+  CHECK(codes_of(diags) == std::vector<std::string>{"SYN-AV1-0103"});  // once per stream
   CHECK(diags[0].severity == Severity::Info);
   CHECK(r1.order_hints.RefFrameSignBias == std::array<bool, 8>{});
 }
@@ -746,13 +750,34 @@ TEST_CASE("av1_frame_grouper_frame_header_and_tile_groups", "[index][av1][fast]"
   CHECK(p.starts_frame);
   CHECK(p.completes_frame);
   CHECK(p.frame_shown);
+  // An OBU_FRAME whose tile group stops short of the last tile keeps the frame open for more tile groups.
+  p = g.on_obu(obu(ObuType::TemporalDelimiter), collect(diags));
+  ObuEvent partial = obu(ObuType::Frame, peek(FrameType::Inter, true));
+  partial.tg_end = 1;
+  partial.num_tiles = 4;
+  p = g.on_obu(partial, collect(diags));
+  CHECK(p.starts_frame);
+  CHECK(p.in_frame);
+  CHECK_FALSE(p.completes_frame);
+  CHECK(g.SeenFrameHeader());
+  CHECK(g.TileNum() == 2);
+  p = g.on_obu(tile_group(3, 4), collect(diags));
+  CHECK(p.completes_frame);
+  CHECK_FALSE(g.SeenFrameHeader());
+  // An OBU_FRAME that carries the last tile is complete by itself.
+  ObuEvent whole = obu(ObuType::Frame, peek(FrameType::Inter, false));
+  whole.tg_end = 3;
+  whole.num_tiles = 4;
+  p = g.on_obu(whole, collect(diags));
+  CHECK(p.completes_frame);
+  CHECK_FALSE(g.SeenFrameHeader());
   bool truncated = true;
   CHECK_FALSE(g.end_of_stream(truncated, collect(diags)));
   CHECK_FALSE(truncated);
-  CHECK(g.frames_started() == 3);
-  CHECK(g.frames_completed() == 3);
-  CHECK(g.shown_frames() == 2);
-  CHECK(g.temporal_units() == 2);
+  CHECK(g.frames_started() == 5);
+  CHECK(g.frames_completed() == 5);
+  CHECK(g.shown_frames() == 3);
+  CHECK(g.temporal_units() == 3);
   CHECK(diags.empty());
 }
 

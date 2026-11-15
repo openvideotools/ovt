@@ -103,6 +103,7 @@ class OffscreenGpu {
   void destroy_host_texture(HostTexture& t);
   void release(HostTexture& t);
   void hold(HostTexture& t);
+  void wait_hold_sem();
 
   DisplayTarget::Interop interop_ = DisplayTarget::Interop::None;
   pl_log log_ = nullptr;
@@ -112,7 +113,8 @@ class OffscreenGpu {
   HostTexture out_;                   // the output texture
   std::vector<HostTexture*> extras_;  // create_extra() textures (not owned)
   VkSemaphore hold_sem_ = VK_NULL_HANDLE;
-  uint64_t hold_value_ = 0;
+  uint64_t hold_value_ = 0;      // the value the next hold signals is ++hold_value_
+  uint64_t hold_signalled_ = 0;  // the value of the last hold that pl_vulkan_hold_ex accepted (0: none)
   // GlTexture
   void* gl_ = nullptr;       // pl_opengl (kept opaque so this header needs no libplacebo/opengl.h)
   void* gl_sync_ = nullptr;  // GLsync of the last end_frame(), handed to the host as ExternalTexture.handle2

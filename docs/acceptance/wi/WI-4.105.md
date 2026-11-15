@@ -49,3 +49,30 @@ $ OVT_CORPORA_DIR=~/wi4105/corpora OVT_REQUIRE_CORPORA=1 ctest --test-dir build/
   (60.2 s), `CellGrid matches hm_cu_dump on the hm-grid goldens` (25.6 s), `RExt 4:4:4 12-bit yields a FrameAnalysis
   per picture`, `two instances decode interleaved`, `caps and ABI table` and
   `malformed hvcC, units and arguments are rejected`.
+
+## Part c1: Mac Mini run, 2026-11-15
+
+- **Machine:** as above.
+- **Commit:** branch `claude/project-thread-56e2sb` at d7ed383 (PR #543), `macos-arm64-release` with
+  `-DOVT_BUILD_PLUGIN_HM=ON` and the preset's `-Werror`.
+- **Corpora and commands:** as for part b, with `OVT_REQUIRE_CORPORA=1`. To run only the new case through Catch2,
+  escape the comma in its name: `"hm plugin: partitions\, filter parameters and RPS match the slice headers"`.
+
+**Result as reported by the Mini session:** `ctest -R "hm plugin"` passes 8 of 8. The new
+`partitions, filter parameters and RPS match the slice headers` takes 34.3 s and passes all 202054 assertions over
+its 16 HEVC_v1 streams. Among them, 245 of the 300 pictures of RPS_E_qualcomm_5 have long-term references,
+DSLICE_A_HHI_5 has 700 dependent slice segments, and TILES_B_Cisco_1, WPP_A_ericsson_MAIN_2 and CAINIT_A_SHARP_4
+are covered too.
+
+**Rerun at 049e957** (after the dpb_fullness_after and RPS POC checks, with BLA pictures expecting empty lists),
+same machine, corpora and commands, 2026-11-15: `ctest -R "hm plugin"` passes 8 of 8; the new case passes all 202054
+assertions in 29.8 s. The intermediate heads 7b6db14 and 3f29f85 failed only on NUT_A_ericsson_5 decode indices 28
+and 32, the BLA pictures.
+
+## Part d: Mac Mini run, 2026-11-15
+
+Same machine, corpora and commands as part c1, branch `claude/project-thread-56e2sb` at 1d86506 (PR #564),
+`macos-arm64-release` with `-DOVT_BUILD_PLUGIN_HM=ON`, `OVT_REQUIRE_CORPORA=1`: `ctest -R "hm plugin"` passes 10 of 10.
+The new cases: `Coefficients planes match the TUs' levels` passes 88629 assertions (17.4 s) and `Coefficients planes only
+on request` passes 17508 assertions (3.3 s). The earlier cases still pass (`hm_md5_vs_sei` 54.7 s, RPS/partitions 30.6 s,
+CellGrid 22.8 s).

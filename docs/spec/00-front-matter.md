@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc30 (2026-11-14) |
+| **Version** | 1.0-rc34 (2026-11-15) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -85,3 +85,7 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc28 (2026-11-14) | Spec-amendment pass 8: accepted answers of `spec-question` issues #466, #473, #512, #513 and the corpus placeholder fix #517 (nine never-fetchable manifest entries deleted, manifest sweeps skip placeholders; see `CHANGELOG.md`). |
 | 1.0-rc29 (2026-11-14) | Spec-amendment pass 9: accepted answers of `spec-question` issues #495, #498 (see `CHANGELOG.md`). |
 | 1.0-rc30 (2026-11-14) | Spec-amendment pass 10: accepted answer of `spec-question` issue #418 (`SYN-H265-0021`, `SYN-H265-0022`; see `CHANGELOG.md`). |
+| 1.0-rc31 (2026-11-14) | Spec-amendment pass 11: accepted answers of `spec-question` issues #528 (SEI payload bound, `SYN-H264-0031`, `SYN-H264-0032`, WI-1.110 AT2) #533 (film grain conformance → `SYN-AV1-0015`) and #529 (H.264 `ParameterSets`, `SYN-H264-0010` variants, `SYN-H264-0070`; see `CHANGELOG.md`). |
+| 1.0-rc32 (2026-11-15) | Spec-amendment pass 12: accepted answers of `spec-question` issues #159, #366 (wording), #406, #419 (float accumulation wording), #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510 (see `CHANGELOG.md`). |
+| 1.0-rc33 (2026-11-15) | Spec-amendment pass 13: accepted answers of `spec-question` issues #546 (tile group range → `SYN-GEN-0003`) and #547 (Android `useLegacyPackaging = true`; see `CHANGELOG.md`). |
+| 1.0-rc34 (2026-11-15) | Spec-amendment pass 14: accepted answers of `spec-question` issues #550 (Qt Quick accessibility under `QtQuickView`: §13.4.4 item 9, risk R-23), #551 (`SYN-H264-0033`), #552 (`SYN-H264-0071`, WI-1.109 four-way split) and #553 (HM plugin: empty RPS lists at BLA pictures); see `CHANGELOG.md`. |
