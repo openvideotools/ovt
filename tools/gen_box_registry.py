@@ -469,10 +469,19 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# REUSE-IgnoreStart
+SPDX_LINES = [  # REUSE: INPUTS.sha256 is our own file (tools/ licence)
+    "# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors",
+    "# SPDX-License-Identifier: LGPL-2.1-or-later",
+]
+# REUSE-IgnoreEnd
+
+
 def render_inputs_sha(inputs: Path) -> str:
     """INPUTS.sha256: the provenance comment lines kept as they are, then one hash line per input file."""
     path = inputs / "INPUTS.sha256"
     head = [ln for ln in path.read_text("utf-8").splitlines() if ln.startswith("#")] if path.exists() else []
+    head = [*SPDX_LINES, *(ln for ln in head if ln not in SPDX_LINES)]
     body = [f"{sha256(p)}  {p.relative_to(inputs).as_posix()}" for p in input_files(inputs)]
     return "\n".join(head + body) + "\n"
 
@@ -631,6 +640,7 @@ def fetch(inputs: Path) -> None:
     up = inputs / "upstream"
     old = set(load_names(up, BOX_NAME_CSVS)) | {d.fourcc for d in load_ffc(up)} if (up / "ffc").exists() else set()
     prov = [
+        *SPDX_LINES,
         "# Inputs of tools/gen_box_registry.py (chapter 08 §8.2.10). The commit lines are written by --fetch; the",
         "# hash lines are rewritten by every generator run and compared by --check.",
     ]

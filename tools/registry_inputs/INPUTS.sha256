@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
 # Inputs of tools/gen_box_registry.py (chapter 08 §8.2.10). The commit lines are written by --fetch; the
 # hash lines are rewritten by every generator run and compared by --check.
 # ffc https://github.com/MPEGGroup/FileFormatConformance 767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067 2025-05-28
