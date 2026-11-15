@@ -50,6 +50,8 @@ void TimingBuilder::packet(uint16_t pid, bool has_pcr, uint64_t pcr, bool discon
   if (!has_pcr) {
     return;
   }
+  // An extension above 299 is out of range but encodable: base 2^33 - 1 with extension 511 lands past the modulus.
+  pcr %= kPcrWrap;
   PcrState& s = pcr_state_[pid];
   if (s.stream < 0) {
     s.stream = static_cast<int32_t>(timing_.pcr.size());

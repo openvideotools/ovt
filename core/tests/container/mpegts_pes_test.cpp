@@ -484,6 +484,16 @@ TEST_CASE("timing: PCR repetition, discontinuity and accuracy checks", "[contain
     CHECK(count_code(*f, DiagCode::CNT_TS_2004) == 0);
     CHECK(count_code(*f, DiagCode::CNT_TS_2005) == 0);
   }
+  SECTION("an out-of-range extension wraps the PCR into the 2^33 * 300 modulus") {
+    Bytes b = pcr_stream(40, 20, 0x0200);
+    std::fill_n(b.begin() + (20 * 188) + 6, 6, uint8_t{0xFF});  // base 2^33 - 1, extension 511
+    const auto f = parse_bytes(b);
+    REQUIRE(f);
+    REQUIRE(f->timing.pcr.size() == 1);
+    REQUIRE(f->timing.pcr[0].points.size() == 2);
+    CHECK(f->timing.pcr[0].points[1].pcr == ((ts::kTimestampWrap - 1) * 300 + 511) % ts::kPcrWrap);
+    CHECK(f->timing.pcr[0].points[1].pcr < ts::kPcrWrap);
+  }
   SECTION("a 1 s gap of missing PCRs is a repetition error") {
     const auto f = parse_bytes(pcr_stream(2000, 20, 0x0200, {}, 500, 1500));
     REQUIRE(f);
