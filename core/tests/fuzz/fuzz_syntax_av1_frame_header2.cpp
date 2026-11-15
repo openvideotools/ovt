@@ -3,12 +3,12 @@
 //
 // Fuzz target of the AV1 uncompressed_header() sub-structure parsers of chapter 7 §7.3.6 rows 20–27 (chapter 14
 // §14.7.1, WI-1.118): loop_filter_params, cdef_params, lr_params, read_tx_mode, frame_reference_mode,
-// skip_mode_params, global_motion_params and film_grain_params. Byte 0 selects the sequence header shape (superblock
-// size, planes, subsampling, enable_cdef / enable_restoration / enable_order_hint, film grain), byte 1 the
-// frame-level inputs (CodedLossless, AllLossless, allow_intrabc, FrameIsIntra, frame type, shown / showable,
-// allow_high_precision_mv), byte 2 seeds the slot order hints, the previous deltas, PrevGmParams and the saved film
-// grain; the rest is the bit stream. Every parser runs in syntax order on the same reader; both recording modes run
-// and must return the same typed values. A ParseError is the expected answer to malformed bytes; any other
+// skip_mode_params, global_motion_params, film_grain_params and (row 29) tile_group_obu. Byte 0 selects the sequence
+// header shape (superblock size, planes, subsampling, enable_cdef / enable_restoration / enable_order_hint, film
+// grain), byte 1 the frame-level inputs (CodedLossless, AllLossless, allow_intrabc, FrameIsIntra, frame type, shown /
+// showable, allow_high_precision_mv), byte 2 seeds the slot order hints, the previous deltas, PrevGmParams and the
+// saved film grain; the rest is the bit stream. Every parser runs in syntax order on the same reader; both recording
+// modes run and must return the same typed values. A ParseError is the expected answer to malformed bytes; any other
 // exception, a crash or a sanitizer report is a finding.
 
 #include <array>
@@ -60,6 +60,24 @@ DecoderState make_state(uint8_t seed) {
     state.slot(i).save(fs, i);
   }
   return state;
+}
+
+// A tile_info() of TileCols x TileRows (1..4 x 1..2, from `seed`) with TileSizeBytes 1..4.
+TileInfo make_tiles(uint8_t seed) {
+  TileInfo ti;
+  ti.TileCols = 1U + (seed & 3U);
+  ti.TileRows = 1U + ((seed >> 2U) & 1U);
+  ti.NumTiles = ti.TileCols * ti.TileRows;
+  ti.TileColsLog2 = static_cast<uint8_t>(ti.TileCols > 2 ? 2 : ti.TileCols - 1);
+  ti.TileRowsLog2 = static_cast<uint8_t>(ti.TileRows - 1);
+  ti.TileSizeBytes = static_cast<uint8_t>(1U + ((seed >> 3U) & 3U));
+  for (uint32_t c = 0; c <= ti.TileCols; ++c) {
+    ti.MiColStarts.push_back(c * 32U);
+  }
+  for (uint32_t r = 0; r <= ti.TileRows; ++r) {
+    ti.MiRowStarts.push_back(r * 32U);
+  }
+  return ti;
 }
 
 uint64_t mix(uint64_t h, uint64_t v) {
@@ -124,6 +142,13 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
     require(fg.point_cb_value.size() >= fg.num_cb_points);
     require(fg.point_cr_value.size() >= fg.num_cr_points);
     summary = mix(summary, mix(fg.grain_seed, fg.num_y_points + fg.num_cr_points));
+    // tile_group_obu(sz) on what is left, with sz up to 3 bytes too large so that overruns are reached.
+    const TileGroup tg =
+        parse_tile_group_obu(br, b, make_tiles(seed), static_cast<uint32_t>(br.bits_left() / 8) + (sel & 3U));
+    require(tg.tg_start <= tg.tg_end && tg.tiles.size() == tg.tg_end - tg.tg_start + 1U);
+    for (const TileGroupTile& t : tg.tiles) {
+      summary = mix(summary, mix(t.byte_offset, t.tileSize));
+    }
   } catch (const ovt::ParseError&) {  // NOLINT(bugprone-empty-catch): the expected answer to malformed input
     summary = ~uint64_t{0};
   }

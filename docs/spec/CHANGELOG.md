@@ -2,6 +2,16 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc34 — 2026-11-15
+
+PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548), #551 and #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 13 §13.4.4 item 9 — Qt Quick accessibility is not exposed through `QtQuickView` (Qt ≤ 6.10); `MainActivity` mirrors the QML root's `productName` onto the view's accessibility node so TalkBack and UI Automator see one labelled node — WI-0.035, WI-0.050 (#550, PR #548)
+- 17 §17.1 — new risk R-23: screen readers cannot reach QML controls on Android under the `QtQuickView` embedding; mitigation and trigger listed — (#550)
+- 7 §7.3.4 row 20, §7.9 — bytes after an `end_of_seq` / `end_of_stream` NAL header are kept as `trailing_data` and reported with the new Info `SYN-H264-0033`; `SYN-H264-0003` stays for reserved values — WI-1.109 (#551)
+- 7 §7.3.4 rows 22–23, §7.9, WI-1.109 block — SVC / MVCD / 3D-AVC subset-SPS extensions, VUI extensions and `prefix_nal_unit_svc()` are kept as bytes with the new Info `SYN-H264-0071` until WI-1.109 part d (waits for the H.264 Annex G–J text); the WI block records the four-way split — WI-1.109 (#552)
+- 7 §7.6.4 mapping and verify mode, WI-4.106 notes — the `hm` plugin reports empty `HevcRps` lists for BLA pictures (HM resets the slice-header RPS and no HM patch is allowed; every entry would be "no reference picture"); other plugins keep the signalled lists; verify mode does not compare `HevcRps` of BLA pictures — WI-4.105, WI-4.106 (#553)
+
 ## 1.0.0-rc33 — 2026-11-15
 
 PATCH-level: spec-amendment pass 13 folds in the accepted answers of `spec-question` issues #546 from WI-1.118 part c (AV1 tile groups) and #547 from WI-0.035/WI-0.050 (Android native-library packaging, PR #548). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. Also corrects the rc32 entry's count ("seventeen" → "eighteen").
