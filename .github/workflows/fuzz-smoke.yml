@@ -205,7 +205,18 @@ jobs:
 
       # The corpus cache is the FIRST corpus directory: libFuzzer writes new units into it, not into the
       # checkout. The committed seeds are the second, read-only one.
+      # Only runs on main save a corpus (one entry per run, so the cache must not grow on every pull request push);
+      # pull requests restore the newest one and start from it.
+      - name: Restore corpus cache (pull request)
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: corpus_cache
+          key: fuzz-corpus-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.shard }}-
+
       - name: Restore corpus cache
+        if: github.event_name != 'pull_request'
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: corpus_cache
