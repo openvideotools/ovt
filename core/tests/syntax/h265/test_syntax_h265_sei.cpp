@@ -292,7 +292,7 @@ void check_vpsid_a_hash(const Parsed& p, size_t picture) {
 TEST_CASE("h265_sei_hrd_a_timing_and_recovery_point", "[syntax][h265][sei][fast]") {
   Env env(kHrdVps, kHrdSps);
   const auto bp = parse_sei(from_hex(kHrdBp), env.ctx);
-  CHECK(env.ctx.buffering_period_sps_id == 0u);
+  CHECK(env.ctx.buffering_period_sps_id == 0U);
   const auto pt = parse_sei(from_hex(kHrdPt0), env.ctx);
   check_hrd_a_first_au(bp, pt);
   const auto pt1 = parse_sei(from_hex(kHrdPt1), env.ctx);  // unit 12
