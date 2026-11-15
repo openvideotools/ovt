@@ -47,10 +47,8 @@ struct PpsTable {
   }
 };
 
-/// The parameter sets parse_slice_header() resolves pic_parameter_set_id through (§7.3.8).
-// SPEC-ASSUMPTION(#529): §7.3.7 declares parse_slice_header() with `const ActiveSets&`; ActiveSets is WI-1.111's
-// (core/src/syntax/h264/active_sets.cpp), so the parser takes these tables, which ActiveSets will own, plus an
-// optional activation callback (WI-1.109 step 1) that ActiveSets uses to record the activation.
+/// The parameter sets parse_slice_header() resolves pic_parameter_set_id through (§7.3.7, §7.3.8; #529): WI-1.111's
+/// ActiveSets owns one and passes it, and records the activation through the optional on_activate callback.
 struct ParameterSets {
   PpsTable pps;
   SpsTable sps;         // nal_unit_type 1, 5 (and 2 for partition A)
@@ -168,7 +166,7 @@ struct SliceHeader {  // NOLINT(clang-analyzer-optin.performance.Padding)
   bool IdrPicFlag = false;           // nal_unit_type 5, or !non_idr_flag of the MVC / 3D-AVC header
   bool MbaffFrameFlag = false;
   uint32_t PicHeightInMbs = 1;
-  uint64_t PicSizeInMbs = 1;
+  uint64_t PicSizeInMbs = 1;  // 64-bit like Sps::PicSizeInMapUnits: up to 2^32 under the #388 caps
   uint32_t MaxPicNum = 16;
   uint32_t CurrPicNum = 0;
   int32_t SliceQPY = 26;
@@ -201,13 +199,17 @@ DecRefPicMarking parse_dec_ref_pic_marking(BitReader& br, SyntaxBuilder& b, bool
 /// Row 24: slice_header() for nal_unit_type 1, 5 and 2 (partition A), and for 20 / 21 with the MVC extension
 /// header (H.7.3.3.4: the same syntax with the subset SPS as the active SPS). The reader stands after the NAL
 /// header; the RBSP remainder is recorded as the opaque `slice_data` node by the caller (parse_slice_layer()).
-/// Throws ParseError SYN-H264-0010 when the PPS or its SPS is missing, SYN-H264-0002 on a range violation.
+/// Throws ParseError SYN-H264-0010 when the PPS or its (subset) SPS is missing, SYN-H264-0002 on a range violation
+/// and for an SVC / 3D-AVC enhancement-layer slice (WI-4.111, #529).
 SliceHeader parse_slice_header(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const ParameterSets& sets);
 
-/// slice_layer_without_partitioning_rbsp() (§7.3.2.8) and, for nal_unit_type 20 / 21 with the MVC extension
-/// header, slice_layer_extension_rbsp() (§7.3.2.13): node `slice_layer_without_partitioning_rbsp` /
-/// `slice_layer_extension_rbsp` holding `slice_header` and the opaque `slice_data`.
-SliceHeader parse_slice_layer(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const ParameterSets& sets);
+/// slice_layer_without_partitioning_rbsp() (§7.3.2.8) and slice_layer_extension_rbsp() (§7.3.2.13): node
+/// `slice_layer_without_partitioning_rbsp` / `slice_layer_extension_rbsp` holding `slice_header` and the opaque
+/// `slice_data`. A NAL 20 unit with svc_extension_flag = 1 or a NAL 21 unit with avc_3d_extension_flag = 1 is kept
+/// as the opaque `slice_layer_extension_bytes` with Info SYN-H264-0070 and returns std::nullopt: its
+/// slice_header_in_scalable_extension() is WI-4.111's (§7.9 table, #529).
+std::optional<SliceHeader> parse_slice_layer(BitReader& br, SyntaxBuilder& b, const NalHeader& nal,
+                                             const ParameterSets& sets);
 
 }  // namespace ovt::syntax::h264
 

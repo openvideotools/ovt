@@ -233,6 +233,7 @@ TEST_CASE("ssim_x264 is registered with a valid descriptor", "[metrics][ssim_x26
       .ovt_metric_path = "", .ovt_plugin_path = "", .defaults = std::vector<std::string>{}});
   ovt::metrics::register_builtin_kernels(reg);
   CHECK(reg.find("ssim_x264") != nullptr);
+  CHECK(reg.find("identity") != nullptr);
   CHECK(reg.find("ssim") != nullptr);
   CHECK(reg.find("psnr") != nullptr);
 }
