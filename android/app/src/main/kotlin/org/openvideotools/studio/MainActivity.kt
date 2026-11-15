@@ -11,6 +11,8 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnAttach
+import androidx.lifecycle.Lifecycle
+import org.qtproject.qt.android.OvtQtResume
 import org.qtproject.qt.android.QtQmlStatus
 import org.qtproject.qt.android.QtQuickView
 
@@ -48,6 +50,9 @@ class MainActivity : AppCompatActivity() {
      * getRootWindowInsets() without a null check. Before the first traversal attaches the window those insets are
      * null, so a QtQuickView built in onCreate crashed with a NullPointerException in about half the emulator runs.
      * After attachment the insets are never null.
+     *
+     * The window attaches after the first onResume, so Qt's own resume callback has already been missed: OvtQtResume
+     * sets the Qt application state to Active, which runs the actions Qt queued (root window, display metrics).
      */
     private fun addQtView(host: FrameLayout) {
         qtView = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
@@ -56,6 +61,8 @@ class MainActivity : AppCompatActivity() {
             qtView,
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
         )
+        // Otherwise Qt's ActivityLifecycleCallbacks set the state at the next onResume.
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
