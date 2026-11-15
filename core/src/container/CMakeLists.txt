@@ -19,6 +19,7 @@ target_sources(
           mpegts/descriptors.cpp
           mpegts/pes.cpp
           mpegts/psi.cpp
+          mpegts/timing.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp

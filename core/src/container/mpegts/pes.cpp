@@ -229,6 +229,9 @@ std::vector<uint8_t> read_pes_payload(const io::RandomAccessFile& file, const Fi
   bool dup_ok = false;
   uint8_t last_cc = 0;
   for (uint64_t k = pes.first_packet; k <= pes.last_packet && k < f.packet_count && out.size() < pes.size; ++k) {
+    if (k < f.timing.packet_pid.size() && f.timing.packet_pid[k] != pid) {
+      continue;  // another PID: no read needed
+    }
     std::array<uint8_t, kPacketBytes> buf{};
     const uint64_t sync = f.sync_offset(k);
     const size_t got = file.read(sync, buf.size(), buf.data());

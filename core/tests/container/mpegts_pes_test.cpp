@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of PES reassembly, the per-PID SampleTable of the MPEG-TS reader (chapter 08
-// §8.6.7, WI-4.206a; the timing table follows in WI-4.206b).
+// Tests of PES reassembly, the per-PID SampleTable and the PCR/PTS timing table of the MPEG-TS reader (chapter 08
+// §8.6.7, WI-4.206a and WI-4.206b).
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -10,13 +10,19 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "container/diagnostics.h"
 #include "container/mpegts/pes.hpp"
 #include "container/mpegts/psi.hpp"
+#include "container/mpegts/timing.hpp"
 #include "container/mpegts/ts_packets.hpp"
 #include "io/memory_file.hpp"
 #include "ovt_container_generated.h"
@@ -172,6 +178,24 @@ size_t count_code(const ts::File& f, DiagCode code) {
 const ts::PesStream* stream_of(const ts::File& f, uint16_t pid) {
   const auto it = std::find_if(f.pes.begin(), f.pes.end(), [pid](const ts::PesStream& s) { return s.pid == pid; });
   return it == f.pes.end() ? nullptr : &*it;
+}
+
+// PCR-only packets on `pid` every `every` packets (1 ms per packet: 1 504 000 bit/s), null packets between.
+Bytes pcr_stream(size_t packets, size_t every, uint16_t pid, const std::vector<std::pair<size_t, int64_t>>& tweak = {},
+                 size_t gap_from = SIZE_MAX, size_t gap_to = 0) {
+  Bytes out;
+  uint8_t null_cc = 0;
+  for (size_t k = 0; k < packets; ++k) {
+    int64_t pcr = static_cast<int64_t>(k) * 27000;
+    for (const auto& [at, delta] : tweak) {
+      pcr += at == k ? delta : 0;
+    }
+    const bool gap = k >= gap_from && k < gap_to;
+    const Bytes pk = k % every == 0 && !gap ? packet(pid, false, 0, {}, pcr_af(static_cast<uint64_t>(pcr)))
+                                            : packet(ts::kNullPid, false, null_cc, Bytes(184, 0xAB));
+    out.insert(out.end(), pk.begin(), pk.end());
+  }
+  return out;
 }
 
 }  // namespace
@@ -408,4 +432,180 @@ TEST_CASE("corpus: ts_h264_dvb PES count and timestamps", "[container][mpegts][p
   CHECK(s.packets.front().pts == 3856608233);
   CHECK(s.packets.back().pts == 3859902233);
   CHECK(pts_sum == 3534161793428);
+}
+
+TEST_CASE("corpus: ts_test_025 PTS/DTS per PES equal the ffprobe golden",
+          "[container][mpegts][pes][needs-corpus][slow]") {
+  // AT1 with B-frames: tests/golden/mpegts/ts_test_025.ffprobe-packets.json is ffprobe 6.1.1 `-show_packets` (PID,
+  // PTS, DTS and position of every packet) of tsduck-test input/test-025.ts (MPEG-2 video with B-frames and MPEG-1
+  // audio). ffprobe prints a missing DTS as the PTS; the packet sizes are left out because the MPEG-2 video parser
+  // moves a few bytes between pictures.
+  const auto path = ovt::test::corpus_or_skip("ts_test_025");
+  std::ifstream in(std::string(OVT_TEST_SOURCE_DIR) + "/tests/golden/mpegts/ts_test_025.ffprobe-packets.json");
+  REQUIRE(in);
+  const auto golden = nlohmann::json::parse(in)["packets"];
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const auto f = ts::parse(*file);
+  REQUIRE(f);
+  struct Row {
+    uint64_t pos;
+    uint16_t pid;
+    int64_t pts;
+    int64_t dts;
+  };
+  std::vector<Row> ours;
+  for (const ts::PesStream& s : f->pes) {
+    for (const ts::PesPacket& p : s.packets) {
+      ours.push_back({f->packet_offset(p.first_packet), s.pid, p.pts, p.dts >= 0 ? p.dts : p.pts});
+    }
+  }
+  std::sort(ours.begin(), ours.end(), [](const Row& a, const Row& b) { return a.pos < b.pos; });
+  REQUIRE(ours.size() == golden.size());
+  size_t with_dts = 0;
+  for (size_t i = 0; i < ours.size(); ++i) {
+    CAPTURE(i);
+    CHECK(ours[i].pos == golden[i]["pos"].get<uint64_t>());
+    CHECK(ours[i].pid == golden[i]["pid"].get<uint16_t>());
+    CHECK(ours[i].pts == golden[i]["pts"].get<int64_t>());
+    CHECK(ours[i].dts == golden[i]["dts"].get<int64_t>());
+    with_dts += ours[i].dts != ours[i].pts ? 1U : 0U;
+  }
+  CHECK(with_dts == 25);  // the B-frame reordering is exercised
+}
+
+TEST_CASE("timing: PCR repetition, discontinuity and accuracy checks", "[container][mpegts][timing][fast]") {
+  SECTION("a clean 20 ms PCR raises nothing") {
+    const auto f = parse_bytes(pcr_stream(1000, 20, 0x0200));
+    REQUIRE(f);
+    REQUIRE(f->timing.pcr.size() == 1);
+    CHECK(f->timing.pcr[0].points.size() == 50);
+    CHECK(f->pcr_pid == 0x0200);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2003) == 0);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2004) == 0);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2005) == 0);
+  }
+  SECTION("an out-of-range extension wraps the PCR into the 2^33 * 300 modulus") {
+    Bytes b = pcr_stream(40, 20, 0x0200);
+    std::fill_n(b.begin() + std::ptrdiff_t{20 * 188 + 6}, 6, uint8_t{0xFF});  // base 2^33 - 1, extension 511
+    const auto f = parse_bytes(b);
+    REQUIRE(f);
+    REQUIRE(f->timing.pcr.size() == 1);
+    REQUIRE(f->timing.pcr[0].points.size() == 2);
+    CHECK(f->timing.pcr[0].points[1].pcr == ((ts::kTimestampWrap - 1) * 300 + 511) % ts::kPcrWrap);
+    CHECK(f->timing.pcr[0].points[1].pcr < ts::kPcrWrap);
+  }
+  SECTION("a 1 s gap of missing PCRs is a repetition error") {
+    const auto f = parse_bytes(pcr_stream(2000, 20, 0x0200, {}, 500, 1500));
+    REQUIRE(f);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2003) == 1);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2004) == 1);  // TR 101 290 2.3b: also more than 100 ms
+    CHECK(f->timing.pcr[0].repetition_errors == 1);
+    const auto it = std::find_if(f->diagnostics.begin(), f->diagnostics.end(),
+                                 [](const ts::Diagnostic& d) { return d.code == DiagCode::CNT_TS_2003; });
+    CHECK(it->message == "PCR_repetition_error: `1020` ms between PCRs on PID `0x0200` (> 40 ms)");
+    CHECK(it->offset == uint64_t{1500} * 188);
+  }
+  SECTION("a jump back is a discontinuity error unless discontinuity_indicator is set") {
+    const auto f = parse_bytes(pcr_stream(200, 20, 0x0200, {{100, -27000 * 90}, {120, -27000 * 90}}));
+    REQUIRE(f);
+    CHECK(count_code(*f, DiagCode::CNT_TS_2004) == 2);  // back at 100, and forward again at 140
+    Bytes b = pcr_stream(
+        200, 20, 0x0200,
+        {{100, -27000 * 90}, {120, -27000 * 90}, {140, -27000 * 90}, {160, -27000 * 90}, {180, -27000 * 90}});
+    b[100 * 188 + 5] |= 0x80U;  // discontinuity_indicator
+    const auto g = parse_bytes(b);
+    REQUIRE(g);
+    CHECK(count_code(*g, DiagCode::CNT_TS_2004) == 0);
+    CHECK(count_code(*g, DiagCode::CNT_TS_2003) == 0);
+  }
+  SECTION("a PCR 740 ns off the line through its neighbours") {
+    const auto f = parse_bytes(pcr_stream(400, 20, 0x0200, {{200, 20}}));
+    REQUIRE(f);
+    REQUIRE(count_code(*f, DiagCode::CNT_TS_2005) == 1);
+    const auto it = std::find_if(f->diagnostics.begin(), f->diagnostics.end(),
+                                 [](const ts::Diagnostic& d) { return d.code == DiagCode::CNT_TS_2005; });
+    CHECK(it->message == "PCR_accuracy_error: `741` ns deviation on PID `0x0200` (> ±500 ns)");
+    CHECK(it->offset == uint64_t{200} * 188);
+  }
+}
+
+TEST_CASE("timing: PTS_error and the TsTiming table", "[container][mpegts][timing][fast]") {
+  Bytes file = psi_packets(0x0200, {{kVideoPid, 0x1B}});
+  uint8_t cc = 0;
+  // Reordered PTS (no error), then a 900 ms step (one CNT-TS-2006).
+  for (const int64_t pts : {0, 10800, 3600, 7200, 10800 + 81000}) {
+    packetize(file, kVideoPid, cc, pes(Bytes(100, 0x55), pts));
+  }
+  const Bytes pcr = pcr_stream(100, 20, 0x0200);
+  file.insert(file.end(), pcr.begin(), pcr.end());
+  const auto f = parse_bytes(file);
+  REQUIRE(f);
+  REQUIRE(count_code(*f, DiagCode::CNT_TS_2006) == 1);
+  CHECK(f->timing.pts_errors == 1);
+  const auto it = std::find_if(f->diagnostics.begin(), f->diagnostics.end(),
+                               [](const ts::Diagnostic& d) { return d.code == DiagCode::CNT_TS_2006; });
+  CHECK(it->message == "PTS_error: `900` ms between PTS on PID `0x0101` (> 700 ms)");
+
+  const ovt::io::MemoryFile mf{std::span<const uint8_t>(file)};
+  const auto reader = ts::make_reader(mf);
+  REQUIRE(reader != nullptr);
+  CHECK(reader->track_count() == 1);
+  const auto tree = reader->tree();
+  const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(tree.data());
+  REQUIRE(t->tracks()->size() == 1);
+  CHECK(t->tracks()->Get(0)->track_id() == kVideoPid);
+  CHECK(t->tracks()->Get(0)->codec() == ovt::fb::Codec::H264);
+  CHECK(t->tracks()->Get(0)->handler() == ovt::fb::HandlerType::Video);
+  CHECK(t->tracks()->Get(0)->sample_count() == 5);
+  CHECK(!reader->sample_table(0, 0, 0).empty());
+  CHECK(reader->sample_table(1, 0, 0).empty());
+
+  const auto timing = reader->ts_timing();
+  const auto* tt = flatbuffers::GetRoot<ovt::fb::TsTiming>(timing.data());
+  CHECK(tt->pcr_pid() == 0x0200);
+  CHECK(tt->packet_size() == 188);
+  REQUIRE(tt->pcr()->size() == 5);
+  CHECK(tt->pcr()->Get(1)->pcr() == uint64_t{20} * 27000);
+  REQUIRE(tt->pts_dts()->size() == 5);
+  CHECK(tt->pts_dts()->Get(1)->pts() == 10800);
+  CHECK(tt->pts_dts()->Get(1)->dts() == -1);
+  CHECK(tt->pts_dts()->Get(1)->packet_index() == 3);
+}
+
+TEST_CASE("timing: bitrate per PID in 10/100/250/500 ms windows", "[container][mpegts][timing][fast]") {
+  // 1 000 packets at 1 ms each: PID 0x0200 every 20th packet, the null PID otherwise.
+  const Bytes b = pcr_stream(1000, 20, 0x0200);
+  const auto f = parse_bytes(b);
+  REQUIRE(f);
+  const auto rates = ts::compute_bitrates(f->timing.packet_pid, f->timing.pcr[0].points, 188);
+  REQUIRE(rates.size() == 8);
+  CHECK(rates[0].pid == 0x0200);
+  CHECK(rates[0].window_ms == 10);
+  CHECK(rates[0].bps.size() == 100);
+  CHECK(rates[1].window_ms == 100);
+  REQUIRE(rates[1].bps.size() == 10);
+  CHECK(std::all_of(rates[1].bps.begin(), rates[1].bps.end(), [](uint32_t v) { return v == 75200; }));
+  CHECK(rates[5].pid == ts::kNullPid);
+  CHECK(rates[5].window_ms == 100);
+  CHECK(std::all_of(rates[5].bps.begin(), rates[5].bps.end(), [](uint32_t v) { return v == 1428800; }));
+  CHECK(rates[3].window_ms == 500);
+  CHECK(rates[3].bps.size() == 2);
+  // Fewer than two PCRs: no time axis.
+  CHECK(ts::compute_bitrates(f->timing.packet_pid, {f->timing.pcr[0].points[0]}, 188).empty());
+}
+
+TEST_CASE("corpus: syn_ts_cc_errors has a 1 s PCR gap", "[container][mpegts][timing][needs-corpus][fast]") {
+  // Recipe 33 removes the PCRs of one second: one PCR interval of more than 1 s on the video PID.
+  const auto path = ovt::test::corpus_or_skip("syn_ts_cc_errors");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const auto f = ts::parse(*file);
+  REQUIRE(f);
+  REQUIRE(f->timing.pcr.size() == 1);
+  CHECK(f->pcr_pid == 0x0100);
+  // ffmpeg's VBR muxer writes a PCR every 100 ms, so shorter repetition errors are expected too.
+  CHECK(std::any_of(f->diagnostics.begin(), f->diagnostics.end(), [](const ts::Diagnostic& d) {
+    constexpr std::string_view head = "PCR_repetition_error: `";
+    return d.code == DiagCode::CNT_TS_2003 && d.message.starts_with(head) &&
+           std::stoul(d.message.substr(head.size())) >= 1000;
+  }));
 }

@@ -82,15 +82,6 @@ uint64_t flag(bool b) {
   return b ? 1U : 0U;
 }
 
-std::string hex_pid(uint16_t pid) {
-  constexpr std::string_view digits = "0123456789ABCDEF";
-  std::string s = "0x0000";
-  for (size_t i = 0; i < 4; ++i) {
-    s[5 - i] = digits[(pid >> (4U * i)) & 15U];
-  }
-  return s;
-}
-
 // Reads the 33-bit base and 9-bit extension of a PCR / OPCR from its six bytes.
 uint64_t read_pcr_base(std::span<const uint8_t> p) {
   return (static_cast<uint64_t>(p[0]) << 25U) | (static_cast<uint64_t>(p[1]) << 17U) |
@@ -222,6 +213,9 @@ class Walker {
         size_(f.file_size),
         stats_(kPidCount),
         cc_(kPidCount),
+        timing_([this](DiagCode code, std::string message, uint64_t offset) {
+          add_diag(f_, code, std::move(message), offset);
+        }),
         es_type_(kPidCount, -1),
         pos_(f.geometry.first_sync),
         last_good_(f.geometry.first_sync) {
@@ -261,6 +255,8 @@ class Walker {
         f_.pes.push_back(std::move(st));
       }
     }
+    f_.timing = timing_.finish();
+    f_.pcr_pid = choose_pcr_pid();
     for (const PsiDiagnostic& d : f_.psi.diagnostics) {  // the PSI diagnostics join the file list (same cap)
       add_diag(f_, d.code, d.message, d.offset);
     }
@@ -276,6 +272,7 @@ class Walker {
   std::vector<CcState> cc_;
   PsiParser psi_;
   PesAssembler pes_;
+  TimingBuilder timing_;
   std::vector<int16_t> es_type_;  // stream_type of the PIDs that a PMT named as elementary streams, else -1
   uint64_t seen_sections_ = 0;
   uint64_t pos_;        // file offset of the next sync byte slot
@@ -314,24 +311,30 @@ class Walker {
                 std::span<const uint8_t>(buf).subspan(h->payload_offset, h->payload_size), f_.packet_count,
                 pos_ + h->payload_offset);
     }
-    take_pes(*h, buf);
+    take_timing_and_pes(*h, buf);
     ++f_.packet_count;
     last_good_ = pos_;
     pos_ += stride_;
     return true;
   }
 
-  // PES reassembly for the payload of every PID that is not PSI (WI-4.206a).
-  void take_pes(const PacketHeader& h, std::span<const uint8_t> buf) {
+  // The PCR checks for every packet; PES reassembly for the payload of every PID that is not PSI (WI-4.206).
+  void take_timing_and_pes(const PacketHeader& h, std::span<const uint8_t> buf) {
     const AdaptationField* af = h.adaptation ? &*h.adaptation : nullptr;
+    const bool has_pcr = af != nullptr && af->pcr_flag && af->length >= 7 && !h.transport_error_indicator;
+    timing_.packet(h.pid, has_pcr, has_pcr ? af->pcr() : 0, af != nullptr && af->discontinuity_indicator,
+                   f_.packet_count, pos_);
     refresh_streams();
     if (h.pid == kNullPid || psi_.wants(h.pid) || !h.has_payload() || h.transport_error_indicator ||
         h.transport_scrambling_control != 0) {
       return;
     }
-    (void)pes_.feed(h.pid, h.payload_unit_start_indicator, af != nullptr && af->random_access_indicator,
-                    h.continuity_counter, buf.subspan(h.payload_offset, h.payload_size), f_.packet_count,
-                    pos_ + h.payload_offset);
+    const PesPacket* started = pes_.feed(
+        h.pid, h.payload_unit_start_indicator, af != nullptr && af->random_access_indicator, h.continuity_counter,
+        buf.subspan(h.payload_offset, h.payload_size), f_.packet_count, pos_ + h.payload_offset);
+    if (started != nullptr && es_type_[h.pid] >= 0) {
+      timing_.pes_start(h.pid, started->pts, f_.sync_offset(started->first_packet));
+    }
   }
 
   // Elementary-stream PIDs become known as PMTs arrive; a PID once named stays one.
@@ -348,6 +351,19 @@ class Walker {
         }
       }
     }
+  }
+
+  [[nodiscard]] uint16_t choose_pcr_pid() const {
+    const auto carries = [this](uint16_t pid) {
+      return std::any_of(f_.timing.pcr.begin(), f_.timing.pcr.end(),
+                         [pid](const PcrStream& s) { return s.pid == pid; });
+    };
+    for (const Program& p : f_.psi.programs) {
+      if (p.has_pmt && carries(p.pcr_pid)) {
+        return p.pcr_pid;
+      }
+    }
+    return f_.timing.pcr.empty() ? kNullPid : f_.timing.pcr.front().pid;
   }
 
   void account(const PacketHeader& h) {
@@ -389,7 +405,7 @@ class Walker {
     } else {
       ++st.continuity_errors;
       add_diag(f_, DiagCode::CNT_TS_1006,
-               "Continuity_count_error on PID `" + hex_pid(h.pid) + "` at packet `" + std::to_string(k) + "` (`" +
+               "Continuity_count_error on PID `" + format_pid(h.pid) + "` at packet `" + std::to_string(k) + "` (`" +
                    std::to_string(expected) + "`/`" + std::to_string(h.continuity_counter) + "`)",
                pos_);
       c.last = h.continuity_counter;
@@ -520,7 +536,7 @@ class MpegtsReader final : public Reader {
 
   [[nodiscard]] std::vector<uint8_t> tree() const override { return build_tree(); }
 
-  // One track per elementary-stream PID with PES packets (WI-4.206a).
+  // One track per elementary-stream PID with PES packets (WI-4.206).
   [[nodiscard]] int track_count() const noexcept override { return static_cast<int>(f_.pes.size()); }
 
   [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override {
@@ -529,6 +545,8 @@ class MpegtsReader final : public Reader {
     }
     return build_sample_table(f_.pes[static_cast<size_t>(track_index)], first, count);
   }
+
+  [[nodiscard]] std::vector<uint8_t> ts_timing() const override { return build_ts_timing(f_); }
 
   ovt_status expand(uint64_t box_offset) override {
     if (box_offset == 0) {  // the root: the next window of TSPK children

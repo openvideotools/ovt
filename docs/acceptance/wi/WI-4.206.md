@@ -1,4 +1,4 @@
-# WI-4.206 acceptance record (part a: PES and SampleTable)
+# WI-4.206 acceptance record (parts a and b)
 
 Machine: cloud container, Ubuntu 24.04 x86_64, GCC 13.3.0, ffmpeg/ffprobe 6.1.1 (distribution, with libx264).
 Date: 2026-11-15. Spec question: #569.
@@ -43,6 +43,29 @@ packet, and in `dts` for every PES that carries one; the 24 PES without a DTS ha
 fills in the PTS (the SampleTable uses the PTS then, as ffprobe does). The dump came from a throw-away test case
 that printed `File::pes`; it is not committed.
 
+### Automated comparison with B-frames (part b)
+
+`corpus: ts_test_025 PTS/DTS per PES equal the ffprobe golden` (`[needs-corpus]`; `ts_test_025` is tagged `slow`,
+so it runs where the slow corpora are fetched) compares every PES of tsduck-test `input/test-025.ts` (MPEG-2 video
+with B-frames, MPEG-1 audio; 198 PES) with the committed golden `tests/golden/mpegts/ts_test_025.ffprobe-packets.json`:
+
+```sh
+ffprobe -v error -show_packets -of json -show_entries packet=stream_index,pts,dts,pos test-025.ts
+```
+
+reduced to `{pid, pts, dts, pos}` per packet in file order (stream 0 = PID 0x1000, 1 = 0x1001). OVT matches all 198
+(PID, PTS, DTS, position) tuples, 25 of them with DTS ≠ PTS. Sizes are not compared: ffprobe's MPEG-2 video parser
+moves a few bytes between pictures (61 video packets differ by 1 to 3 bytes from the PES payload size).
+`ts_test_026` (H.264) was not usable as a golden because ffprobe's parser splits its PES into more packets (145 vs 51).
+
 ## Test 2: a 1 s PCR gap gives `CNT-TS-2003`
 
-Part b (WI-4.206b, the timing table) adds this test and its record.
+Automated: `timing: PCR repetition, discontinuity and accuracy checks` section "a 1 s gap of missing PCRs is a
+repetition error" (`[container][mpegts][timing][fast]`, synthetic stream: one `CNT-TS-2003` "1020 ms", one
+`CNT-TS-2004`), and `corpus: syn_ts_cc_errors has a 1 s PCR gap` (`[needs-corpus]`). On the regenerated recipe 33
+files OVT reports:
+
+| File | CNT-TS-1006 | CNT-TS-2003 | CNT-TS-2004 |
+|---|---|---|---|
+| `syn_ts_clean.ts` | 0 | 39 (every 100 ms PCR interval of ffmpeg's VBR muxer) | 0 |
+| `syn_ts_cc_errors.ts` | 7 | 29, one of them the 1 100 ms gap | 1 (the gap) |
