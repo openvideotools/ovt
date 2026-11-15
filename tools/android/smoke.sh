@@ -47,7 +47,7 @@ mkdir -p "$out"
 
 fail() {
   echo "::error::smoke: $*"
-  excerpt
+  excerpt | tee "$out/excerpt.txt"
   exit 1
 }
 
@@ -98,6 +98,8 @@ for _ in $(seq 1 30); do
 done
 [ "$found" = 1 ] || fail "uiautomator found no node with text \"$APP_TEXT\" within 60 s"
 echo "found \"$APP_TEXT\""
+# Every pid the app had since step 2; a native crash line names the pid, not the (15-character) kernel comm.
+app_pids="$(adb shell pidof "$PKG" | tr -d '\r')"
 
 echo "== 3. CLI"
 if [ -n "$cli" ]; then
@@ -105,6 +107,8 @@ if [ -n "$cli" ]; then
   adb push "$cli" "$REMOTE_DIR/ovt" > /dev/null
   adb shell "chmod 755 $REMOTE_DIR/ovt"
   if [ -n "$libdir" ]; then adb push "$libdir"/. "$REMOTE_DIR/" > /dev/null; fi
+  # run_ovt interpolates its arguments into a shell on the device: only the fixed arguments of this script, never
+  # untrusted input.
   run_ovt() { adb shell "cd $REMOTE_DIR && LD_LIBRARY_PATH=$REMOTE_DIR ./ovt $*; echo EXIT=\$?" | tr -d '\r'; }
   ver="$(run_ovt --version)"
   echo "$ver"
@@ -125,9 +129,25 @@ else
   echo "no --cli given: skipped"
 fi
 
+# Self-test of the failure path (WI-0.035 acceptance test 2; CI input smoke_probe=abort): kill the app with SIGABRT, the
+# way a native crash ends it, and let the checks below find it.
+if [ "${OVT_SMOKE_PROBE:-}" = abort ]; then
+  echo "== probe: SIGABRT to the app"
+  adb shell "kill -ABRT $(adb shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')" || true
+  sleep 5
+fi
+
 echo "== 4. logcat check"
-excerpt > "$out/excerpt.txt"
+adb logcat -d > "$out/logcat.txt" 2>&1 || true
 if grep -q 'OVT-FATAL' "$out/logcat.txt"; then fail "logcat contains OVT-FATAL"; fi
 if grep -q 'FATAL EXCEPTION' "$out/logcat.txt"; then fail "logcat contains a FATAL EXCEPTION"; fi
-if grep -Eq "Fatal signal .*(${PKG}|ovt|Qt)" "$out/logcat.txt"; then fail "logcat contains a native crash of the app"; fi
+# The debuggerd banner "Fatal signal 6 (SIGABRT), code -1, fault addr ... in tid T (comm), pid P (comm)" names the
+# process by pid; its tombstone header ">>> <package> <<<" names it in full. The kernel comm is cut to 15 characters,
+# so neither is matched by name.
+app_pids="$app_pids $(adb shell pidof "$PKG" | tr -d '\r')"
+for pid in $app_pids; do
+  if grep -Eq "Fatal signal .* pid $pid " "$out/logcat.txt"; then fail "native crash of the app (pid $pid)"; fi
+done
+if grep -Fq ">>> $PKG <<<" "$out/logcat.txt"; then fail "logcat has a tombstone of $PKG"; fi
+excerpt > "$out/excerpt.txt"
 echo "smoke: OK (screenshot: $out/screenshot.png)"
