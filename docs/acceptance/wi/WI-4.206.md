@@ -49,8 +49,8 @@ that printed `File::pes`; it is not committed.
 so it runs where the slow corpora are fetched) compares every PES of tsduck-test `input/test-025.ts` (MPEG-2 video
 with B-frames, MPEG-1 audio; 198 PES) with the committed golden `tests/golden/mpegts/ts_test_025.ffprobe-packets.json`:
 
-```console
-$ ffprobe -v error -show_packets -of json -show_entries packet=stream_index,pts,dts,pos test-025.ts
+```sh
+ffprobe -v error -show_packets -of json -show_entries packet=stream_index,pts,dts,pos test-025.ts
 ```
 
 reduced to `{pid, pts, dts, pos}` per packet in file order (stream 0 = PID 0x1000, 1 = 0x1001). OVT matches all 198
