@@ -13,16 +13,19 @@ add_executable(
   test_metric_abi.cpp
   test_metric_job.cpp
   test_metrics_jobspec.cpp
+  test_metrics_maps.cpp
   test_metrics_plugin_registry.cpp
   test_metrics_psnr.cpp
   test_metrics_ssim.cpp
   test_metrics_identity.cpp
   test_metrics_ssim_x264.cpp
   test_metrics_vmaf.cpp
+  test_metrics_xarch.cpp
   test_normalization_config.cpp)
 target_include_directories(ovt_tests_metrics PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
+# Highway: test_metrics_xarch.cpp runs the kernels under every generated target (hwy::SetSupportedTargetsForTest).
 target_link_libraries(ovt_tests_metrics PRIVATE ovt_core_objects ovt_test_support ovt::flags ${flatbuffers_TARGET}
-                                                ${nlohmann_json_TARGET} ${Catch2_TARGET})
+                                                ${nlohmann_json_TARGET} ${Catch2_TARGET} ${hwy_TARGET})
 target_compile_definitions(
   ovt_tests_metrics
   PRIVATE "OVT_EXAMPLE_METRIC_ROOT=\"${OVT_EXAMPLE_METRIC_ROOT}\""

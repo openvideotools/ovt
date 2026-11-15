@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the ssim metric (chapter 9 §9.4.3, §9.4.7; WI-3.307 acceptance tests 1 and 2, plus the scalar/Highway
-// identity, the libvmaf down-scaling, the maps and the "valid" border against a double-precision reference).
+// identity, the libvmaf down-scaling, the maps and the "valid" border against a double-precision reference), and the
+// golden suite against libvmaf float_ssim on the WI-0.565 pairs (chapter 14 §14.4.10; WI-3.590 acceptance test 2).
 
 #include <array>
 #include <catch2/catch_approx.hpp>
@@ -26,6 +27,7 @@
 #include "metrics/kernels/psnr_metric.h"
 #include "metrics/kernels/ssim_kernels.h"
 #include "metrics/kernels/ssim_metric.h"
+#include "metrics_golden_suite.h"
 #include "ovt_metrics_generated.h"
 #include "test_support/corpus.h"
 
@@ -610,4 +612,41 @@ TEST_CASE("ssim 1080p single-thread throughput", "[.][bench][metrics][ssim]") {
     std::printf("ssim 1080p luma, border=%s: %.1f fps (1 thread)\n", border, kFrames / dt.count());
   }
   SUCCEED();
+}
+
+// ---- WI-3.590: ssim against libvmaf float_ssim in the vmaf CLI goldens of WI-0.565 (chapter 14 §14.4.10) ---------
+
+namespace {
+
+namespace suite = ovt::test::metrics_suite;
+
+// `ssim` with its defaults (border "libvmaf", luma) equals the vmaf CLI's float_ssim of vmaf_v0.6.1 within 1e-4.
+void check_ssim_pair(const suite::GoldenPair& pair) {
+  const auto golden = suite::read_golden_gz(std::string(pair.id) + ".vmaf_v0.6.1.vmaf.json.gz");
+  const auto& frames = golden.at("frames");
+  REQUIRE(frames.size() == pair.frames);
+  suite::Metric inst(ovt::metrics::ssim_metric_api(), "{}");
+  const uint32_t n = suite::for_each_frame(pair, [&](uint32_t i, const suite::Picture& r, const suite::Picture& d) {
+    const auto& g = frames.at(i);
+    REQUIRE(g.at("i").get<uint32_t>() == i);
+    const suite::Score s = inst.score(r.planes, d.planes, static_cast<int32_t>(i));
+    INFO(pair.id << " frame " << i);
+    CHECK(std::fabs(s.values.at(0) - g.at("float_ssim").get<double>()) <= 1e-4);
+  });
+  CHECK(n == pair.frames);
+}
+
+}  // namespace
+
+TEST_CASE("ssim golden suite: libvmaf float_ssim on the Netflix pair", "[metrics][ssim][golden][needs-corpus]") {
+  check_ssim_pair(suite::kPairs[0]);
+}
+
+TEST_CASE("ssim golden suite: libvmaf float_ssim on syn_metrics_1080p", "[metrics][ssim][golden][needs-corpus]") {
+  check_ssim_pair(suite::kPairs[1]);
+}
+
+TEST_CASE("ssim golden suite: libvmaf float_ssim on the 10-bit syn_metrics_pq_1080p",
+          "[metrics][ssim][golden][needs-corpus]") {
+  check_ssim_pair(suite::kPairs[2]);
 }
