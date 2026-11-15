@@ -65,6 +65,8 @@ ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
 # grows with parts b (quantization, segmentation, delta q / lf) and c (the whole header).
 ovt_add_fuzz_target(syntax_av1_frame_header fuzz_syntax_av1_frame_header.cpp)
+# WI-1.118: the uncompressed_header() rows 20–25 parsers (part a; part b appends rows 26–27), in syntax order.
+ovt_add_fuzz_target(syntax_av1_frame_header2 fuzz_syntax_av1_frame_header2.cpp)
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
 # WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry points.
@@ -79,6 +81,8 @@ ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
 ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
 # WI-1.108: H.264 NAL header, SPS and PPS parsers (byte 0 selects the mode).
 ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
+# WI-1.109a: H.264 slice header (WI-1.109b adds the AUD, filler data and data partition dispatch).
+ovt_add_fuzz_target(h264_slice fuzz_h264_slice.cpp)
 # WI-1.110: the H.264 SEI framing and payload parsers.
 ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
 

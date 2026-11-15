@@ -106,7 +106,7 @@ class Session {
                            FrameRequest request);
   ovt_status decode_range(int rap, int t, uint32_t stage_mask, const ovt::jobs::Cancel* cancel, Pulled& result);
   [[nodiscard]] int rap_for(int t, bool from_previous_rap) const;
-  ovt_status create_decoder(int rap);
+  ovt_status create_decoder(int rap, uint32_t stage_mask);
   void destroy_decoder() noexcept;
   ovt_status feed_parameter_sets(int rap);
   ovt_status push_unit(uint32_t unit_index, int32_t decode_index, int64_t pts);
