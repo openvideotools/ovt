@@ -16,6 +16,7 @@ target_sources(
           format_sniff.cpp
           ivf.cpp
           mpegts/descriptors.cpp
+          mpegts/pes.cpp
           mpegts/psi.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
