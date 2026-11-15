@@ -28,6 +28,7 @@ Severity: H (blocks a phase exit criterion), M (degrades a deliverable), L (cosm
 | R-20 | **Dolby Vision expectations** (users expect "true DV" rendering). | L | M | Parse and display RPU; convert P5/P8 via libplacebo; label "not Dolby-certified rendering". | — | 10 |
 | R-21 | **Spec evolution** (HEVC v2+ extensions, AV1 errata, future AV2/AVM). | L | L | Codec extension tables isolate codec-specific data; `Codec` enum extensible; plugin ABI versioned. | — | 6, 7 |
 | R-22 | **Hardware decoder output differs from software** (film grain, rounding). | L | M | Analysis always on the software path; "verify HW vs SW" diff view (phase 4). | — | 7 |
+| R-23 | **Screen readers cannot reach QML controls on Android**: the `QtQuickView` embedding (ADR-004) does not expose the Qt Quick accessibility tree (Qt ≤ 6.10, issue #550). | M | H | `MainActivity` labels the Qt view's own accessibility node (§13.4.4 item 9); track Qt's embedded-accessibility work (`QtEmbeddedDelegate`); if Qt 6.11 does not close it, evaluate a `QtActivity`-hosted screen-reader mode. | TalkBack test in the emulator smoke job (#487) finds one node | 11, 13 |
 
 ## 17.2 Open questions for the owner
 
