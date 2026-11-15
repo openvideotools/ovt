@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnAttach
+import androidx.lifecycle.Lifecycle
 import org.qtproject.qt.android.OvtQtResume
 import org.qtproject.qt.android.QtQmlStatus
 import org.qtproject.qt.android.QtQuickView
@@ -51,21 +52,28 @@ class MainActivity : AppCompatActivity() {
      * After attachment the insets are never null.
      *
      * The window attaches after the first onResume, so Qt's own resume callback has already been missed: OvtQtResume
-     * sets the Qt application state to Active once Qt's platform plugin is ready, which runs the actions Qt queued
-     * (root window, display metrics).
+     * sets the Qt application state to Active at once (Qt's start-up waits for UI-thread runnables that a Suspended
+     * state parks). The view joins the hierarchy only once Qt's platform plugin is ready: attaching it queues the
+     * root-window creation, which Qt drops if it runs before main() has created the QGuiApplication.
      */
     private fun addQtView(host: FrameLayout) {
-        qtView = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
-        qtView.setStatusChangeListener { status -> onShellStatus(status) }
-        host.addView(
-            qtView,
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
-        )
-        OvtQtResume.activityAlreadyResumed(this)
+        val view = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
+        qtView = view
+        view.setStatusChangeListener { status -> onShellStatus(status) }
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
+        OvtQtResume.runWhenPluginReady {
+            if (isDestroyed) return@runWhenPluginReady
+            Log.i(TAG, "OVT: Qt platform plugin ready, attaching the QtQuickView")
+            host.addView(
+                view,
+                FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+            )
+        }
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
     private fun onShellStatus(status: QtQmlStatus) {
+        Log.i(TAG, "OVT: QML root status $status")
         when (status) {
             QtQmlStatus.READY -> exposeShellTitle()
             QtQmlStatus.ERROR -> Log.e(TAG, "OVT-FATAL: the QML root $SHELL_QML failed to load")
