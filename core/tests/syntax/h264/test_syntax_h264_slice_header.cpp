@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.109a: H.264 slice_header() with ref_pic_list_modification(), pred_weight_table() and dec_ref_pic_marking(),
-// the access unit delimiter, end of sequence / stream, filler data and the slice data partitions (chapter 7 §7.3.4
-// rows 19, 20, 24–28).
+// WI-1.109a–c: H.264 slice_header() with ref_pic_list_modification(), pred_weight_table() and dec_ref_pic_marking(),
+// the access unit delimiter, end of sequence / stream, filler data, the slice data partitions, the SPS extension,
+// the subset SPS (MVC extension) and the prefix NAL unit (chapter 7 §7.3.4 rows 19–28).
 //
 // Oracles:
 // - x264 fixtures (FFmpeg 6.1.1 libx264, 2026-11-14, lavfi testsrc2 176x144): `wp.264` (fade-in, weightp=2, ref=3,
@@ -15,6 +15,13 @@
 //   tests/golden/h264/ (WI-0.552): the fast variants rebuild the SPS, PPS and slice header bit-exactly from the
 //   golden's (bit_offset, bit_length, value) records (each element re-encoded with its descriptor and checked
 //   against the recorded length); the [needs-corpus] variants parse the conformance streams themselves.
+// - SPS extension (WI-1.109c): NAL 13 units written by a script and inserted after the SPS of `wp.264`; the expected
+//   trees are the FFmpeg 6.1.1 trace_headers lines of those units (2026-11-15).
+// - Subset SPS (WI-1.109c, acceptance test 3): the first subset SPS of jvt_MVCNV_1 (hex and values recorded on the
+//   Mac Mini with GStreamer 1.24.2 gst_h264_parser_parse_subset_sps(), probe
+//   /mnt/project-files/wi1109-gst-subset-sps-probe.c, 2026-11-15) and two script-written MVC subset SPS units whose
+//   expected values are GStreamer 1.24.2's parse of the same bytes (Ubuntu 24.04 libgstcodecparsers, 2026-11-15; the
+//   same probe agreed with this parser on 700 random MVC subset SPS units).
 // - Everything else uses hand-written bit strings.
 
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
@@ -40,7 +47,10 @@
 #include "ovt/cxx/syntax/h264/data_partition.hpp"
 #include "ovt/cxx/syntax/h264/nal_header.hpp"
 #include "ovt/cxx/syntax/h264/pps.hpp"
+#include "ovt/cxx/syntax/h264/prefix_nal.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
+#include "ovt/cxx/syntax/h264/sps_ext.hpp"
+#include "ovt/cxx/syntax/h264/subset_sps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "ovt/cxx/syntax/unit_scan.hpp"
 #include "syntax/common/syntax_node_buffer.h"
@@ -1446,7 +1456,7 @@ TEST_CASE("h264_aud_eos_filler", "[syntax][h264][fast]") {
     const auto junk = parse_plain(from_hex("0a1234"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
       (void)h264::parse_end_of_seq(br, b);
     });
-    CHECK(diag_codes(junk.tree.root()) == std::vector<std::string>{"SYN-H264-0003"});
+    CHECK(diag_codes(junk.tree.root()) == std::vector<std::string>{"SYN-H264-0033"});  // #551
     CHECK(find_node(junk.tree.root(), "trailing_data") != nullptr);
   }
   SECTION("filler data: the ff_byte run as one node") {
@@ -1508,5 +1518,285 @@ TEST_CASE("h264_slice_data_partitions", "[syntax][h264][fast]") {
       CHECK(find_node(p.tree.root(), type == 3 ? "slice_data_partition_b_layer_rbsp"
                                                : "slice_data_partition_c_layer_rbsp") != nullptr);
     }
+  }
+}
+
+// ---- SPS extension, subset SPS, prefix NAL (WI-1.109c) ---------------------------------------------------------
+
+namespace {
+
+// FFmpeg 6.1.1 trace_headers of NAL 13 units inserted after the SPS of wp.264 (see the file comment).
+constexpr std::string_view kSpsExt1 = "6da9fe0040";
+constexpr std::string_view kSpsExt1Trace = R"(0 forbidden_zero_bit 0 = 0
+1 nal_ref_idc 11 = 3
+3 nal_unit_type 01101 = 13
+8 seq_parameter_set_id 1 = 0
+9 aux_format_idc 010 = 1
+12 bit_depth_aux_minus8 1 = 0
+13 alpha_incr_flag 0 = 0
+14 alpha_opaque_value 011111111 = 255
+23 alpha_transparent_value 000000000 = 0
+32 additional_extension_flag 0 = 0
+33 rbsp_stop_one_bit 1 = 1
+34 rbsp_alignment_zero_bit 0 = 0
+35 rbsp_alignment_zero_bit 0 = 0
+36 rbsp_alignment_zero_bit 0 = 0
+37 rbsp_alignment_zero_bit 0 = 0
+38 rbsp_alignment_zero_bit 0 = 0
+39 rbsp_alignment_zero_bit 0 = 0
+)";
+constexpr std::string_view kSpsExt2 = "6db2dffe0114";
+constexpr std::string_view kSpsExt2Trace = R"(0 forbidden_zero_bit 0 = 0
+1 nal_ref_idc 11 = 3
+3 nal_unit_type 01101 = 13
+8 seq_parameter_set_id 1 = 0
+9 aux_format_idc 011 = 2
+12 bit_depth_aux_minus8 00101 = 4
+17 alpha_incr_flag 1 = 1
+18 alpha_opaque_value 0111111111111 = 4095
+31 alpha_transparent_value 0000000010001 = 17
+44 additional_extension_flag 0 = 0
+45 rbsp_stop_one_bit 1 = 1
+46 rbsp_alignment_zero_bit 0 = 0
+47 rbsp_alignment_zero_bit 0 = 0
+)";
+constexpr std::string_view kSpsExt3 = "6dd0";
+constexpr std::string_view kSpsExt3Trace = R"(0 forbidden_zero_bit 0 = 0
+1 nal_ref_idc 11 = 3
+3 nal_unit_type 01101 = 13
+8 seq_parameter_set_id 1 = 0
+9 aux_format_idc 1 = 0
+10 additional_extension_flag 0 = 0
+11 rbsp_stop_one_bit 1 = 1
+12 rbsp_alignment_zero_bit 0 = 0
+13 rbsp_alignment_zero_bit 0 = 0
+14 rbsp_alignment_zero_bit 0 = 0
+15 rbsp_alignment_zero_bit 0 = 0
+)";
+
+// First subset SPS of jvt_MVCNV_1 (byte offset 19, 19 bytes), recorded with GStreamer 1.24.2 on the Mac Mini.
+constexpr std::string_view kMvcnv1SubsetSps = "6f76001f4b0d30420a03d974d6956963d6e9b2";
+// Script-written MVC subset SPS units; expected values from GStreamer 1.24.2 (see the file comment).
+constexpr std::string_view kMvc4Views = "6f80002822ce80780226492b3ad515ba2ad69a2a2843a52a29c24ace42";
+constexpr std::string_view kMvc2ViewsExt2 = "6f760028040b3a01e008994614ab599fc526e0";
+// seq_parameter_set_data() then an SVC (83) / MVCD (138) extension, an MVC VUI extension, and High (100).
+constexpr std::string_view kSvcSubsetSps = "6f5300286b3a01e008996a40";
+constexpr std::string_view kMvcdSubsetSps = "6f8a00282ace807802265780";
+constexpr std::string_view kMvcVuiSubsetSps = "6f76002832ce8078022679447c61";
+constexpr std::string_view kHighSubsetSps = "6f6400283ace8078022620";
+
+using Refs = std::vector<std::vector<uint32_t>>;
+
+void check_mvcnv1(const h264::SubsetSps& s) {
+  CHECK(s.sps.seq_parameter_set_id == 1);
+  CHECK(s.sps.profile_idc == 118);
+  REQUIRE(s.extension == h264::SubsetSpsExtension::Mvc);
+  CHECK(s.mvc.num_views_minus1 == 2);
+  CHECK(s.mvc.view_id == std::vector<uint32_t>{0, 1, 2});
+  CHECK(s.mvc.anchor_ref_l0 == Refs{{}, {0}, {1}});
+  CHECK(s.mvc.anchor_ref_l1 == Refs{{}, {}, {}});
+  CHECK(s.mvc.non_anchor_ref_l0 == Refs{{}, {0}, {1}});
+  CHECK(s.mvc.non_anchor_ref_l1 == Refs{{}, {}, {}});
+  REQUIRE(s.mvc.level_values.size() == 1);
+  CHECK(s.mvc.level_values[0].level_idc == 30);
+  REQUIRE(s.mvc.level_values[0].ops.size() == 1);
+  CHECK(s.mvc.level_values[0].ops[0].temporal_id == 3);
+  CHECK(s.mvc.level_values[0].ops[0].target_view_id == std::vector<uint32_t>{0, 1, 2});
+  CHECK(s.mvc.level_values[0].ops[0].num_views_minus1 == 2);
+}
+
+}  // namespace
+
+TEST_CASE("h264_sps_extension", "[syntax][h264][fast]") {
+  SECTION("the tree equals FFmpeg's trace_headers") {
+    for (const auto& [hex, trace] :
+         {std::pair{kSpsExt1, kSpsExt1Trace}, std::pair{kSpsExt2, kSpsExt2Trace}, std::pair{kSpsExt3, kSpsExt3Trace}}) {
+      h264::SpsExtension e;
+      const auto p = parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+        e = h264::parse_sps_extension(br, b);
+      });
+      CAPTURE(hex);
+      CHECK(ovt::syntax::to_trace(p.tree, p.rbsp) == trace);
+      CHECK(diag_codes(p.tree.root()).empty());
+    }
+  }
+  SECTION("fields and BitDepthAux") {
+    h264::SpsExtension e;
+    (void)parse_plain(from_hex(kSpsExt2), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      e = h264::parse_sps_extension(br, b);
+    });
+    CHECK(e.aux_format_idc == 2);
+    CHECK(e.BitDepthAux == 12);
+    CHECK(e.alpha_incr_flag);
+    CHECK(e.alpha_opaque_value == 4095);
+    CHECK(e.alpha_transparent_value == 17);
+  }
+  SECTION("aux_format_idc 4 throws; additional_extension_flag 1 is a Warning, the rest kept") {
+    BitWriter w;
+    w.nal(3, 13);
+    w.ue(0);
+    w.ue(4);
+    try {
+      (void)parse_plain(slice_end(w), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+        (void)h264::parse_sps_extension(br, b);
+      });
+      FAIL("aux_format_idc 4 accepted");
+    } catch (const ParseError& e) {
+      CHECK(e.code == "SYN-H264-0002");
+    }
+    BitWriter x;
+    x.nal(3, 13);
+    x.ue(0);
+    x.ue(0);
+    x.flag(true);  // additional_extension_flag
+    x.u(8, 0xA5);
+    const auto p = parse_plain(slice_end(x), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      (void)h264::parse_sps_extension(br, b);
+    });
+    CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0003"});
+    CHECK(find_node(p.tree.root(), "additional_extension_data") != nullptr);
+  }
+}
+
+TEST_CASE("h264_subset_sps_mvc_unit", "[syntax][h264][fast]") {
+  SECTION("AT3: jvt_MVCNV_1's subset SPS equals GStreamer") {
+    h264::SubsetSps s;
+    const auto p = parse_plain(
+        from_hex(kMvcnv1SubsetSps),
+        [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) { s = h264::parse_subset_sps(br, b); });
+    check_mvcnv1(s);
+    CHECK_FALSE(s.mvc_vui_parameters_present_flag);
+    CHECK(diag_codes(p.tree.root()).empty());
+    CHECK(find_node(p.tree.root(), "seq_parameter_set_mvc_extension") != nullptr);
+    CHECK(find_node(p.tree.root(), "rbsp_stop_one_bit") != nullptr);
+  }
+  SECTION("four views with inter-view references and two level values") {
+    h264::SubsetSps s;
+    (void)parse_plain(from_hex(kMvc4Views), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      s = h264::parse_subset_sps(br, b);
+    });
+    CHECK(s.sps.seq_parameter_set_id == 3);
+    CHECK(s.sps.profile_idc == 128);
+    CHECK(s.mvc.view_id == std::vector<uint32_t>{0, 4, 2, 6});
+    CHECK(s.mvc.anchor_ref_l0 == Refs{{}, {0}, {0}, {2, 0}});
+    CHECK(s.mvc.anchor_ref_l1 == Refs{{}, {}, {4}, {4}});
+    CHECK(s.mvc.non_anchor_ref_l0 == Refs{{}, {0}, {0}, {2}});
+    CHECK(s.mvc.non_anchor_ref_l1 == Refs{{}, {}, {}, {4}});
+    REQUIRE(s.mvc.level_values.size() == 2);
+    CHECK(s.mvc.level_values[0].level_idc == 40);
+    REQUIRE(s.mvc.level_values[0].ops.size() == 2);
+    CHECK(s.mvc.level_values[0].ops[1].temporal_id == 2);
+    CHECK(s.mvc.level_values[0].ops[1].target_view_id == std::vector<uint32_t>{0, 4});
+    CHECK(s.mvc.level_values[0].ops[1].num_views_minus1 == 1);
+    CHECK(s.mvc.level_values[1].level_idc == 41);
+    REQUIRE(s.mvc.level_values[1].ops.size() == 1);
+    CHECK(s.mvc.level_values[1].ops[0].temporal_id == 4);
+    CHECK(s.mvc.level_values[1].ops[0].target_view_id == std::vector<uint32_t>{0, 4, 2, 6});
+    CHECK(s.mvc.level_values[1].ops[0].num_views_minus1 == 3);
+  }
+  SECTION("additional_extension2 data is read to the trailing bits") {
+    h264::SubsetSps s;
+    const auto p = parse_plain(from_hex(kMvc2ViewsExt2), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      s = h264::parse_subset_sps(br, b);
+    });
+    CHECK(s.sps.seq_parameter_set_id == 31);
+    CHECK(s.mvc.view_id == std::vector<uint32_t>{5, 9});
+    CHECK(s.mvc.anchor_ref_l0 == Refs{{}, {0}});
+    CHECK(s.mvc.anchor_ref_l1 == Refs{{}, {0}});
+    CHECK(s.mvc.non_anchor_ref_l0 == Refs{{}, {}});
+    CHECK(s.mvc.non_anchor_ref_l1 == Refs{{}, {0}});
+    REQUIRE(s.mvc.level_values.size() == 1);
+    CHECK(s.mvc.level_values[0].level_idc == 51);
+    CHECK(s.mvc.level_values[0].ops[0].target_view_id == std::vector<uint32_t>{9});
+    CHECK(s.additional_extension2_flag);
+    CHECK(s.additional_extension2_data_bits == 4);
+    CHECK(diag_codes(p.tree.root()).empty());
+  }
+  SECTION("SVC, MVCD and the MVC VUI extension are kept as bytes with SYN-H264-0071 (#552)") {
+    for (const auto hex : {kSvcSubsetSps, kMvcdSubsetSps, kMvcVuiSubsetSps}) {
+      h264::SubsetSps s;
+      const auto p = parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+        s = h264::parse_subset_sps(br, b);
+      });
+      CAPTURE(hex);
+      CHECK(s.sps.pic_width_in_mbs_minus1 == 119);
+      CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0071"});
+      CHECK(find_node(p.tree.root(), "subset_sps_extension") != nullptr);
+    }
+  }
+  SECTION("a profile without an extension: seq_parameter_set_data() then additional_extension2_flag") {
+    h264::SubsetSps s;
+    const auto p = parse_plain(from_hex(kHighSubsetSps), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      s = h264::parse_subset_sps(br, b);
+    });
+    CHECK(s.extension == h264::SubsetSpsExtension::None);
+    CHECK(s.sps.seq_parameter_set_id == 6);
+    CHECK_FALSE(s.additional_extension2_flag);
+    CHECK(diag_codes(p.tree.root()).empty());
+  }
+  SECTION("num_views_minus1 1024 and num_anchor_refs_l0 above num_views_minus1 throw") {
+    // Script-written: seq_parameter_set_data() (profile 118), bit_equal_to_one, then num_views_minus1 = 1024, or
+    // num_views_minus1 = 1 with num_anchor_refs_l0[1] = 2 > Min(15, num_views_minus1).
+    for (const auto& [hex, name] : {std::pair{"6f760028ace807802264008038", "num_views_minus1"},
+                                    std::pair{"6f760028ace80780226553e0", "num_anchor_refs_l0"}}) {
+      try {
+        (void)parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+          (void)h264::parse_subset_sps(br, b);
+        });
+        FAIL("out-of-range count accepted");
+      } catch (const ParseError& e) {
+        CHECK(e.code == "SYN-H264-0002");
+        CHECK_THAT(e.what(), Catch::Matchers::ContainsSubstring(name));
+      }
+    }
+  }
+}
+
+TEST_CASE("h264_subset_sps_mvc_unit_corpus_mvcnv1", "[syntax][h264][slow][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("jvt_MVCNV_1");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  std::optional<h264::SubsetSps> found;
+  ovt::syntax::scan_annexb(*file, [&](const ovt::syntax::ScannedUnit& u) {
+    if (found || u.bytes.empty() || (u.bytes[0] & 0x1FU) != 15) {
+      return;
+    }
+    const auto p = parse_plain(
+        std::vector<uint8_t>(u.bytes.begin(), u.bytes.end()),
+        [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) { found = h264::parse_subset_sps(br, b); });
+    CHECK(diag_codes(p.tree.root()).empty());
+  });
+  REQUIRE(found.has_value());
+  check_mvcnv1(*found);
+}
+
+TEST_CASE("h264_prefix_nal", "[syntax][h264][fast]") {
+  SECTION("an MVC prefix is empty") {
+    h264::PrefixNalUnit pn;
+    const auto p = parse_plain(from_hex("6e400007"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
+      pn = h264::parse_prefix_nal_unit(br, b, h);
+    });
+    CHECK_FALSE(pn.svc);
+    CHECK(pn.span.bit_length == 0);
+    CHECK(diag_codes(p.tree.root()).empty());
+    CHECK(find_node(p.tree.root(), "prefix_nal_unit_rbsp") != nullptr);
+  }
+  SECTION("an SVC prefix payload is kept as bytes with SYN-H264-0071 (#552)") {
+    h264::PrefixNalUnit pn;
+    const auto p = parse_plain(from_hex("6e80800720"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
+      pn = h264::parse_prefix_nal_unit(br, b, h);
+    });
+    CHECK(pn.svc);
+    CHECK(pn.svc_kept_as_bytes);
+    CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0071"});
+    CHECK(find_node(p.tree.root(), "prefix_nal_unit_svc") != nullptr);
+  }
+  SECTION("an SVC prefix without payload (nal_ref_idc 0) records nothing") {
+    h264::PrefixNalUnit pn;
+    const auto p = parse_plain(from_hex("0e808007"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
+      pn = h264::parse_prefix_nal_unit(br, b, h);
+    });
+    CHECK(pn.svc);
+    CHECK_FALSE(pn.svc_kept_as_bytes);
+    CHECK(diag_codes(p.tree.root()).empty());
   }
 }

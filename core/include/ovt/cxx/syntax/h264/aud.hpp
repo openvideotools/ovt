@@ -43,7 +43,7 @@ struct FillerData {
 AccessUnitDelimiter parse_access_unit_delimiter(BitReader& br, SyntaxBuilder& b);
 
 /// Row 20: end_of_seq_rbsp() / end_of_stream_rbsp(), nodes `end_of_seq_rbsp` / `end_of_stream_rbsp`. Both RBSPs are
-/// empty; bytes after the NAL header are reported (Diagnostic Warning SYN-H264-0003) and recorded as the opaque
+/// empty; bytes after the NAL header are reported (Info SYN-H264-0033, #551) and recorded as the opaque
 /// `trailing_data` node.
 BitSpan parse_end_of_seq(BitReader& br, SyntaxBuilder& b);
 BitSpan parse_end_of_stream(BitReader& br, SyntaxBuilder& b);
