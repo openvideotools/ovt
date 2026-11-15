@@ -85,8 +85,6 @@ ovt_plugin_ffmpeg_smoke_tests = "LGPL-2.1-or-later"
 ovt_plugin_ffmpeg_framemd5 = "LGPL-2.1-or-later"
 # Render tests (WI-1.400 onward): the VideoSurface init test.
 ovt_tests_render = "LGPL-2.1-or-later"
-# The manual EDR pattern tool of WI-1.406 (macOS only).
-ovt_manual_edr_pattern = "LGPL-2.1-or-later"
 
 # Targets built under a `tests/` directory need no row here: the gate checks their own licence and link graph without one
 # (SPEC-ASSUMPTION(#432), WI-0.032). Rows are for what ships or is built outside such a directory:

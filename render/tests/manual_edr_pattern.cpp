@@ -100,13 +100,16 @@ int main(int argc, char** argv) try {
   for (int i = 1; i + 1 < argc; i += 2) {
     const std::string key = argv[i];
     const std::string value = argv[i + 1];
-    if (key == "--encoding") {
+    if (key == "--encoding" && (value == "scrgb" || value == "pq" || value == "hlg" || value == "srgb")) {
       requested = value == "pq"     ? Encoding::Pq10
                   : value == "hlg"  ? Encoding::Hlg10
                   : value == "srgb" ? Encoding::Srgb8
                                     : Encoding::ScRgbLinear16F;
     } else if (key == "--seconds") {
       seconds = std::strtod(value.c_str(), nullptr);
+    } else {
+      (void)std::fprintf(stderr, "usage: %s [--encoding scrgb|pq|hlg|srgb] [--seconds N]\n", argv[0]);
+      return 2;
     }
   }
 
