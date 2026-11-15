@@ -19,15 +19,18 @@ namespace ovt::syntax::h264 {
 
 namespace {
 
+constexpr std::string_view kTrailingBytesCode = "SYN-H264-0033";
+
 BitSpan parse_empty_rbsp(BitReader& br, SyntaxBuilder& b, std::string_view name, std::string_view spec_ref) {
   const auto start = br.mark();
   auto scope = b.scoped(name, spec_ref);
   if (br.bits_left() > 0) {
-    // SPEC-ASSUMPTION(#551): reported with SYN-H264-0003 until §7.9 gives trailing bytes after an empty RBSP their
-    // own row (proposed: Info SYN-H264-0033).
-    b.diag(Severity::Warning, detail::kReservedCode,
-           fmt::format("{}: {} unexpected bytes after the NAL unit header", name, (br.bits_left() + 7) / 8), spec_ref);
+    // SPEC-ASSUMPTION(#551): Info SYN-H264-0033 "%s has %d trailing bytes after the NAL unit header" (accepted,
+    // §7.9 row lands in rc34).
     b.opaque_rest("trailing_data");
+    b.diag(Severity::Info, kTrailingBytesCode,
+           fmt::format("{} has {} trailing bytes after the NAL unit header", name, (br.bits_left() + 7) / 8), spec_ref,
+           true);
   }
   return br.span_since(start);
 }

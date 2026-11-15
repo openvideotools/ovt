@@ -1456,7 +1456,7 @@ TEST_CASE("h264_aud_eos_filler", "[syntax][h264][fast]") {
     const auto junk = parse_plain(from_hex("0a1234"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
       (void)h264::parse_end_of_seq(br, b);
     });
-    CHECK(diag_codes(junk.tree.root()) == std::vector<std::string>{"SYN-H264-0003"});
+    CHECK(diag_codes(junk.tree.root()) == std::vector<std::string>{"SYN-H264-0033"});  // #551
     CHECK(find_node(junk.tree.root(), "trailing_data") != nullptr);
   }
   SECTION("filler data: the ff_byte run as one node") {
