@@ -23,6 +23,8 @@ BitSpan parse_empty_rbsp(BitReader& br, SyntaxBuilder& b, std::string_view name,
   const auto start = br.mark();
   auto scope = b.scoped(name, spec_ref);
   if (br.bits_left() > 0) {
+    // SPEC-ASSUMPTION(#551): reported with SYN-H264-0003 until §7.9 gives trailing bytes after an empty RBSP their
+    // own row (proposed: Info SYN-H264-0033).
     b.diag(Severity::Warning, detail::kReservedCode,
            fmt::format("{}: {} unexpected bytes after the NAL unit header", name, (br.bits_left() + 7) / 8), spec_ref);
     b.opaque_rest("trailing_data");
