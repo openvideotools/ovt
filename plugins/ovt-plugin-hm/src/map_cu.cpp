@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "analysis.hpp"
+#include "map_pic.hpp"
 
 // HM's headers (system includes: HM's warnings are not OVT's, WI-4.104).
 #include "TLibCommon/CommonDef.h"
@@ -102,9 +103,10 @@ std::vector<uint8_t> finish(flatbuffers::FlatBufferBuilder& fbb, Builder& b) {
 
 class Mapper {
  public:
-  Mapper(TComPic& pic, const PicIndex& index, Analysis* out)
+  Mapper(TComPic& pic, const PicIndex& index, const PicMaps& maps, Analysis* out)
       : pic_(pic),
         index_(index),
+        maps_(maps),
         out_(*out),
         sps_(*pic.getSlice(0)->getSPS()),
         pps_(*pic.getSlice(0)->getPPS()),
@@ -137,6 +139,7 @@ class Mapper {
  private:
   TComPic& pic_;
   const PicIndex& index_;
+  const PicMaps& maps_;
   Analysis& out_;
   const TComSPS& sps_;
   const TComPPS& pps_;
@@ -232,7 +235,10 @@ class Mapper {
     b.ext_type = "HevcCtu";
     const uint8_t sao_luma = ctu_ext(ts, rs, *slice, &b.ext);
     const uint32_t id = add_block(0, std::move(b));
-    for_cells(out_.blocks[id].rect, [&](std::size_t i, UInt, UInt) { out_.grid.filter_idx[i] = sao_luma; });
+    for_cells(out_.blocks[id].rect, [&](std::size_t i, UInt, UInt) {
+      out_.grid.filter_idx[i] = sao_luma;
+      out_.grid.partition_id[i] = maps_.segment[rs];
+    });
     const auto& slots = slots_of(slice);
     coding_quadtree(*cu, slots, id, 0, 0, x0, y0, ctu_);
   }
@@ -286,7 +292,9 @@ class Mapper {
     fb::HevcCtuBuilder h(ext_);
     h.add_CtbAddrInRs(rs);
     h.add_CtbAddrInTs(ts);
-    h.add_tile_idx(static_cast<uint16_t>(pic_.getPicSym()->getTileIdxMap(static_cast<Int>(rs))));
+    h.add_slice_segment_idx(maps_.segment[rs]);
+    h.add_tile_idx(maps_.tile[rs]);
+    h.add_end_of_slice_segment_flag(maps_.last_in_segment[rs]);
     if (!sao.type.empty()) {
       h.add_SaoTypeIdx(type_v);
       h.add_SaoOffsetVal(offsets_v);
@@ -655,9 +663,10 @@ class Mapper {
 
 }  // namespace
 
-void map_cu(TComPic& pic, const PicIndex& index, Analysis* out) {
+void map_cu(TComPic& pic, const PicIndex& index, int dpb_fullness, Analysis* out) {
   *out = Analysis();
-  Mapper(pic, index, out).run();
+  const PicMaps maps = map_pic(pic, index, dpb_fullness, out);
+  Mapper(pic, index, maps, out).run();
 }
 
 }  // namespace ovt::hm

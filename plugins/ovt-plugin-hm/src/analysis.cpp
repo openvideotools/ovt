@@ -26,6 +26,7 @@ void Grid::resize(uint32_t w, uint32_t h) {
   tx_type.assign(n, 0xFF);
   cbf.assign(n, 0);
   filter_idx.assign(n, 0);
+  partition_id.assign(n, 0);
 }
 
 namespace {
@@ -47,10 +48,12 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   const auto tx_type = fbb.CreateVector(g.tx_type);
   const auto cbf = fbb.CreateVector(g.cbf);
   const auto filter_idx = fbb.CreateVector(g.filter_idx);
+  const auto partition_id = fbb.CreateVector(g.partition_id);
   fb::CellGridBuilder b(fbb);
   b.add_cells_w(g.w4);
   b.add_cells_h(g.h4);
   b.add_block_id(block_id);
+  b.add_partition_id(partition_id);
   b.add_pred(pred);
   b.add_qp(qp);
   b.add_intra_mode_y(intra_y);
@@ -77,6 +80,32 @@ flatbuffers::Offset<flatbuffers::Vector<uint8_t>> nested(flatbuffers::FlatBuffer
   }
   fbb.ForceVectorAlignment(ext.size(), 1, 8);
   return fbb.CreateVector(ext);
+}
+
+flatbuffers::Offset<fb::PartitionInfo> build_partition(flatbuffers::FlatBufferBuilder& fbb, const PartRec& r,
+                                                       uint16_t index) {
+  fb::PartitionInfoBuilder p(fbb);
+  p.add_kind(r.kind);
+  p.add_index(index);
+  p.add_parent(r.parent);
+  p.add_slice_type(r.slice_type);
+  p.add_rect(&r.rect);
+  p.add_first_block_addr(r.first_block_addr);
+  p.add_block_count(r.block_count);
+  p.add_qp(r.qp);
+  p.add_qp_delta(r.qp_delta);
+  p.add_deblocking_disable(r.deblocking_disable);
+  p.add_deblock_alpha_or_beta_offset_div2(r.beta_offset_div2);
+  p.add_deblock_beta_or_tc_offset_div2(r.tc_offset_div2);
+  p.add_loop_filter_across_slices(r.loop_filter_across_slices);
+  p.add_sao_luma(r.sao_luma);
+  p.add_sao_chroma(r.sao_chroma);
+  p.add_tile_row(r.tile_row);
+  p.add_tile_col(r.tile_col);
+  p.add_num_entry_points(r.num_entry_points);
+  p.add_cabac_init(r.cabac_init);
+  p.add_max_num_merge_cand(r.max_num_merge_cand);
+  return p.Finish();
 }
 
 }  // namespace
@@ -116,6 +145,20 @@ MappedAnalysis build_analysis(flatbuffers::FlatBufferBuilder& fbb, const Analysi
         fb::CreateRefSlotDirect(fbb, static_cast<uint8_t>(i), &frame, r.name.c_str(), r.long_term, r.usage_cells));
   }
   out.refs = fbb.CreateVector(refs);
+  std::vector<flatbuffers::Offset<fb::PartitionInfo>> parts;
+  parts.reserve(a.partitions.size());
+  for (std::size_t i = 0; i < a.partitions.size(); ++i) {
+    parts.push_back(build_partition(fbb, a.partitions[i], static_cast<uint16_t>(i)));
+  }
+  out.partitions = fbb.CreateVector(parts);
+  if (!a.filter_params.empty()) {
+    out.filter_params = nested(fbb, a.filter_params);
+    out.filter_params_type = fbb.CreateString("HevcFilterParams");
+  }
+  if (!a.ref_state.empty()) {
+    out.ref_state = nested(fbb, a.ref_state);
+    out.ref_state_type = fbb.CreateString("HevcRps");
+  }
   out.grid = build_grid(fbb, a.grid);
   return out;
 }
