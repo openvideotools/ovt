@@ -7,7 +7,8 @@
 // diagnostics list stays capped; the tree can be built and expanding the root until nothing changes terminates;
 // decode_packet never reads past the span it is given. PES (WI-4.206a): decode_pes_header never reads past its span;
 // every PES lies inside the packet range and its reread payload is never longer than its size; the sample tables
-// can be built and agree with the PES list.
+// can be built and agree with the PES list. Timing (WI-4.206b): every packet has its PID recorded, the PCR points
+// lie inside the packet range in order, and the TsTiming table can be built and lists one point per PES.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -49,6 +50,25 @@ void check_pes(const ovt::io::MemoryFile& file, const ts::File& a, const ts::Fil
     const auto table = reader.sample_table(static_cast<int>(i), 0, 0);
     require(flatbuffers::GetRoot<ovt::fb::SampleTable>(table.data())->count() == s.packets.size());
   }
+}
+
+// The timing table (WI-4.206b).
+void check_timing(const ts::File& a, const ovt::container::Reader& reader) {
+  require(a.timing.packet_pid.size() == a.packet_count);
+  for (const ts::PcrStream& s : a.timing.pcr) {
+    for (size_t j = 0; j < s.points.size(); ++j) {
+      require(s.points[j].packet_index < a.packet_count && s.points[j].pcr < ts::kPcrWrap);
+      require(j == 0 || s.points[j].packet_index > s.points[j - 1].packet_index);
+    }
+  }
+  size_t pes_total = 0;
+  for (const ts::PesStream& s : a.pes) {
+    pes_total += s.packets.size();
+  }
+  const auto timing = reader.ts_timing();
+  const auto* tt = flatbuffers::GetRoot<ovt::fb::TsTiming>(timing.data());
+  require(tt->pts_dts()->size() == pes_total && tt->packet_size() == a.geometry.stride);
+  require(tt->bitrate_per_pid()->size() <= a.pids.size() * ts::kBitrateWindowsMs.size());
 }
 
 }  // namespace
@@ -114,6 +134,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     require(reader->expand(a->packet_offset(0)) == OVT_OK);
 
     check_pes(file, *a, *b, *reader, size);
+    check_timing(*a, *reader);
   } catch (...) {
     std::abort();
   }

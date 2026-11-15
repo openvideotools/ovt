@@ -3,8 +3,8 @@
 //
 // The MPEG-TS packet layer (chapter 08 §8.6.7, WI-4.204): packet size detection (188 / 192 / 204), sync and resync,
 // header and adaptation-field decoding (ISO/IEC 13818-1 §2.4.3), per-PID statistics and the lazy packet tree.
-// PSI/SI tables are decoded by psi.hpp (WI-4.205), PES packets by pes.hpp (WI-4.206a); the timing table
-// (WI-4.206b) and the TR 101 290 report (WI-4.207) follow.
+// PSI/SI tables are decoded by psi.hpp (WI-4.205), PES packets and the timing table by pes.hpp and timing.hpp
+// (WI-4.206); the TR 101 290 report follows (WI-4.207).
 //
 // SPEC-ASSUMPTION(#337): resync rule, node names, continuity-counter rule and the M2TS prefix are not fixed by
 // §8.6.7; the proposed answers are in the issue and in the comments below.
@@ -25,6 +25,7 @@
 #include "container/diagnostics.h"
 #include "container/mpegts/pes.hpp"
 #include "container/mpegts/psi.hpp"
+#include "container/mpegts/timing.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 
 namespace ovt::container::mpegts {
@@ -129,6 +130,9 @@ struct File {
   // PES packets of the elementary-stream PIDs that some PMT named, ascending PID; each is a track
   // (TrackInfo.track_id = PID) and each PES one sample (WI-4.206).
   std::vector<PesStream> pes;
+  Timing timing;                // PCR points, PCR/PTS check counts and the PID of every packet (WI-4.206)
+  uint16_t pcr_pid = kNullPid;  // the timing table's PCR PID: of the first program whose PCR PID carries one,
+                                // else the lowest PID that carries a PCR
 
   // File offset of the first byte of packet `index` (the prefix of an M2TS packet included), index < packet_count.
   [[nodiscard]] uint64_t packet_offset(uint64_t index) const noexcept;
@@ -151,6 +155,10 @@ AnnexBSummary pes_units(const io::RandomAccessFile& file, const File& f, const P
 // SampleTable FlatBuffer of `count` PES packets of `stream` from `first` (count 0 = all): timescale 90000, `dts`
 // the DTS (else the PTS) unwrapped across 2^33, `cts_offset` PTS - DTS, `is_sync` the random_access_indicator.
 [[nodiscard]] std::vector<uint8_t> build_sample_table(const PesStream& stream, uint32_t first, uint32_t count);
+
+// TsTiming FlatBuffer (chapter 06 §6.4): PCR points of `pcr_pid`, one TsPtsPoint per PES in packet order and the
+// bitrate of every PID in the windows of kBitrateWindowsMs.
+[[nodiscard]] std::vector<uint8_t> build_ts_timing(const File& f);
 
 // nullptr when `file` is not a transport stream.
 [[nodiscard]] std::unique_ptr<Reader> make_reader(const io::RandomAccessFile& file);
