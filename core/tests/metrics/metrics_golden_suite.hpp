@@ -44,23 +44,42 @@ struct GoldenPair {
   std::string_view dist_file;
   uint32_t frames;
   uint32_t bit_depth;
+  // When the entry holds no `dist_file`: the video file of the entry that is decoded to it (empty = none).
+  std::string_view dist_source;
 };
 
-// The pairs of §14.4.10 / §14.4.12. syn_metrics_1080p's distorted side is the decoded x264 stream: recipe 25 of
-// chapter 14 §14.3.3 says the fetcher decodes it to Y4M, which tools/fetch_corpora.py does not do yet, so the test
-// looks for syn_metrics_1080p_dist.y4m next to the reference and skips the pair when it is absent (recorded in the
-// WI-3.590 PR as a deviation).
+// The pairs of §14.4.10 / §14.4.12. syn_metrics_1080p's distorted side is the x264 stream of recipe 25 (chapter 14
+// §14.3.3), which the corpus holds as .264/.mp4 only: like tools/goldens/gen_metrics.py's to_y4m(), the test decodes
+// the first `frames` pictures of the .mp4 with the ffmpeg CLI into a temporary Y4M (DistY4m).
 inline constexpr std::array<GoldenPair, 3> kPairs = {{
-    {"netflix_src01_576x324", "netflix_src01_hrc00_576x324", "", "netflix_src01_hrc01_576x324", "", 48, 8},
+    {"netflix_src01_576x324", "netflix_src01_hrc00_576x324", "", "netflix_src01_hrc01_576x324", "", 48, 8, ""},
     {"syn_metrics_1080p", "syn_metrics_1080p_pair", "syn_metrics_1080p_ref.y4m", "syn_metrics_1080p_pair",
-     "syn_metrics_1080p_dist.y4m", 60, 8},
+     "syn_metrics_1080p_dist.y4m", 60, 8, "syn_metrics_1080p_dist.mp4"},
     {"syn_metrics_pq_1080p", "syn_metrics_pq_1080p_pair", "syn_metrics_pq_1080p_ref.y4m", "syn_metrics_pq_1080p_pair",
-     "syn_metrics_pq_1080p_dist.y4m", 60, 10},
+     "syn_metrics_pq_1080p_dist.y4m", 60, 10, ""},
 }};
 
 // The file `name` of corpus entry `entry` (its primary file when `name` is empty). Skips the running test (or fails
 // it under OVT_REQUIRE_CORPORA=1) when the entry is absent, and skips it when the entry lacks the named file.
 std::filesystem::path corpus_file(std::string_view entry, std::string_view name);
+
+// The distorted Y4M of `pair`, decoded into a temporary file when the entry holds only `dist_source`; the file is
+// removed when the object is destroyed. Skips the test when the entry is absent, and skips it (or fails it under
+// OVT_REQUIRE_CORPORA=1) when the ffmpeg CLI is missing or cannot decode the source.
+class DistY4m {
+ public:
+  explicit DistY4m(const GoldenPair& pair);
+  DistY4m(const DistY4m&) = delete;
+  DistY4m& operator=(const DistY4m&) = delete;
+  DistY4m(DistY4m&&) = delete;
+  DistY4m& operator=(DistY4m&&) = delete;
+  ~DistY4m();
+  [[nodiscard]] const std::filesystem::path& path() const { return path_; }
+
+ private:
+  std::filesystem::path path_;
+  bool temporary_ = false;
+};
 
 // A decoded picture: three planes of 4:2:0 samples, 1 byte (8-bit) or 2 bytes little-endian (9..16-bit).
 struct Picture {
@@ -212,9 +231,9 @@ class Metric {
 template <typename Fn>
 uint32_t for_each_frame(const GoldenPair& pair, Fn&& fn) {
   const auto ref_path = corpus_file(pair.ref_entry, pair.ref_file);
-  const auto dist_path = corpus_file(pair.dist_entry, pair.dist_file);
+  const DistY4m dist(pair);
   Y4mReader ry(ref_path);
-  Y4mReader dy(dist_path);
+  Y4mReader dy(dist.path());
   REQUIRE(ry.width() == dy.width());
   REQUIRE(ry.height() == dy.height());
   REQUIRE(ry.bit_depth() == pair.bit_depth);

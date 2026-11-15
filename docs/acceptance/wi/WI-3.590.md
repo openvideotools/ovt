@@ -6,9 +6,11 @@ version: 1.0-rc34.
 
 Corpora present locally: `netflix_src01_hrc00_576x324`, `netflix_src01_hrc01_576x324` (`tools/fetch_corpora.py`).
 The `syn_metrics_1080p_pair` and `syn_metrics_pq_1080p_pair` entries are generated (recipes 25 and 58) and were not
-available here; their test cases skip and run where the nightly generates the synthetic streams. The
-`syn_metrics_1080p` case also needs the decoded `syn_metrics_1080p_dist.y4m`, which the fetcher does not write yet
-(see the PR's deviations).
+available here; their test cases skip and run where the nightly generates the synthetic streams. For
+`syn_metrics_1080p` the test decodes the first 60 pictures of `syn_metrics_1080p_dist.mp4` with the ffmpeg CLI into a
+temporary Y4M (the command of `gen_metrics.py` `to_y4m()`), so no fetcher change is needed; that path was exercised
+locally on a stand-in entry (an x264 encode of the Netflix reference), where the decode, the float64 recomputation and
+the per-frame loop ran and only the golden values differed, as expected for stand-in content.
 
 | Acceptance test | Test (binary `ovt_tests_metrics`) | Local result |
 |---|---|---|

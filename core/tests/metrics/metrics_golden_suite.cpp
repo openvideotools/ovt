@@ -8,12 +8,16 @@
 #include <array>
 #include <catch2/catch_test_macros.hpp>
 #include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <limits>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
+#include <system_error>
+
+#include <unistd.h>
 
 #include "test_support/corpus.h"
 
@@ -26,9 +30,46 @@ std::filesystem::path corpus_file(std::string_view entry, std::string_view name)
   }
   std::filesystem::path p = primary.parent_path() / std::string(name);
   if (!std::filesystem::exists(p)) {
-    SKIP("corpus entry " << entry << " has no " << name << " (the fetcher does not decode it to Y4M yet)");
+    SKIP("corpus entry " << entry << " has no " << name);
   }
   return p;
+}
+
+DistY4m::DistY4m(const GoldenPair& pair) {
+  const std::filesystem::path primary = ovt::test::corpus_or_skip(pair.dist_entry);
+  if (pair.dist_file.empty() || primary.filename() == pair.dist_file) {
+    path_ = primary;
+    return;
+  }
+  const std::filesystem::path dir = primary.parent_path();
+  if (std::filesystem::exists(dir / std::string(pair.dist_file)) || pair.dist_source.empty()) {
+    path_ = corpus_file(pair.dist_entry, pair.dist_file);
+    return;
+  }
+  const std::filesystem::path source = dir / std::string(pair.dist_source);
+  REQUIRE(std::filesystem::exists(source));
+  // Unique per process: ctest may run several of these cases at once.
+  path_ = std::filesystem::temp_directory_path() /
+          ("ovt_metrics_" + std::string(pair.id) + "_" + std::to_string(::getpid()) + "_dist.y4m");
+  temporary_ = true;
+  // The command of gen_metrics.py to_y4m() that made the goldens: first `frames` pictures, 8-bit 4:2:0.
+  const std::string cmd = "ffmpeg -hide_banner -nostdin -v error -y -i '" + source.string() + "' -frames:v " +
+                          std::to_string(pair.frames) + " -pix_fmt yuv420p -strict -1 -f yuv4mpegpipe '" +
+                          path_.string() + "'";
+  const int rc = std::system(cmd.c_str());  // NOLINT(cert-env33-c,concurrency-mt-unsafe): fixed command, test only
+  if (rc != 0 || !std::filesystem::exists(path_)) {
+    if (ovt::test::require_corpora()) {
+      FAIL("cannot decode " << source << " with the ffmpeg CLI (exit status " << rc << ")");
+    }
+    SKIP("cannot decode " << source << " with the ffmpeg CLI (exit status " << rc << ")");
+  }
+}
+
+DistY4m::~DistY4m() {
+  if (temporary_) {
+    std::error_code ec;
+    std::filesystem::remove(path_, ec);
+  }
 }
 
 nlohmann::json read_golden_gz(const std::string& name) {
