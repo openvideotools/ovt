@@ -4,7 +4,7 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc34 — 2026-11-15
 
-PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548) #551, #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548), #551 and #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
 
 - 13 §13.4.4 item 9 — Qt Quick accessibility is not exposed through `QtQuickView` (Qt ≤ 6.10); `MainActivity` mirrors the QML root's `productName` onto the view's accessibility node so TalkBack and UI Automator see one labelled node — WI-0.035, WI-0.050 (#550, PR #548)
 - 17 §17.1 — new risk R-23: screen readers cannot reach QML controls on Android under the `QtQuickView` embedding; mitigation and trigger listed — (#550)
