@@ -1286,9 +1286,14 @@ TEST_CASE("av1_fh1_tiles_cdef_lr_first_header", "[syntax][av1][fast][needs-corpu
         CHECK(h.quantization_params.base_q_idx == 36);
         CHECK(h.delta_lf_params.span.bit_offset == 75);
         CHECK(h.span.bit_offset == 32);
-        CHECK(h.span.bit_length == 75 - 32);
         CHECK_FALSE(h.lossless.CodedLossless);
-        CHECK(h.part1_only);
+        // WI-1.118: rows 20–27 follow (trace_headers 75 loop_filter_params … 162 tx_mode 1 = TX_MODE_SELECT, 163
+        // reduced_tx_set 0; a KEY frame reads no global motion and the sequence has no film grain), then the
+        // byte_alignment() of frame_obu() at 164.
+        CHECK(h.loop_filter_params.span.bit_offset == 75);
+        CHECK(h.tx_mode.TxMode == TxModeType::Select);
+        CHECK_FALSE(h.reduced_tx_set);
+        CHECK(h.span.bit_length == 164 - 32);
       });
   REQUIRE(done);
 }
@@ -1380,6 +1385,11 @@ Bytes key_frame_payload(uint32_t order_hint, uint8_t base_q_idx) {
   w.put(0, 1);                                                   // segmentation_enabled
   if (base_q_idx > 0) {
     w.put(0, 1);  // delta_q_present
+    // WI-1.118 rows 20–27, every choice 0: loop_filter_level[0..1] f(6) each, loop_filter_sharpness f(3),
+    // loop_filter_delta_enabled f(1), tx_mode_select f(1), reduced_tx_set f(1) (no CDEF / LR in this sequence).
+    w.put(0, 18);
+  } else {
+    w.put(0, 1);  // CodedLossless: only reduced_tx_set
   }
   w.trailing();
   return w.bytes();
@@ -1470,6 +1480,7 @@ TEST_CASE("av1_fh1_inter_frame_short_signaling_and_ref_order_hint_mismatch", "[s
   w.put(60, 8).put(0, 1).put(0, 1).put(0, 1).put(0, 1);
   w.put(1, 1).put(0, 64);  // segmentation_enabled, 64 feature_enabled = 0
   w.put(1, 1).put(1, 2).put(1, 1).put(2, 2).put(0, 1);
+  w.put(0, 64);  // WI-1.118 rows 20–27 (loop filter … film grain), every choice 0
   w.trailing();
   SyntaxNodeBuffer tree;
   const FrameHeader h = parse_fh(obu(3, w.bytes()), seq, state, &tree);
@@ -1583,7 +1594,18 @@ TEST_CASE("av1_fh1_reduced_still_picture_frame_ids_and_buffer_removal_time", "[s
     // OrderHintBits 0), render 0, (disable_frame_end_update_cdf inferred 1), tile_info 1 0 0, base_q_idx 10,
     // deltas 0 ×3, using_qmatrix 0, segmentation 0, delta_q_present 0.
     BitWriter w;
-    w.put(0, 1).put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1).put(10, 8).put(0, 4).put(0, 1).put(0, 1).trailing();
+    w.put(0, 1)
+        .put(0, 1)
+        .put(0, 1)
+        .put(1, 1)
+        .put(0, 1)
+        .put(0, 1)
+        .put(10, 8)
+        .put(0, 4)
+        .put(0, 1)
+        .put(0, 1)
+        .put(0, 64)
+        .trailing();  // + rows 20–27, all 0
     DecoderState state;
     SyntaxNodeBuffer tree;
     const FrameHeader h = parse_fh(obu(6, w.bytes()), seq, state, &tree);
@@ -1597,7 +1619,8 @@ TEST_CASE("av1_fh1_reduced_still_picture_frame_ids_and_buffer_removal_time", "[s
     CHECK(h.disable_frame_end_update_cdf);
     CHECK(h.refresh_frame_flags == kAllFrames);
     CHECK(h.quantization_params.base_q_idx == 10);
-    CHECK(h.span.bit_length == 1 + 1 + 1 + 3 + 8 + 4 + 1 + 1);
+    // … plus rows 20–27 (WI-1.118): loop filter 6 + 6 + 3 + 1, tx_mode_select 1, reduced_tx_set 1.
+    CHECK(h.span.bit_length == 1 + 1 + 1 + 3 + 8 + 4 + 1 + 1 + 16 + 1 + 1);
     CHECK(find(tree.root(), "reduced_still_picture_header") != nullptr);
     CHECK(find(tree.root(), "show_existing_frame") == nullptr);
   }
@@ -1630,7 +1653,8 @@ TEST_CASE("av1_fh1_reduced_still_picture_frame_ids_and_buffer_removal_time", "[s
       w.put(0, 3).put(4, 4);
     }
     w.put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1).put(0, 1);
-    w.put(1, 1).put(0, 1).put(0, 1).put(30, 8).put(0, 4).put(0, 1).put(0, 1).trailing();
+    w.put(1, 1).put(0, 1).put(0, 1).put(30, 8).put(0, 4).put(0, 1).put(0, 1).put(0, 64).trailing();  // + rows 20–27,
+                                                                                                     // all 0
     SyntaxNodeBuffer tree;
     const FrameHeader h = parse_fh(obu(6, w.bytes()), seq, state, &tree);
     CHECK(h.current_frame_id == 105);
@@ -1667,7 +1691,17 @@ TEST_CASE("av1_fh1_reduced_still_picture_frame_ids_and_buffer_removal_time", "[s
     BitWriter w;
     w.put(0, 1).put(0, 2).put(1, 1).put(0, 1).put(0, 1).put(0, 1).put(9, 7);
     w.put(1, 1).put(700, 10);
-    w.put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1).put(40, 8).put(0, 4).put(0, 1).put(0, 1).trailing();
+    w.put(0, 1)
+        .put(0, 1)
+        .put(1, 1)
+        .put(0, 1)
+        .put(0, 1)
+        .put(40, 8)
+        .put(0, 4)
+        .put(0, 1)
+        .put(0, 1)
+        .put(0, 18)
+        .trailing();  // + rows 20–27, all 0 (loop filter 16, tx_mode_select, reduced_tx_set)
     ObuHeader ext;
     ext.obu_type = 3;
     ext.obu_extension_flag = true;
@@ -1687,7 +1721,7 @@ TEST_CASE("av1_fh1_reduced_still_picture_frame_ids_and_buffer_removal_time", "[s
     BitWriter w2;
     w2.put(0, 1).put(0, 2).put(1, 1).put(0, 1).put(0, 1).put(0, 1).put(9, 7);
     w2.put(1, 1).put(700, 10).put(701, 10);
-    w2.put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1).put(40, 8).put(0, 4).put(0, 1).put(0, 1).trailing();
+    w2.put(0, 1).put(0, 1).put(1, 1).put(0, 1).put(0, 1).put(40, 8).put(0, 4).put(0, 1).put(0, 1).put(0, 18).trailing();
     BitReader br2(w2.bytes());
     SyntaxBuilder b2(br2);
     DecoderState state2;

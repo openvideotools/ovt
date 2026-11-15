@@ -567,6 +567,7 @@ Decision: use the **Qt Gradle plugin** (`org.qtproject.qt.gradleplugin`, shipped
 6. **Plugins.** On start, `PluginStore.scan()` collects `applicationInfo.nativeLibraryDir`, `filesDir/plugins`, and the codec pack's `nativeLibraryDir` (if installed) and calls `ovt_plugins_add_search_path` for each (§13.4.6).
 7. **Cache dir.** `ovt_cache_set_dir(cacheDir/ovt)`; Android may purge it.
 8. **CLI for tests.** The CLI is not packaged; CI pushes `build/android-x86_64-release/cli/ovt` to the emulator with `adb push … /data/local/tmp/ovt` for smoke tests.
+9. **Accessibility.** Qt Quick accessibility is not exposed through `QtQuickView` (Qt ≤ 6.10: only `QtActivityDelegate` registers `QtAccessibilityInterface`; `QtEmbeddedDelegate` does not). On QML `READY`, `MainActivity` mirrors the QML root's `productName` onto the view's own accessibility node (`text` and `contentDescription`), so TalkBack and UI Automator see one labelled node until Qt supports embedded accessibility (risk R-23, chapter 17 §17.1; issue #550).
 
 **JNI surface (`android/app/src/main/cpp/ovt_jni.cpp`, registered with `RegisterNatives` on `org.openvideotools.studio.OvtNative`; these are the only native entry points the Kotlin side calls — everything else goes through Qt):**
 
