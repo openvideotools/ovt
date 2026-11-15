@@ -63,3 +63,8 @@ $ OVT_CORPORA_DIR=~/wi4105/corpora OVT_REQUIRE_CORPORA=1 ctest --test-dir build/
 its 16 HEVC_v1 streams. Among them, 245 of the 300 pictures of RPS_E_qualcomm_5 have long-term references,
 DSLICE_A_HHI_5 has 700 dependent slice segments, and TILES_B_Cisco_1, WPP_A_ericsson_MAIN_2 and CAINIT_A_SHARP_4
 are covered too.
+
+**Rerun at 049e957** (after the dpb_fullness_after and RPS POC checks, with BLA pictures expecting empty lists),
+same machine, corpora and commands, 2026-11-15: `ctest -R "hm plugin"` passes 8 of 8; the new case passes all 202054
+assertions in 29.8 s. The intermediate heads 7b6db14 and 3f29f85 failed only on NUT_A_ericsson_5 decode indices 28
+and 32, the BLA pictures.
