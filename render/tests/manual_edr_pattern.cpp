@@ -19,6 +19,7 @@
 #include <cstring>
 #include <exception>
 #include <fstream>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -90,6 +91,29 @@ bool load_pattern(const std::string& dir, Pattern& out) {
   return true;
 }
 
+// --encoding scrgb|pq|hlg|srgb and --seconds N; false on anything else.
+bool parse_args(int argc, char** argv, Encoding& requested, double& seconds) {
+  const std::span<char*> args(argv, static_cast<size_t>(argc));
+  for (size_t i = 1; i < args.size(); i += 2) {
+    const std::string key = args[i];
+    const std::string value = i + 1 < args.size() ? args[i + 1] : "";
+    if (key == "--seconds" && !value.empty()) {
+      seconds = std::strtod(value.c_str(), nullptr);
+    } else if (key == "--encoding" && value == "scrgb") {
+      requested = Encoding::ScRgbLinear16F;
+    } else if (key == "--encoding" && value == "pq") {
+      requested = Encoding::Pq10;
+    } else if (key == "--encoding" && value == "hlg") {
+      requested = Encoding::Hlg10;
+    } else if (key == "--encoding" && value == "srgb") {
+      requested = Encoding::Srgb8;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 // NOLINTBEGIN(cppcoreguidelines-pro-type-vararg,cppcoreguidelines-pro-bounds-pointer-arithmetic): a CLI tool
@@ -97,20 +121,9 @@ int main(int argc, char** argv) try {
   Encoding requested = Encoding::ScRgbLinear16F;
   double seconds = 60.0;
   const std::string patterns = OVT_PATTERNS_DIR;
-  for (int i = 1; i + 1 < argc; i += 2) {
-    const std::string key = argv[i];
-    const std::string value = argv[i + 1];
-    if (key == "--encoding" && (value == "scrgb" || value == "pq" || value == "hlg" || value == "srgb")) {
-      requested = value == "pq"     ? Encoding::Pq10
-                  : value == "hlg"  ? Encoding::Hlg10
-                  : value == "srgb" ? Encoding::Srgb8
-                                    : Encoding::ScRgbLinear16F;
-    } else if (key == "--seconds") {
-      seconds = std::strtod(value.c_str(), nullptr);
-    } else {
-      (void)std::fprintf(stderr, "usage: %s [--encoding scrgb|pq|hlg|srgb] [--seconds N]\n", argv[0]);
-      return 2;
-    }
+  if (!parse_args(argc, argv, requested, seconds)) {
+    (void)std::fprintf(stderr, "usage: %s [--encoding scrgb|pq|hlg|srgb] [--seconds N]\n", argv[0]);
+    return 2;
   }
 
   Pattern pattern;
