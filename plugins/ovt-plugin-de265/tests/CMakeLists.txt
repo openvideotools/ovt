@@ -37,6 +37,15 @@ ovt_set_license(ovt_plugin_de265_smoke_tests "LGPL-3.0-or-later")
 ovt_catch_discover_tests(ovt_plugin_de265_smoke_tests)
 
 if(NOT OVT_SYSTEM_DE265)
+  # ---- WI-2.164: the block mapping ---------------------------------------------------------------------------------
+  # The CellGrid layer (map_grid.cpp) on hand-made libde265 metadata. Built only with the patched libde265, the one
+  # that has the block metadata.
+  add_executable(ovt_plugin_de265_map_tests test_de265_map.cpp ../src/map_grid.cpp)
+  target_include_directories(ovt_plugin_de265_map_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
+  target_link_libraries(ovt_plugin_de265_map_tests PRIVATE ovt_schemas ovt::flags ${Catch2_TARGET})
+  ovt_set_license(ovt_plugin_de265_map_tests "LGPL-3.0-or-later")
+  ovt_catch_discover_tests(ovt_plugin_de265_map_tests)
+
   # ---- WI-2.166: plane snapshots (libde265 patch 0003) ----------------------------------------------------------
   # Loads the plugin like the smoke tests and compares its planes with direct decodes of the same patched libde265
   # (in-loop filters switched off), which this executable links statically; the plugin's own copy stays private to

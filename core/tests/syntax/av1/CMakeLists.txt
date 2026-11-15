@@ -9,3 +9,18 @@ target_link_libraries(ovt_tests_syntax_av1_sequence_metadata PRIVATE ovt_core_ob
                                                                      ${Catch2_TARGET})
 ovt_set_license(ovt_tests_syntax_av1_sequence_metadata "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax_av1_sequence_metadata)
+
+# WI-1.117: uncompressed_header() sub-structures (part a: frame size, render size, frame_size_with_refs, tile_info).
+add_executable(ovt_tests_syntax_av1_frame_header test_syntax_av1_frame_header.cpp)
+target_link_libraries(ovt_tests_syntax_av1_frame_header PRIVATE ovt_core_objects ovt_test_support ovt::flags
+                                                                ${Catch2_TARGET})
+ovt_set_license(ovt_tests_syntax_av1_frame_header "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_syntax_av1_frame_header)
+
+# WI-1.118: uncompressed_header() rows 20–27 (loop filter, CDEF, LR, tx mode, reference / skip mode, global motion,
+# film grain).
+add_executable(ovt_tests_syntax_av1_frame_header2 test_syntax_av1_frame_header2.cpp)
+target_link_libraries(ovt_tests_syntax_av1_frame_header2 PRIVATE ovt_core_objects ovt_test_support ovt::flags
+                                                                 ${Catch2_TARGET})
+ovt_set_license(ovt_tests_syntax_av1_frame_header2 "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_syntax_av1_frame_header2)

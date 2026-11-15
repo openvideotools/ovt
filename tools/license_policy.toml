@@ -66,6 +66,8 @@ ovt_plugin_de265_probe_tests = "LGPL-3.0-or-later"
 ovt_plugin_de265_grid_dump = "LGPL-3.0-or-later"
 # The plugin smoke test (WI-2.163) loads the plugin through the LGPL-2.1-or-later host registry.
 ovt_plugin_de265_smoke_tests = "LGPL-3.0-or-later"
+# The block-mapping tests of WI-2.164 (the plugin's map sources linked in).
+ovt_plugin_de265_map_tests = "LGPL-3.0-or-later"
 # The plane snapshot tests (WI-2.166): the host registry plus a direct link of the patched libde265.
 ovt_plugin_de265_planes_tests = "LGPL-3.0-or-later"
 ovt_plugin_ffmpeg = "LGPL-2.1-or-later"
@@ -94,6 +96,8 @@ ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level dir
 [directories]               # SPDX id required in file headers; longest prefix wins
 "core/include/ovt/abi" = "BSD-2-Clause"
 "core/schema" = "BSD-2-Clause"
+# WI-0.094: the test-only copy of ovt_model.fbs (schema evolution tests) keeps the schema's licence.
+"core/tests/schema/evolution" = "BSD-2-Clause"
 "core" = "LGPL-2.1-or-later"
 "render" = "LGPL-2.1-or-later"
 "cli" = "GPL-3.0-or-later"
@@ -142,6 +146,7 @@ vulkan-loader = "Apache-2.0"
 [gradle_license_names]      # free-text licence names of the Gradle report -> SPDX id
 "The Apache Software License, Version 2.0" = "Apache-2.0"
 "Apache License, Version 2.0" = "Apache-2.0"
+"The Apache License, Version 2.0" = "Apache-2.0"   # kotlin-stdlib, -common, -jdk7, -jdk8 (WI-0.034 gate step)
 "Apache-2.0" = "Apache-2.0"
 
 [pip_overrides]             # Python packages whose installed metadata has no usable licence field

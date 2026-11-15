@@ -13,6 +13,8 @@ target_sources(
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
+          mpegts/descriptors.cpp
+          mpegts/psi.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp

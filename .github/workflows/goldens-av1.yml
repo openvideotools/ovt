@@ -18,12 +18,13 @@ on:
       - "tools/goldens/av1_skips.json"
       - "tests/oracles/normalize/aom_inspect*"
       - "tests/oracles/normalize/canon.py"
+      - "tests/corpora/manifest.json" # a changed corpus input changes the goldens
       - ".github/workflows/goldens-av1.yml"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
