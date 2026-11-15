@@ -255,10 +255,9 @@ ToneMappingInfo parse_tone_mapping_info(SeiPayloadReader& r) {
       if (exposure_idc == kExtendedIso) {
         (void)r.u("exposure_index_value", 32);
       }
-      if (r.flag("exposure_compensation_signalled_flag")) {
-        (void)r.u("exposure_compensation_numerator_idc", 16);
-        (void)r.u("exposure_compensation_denominator_idc", 8);
-      }
+      (void)r.flag("exposure_compensation_value_sign_flag");
+      (void)r.u("exposure_compensation_value_numerator", 16);
+      (void)r.u("exposure_compensation_value_denom_idc", 16);
       (void)r.u("ref_screen_luminance_white", 32);
       (void)r.u("extended_range_white_level", 32);
       (void)r.u("nominal_black_level_code_value", 16);

@@ -883,6 +883,33 @@ TEST_CASE("h264_sei_tone_mapping_info", "[syntax][h264][sei][fast]") {
     auto p = parse(w);
     CHECK(payload_as<ToneMappingInfo>(p.sei.messages[0]).values == std::vector<uint32_t>{0, 64, 128, 192});
   }
+  {  // model 4 (camera and exposure data, D.1.21): the three exposure_compensation_value fields are unconditional
+    BitWriter w;
+    w.ue(2);
+    w.u(1, 0);
+    w.ue(0);
+    w.u(8, 8);
+    w.u(8, 8);
+    w.ue(4);
+    w.u(8, 255);  // camera_iso_speed_idc: extended
+    w.u(32, 3200);
+    w.u(8, 5);  // exposure_index_idc
+    w.u(1, 1);  // exposure_compensation_value_sign_flag
+    w.u(16, 3);
+    w.u(16, 4);
+    w.u(32, 100);  // ref_screen_luminance_white
+    w.u(32, 400);  // extended_range_white_level
+    w.u(16, 16);
+    w.u(16, 235);
+    w.u(16, 254);
+    auto p = parse(w);
+    CHECK(p.sei.messages[0].parsed);
+    CHECK(payload_as<ToneMappingInfo>(p.sei.messages[0]).tone_map_model_id == 4);
+    CHECK(diag_codes(p).empty());
+    const auto* n = find_node(p.tree.root(), "nominal_white_level_code_value");
+    REQUIRE(n != nullptr);
+    CHECK(n->uvalue == 235);
+  }
   {  // cancel
     BitWriter w;
     w.ue(5);
