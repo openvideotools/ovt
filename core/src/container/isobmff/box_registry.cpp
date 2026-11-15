@@ -169,8 +169,9 @@ void BoxRegistry::join_decoder(const BoxDecoder* d) const {
   }
   entries_.push_back(e);
   const RegistryEntry* p = &entries_.back();
-  // SPEC-ASSUMPTION(#574): a "*" decoder also decorates every more specific table row of its fourcc, so a generated context row (higher
-  // specificity, no decoder) cannot hide it; each decorated copy keeps the row's pattern and metadata.
+  // SPEC-ASSUMPTION(#574): a "*" decoder also decorates every more specific table row of its fourcc, so a generated
+  // context row (higher specificity, no decoder) cannot hide it; each decorated copy keeps the row's pattern and
+  // metadata.
   if (!is_uuid && !is_parent_wild && std::string_view(d->context_pattern) == "*") {
     if (const auto rows = by_fourcc_.find(key); rows != by_fourcc_.end()) {
       const std::vector<const RegistryEntry*> table_rows = rows->second;  // the loop appends to rows->second
