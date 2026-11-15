@@ -639,7 +639,7 @@ class MpegtsReader final : public Reader {
                                               0));
     }
     const fb::ByteSpan root_span(0, f_.file_size);
-    const auto root =
+    const auto packets_root =
         fb::CreateBoxNode(fbb, fbb.CreateString("MPTS"), 0, &root_span, 0, -1, -1, fbb.CreateVector(fields), nullptr,
                           fbb.CreateVector(packets), fbb.CreateString("ISO/IEC 13818-1 §2.4.3"),
                           fbb.CreateString("MPEG transport stream"), fbb.CreateVector(root_diags));
@@ -649,7 +649,12 @@ class MpegtsReader final : public Reader {
     for (const Diagnostic& d : f_.diagnostics) {
       tree_diags.push_back(treefb::diagnostic(fbb, d.code, d.message, d.offset));
     }
-    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(&root, 1), 0,
+    // A second root `PSIT` carries the PSI/SI sections once any was found (WI-4.205).
+    std::vector<flatbuffers::Offset<fb::BoxNode>> roots = {packets_root};
+    if (f_.psi.section_count > 0) {
+      roots.push_back(build_psi_node(fbb, f_.psi, f_.file_size));
+    }
+    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(roots), 0,
                                        fbb.CreateVector(tree_diags)));
     const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
     return {bytes.begin(), bytes.end()};
