@@ -32,6 +32,15 @@ void require_range(const BitReader& br, std::string_view name, T value, int64_t 
   }
 }
 
+// SPEC-ASSUMPTION(#552): Info for a payload recorded as opaque bytes until its syntax is parsed (WI-1.109d).
+inline constexpr std::string_view kKeptAsBytesCode = "SYN-H264-0071";
+
+/// Records the rest of the RBSP as the opaque node `name` with Info SYN-H264-0071 "<name> kept as bytes".
+inline void keep_as_bytes(SyntaxBuilder& b, std::string_view name, std::string_view spec_ref) {
+  b.opaque_rest(name);
+  b.diag(Severity::Info, kKeptAsBytesCode, fmt::format("{} kept as bytes", name), spec_ref, true);
+}
+
 /// Diagnostic Warning SYN-H264-0003 on the last emitted node.
 template <class T>
 void warn_reserved(SyntaxBuilder& b, std::string_view name, T value, std::string_view spec_ref = {}) {
@@ -74,6 +83,14 @@ inline bool read_flag_at(SyntaxBuilder& b, std::string_view name, int idx) {
 inline int32_t read_se_at(SyntaxBuilder& b, std::string_view name, int idx) {
   b.begin_array_element(name, idx);
   const int32_t v = b.read_se(name);
+  b.end_array_element();
+  return v;
+}
+
+/// Reads one ue(v) element `name[idx]`.
+inline uint32_t read_ue_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const uint32_t v = b.read_ue(name);
   b.end_array_element();
   return v;
 }

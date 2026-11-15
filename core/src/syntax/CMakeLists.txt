@@ -65,5 +65,7 @@ target_sources(ovt_core_objects PRIVATE h264/slice_header.cpp h264/ref_pic_list_
 # WI-1.109b: H.264 AUD, end of sequence / stream, filler data and slice data partitions (chapter 7 §7.3.4 rows 19, 20
 # and 28).
 target_sources(ovt_core_objects PRIVATE h264/aud.cpp h264/data_partition.cpp)
+# WI-1.109c: H.264 SPS extension, subset SPS (MVC extension) and prefix NAL (chapter 7 §7.3.4 rows 21–23).
+target_sources(ovt_core_objects PRIVATE h264/sps_ext.cpp h264/subset_sps.cpp h264/prefix_nal.cpp)
 # WI-1.110: SEI framing shared by H.264 and H.265, and the H.264 SEI payload parsers (chapter 7 §7.3.4 rows 7–18).
 target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp)
