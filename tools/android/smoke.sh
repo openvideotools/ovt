@@ -51,12 +51,26 @@ fail() {
   exit 1
 }
 
-# The part of logcat that explains a failure: the app's own lines and every crash banner.
+# The part of logcat that explains a failure: the app's own lines (by pid and by tag) and every crash banner, without
+# the uiautomator launcher chatter that each dump writes. Also the window dump and the focused window.
 excerpt() {
   adb logcat -d > "$out/logcat.txt" 2>&1 || true
   adb exec-out screencap -p > "$out/screenshot.png" 2>/dev/null || true
-  echo "---- logcat excerpt (OVT, AndroidRuntime, DEBUG, libc, Qt) ----"
-  grep -E 'OVT|AndroidRuntime|FATAL|Fatal signal|DEBUG|libc |Qt|org.openvideotools' "$out/logcat.txt" | tail -n 80 || true
+  local pid
+  pid="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' | awk '{print $1}')"
+  echo "---- logcat excerpt (app pid '${pid:-none}', OVT, Qt, crash banners) ----"
+  { grep -E "OVT|Qt|FATAL|Fatal signal|DEBUG  |org.openvideotools" "$out/logcat.txt" || true
+    if [ -n "$pid" ]; then grep -E "^[0-9-]+ [0-9:.]+ +$pid " "$out/logcat.txt" || true; fi
+  } | grep -vE 'RuntimeInit|Using default boot image|Leaving lock profiling|Calling main entry|Shutting down VM|AppsFilter' |
+    sort -u | tail -n 80 || true
+  echo "---- window dump (text/content-desc/class of every node) ----"
+  if [ -f "$out/window.xml" ]; then
+    grep -oE '(class|text|content-desc)="[^"]*"' "$out/window.xml" | paste -sd' ' | fold -w 200 | head -n 20 || true
+  else
+    echo "(no window.xml)"
+  fi
+  echo "---- top activity ----"
+  adb shell dumpsys activity activities 2>/dev/null | grep -E 'mResumedActivity|topResumedActivity' | head -n 3 || true
   echo "---- end of excerpt (full log: $out/logcat.txt) ----"
 }
 
