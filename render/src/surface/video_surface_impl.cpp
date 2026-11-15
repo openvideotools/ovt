@@ -10,7 +10,6 @@
 // inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
 // (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1.
 
-#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -648,46 +647,49 @@ class VideoSurfaceImpl final : public VideoSurface {
         wait_fences == nullptr || destroy_fence == nullptr) {
       return;
     }
-    // The graphics, compute and transfer families may coincide; lock each (family, index) once.
-    std::vector<std::pair<uint32_t, uint32_t>> queues;
-    for (const pl_vulkan_queue& q : {vk_->queue_graphics, vk_->queue_compute, vk_->queue_transfer}) {
-      for (uint32_t i = 0; i < q.count; ++i) {
-        const std::pair<uint32_t, uint32_t> key{q.index, i};
-        if (std::find(queues.begin(), queues.end(), key) == queues.end()) {
-          queues.push_back(key);
-        }
-      }
-    }
-    for (const auto& [qf, qi] : queues) {
-      vk_->lock_queue(vk_, qf, qi);
-    }
+    // Every queue is locked while the device drains, then a fence submitted behind each queue's work is waited for.
+    // Nothing here allocates: ~VideoSurfaceImpl reaches this through destroy() and must not throw.
+    for_each_queue([this](uint32_t qf, uint32_t qi) { vk_->lock_queue(vk_, qf, qi); });
     static_cast<void>(device_wait_idle(dev));
-    std::vector<VkFence> fences;
-    fences.reserve(queues.size());
-    for (const auto& [qf, qi] : queues) {
+    for_each_queue([&](uint32_t qf, uint32_t qi) {
       VkQueue queue = VK_NULL_HANDLE;
       get_queue(dev, qf, qi, &queue);
       VkFenceCreateInfo info = {};
       info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
       VkFence fence = VK_NULL_HANDLE;
       if (queue == VK_NULL_HANDLE || create_fence(dev, &info, nullptr, &fence) != VK_SUCCESS) {
-        continue;
+        return;
       }
       // submitCount 0 with a fence: the fence alone goes into the queue, behind everything submitted before it.
-      if (queue_submit(queue, 0, nullptr, fence) != VK_SUCCESS) {
-        destroy_fence(dev, fence, nullptr);
-        continue;
+      if (queue_submit(queue, 0, nullptr, fence) == VK_SUCCESS) {
+        static_cast<void>(wait_fences(dev, 1, &fence, VK_TRUE, UINT64_MAX));
       }
-      fences.push_back(fence);
-    }
-    if (!fences.empty()) {
-      static_cast<void>(wait_fences(dev, static_cast<uint32_t>(fences.size()), fences.data(), VK_TRUE, UINT64_MAX));
-    }
-    for (VkFence fence : fences) {
       destroy_fence(dev, fence, nullptr);
+    });
+    for_each_queue([this](uint32_t qf, uint32_t qi) { vk_->unlock_queue(vk_, qf, qi); });
+  }
+
+  // Calls fn(family, index) once for every queue of the graphics, compute and transfer families, which may coincide.
+  template <typename Fn>
+  void for_each_queue(const Fn& fn) const {
+    const pl_vulkan_queue& graphics = vk_->queue_graphics;
+    const pl_vulkan_queue& compute = vk_->queue_compute;
+    const pl_vulkan_queue& transfer = vk_->queue_transfer;
+    const auto in = [](const pl_vulkan_queue& q, uint32_t family, uint32_t index) {
+      return q.index == family && index < q.count;
+    };
+    for (uint32_t i = 0; i < graphics.count; ++i) {
+      fn(graphics.index, i);
     }
-    for (const auto& [qf, qi] : queues) {
-      vk_->unlock_queue(vk_, qf, qi);
+    for (uint32_t i = 0; i < compute.count; ++i) {
+      if (!in(graphics, compute.index, i)) {
+        fn(compute.index, i);
+      }
+    }
+    for (uint32_t i = 0; i < transfer.count; ++i) {
+      if (!in(graphics, transfer.index, i) && !in(compute, transfer.index, i)) {
+        fn(transfer.index, i);
+      }
     }
   }
 

@@ -1,16 +1,22 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
-// The per-picture libde265 block metadata that the chapter 07 §7.6.2 mapping table reads (the rows available with
-// patch 0001; WI-2.164). The decoder copies it out of libde265 through the patch-0001 accessors before the picture
-// goes back to libde265; map_grid.cpp turns it into FlatBuffers parts of the FrameAnalysis on the host's thread.
-// Free of libde265 headers so that the unit tests can build BlockData by hand.
+// libde265 metadata -> CellGrid / Block tree / MotionVector / RefSlot / partitions / HevcFilterParams (chapter 07
+// §7.6.2 mapping table, the rows available with patch 0001; WI-2.164). decoder.cpp copies the per-picture metadata
+// into BlockData through the patch-0001 accessors before the picture goes back to libde265; map_blocks() turns it
+// into FlatBuffers parts of the FrameAnalysis on the host's thread. Free of libde265 headers so that the unit tests
+// can build BlockData by hand.
 #ifndef OVT_PLUGIN_DE265_MAP_BLOCKS_HPP
 #define OVT_PLUGIN_DE265_MAP_BLOCKS_HPP
 
+#include <flatbuffers/flatbuffers.h>
+
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
+
+#include "ovt_model_generated.h"
 
 namespace ovt::de265 {
 
@@ -95,13 +101,33 @@ struct BlockData {
   std::vector<SliceHeader> slices;
 };
 
-/// Picture-level facts the mapping needs besides the block metadata.
+/// Picture-level facts map_blocks() needs besides the block metadata.
 struct PictureFormat {
   int32_t coded_w = 0;  // pic_width_in_luma_samples
   int32_t coded_h = 0;
   uint8_t chroma_format = 1;  // 0 = 4:0:0 (no chroma modes)
   uint8_t bit_depth_luma = 8;
 };
+
+/// The FlatBuffers parts map_blocks() writes into the caller's builder.
+struct MappedBlocks {
+  flatbuffers::Offset<ovt::fb::CellGrid> grid;
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::Block>>> blocks;
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::MotionVector>>> mvs;
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::RefSlot>>> refs;
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::PartitionInfo>>> partitions;
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params;  // nested HevcFilterParams; null when unmapped
+  flatbuffers::Offset<flatbuffers::Vector<uint32_t>> qp_hist;
+  std::vector<std::string> warnings;  // messages for Warning Diagnostics on the frame
+};
+
+/// Grid fields map_blocks() fills (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.2 Caps row): all but bits_x8,
+/// which needs patch 0002 (WI-2.165).
+constexpr uint32_t kGridFields = 0xFFFFU & ~(1U << 13U);
+
+/// Maps @p d into @p fbb. Must not be called while another table is being built in @p fbb. With `d.valid == false`
+/// (or metadata that does not fit @p fmt) only the empty grid is made.
+MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d, const PictureFormat& fmt);
 
 }  // namespace ovt::de265
 
