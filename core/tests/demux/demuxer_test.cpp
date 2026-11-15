@@ -374,7 +374,27 @@ std::string ffprobe_libavformat() {
 struct Demuxed {
   std::vector<Read> packets;
   std::string error;
+  bool read_error = false;     // the error came from read_packet (after a successful open)
+  ovt_status status = OVT_OK;  // its class
 };
+
+// A manifest `expected.demux` (#558): the pinned libavformat stops this file after `packets` packets with `error`.
+struct ExpectedDemux {
+  size_t packets;
+  ovt_status error;
+  std::string error_name;  // as the manifest spells it
+};
+
+std::optional<ExpectedDemux> expected_demux(const nlohmann::json& entry) {
+  const auto expected = entry.value("expected", nlohmann::json::object());
+  if (!expected.contains("demux")) {
+    return std::nullopt;
+  }
+  const auto& d = expected.at("demux");
+  const std::string error = d.at("error");
+  const ovt_status status = error == "corrupt" ? OVT_E_CORRUPT : error == "io" ? OVT_E_IO : OVT_E_UNSUPPORTED;
+  return ExpectedDemux{d.at("packets").get<size_t>(), status, error};
+}
 
 Demuxed demux_all(const std::filesystem::path& path, std::string_view hint) {
   Demuxed out;
@@ -394,6 +414,8 @@ Demuxed demux_all(const std::filesystem::path& path, std::string_view hint) {
     auto r = d.value()->read_packet();
     if (!r.has_value()) {
       out.error = "read_packet after " + std::to_string(out.packets.size()) + " packets: " + std::string(r.message());
+      out.read_error = true;
+      out.status = r.status();
       return out;
     }
     if (!r.value()) {
@@ -404,13 +426,25 @@ Demuxed demux_all(const std::filesystem::path& path, std::string_view hint) {
   }
 }
 
+// For an entry with `expected.demux` (#558): the Demuxer must open the file, deliver exactly the expected number of
+// packets and then fail with the expected error class. True when it does; the packets are then compared with
+// ffprobe's, which stops at the same read error.
+bool check_expected_stop(const Demuxed& got, const ExpectedDemux& expect) {
+  INFO("expected.demux: " << expect.packets << " packets, then " << expect.error_name << "; got " << got.packets.size()
+                          << " packets, error '" << got.error << "'");
+  const bool ok = got.read_error && got.status == expect.error && got.packets.size() == expect.packets;
+  CHECK(ok);  // when libavformat reads further (or fails earlier), update the manifest entry
+  return ok;
+}
+
 // Acceptance test 1 for one file: packet counts per stream equal ffprobe's, and so does every file_pos.
 // `tolerant`: MPEG-TS / Annex B, where ±1 packet is accepted and positions are compared only on equal counts
 // (§8.7.1 "Oracle parity"). The open outcome is part of the parity: a file ffprobe reads must open and read to the
 // end here, and a file ffprobe rejects must be rejected here too when both run the same libavformat (a different
 // libavformat may parse boxes the other one does not know, e.g. FFmpeg ≥ 5.1 rejects a 'kind' box that has no
 // value string, which 4.4 skips). Uses CHECK only; returns false when any check failed.
-bool check_parity(const std::filesystem::path& path, std::string_view hint, bool tolerant) {
+bool check_parity(const std::filesystem::path& path, std::string_view hint, bool tolerant,
+                  const std::optional<ExpectedDemux>& expect = std::nullopt) {
   static const std::string ours = our_libavformat();
   static const std::string theirs = ffprobe_libavformat();
   const bool same_lavf = ours == theirs;
@@ -426,7 +460,10 @@ bool check_parity(const std::filesystem::path& path, std::string_view hint, bool
     CHECK_FALSE(got.error.empty());
     return !got.error.empty();
   }
-  if (!got.error.empty()) {
+  if (expect && !check_expected_stop(got, *expect)) {
+    return false;
+  }
+  if (!got.error.empty() && !expect) {
     FAIL_CHECK("ffprobe read " << probe->size() << " packets from " << path
                                << " but the Demuxer failed: " << got.error);
     return false;
@@ -789,7 +826,7 @@ TEST_CASE("demux: packet counts and positions equal ffprobe on every corpus MP4/
       continue;
     }
     INFO("corpus " << id);
-    if (!check_parity(*path, *hint, c == "annexb" || c == "mpegts")) {
+    if (!check_parity(*path, *hint, c == "annexb" || c == "mpegts", expected_demux(entry))) {
       failed.push_back(id);
     }
     ++compared;
