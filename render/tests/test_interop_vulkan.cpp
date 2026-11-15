@@ -451,8 +451,9 @@ TEST_CASE("render_test_interop: VulkanSharedDevice hands the scope textures to t
     REQUIRE(scope.tex.handle != nullptr);
     CHECK(scope.tex.format == DisplayTarget::OffscreenFormat::Rgba16F);
     CHECK(scope.tex.layout == static_cast<uint32_t>(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL));
-    // The host's copy equals the same scope measured on a surface of its own device: libplacebo's download of an
-    // imported device's texture crashes on MoltenVK (vk_malloc_slice in its staging-buffer path).
+    // The host's copy equals the same scope measured on a surface of its own device, and the surface's own readback
+    // (export_png's path), which goes through an explicit buffer because libplacebo's staging path for an imported
+    // device's texture crashes on MoltenVK (vk_malloc_slice).
     const std::vector<uint8_t> host_bytes =
         host.read_image(static_cast<VkImage>(scope.tex.handle), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         static_cast<uint32_t>(scope.tex.width), static_cast<uint32_t>(scope.tex.height), 8);
@@ -463,6 +464,9 @@ TEST_CASE("render_test_interop: VulkanSharedDevice hands the scope textures to t
     CHECK((w == scope.tex.width && h == scope.tex.height));
     REQUIRE(host_bytes.size() == texels.size() * sizeof(uint16_t));
     CHECK(std::memcmp(host_bytes.data(), texels.data(), host_bytes.size()) == 0);
+    std::vector<uint16_t> shared;
+    REQUIRE(ovt::render::detail::download_scope(*surface, kind, shared, w, h));
+    CHECK(shared == texels);
   }
   own.reset();
   surface.reset();

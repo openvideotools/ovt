@@ -1,16 +1,21 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// §10.7.6 luminance waveform and §10.7.7 vectorscope / CIE xy (WI-4.454a): three GPU passes per measured render, all
-// reading the measurement texture M at the sample grid of §10.7.3. scope_clear.glsl (compute) zeroes the uint32 counts;
-// scopes.glsl (compute) adds one count per sampled pixel to each scope with integer atomics (SPEC-ASSUMPTION(#473));
-// scope_resolve.frag (fragment) turns the counts into the RGBA16F scope textures the host samples (ScopeTexture,
-// §10.7.9). Also the CPU reference of the mappings.
+// §10.7.6 luminance waveform and §10.7.7 vectorscope / CIE xy (WI-4.454): three GPU passes per measured render,
+// all reading the measurement texture M at the sample grid of §10.7.3:
+//   scope_clear.glsl   (compute)  zero the uint32 counts,
+//   scopes.glsl        (compute)  add one count per sampled pixel to each scope (integer atomics,
+//   SPEC-ASSUMPTION(#473)), scope_resolve.frag (fragment) counts -> the RGBA16F scope textures the host samples
+//   (ScopeTexture, §10.7.9).
+// Also the CPU reference of the mappings and the PNG of ExportKind::Scope*Png (§10.8).
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -212,6 +217,55 @@ bool resolve_pass(pl_dispatch dp, pl_buf counts, uint32_t base, int planes, uint
     return false;
   }
   return true;
+}
+
+// IEEE binary16 -> float (normal, subnormal, inf and NaN).
+float half_to_float(uint16_t h) {
+  const uint32_t sign = (h >> 15U) & 1U;
+  const uint32_t exp = (h >> 10U) & 0x1FU;
+  const uint32_t mant = h & 0x3FFU;
+  float v = 0;
+  if (exp == 0) {
+    v = std::ldexp(static_cast<float>(mant), -24);
+  } else if (exp == 31) {
+    v = mant == 0 ? INFINITY : NAN;
+  } else {
+    v = std::ldexp(static_cast<float>(mant | 0x400U), static_cast<int>(exp) - 25);
+  }
+  return sign != 0 ? -v : v;
+}
+
+uint32_t crc32(const uint8_t* data, size_t n, uint32_t crc) {
+  static const std::array<uint32_t, 256> table = [] {
+    std::array<uint32_t, 256> t{};
+    for (uint32_t i = 0; i < 256; ++i) {
+      uint32_t c = i;
+      for (int k = 0; k < 8; ++k) {
+        c = (c & 1U) != 0 ? 0xEDB88320U ^ (c >> 1U) : c >> 1U;
+      }
+      t.at(i) = c;
+    }
+    return t;
+  }();
+  crc = ~crc;
+  for (size_t i = 0; i < n; ++i) {
+    crc = table.at((crc ^ data[i]) & 0xFFU) ^ (crc >> 8U);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  }
+  return ~crc;
+}
+
+void put32(std::vector<uint8_t>& out, uint32_t v) {
+  for (int s = 24; s >= 0; s -= 8) {
+    out.push_back(static_cast<uint8_t>(v >> static_cast<unsigned>(s)));
+  }
+}
+
+void put_chunk(std::vector<uint8_t>& out, const char* type, const std::vector<uint8_t>& data) {
+  put32(out, static_cast<uint32_t>(data.size()));
+  const size_t start = out.size();
+  out.insert(out.end(), type, type + 4);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  out.insert(out.end(), data.begin(), data.end());
+  put32(out, crc32(&out[start], out.size() - start, 0));
 }
 
 }  // namespace
@@ -417,6 +471,89 @@ ScopeTexture ScopeSet::texture(int set, ScopeKind kind) const {
   }
   st.valid = st.valid && st.tex.handle != nullptr;
   return st;
+}
+
+// ---- export ---------------------------------------------------------------------------------------------------------
+
+std::vector<uint8_t> scope_png_rgb(const std::vector<uint16_t>& rgba16hf, int width, int height) {
+  const auto pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+  std::vector<uint8_t> rgb(pixels * 3, 0);
+  if (rgba16hf.size() < pixels * 4) {
+    return rgb;
+  }
+  float peak = 0;
+  for (size_t p = 0; p < pixels; ++p) {
+    for (size_t c = 0; c < 3; ++c) {
+      const float v = half_to_float(rgba16hf[(p * 4) + c]);
+      if (std::isfinite(v)) {
+        peak = std::max(peak, v);
+      }
+    }
+  }
+  if (peak <= 0) {
+    return rgb;
+  }
+  for (size_t p = 0; p < pixels; ++p) {
+    for (size_t c = 0; c < 3; ++c) {
+      const float v = std::clamp(half_to_float(rgba16hf[(p * 4) + c]) / peak, 0.0F, 1.0F);
+      rgb[(p * 3) + c] = static_cast<uint8_t>(std::lround(v * 255.0F));
+    }
+  }
+  return rgb;
+}
+
+bool write_png_rgb8(const char* path, const std::vector<uint8_t>& rgb, int width, int height) {
+  if (path == nullptr || width <= 0 || height <= 0 ||
+      rgb.size() != static_cast<size_t>(width) * static_cast<size_t>(height) * 3) {
+    return false;
+  }
+  const size_t row = (static_cast<size_t>(width) * 3) + 1;  // filter byte 0 + RGB
+  std::vector<uint8_t> raw;
+  raw.reserve(row * static_cast<size_t>(height));
+  for (int y = 0; y < height; ++y) {
+    raw.push_back(0);
+    const auto start = static_cast<size_t>(y) * static_cast<size_t>(width) * 3;
+    raw.insert(raw.end(), rgb.begin() + static_cast<std::ptrdiff_t>(start),
+               rgb.begin() + static_cast<std::ptrdiff_t>(start + (static_cast<size_t>(width) * 3)));
+  }
+  // zlib stream of stored deflate blocks (RFC 1950/1951): no compression, so no zlib dependency.
+  std::vector<uint8_t> z = {0x78, 0x01};
+  constexpr size_t kBlock = 65535;
+  for (size_t at = 0; at < raw.size() || at == 0; at += kBlock) {
+    const size_t n = std::min(kBlock, raw.size() - at);
+    const bool last = at + n >= raw.size();
+    z.push_back(last ? 1 : 0);
+    z.push_back(static_cast<uint8_t>(n & 0xFFU));
+    z.push_back(static_cast<uint8_t>(n >> 8U));
+    z.push_back(static_cast<uint8_t>(~n & 0xFFU));
+    z.push_back(static_cast<uint8_t>((~n >> 8U) & 0xFFU));
+    z.insert(z.end(), raw.begin() + static_cast<std::ptrdiff_t>(at), raw.begin() + static_cast<std::ptrdiff_t>(at + n));
+    if (last) {
+      break;
+    }
+  }
+  uint32_t a = 1;
+  uint32_t b = 0;
+  for (const uint8_t v : raw) {
+    a = (a + v) % 65521U;
+    b = (b + a) % 65521U;
+  }
+  put32(z, (b << 16U) | a);
+
+  std::vector<uint8_t> png = {0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+  std::vector<uint8_t> ihdr;
+  put32(ihdr, static_cast<uint32_t>(width));
+  put32(ihdr, static_cast<uint32_t>(height));
+  ihdr.insert(ihdr.end(), {8, 2, 0, 0, 0});  // bit depth 8, colour type 2 (RGB), deflate, filter 0, no interlace
+  put_chunk(png, "IHDR", ihdr);
+  put_chunk(png, "IDAT", z);
+  put_chunk(png, "IEND", {});
+
+  const std::unique_ptr<std::FILE, int (*)(std::FILE*)> f(std::fopen(path, "wb"), &std::fclose);
+  if (f == nullptr) {
+    return false;
+  }
+  return std::fwrite(png.data(), 1, png.size(), f.get()) == png.size();
 }
 
 }  // namespace ovt::render::detail

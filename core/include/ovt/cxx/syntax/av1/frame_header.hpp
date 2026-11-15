@@ -390,6 +390,143 @@ struct FrameHeader {
 void mark_ref_frames(DecoderState& state, const SequenceHeader& seq, uint32_t current_frame_id, FrameType frame_type,
                      bool show_frame) noexcept;
 
+// ==== WI-1.118: §7.3.6 rows 20–25 (part a; rows 26–27 follow in part b) ==============================
+// The parsers below take the frame-level inputs uncompressed_header() has derived by then (CodedLossless,
+// AllLossless, allow_intrabc, FrameIsIntra, ref_frame_idx[], OrderHint, the primary reference's saved values) as
+// arguments, so that each one can be tested and fuzzed on its own; parse_frame_header() (row 11) calls them in
+// syntax order.
+
+// AV1 §3 constants used by rows 20–25.
+inline constexpr uint16_t kRestorationTileSizeMax = 256;  // RESTORATION_TILESIZE_MAX
+
+/// The loop_filter_ref_deltas of setup_past_independence() and of the lossless / intrabc branch of
+/// loop_filter_params(): INTRA_FRAME 1, LAST..LAST3 0, GOLDEN -1, BWDREF 0, ALTREF2 -1, ALTREF -1.
+inline constexpr std::array<int8_t, kTotalRefsPerFrame> kDefaultLoopFilterRefDeltas{1, 0, 0, 0, -1, 0, -1, -1};
+
+// ---- row 20: loop_filter_params() ---------------------------------------------------------------------------
+
+struct LoopFilterParams {
+  BitSpan span{0, 0};
+  // loop_filter_ref_deltas[i] su(1+6) / loop_filter_mode_deltas[i] su(1+6) where update_*_delta is set; the
+  // other entries keep the values of the primary reference frame (load_previous()) or setup_past_independence().
+  std::array<int8_t, kTotalRefsPerFrame> loop_filter_ref_deltas = kDefaultLoopFilterRefDeltas;
+  std::array<int8_t, 2> loop_filter_mode_deltas{0, 0};
+  std::array<bool, kTotalRefsPerFrame> update_ref_delta{};
+  std::array<bool, 2> update_mode_delta{};
+  // loop_filter_level[0] / [1] f(6); [2] / [3] f(6) only when NumPlanes > 1 and [0] or [1] is non-zero (else 0)
+  std::array<uint8_t, 4> loop_filter_level{};
+  uint8_t loop_filter_sharpness = 0;  // f(3)
+  bool loop_filter_delta_enabled = false;
+  bool loop_filter_delta_update = false;
+  bool coded = false;  // derived: false for the CodedLossless || allow_intrabc branch (nothing read)
+};
+
+/// loop_filter_params() (AV1 §5.9.11) at the current position (node "loop_filter_params"). `prev_ref_deltas` /
+/// `prev_mode_deltas` are the deltas in force before the call: FrameState::loop_filter_ref_deltas / _mode_deltas
+/// of the primary reference, or the setup_past_independence() defaults.
+[[nodiscard]] LoopFilterParams parse_loop_filter_params(BitReader& br, SyntaxBuilder& b, const ColorConfig& cc,
+                                                        bool CodedLossless, bool allow_intrabc,
+                                                        const std::array<int8_t, kTotalRefsPerFrame>& prev_ref_deltas,
+                                                        const std::array<int8_t, 2>& prev_mode_deltas);
+
+// ---- row 21: cdef_params() ----------------------------------------------------------------------------------
+
+struct CdefParams {
+  BitSpan span{0, 0};
+  // One entry per CDEF strength index i < (1 << cdef_bits); secondary strengths with the 3 → 4 mapping applied.
+  std::array<uint8_t, 8> cdef_y_pri_strength{};
+  std::array<uint8_t, 8> cdef_y_sec_strength{};
+  std::array<uint8_t, 8> cdef_uv_pri_strength{};  // f(4), only when NumPlanes > 1
+  std::array<uint8_t, 8> cdef_uv_sec_strength{};
+  uint8_t cdef_damping_minus_3 = 0;  // f(2)
+  uint8_t CdefDamping = 3;           // derived: cdef_damping_minus_3 + 3
+  uint8_t cdef_bits = 0;             // f(2)
+  bool coded = false;                // derived: false for the CodedLossless || allow_intrabc || !enable_cdef branch
+};
+
+/// cdef_params() (AV1 §5.9.19) at the current position (node "cdef_params"); `seq` supplies enable_cdef and
+/// NumPlanes.
+[[nodiscard]] CdefParams parse_cdef_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                           bool CodedLossless, bool allow_intrabc);
+
+// ---- row 22: lr_params() ------------------------------------------------------------------------------------
+
+/// FrameRestorationType (AV1 §6.10.15). The values equal ovt.fb.Av1RestorationType.
+enum class RestorationType : uint8_t { None = 0, Wiener = 1, Sgrproj = 2, Switchable = 3 };
+/// Remap_Lr_Type[lr_type] (AV1 §5.9.20).
+inline constexpr std::array<RestorationType, 4> kRemapLrType{RestorationType::None, RestorationType::Switchable,
+                                                             RestorationType::Wiener, RestorationType::Sgrproj};
+/// "RESTORE_NONE", "RESTORE_WIENER", "RESTORE_SGRPROJ", "RESTORE_SWITCHABLE".
+[[nodiscard]] std::string_view restoration_type_name(RestorationType t) noexcept;
+
+/// count_units_in_frame(unitSize, frameSize) (AV1 §5.11.57): Max((frameSize + (unitSize >> 1)) / unitSize, 1).
+[[nodiscard]] uint32_t count_units_in_frame(uint32_t unitSize, uint32_t frameSize) noexcept;
+
+struct LrParams {
+  BitSpan span{0, 0};
+  std::array<RestorationType, 3> FrameRestorationType{};  // Remap_Lr_Type[lr_type], RESTORE_NONE when not read
+  std::array<uint8_t, 3> lr_type{};                       // f(2) per plane < NumPlanes
+  // LoopRestorationSize[plane] = RESTORATION_TILESIZE_MAX >> (2 - lr_unit_shift), chroma >> lr_uv_shift; only
+  // meaningful with UsesLr (kept at RESTORATION_TILESIZE_MAX otherwise).
+  std::array<uint16_t, 3> LoopRestorationSize{kRestorationTileSizeMax, kRestorationTileSizeMax,
+                                              kRestorationTileSizeMax};
+  // Derived LR unit grid per plane (AV1 §5.11.57: unitRows / unitCols from count_units_in_frame() on the
+  // upscaled plane size); 0 for planes with RESTORE_NONE or without UsesLr.
+  std::array<uint32_t, 3> LrUnitRows{};
+  std::array<uint32_t, 3> LrUnitCols{};
+  uint8_t lr_unit_shift = 0;  // after the increment / lr_unit_extra_shift of §5.9.20 (0..2)
+  bool lr_unit_extra_shift = false;
+  uint8_t lr_uv_shift = 0;  // f(1) when subsampling_x && subsampling_y && usesChromaLr, else 0
+  bool UsesLr = false;
+  bool usesChromaLr = false;
+  bool coded = false;  // derived: false for the AllLossless || allow_intrabc || !enable_restoration branch
+};
+
+/// lr_params() (AV1 §5.9.20) at the current position (node "lr_params"). `UpscaledWidth` / `FrameHeight` size the
+/// derived unit grid.
+[[nodiscard]] LrParams parse_lr_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq, bool AllLossless,
+                                       bool allow_intrabc, uint32_t UpscaledWidth, uint32_t FrameHeight);
+
+// ---- row 23: read_tx_mode() ---------------------------------------------------------------------------------
+
+/// TxMode (AV1 §6.8.21): the values of ovt.fb.Av1FilterParams.TxMode.
+enum class TxModeType : uint8_t { Only4x4 = 0, Largest = 1, Select = 2 };
+/// "ONLY_4X4", "TX_MODE_LARGEST", "TX_MODE_SELECT".
+[[nodiscard]] std::string_view tx_mode_name(TxModeType m) noexcept;
+
+struct TxModeParams {
+  BitSpan span{0, 0};
+  TxModeType TxMode = TxModeType::Only4x4;
+  bool tx_mode_select = false;  // f(1), only without CodedLossless
+};
+
+/// read_tx_mode() (AV1 §5.9.21) at the current position (node "tx_mode").
+[[nodiscard]] TxModeParams parse_tx_mode(BitReader& br, SyntaxBuilder& b, bool CodedLossless);
+
+// ---- rows 24 and 25: frame_reference_mode(), skip_mode_params() ---------------------------------------------
+
+/// frame_reference_mode() (AV1 §5.9.23) at the current position (node "frame_reference_mode"): reference_select
+/// f(1), or 0 for an intra frame.
+[[nodiscard]] bool parse_frame_reference_mode(BitReader& br, SyntaxBuilder& b, bool FrameIsIntra);
+
+struct SkipModeParams {
+  BitSpan span{0, 0};
+  // SkipModeFrame[0..1] (LAST_FRAME..ALTREF_FRAME), kNoneFrame when !skipModeAllowed
+  std::array<int8_t, 2> SkipModeFrame{kNoneFrame, kNoneFrame};
+  // §5.9.22 locals, kept for display and the tests: the chosen reference indices (0..6) or -1
+  int8_t forwardIdx = -1;
+  int8_t backwardIdx = -1;
+  int8_t secondForwardIdx = -1;
+  bool skipModeAllowed = false;
+  bool skip_mode_present = false;  // f(1), only when skipModeAllowed
+};
+
+/// skip_mode_params() (AV1 §5.9.22) at the current position (node "skip_mode_params"). RefOrderHint[] comes from
+/// the slots of `state` named by `ref_frame_idx`; an unset entry (-1) counts as order hint 0.
+[[nodiscard]] SkipModeParams parse_skip_mode_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                                    const DecoderState& state, const RefFrameIdx& ref_frame_idx,
+                                                    uint32_t OrderHint, bool FrameIsIntra, bool reference_select);
+
 }  // namespace ovt::syntax::av1
 
 #endif  // OVT_CXX_SYNTAX_AV1_FRAME_HEADER_HPP

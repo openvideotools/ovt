@@ -21,8 +21,8 @@ target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
 # constants in a generated header (cmake/OvtEmbedShaders.cmake).
 target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
                                   src/measure/measurer.cpp)
-# WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
-target_sources(ovt_render PRIVATE src/measure/scopes.cpp)
+# WI-4.454: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_render PRIVATE src/measure/scopes.cpp src/measure/gamut_tables.cpp)
 include(OvtEmbedShaders)
 ovt_embed_shaders(
   "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h" kShaderMeasurePrep src/shaders/measure_prep.frag
