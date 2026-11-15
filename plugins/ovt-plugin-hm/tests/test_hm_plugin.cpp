@@ -870,10 +870,8 @@ void check_segment(int idx, std::size_t i, const PicOut& p, const h265::SliceSeg
   m->check(idx, s + "filter sao_chroma", p.filter_sao_chroma.at(i), part.sao_chroma);
 }
 
-// HevcRps against the first slice segment header.
-// The PicOrderCntVal differences of the short-term RPS lists against the parser's DeltaPocS0/S1 (7-61, 7-62), and
-// dpb_fullness_after within [1 + the "Curr" references, sps_max_dec_pic_buffering_minus1 + 1], 1 at an IDR.
-void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
+// The expected PicOrderCntVal differences of StCurrBefore, StCurrAfter and StFoll (7-61, 7-62), each sorted.
+std::array<std::vector<int>, 3> expected_st_deltas(const HeaderPic& want) {
   std::array<std::vector<int>, 3> deltas;
   // SPEC-ASSUMPTION(#553): HM drops a BLA picture's RPS, so the HM plugin reports its lists empty.
   const h265::StRefPicSet st = want.bla ? h265::StRefPicSet{} : want.st;
@@ -883,20 +881,30 @@ void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, 
   for (uint32_t i = 0; i < st.NumPositivePics; ++i) {
     deltas.at(st.UsedByCurrPicS1.at(i) ? 1 : 2).push_back(st.DeltaPocS1.at(i));
   }
+  for (std::vector<int>& d : deltas) {
+    std::sort(d.begin(), d.end());
+  }
+  return deltas;
+}
+
+std::string join_ints(const std::vector<int>& v) {
+  std::string out;
+  for (const int d : v) {
+    out += (out.empty() ? "" : ",") + std::to_string(d);
+  }
+  return "{" + out + "}";
+}
+
+// The PicOrderCntVal differences of the short-term RPS lists against the parser's DeltaPocS0/S1, and
+// dpb_fullness_after within [1 + the "Curr" references, sps_max_dec_pic_buffering_minus1 + 1], 1 at an IDR or BLA.
+void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
+  const std::array<std::vector<int>, 3> deltas = expected_st_deltas(want);
   static constexpr std::array<const char*, 3> kNames = {"StCurrBefore", "StCurrAfter", "StFoll"};
   for (std::size_t l = 0; l < 3; ++l) {
-    std::sort(deltas.at(l).begin(), deltas.at(l).end());
     if (deltas.at(l) != p.st_deltas.at(l)) {
-      const auto join = [](const std::vector<int>& v) {
-        std::string out;
-        for (const int d : v) {
-          out += (out.empty() ? "" : ",") + std::to_string(d);
-        }
-        return "{" + out + "}";
-      };
       m->check(idx,
-               std::string("RefPicSet") + kNames.at(l) + " POC deltas " + join(p.st_deltas.at(l)) +
-                   " differ from st_ref_pic_set " + join(deltas.at(l)),
+               std::string("RefPicSet") + kNames.at(l) + " POC deltas " + join_ints(p.st_deltas.at(l)) +
+                   " differ from st_ref_pic_set " + join_ints(deltas.at(l)),
                1, 0);
     }
   }
@@ -913,6 +921,7 @@ void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, 
   }
 }
 
+// HevcRps against the first slice segment header.
 void check_rps(int idx, const PicOut& p, const h265::SliceSegmentHeader& sh, bool idr, Mismatches* m) {
   m->check(idx, "has ref_state", p.has_rps ? 1 : 0, 1);
   m->check(idx, "NumPicTotalCurr", p.num_pic_total_curr, sh.NumPicTotalCurr);
