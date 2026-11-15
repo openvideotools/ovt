@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -447,7 +448,7 @@ void OffscreenGpu::wait_hold_sem() {
   constexpr uint64_t kTimeoutNs = 1'000'000'000;  // the GPU work is already done (pl_gpu_finish); this is a backstop
   if (wait_semaphores(vk_->device, &wait, kTimeoutNs) != VK_SUCCESS) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
-    pl_msg(log_, PL_LOG_WARN, "offscreen: the hold semaphore did not reach its last value before destroy");
+    (void)std::fprintf(stderr, "[render] offscreen: the hold semaphore did not reach its last value before destroy\n");
   }
 }
 
