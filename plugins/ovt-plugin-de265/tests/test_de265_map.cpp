@@ -832,7 +832,7 @@ std::optional<json> hm_golden(std::string_view id) {
   if (!std::filesystem::exists(file)) {
     return std::nullopt;
   }
-  return json::parse(read_pipe("gzip -dc \"" + file.string() + "\""));
+  return std::optional<json>(std::in_place, json::parse(read_pipe("gzip -dc \"" + file.string() + "\"")));
 }
 
 // refIdx of a refs[] entry: "L0[i]", "L1[i]" or "S<s>:L0[i]".
