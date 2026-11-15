@@ -254,6 +254,11 @@ class PicMapper {
     for (int i = 0; i < rps->getNumberOfPictures(); ++i) {
       const bool used = rps->getUsed(i) != 0;
       if (i < st) {
+        if (rps->getDeltaPOC(i) == 0) {
+          // HM's inter RPS prediction keeps a predicted entry whose dPoc is 0 (TDecCavlc::parseShortTermRefPicSet
+          // counts it as positive); equations 7-61 and 7-62 drop it, since it would be the current picture.
+          continue;
+        }
         const int poc = s.getPOC() + rps->getDeltaPOC(i);
         const std::size_t list = !used ? 2 : (i < neg ? 0 : 1);
         lists->at(list).push_back(rps_pic(fbb, find_ref(poc, false), poc, used, false, 255));

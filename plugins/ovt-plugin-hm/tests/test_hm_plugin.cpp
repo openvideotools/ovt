@@ -884,7 +884,17 @@ void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, 
   for (std::size_t l = 0; l < 3; ++l) {
     std::sort(deltas.at(l).begin(), deltas.at(l).end());
     if (deltas.at(l) != p.st_deltas.at(l)) {
-      m->check(idx, std::string("RefPicSet") + kNames.at(l) + " POC deltas differ from st_ref_pic_set", 1, 0);
+      const auto join = [](const std::vector<int>& v) {
+        std::string out;
+        for (const int d : v) {
+          out += (out.empty() ? "" : ",") + std::to_string(d);
+        }
+        return "{" + out + "}";
+      };
+      m->check(idx,
+               std::string("RefPicSet") + kNames.at(l) + " POC deltas " + join(p.st_deltas.at(l)) +
+                   " differ from st_ref_pic_set " + join(deltas.at(l)),
+               1, 0);
     }
   }
   const std::size_t curr = p.rps_sizes[0] + p.rps_sizes[1] + p.rps_sizes[3];
