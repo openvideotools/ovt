@@ -4,9 +4,16 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc35 — 2026-11-15
 
-PATCH-level: spec-amendment pass 15 folds in the accepted answer of `spec-question` issue #558 from WI-1.230 (PR #518). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
+PATCH-level: spec-amendment pass 15 folds in the accepted answers of `spec-question` issues #558 from WI-1.230 (PR #518), #567 from WI-1.205 (PR #571), #568 from WI-1.111 (PR #573) and #569 from WI-4.206 (PR #572). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
 
 - 8 §8.7 WI-1.230 AT1 — for a manifest entry carrying `expected.demux = {packets, error}` the parity sweep asserts exactly that packet count, `file_pos` parity for those packets and then a read error of that class (`mpegff_FX_VY_9436R_3_qhd`: 216 of 483 samples, libavformat CENC/seig limitation); an acceptance-test narrowing for one entry, listed for the owner's check-in — WI-1.230 (#558)
+- 8 §8.3 field rules, builder note and §8.3.1 notation — derived text of a `String` (fourcc) field is a sibling `<field>.derived` (`kind = String`, empty `span`), `compatible_brands.derived` for the array; non-`String` kinds keep it in `svalue` (#415); the two sentences no longer disagree — WI-1.205, WI-1.203 (#567 point 2)
+- 8 §8.3.1 `hdlr` — a QuickTime counted `name` is two fields, `name_length u8` then `name str_fixed(name_length)` — WI-1.205 (#567 point 3)
+- 8 §8.10 WI-1.205 AT1 — `mvhd`/`tkhd`/`mdhd` on `mpegff_a1_foreman_qcif`, `elst.entries[0].media_time` on `mpegff_hvc1_only` (the former has no `edts`); an acceptance-test substitution listed for the owner's check-in — WI-1.205 (#567 point 1)
+- 7 §7.3.9 rule 10 — a prefix NAL (14) does not start a picture; it belongs to the base-layer slice that follows — WI-1.111 (#568 point 1)
+- 7 §7.3.9 field pairing — both fields of a complementary pair are reference or both non-reference (H.264 3.29/3.30) — WI-1.111 (#568 point 4)
+- 7 §7.8 WI-1.111 AT2 and notes — AT2 uses `jvt_sp1_bt_a` (`MR9_BT_B` has no mmco 5; an acceptance-test substitution listed for the owner's check-in); JM 19.0 + FFmpeg `-debug pict` per-picture POC oracle in `jm_poc_expected.h`; an SPS changing inside a picture is held to the next picture without a diagnostic; identical repeated parameter sets keep their `generation` — WI-1.111 (#568 points 2, 3, 5, 6)
+- 8 §8.6.7 and WI-4.206 notes — PES reassembly starts at the first `payload_unit_start_indicator` with a `00 00 01` payload on every non-PSI PID (PES before the PMT count, as ffprobe counts them); damaged PES keep their bytes with `complete = false`; file-based TR 101 290 2.3a/2.3b/2.4/2.5 semantics on carried values (`CNT-TS-2003`…`2006`); ffmpeg's 100 ms PCR interval makes `syn_ts_clean.ts` report `CNT-TS-2003` legitimately; `bitrate_per_pid` time axis and memory bound — WI-4.206 (#569)
 
 ## 1.0.0-rc34 — 2026-11-15
 
