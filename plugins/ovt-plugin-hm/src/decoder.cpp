@@ -14,6 +14,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 // HM's headers (system includes: HM's warnings are not OVT's, WI-4.104).
 #include "TLibCommon/CommonDef.h"
@@ -137,6 +138,86 @@ void copy_plane(const TComPicYuv& rec, ComponentID comp, int bit_depth, Plane* o
   }
 }
 
+// One picture of the output-order DPB model of H.265 C.5.2 (decode index, POC, "needed for output", "used for
+// reference", PicLatencyCount). It runs next to HM's own buffers, whose pictures the plugin releases once copied.
+struct DpbEntry {
+  int32_t decode_index = 0;
+  int poc = 0;
+  bool needed_for_output = false;
+  bool referenced = false;
+  uint32_t latency = 0;
+};
+
+// The DPB parameters of HighestTid (C.5.2.2).
+struct DpbLimits {
+  std::size_t max_num_reorder = 0;
+  std::size_t max_dec_pic_buffering = 0;  // sps_max_dec_pic_buffering_minus1 + 1
+  uint32_t max_latency_increase_plus1 = 0;
+  uint32_t max_latency_pictures = 0;  // SpsMaxLatencyPictures (7-9)
+};
+
+// C.5.2.4 "bumping": the picture first in output order is output; it is emptied when unused for reference.
+void bump(std::vector<DpbEntry>* dpb) {
+  auto first = dpb->end();
+  for (auto it = dpb->begin(); it != dpb->end(); ++it) {
+    if (it->needed_for_output && (first == dpb->end() || it->poc < first->poc)) {
+      first = it;
+    }
+  }
+  if (first == dpb->end()) {
+    return;
+  }
+  first->needed_for_output = false;
+  if (!first->referenced) {
+    dpb->erase(first);
+  }
+}
+
+std::size_t needed_count(const std::vector<DpbEntry>& dpb) {
+  return static_cast<std::size_t>(
+      std::count_if(dpb.begin(), dpb.end(), [](const DpbEntry& e) { return e.needed_for_output; }));
+}
+
+bool latency_exceeded(const std::vector<DpbEntry>& dpb, const DpbLimits& lim) {
+  return lim.max_latency_increase_plus1 != 0 && std::any_of(dpb.begin(), dpb.end(), [&](const DpbEntry& e) {
+           return e.needed_for_output && e.latency >= lim.max_latency_pictures;
+         });
+}
+
+// C.5.2.2 and C.5.2.3 for the current picture @p cur, whose RPS has marked the pictures of @p dpb (`referenced`).
+// Returns the DPB fullness after the current picture is stored and the additional bumping is done.
+std::size_t dpb_step(std::vector<DpbEntry>* dpb, DpbEntry cur, bool irap_no_rasl_output, const DpbLimits& lim) {
+  if (irap_no_rasl_output) {
+    // With NoOutputOfPriorPicsFlag 1 every picture is emptied without output; with 0 the non-empty buffers are
+    // emptied by repeated bumping. Either way the DPB is empty before the IRAP picture is stored.
+    dpb->clear();
+  } else {
+    std::erase_if(*dpb, [](const DpbEntry& e) { return !e.needed_for_output && !e.referenced; });
+    while (needed_count(*dpb) > lim.max_num_reorder || latency_exceeded(*dpb, lim) ||
+           dpb->size() >= lim.max_dec_pic_buffering) {
+      const std::size_t before = dpb->size() + needed_count(*dpb);
+      bump(dpb);
+      if (dpb->size() + needed_count(*dpb) == before) {
+        break;  // nothing left to output: a non-conforming stream overfills the DPB with reference pictures
+      }
+    }
+  }
+  if (cur.needed_for_output) {
+    for (DpbEntry& e : *dpb) {
+      if (e.needed_for_output && e.poc > cur.poc) {
+        ++e.latency;  // C.5.2.3: pictures that follow the current one in output order
+      }
+    }
+  }
+  cur.referenced = true;  // "used for short-term reference"
+  cur.latency = 0;
+  dpb->push_back(cur);
+  while (needed_count(*dpb) > lim.max_num_reorder || latency_exceeded(*dpb, lim)) {
+    bump(dpb);
+  }
+  return dpb->size();
+}
+
 }  // namespace
 
 struct Decoder::Impl {
@@ -158,8 +239,9 @@ struct Decoder::Impl {
   const TComSlice* cur_slice0 = nullptr;
   int32_t cur_index = -1;
   int64_t cur_pts = 0;
-  int32_t next_index = 0;  // decode index when the host gave none
-  PicIndex pic_index;      // decode index of every exported picture HM still holds
+  int32_t next_index = 0;           // decode index when the host gave none
+  PicIndex pic_index;               // decode index of every exported picture HM still holds
+  std::vector<DpbEntry> dpb_model;  // HevcRps.dpb_fullness_after (C.5.2)
   std::deque<Frame> frames;
   std::vector<Diag> pending_diags;  // attached to the next frame that comes out
 
@@ -200,22 +282,42 @@ struct Decoder::Impl {
   }
 
   void export_picture(TComPic* pic);
-  [[nodiscard]] int dpb_fullness(const TComPic* pic) const;
+  [[nodiscard]] int dpb_fullness(const TComPic* pic, int32_t decode_index);
   void finish_picture(bool eos);
   void manage_buffer(NalUnitType type, bool new_picture);
   ovt_status decode_unit(std::span<const uint8_t> unit, int32_t hint, int64_t host_pts);
 };
 
-// HevcRps.dpb_fullness_after: the pictures HM holds marked as used for reference, this one included. Pictures
-// waiting only for output do not count, because the plugin releases each picture once it has copied it.
-int Decoder::Impl::dpb_fullness(const TComPic* pic) const {
-  int n = 0;
+// HevcRps.dpb_fullness_after: the C.5.2.2 DPB fullness after @p pic is stored. HM's buffers cannot give it, since
+// the plugin releases each picture once copied, so the output-order DPB runs as a model: the reference marking of
+// the current picture's RPS comes from HM's pictures, output follows the bumping rules of C.5.2.
+int Decoder::Impl::dpb_fullness(const TComPic* pic, int32_t decode_index) {
+  std::set<int32_t> referenced;
   if (pic_list != nullptr) {
     for (const TComPic* p : *pic_list) {
-      n += (p == pic || (p->getReconMark() && p->getSlice(0)->isReferenced())) ? 1 : 0;
+      const auto it = pic_index.find(p);
+      if (p != pic && it != pic_index.end() && p->getReconMark() && p->getSlice(0)->isReferenced()) {
+        referenced.insert(it->second);
+      }
     }
   }
-  return n;
+  for (DpbEntry& e : dpb_model) {
+    e.referenced = e.referenced && referenced.contains(e.decode_index);
+  }
+  const TComSlice& first = *pic->getSlice(0);
+  const TComSPS& sps = *first.getSPS();
+  const UInt tid = sps.getMaxTLayers() - 1;  // HighestTid: HM decodes every temporal sub-layer
+  DpbLimits lim;
+  lim.max_num_reorder = static_cast<std::size_t>(sps.getNumReorderPics(tid));
+  lim.max_dec_pic_buffering = sps.getMaxDecPicBuffering(tid);
+  lim.max_latency_increase_plus1 = sps.getMaxLatencyIncreasePlus1(tid);
+  lim.max_latency_pictures = static_cast<uint32_t>(sps.getNumReorderPics(tid)) + lim.max_latency_increase_plus1 - 1;
+  DpbEntry cur;
+  cur.decode_index = decode_index;
+  cur.poc = first.getPOC();
+  cur.needed_for_output = first.getPicOutputFlag();
+  const bool irap_no_rasl = first.getRapPicFlag() && first.getNoRaslOutputFlag();
+  return static_cast<int>(dpb_step(&dpb_model, cur, irap_no_rasl, lim));
 }
 
 void Decoder::Impl::export_picture(TComPic* pic) {
@@ -264,7 +366,7 @@ void Decoder::Impl::export_picture(TComPic* pic) {
     const auto comp = static_cast<ComponentID>(c);
     copy_plane(*rec, comp, sps->getBitDepth(toChannelType(comp)), &f.planes[c]);
   }
-  map_cu(*pic, pic_index, dpb_fullness(pic), &f.analysis);
+  map_cu(*pic, pic_index, dpb_fullness(pic, f.decode_index), &f.analysis);
   pic_index[pic] = f.decode_index;
   if (f.analysis.mv_clamped_cells > 0) {
     add_diag(kWarning, "MDL-GEN-0003",

@@ -262,9 +262,11 @@ struct PicOut {
   bool has_filter = false;
   bool has_rps = false;
   int num_pic_total_curr = 0, sps_flag = 0, sps_idx = 0, col_l0 = 0, col_idx = 0, output_flag = 0;
-  std::array<std::size_t, 7> rps_sizes{};       // StCurrBefore, StCurrAfter, StFoll, LtCurr, LtFoll, L0, L1
-  std::array<std::vector<int>, 2> list_frames;  // RefPicList0/1 decode indices
-  std::array<std::vector<int>, 2> slot_frames;  // decode index of RefSlot "L0[i]" / "L1[i]"
+  int dpb_fullness = 0, max_dec_pic_buffering = 0;  // dpb_fullness_after, sps_max_dec_pic_buffering_minus1 + 1
+  std::array<std::vector<int>, 3> st_deltas;        // PicOrderCntVal - current POC of StCurrBefore, StCurrAfter, StFoll
+  std::array<std::size_t, 7> rps_sizes{};           // StCurrBefore, StCurrAfter, StFoll, LtCurr, LtFoll, L0, L1
+  std::array<std::vector<int>, 2> list_frames;      // RefPicList0/1 decode indices
+  std::array<std::vector<int>, 2> slot_frames;      // decode index of RefSlot "L0[i]" / "L1[i]"
   // Per CTU in tile scan: HevcCtu slice_segment_idx, tile_idx, CtbAddrInRs, the partition_id of its first cell, and
   // the CTU's x and y in luma samples.
   std::vector<std::array<uint32_t, 6>> ctus;
@@ -278,6 +280,18 @@ void rps_of(const ovt::fb::HevcRps& r, PicOut* out) {
   out->col_l0 = r.collocated_from_l0_flag();
   out->col_idx = r.collocated_ref_idx();
   out->output_flag = r.pic_output_flag();
+  out->dpb_fullness = r.dpb_fullness_after();
+  out->max_dec_pic_buffering = r.sps_max_dec_pic_buffering_minus1() + 1;
+  int set = 0;
+  for (const auto* v : {r.RefPicSetStCurrBefore(), r.RefPicSetStCurrAfter(), r.RefPicSetStFoll()}) {
+    std::vector<int>& d = out->st_deltas.at(static_cast<std::size_t>(set++));
+    if (v != nullptr) {
+      for (const ovt::fb::HevcRpsPic* e : *v) {
+        d.push_back(e->PicOrderCntVal() - r.PicOrderCntVal());
+      }
+    }
+    std::sort(d.begin(), d.end());
+  }
   const auto size = [](const auto* v) { return v == nullptr ? std::size_t{0} : std::size_t{v->size()}; };
   out->rps_sizes = {size(r.RefPicSetStCurrBefore()),
                     size(r.RefPicSetStCurrAfter()),
@@ -736,8 +750,39 @@ struct HeaderPic {
   std::vector<h265::SliceSegmentHeader> segs;
   std::size_t tiles = 1;
   uint32_t ctbs = 0;
-  bool idr = false;  // IDR_W_RADL or IDR_N_LP: the slice headers carry no RPS syntax
+  bool idr = false;      // IDR_W_RADL or IDR_N_LP: the slice headers carry no RPS syntax
+  h265::StRefPicSet st;  // the short-term RPS of the picture (the SPS's or the slice header's own)
 };
+
+// Stores a VPS, SPS or PPS NAL unit in @p sets.
+void put_parameter_set(const h265::NalHeader& h, ovt::BitReader& br, ovt::syntax::SyntaxBuilder& b,
+                       std::span<const uint8_t> rbsp, uint64_t unit, h265::ActiveSets* sets,
+                       std::vector<h265::SetDiagnostic>* diags) {
+  if (h.nal_unit_type < h265::kVpsNut || h.nal_unit_type > h265::kPpsNut) {
+    return;
+  }
+  sets->end_picture();  // conforming streams change a set's content only between pictures
+  if (h.nal_unit_type == h265::kVpsNut) {
+    sets->put_vps(h265::parse_vps(br, b), rbsp, unit, *diags);
+  } else if (h.nal_unit_type == h265::kSpsNut) {
+    sets->put_sps(h265::parse_sps(br, b, h.nuh_layer_id), rbsp, unit, *diags);
+  } else {
+    sets->put_pps(h265::parse_pps(br, b), rbsp, unit, *diags);
+  }
+}
+
+// The picture-level fields of a HeaderPic, from its first slice segment.
+HeaderPic header_pic(const h265::NalHeader& h, const h265::SliceSegmentHeader& sh, const h265::Activation& act) {
+  HeaderPic out;
+  out.tiles = (act.active->colBd.size() - 1) * (act.active->rowBd.size() - 1);
+  out.ctbs = act.sps->PicSizeInCtbsY;
+  out.idr = h.nal_unit_type == h265::kIdrWRadl || h.nal_unit_type == h265::kIdrNLp;
+  if (!out.idr) {
+    out.st = sh.short_term_ref_pic_set_sps_flag ? act.sps->st_ref_pic_set.at(sh.short_term_ref_pic_set_idx)
+                                                : sh.st_ref_pic_set;
+  }
+  return out;
+}
 
 // Parses every layer-0 slice segment header of @p bytes, keyed by the picture counter StreamFeeder hints with.
 std::map<int, HeaderPic> headers_of(const std::vector<uint8_t>& bytes) {
@@ -759,16 +804,7 @@ std::map<int, HeaderPic> headers_of(const std::vector<uint8_t>& bytes) {
     if (h.nuh_layer_id != 0) {
       continue;
     }
-    if (h.nal_unit_type >= h265::kVpsNut && h.nal_unit_type <= h265::kPpsNut) {
-      sets.end_picture();  // conforming streams change a set's content only between pictures
-    }
-    if (h.nal_unit_type == h265::kVpsNut) {
-      sets.put_vps(h265::parse_vps(br, b), rbsp.rbsp, unit, diags);
-    } else if (h.nal_unit_type == h265::kSpsNut) {
-      sets.put_sps(h265::parse_sps(br, b, h.nuh_layer_id), rbsp.rbsp, unit, diags);
-    } else if (h.nal_unit_type == h265::kPpsNut) {
-      sets.put_pps(h265::parse_pps(br, b), rbsp.rbsp, unit, diags);
-    }
+    put_parameter_set(h, br, b, rbsp.rbsp, unit, &sets, &diags);
     if (!h.is_vcl) {
       continue;
     }
@@ -780,10 +816,7 @@ std::map<int, HeaderPic> headers_of(const std::vector<uint8_t>& bytes) {
       prev_independent = sh;
     }
     if (sh.first_slice_segment_in_pic_flag) {
-      ++pic;
-      out[pic].tiles = (act->active->colBd.size() - 1) * (act->active->rowBd.size() - 1);
-      out[pic].ctbs = act->sps->PicSizeInCtbsY;
-      out[pic].idr = h.nal_unit_type == h265::kIdrWRadl || h.nal_unit_type == h265::kIdrNLp;
+      out[++pic] = header_pic(h, sh, *act);
     }
     if (pic >= 0) {
       out[pic].segs.push_back(std::move(sh));
@@ -836,6 +869,34 @@ void check_segment(int idx, std::size_t i, const PicOut& p, const h265::SliceSeg
 }
 
 // HevcRps against the first slice segment header.
+// The PicOrderCntVal differences of the short-term RPS lists against the parser's DeltaPocS0/S1 (7-61, 7-62), and
+// dpb_fullness_after within [1 + the "Curr" references, sps_max_dec_pic_buffering_minus1 + 1], 1 at an IDR.
+void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
+  std::array<std::vector<int>, 3> deltas;
+  const h265::StRefPicSet& st = want.st;
+  for (uint32_t i = 0; i < st.NumNegativePics; ++i) {
+    deltas.at(st.UsedByCurrPicS0.at(i) ? 0 : 2).push_back(st.DeltaPocS0.at(i));
+  }
+  for (uint32_t i = 0; i < st.NumPositivePics; ++i) {
+    deltas.at(st.UsedByCurrPicS1.at(i) ? 1 : 2).push_back(st.DeltaPocS1.at(i));
+  }
+  static constexpr std::array<const char*, 3> kNames = {"StCurrBefore", "StCurrAfter", "StFoll"};
+  for (std::size_t l = 0; l < 3; ++l) {
+    std::sort(deltas.at(l).begin(), deltas.at(l).end());
+    if (deltas.at(l) != p.st_deltas.at(l)) {
+      m->check(idx, std::string("RefPicSet") + kNames.at(l) + " POC deltas differ from st_ref_pic_set", 1, 0);
+    }
+  }
+  const std::size_t curr = p.rps_sizes[0] + p.rps_sizes[1] + p.rps_sizes[3];
+  m->check(idx, "dpb_fullness_after >= 1 + Curr references", std::cmp_greater_equal(p.dpb_fullness, 1 + curr) ? 1 : 0,
+           1);
+  m->check(idx, "dpb_fullness_after <= sps_max_dec_pic_buffering_minus1 + 1",
+           p.dpb_fullness <= p.max_dec_pic_buffering ? 1 : 0, 1);
+  if (want.idr) {
+    m->check(idx, "dpb_fullness_after at an IDR", p.dpb_fullness, 1);
+  }
+}
+
 void check_rps(int idx, const PicOut& p, const h265::SliceSegmentHeader& sh, bool idr, Mismatches* m) {
   m->check(idx, "has ref_state", p.has_rps ? 1 : 0, 1);
   m->check(idx, "NumPicTotalCurr", p.num_pic_total_curr, sh.NumPicTotalCurr);
@@ -918,6 +979,7 @@ void check_picture(int idx, const PicOut& p, const HeaderPic& want, Mismatches* 
   }
   check_ctus(idx, p, segments, want.tiles, m);
   check_rps(idx, p, want.segs.front(), want.idr, m);
+  check_st_rps_and_fullness(idx, p, want, m);
 }
 
 // Streams with dependent segments, entry points, tiles, WPP, several slices, explicit and SPS RPSs, long-term
