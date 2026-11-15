@@ -435,7 +435,7 @@ TEST_CASE("corpus: ts_h264_dvb PES count and timestamps", "[container][mpegts][p
 }
 
 TEST_CASE("corpus: ts_test_025 PTS/DTS per PES equal the ffprobe golden",
-          "[container][mpegts][pes][needs-corpus][fast]") {
+          "[container][mpegts][pes][needs-corpus][slow]") {
   // AT1 with B-frames: tests/golden/mpegts/ts_test_025.ffprobe-packets.json is ffprobe 6.1.1 `-show_packets` (PID,
   // PTS, DTS and position of every packet) of tsduck-test input/test-025.ts (MPEG-2 video with B-frames and MPEG-1
   // audio). ffprobe prints a missing DTS as the PTS; the packet sizes are left out because the MPEG-2 video parser
