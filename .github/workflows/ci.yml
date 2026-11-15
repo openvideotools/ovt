@@ -671,7 +671,17 @@ jobs:
           cmake --build --preset android-x86_64-release --target ovt_cli
           mkdir -p build/smoke-inputs
           cp build/android-x86_64-release/cli/ovt build/smoke-inputs/ovt
-          cp "$ndk"/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so build/smoke-inputs/
+          # ovt links libovt_core.so and the FFmpeg libraries dynamically; they and libc++_shared.so go next to it.
+          mkdir -p build/smoke-inputs/lib
+          find build/android-x86_64-release build/third_party/android-x86_64 \( -name libovt_core.so -o -name 'lib*_ovt.so' \) \
+            -exec cp -n {} build/smoke-inputs/lib/ \;
+          cp "$ndk"/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so build/smoke-inputs/lib/
+          ls -l build/smoke-inputs/lib
+          # Report libraries that are needed but neither shipped here nor part of the Android system.
+          readelf="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          for f in build/smoke-inputs/ovt build/smoke-inputs/lib/*.so; do "$readelf" -d "$f" | sed -n 's/.*NEEDED.*\[\(.*\)\]/\1/p'; done |
+            sort -u | grep -vxE 'lib(c|m|dl|log|android|z|EGL|GLESv2|GLESv3|vulkan|OpenSLES|mediandk|nativewindow|jnigraphics)\.so' |
+            while read -r n; do [ -e "build/smoke-inputs/lib/$n" ] || echo "::warning::needed but not shipped to the emulator: $n"; done
           apk="$(find android/app/build/outputs/apk/foss/debug -name '*-x86_64-*.apk' | head -n 1)"
           cp "$apk" build/smoke-inputs/ovt-studio-x86_64.apk
 
@@ -700,7 +710,7 @@ jobs:
           force-avd-creation: true
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
-          script: tools/android/smoke.sh --apk build/smoke-inputs/ovt-studio-x86_64.apk --out build/smoke-out --cli build/smoke-inputs/ovt --libcxx build/smoke-inputs/libc++_shared.so --sample build/smoke-inputs/mini.mp4
+          script: tools/android/smoke.sh --apk build/smoke-inputs/ovt-studio-x86_64.apk --out build/smoke-out --cli build/smoke-inputs/ovt --libdir build/smoke-inputs/lib --sample build/smoke-inputs/mini.mp4
 
       # Logcat, window dump and screenshot (no APK). Also on failure: WI-0.035 acceptance test 2 wants the logcat excerpt.
       - name: Upload logcat and screenshot

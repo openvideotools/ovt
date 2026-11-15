@@ -5,7 +5,7 @@
 # Android emulator smoke test (chapter 13 §13.7.1 row android-emulator-smoke, WI-0.035). Runs against a booted
 # emulator or device that `adb` can see; the CI job starts the emulator and calls this script.
 #
-#   tools/android/smoke.sh --apk <foss-x86_64.apk> --out <dir> [--cli <ovt>] [--sample <mini.mp4>] [--libcxx <libc++_shared.so>]
+#   tools/android/smoke.sh --apk <foss-x86_64.apk> --out <dir> [--cli <ovt>] [--sample <mini.mp4>] [--libdir <dir with libovt_core.so, libc++_shared.so, ...>]
 #
 # Checks, in order (any failure exits 1 after printing the logcat excerpt that explains it):
 #   1. adb install of the APK and `am start` of MainActivity;
@@ -28,14 +28,14 @@ ACTIVITY="$PKG/org.openvideotools.studio.MainActivity"
 REMOTE_DIR="/data/local/tmp/ovt-smoke"
 APP_TEXT="OVT Studio"
 
-apk="" out="" cli="" sample="" libcxx=""
+apk="" out="" cli="" sample="" libdir=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --apk) apk="$2"; shift ;;
     --out) out="$2"; shift ;;
     --cli) cli="$2"; shift ;;
     --sample) sample="$2"; shift ;;
-    --libcxx) libcxx="$2"; shift ;;
+    --libdir) libdir="$2"; shift ;;
     -h|--help) sed -n '6,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
@@ -104,7 +104,7 @@ if [ -n "$cli" ]; then
   adb shell "mkdir -p $REMOTE_DIR"
   adb push "$cli" "$REMOTE_DIR/ovt" > /dev/null
   adb shell "chmod 755 $REMOTE_DIR/ovt"
-  if [ -n "$libcxx" ]; then adb push "$libcxx" "$REMOTE_DIR/libc++_shared.so" > /dev/null; fi
+  if [ -n "$libdir" ]; then adb push "$libdir"/. "$REMOTE_DIR/" > /dev/null; fi
   run_ovt() { adb shell "cd $REMOTE_DIR && LD_LIBRARY_PATH=$REMOTE_DIR ./ovt $*; echo EXIT=\$?" | tr -d '\r'; }
   ver="$(run_ovt --version)"
   echo "$ver"
