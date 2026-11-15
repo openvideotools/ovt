@@ -79,7 +79,7 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   }
 
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size() + mapped.warnings.size());
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + 1);
   for (const ovt::de265::Diag& d : f.diagnostics) {
     diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
                                                     d.message.c_str()));
@@ -88,6 +88,12 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   for (const std::string& w : mapped.warnings) {
     diags.push_back(
         ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
+  }
+  if (mapped.mv_clamped_cells > 0) {  // chapter 06 §6.2.3: once per frame
+    const std::string msg =
+        "motion vector clamped to \u00b132767 (" + std::to_string(mapped.mv_clamped_cells) + " cells)";
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning),
+                                                    "MDL-GEN-0003", msg.c_str()));
   }
   const auto diags_v = fbb->CreateVector(diags);
 

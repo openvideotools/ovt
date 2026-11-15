@@ -693,6 +693,7 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
     mp.emit_ctu(rs, tile_idx, seg[slice].last_ts == d.ctb_addr_ts[ctb]);
   }
   fill_cells(g, d, fmt, refs);
+  out.mv_clamped_cells = g.mv_clamped_cells;
 
   const auto uncovered = std::count(g.block_id.begin(), g.block_id.end(), 0U);
   if (uncovered > 0) {
