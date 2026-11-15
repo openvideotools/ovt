@@ -31,3 +31,15 @@ bench_metrics_psnr_1080p/.../real_time        fps_1_thread=108.9/s          synt
 bench_metrics_psnr_ssim_1080p/.../real_time   fps_4_threads=49.5/s          synthetic 1080p
 bench_metrics_maps/.../real_time              overhead_ms_per_frame=41.7    synthetic 1080p
 ```
+
+The same binary from the `linux-x64-release` build (optimised), same container and input; informational, this is not
+the budget machine:
+
+```console
+bench_metrics_psnr_1080p/.../real_time        fps_1_thread=1315.8/s         budget on m1-air-8gb: >= 600
+bench_metrics_psnr_ssim_1080p/.../real_time   fps_4_threads=473.9/s         budget on m1-air-8gb: >= 200
+bench_metrics_maps/.../real_time              overhead_ms_per_frame=2.66    budget on m1-air-8gb: <= 1.5
+```
+
+The maps overhead is above its budget on this machine. It is the cost of the WI-3.306/3.307 map code (psnr maps on
+three planes, the ssim window accumulator), not of this WI; the `m1-air-8gb` run will show whether it holds there.
