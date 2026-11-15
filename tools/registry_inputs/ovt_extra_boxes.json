@@ -1,0 +1,654 @@
+{
+  "comment": "Hand-maintained boxes absent from both MP4RA and the FileFormatConformance JSON, or whose entry there lacks type information (chapter 08 §8.2.10). Same entry shape as the conformance JSON plus `spec_ref` and an optional `kind` override; an entry here replaces the conformance entries of its fourcc. `(c)` stands for the byte 0xA9.",
+  "entries": [
+    {
+      "fourcc": "pssh",
+      "type": "FullBox",
+      "description": "Protection system specific header",
+      "containers": [
+        "moov",
+        "moof"
+      ],
+      "spec_ref": "ISO/IEC 23001-7",
+      "versions": [
+        0,
+        1
+      ]
+    },
+    {
+      "fourcc": "tenc",
+      "type": "FullBox",
+      "description": "Track encryption",
+      "containers": [
+        "schi"
+      ],
+      "spec_ref": "ISO/IEC 23001-7",
+      "versions": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "fourcc": "senc",
+      "type": "FullBox",
+      "description": "Sample specific encryption data",
+      "containers": [
+        "traf",
+        "trak"
+      ],
+      "spec_ref": "ISO/IEC 23001-7",
+      "versions": [
+        0,
+        1,
+        2
+      ],
+      "flags": [
+        {
+          "name": "UseSubSampleEncryption",
+          "value": "0x000002"
+        }
+      ]
+    },
+    {
+      "fourcc": "av1C",
+      "type": "Box",
+      "description": "AV1 codec configuration",
+      "containers": [
+        {
+          "AV1SampleEntry": [
+            "av01"
+          ]
+        },
+        "ipco"
+      ],
+      "spec_ref": "AV1-ISOBMFF §2.3"
+    },
+    {
+      "fourcc": "vpcC",
+      "type": "FullBox",
+      "description": "VP codec configuration",
+      "containers": [
+        {
+          "VPSampleEntry": [
+            "vp08",
+            "vp09",
+            "vp10"
+          ]
+        }
+      ],
+      "spec_ref": "VP-ISOBMFF §2.3",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "fourcc": "dOps",
+      "type": "Box",
+      "description": "Opus specific",
+      "containers": [
+        {
+          "OpusSampleEntry": [
+            "Opus"
+          ]
+        }
+      ],
+      "spec_ref": "Opus-ISOBMFF §4.3.2"
+    },
+    {
+      "fourcc": "dfLa",
+      "type": "FullBox",
+      "description": "FLAC specific",
+      "containers": [
+        {
+          "FLACSampleEntry": [
+            "fLaC"
+          ]
+        }
+      ],
+      "spec_ref": "FLAC-ISOBMFF §3.3.2",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "esds",
+      "type": "FullBox",
+      "description": "Elementary stream descriptor",
+      "containers": [
+        {
+          "MPEG4SampleEntry": [
+            "mp4a",
+            "mp4v",
+            "mp4s",
+            "encv",
+            "enca",
+            "wave"
+          ]
+        }
+      ],
+      "spec_ref": "ISO/IEC 14496-14 §6.7",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "dvcC",
+      "type": "Box",
+      "description": "Dolby Vision configuration (profiles up to 7)",
+      "containers": [
+        "VisualSampleEntry"
+      ],
+      "spec_ref": "Dolby Vision ISOBMFF"
+    },
+    {
+      "fourcc": "dvvC",
+      "type": "Box",
+      "description": "Dolby Vision configuration (profiles 8 to 10)",
+      "containers": [
+        "VisualSampleEntry"
+      ],
+      "spec_ref": "Dolby Vision ISOBMFF"
+    },
+    {
+      "fourcc": "dvwC",
+      "type": "Box",
+      "description": "Dolby Vision configuration (profiles above 10)",
+      "containers": [
+        "VisualSampleEntry"
+      ],
+      "spec_ref": "Dolby Vision ISOBMFF"
+    },
+    {
+      "fourcc": "dac3",
+      "type": "Box",
+      "description": "AC-3 specific",
+      "containers": [
+        {
+          "AC3SampleEntry": [
+            "ac-3"
+          ]
+        }
+      ],
+      "spec_ref": "ETSI TS 102 366 Annex F"
+    },
+    {
+      "fourcc": "dec3",
+      "type": "Box",
+      "description": "Enhanced AC-3 specific",
+      "containers": [
+        {
+          "EC3SampleEntry": [
+            "ec-3"
+          ]
+        }
+      ],
+      "spec_ref": "ETSI TS 102 366 Annex F"
+    },
+    {
+      "fourcc": "dac4",
+      "type": "Box",
+      "description": "AC-4 specific",
+      "containers": [
+        {
+          "AC4SampleEntry": [
+            "ac-4"
+          ]
+        }
+      ],
+      "spec_ref": "ETSI TS 103 190-2 Annex E"
+    },
+    {
+      "fourcc": "wave",
+      "type": "Box",
+      "description": "QuickTime sound decompression parameters",
+      "containers": [
+        "AudioSampleEntry"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "enda",
+      "type": "Box",
+      "description": "QuickTime audio endianness",
+      "containers": [
+        "wave"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "chan",
+      "type": "FullBox",
+      "description": "QuickTime audio channel layout",
+      "containers": [
+        "AudioSampleEntry",
+        "wave"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "gmhd",
+      "type": "Box",
+      "description": "QuickTime base media information header",
+      "containers": [
+        "minf"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "gmin",
+      "type": "FullBox",
+      "description": "QuickTime base media info",
+      "containers": [
+        "gmhd"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "tapt",
+      "type": "Box",
+      "description": "QuickTime track aperture mode dimensions",
+      "containers": [
+        "trak"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "clef",
+      "type": "FullBox",
+      "description": "QuickTime track clean aperture dimensions",
+      "containers": [
+        "tapt"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "prof",
+      "type": "FullBox",
+      "description": "QuickTime track production aperture dimensions",
+      "containers": [
+        "tapt"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "enof",
+      "type": "FullBox",
+      "description": "QuickTime track encoded pixels dimensions",
+      "containers": [
+        "tapt"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "fiel",
+      "type": "Box",
+      "description": "QuickTime field handling",
+      "containers": [
+        "VisualSampleEntry"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "wide",
+      "type": "Box",
+      "description": "QuickTime 64-bit expansion placeholder",
+      "containers": [
+        "file",
+        "moov",
+        "udta"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "tmcd",
+      "type": "SampleEntry",
+      "description": "QuickTime timecode sample entry",
+      "containers": [
+        "stsd"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "ContainerWithPrefix"
+    },
+    {
+      "fourcc": "tmcd",
+      "type": "TrackReferenceTypeBox",
+      "description": "QuickTime timecode track reference",
+      "containers": [
+        "tref"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "tmcd",
+      "type": "Box",
+      "description": "QuickTime timecode media information",
+      "containers": [
+        "gmhd"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "tcmi",
+      "type": "FullBox",
+      "description": "QuickTime timecode media information",
+      "containers": [
+        "tmcd"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "(c)xyz",
+      "type": "Box",
+      "description": "QuickTime location (ISO 6709 string)",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF"
+    },
+    {
+      "fourcc": "(c)nam",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: title",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)nam",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: title",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "(c)ART",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: artist",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)ART",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: artist",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "(c)alb",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: album",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)alb",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: album",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "(c)day",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: date",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)day",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: date",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "(c)cmt",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: comment",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)cmt",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: comment",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "(c)too",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: encoding tool",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "QTFF",
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "(c)too",
+      "type": "Box",
+      "description": "QuickTime user data / iTunes item: encoding tool",
+      "containers": [
+        "ilst"
+      ],
+      "spec_ref": "iTunes metadata",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "chpl",
+      "type": "FullBox",
+      "description": "Nero chapter list",
+      "containers": [
+        "udta"
+      ],
+      "spec_ref": "Nero",
+      "versions": [
+        0,
+        1
+      ]
+    },
+    {
+      "fourcc": "ilst",
+      "type": "Box",
+      "description": "iTunes metadata item list",
+      "containers": [
+        "meta"
+      ],
+      "spec_ref": "iTunes metadata"
+    },
+    {
+      "fourcc": "keys",
+      "type": "Box",
+      "description": "Metadata key table",
+      "containers": [
+        {
+          "BoxedMetadataSampleEntry": [
+            "mebx"
+          ]
+        }
+      ],
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "kind": "Container"
+    },
+    {
+      "fourcc": "keys",
+      "type": "FullBox",
+      "description": "QuickTime metadata item keys",
+      "containers": [
+        "meta"
+      ],
+      "spec_ref": "QTFF",
+      "versions": [
+        0
+      ],
+      "kind": "Leaf"
+    },
+    {
+      "fourcc": "data",
+      "type": "Box",
+      "description": "iTunes metadata value",
+      "containers": [
+        "*"
+      ],
+      "spec_ref": "iTunes metadata"
+    },
+    {
+      "fourcc": "mean",
+      "type": "FullBox",
+      "description": "iTunes reverse-DNS namespace",
+      "containers": [
+        "*"
+      ],
+      "spec_ref": "iTunes metadata",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "name",
+      "type": "FullBox",
+      "description": "iTunes reverse-DNS name",
+      "containers": [
+        "*"
+      ],
+      "spec_ref": "iTunes metadata",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "mpvd",
+      "type": "Box",
+      "description": "Google motion photo video data",
+      "containers": [
+        "file"
+      ],
+      "spec_ref": "Google motion photo",
+      "kind": "Opaque"
+    },
+    {
+      "fourcc": "uuid:a2394f52-5a9b-4f14-a244-6c427c648df4",
+      "type": "FullBox",
+      "description": "PIFF sample encryption",
+      "containers": [
+        "traf"
+      ],
+      "spec_ref": "PIFF 1.3 §5.3.2",
+      "versions": [
+        0
+      ],
+      "flags": [
+        {
+          "name": "OverrideTrackEncryptionBoxParameters",
+          "value": "0x000001"
+        },
+        {
+          "name": "UseSubSampleEncryption",
+          "value": "0x000002"
+        }
+      ]
+    },
+    {
+      "fourcc": "uuid:8974dbce-7be7-4c51-84f9-7148f9882554",
+      "type": "FullBox",
+      "description": "PIFF track encryption",
+      "containers": [
+        "schi"
+      ],
+      "spec_ref": "PIFF 1.3 §5.3.1",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "uuid:d08a4f18-10f3-4a82-b6c8-32d8aba183d3",
+      "type": "FullBox",
+      "description": "PIFF protection system specific header",
+      "containers": [
+        "moov"
+      ],
+      "spec_ref": "PIFF 1.3 §5.3.3",
+      "versions": [
+        0
+      ]
+    },
+    {
+      "fourcc": "uuid:6d1d9b05-42d5-44e6-80e2-141daff757b2",
+      "type": "FullBox",
+      "description": "Smooth Streaming fragment absolute time (tfxd)",
+      "containers": [
+        "traf"
+      ],
+      "spec_ref": "MS-SSTR §2.2.4.4",
+      "versions": [
+        0,
+        1
+      ]
+    },
+    {
+      "fourcc": "uuid:d4807ef2-ca39-4695-8e54-26cb9e46a79f",
+      "type": "FullBox",
+      "description": "Smooth Streaming next fragments (tfrf)",
+      "containers": [
+        "traf"
+      ],
+      "spec_ref": "MS-SSTR §2.2.4.5",
+      "versions": [
+        0,
+        1
+      ]
+    }
+  ]
+}

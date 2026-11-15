@@ -81,6 +81,9 @@ X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "Q
 X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
 X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
+// WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
+X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
+
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
