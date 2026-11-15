@@ -21,8 +21,10 @@
 
 set -euo pipefail
 
-PKG="org.openvideotools.studio"
-ACTIVITY="$PKG/.MainActivity"
+# The debug APK has applicationIdSuffix ".debug" (android/app/build.gradle.kts) while the Activity class stays in the
+# namespace, so the component is <application id>/<namespace>.MainActivity. OVT_SMOKE_PACKAGE overrides the id.
+PKG="${OVT_SMOKE_PACKAGE:-org.openvideotools.studio.debug}"
+ACTIVITY="$PKG/org.openvideotools.studio.MainActivity"
 REMOTE_DIR="/data/local/tmp/ovt-smoke"
 APP_TEXT="OVT Studio"
 
