@@ -17,7 +17,8 @@ target_link_libraries(ovt_tests_syntax_av1_frame_header PRIVATE ovt_core_objects
 ovt_set_license(ovt_tests_syntax_av1_frame_header "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax_av1_frame_header)
 
-# WI-1.118: uncompressed_header() rows 20–25 (part a: loop filter, CDEF, LR, tx mode, reference / skip mode).
+# WI-1.118: uncompressed_header() rows 20–27 (loop filter, CDEF, LR, tx mode, reference / skip mode, global motion,
+# film grain).
 add_executable(ovt_tests_syntax_av1_frame_header2 test_syntax_av1_frame_header2.cpp)
 target_link_libraries(ovt_tests_syntax_av1_frame_header2 PRIVATE ovt_core_objects ovt_test_support ovt::flags
                                                                  ${Catch2_TARGET})

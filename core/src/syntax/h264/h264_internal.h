@@ -17,9 +17,9 @@
 
 namespace ovt::syntax::h264::detail {
 
-// SPEC-ASSUMPTION(#320): generic H.264 range-violation ParseError code, mirroring SYN-H265-0007.
+// Generic H.264 range-violation ParseError code, mirroring SYN-H265-0007 (§7.9.3).
 inline constexpr std::string_view kRangeCode = "SYN-H264-0002";
-// SPEC-ASSUMPTION(#320): Warning for an unknown or reserved value that a decoder may ignore (§7.3.1 rule 3).
+// Warning for an unknown or reserved value that a decoder may ignore (§7.3.1 rule 3, §7.9.3).
 inline constexpr std::string_view kReservedCode = "SYN-H264-0003";
 
 /// Throws ParseError SYN-H264-0002 unless lo <= value <= hi (§7.3.1 rule 3: checked before any loop is entered).
@@ -47,6 +47,35 @@ inline void read_rbsp_trailing_bits(BitReader& br, SyntaxBuilder& b) {
   while (!br.byte_aligned()) {
     b.read_f("rbsp_alignment_zero_bit", 1, 0);
   }
+}
+
+/// Diagnostic Error SYN-H264-0002 on the last emitted node unless lo <= value <= hi; parsing continues (for limits
+/// whose violation does not endanger the parse, e.g. a count the spec bounds but no loop depends on). Returns
+/// whether the value was in range.
+inline bool check_range(SyntaxBuilder& b, std::string_view name, int64_t value, int64_t lo, int64_t hi,
+                        std::string_view spec_ref = {}) {
+  if (value >= lo && value <= hi) {
+    return true;
+  }
+  b.diag(Severity::Error, kRangeCode,
+         fmt::format("{} out of range ({} = {}, allowed [{},{}])", name, name, value, lo, hi), spec_ref, true);
+  return false;
+}
+
+/// Reads one u(1) element `name[idx]`.
+inline bool read_flag_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const bool v = b.read_flag(name);
+  b.end_array_element();
+  return v;
+}
+
+/// Reads one se(v) element `name[idx]`.
+inline int32_t read_se_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const int32_t v = b.read_se(name);
+  b.end_array_element();
+  return v;
 }
 
 /// Ceil(Log2(n)) for n >= 1.
