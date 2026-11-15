@@ -486,7 +486,7 @@ TEST_CASE("timing: PCR repetition, discontinuity and accuracy checks", "[contain
   }
   SECTION("an out-of-range extension wraps the PCR into the 2^33 * 300 modulus") {
     Bytes b = pcr_stream(40, 20, 0x0200);
-    std::fill_n(b.begin() + (20 * 188) + 6, 6, uint8_t{0xFF});  // base 2^33 - 1, extension 511
+    std::fill_n(b.begin() + std::ptrdiff_t{20 * 188 + 6}, 6, uint8_t{0xFF});  // base 2^33 - 1, extension 511
     const auto f = parse_bytes(b);
     REQUIRE(f);
     REQUIRE(f->timing.pcr.size() == 1);
