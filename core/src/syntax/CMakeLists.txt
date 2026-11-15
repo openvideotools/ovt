@@ -57,6 +57,9 @@ target_sources(ovt_core_objects PRIVATE h265/active_sets.cpp)
 target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp h264/vui.cpp
                                         h264/sps.cpp h264/pps.cpp)
 # WI-1.109a: H.264 slice header with ref list modification, pred weight table and dec ref pic marking (chapter 7
-# §7.3.4 rows 24–27). WI-1.109b adds the AUD, end of sequence / stream, filler data and data partitions.
+# §7.3.4 rows 24–27).
 target_sources(ovt_core_objects PRIVATE h264/slice_header.cpp h264/ref_pic_list_modification.cpp
                                         h264/pred_weight_table.cpp h264/dec_ref_pic_marking.cpp)
+# WI-1.109b: H.264 AUD, end of sequence / stream, filler data and slice data partitions (chapter 7 §7.3.4 rows 19, 20
+# and 28).
+target_sources(ovt_core_objects PRIVATE h264/aud.cpp h264/data_partition.cpp)
