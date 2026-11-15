@@ -2,9 +2,16 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc33 — 2026-11-15
+
+PATCH-level: spec-amendment pass 13 folds in the accepted answers of `spec-question` issues #546 from WI-1.118 part c (AV1 tile groups) and #547 from WI-0.035/WI-0.050 (Android native-library packaging, PR #548). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. Also corrects the rc32 entry's count ("seventeen" → "eighteen").
+
+- 7 §7.3.6 row 29 — a tile group with `tg_end ≥ NumTiles` or `tg_start > tg_end` is ParseError `SYN-GEN-0003`; the read values stay in the partial tree, no tile is visited, and the frame is reported truncated (`SYN-AV1-0101`) as after a `SYN-AV1-0020` overrun — WI-1.118 (#546)
+- 13 §13.4.2, §13.4.5, §13.4.6 W^X paragraph, WI-0.050 notes — the app module uses `useLegacyPackaging = true` (libraries extracted at install) because Qt 6.8.3's `QtLoader` reads only `ApplicationInfo.nativeLibraryDir` (direct-from-APK loading arrives in Qt 6.9.0); no `android:extractNativeLibs` in the source manifest; user-plugin W^X rule unchanged; Play policy check before a `play` release (WI-0.056) — WI-0.050 (#547, PR #548)
+
 ## 1.0.0-rc32 — 2026-11-15
 
-MINOR-level: spec-amendment pass 12 folds in the accepted answers of seventeen `spec-question` issues on chapters 6, 7, 8, 9, 10, 13 and 14 (#159, #366 ranking wording, #406, #419 accumulation wording, #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510). #470, #471, #480, #486 and #499 were accepted by the owner on 2026-11-14 ("OK all"); the rest under the Level-3 spec-question triage. No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; §7.5.3 adds a priming `pull()` to the host/plugin contract text and §10.2.2 pins field semantics of `ExternalTexture`/`VulkanDeviceInfo` without changing a declaration.
+MINOR-level: spec-amendment pass 12 folds in the accepted answers of eighteen `spec-question` items on chapters 6, 7, 8, 9, 10, 13 and 14 (#159, #366 ranking wording, #406, #419 accumulation wording, #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510). #470, #471, #480, #486 and #499 were accepted by the owner on 2026-11-14 ("OK all"); the rest under the Level-3 spec-question triage. No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; §7.5.3 adds a priming `pull()` to the host/plugin contract text and §10.2.2 pins field semantics of `ExternalTexture`/`VulkanDeviceInfo` without changing a declaration.
 
 - 14 §14.3.3 recipe 45 — `syn_h265_multi_pps` clones differ in `num_extra_slice_header_bits` / `output_flag_present_flag`, not `init_qp_minus26` (decoding unchanged, formally non-conforming) — WI-0.553 (#159)
 - 8 §8.6.6 step 4 — ranking prefers the larger picture (width × height); chroma and bit-depth tie-breaks at equal geometry — WI-1.229 (#366)
