@@ -97,5 +97,18 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
   endforeach()
 endif()
 
+# WI-2.581: push() of ovt-plugin-aom (chapter 14 §14.7.1). Same shape as plugin_push_ffmpeg above; the plugin exists only
+# with the bundled libaom (OVT_SYSTEM_LIBAOM=OFF), so the target does too.
+if(OVT_BUILD_PLUGIN_AOM AND NOT OVT_SYSTEM_LIBAOM)
+  ovt_add_fuzz_target(plugin_push_aom
+                      "${PROJECT_SOURCE_DIR}/plugins/ovt-plugin-aom/tests/fuzz/fuzz_plugin_push_aom.cpp")
+  foreach(_target ovt_fuzz_plugin_push_aom_regress ovt_fuzz_plugin_push_aom)
+    if(TARGET ${_target})
+      target_compile_definitions(${_target} PRIVATE "OVT_AOM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_aom>\"")
+      add_dependencies(${_target} ovt_plugin_aom)
+    endif()
+  endforeach()
+endif()
+
 # WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
 ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
