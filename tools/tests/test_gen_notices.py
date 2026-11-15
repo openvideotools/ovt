@@ -183,7 +183,11 @@ def test_bad_derived_file_is_usage_error(tree: dict, tmp_path: Path) -> None:
 
 
 def test_repository_derived_file_parses() -> None:
-    assert gn.read_derived(TOOLS / "derived_files.toml") == []
+    rows = gn.read_derived(TOOLS / "derived_files.toml")
+    assert "render/src/measure/cie1931_locus.h" in [r["path"] for r in rows]
+    for r in rows:
+        assert (TOOLS.parent / r["path"]).is_file(), r["path"]
+        assert len(r["commit"]) == 40, r["path"]
 
 
 def test_fence_longer_than_text_backticks() -> None:

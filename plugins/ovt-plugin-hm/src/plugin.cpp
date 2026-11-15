@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "analysis.hpp"
 #include "decoder.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt_model_generated.h"
@@ -49,11 +50,11 @@ namespace {
 const ovt_AnalysisCaps kCaps = {
     sizeof(ovt_AnalysisCaps),
     kCodecH265,
-    1U << kStageRecon,  // plane_stages: Reconstruction (WI-4.105 part b adds Coefficients)
-    0U,                 // grid_fields: none yet; WI-4.105 part b fills the CellGrid vectors and announces them
-    0,                  // has_symbol_accounting
-    1,                  // bit_exact: the reference decoder
-    0,                  // supports_threads: HM decodes on the calling thread
+    1U << kStageRecon,     // plane_stages: Reconstruction (WI-4.105 part b adds Coefficients)
+    ovt::hm::kGridFields,  // grid_fields: all but partition_id, bits_x8 and deblock_bs (analysis.hpp)
+    0,                     // has_symbol_accounting
+    1,                     // bit_exact: the reference decoder
+    0,                     // supports_threads: HM decodes on the calling thread
     "hm",
     "0.1.0+HM-18.0",
     "BSD-3-Clause",
@@ -110,12 +111,9 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
   }
   const auto planes_v = fbb->CreateVector(planes);
 
-  flatbuffers::Offset<ovt::fb::CellGrid> grid_off;
+  ovt::hm::MappedAnalysis mapped;
   if (f.picture) {
-    ovt::fb::CellGridBuilder grid(*fbb);
-    grid.add_cells_w(static_cast<uint32_t>((f.coded_w + 3) / 4));
-    grid.add_cells_h(static_cast<uint32_t>((f.coded_h + 3) / 4));
-    grid_off = grid.Finish();
+    mapped = ovt::hm::build_analysis(*fbb, f.analysis, f.coded_w, f.coded_h);
   }
 
   const ovt::fb::FrameId id(f.decode_index, -1);  // the host assigns display_index from its index
@@ -149,7 +147,10 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
   fa.add_plugin_version(plugin_version);
   fa.add_frame(info_off);
   if (f.picture) {
-    fa.add_grid(grid_off);
+    fa.add_grid(mapped.grid);
+    fa.add_blocks(mapped.blocks);
+    fa.add_mvs(mapped.mvs);
+    fa.add_refs(mapped.refs);
   }
   fa.add_planes(planes_v);
   fa.add_diagnostics(diags_v);
