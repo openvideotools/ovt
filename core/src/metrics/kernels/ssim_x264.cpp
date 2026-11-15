@@ -280,12 +280,17 @@ bool x264_plane(X264State& m, const ovt_MetricPlanes& r, const ovt_MetricPlanes&
   if (sink != nullptr && m.options.map_block != 0) {
     map.emplace(r, p, m.options.map_block);
   }
-  double total = 0.0;
+  // x264 sums in float: four windows in ssim_end4, then those groups in x264_pixel_ssim_wxh; OVT keeps that order and
+  // those types (only the per-window division is double, rounded to float on the way in), so that the float rounding
+  // of the sum is the same as the oracle's. SPEC-ASSUMPTION(#419): §9.4.4 step 3 "ssim_end4 sums four windows in
+  // float".
+  float total = 0.0F;
   block_row_sums(r, d, p, 0, blocks_x, m.rows[0]);
   for (uint32_t wy = 0; wy + 1 < blocks_y; ++wy) {
     auto& upper = m.rows[wy & 1U];
     auto& lower = m.rows[(wy & 1U) ^ 1U];
     block_row_sums(r, d, p, wy + 1, blocks_x, lower);
+    float group = 0.0F;
     for (uint32_t wx = 0; wx + 1 < blocks_x; ++wx) {
       BlockSums s;
       for (const BlockSums* b : {&upper[wx], &upper[wx + 1], &lower[wx], &lower[wx + 1]}) {
@@ -295,13 +300,17 @@ bool x264_plane(X264State& m, const ovt_MetricPlanes& r, const ovt_MetricPlanes&
         s.s12 += b->s12;
       }
       const double v = window_ssim(s, r.bit_depth);
-      total += v;
+      group += static_cast<float>(v);
+      if ((wx & 3U) == 3U || wx + 2 == blocks_x) {  // ssim_end4: four windows, or the rest of the row
+        total += group;
+        group = 0.0F;
+      }
       if (map) {
         map->add(wx, wy, v);
       }
     }
   }
-  score = total / (static_cast<double>(blocks_x - 1) * static_cast<double>(blocks_y - 1));
+  score = static_cast<double>(total) / (static_cast<double>(blocks_x - 1) * static_cast<double>(blocks_y - 1));
   if (map) {
     sink->put(blob_id(p, decode_index, m.options.map_block),
               encode_ovtmap(map->blocks_w, map->blocks_h, static_cast<uint16_t>(m.options.map_block), p, 0, -1.0F, 1.0F,

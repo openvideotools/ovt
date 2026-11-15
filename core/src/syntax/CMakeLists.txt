@@ -22,6 +22,14 @@ target_link_libraries(ovt_core_objects PUBLIC "$<BUILD_INTERFACE:ovt_schemas>")
 # metadata and tile list parsers (chapter 7 §7.3.6 rows 1–9 and 30).
 target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.cpp av1/color_config.cpp av1/timing.cpp
                                         av1/metadata.cpp av1/tile_list.cpp)
+# WI-1.119: the AV1 reference slot model (DecoderState, §7.20 update, §7.21 loading, §7.8 set_frame_refs).
+target_sources(ovt_core_objects PRIVATE av1/decoder_state.cpp)
+# WI-1.117: AV1 uncompressed_header() part 1 (chapter 7 §7.3.6 rows 11–19); part a: frame_size / superres /
+# render_size / frame_size_with_refs (rows 12–14) and tile_info (row 15).
+target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp av1/quantization.cpp av1/segmentation.cpp
+                                        av1/delta_params.cpp)
+# WI-1.118: uncompressed_header() rows 20–25 (part a: loop filter, CDEF, LR, tx mode, reference / skip mode).
+target_sources(ovt_core_objects PRIVATE av1/loop_filter.cpp av1/cdef.cpp av1/lr.cpp av1/tx_mode.cpp av1/skip_mode.cpp)
 # WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
 # st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
 # rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).
@@ -40,3 +48,9 @@ target_sources(
 # substream mapping (chapter 7 §7.3.5 rows 10–12).
 target_sources(ovt_core_objects PRIVATE h265/slice_segment_header.cpp h265/ref_pic_lists_modification.cpp
                                         h265/pred_weight_table.cpp)
+# WI-1.115: H.265 parameter-set activation tracking (chapter 7 §7.3.8).
+target_sources(ovt_core_objects PRIVATE h265/active_sets.cpp)
+# WI-1.108: H.264 NAL header, SPS (VUI, HRD, scaling lists) and PPS parsers; H.273 code-point names shared with
+# the H.265 and AV1 parsers.
+target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp h264/vui.cpp
+                                        h264/sps.cpp h264/pps.cpp)

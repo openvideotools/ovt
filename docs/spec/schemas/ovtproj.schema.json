@@ -86,7 +86,7 @@
               "frame": { "type": "object", "properties": { "decode_index": { "type": "integer" } } },
               "block": { "type": "object", "properties": { "decode_index": { "type": "integer" }, "rect": { "type": "array", "items": { "type": "integer" }, "minItems": 4, "maxItems": 4 } } },
               "bytes": { "type": "object", "properties": { "offset": { "type": "integer" }, "length": { "type": "integer" } } },
-              "field": { "type": "object", "properties": { "unit_index": { "type": "integer" }, "path": { "type": "string" } } },
+              "field": { "type": "object", "properties": { "unit_index": { "type": "integer" }, "path": { "type": "string" }, "bit_offset": { "type": "integer", "description": "optional; with bit_length marks the field bytes in Hex (#421)" }, "bit_length": { "type": "integer" } } },
               "box": { "type": "object", "properties": { "path": { "type": "string", "description": "moov/trak[1]/mdia/minf/stbl/stsz" } } }
             }
           }
