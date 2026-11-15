@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Unit tests of the AV1 uncompressed_header() sub-structures of chapter 7 §7.3.6 rows 20–27 and 29 (WI-1.118):
-// loop_filter_params, cdef_params, lr_params, read_tx_mode, frame_reference_mode, skip_mode_params,
-// global_motion_params (with the subexp decoding), film_grain_params (with load_grain_params) and tile_group_obu.
-// The frame OBU (row 28) and the uncompressed_header() wiring follow in WI-1.118 part c.
+// Unit tests of the AV1 uncompressed_header() rows of chapter 7 §7.3.6 rows 20–29 (WI-1.118): loop_filter_params,
+// cdef_params, lr_params, read_tx_mode, frame_reference_mode, skip_mode_params, global_motion_params (with the
+// subexp decoding), film_grain_params (with load_grain_params), frame_obu and tile_group_obu, and whole streams
+// through parse_frame_header() / parse_frame_obu() with rows 20–27 wired in.
 //
 // Expected values come from recorded oracle runs, cited at each fixture:
 //   - FFmpeg 6.1.1 `-bsf:v trace_headers` (bit offsets counted from the first OBU header bit, as the trace prints
@@ -16,7 +16,8 @@
 // chapter 14 synthetic streams syn_av1_tiles_cdef_lr (recipe 13) and syn_av1_hidden_altref_showexisting (recipe
 // 14) regenerate bit-exactly (sha256 equal to tests/corpora/manifest.json); syn_av1_globalmotion (recipe 74) was
 // regenerated locally with sha256 26fb68f7…f5b7, which differs from the manifest's c92d15f7…81bf, so its excerpt
-// stands on its own. Full-header parity over whole streams is part c (parse_frame_header) and WI-1.572.
+// stands on its own. Tile-group parity over whole streams is checked here against GStreamer; full field-by-field header
+// parity over the aom vectors and the Argon subset is WI-1.572.
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -1340,6 +1341,277 @@ TEST_CASE("av1_tile_group_obu_tile_size_overrun", "[syntax][av1][fast]") {
   CHECK(g.end_of_stream(truncated, collect));
   CHECK(truncated);
   CHECK(std::find(codes.begin(), codes.end(), "SYN-AV1-0101") != codes.end());
+}
+
+// ---- row 28 and the whole uncompressed_header(): every frame of real streams ----------------------------------------
+
+// Calls `cb` with every OBU (header byte included) of an IVF file.
+void for_each_ivf_obu(const Bytes& file, const std::function<void(std::span<const uint8_t>)>& cb) {
+  REQUIRE(file.size() >= 32);
+  const size_t header_size = file[6] | (static_cast<size_t>(file[7]) << 8U);
+  size_t pos = header_size;
+  while (pos + 12 <= file.size()) {
+    const size_t frame_size = file[pos] | (static_cast<size_t>(file[pos + 1]) << 8U) |
+                              (static_cast<size_t>(file[pos + 2]) << 16U) | (static_cast<size_t>(file[pos + 3]) << 24U);
+    pos += 12;
+    REQUIRE(pos + frame_size <= file.size());
+    const std::span<const uint8_t> frame(file.data() + pos, frame_size);
+    size_t off = 0;
+    while (off < frame.size()) {
+      BitReader br(frame.subspan(off));
+      SyntaxBuilder b(br);
+      b.set_recording(false);
+      const ObuHeader h = parse_obu_header(br, b);
+      const size_t total = (h.header_bits / 8) + h.obu_size;
+      REQUIRE(off + total <= frame.size());
+      cb(frame.subspan(off, total));
+      off += total;
+    }
+    pos += frame_size;
+  }
+}
+
+struct StreamCounts {
+  size_t frame_headers = 0;  // OBU_FRAME + OBU_FRAME_HEADER (show_existing_frame included)
+  size_t tile_groups = 0;
+  size_t tiles = 0;
+  uint64_t tile_bytes = 0;  // sum of tileSize
+  size_t frames_completed = 0;
+};
+
+// Parses every frame of an IVF stream the way the index will: OBU_FRAME through parse_frame_obu(), OBU_FRAME_HEADER
+// through parse_frame_header() and each OBU_TILE_GROUP against that header's tile_info(), with the §7.20 slot update
+// after each complete frame (and after a show_existing_frame of a KEY slot, §7.21). Every tile group must end exactly
+// at its OBU's end, which only happens when every uncompressed_header() bit before it was read right. `cb` sees
+// each header.
+StreamCounts walk_frames(const Bytes& file, const std::function<void(size_t, const FrameHeader&)>& cb = {}) {
+  StreamCounts c;
+  SequenceHeader seq;
+  DecoderState state;
+  FrameHeader pending;
+  bool open = false;
+  auto complete = [&](const FrameHeader& h) {
+    if (h.show_existing_frame) {
+      if (h.frame_type == FrameType::Key) {
+        reference_frame_update(state, h.state, kAllFrames, state.slot(h.frame_to_show_map_idx).slot_decode_index);
+      }
+    } else {
+      reference_frame_update(state, h.state, h.refresh_frame_flags, static_cast<int64_t>(c.frames_completed));
+    }
+    ++c.frames_completed;
+    open = false;
+  };
+  auto count_tiles = [&](const TileGroup& tg) {
+    ++c.tile_groups;
+    c.tiles += tg.tiles.size();
+    for (const TileGroupTile& t : tg.tiles) {
+      c.tile_bytes += t.tileSize;
+    }
+  };
+  for_each_ivf_obu(file, [&](std::span<const uint8_t> unit) {
+    BitReader br(unit);
+    SyntaxBuilder b(br);
+    b.set_recording(false);
+    const ObuHeader h = parse_obu_header(br, b);
+    CAPTURE(c.frame_headers, h.type_name);
+    switch (h.type()) {
+      case ObuType::SequenceHeader:
+        seq = parse_sequence_header(br, b);
+        return;
+      case ObuType::Frame: {
+        REQUIRE_FALSE(open);
+        const FrameObu f = parse_frame_obu(br, b, h, seq, state);
+        if (cb) {
+          cb(c.frame_headers, f.frame_header);
+        }
+        ++c.frame_headers;
+        REQUIRE_FALSE(f.frame_header.show_existing_frame);
+        count_tiles(f.tile_group);
+        CHECK(br.bit_pos() == unit.size() * 8);
+        REQUIRE(f.tile_group.frame_complete);  // AV1 §7.5: an OBU_FRAME's tile group ends the frame
+        complete(f.frame_header);
+        return;
+      }
+      case ObuType::FrameHeader: {
+        REQUIRE_FALSE(open);
+        pending = parse_frame_header(br, b, h, seq, state, false);
+        if (cb) {
+          cb(c.frame_headers, pending);
+        }
+        ++c.frame_headers;
+        open = true;
+        if (pending.show_existing_frame) {
+          complete(pending);
+        }
+        return;
+      }
+      case ObuType::TileGroup: {
+        REQUIRE(open);
+        const TileGroup tg = parse_tile_group_obu(br, b, pending.tile_info, static_cast<uint32_t>(h.obu_size));
+        count_tiles(tg);
+        CHECK(br.bit_pos() == unit.size() * 8);
+        if (tg.frame_complete) {
+          complete(pending);
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  });
+  CHECK_FALSE(open);
+  return c;
+}
+
+// Whole-stream parity with GStreamer 1.24.2 codecparsers (tests/oracles/gst_parse_oracle.c --codec av1 --ivf): its
+// frame_header and tile_group records per stream, tiles = sum of tg_end - tg_start + 1, tile bytes = sum of
+// entry[tg_start..tg_end].tile_size. svc_L2T2 carries OBU_FRAME_HEADER plus several OBU_TILE_GROUPs per frame
+// (tile_start_and_end present), 05_mv a hidden frame and a show_existing_frame header, film_grain_50 film grain with
+// update_grain and show_existing_frame headers, tiles_cdef_lr 4x2 tiles with CDEF and LR on 128x128 superblocks.
+TEST_CASE("av1_frame_obu_whole_streams_vs_gstreamer", "[syntax][av1][fast][needs-corpus]") {
+  struct Expected {
+    const char* id;
+    size_t frame_headers;
+    size_t tile_groups;
+    size_t tiles;
+    uint64_t tile_bytes;
+  };
+  const std::array<Expected, 7> streams{{
+      {"aom_av1_1_b8_01_size_16x16", 2, 2, 2, 213},
+      {"aom_av1_1_b8_02_allintra", 39, 39, 39, 1486885},
+      {"aom_av1_1_b8_04_cdfupdate", 2, 2, 2, 35951},
+      {"aom_av1_1_b8_05_mv", 5, 4, 4, 54974},
+      {"aom_av1_1_b8_22_svc_L2T2", 16, 40, 56, 119020},
+      {"aom_av1_1_b8_23_film_grain_50", 14, 11, 11, 26931},
+      {"syn_av1_tiles_cdef_lr", 60, 60, 480, 635229},
+  }};
+  for (const Expected& e : streams) {
+    CAPTURE(e.id);
+    const auto path = ovt::test::corpus_or_skip(e.id);
+    const StreamCounts c = walk_frames(read_file(path));
+    CHECK(c.frame_headers == e.frame_headers);
+    CHECK(c.tile_groups == e.tile_groups);
+    CHECK(c.tiles == e.tiles);
+    CHECK(c.tile_bytes == e.tile_bytes);
+    CHECK(c.frames_completed == e.frame_headers);
+  }
+}
+
+// The rows 20–27 values through parse_frame_header() itself on the acceptance-test vectors (the same oracle values
+// as the sub-parser tests above): syn_av1_tiles_cdef_lr frame 0 (AT1) and frame 1 (LR SGRPROJ, LoopRestorationSize
+// 256); av1-1-b8-23-film_grain-50 frame 0 (AT2).
+TEST_CASE("av1_frame_header_rows_20_27_through_parse_frame_header", "[syntax][av1][fast][needs-corpus]") {
+  {
+    const auto path = ovt::test::corpus_or_skip("syn_av1_tiles_cdef_lr");
+    size_t seen = 0;
+    (void)walk_frames(read_file(path), [&](size_t i, const FrameHeader& h) {
+      if (i == 0) {
+        ++seen;
+        CHECK(h.loop_filter_params.span.bit_offset == 75);
+        CHECK(h.loop_filter_params.loop_filter_level == std::array<uint8_t, 4>{1, 1, 3, 1});
+        CHECK(h.cdef_params.cdef_bits == 2);
+        CHECK(h.cdef_params.cdef_y_pri_strength == std::array<uint8_t, 8>{0, 4, 0, 8, 0, 0, 0, 0});
+        CHECK(h.lr_params.FrameRestorationType[0] == RestorationType::None);
+        CHECK(h.tx_mode.TxMode == TxModeType::Select);
+        CHECK_FALSE(h.reduced_tx_set);
+        CHECK(h.span.bit_offset + h.span.bit_length == 164);
+      } else if (i == 1) {
+        ++seen;
+        CHECK(h.loop_filter_params.span.bit_offset == 104);
+        CHECK(h.loop_filter_params.loop_filter_level == std::array<uint8_t, 4>{1, 1, 7, 5});
+        CHECK(h.cdef_params.CdefDamping == 4);
+        CHECK(h.lr_params.FrameRestorationType[0] == RestorationType::Sgrproj);
+        CHECK(h.lr_params.LoopRestorationSize[0] == 256);
+      }
+    });
+    CHECK(seen == 2);
+  }
+  {
+    const auto path = ovt::test::corpus_or_skip("aom_av1_1_b8_23_film_grain_50");
+    size_t seen = 0;
+    (void)walk_frames(read_file(path), [&](size_t i, const FrameHeader& h) {
+      if (i != 0) {
+        return;
+      }
+      ++seen;
+      const FilmGrainParams& fg = h.state.film_grain_params;
+      CHECK(fg.apply_grain);
+      CHECK(fg.grain_seed == 7391);
+      CHECK(fg.num_y_points == 7);
+      CHECK(fg.num_cb_points == 5);
+      CHECK(fg.num_cr_points == 6);
+      CHECK(fg.cr_offset == 256);
+      CHECK(fg.overlap_flag);
+      CHECK(h.cdef_params.cdef_uv_sec_strength == std::array<uint8_t, 8>{4, 0, 0, 0, 4, 1, 0, 0});
+      CHECK(h.span.bit_offset + h.span.bit_length == 1168);
+    });
+    CHECK(seen == 1);
+  }
+}
+
+TEST_CASE("av1_frame_obu_hand_assembled_and_overrun", "[syntax][av1][fast]") {
+  // A reduced_still_picture_header CIF KEY frame (as the WI-1.117 test of that path): disable_cdf_update 0,
+  // allow_screen_content_tools 0, render_and_frame_size_different 0, tile_info 1 0 0, base_q_idx 10, the four
+  // quantization flags 0, segmentation_enabled 0, delta_q_present 0 (20 bits); rows 20–27: loop_filter_level[0..1]
+  // 0, sharpness 0, delta_enabled 0, tx_mode_select 0, reduced_tx_set 0 (18 bits; no CDEF / LR / film grain);
+  // byte_alignment() to 40 bits; then one tile (sbCols 6, sbRows 5 with TileColsLog2 = TileRowsLog2 = 0).
+  SequenceHeader seq;
+  seq.reduced_still_picture_header = true;
+  seq.still_picture = true;
+  seq.frame_width_bits_minus_1 = 8;
+  seq.frame_height_bits_minus_1 = 8;
+  seq.max_frame_width_minus_1 = 351;
+  seq.max_frame_height_minus_1 = 287;
+  seq.max_frame_width = 352;
+  seq.max_frame_height = 288;
+  seq.color_config.NumPlanes = 3;
+  BitWriter w;
+  w.put(0, 1).put(0, 1).put(0, 1);                                // disable_cdf_update, screen content, render
+  w.put(1, 1).put(0, 1).put(0, 1);                                // tile_info
+  w.put(10, 8).put(0, 4);                                         // quantization_params
+  w.put(0, 1).put(0, 1);                                          // segmentation_enabled, delta_q_present
+  w.put(0, 6).put(0, 6).put(0, 3).put(0, 1).put(0, 1).put(0, 1);  // rows 20–27
+  const uint32_t header_bits = 20 + 18;
+  Bytes payload = w.bytes();
+  REQUIRE(payload.size() == (header_bits + 7) / 8);
+  payload.insert(payload.end(), {0xDE, 0xAD, 0xBE});  // tile_data
+  ObuHeader obu;
+  obu.obu_type = static_cast<uint8_t>(ObuType::Frame);
+  obu.obu_has_size_field = true;
+  obu.obu_size = payload.size();
+  DecoderState state;
+  FrameObu f;
+  uint64_t bits = 0;
+  const SyntaxNodeBuffer tree =
+      with_tree(payload, [&](BitReader& br, SyntaxBuilder& b) { f = parse_frame_obu(br, b, obu, seq, state); }, &bits);
+  CHECK(bits == payload.size() * 8);
+  CHECK(f.frame_header.frame_type == FrameType::Key);
+  CHECK(f.frame_header.quantization_params.base_q_idx == 10);
+  CHECK(f.frame_header.span.bit_length == header_bits);
+  CHECK(f.headerBytes == (header_bits + 7) / 8);
+  CHECK(f.tile_group.frame_complete);
+  REQUIRE(f.tile_group.tiles.size() == 1);
+  CHECK(f.tile_group.tiles[0].tileSize == 3);
+  CHECK(f.tile_group.tiles[0].byte_offset == f.headerBytes);
+  CHECK(find(tree.root(), "frame_header_obu") != nullptr);
+  CHECK(find(tree.root(), "tile_group_obu") != nullptr);
+
+  // obu_size two bytes short of the tile data actually present: the one tile takes sz - headerBytes = 1 byte.
+  obu.obu_size = payload.size() - 2;
+  FrameObu shorter;
+  (void)with_tree(payload, [&](BitReader& br, SyntaxBuilder& b) { shorter = parse_frame_obu(br, b, obu, seq, state); });
+  REQUIRE(shorter.tile_group.tiles.size() == 1);
+  CHECK(shorter.tile_group.tiles[0].tileSize == 1);
+
+  // obu_size larger than the bytes present: the last tile overruns the reader, SYN-AV1-0020.
+  obu.obu_size = payload.size() + 5;
+  std::string code;
+  try {
+    (void)with_tree(payload, [&](BitReader& br, SyntaxBuilder& b) { (void)parse_frame_obu(br, b, obu, seq, state); });
+  } catch (const ovt::ParseError& e) {
+    code = e.code;
+  }
+  CHECK(code == "SYN-AV1-0020");
 }
 
 }  // namespace

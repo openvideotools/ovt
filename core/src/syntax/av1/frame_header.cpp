@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// AV1 uncompressed_header() (chapter 7 §7.3.6 row 11; WI-1.117, part 1: up to and including delta_lf_params() and
-// the lossless derivations; rows 20–29 follow in WI-1.118). The function mirrors AV1 §5.9.2 line by line. It reads
-// bits and consults the DecoderState of WI-1.119 (RefFrameType for show_existing_frame, RefValid / RefOrderHint for
-// ref_order_hint[], the slots for frame_size_with_refs(), set_frame_refs() and load_previous()); it mutates the
-// state only where §5.9.2 does inside the header (the shown-KEY reset, mark_ref_frames(), the ref_order_hint
-// mismatch), never the §7.20 / §7.21 processes, which the index runs after the frame's tile groups.
+// AV1 uncompressed_header() (chapter 7 §7.3.6 row 11; WI-1.117 up to and including delta_lf_params() and the
+// lossless derivations, WI-1.118 rows 20–27 through film_grain_params()). The function mirrors AV1 §5.9.2 line by line.
+// It reads bits and consults the DecoderState of WI-1.119 (RefFrameType for show_existing_frame, RefValid /
+// RefOrderHint for ref_order_hint[], the slots for frame_size_with_refs(), set_frame_refs() and load_previous()); it
+// mutates the state only where §5.9.2 does inside the header (the shown-KEY reset, mark_ref_frames(), the
+// ref_order_hint mismatch), never the §7.20 / §7.21 processes, which the index runs after the frame's tile groups.
 
 #include <fmt/format.h>
 
@@ -385,6 +385,36 @@ void parse_tiles_quant_segmentation(BitReader& br, SyntaxBuilder& b, const Seque
                                     h.lossless.AllLossless ? 1 : 0));
 }
 
+// loop_filter_params() … film_grain_params() (§7.3.6 rows 20–27, WI-1.118) in AV1 §5.9.2 order, from the values
+// load_previous() / setup_past_independence() left in h.state (loop filter deltas, PrevGmParams); the results go
+// back into h.state for the §7.20 update process.
+void parse_rows_20_to_27(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq, const DecoderState& state,
+                         FrameHeader& h) {
+  const bool CodedLossless = h.lossless.CodedLossless;
+  h.loop_filter_params = parse_loop_filter_params(br, b, seq.color_config, CodedLossless, h.allow_intrabc,
+                                                  h.state.loop_filter_ref_deltas, h.state.loop_filter_mode_deltas);
+  h.state.loop_filter_ref_deltas = h.loop_filter_params.loop_filter_ref_deltas;
+  h.state.loop_filter_mode_deltas = h.loop_filter_params.loop_filter_mode_deltas;
+  h.cdef_params = parse_cdef_params(br, b, seq, CodedLossless, h.allow_intrabc);
+  h.lr_params = parse_lr_params(br, b, seq, h.lossless.AllLossless, h.allow_intrabc, h.frame_size.UpscaledWidth,
+                                h.frame_size.FrameHeight);
+  h.tx_mode = parse_tx_mode(br, b, CodedLossless);
+  h.reference_select = parse_frame_reference_mode(br, b, h.FrameIsIntra);
+  h.skip_mode_params =
+      parse_skip_mode_params(br, b, seq, state, h.ref_frame_idx, h.state.OrderHint, h.FrameIsIntra, h.reference_select);
+  if (h.FrameIsIntra || h.error_resilient_mode || !seq.enable_warped_motion) {
+    h.allow_warped_motion = false;
+  } else {
+    h.allow_warped_motion = b.read_flag("allow_warped_motion");
+  }
+  h.reduced_tx_set = b.read_flag("reduced_tx_set");
+  h.global_motion_params =
+      parse_global_motion_params(br, b, h.FrameIsIntra, h.allow_high_precision_mv, h.state.gm_params);
+  h.state.gm_params = h.global_motion_params.gm_params;
+  h.state.film_grain_params =
+      parse_film_grain_params(br, b, seq, state, h.ref_frame_idx, h.frame_type, h.show_frame, h.showable_frame);
+}
+
 FrameHeader parse_uncompressed_header(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq, DecoderState& state,
                                       uint8_t temporal_id, uint8_t spatial_id) {
   FrameHeader h;
@@ -427,8 +457,8 @@ FrameHeader parse_uncompressed_header(BitReader& br, SyntaxBuilder& b, const Seq
   load_previous(state, h);  // setup_past_independence() or load_previous(); CDFs are not modelled
   // motion_field_estimation() (use_ref_frame_mvs) is decoder-only and not performed (§7.3.6 row 11).
   parse_tiles_quant_segmentation(br, b, seq, h);
+  parse_rows_20_to_27(br, b, seq, state, h);
   h.is_rap = h.frame_type == FrameType::Key && h.show_frame;
-  h.part1_only = true;  // loop_filter_params() … film_grain_params() are WI-1.118
   emit_summary(b, h);
   h.span = br.span_since(start);
   return h;
