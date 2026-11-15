@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "metrics/host/plugin_registry.h"
+#include "metrics/kernels/identity.h"
 #include "metrics/kernels/map_sink.h"
 #include "metrics/kernels/psnr_kernels.h"
 #include "metrics/kernels/ssim_metric.h"
@@ -453,6 +454,7 @@ void register_builtin_kernels(PluginRegistry& registry) {
   (void)registry.register_builtin(psnr_metric_api(), "(built-in)");
   (void)registry.register_builtin(ssim_metric_api(), "(built-in)");
   (void)registry.register_builtin(ssim_x264_metric_api(), "(built-in)");
+  (void)registry.register_builtin(identity_metric_api(), "(built-in)");
 }
 
 }  // namespace ovt::metrics
