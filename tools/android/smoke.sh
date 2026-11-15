@@ -57,7 +57,7 @@ excerpt() {
   adb logcat -d > "$out/logcat.txt" 2>&1 || true
   adb exec-out screencap -p > "$out/screenshot.png" 2>/dev/null || true
   local pid
-  pid="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' | awk '{print $1}')"
+  pid="$(adb shell pidof "$PKG" 2>/dev/null | tr -d '\r' | awk '{print $1}')" || pid=""
   echo "---- logcat excerpt (app pid '${pid:-none}', OVT, Qt, crash banners) ----"
   { grep -E "OVT|Qt|FATAL|Fatal signal|DEBUG  |org.openvideotools" "$out/logcat.txt" || true
     if [ -n "$pid" ]; then grep -E "^[0-9-]+ [0-9:.]+ +$pid " "$out/logcat.txt" || true; fi
