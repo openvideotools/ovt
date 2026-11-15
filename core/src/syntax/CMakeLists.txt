@@ -28,10 +28,10 @@ target_sources(ovt_core_objects PRIVATE av1/decoder_state.cpp)
 # render_size / frame_size_with_refs (rows 12–14) and tile_info (row 15).
 target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp av1/quantization.cpp av1/segmentation.cpp
                                         av1/delta_params.cpp)
-# WI-1.118: uncompressed_header() rows 20–27 (loop filter, CDEF, LR, tx mode, reference / skip mode, global motion,
-# film grain).
+# WI-1.118: uncompressed_header() rows 20–27 and 29 (loop filter, CDEF, LR, tx mode, reference / skip mode,
+# global motion, film grain, tile group).
 target_sources(ovt_core_objects PRIVATE av1/loop_filter.cpp av1/cdef.cpp av1/lr.cpp av1/tx_mode.cpp av1/skip_mode.cpp
-                                        av1/global_motion.cpp av1/film_grain.cpp)
+                                        av1/global_motion.cpp av1/film_grain.cpp av1/tile_group.cpp)
 # WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
 # st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
 # rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).

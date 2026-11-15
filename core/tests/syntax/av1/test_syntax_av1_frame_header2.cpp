@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Unit tests of the AV1 uncompressed_header() sub-structures of chapter 7 §7.3.6 rows 20–27 (WI-1.118 parts a and b):
+// Unit tests of the AV1 uncompressed_header() sub-structures of chapter 7 §7.3.6 rows 20–27 and 29 (WI-1.118):
 // loop_filter_params, cdef_params, lr_params, read_tx_mode, frame_reference_mode, skip_mode_params,
-// global_motion_params (with the subexp decoding) and film_grain_params (with load_grain_params). The frame OBU,
-// the tile group (rows 28–29) and the uncompressed_header() wiring are WI-1.118 part c.
+// global_motion_params (with the subexp decoding), film_grain_params (with load_grain_params) and tile_group_obu.
+// The frame OBU (row 28) and the uncompressed_header() wiring follow in WI-1.118 part c.
 //
 // Expected values come from recorded oracle runs, cited at each fixture:
 //   - FFmpeg 6.1.1 `-bsf:v trace_headers` (bit offsets counted from the first OBU header bit, as the trace prints
@@ -21,6 +21,7 @@
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -30,9 +31,11 @@
 #include <ios>
 #include <iterator>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include "index/av1_frame_boundary.h"
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/av1/decoder_state.hpp"
 #include "ovt/cxx/syntax/av1/frame_header.hpp"
@@ -1119,6 +1122,224 @@ TEST_CASE("av1_film_grain_params_corpus_av1_1_b8_23_film_grain_50", "[syntax][av
     br.skip_bits(60);
     check_film_grain_50_frame0(br, b, 0);
   });
+}
+
+// ---- row 29: tile_group_obu --------------------------------------------------------------------------------------
+
+// The tile_info() of syn_av1_tiles_cdef_lr (1280x720, 128x128 superblocks, uniform spacing, TileColsLog2 2,
+// TileRowsLog2 1; WI-1.117 AT3 checks the same values through parse_tile_info) with `tile_size_bytes`.
+TileInfo tiles_4x2(uint8_t tile_size_bytes) {
+  TileInfo ti;
+  ti.MiColStarts = {0, 96, 192, 288, 320};
+  ti.MiRowStarts = {0, 96, 180};
+  ti.TileCols = 4;
+  ti.TileRows = 2;
+  ti.NumTiles = 8;
+  ti.TileColsLog2 = 2;
+  ti.TileRowsLog2 = 1;
+  ti.tile_size_bytes_minus_1 = static_cast<uint8_t>(tile_size_bytes - 1);
+  ti.TileSizeBytes = tile_size_bytes;
+  ti.sbShift = 5;
+  return ti;
+}
+
+// tile_group_obu of frame 0 of syn_av1_tiles_cdef_lr (OBU_FRAME, obu_size 22932 behind a 4-byte OBU header).
+// trace_headers: the frame header ends with byte_alignment() at bit 168 (59 tile_size_bytes_minus1 = 1, so
+// TileSizeBytes 2), 168 tile_start_and_end_present_flag 0 and 7 zero bits; frame_header_obu() took 17 bytes, so
+// sz = 22932 - 17 = 22915. gst_parse_oracle GstAV1TileGroupOBU: tg_start 0, tg_end 7, entry[].tile_size {1100,
+// 749, 878, 248, 74, 45, 19790, 16}, tile_offset (from the first payload byte) {20, 1122, 1873, 2753, 3003, 3079,
+// 3126, 22916}, tile_row {0,0,0,0,1,1,1,1}, tile_col {0,1,2,3,0,1,2,3}, mi_row_start {0,0,0,0,96,96,96,96},
+// mi_row_end {96,96,96,96,180,180,180,180}, mi_col_start {0,96,192,288,0,96,192,288}, mi_col_end
+// {96,192,288,320,96,192,288,320}.
+TEST_CASE("av1_tile_group_obu_corpus_syn_av1_tiles_cdef_lr", "[syntax][av1][fast][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("syn_av1_tiles_cdef_lr");
+  const Bytes obu0 = nth_frame_obu(read_file(path), 0);
+  REQUIRE(obu0.size() == 4 + 22932);
+  TileGroup tg;
+  uint64_t bits = 0;
+  const SyntaxNodeBuffer tree = with_tree(
+      obu0,
+      [&](BitReader& br, SyntaxBuilder& b) {
+        br.skip_bits(168);
+        tg = parse_tile_group_obu(br, b, tiles_4x2(2), 22932 - 17);
+      },
+      &bits);
+  CHECK(bits == obu0.size() * 8);
+  CHECK_FALSE(tg.tile_start_and_end_present_flag);
+  CHECK(tg.tg_start == 0);
+  CHECK(tg.tg_end == 7);
+  CHECK(tg.headerBytes == 1);
+  CHECK(tg.frame_complete);
+  REQUIRE(tg.tiles.size() == 8);
+  const std::array<uint64_t, 8> size{1100, 749, 878, 248, 74, 45, 19790, 16};
+  const std::array<uint64_t, 8> offset{20, 1122, 1873, 2753, 3003, 3079, 3126, 22916};
+  const std::array<uint32_t, 8> mi_col_start{0, 96, 192, 288, 0, 96, 192, 288};
+  const std::array<uint32_t, 8> mi_col_end{96, 192, 288, 320, 96, 192, 288, 320};
+  for (size_t i = 0; i < 8; ++i) {
+    CAPTURE(i);
+    const TileGroupTile& t = tg.tiles[i];
+    CHECK(t.TileNum == i);
+    CHECK(t.tileSize == size[i]);
+    CHECK(t.byte_offset == 4 + offset[i]);
+    CHECK(t.tileRow == i / 4);
+    CHECK(t.tileCol == i % 4);
+    CHECK(t.MiRowStart == (i < 4 ? 0U : 96U));
+    CHECK(t.MiRowEnd == (i < 4 ? 96U : 180U));
+    CHECK(t.MiColStart == mi_col_start[i]);
+    CHECK(t.MiColEnd == mi_col_end[i]);
+    CHECK(t.tile_size_minus_1 == (i < 7 ? size[i] - 1 : 0));
+  }
+  CHECK(count_named(tree.root(), "tile_size_minus_1") == 7);
+  CHECK(count_named(tree.root(), "tile_data") == 8);
+  const SyntaxNodeData* td = find(tree.root(), "tile_data", 6);
+  REQUIRE(td != nullptr);
+  CHECK(td->span.bit_offset == uint64_t{4 + 3126} * 8U);
+  CHECK(td->span.bit_length == 19790U * 8U);
+}
+
+TEST_CASE("av1_tile_group_obu_start_end_and_single_tile", "[syntax][av1][fast]") {
+  // Two tile groups of one 4x2 frame, TileSizeBytes 1. Group 1: tile_start_and_end_present_flag 1, tileBits
+  // 2 + 1 = 3, tg_start 2, tg_end 5, then byte_alignment() (1 + 3 + 3 = 7 bits + 1 zero bit): headerBytes 1;
+  // tiles 2, 3, 4 carry tile_size_minus_1 {2, 0, 4} (sizes 3, 1, 5), tile 5 takes the rest:
+  // sz = 1 + (1 + 3) + (1 + 1) + (1 + 5) + 6 = 19, so tile 5 is 6 bytes.
+  BitWriter w;
+  w.put(1, 1).put(2, 3).put(5, 3).put(0, 1);
+  const std::array<uint64_t, 3> sizes_minus_1{2, 0, 4};
+  for (const uint64_t m : sizes_minus_1) {
+    w.put(m, 8);
+    for (uint64_t i = 0; i <= m; ++i) {
+      w.put(0xA5, 8);
+    }
+  }
+  for (int i = 0; i < 6; ++i) {
+    w.put(0x5A, 8);
+  }
+  const Bytes g1 = w.bytes();
+  REQUIRE(g1.size() == 19);
+  TileGroup tg;
+  (void)with_tree(g1, [&](BitReader& br, SyntaxBuilder& b) { tg = parse_tile_group_obu(br, b, tiles_4x2(1), 19); });
+  CHECK(tg.tile_start_and_end_present_flag);
+  CHECK(tg.tg_start == 2);
+  CHECK(tg.tg_end == 5);
+  CHECK(tg.headerBytes == 1);
+  CHECK_FALSE(tg.frame_complete);
+  REQUIRE(tg.tiles.size() == 4);
+  CHECK(tg.tiles[0].byte_offset == 2);
+  CHECK(tg.tiles[0].tileSize == 3);
+  CHECK(tg.tiles[1].byte_offset == 6);
+  CHECK(tg.tiles[1].tileSize == 1);
+  CHECK(tg.tiles[2].byte_offset == 8);
+  CHECK(tg.tiles[2].tileSize == 5);
+  CHECK(tg.tiles[2].tileRow == 1);  // TileNum 4
+  CHECK(tg.tiles[2].tileCol == 0);
+  CHECK(tg.tiles[3].byte_offset == 13);
+  CHECK(tg.tiles[3].tileSize == 6);
+  CHECK(tg.tiles[3].tile_size_minus_1 == 0);  // last tile: not read
+  CHECK(tg.tiles[3].MiColStart == 96);
+  CHECK(tg.tiles[3].MiColEnd == 192);
+
+  // Group 2: tiles 6..7 ends the frame.
+  BitWriter w2;
+  w2.put(1, 1).put(6, 3).put(7, 3).put(0, 1).put(0, 8).put(0x11, 8).put(0x22, 8).put(0x33, 8);
+  TileGroup tg2;
+  (void)with_tree(w2.bytes(), [&](BitReader& br, SyntaxBuilder& b) {
+    tg2 = parse_tile_group_obu(br, b, tiles_4x2(1), static_cast<uint32_t>(w2.bytes().size()));
+  });
+  CHECK(tg2.frame_complete);
+  REQUIRE(tg2.tiles.size() == 2);
+  CHECK(tg2.tiles[1].tileSize == 2);
+  CHECK(tg2.tiles[1].MiColEnd == 320);
+
+  // NumTiles == 1: nothing is read before byte_alignment(); the one tile takes sz.
+  TileInfo one;
+  one.MiColStarts = {0, 44};
+  one.MiRowStarts = {0, 36};
+  one.TileCols = 1;
+  one.TileRows = 1;
+  one.NumTiles = 1;
+  const Bytes data{0x01, 0x02, 0x03};
+  TileGroup tg3;
+  uint64_t bits = 0;
+  (void)with_tree(data, [&](BitReader& br, SyntaxBuilder& b) { tg3 = parse_tile_group_obu(br, b, one, 3); }, &bits);
+  CHECK(bits == 24);
+  CHECK(tg3.headerBytes == 0);
+  CHECK(tg3.frame_complete);
+  REQUIRE(tg3.tiles.size() == 1);
+  CHECK(tg3.tiles[0].tileSize == 3);
+  CHECK(tg3.tiles[0].MiRowEnd == 36);
+}
+
+std::string parse_error_code(const Bytes& bytes, const TileInfo& ti, uint32_t sz) {
+  try {
+    (void)with_tree(bytes, [&](BitReader& br, SyntaxBuilder& b) { (void)parse_tile_group_obu(br, b, ti, sz); });
+  } catch (const ovt::ParseError& e) {
+    return e.code;
+  }
+  return "";
+}
+
+// Acceptance test 4: a tile_size_minus_1 that overruns the tile group is ParseError SYN-AV1-0020, and the frame,
+// which never reaches tg_end == NumTiles - 1, is reported truncated (SYN-AV1-0101) by the index's frame grouper.
+TEST_CASE("av1_tile_group_obu_tile_size_overrun", "[syntax][av1][fast]") {
+  // 4x2 tiles, TileSizeBytes 2, no start/end: tile 0 says 0x0100 + 1 = 257 bytes but only 10 follow.
+  BitWriter w;
+  w.put(0, 8).put(0x00, 8).put(0x01, 8);  // header byte, then le(2) = 0x0100
+  for (int i = 0; i < 10; ++i) {
+    w.put(0, 8);
+  }
+  CHECK(parse_error_code(w.bytes(), tiles_4x2(2), 13) == "SYN-AV1-0020");
+  // A tile size (le(2) = 5, 6 bytes) that the data holds but sz (1 + 2 + 5 = 8) does not.
+  BitWriter w_sz;
+  w_sz.put(0, 8).put(0x05, 8).put(0x00, 8);
+  for (int i = 0; i < 10; ++i) {
+    w_sz.put(0, 8);
+  }
+  CHECK(parse_error_code(w_sz.bytes(), tiles_4x2(2), 8) == "SYN-AV1-0020");
+  // sz too small for the tile_size_minus_1 field itself.
+  CHECK(parse_error_code(w.bytes(), tiles_4x2(2), 2) == "SYN-AV1-0020");
+  // The last tile: sz says more bytes than the OBU holds.
+  TileInfo one;
+  one.MiColStarts = {0, 44};
+  one.MiRowStarts = {0, 36};
+  one.TileCols = 1;
+  one.TileRows = 1;
+  one.NumTiles = 1;
+  CHECK(parse_error_code(Bytes{0x01, 0x02}, one, 3) == "SYN-AV1-0020");
+  // tg_end past the last tile (tileBits 3 codes 0..7 but the frame has 6 tiles): SYN-GEN-0003.
+  TileInfo six = tiles_4x2(1);
+  six.MiColStarts = {0, 96, 192, 288};
+  six.TileCols = 3;
+  six.NumTiles = 6;
+  BitWriter w2;
+  w2.put(1, 1).put(4, 3).put(6, 3).put(0, 1).put(0, 8).put(0, 8);
+  CHECK(parse_error_code(w2.bytes(), six, 3) == "SYN-GEN-0003");
+  BitWriter w3;
+  w3.put(1, 1).put(5, 3).put(4, 3).put(0, 1).put(0, 8);  // tg_start > tg_end
+  CHECK(parse_error_code(w3.bytes(), six, 2) == "SYN-GEN-0003");
+
+  // The index side: OBU_FRAME_HEADER (NumTiles 8), then the OBU_TILE_GROUP whose tile_group_obu() failed, so the
+  // builder hands the grouper no tg_end; the frame stays open and end of stream reports it truncated.
+  ovt::index::Av1FrameGrouper g;
+  ovt::index::ObuEvent fh;
+  fh.header.obu_type = static_cast<uint8_t>(ObuType::FrameHeader);
+  fh.header.obu_has_size_field = true;
+  fh.frame_header = ovt::index::FrameHeaderPeek{};
+  fh.num_tiles = 8;
+  std::vector<std::string> codes;
+  const auto collect = [&codes](const ovt::index::IndexDiagnostic& d) { codes.emplace_back(d.code); };
+  (void)g.on_obu(fh, collect);
+  ovt::index::ObuEvent failed_tg;
+  failed_tg.header.obu_type = static_cast<uint8_t>(ObuType::TileGroup);
+  failed_tg.header.obu_has_size_field = true;
+  failed_tg.num_tiles = 8;
+  const ovt::index::ObuPlacement p = g.on_obu(failed_tg, collect);
+  CHECK(p.in_frame);
+  CHECK_FALSE(p.completes_frame);
+  CHECK(g.frame_open());
+  bool truncated = false;
+  CHECK(g.end_of_stream(truncated, collect));
+  CHECK(truncated);
+  CHECK(std::find(codes.begin(), codes.end(), "SYN-AV1-0101") != codes.end());
 }
 
 }  // namespace

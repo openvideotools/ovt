@@ -456,6 +456,40 @@ struct GlobalMotionParams {
 /// load_grain_params(idx) (AV1 §7.21 / §6.8.20): the SavedFilmGrainParams of slot `idx`.
 [[nodiscard]] FilmGrainParams load_grain_params(const DecoderState& state, uint8_t idx) noexcept;
 
+// ---- row 29: tile_group_obu() -------------------------------------------------------------------------------
+
+/// One tile of a tile group (AV1 §5.11.1 loop body). tile_data() is opaque: byte_offset / tileSize locate it,
+/// byte_offset counted from the first byte of the BitReader's data (the caller adds the OBU's file offset for the
+/// derived "tile byte range").
+struct TileGroupTile {
+  uint64_t byte_offset = 0;
+  uint64_t tileSize = 0;
+  uint32_t TileNum = 0;
+  uint32_t tileRow = 0;
+  uint32_t tileCol = 0;
+  uint32_t MiRowStart = 0;
+  uint32_t MiRowEnd = 0;
+  uint32_t MiColStart = 0;
+  uint32_t MiColEnd = 0;
+  uint32_t tile_size_minus_1 = 0;  // le(TileSizeBytes); not read (0) for the last tile of the group
+};
+
+struct TileGroup {
+  std::vector<TileGroupTile> tiles;  // tg_start .. tg_end
+  BitSpan span{0, 0};
+  uint32_t tg_start = 0;
+  uint32_t tg_end = 0;
+  uint32_t headerBytes = 0;  // bytes up to and including byte_alignment()
+  bool tile_start_and_end_present_flag = false;
+  bool frame_complete = false;  // tg_end == NumTiles - 1: SeenFrameHeader = 0, the reference update runs
+};
+
+/// tile_group_obu(sz) (AV1 §5.11.1) at the current position (node "tile_group_obu"), with `sz` the bytes left in
+/// the OBU and `ti` the frame's tile_info(). A tile size that overruns the group (or the reader's data) is
+/// ParseError SYN-AV1-0020; a tile range outside 0 .. NumTiles - 1 is ParseError SYN-GEN-0003. Either way the
+/// frame never reaches tg_end == NumTiles - 1 and the index reports it truncated (SYN-AV1-0101).
+[[nodiscard]] TileGroup parse_tile_group_obu(BitReader& br, SyntaxBuilder& b, const TileInfo& ti, uint32_t sz);
+
 }  // namespace ovt::syntax::av1
 
 #endif  // OVT_CXX_SYNTAX_AV1_FRAME_HEADER_HPP
