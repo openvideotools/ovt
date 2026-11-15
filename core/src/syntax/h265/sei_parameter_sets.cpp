@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.265 active_parameter_sets() (D.2.21) and decoded_picture_hash() (D.3.19): chapter 7 §7.3.5 row 14, WI-1.114.
+// H.265 active_parameter_sets() (D.2.21) and decoded_picture_hash() (D.2.19): chapter 7 §7.3.5 row 14, WI-1.114.
 // The picture hash is stored in DecodedPictureHash for the verify job (§7.6.4).
 
 #include <algorithm>

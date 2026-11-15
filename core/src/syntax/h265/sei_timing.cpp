@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.265 buffering_period() (D.2.2), pic_timing() (D.2.3) and recovery_point() (D.2.8): chapter 7 §7.3.5 row 14,
-// WI-1.114. The HRD field lengths come from the hrd_parameters() of the SPS VUI.
+// H.265 buffering_period() (D.2.2), pic_timing() (D.2.3), recovery_point() (D.2.8) and time_code() (D.2.27): chapter 7
+// §7.3.5 row 14, WI-1.114. The HRD field lengths come from the hrd_parameters() of the SPS VUI.
+
+#include <fmt/format.h>
 
 #include <array>
 #include <cstdint>
@@ -57,6 +59,49 @@ std::vector<InitialCpbRemoval> read_cpb_entries(SeiPayloadReader& r, const HrdPa
     }
   }
   return out;
+}
+
+TimeCodeClock parse_clock(SeiPayloadReader& r, int index) {
+  TimeCodeClock c;
+  SyntaxBuilder& b = r.builder();
+  const SeiArrayElement element(b, "clock_timestamp", index);
+  c.clock_timestamp_flag = r.flag("clock_timestamp_flag");
+  if (!c.clock_timestamp_flag) {
+    return c;
+  }
+  c.units_field_based_flag = r.flag("units_field_based_flag");
+  c.counting_type = static_cast<uint32_t>(r.u("counting_type", 5));
+  c.full_timestamp_flag = r.flag("full_timestamp_flag");
+  c.discontinuity_flag = r.flag("discontinuity_flag");
+  c.cnt_dropped_flag = r.flag("cnt_dropped_flag");
+  c.n_frames = static_cast<uint32_t>(r.u("n_frames", 9));  // u(9), not u(8) as in H.264 pic_timing
+  if (c.full_timestamp_flag) {
+    c.seconds_flag = c.minutes_flag = c.hours_flag = true;
+    c.seconds_value = static_cast<uint32_t>(r.u("seconds_value", 6));
+    c.minutes_value = static_cast<uint32_t>(r.u("minutes_value", 6));
+    c.hours_value = static_cast<uint32_t>(r.u("hours_value", 5));
+  } else {
+    c.seconds_flag = r.flag("seconds_flag");
+    if (c.seconds_flag) {
+      c.seconds_value = static_cast<uint32_t>(r.u("seconds_value", 6));
+      c.minutes_flag = r.flag("minutes_flag");
+      if (c.minutes_flag) {
+        c.minutes_value = static_cast<uint32_t>(r.u("minutes_value", 6));
+        c.hours_flag = r.flag("hours_flag");
+        if (c.hours_flag) {
+          c.hours_value = static_cast<uint32_t>(r.u("hours_value", 5));
+        }
+      }
+    }
+  }
+  c.time_offset_length = static_cast<uint32_t>(r.u("time_offset_length", 5));
+  if (c.time_offset_length > 0) {
+    c.time_offset_value = static_cast<int32_t>(r.i("time_offset_value", c.time_offset_length));
+    b.set_descriptor_text("i(v)");
+  }
+  c.text = fmt::format("{:02}:{:02}:{:02}:{:02}", c.hours_value, c.minutes_value, c.seconds_value, c.n_frames);
+  b.derived("clockTimestamp", c.text);
+  return c;
 }
 
 }  // namespace
@@ -150,6 +195,15 @@ RecoveryPoint parse_recovery_point(SeiPayloadReader& r, const Sps* sps) {
   p.exact_match_flag = r.flag("exact_match_flag");
   p.broken_link_flag = r.flag("broken_link_flag");
   return p;
+}
+
+TimeCode parse_time_code(SeiPayloadReader& r) {
+  TimeCode t;
+  t.num_clock_ts = static_cast<uint32_t>(r.u("num_clock_ts", 2));
+  for (uint32_t i = 0; i < t.num_clock_ts; ++i) {
+    t.clock.push_back(parse_clock(r, static_cast<int>(i)));
+  }
+  return t;
 }
 
 }  // namespace ovt::syntax::h265::detail
