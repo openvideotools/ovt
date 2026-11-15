@@ -108,7 +108,8 @@ extern const size_t SchemesCount;
 [[nodiscard]] std::span<const RegistryName> generated_handlers() noexcept;
 [[nodiscard]] std::span<const RegistryName> generated_item_types() noexcept;
 [[nodiscard]] std::span<const RegistryName> generated_schemes() noexcept;
-// MP4RA description of a code, or "" when the list does not have it.
+// MP4RA description of a code, or "" when the list does not have it. SPEC-ASSUMPTION(#574): the descriptions are
+// left empty until the owner rules on the MP4RA data licence; the codes and specification names are present.
 [[nodiscard]] std::string_view brand_description(std::string_view code) noexcept;
 [[nodiscard]] std::string_view handler_description(std::string_view code) noexcept;
 [[nodiscard]] std::string_view item_type_description(std::string_view code) noexcept;

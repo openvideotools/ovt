@@ -78,6 +78,10 @@ NAME_TABLES = [  # (C++ array, input CSV)
 ]
 BOX_NAME_CSVS = ["mp4ra_boxes.csv", "mp4ra_boxes_udta.csv", "mp4ra_boxes_qt.csv"]
 KIND_NAMES = {"Container", "ContainerWithPrefix", "Leaf", "Opaque"}
+# SPEC-ASSUMPTION(#574): MP4RA states no licence for its data, so until the owner rules (licence question of
+# WI-1.203) its description column is not copied into the generated file: box rows take the conformance JSON or
+# extra description, and the name tables carry codes and specification names only. Flip to restore them.
+USE_MP4RA_DESCRIPTIONS = False
 
 
 class InputError(Exception):
@@ -307,7 +311,7 @@ class Row:
 def make_row(cc: str, pattern: str, d: Def | None, names: dict, parents: str) -> Row:
     full = is_fullbox(d) if d is not None else False
     mp4ra = names.get(cc)
-    desc = mp4ra[0] if mp4ra else (d.description if d else "")
+    desc = mp4ra[0] if mp4ra and USE_MP4RA_DESCRIPTIONS else (d.description if d else "")
     spec = d.spec_ref if d is not None and d.spec_ref else (mp4ra[1] if mp4ra else "")
     return Row(
         fourcc=cc,
@@ -358,7 +362,7 @@ def load_name_table(path: Path) -> list[tuple[str, str, str]]:
     seen: dict[str, tuple[str, str, str]] = {}
     for row in read_csv(path):
         cc = norm_fourcc(row["code"])
-        seen.setdefault(cc, (cc, row["description"], row["specification"]))
+        seen.setdefault(cc, (cc, row["description"] if USE_MP4RA_DESCRIPTIONS else "", row["specification"]))
     return [seen[k] for k in sorted(seen, key=lambda s: s.encode("latin-1"))]
 
 

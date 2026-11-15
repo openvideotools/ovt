@@ -15,6 +15,7 @@
 #include <iterator>
 #include <regex>
 #include <set>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -182,12 +183,16 @@ TEST_CASE("extra boxes: CENC, codec configurations, QuickTime, iTunes, PIFF", "[
 }
 
 TEST_CASE("MP4RA name tables", "[container][registry][fast]") {
-  CHECK_FALSE(iso::brand_description("isom").empty());
-  CHECK_FALSE(iso::brand_description("qt  ").empty());
+  const auto has = [](std::span<const iso::RegistryName> table, std::string_view code) {
+    return std::ranges::any_of(table, [&](const iso::RegistryName& n) { return std::string_view(n.code) == code; });
+  };
+  CHECK(has(iso::generated_brands(), "isom"));
+  CHECK(has(iso::generated_brands(), "qt  "));
+  CHECK_FALSE(has(iso::generated_brands(), "zzzz"));
+  CHECK(has(iso::generated_handlers(), "vide"));
+  CHECK(has(iso::generated_item_types(), "hvc1"));
+  CHECK(has(iso::generated_schemes(), "cenc"));
   CHECK(iso::brand_description("zzzz").empty());
-  CHECK_FALSE(iso::handler_description("vide").empty());
-  CHECK_FALSE(iso::item_type_description("hvc1").empty());
-  CHECK_FALSE(iso::scheme_description("cenc").empty());
   for (const auto table :
        {iso::generated_brands(), iso::generated_handlers(), iso::generated_item_types(), iso::generated_schemes()}) {
     REQUIRE_FALSE(table.empty());
