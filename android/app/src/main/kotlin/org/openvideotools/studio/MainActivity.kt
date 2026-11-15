@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.doOnAttach
 import org.qtproject.qt.android.QtQmlStatus
 import org.qtproject.qt.android.QtQuickView
 
@@ -32,16 +33,29 @@ class MainActivity : AppCompatActivity() {
         hdrSurface = HdrSurfaceView(this)
         host.addView(hdrSurface, FrameLayout.LayoutParams(0, 0))
 
-        // Top child: the Qt Quick UI. Constructing QtQuickView loads the Qt libraries and libovt_studio_<abi>.so,
-        // runs its main() (which only starts the event loop on Android) and then loads the QML root below.
+        // Top child: the Qt Quick UI, created once the window's decor view is attached (see addQtView).
+        window.decorView.doOnAttach { addQtView(host) }
+
+        Log.i(TAG, "OVT: native ${OvtNative.version()}")
+    }
+
+    /**
+     * Adds the Qt Quick UI. Constructing QtQuickView loads the Qt libraries and libovt_studio_<abi>.so, runs its
+     * main() (which only starts the event loop on Android) and then loads the QML root.
+     *
+     * Not done in onCreate: as soon as Qt's platform plugin is ready, Qt 6.8's QtEmbeddedDelegate posts
+     * QtDisplayManager.setApplicationDisplayMetrics() to the UI thread, which dereferences the decor view's
+     * getRootWindowInsets() without a null check. Before the first traversal attaches the window those insets are
+     * null, so a QtQuickView built in onCreate crashed with a NullPointerException in about half the emulator runs.
+     * After attachment the insets are never null.
+     */
+    private fun addQtView(host: FrameLayout) {
         qtView = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
         qtView.setStatusChangeListener { status -> onShellStatus(status) }
         host.addView(
             qtView,
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
         )
-
-        Log.i(TAG, "OVT: native ${OvtNative.version()}")
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
