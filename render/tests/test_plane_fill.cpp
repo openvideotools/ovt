@@ -26,7 +26,6 @@
 
 namespace {
 
-using ovt::render::DisplayTarget;
 using ovt::render::Picture;
 using ovt::render::VideoSurface;
 using ovt::render::ViewState;

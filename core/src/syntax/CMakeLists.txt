@@ -24,10 +24,11 @@ target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.c
                                         av1/metadata.cpp av1/tile_list.cpp)
 # WI-1.119: the AV1 reference slot model (DecoderState, §7.20 update, §7.21 loading, §7.8 set_frame_refs).
 target_sources(ovt_core_objects PRIVATE av1/decoder_state.cpp)
-# WI-1.117: AV1 uncompressed_header() part 1 (chapter 7 §7.3.6 rows 11–19); part a: frame_size / superres /
-# render_size / frame_size_with_refs (rows 12–14) and tile_info (row 15).
+# WI-1.117: AV1 uncompressed_header() part 1 (chapter 7 §7.3.6 rows 11–19): frame_size / superres / render_size /
+# frame_size_with_refs (rows 12–14), tile_info (row 15), quantization / segmentation / delta params (rows 16–19)
+# and uncompressed_header() itself (row 11).
 target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp av1/quantization.cpp av1/segmentation.cpp
-                                        av1/delta_params.cpp)
+                                        av1/delta_params.cpp av1/frame_header.cpp)
 # WI-1.118: uncompressed_header() rows 20–27 (loop filter, CDEF, LR, tx mode, reference / skip mode, global motion,
 # film grain).
 target_sources(ovt_core_objects PRIVATE av1/loop_filter.cpp av1/cdef.cpp av1/lr.cpp av1/tx_mode.cpp av1/skip_mode.cpp
@@ -63,3 +64,5 @@ target_sources(ovt_core_objects PRIVATE h264/slice_header.cpp h264/ref_pic_list_
 # WI-1.109b: H.264 AUD, end of sequence / stream, filler data and slice data partitions (chapter 7 §7.3.4 rows 19, 20
 # and 28).
 target_sources(ovt_core_objects PRIVATE h264/aud.cpp h264/data_partition.cpp)
+# WI-1.110: SEI framing shared by H.264 and H.265, and the H.264 SEI payload parsers (chapter 7 §7.3.4 rows 7–18).
+target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp)

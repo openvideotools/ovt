@@ -92,6 +92,8 @@ struct DecodeOutcome {
   uint64_t children_offset = 0;  // ContainerWithPrefix: payload offset of the first child
   bool truncated = false;        // the decoder threw ParseError; CNT-1002 is on the node
 };
+// The walker's call of a decoder: a ParseError is caught and becomes CNT-1002 ("truncated <box>: <message>"); fields
+// recorded before the throw are kept.
 DecodeOutcome run_decoder(const BoxDecoder& d, BoxContext& ctx, BitReader& br, FieldBuilder& fb);
 
 }  // namespace ovt::container::isobmff
