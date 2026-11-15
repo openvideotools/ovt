@@ -246,19 +246,19 @@ BoxRegistry& global_registry() {
 }
 
 std::span<const RegistryEntry> generated_entries() noexcept {
-  return {kEntries, kEntryCount};
+  return {&kEntries[0], kEntryCount};
 }
 std::span<const RegistryName> generated_brands() noexcept {
-  return {kBrands, BrandsCount};
+  return {&kBrands[0], BrandsCount};
 }
 std::span<const RegistryName> generated_handlers() noexcept {
-  return {kHandlers, HandlersCount};
+  return {&kHandlers[0], HandlersCount};
 }
 std::span<const RegistryName> generated_item_types() noexcept {
-  return {kItemTypes, ItemTypesCount};
+  return {&kItemTypes[0], ItemTypesCount};
 }
 std::span<const RegistryName> generated_schemes() noexcept {
-  return {kSchemes, SchemesCount};
+  return {&kSchemes[0], SchemesCount};
 }
 std::string_view brand_description(std::string_view code) noexcept {
   return find_name(generated_brands(), code);

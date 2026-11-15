@@ -316,6 +316,20 @@ uint64_t run_hand_decoder(const io::RandomAccessFile& file, BoxNodeT& n, const B
   return out.truncated ? end - payload_begin : std::min(out.children_offset, end - payload_begin);
 }
 
+// Step 2.10: registry metadata, or CNT-1001 for an unknown type. build_node already marked a truncated box by
+// setting its description to "[truncated]"; keep that suffix.
+void apply_registry_metadata(BoxNodeT& n, const RegistryEntry* entry, const FourCC& type, const BoxContext& ctx,
+                             uint64_t pos) {
+  const bool truncated = !n.description.empty();
+  if (entry != nullptr) {
+    n.spec_ref = entry->spec_ref;
+    n.description = std::string(entry->description) + (truncated ? " [truncated]" : "");
+  } else if (plausible_type(type, ctx)) {
+    n.description = truncated ? "unknown [truncated]" : "unknown";
+    add_diag(n, DiagCode::CNT_1001, "unknown box type " + n.fourcc + at(pos), pos);
+  }
+}
+
 // Steps 2.10-2.13 for one box: registry metadata, FullBox header, the top-level bookkeeping, then the hand decoder,
 // children (containers) or the payload span. `ctx` is the sibling context a decoder may update for later siblings.
 // Recursion is bounded by kMaxBoxDepth (step 2.1).
@@ -325,15 +339,7 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
   const uint64_t end = pos + n.file_span->length();
   uint64_t payload_begin = pos + n.header_length;
   const RegistryEntry* entry = registry_row(n, type, ctx);
-  const bool truncated = !n.description.empty();  // build_node marked it "[truncated]"
-  // 2.10: registry metadata, or CNT-1001 for an unknown type.
-  if (entry != nullptr) {
-    n.spec_ref = entry->spec_ref;
-    n.description = std::string(entry->description) + (truncated ? " [truncated]" : "");
-  } else if (plausible_type(type, ctx)) {
-    n.description = truncated ? "unknown [truncated]" : "unknown";
-    add_diag(n, DiagCode::CNT_1001, "unknown box type " + n.fourcc + at(pos), pos);
-  }
+  apply_registry_metadata(n, entry, type, ctx, pos);
   BoxKind kind = entry != nullptr ? entry->kind : BoxKind::Leaf;
   if (depth == 0) {
     track_top_level_flags(st, type, n);
