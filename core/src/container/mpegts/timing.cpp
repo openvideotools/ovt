@@ -109,7 +109,7 @@ void TimingBuilder::check_accuracy(const PcrState& s, PcrStream& st, uint64_t de
     return;
   }
   const uint64_t first = (s.last + kPcrWrap - s.prev) % kPcrWrap;
-  const double span = static_cast<double>(first + delta);
+  const auto span = static_cast<double>(first + delta);
   const auto where = static_cast<double>(s.last_offset - s.prev_offset) / static_cast<double>(offset - s.prev_offset);
   const double deviation_ns = (static_cast<double>(first) - span * where) * 1000.0 / 27.0;
   if (std::fabs(deviation_ns) <= kAccuracyLimitNs) {
