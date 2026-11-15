@@ -267,14 +267,23 @@ struct Lossless {
 [[nodiscard]] Lossless compute_lossless(const QuantizationParams& q, const SegmentationParams& seg,
                                         bool frame_width_equals_upscaled_width) noexcept;
 
-// ==== WI-1.118: §7.3.6 rows 20–25 (part a; rows 26–27 follow in part b) ==============================
+// ==== WI-1.118: §7.3.6 rows 20–27 ===============================================================================
 // The parsers below take the frame-level inputs uncompressed_header() has derived by then (CodedLossless,
 // AllLossless, allow_intrabc, FrameIsIntra, ref_frame_idx[], OrderHint, the primary reference's saved values) as
 // arguments, so that each one can be tested and fuzzed on its own; parse_frame_header() (row 11) calls them in
 // syntax order.
 
-// AV1 §3 constants used by rows 20–25.
+// AV1 §3 constants used by rows 20–27.
 inline constexpr uint16_t kRestorationTileSizeMax = 256;  // RESTORATION_TILESIZE_MAX
+inline constexpr uint8_t kWarpedModelPrecBits = 16;       // WARPEDMODEL_PREC_BITS
+inline constexpr uint8_t kGmAbsTransBits = 12;            // GM_ABS_TRANS_BITS
+inline constexpr uint8_t kGmAbsTransOnlyBits = 9;         // GM_ABS_TRANS_ONLY_BITS
+inline constexpr uint8_t kGmAbsAlphaBits = 12;            // GM_ABS_ALPHA_BITS
+inline constexpr uint8_t kGmAlphaPrecBits = 15;           // GM_ALPHA_PREC_BITS
+inline constexpr uint8_t kGmTransPrecBits = 6;            // GM_TRANS_PREC_BITS
+inline constexpr uint8_t kGmTransOnlyPrecBits = 3;        // GM_TRANS_ONLY_PREC_BITS
+inline constexpr uint8_t kMaxNumYPoints = 14;             // num_y_points <= 14 (AV1 §6.8.20 conformance)
+inline constexpr uint8_t kMaxNumCbCrPoints = 10;          // num_cb_points / num_cr_points <= 10 (AV1 §6.8.20)
 
 /// The loop_filter_ref_deltas of setup_past_independence() and of the lossless / intrabc branch of
 /// loop_filter_params(): INTRA_FRAME 1, LAST..LAST3 0, GOLDEN -1, BWDREF 0, ALTREF2 -1, ALTREF -1.
@@ -403,6 +412,49 @@ struct SkipModeParams {
 [[nodiscard]] SkipModeParams parse_skip_mode_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
                                                     const DecoderState& state, const RefFrameIdx& ref_frame_idx,
                                                     uint32_t OrderHint, bool FrameIsIntra, bool reference_select);
+
+// ---- row 26: global_motion_params() -------------------------------------------------------------------------
+
+/// GmType (AV1 §6.8.17). The values equal ovt.fb.Av1GmType.
+enum class GlobalMotionType : uint8_t { Identity = 0, Translation = 1, RotZoom = 2, Affine = 3 };
+/// "IDENTITY", "TRANSLATION", "ROTZOOM", "AFFINE".
+[[nodiscard]] std::string_view gm_type_name(GlobalMotionType t) noexcept;
+
+struct GlobalMotionParams {
+  GmParams gm_params = identity_gm_params();                  // gm_params[ref][0..5], entry 0 (INTRA_FRAME) unused
+  std::array<GlobalMotionType, kTotalRefsPerFrame> GmType{};  // GmType[ref], IDENTITY when !is_global
+  BitSpan span{0, 0};
+  std::array<bool, kTotalRefsPerFrame> is_global{};  // f(1) per ref LAST_FRAME..ALTREF_FRAME (inter frames)
+};
+
+/// inverse_recenter(r, v) (AV1 §5.9.29).
+[[nodiscard]] int32_t inverse_recenter(int32_t r, int32_t v) noexcept;
+
+/// global_motion_params() (AV1 §5.9.24) with read_global_param(), decode_signed_subexp_with_ref(),
+/// decode_unsigned_subexp_with_ref(), decode_subexp() and inverse_recenter() (AV1 §5.9.25–§5.9.29) at the current
+/// position (node "global_motion_params"). `PrevGmParams` is the primary reference's SavedGmParams
+/// (load_previous()) or identity_gm_params() (setup_past_independence(), and every error-resilient frame).
+[[nodiscard]] GlobalMotionParams parse_global_motion_params(BitReader& br, SyntaxBuilder& b, bool FrameIsIntra,
+                                                            bool allow_high_precision_mv, const GmParams& PrevGmParams);
+
+// ---- row 27: film_grain_params() ----------------------------------------------------------------------------
+
+/// film_grain_params() (AV1 §5.9.30) at the current position (node "film_grain_params"). Returns the
+/// FilmGrainParams the frame uses (what the §7.20 update process saves): reset_grain_params() (all zero) without
+/// film_grain_params_present, for a frame that is neither shown nor showable, or with apply_grain = 0. With
+/// update_grain = 0, load_grain_params(film_grain_params_ref_idx) copies SavedFilmGrainParams of that slot of
+/// `state` (apply_grain included, as libaom does) and grain_seed is restored to the value read; update_grain and
+/// film_grain_params_ref_idx keep the values read (they only say where the parameters came from). A
+/// film_grain_params_ref_idx that is not one of ref_frame_idx[], num_y_points > 14, num_cb_points or num_cr_points
+/// > 10, point values that do not increase, or (4:2:0) exactly one of num_cb_points / num_cr_points zero are
+/// Diagnostic Error SYN-AV1-0015 (AV1 §6.8.20 conformance requirements; SPEC-ASSUMPTION(#533)); the values
+/// stand as read.
+[[nodiscard]] FilmGrainParams parse_film_grain_params(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq,
+                                                      const DecoderState& state, const RefFrameIdx& ref_frame_idx,
+                                                      FrameType frame_type, bool show_frame, bool showable_frame);
+
+/// load_grain_params(idx) (AV1 §7.21 / §6.8.20): the SavedFilmGrainParams of slot `idx`.
+[[nodiscard]] FilmGrainParams load_grain_params(const DecoderState& state, uint8_t idx) noexcept;
 
 }  // namespace ovt::syntax::av1
 

@@ -65,23 +65,25 @@ enum RefFrame : int8_t {
 [[nodiscard]] std::string_view frame_type_name(FrameType t) noexcept;
 
 /// film_grain_params() (AV1 §5.9.30 / §6.8.20): the fields the update process saves (SavedFilmGrainParams) and
-/// load_grain_params() restores. The frame header parser (WI-1.118) fills it; the arrays are sized by the
-/// syntax maxima (14 luma points, 10 chroma points, 24 / 25 AR coefficients).
+/// load_grain_params() restores. The frame header parser (WI-1.118) fills it. The point arrays are sized by the
+/// f(4) count descriptors (16), not by the conformance maxima (14 luma, 10 chroma points), so that an
+/// out-of-range count (Diagnostic Error SYN-AV1-0015) is still stored as read; the AR coefficient arrays by the
+/// largest numPosLuma / numPosChroma (24 / 25).
 struct FilmGrainParams {
   bool apply_grain = false;
   uint16_t grain_seed = 0;
   bool update_grain = true;
   uint8_t film_grain_params_ref_idx = 0;
   uint8_t num_y_points = 0;
-  std::array<uint8_t, 14> point_y_value{};
-  std::array<uint8_t, 14> point_y_scaling{};
+  std::array<uint8_t, 16> point_y_value{};
+  std::array<uint8_t, 16> point_y_scaling{};
   bool chroma_scaling_from_luma = false;
   uint8_t num_cb_points = 0;
-  std::array<uint8_t, 10> point_cb_value{};
-  std::array<uint8_t, 10> point_cb_scaling{};
+  std::array<uint8_t, 16> point_cb_value{};
+  std::array<uint8_t, 16> point_cb_scaling{};
   uint8_t num_cr_points = 0;
-  std::array<uint8_t, 10> point_cr_value{};
-  std::array<uint8_t, 10> point_cr_scaling{};
+  std::array<uint8_t, 16> point_cr_value{};
+  std::array<uint8_t, 16> point_cr_scaling{};
   uint8_t grain_scaling_minus_8 = 0;
   uint8_t ar_coeff_lag = 0;
   std::array<uint8_t, 24> ar_coeffs_y_plus_128{};
