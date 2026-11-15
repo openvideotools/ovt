@@ -17,9 +17,9 @@
 
 namespace ovt::syntax::h264::detail {
 
-// SPEC-ASSUMPTION(#320): generic H.264 range-violation ParseError code, mirroring SYN-H265-0007.
+// Generic H.264 range-violation ParseError code, mirroring SYN-H265-0007 (§7.9.3).
 inline constexpr std::string_view kRangeCode = "SYN-H264-0002";
-// SPEC-ASSUMPTION(#320): Warning for an unknown or reserved value that a decoder may ignore (§7.3.1 rule 3).
+// Warning for an unknown or reserved value that a decoder may ignore (§7.3.1 rule 3, §7.9.3).
 inline constexpr std::string_view kReservedCode = "SYN-H264-0003";
 
 /// Throws ParseError SYN-H264-0002 unless lo <= value <= hi (§7.3.1 rule 3: checked before any loop is entered).

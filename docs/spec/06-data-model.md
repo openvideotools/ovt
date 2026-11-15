@@ -979,7 +979,7 @@ The neutral vectors are "codec-numbered": the consumer needs `FrameInfo`-level c
 
 ### 6.3.6 `PlaneRef` conventions
 
-One `PlaneRef` per `(stage, plane)` exported for the frame; the `blob_id` follows §6.6.2. `PlaneStage.Coefficients` planes are `int32` little-endian, full coded size (`width = coded_w`, `height = coded_h`), holding the dequantised coefficient at the sample position of the transform block's coefficient scan position `(u, v)` (i.e. coefficient `(u, v)` of a TB at `(x0, y0)` is stored at `(x0 + u, y0 + v)`), zero elsewhere; this is the "coefficient view" layout StreamEye uses. `Residual` planes are `int16` signed (prediction-subtracted reconstruction, before clipping). All other stages are unsigned samples at the stream's bit depth.
+One `PlaneRef` per `(stage, plane)` exported for the frame; the `blob_id` follows §6.6.2. `PlaneStage.Coefficients` planes are `int32` little-endian, full coded size (`width = coded_w`, `height = coded_h`), holding the dequantised coefficient at the sample position of the transform block's coefficient scan position `(u, v)` (i.e. coefficient `(u, v)` of a TB at `(x0, y0)` is stored at `(x0 + u, y0 + v)`), zero elsewhere; this is the "coefficient view" layout StreamEye uses. `Residual` planes are `int16` signed, defined as `PreDeblock − Prediction` after the decoder's clipping, so `Prediction + Residual == PreDeblock` for every sample (#450); PCM and transquant-bypass blocks use `Prediction = 0` by convention, so their `Residual` equals `PreDeblock`. `PlaneRef.bit_depth` is the stream bit depth for `Residual` and 16 for `Coefficients` (the CoeffMin/CoeffMax range). All other stages are unsigned samples at the stream's bit depth.
 
 ### 6.3.7 Canonical vector orders (determinism)
 

@@ -20,7 +20,7 @@ namespace ovt::syntax::h264 {
 
 namespace {
 
-// SPEC-ASSUMPTION(#388): arithmetic-safety bound only, mirroring the H.265 kMaxLumaDimension cap. With 16-bit
+// Arithmetic-safety bound only (§7.3.4 row 2), mirroring the H.265 kMaxLumaDimension cap. With 16-bit
 // macroblock dimensions FrameHeightInMbs stays in uint32 and PicSizeInMapUnits / PicWidthInMbs*FrameHeightInMbs
 // (uint64) are well defined; the level limit (Table A-1 MaxFS) is the conformance Warning of WI-4.109.
 constexpr uint32_t kMaxPicDimensionMinus1 = 65535;
