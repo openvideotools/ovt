@@ -74,3 +74,15 @@ target_sources(ovt_tests_render PRIVATE test_measure.cpp)
 
 # WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
 target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
+
+# WI-1.406: NATIVE targets (§10.4.1): encoding choice, CAMetalLayer table, headroom rule, and the swapchain path on a
+# headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
+# CAMetalLayer through MoltenVK.
+target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+if(APPLE)
+  target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
+  set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_tests_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
+                                                 "-framework CoreFoundation")
+endif()
