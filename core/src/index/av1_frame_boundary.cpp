@@ -164,17 +164,24 @@ ObuPlacement Av1FrameGrouper::on_obu(const ObuEvent& e, const IndexDiagnosticCal
         ++frames_completed_;
         return p;
       }
+      seen_frame_header_ = true;
+      tile_num_ = 0;
+      num_tiles_ = e.num_tiles;
       if (type == ObuType::Frame) {
-        // §7.3.9 (a): one OBU_FRAME carries the frame header and exactly one tile group (AV1 §5.10). With a known
-        // tile count it may still be the first of several frames' worth only when tg_end < NumTiles - 1, which
-        // AV1 §7.5 forbids for OBU_FRAME; treat it as complete.
+        // §7.3.9 (a): one OBU_FRAME carries the frame header and one tile group (AV1 §5.10). It is the whole frame
+        // unless the tile counts are known and its tile group stops short of the last tile (tg_end < NumTiles - 1):
+        // then further OBU_TILE_GROUPs follow (AV1 §7.5 allows it) and the frame stays open (#489 review).
+        const bool more_tile_groups = e.tg_end && num_tiles_ && *e.tg_end + 1U < *num_tiles_;
+        if (more_tile_groups) {
+          tile_num_ = *e.tg_end + 1U;
+          return p;
+        }
+        seen_frame_header_ = false;
+        num_tiles_.reset();
         p.completes_frame = true;
         ++frames_completed_;
         return p;
       }
-      seen_frame_header_ = true;
-      tile_num_ = 0;
-      num_tiles_ = e.num_tiles;
       return p;
     }
 
