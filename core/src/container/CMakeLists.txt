@@ -9,10 +9,13 @@ target_sources(
   ovt_core_objects
   PRIVATE annexb.cpp
           container.cpp
+          isobmff/box_registry.cpp
           isobmff/box_walk.cpp
+          isobmff/field_builder.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
+          mpegts/descriptors.cpp
           mpegts/psi.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp

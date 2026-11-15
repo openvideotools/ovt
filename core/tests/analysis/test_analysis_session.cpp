@@ -48,11 +48,17 @@ struct Spy {
   int destroys = 0;
   int flushes = 0;
   std::vector<Push> pushes;
+  struct Pull {
+    uint32_t mask;
+    std::size_t pushes_before;  // pushes seen when this pull was issued
+  };
+  std::vector<Pull> pulls;
   ovt::jobs::Cancel* cancel_on = nullptr;  // requested when the first unit of `cancel_at` is pushed
   int cancel_at = -1;
   void clear_calls() {
     creates = destroys = flushes = 0;
     pushes.clear();
+    pulls.clear();
   }
 };
 Spy g_spy;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables): C function table needs global state
@@ -76,6 +82,14 @@ ovt_status spy_push(ovt_AnalysisDecoder* dec, const uint8_t* unit, size_t len, i
   }
   return g_spy.real->push(dec, unit, len, hint, pts);
 }
+ovt_status spy_pull(ovt_AnalysisDecoder* dec, uint32_t mask, ovt_Buffer* out) noexcept {
+  try {
+    g_spy.pulls.push_back({mask, g_spy.pushes.size()});
+  } catch (...) {
+    return OVT_E_NOMEM;
+  }
+  return g_spy.real->pull(dec, mask, out);
+}
 ovt_status spy_flush(ovt_AnalysisDecoder* dec) noexcept {
   ++g_spy.flushes;
   return g_spy.real->flush(dec);
@@ -98,6 +112,7 @@ LoadedPlugin spy_plugin(const char* sub, const char* id) {
   api.create = spy_create;
   api.destroy = spy_destroy;
   api.push = spy_push;
+  api.pull = spy_pull;
   api.flush = spy_flush;
   g_spy = Spy{};
   g_spy.real = real->api;
@@ -247,6 +262,47 @@ TEST_CASE("AT1: frame T then T+1 reuses the warm decoder", "[analysis][session][
   CHECK(g_spy.pushes[0].hint == 46);
   CHECK(g_spy.pushes[0].bytes == std::vector<uint8_t>{0x01, 46, 0xAB});
   CHECK(g_spy.flushes == 0);  // never flush when the target appeared
+}
+
+TEST_CASE("#449: a planes request primes the decoder with one pull before the first push",
+          "[analysis][session][fast]") {
+  const auto plugin = spy_plugin("mock", "mock");
+  auto s = h264_script(90, 30);
+  Session session(*s->file, s->index, plugin, {});
+  std::vector<uint8_t> out;
+  constexpr uint32_t kPreDeblock = 1U << 3U;
+  REQUIRE(session.frame(45, kPreDeblock | 1U, nullptr, out) == OVT_OK);
+  REQUIRE(!g_spy.pulls.empty());
+  CHECK(g_spy.pulls[0].mask == (kPreDeblock | 1U));
+  CHECK(g_spy.pulls[0].pushes_before == 0);  // issued right after create(), before any push
+  CHECK(g_spy.creates == 1);
+
+  // A warm decoder already saw the request: no second priming pull.
+  g_spy.clear_calls();
+  REQUIRE(session.frame(46, kPreDeblock, nullptr, out) == OVT_OK);
+  CHECK(g_spy.creates == 0);
+  for (const auto& p : g_spy.pulls) {
+    CHECK(p.pushes_before > 0);
+  }
+
+  // Recreating the decoder (earlier frame) primes again.
+  g_spy.clear_calls();
+  REQUIRE(session.frame(40, kPreDeblock, nullptr, out) == OVT_OK);
+  CHECK(g_spy.creates == 1);
+  REQUIRE(!g_spy.pulls.empty());
+  CHECK(g_spy.pulls[0].pushes_before == 0);
+}
+
+TEST_CASE("#449: Reconstruction-only or empty masks send no priming pull", "[analysis][session][fast]") {
+  const auto plugin = spy_plugin("mock", "mock");
+  auto s = h264_script(60, 30);
+  Session session(*s->file, s->index, plugin, {});
+  std::vector<uint8_t> out;
+  REQUIRE(session.frame(5, 0, nullptr, out) == OVT_OK);
+  REQUIRE(session.frame(35, 1U, nullptr, out) == OVT_OK);
+  for (const auto& p : g_spy.pulls) {
+    CHECK(p.pushes_before > 0);
+  }
 }
 
 TEST_CASE("frame T-1 after T recreates the decoder from the RAP", "[analysis][session][fast]") {

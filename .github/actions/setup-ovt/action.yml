@@ -187,12 +187,23 @@ runs:
         path: build/third_party/downloads
         key: tpdl-${{ runner.os }}-${{ hashFiles('third_party/VERSIONS.md') }}
 
+    # ccache entries are the biggest caches (up to 2 GB each) and the repository has a 10 GB cap shared by every branch,
+    # so they must not pile up: no timestamp suffix and a per-day key, so that the first main build of the day saves one
+    # entry per preset and every later run of that day hits it exactly and saves nothing. Pull requests only restore
+    # (the newest main entry through the prefix); their own entries were duplicates that no other branch can read.
+    - name: ccache day
+      id: ccacheday
+      shell: bash
+      run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
     - name: ccache
       uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # v1.2.18
       with:
-        key: ccache-${{ runner.os }}-${{ inputs.preset }}-${{ github.sha }}
+        key: ccache-${{ runner.os }}-${{ inputs.preset }}-${{ steps.ccacheday.outputs.day }}
         restore-keys: ccache-${{ runner.os }}-${{ inputs.preset }}-
-        max-size: 2G
+        append-timestamp: false
+        save: ${{ github.event_name != 'pull_request' }}
+        max-size: 1G
 
     - name: ccache settings
       shell: bash

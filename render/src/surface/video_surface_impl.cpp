@@ -9,7 +9,6 @@
 // compare modes, overlays, measurements (WI-4.452, render/src/measure/) and export arrive with their own work items;
 // until then those entry points are inert.
 
-#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -99,7 +98,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
-    static_cast<void>(measurer_.init(log_, gpu_));
+    static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
 
     target_ = target;
     return create_texture(target.width, target.height);
@@ -212,9 +211,32 @@ class VideoSurfaceImpl final : public VideoSurface {
     return measurer_.poll();
   }
 
-  bool export_png(const char* /*path*/, ExportKind /*kind*/, const ViewState* /*view_or_null*/) override {
-    error_ = "export_png is not implemented yet (chapter 10 §10.8)";
+  bool export_png(const char* path, ExportKind kind, const ViewState* /*view_or_null*/) override {
+    switch (kind) {
+      case ExportKind::ScopeWaveformPng:
+        return export_scope(path, detail::ScopeKind::Waveform);
+      case ExportKind::ScopeVectorscopePng:
+        return export_scope(path, detail::ScopeKind::Vectorscope);
+      case ExportKind::ScopeCiePng:
+        return export_scope(path, detail::ScopeKind::CieXy);
+      case ExportKind::HdrPng16:
+      case ExportKind::SdrPng8:
+      case ExportKind::ViewPng8:
+        break;
+    }
+    error_ = "export_png is not implemented yet for this kind (chapter 10 §10.8, WI-1.412)";
     return false;
+  }
+
+  void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
+
+  // The `kind` scope texture of the newest measurement, downloaded (blocking).
+  bool download_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    offscreen_.begin_frame();  // textures held by the host come back for the read ...
+    const bool ok = read_scope(kind, texels, width, height);
+    offscreen_.end_frame();  // ... and go back to it, as after render()
+    return ok;
   }
 
   [[nodiscard]] DisplayTarget::OutputEncoding active_encoding() const override {
@@ -286,6 +308,61 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
   }
 
+  // ExportKind::Scope*Png (§10.8, WI-4.454): measures picture A now (blocking, unlike measure()), then writes the scope
+  // texture through the GUI-independent LUT of detail::scope_png_rgb().
+  bool export_scope(const char* path, detail::ScopeKind kind) {
+    if (!slot_a_.valid) {
+      error_ = "export_png: no picture in slot A";
+      return false;
+    }
+    offscreen_.begin_frame();  // textures held by the host come back for the passes
+    const bool measured = measurer_.measure_now(slot_a_);
+    std::vector<uint16_t> texels;
+    int width = 0;
+    int height = 0;
+    const bool ok = measured && read_scope(kind, texels, width, height);
+    offscreen_.end_frame();  // and go back to the host, as after render()
+    if (!ok) {
+      error_ = measured ? "export_png: the scope texture cannot be read back"
+                        : "export_png: scope measurement failed: " + measurer_.error();
+      return false;
+    }
+    const std::vector<uint8_t> rgb = detail::scope_png_rgb(texels, width, height);
+    if (!detail::write_png_rgb8(path, rgb, width, height)) {
+      error_ = std::string("export_png: cannot write ") + (path != nullptr ? path : "(null)");
+      return false;
+    }
+    error_.clear();
+    return true;
+  }
+
+  // Between offscreen_.begin_frame() and end_frame().
+  bool read_scope(detail::ScopeKind kind, std::vector<uint16_t>& texels, int& width, int& height) {
+    pl_tex tex = measurer_.scope_tex(kind);
+    if (tex == nullptr || !tex->params.host_readable) {
+      return false;
+    }
+    width = tex->params.w;
+    height = tex->params.h;
+    texels.assign(static_cast<size_t>(width) * static_cast<size_t>(height) * 4, 0);
+    // Through an explicit host-readable buffer: libplacebo's own staging path for a pointer download
+    // (pl_tex_download_pbo) crashes in vk_malloc_slice on MoltenVK when the device was imported (VulkanSharedDevice).
+    struct pl_buf_params bp = {};
+    bp.size = texels.size() * sizeof(uint16_t);
+    bp.host_readable = true;
+    pl_buf buf = pl_buf_create(gpu_, &bp);
+    if (buf == nullptr) {
+      return false;
+    }
+    struct pl_tex_transfer_params tp = {};
+    tp.tex = tex;
+    tp.row_pitch = static_cast<size_t>(width) * 4 * sizeof(uint16_t);
+    tp.buf = buf;
+    const bool ok = pl_tex_download(gpu_, &tp) && pl_buf_read(gpu_, buf, 0, texels.data(), bp.size);
+    pl_buf_destroy(gpu_, &buf);
+    return ok;
+  }
+
   bool create_texture(int /*width*/, int /*height*/) {
     std::string reason;
     if (!offscreen_.create_texture(target_, reason)) {
@@ -349,46 +426,49 @@ class VideoSurfaceImpl final : public VideoSurface {
         wait_fences == nullptr || destroy_fence == nullptr) {
       return;
     }
-    // The graphics, compute and transfer families may coincide; lock each (family, index) once.
-    std::vector<std::pair<uint32_t, uint32_t>> queues;
-    for (const pl_vulkan_queue& q : {vk_->queue_graphics, vk_->queue_compute, vk_->queue_transfer}) {
-      for (uint32_t i = 0; i < q.count; ++i) {
-        const std::pair<uint32_t, uint32_t> key{q.index, i};
-        if (std::find(queues.begin(), queues.end(), key) == queues.end()) {
-          queues.push_back(key);
-        }
-      }
-    }
-    for (const auto& [qf, qi] : queues) {
-      vk_->lock_queue(vk_, qf, qi);
-    }
+    // Every queue is locked while the device drains, then a fence submitted behind each queue's work is waited for.
+    // Nothing here allocates: ~VideoSurfaceImpl reaches this through destroy() and must not throw.
+    for_each_queue([this](uint32_t qf, uint32_t qi) { vk_->lock_queue(vk_, qf, qi); });
     static_cast<void>(device_wait_idle(dev));
-    std::vector<VkFence> fences;
-    fences.reserve(queues.size());
-    for (const auto& [qf, qi] : queues) {
+    for_each_queue([&](uint32_t qf, uint32_t qi) {
       VkQueue queue = VK_NULL_HANDLE;
       get_queue(dev, qf, qi, &queue);
       VkFenceCreateInfo info = {};
       info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
       VkFence fence = VK_NULL_HANDLE;
       if (queue == VK_NULL_HANDLE || create_fence(dev, &info, nullptr, &fence) != VK_SUCCESS) {
-        continue;
+        return;
       }
       // submitCount 0 with a fence: the fence alone goes into the queue, behind everything submitted before it.
-      if (queue_submit(queue, 0, nullptr, fence) != VK_SUCCESS) {
-        destroy_fence(dev, fence, nullptr);
-        continue;
+      if (queue_submit(queue, 0, nullptr, fence) == VK_SUCCESS) {
+        static_cast<void>(wait_fences(dev, 1, &fence, VK_TRUE, UINT64_MAX));
       }
-      fences.push_back(fence);
-    }
-    if (!fences.empty()) {
-      static_cast<void>(wait_fences(dev, static_cast<uint32_t>(fences.size()), fences.data(), VK_TRUE, UINT64_MAX));
-    }
-    for (VkFence fence : fences) {
       destroy_fence(dev, fence, nullptr);
+    });
+    for_each_queue([this](uint32_t qf, uint32_t qi) { vk_->unlock_queue(vk_, qf, qi); });
+  }
+
+  // Calls fn(family, index) once for every queue of the graphics, compute and transfer families, which may coincide.
+  template <typename Fn>
+  void for_each_queue(const Fn& fn) const {
+    const pl_vulkan_queue& graphics = vk_->queue_graphics;
+    const pl_vulkan_queue& compute = vk_->queue_compute;
+    const pl_vulkan_queue& transfer = vk_->queue_transfer;
+    const auto in = [](const pl_vulkan_queue& q, uint32_t family, uint32_t index) {
+      return q.index == family && index < q.count;
+    };
+    for (uint32_t i = 0; i < graphics.count; ++i) {
+      fn(graphics.index, i);
     }
-    for (const auto& [qf, qi] : queues) {
-      vk_->unlock_queue(vk_, qf, qi);
+    for (uint32_t i = 0; i < compute.count; ++i) {
+      if (!in(graphics, compute.index, i)) {
+        fn(compute.index, i);
+      }
+    }
+    for (uint32_t i = 0; i < transfer.count; ++i) {
+      if (!in(graphics, transfer.index, i) && !in(compute, transfer.index, i)) {
+        fn(transfer.index, i);
+      }
     }
   }
 
@@ -440,6 +520,29 @@ bool download_output(const VideoSurface& surface, OutputPixels& out) {
     return false;
   }
   return impl->download(out);
+}
+
+bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->set_scope_config(config);
+  return true;
+}
+
+bool hold_readbacks(VideoSurface& surface, bool hold) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl == nullptr) {
+    return false;
+  }
+  impl->hold_readbacks(hold);
+  return true;
+}
+
+bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width, int& height) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->download_scope(kind, rgba16hf, width, height);
 }
 
 bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {

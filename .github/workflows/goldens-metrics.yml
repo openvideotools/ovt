@@ -18,12 +18,13 @@ on:
       - "tests/oracles/normalize/**"
       - "tests/oracles/x264_ssim/**"
       - "tests/golden/metrics/rd_points/**"
+      - "tests/corpora/manifest.json" # a changed corpus input changes the goldens
       - ".github/workflows/goldens-metrics.yml"
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
