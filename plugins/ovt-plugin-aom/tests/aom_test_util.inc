@@ -34,7 +34,7 @@ inline const ovt::analysis::LoadedPlugin& plugin() {
 
 // One decoder instance, destroyed at scope exit.
 struct Instance {
-  Instance() : api(*plugin().api) { status = api.create(nullptr, 0, 2, &dec); }
+  explicit Instance(int threads = 2) : api(*plugin().api) { status = api.create(nullptr, 0, threads, &dec); }
   ~Instance() {
     if (dec != nullptr) {
       api.destroy(dec);
