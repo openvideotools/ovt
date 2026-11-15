@@ -22,6 +22,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
@@ -183,6 +184,7 @@ struct Grid {
   std::unique_ptr<flatbuffers::FlatBufferBuilder> fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(4096);
   std::vector<ovt::de265::RefTable::Slot> slots;
   std::vector<uint32_t> qp_hist;
+  uint32_t mv_clamped_cells = 0;
   [[nodiscard]] const fb::CellGrid& grid() const {
     return *flatbuffers::GetRoot<fb::CellGrid>(fbb->GetBufferPointer());
   }
@@ -194,6 +196,7 @@ Grid map(const Pic& p) {
   ovt::de265::RefTable refs(p.d.slices);
   ovt::de265::fill_cells(g, p.d, p.fmt, refs);
   out.slots = refs.slots();
+  out.mv_clamped_cells = g.mv_clamped_cells;
   {
     flatbuffers::FlatBufferBuilder h;
     h.Finish(ovt::de265::build_qp_hist(h, g));
@@ -491,11 +494,28 @@ TEST_CASE("de265 map_grid: RefSlots shared between slice segments and the slot l
   CHECK(big.slot(4, 1, 14) == -1);
 }
 
-TEST_CASE("de265 map_grid: quarter-sample vectors saturate at the int16 range", "[fast]") {
+TEST_CASE("de265 map_grid: quarter-sample vectors clamp to ±32767", "[fast]") {
   CHECK(ovt::de265::mv16(3) == 12);
   CHECK(ovt::de265::mv16(-5) == -20);
   CHECK(ovt::de265::mv16(10000) == 32767);
-  CHECK(ovt::de265::mv16(-10000) == -32768);
+  CHECK(ovt::de265::mv16(-10000) == -32767);  // -32768 is the MVD sentinel (chapter 06 §6.2.3)
+  CHECK(ovt::de265::mv16_clamps(8192));
+  CHECK_FALSE(ovt::de265::mv16_clamps(8191));
+  CHECK(ovt::de265::mv16_clamps(-8192));
+  CHECK_FALSE(ovt::de265::mv16_clamps(-8191));
+
+  // A 32x32 PB with an L0 vector of 9000 quarter samples: 64 clamped cells (MDL-GEN-0003), stored as 32767.
+  Pic p(64, 32, 5, 3);
+  p.d.slices[0] = b_slice();
+  p.cu(0, 0, 5, Mode::Inter);
+  p.motion(0, 0, 32, 32, 0, 0, 9000, -9000, 0);
+  p.cu(32, 0, 5, Mode::Inter);
+  p.motion(32, 0, 32, 32, 0, 0, 8191, 4, 0);
+  const Grid m = map(p);
+  CHECK(m.mv_clamped_cells == 64);
+  CHECK(m.grid().mv0_x()->Get(0) == 32767);
+  CHECK(m.grid().mv0_y()->Get(0) == -32767);
+  CHECK(m.grid().mv0_x()->Get(static_cast<flatbuffers::uoffset_t>(p.cell(32, 0))) == 32764);
 }
 
 TEST_CASE("de265 map_blocks: block tree of a hand-made picture", "[fast]") {
@@ -828,6 +848,40 @@ int ref_idx_of(const fb::FrameAnalysis& fa, int8_t slot) {
 /// HM's DM_CHROMA_IDX: getIntraDir(CHANNEL_TYPE_CHROMA) for a CU whose chroma mode follows luma.
 constexpr int kHmDmChroma = 36;
 
+/// A golden vector (1/16 luma samples, unclamped) as CellGrid stores it (chapter 06 §6.2.3).
+int clamp_mv(int hm) {
+  return std::clamp(hm, -ovt::de265::kMvNeutralMax, ovt::de265::kMvNeutralMax);
+}
+
+/// Grid cells of a golden frame with a vector component outside ±32767: the MDL-GEN-0003 count.
+std::size_t clamped_cells(const json& fields) {
+  std::size_t n = 0;
+  const std::size_t cells = fields.at("mv0_x").size();
+  for (std::size_t i = 0; i < cells; ++i) {
+    for (const char* key : {"mv0_x", "mv0_y", "mv1_x", "mv1_y"}) {
+      const int v = fields.at(key)[i].get<int>();
+      if (v != clamp_mv(v)) {
+        ++n;
+        break;
+      }
+    }
+  }
+  return n;
+}
+
+/// The MDL-GEN-0003 Diagnostics of a frame (at most one, chapter 06 §6.2.3).
+std::vector<std::string> clamp_diagnostics(const fb::FrameAnalysis& fa) {
+  std::vector<std::string> out;
+  if (fa.diagnostics() != nullptr) {
+    for (const fb::Diagnostic* d : *fa.diagnostics()) {
+      if (d->code() != nullptr && d->code()->str() == "MDL-GEN-0003") {
+        out.push_back(d->message() != nullptr ? d->message()->str() : std::string());
+      }
+    }
+  }
+  return out;
+}
+
 struct Mismatch {
   std::size_t count = 0;
   std::string first;
@@ -870,10 +924,11 @@ std::map<std::string, Mismatch> compare_frame(const fb::FrameAnalysis& fa, const
       }
       cmp("intra_mode_c", g.intra_mode_c()->Get(u), hm_c);
     }
-    cmp("mv0_x", g.mv0_x()->Get(u), f.at("mv0_x")[i].get<int>());
-    cmp("mv0_y", g.mv0_y()->Get(u), f.at("mv0_y")[i].get<int>());
-    cmp("mv1_x", g.mv1_x()->Get(u), f.at("mv1_x")[i].get<int>());
-    cmp("mv1_y", g.mv1_y()->Get(u), f.at("mv1_y")[i].get<int>());
+    // The golden holds HM's vectors unclamped (×4); CellGrid clamps them to ±32767 (chapter 06 §6.2.3).
+    cmp("mv0_x", g.mv0_x()->Get(u), clamp_mv(f.at("mv0_x")[i].get<int>()));
+    cmp("mv0_y", g.mv0_y()->Get(u), clamp_mv(f.at("mv0_y")[i].get<int>()));
+    cmp("mv1_x", g.mv1_x()->Get(u), clamp_mv(f.at("mv1_x")[i].get<int>()));
+    cmp("mv1_y", g.mv1_y()->Get(u), clamp_mv(f.at("mv1_y")[i].get<int>()));
     cmp("ref0", ref_idx_of(fa, g.ref0()->Get(u)), f.at("ref0")[i].get<int>());
     cmp("ref1", ref_idx_of(fa, g.ref1()->Get(u)), f.at("ref1")[i].get<int>());
     // Transform fields exist only where a transform tree was read: not for skipped or PCM CUs, nor for a 64x64 CU
@@ -913,6 +968,16 @@ void check_against_hm(std::string_view id) {
     for (const auto& [field, mismatch] : compare_frame(fa, frame, index)) {
       INFO(id << " " << mismatch.count << " cells differ; first: " << mismatch.first);
       CHECK(mismatch.count == 0);
+    }
+    // MDL-GEN-0003 once per frame with a clamp, naming the clamped cells.
+    const std::size_t clamped = clamped_cells(frame.at("fields"));
+    const std::vector<std::string> diags = clamp_diagnostics(fa);
+    INFO(id << " frame " << index << ": " << clamped << " clamped cells");
+    if (clamped == 0) {
+      CHECK(diags.empty());
+    } else {
+      REQUIRE(diags.size() == 1);
+      CHECK(diags.front().find("(" + std::to_string(clamped) + " cells)") != std::string::npos);
     }
   }
 }
