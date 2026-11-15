@@ -244,6 +244,10 @@ class PicMapper {
   using PicVec = std::vector<flatbuffers::Offset<fb::HevcRpsPic>>;
 
   // The five RPS lists of 8.3.2: StCurrBefore, StCurrAfter, StFoll, LtCurr, LtFoll.
+  // SPEC-ASSUMPTION(#553): a BLA picture's lists are empty. HM's parseSliceHeader reads its RPS but resets it to an
+  // empty set; every entry would be a "no reference picture" Foll entry (IRAP with NoRaslOutputFlag 1).
+  // HM's inter RPS prediction keeps a predicted entry whose dPoc is 0 (parseShortTermRefPicSet counts it as
+  // positive); equations 7-61 and 7-62 drop it, since it would be the current picture, so it is skipped here.
   void rps_lists(flatbuffers::FlatBufferBuilder& fbb, TComSlice& s, std::array<PicVec, 5>* lists) const {
     const TComReferencePictureSet* rps = s.getRPS();
     if (rps == nullptr) {
@@ -255,9 +259,7 @@ class PicMapper {
       const bool used = rps->getUsed(i) != 0;
       if (i < st) {
         if (rps->getDeltaPOC(i) == 0) {
-          // HM's inter RPS prediction keeps a predicted entry whose dPoc is 0 (TDecCavlc::parseShortTermRefPicSet
-          // counts it as positive); equations 7-61 and 7-62 drop it, since it would be the current picture.
-          continue;
+          continue;  // see above: not an entry of 7-61 / 7-62
         }
         const int poc = s.getPOC() + rps->getDeltaPOC(i);
         const std::size_t list = !used ? 2 : (i < neg ? 0 : 1);

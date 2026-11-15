@@ -751,6 +751,7 @@ struct HeaderPic {
   std::size_t tiles = 1;
   uint32_t ctbs = 0;
   bool idr = false;      // IDR_W_RADL or IDR_N_LP: the slice headers carry no RPS syntax
+  bool bla = false;      // BLA_W_LP, BLA_W_RADL or BLA_N_LP
   h265::StRefPicSet st;  // the short-term RPS of the picture (the SPS's or the slice header's own)
 };
 
@@ -777,6 +778,7 @@ HeaderPic header_pic(const h265::NalHeader& h, const h265::SliceSegmentHeader& s
   out.tiles = (act.active->colBd.size() - 1) * (act.active->rowBd.size() - 1);
   out.ctbs = act.sps->PicSizeInCtbsY;
   out.idr = h.nal_unit_type == h265::kIdrWRadl || h.nal_unit_type == h265::kIdrNLp;
+  out.bla = h.nal_unit_type >= h265::kBlaWLp && h.nal_unit_type <= h265::kBlaNLp;
   if (!out.idr) {
     out.st = sh.short_term_ref_pic_set_sps_flag ? act.sps->st_ref_pic_set.at(sh.short_term_ref_pic_set_idx)
                                                 : sh.st_ref_pic_set;
@@ -873,7 +875,8 @@ void check_segment(int idx, std::size_t i, const PicOut& p, const h265::SliceSeg
 // dpb_fullness_after within [1 + the "Curr" references, sps_max_dec_pic_buffering_minus1 + 1], 1 at an IDR.
 void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
   std::array<std::vector<int>, 3> deltas;
-  const h265::StRefPicSet& st = want.st;
+  // SPEC-ASSUMPTION(#553): HM drops a BLA picture's RPS, so the HM plugin reports its lists empty.
+  const h265::StRefPicSet st = want.bla ? h265::StRefPicSet{} : want.st;
   for (uint32_t i = 0; i < st.NumNegativePics; ++i) {
     deltas.at(st.UsedByCurrPicS0.at(i) ? 0 : 2).push_back(st.DeltaPocS0.at(i));
   }
@@ -902,8 +905,11 @@ void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, 
            1);
   m->check(idx, "dpb_fullness_after <= sps_max_dec_pic_buffering_minus1 + 1",
            p.dpb_fullness <= p.max_dec_pic_buffering ? 1 : 0, 1);
-  if (want.idr) {
-    m->check(idx, "dpb_fullness_after at an IDR", p.dpb_fullness, 1);
+  if (want.bla) {
+    m->check(idx, "BLA long-term entries", p.rps_sizes[3] + p.rps_sizes[4] == 0 ? 0 : 1, 0);
+  }
+  if (want.idr || want.bla) {
+    m->check(idx, "dpb_fullness_after at an IDR or BLA", p.dpb_fullness, 1);
   }
 }
 
