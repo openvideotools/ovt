@@ -6,8 +6,8 @@
 // gzip-compressed oracle goldens of tests/golden/metrics/, and a small metric instance wrapper. The goldens are the
 // committed WI-0.565 files and are only read here, never regenerated.
 
-#ifndef OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_H
-#define OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_H
+#ifndef OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_HPP
+#define OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_HPP
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -60,17 +60,7 @@ inline constexpr std::array<GoldenPair, 3> kPairs = {{
 
 // The file `name` of corpus entry `entry` (its primary file when `name` is empty). Skips the running test (or fails
 // it under OVT_REQUIRE_CORPORA=1) when the entry is absent, and skips it when the entry lacks the named file.
-inline std::filesystem::path corpus_file(std::string_view entry, std::string_view name) {
-  std::filesystem::path primary = ovt::test::corpus_or_skip(entry);
-  if (name.empty() || primary.filename() == name) {
-    return primary;
-  }
-  std::filesystem::path p = primary.parent_path() / std::string(name);
-  if (!std::filesystem::exists(p)) {
-    SKIP("corpus entry " << entry << " has no " << name << " (the fetcher does not decode it to Y4M yet)");
-  }
-  return p;
-}
+std::filesystem::path corpus_file(std::string_view entry, std::string_view name);
 
 // A decoded picture: three planes of 4:2:0 samples, 1 byte (8-bit) or 2 bytes little-endian (9..16-bit).
 struct Picture {
@@ -169,40 +159,14 @@ class Y4mReader {
 
 // The JSON of a gzip-compressed golden under tests/golden/metrics/ (gzip is on every desktop CI image, as in
 // test_metrics_vmaf.cpp; only [needs-corpus] tests read these files).
-inline nlohmann::json read_golden_gz(const std::string& name) {
-  const std::filesystem::path path = std::filesystem::path(OVT_GOLDEN_METRICS_DIR) / name;
-  REQUIRE(std::filesystem::exists(path));
-  const std::string cmd = "gzip -dc '" + path.string() + "'";
-  std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(cmd.c_str(), "r"),  // NOLINT(cert-env33-c): fixed command
-                                             pclose);
-  REQUIRE(pipe != nullptr);
-  std::string text;
-  std::array<char, 65536> chunk{};
-  size_t n = 0;
-  while ((n = std::fread(chunk.data(), 1, chunk.size(), pipe.get())) > 0) {
-    text.append(chunk.data(), n);
-  }
-  REQUIRE(!text.empty());
-  return nlohmann::json::parse(text);
-}
+nlohmann::json read_golden_gz(const std::string& name);
 
 // A score of a golden: a number, or the strings "inf" / "-inf" that tests/oracles/normalize/canon.py writes for
 // infinities (FFmpeg prints `inf` for identical planes).
-inline double golden_value(const nlohmann::json& v) {
-  if (v.is_string()) {
-    const auto s = v.get<std::string>();
-    REQUIRE((s == "inf" || s == "-inf"));
-    return s == "inf" ? std::numeric_limits<double>::infinity() : -std::numeric_limits<double>::infinity();
-  }
-  return v.get<double>();
-}
+double golden_value(const nlohmann::json& v);
 
 // FFmpeg's `%0.2f` of a double, read back: the value the psnr filter would print for `v`.
-inline double round2(double v) {
-  std::array<char, 64> text{};
-  std::snprintf(text.data(), text.size(), "%0.2f", v);  // NOLINT(cppcoreguidelines-pro-type-vararg)
-  return std::stod(text.data());
-}
+double round2(double v);
 
 struct Score {
   std::vector<double> values;
@@ -267,4 +231,4 @@ uint32_t for_each_frame(const GoldenPair& pair, Fn&& fn) {
 
 }  // namespace ovt::test::metrics_suite
 
-#endif  // OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_H
+#endif  // OVT_CORE_TESTS_METRICS_METRICS_GOLDEN_SUITE_HPP

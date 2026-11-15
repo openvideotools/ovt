@@ -36,7 +36,7 @@
 #include "metrics/kernels/ssim_kernels.h"
 #include "metrics/kernels/ssim_metric.h"
 #include "metrics/kernels/ssim_x264.h"
-#include "metrics_golden_suite.h"
+#include "metrics_golden_suite.hpp"
 #include "test_support/golden.h"
 
 namespace {

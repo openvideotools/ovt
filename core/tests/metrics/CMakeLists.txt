@@ -10,6 +10,7 @@ add_subdirectory(example_plugin)
 add_executable(
   ovt_tests_metrics
   abi_header_c.c
+  metrics_golden_suite.cpp
   test_metric_abi.cpp
   test_metric_job.cpp
   test_metrics_jobspec.cpp

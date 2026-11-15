@@ -27,7 +27,7 @@
 #include "metrics/kernels/psnr_metric.h"
 #include "metrics/kernels/ssim_kernels.h"
 #include "metrics/kernels/ssim_metric.h"
-#include "metrics_golden_suite.h"
+#include "metrics_golden_suite.hpp"
 #include "ovt_metrics_generated.h"
 #include "test_support/corpus.h"
 

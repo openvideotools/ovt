@@ -29,7 +29,7 @@
 #include "metrics/kernels/map_sink.h"
 #include "metrics/kernels/psnr_kernels.h"
 #include "metrics/kernels/psnr_metric.h"
-#include "metrics_golden_suite.h"
+#include "metrics_golden_suite.hpp"
 
 namespace {
 
