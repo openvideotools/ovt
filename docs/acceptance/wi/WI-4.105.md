@@ -68,3 +68,11 @@ are covered too.
 same machine, corpora and commands, 2026-11-15: `ctest -R "hm plugin"` passes 8 of 8; the new case passes all 202054
 assertions in 29.8 s. The intermediate heads 7b6db14 and 3f29f85 failed only on NUT_A_ericsson_5 decode indices 28
 and 32, the BLA pictures.
+
+## Part d: Mac Mini run, 2026-11-15
+
+Same machine, corpora and commands as part c1, branch `claude/project-thread-56e2sb` at 1d86506 (PR #564),
+`macos-arm64-release` with `-DOVT_BUILD_PLUGIN_HM=ON`, `OVT_REQUIRE_CORPORA=1`: `ctest -R "hm plugin"` passes 10 of 10.
+The new cases: `Coefficients planes match the TUs' levels` passes 88629 assertions (17.4 s) and `Coefficients planes only
+on request` passes 17508 assertions (3.3 s). The earlier cases still pass (`hm_md5_vs_sei` 54.7 s, RPS/partitions 30.6 s,
+CellGrid 22.8 s).
