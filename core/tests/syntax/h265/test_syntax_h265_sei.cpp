@@ -1,17 +1,21 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.114a: H.265 SEI framing, payload names, prefix/suffix placement and the buffering_period, pic_timing,
-// recovery_point, active_parameter_sets and decoded_picture_hash payloads (chapter 7 §7.3.5 rows 13–14).
+// WI-1.114: H.265 SEI framing, payload names, prefix/suffix placement and the buffering_period, pic_timing,
+// recovery_point, active_parameter_sets and decoded_picture_hash payloads (part a), and time_code, the two user-data
+// payloads, frame_packing_arrangement, display_orientation and the colour payloads 137, 144, 147 and 148 (part b);
+// chapter 7 §7.3.5 rows 13–14.
 //
 // Fixtures: VPS, SPS and SEI NAL units rebuilt bit for bit from tests/golden/h265/<id>.trace_headers.json.gz (each
 // element at its recorded offset and width, plus rbsp_trailing_bits and emulation prevention); expected values are
 // the recorded ones, with the golden's unit number in each comment. Acceptance test 1 uses jctvc_VPSID_A_VIDYO_2 for
 // the MD5 picture hash, because jctvc_AMP_A_Samsung_7 carries no SEI at all (its ovt-units golden lists NAL types 32,
 // 33, 34, 19, 1 and 2 only), and acceptance test 3 uses jctvc_HRD_A_Fujitsu_3 and jctvc_CONFWIN_A_Sony_1, because
-// jctvc_VPSID_A_VIDYO_2 carries no active_parameter_sets SEI (SPEC-ASSUMPTION #570). Payloads that no golden covers
-// (CRC, multi-layer active_parameter_sets, irap_cpb_params_present_flag) are worked by hand from H.265 (08/2021) Annex
-// D. The [needs-corpus] cases run the same checks on the real streams.
+// jctvc_VPSID_A_VIDYO_2 carries no active_parameter_sets SEI, and acceptance test 2 uses syn_h265_hdr10plus
+// (SPEC-ASSUMPTION #570). Payloads that no golden covers (CRC, multi-layer active_parameter_sets,
+// irap_cpb_params_present_flag, time_code, frame_packing_arrangement, display_orientation,
+// ambient_viewing_environment) are worked by hand from H.265 (08/2021) Annex D. The [needs-corpus] cases run the same
+// checks on the real streams.
 
 #include "ovt/cxx/syntax/h265/sei.hpp"
 
@@ -104,6 +108,16 @@ constexpr std::string_view kConfBp = "4e01000aa00afc800002bf20000080";  // unit 
 constexpr std::string_view kConfPt0 = "4e010104080000c080";             // unit 6
 constexpr std::string_view kConfRecovery = kHrdRecovery;                // unit 7, the same bytes as HRD_A unit 6
 constexpr std::string_view kConfPt2 = "4e0101040801004080";             // unit 13
+
+// syn_h265_hdr10plus: content_light_level_info (unit 3), mastering_display_colour_volume (unit 4, with emulation
+// prevention) and the HDR10+ user_data_registered_itu_t_t35 (unit 6). syn_pat_hlg_patches: alternative_transfer_
+// characteristics (unit 0).
+constexpr std::string_view kHdrCll = "4e01900403e8019080";
+constexpr std::string_view kHdrMdcv = "4e01891833c286c41d4c0bb884d03e803d13404200989680000003000180";
+constexpr std::string_view kHdrT35 =
+    "4e010440b5003c0001040140000c81388088b83a9800fa240800282800c8500190c807d1900fa2584e22d09c42f938831a71000042584b"
+    "24663353366a0099acdccf9a0080";
+constexpr std::string_view kHlgAtc = "4e0193011280";
 
 // ---- plumbing ------------------------------------------------------------------------------------------------------
 
@@ -485,6 +499,227 @@ TEST_CASE("h265_sei_decoded_picture_hash_crc_and_monochrome", "[syntax][h265][se
   CHECK(std::get<DecodedPictureHash>(r.sei.messages[0].payload).hash_type_name == "reserved");
   CHECK(diag_codes(r) == std::vector<std::string>{"SYN-H265-0052"});
   CHECK(find_node(r.tree.root(), "reserved_payload_extension_data") != nullptr);
+}
+
+// ---- part b: user data, picture and colour payloads ------------------------------------------------------------
+
+// Acceptance test 2 (SPEC-ASSUMPTION #570: syn_h265_hdr10plus, an x265 encode with --master-display
+// G(13250,34500)B(7500,3000)R(34000,16000)WP(15635,16450)L(10000000,1) --max-cll 1000,400 --dhdr10-info): the
+// MDCV, CLL and HDR10+ SEIs rebuilt from its trace_headers golden (units 3, 4 and 6); syn_h265_main10_pq_hdr carries
+// the same bytes in its units 3 and 4.
+TEST_CASE("h265_sei_hdr10plus_colour_volume_and_t35", "[syntax][h265][sei][fast]") {
+  SeiContext ctx;
+  const auto cll_unit = parse_sei(from_hex(kHdrCll), ctx);
+  const auto& cll = only_payload<ContentLightLevelInfo>(cll_unit);
+  CHECK(cll.max_content_light_level == 1000);
+  CHECK(cll.max_pic_average_light_level == 400);
+  CHECK(find_node(cll_unit.tree.root(), "content_light_level")->derived == "MaxCLL 1000 cd/m², MaxFALL 400 cd/m²");
+
+  const auto mdcv_unit = parse_sei(from_hex(kHdrMdcv), ctx);
+  const auto& m = only_payload<MasteringDisplayColourVolume>(mdcv_unit);
+  CHECK(m.display_primaries_x == std::array<uint32_t, 3>{13250, 7500, 34000});  // G, B, R as coded
+  CHECK(m.display_primaries_y == std::array<uint32_t, 3>{34500, 3000, 16000});
+  CHECK(m.mdcv_primaries_x == std::array<uint32_t, 3>{34000, 13250, 7500});  // R, G, B
+  CHECK(m.mdcv_primaries_y == std::array<uint32_t, 3>{16000, 34500, 3000});
+  CHECK(m.white_point_x == 15635);
+  CHECK(m.white_point_y == 16450);
+  CHECK(m.max_display_mastering_luminance == 10000000);
+  CHECK(m.min_display_mastering_luminance == 1);
+  CHECK(m.text ==
+        "R (0.680, 0.320) G (0.265, 0.690) B (0.150, 0.060) WP (0.3127, 0.3290) max 1000 cd/m² min 0.0001 cd/m²");
+  CHECK(find_node(mdcv_unit.tree.root(), "mastering_display")->derived == m.text);
+
+  const auto t35_unit = parse_sei(from_hex(kHdrT35), ctx);
+  const auto& t = only_payload<UserDataRegisteredItuTT35>(t35_unit);
+  CHECK(t.itu_t_t35_country_code == 181);
+  CHECK(t.itu_t_t35_terminal_provider_code == 0x003C);
+  CHECK(t.itu_t_t35_terminal_provider_oriented_code == 0x0001);
+  CHECK(t.enum_name == "HDR10+ (SMPTE ST 2094-40)");
+  CHECK(t.has_hdr10plus);
+  CHECK_FALSE(t.has_dolby_vision);
+  CHECK(t.payload_byte_count == 59);  // 64 bytes less country code, provider code and oriented code
+  // Hand-decoded from payload bytes 5.. of the golden: application_identifier 4 (AT2), version 1, one window,
+  // targeted_system_display_maximum_luminance 400, maxscl 40000 / 35000 / 30000.
+  CHECK(t.hdr10plus_application_identifier == 4);
+  CHECK(t.hdr10plus_application_version == 1);
+  CHECK(t.hdr10plus_num_windows == 1);
+  CHECK(t.hdr10plus_targeted_system_display_maximum_luminance == 400);
+  CHECK(t.hdr10plus_maxscl == std::array<uint32_t, 3>{40000, 35000, 30000});
+  CHECK(find_node(t35_unit.tree.root(), "itu_t_t35_terminal_provider_code")->enum_name == t.enum_name);
+  for (const Parsed* p : {&cll_unit, &mdcv_unit, &t35_unit}) {
+    CHECK(diag_codes(*p).empty());
+  }
+}
+
+TEST_CASE("h265_sei_alternative_transfer_characteristics_hlg", "[syntax][h265][sei][fast]") {
+  SeiContext ctx;
+  const auto p = parse_sei(from_hex(kHlgAtc), ctx);
+  CHECK(only_payload<AlternativeTransferCharacteristics>(p).preferred_transfer_characteristics == 18);
+  CHECK(diag_codes(p).empty());
+}
+
+TEST_CASE("h265_sei_user_data_unregistered_x265", "[syntax][h265][sei][fast]") {
+  // The UUID and the start of the option string of syn_h265_hdr10plus unit 5, shortened (the golden is 2 391 bytes).
+  Bytes payload = from_hex("2ca2de09b51747dbbb55a4fe7fc2fc4e");
+  const std::string text =
+      "x265 (build 215) - 4.1:[Linux][GCC 13.3.0][64 bit] 10bit - H.265/HEVC codec - options: "
+      "cpuid=1111039 frame-threads=1 wpp bitdepth=10";
+  payload.insert(payload.end(), text.begin(), text.end());
+  payload.push_back(0);
+  SeiContext ctx;
+  const auto p = parse_sei(sei_nal({{5, payload}}), ctx);
+  const auto& u = only_payload<SeiUserDataUnregistered>(p);
+  CHECK(u.uuid == "2CA2DE09-B517-47DB-BB55-A4FE7FC2FC4E");
+  CHECK(u.enum_name == "x265 options");
+  CHECK(u.text == text);
+  CHECK(u.payload_byte_count == text.size() + 1);
+  CHECK(find_node(p.tree.root(), "uuid_iso_iec_11578")->enum_name == "x265 options");
+  CHECK(find_node(p.tree.root(), "x265_option[wpp]")->derived == "1");
+  CHECK(find_node(p.tree.root(), "x265_option[bitdepth]")->derived == "10");
+  CHECK(diag_codes(p).empty());
+  // Shorter than its UUID: BR-0001, and the next message still parses.
+  const auto q = parse_sei(sei_nal({{5, Bytes(10, 0x11)}, {144, {0x03, 0xE8, 0x01, 0x90}}}), ctx);
+  REQUIRE(q.sei.messages.size() == 2);
+  CHECK_FALSE(q.sei.messages[0].parsed);
+  CHECK(q.sei.messages[1].parsed);
+  CHECK(diag_codes(q) == std::vector<std::string>{"BR-0001"});
+}
+
+TEST_CASE("h265_sei_frame_packing_arrangement", "[syntax][h265][sei][fast]") {
+  BitWriter w;
+  w.ue(2);    // frame_packing_arrangement_id
+  w.u(1, 0);  // cancel_flag
+  w.u(7, 3);  // type: side by side
+  w.u(1, 0);  // quincunx_sampling_flag
+  w.u(6, 1);  // content_interpretation_type
+  w.u(1, 1);  // spatial_flipping_flag
+  w.u(1, 0);  // frame0_flipped_flag
+  w.u(1, 0);  // field_views_flag
+  w.u(1, 1);  // current_frame_is_frame0_flag
+  w.u(1, 0);  // frame0_self_contained_flag
+  w.u(1, 1);  // frame1_self_contained_flag
+  w.u(4, 1);  // frame0_grid_position_x
+  w.u(4, 2);  // frame0_grid_position_y
+  w.u(4, 3);  // frame1_grid_position_x
+  w.u(4, 4);  // frame1_grid_position_y
+  w.u(8, 0);  // reserved_byte
+  w.u(1, 1);  // persistence_flag
+  w.u(1, 1);  // upsampled_aspect_ratio_flag
+  SeiContext ctx;
+  const auto p = parse_sei(sei_nal({{45, payload_bytes(w)}}), ctx);
+  const auto& f = only_payload<FramePackingArrangement>(p);
+  CHECK(f.frame_packing_arrangement_id == 2);
+  CHECK(f.type == 3);
+  CHECK(f.type_name == "side by side");
+  CHECK(f.content_interpretation_type == 1);
+  CHECK(f.spatial_flipping_flag);
+  CHECK(f.current_frame_is_frame0_flag);
+  CHECK(f.frame1_self_contained_flag);
+  CHECK(f.grid_position == std::array<uint32_t, 4>{1, 2, 3, 4});
+  CHECK(f.persistence_flag);
+  CHECK(f.upsampled_aspect_ratio_flag);
+  CHECK(diag_codes(p).empty());
+  // Cancelled, then frame sequential (no grid positions).
+  BitWriter c;
+  c.ue(0);
+  c.u(1, 1);  // cancel_flag
+  c.u(1, 0);  // upsampled_aspect_ratio_flag
+  BitWriter s;
+  s.ue(1);
+  s.u(1, 0);
+  s.u(7, 5);  // frame sequential
+  s.u(1, 0);
+  s.u(6, 0);
+  s.u(6, 0);  // the six flags
+  s.u(8, 0);  // reserved_byte
+  s.u(1, 0);  // persistence_flag
+  s.u(1, 0);  // upsampled_aspect_ratio_flag
+  const auto q = parse_sei(sei_nal({{45, payload_bytes(c)}, {45, payload_bytes(s)}}), ctx);
+  REQUIRE(q.sei.messages.size() == 2);
+  CHECK(std::get<FramePackingArrangement>(q.sei.messages[0].payload).cancel_flag);
+  const auto& seq = std::get<FramePackingArrangement>(q.sei.messages[1].payload);
+  CHECK(seq.type_name == "frame sequential");
+  CHECK(find_node(q.tree.root(), "frame0_grid_position_x") == nullptr);
+  CHECK(diag_codes(q).empty());
+}
+
+TEST_CASE("h265_sei_display_orientation_ambient_viewing_time_code", "[syntax][h265][sei][fast]") {
+  BitWriter d;
+  d.u(1, 0);        // display_orientation_cancel_flag
+  d.u(1, 1);        // hor_flip
+  d.u(1, 0);        // ver_flip
+  d.u(16, 0x4000);  // anticlockwise_rotation: 90 degrees
+  d.u(1, 1);        // display_orientation_persistence_flag
+  BitWriter a;
+  a.u(32, 3141592);  // ambient_illuminance: 314.1592 lux
+  a.u(16, 15635);    // ambient_light_x (D65)
+  a.u(16, 16450);    // ambient_light_y
+  BitWriter t;
+  t.u(2, 3);  // num_clock_ts
+  // [0] full timestamp, n_frames 300 needs the ninth bit; time_offset_length 5, time_offset_value -3
+  t.u(1, 1);
+  t.u(1, 0);     // units_field_based_flag
+  t.u(5, 4);     // counting_type
+  t.u(1, 1);     // full_timestamp_flag
+  t.u(1, 0);     // discontinuity_flag
+  t.u(1, 1);     // cnt_dropped_flag
+  t.u(9, 300);   // n_frames
+  t.u(6, 59);    // seconds_value
+  t.u(6, 30);    // minutes_value
+  t.u(5, 23);    // hours_value
+  t.u(5, 5);     // time_offset_length
+  t.u(5, 0x1D);  // time_offset_value i(5) = -3
+  // [1] no timestamp
+  t.u(1, 0);
+  // [2] seconds and minutes only, no time offset
+  t.u(1, 1);
+  t.u(1, 1);   // units_field_based_flag
+  t.u(5, 0);   // counting_type
+  t.u(1, 0);   // full_timestamp_flag
+  t.u(1, 1);   // discontinuity_flag
+  t.u(1, 0);   // cnt_dropped_flag
+  t.u(9, 12);  // n_frames
+  t.u(1, 1);   // seconds_flag
+  t.u(6, 5);   // seconds_value
+  t.u(1, 1);   // minutes_flag
+  t.u(6, 2);   // minutes_value
+  t.u(1, 0);   // hours_flag
+  t.u(5, 0);   // time_offset_length
+  SeiContext ctx;
+  const auto p = parse_sei(sei_nal({{47, payload_bytes(d)}, {148, payload_bytes(a)}, {136, payload_bytes(t)}}), ctx);
+  REQUIRE(p.sei.messages.size() == 3);
+  CHECK(diag_codes(p).empty());
+  const auto& o = std::get<DisplayOrientation>(p.sei.messages[0].payload);
+  CHECK(o.hor_flip);
+  CHECK_FALSE(o.ver_flip);
+  CHECK(o.anticlockwise_rotation == 0x4000);
+  CHECK(o.degrees == 90.0);
+  CHECK(o.persistence_flag);
+  CHECK(find_node(p.tree.root(), "rotation_degrees")->derived == "90 degrees anticlockwise");
+  const auto& e = std::get<AmbientViewingEnvironment>(p.sei.messages[1].payload);
+  CHECK(e.ambient_illuminance == 3141592);
+  CHECK(e.ambient_light_x == 15635);
+  CHECK(e.ambient_light_y == 16450);
+  CHECK(find_node(p.tree.root(), "ambient_viewing_environment", -1)->first_child != nullptr);
+  const auto& tc = std::get<TimeCode>(p.sei.messages[2].payload);
+  REQUIRE(tc.num_clock_ts == 3);
+  REQUIRE(tc.clock.size() == 3);
+  CHECK(tc.clock[0].n_frames == 300);
+  CHECK(tc.clock[0].counting_type == 4);
+  CHECK(tc.clock[0].cnt_dropped_flag);
+  CHECK(tc.clock[0].time_offset_value == -3);
+  CHECK(tc.clock[0].text == "23:30:59:300");
+  CHECK_FALSE(tc.clock[1].clock_timestamp_flag);
+  CHECK(tc.clock[1].text.empty());
+  CHECK(tc.clock[2].units_field_based_flag);
+  CHECK(tc.clock[2].seconds_value == 5);
+  CHECK(tc.clock[2].minutes_value == 2);
+  CHECK_FALSE(tc.clock[2].hours_flag);
+  CHECK(tc.clock[2].text == "00:02:05:12");
+  // A cancelled display orientation is one bit.
+  const auto c = parse_sei(sei_nal({{47, {0xC0}}}), ctx);
+  CHECK(only_payload<DisplayOrientation>(c).cancel_flag);
+  CHECK(diag_codes(c).empty());
 }
 
 // ---- framing, names, placement

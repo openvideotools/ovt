@@ -3,8 +3,9 @@
 //
 // H.265 SEI messages (Annex D): sei_rbsp() over the shared framing of WI-1.110 and the payload parsers of chapter 7
 // §7.3.5 rows 13 and 14 (WI-1.114a: buffering_period, pic_timing, recovery_point, active_parameter_sets and
-// decoded_picture_hash; WI-1.114b adds time_code and the user-data and colour payloads). Every other payload type is
-// kept as Bytes under its Annex D name. C++ helper header (D22): semi-public, no ABI promise, never included from a
+// decoded_picture_hash; WI-1.114b: time_code, the two user-data payloads, frame_packing_arrangement,
+// display_orientation and the colour payloads 137, 144, 147 and 148). Every other payload type is kept as Bytes under
+// its Annex D name. C++ helper header (D22): semi-public, no ABI promise, never included from a
 // C header.
 //
 // Every message becomes a node `sei_message[i]` whose child is the payload node named after the payload. A payload
@@ -93,7 +94,7 @@ struct ActiveParameterSets {
   bool vps_known = false;
 };
 
-/// decoded_picture_hash() (D.3.19, type 132), stored for the verify job (§7.6.4).
+/// decoded_picture_hash() (D.2.19, type 132), stored for the verify job (§7.6.4).
 struct DecodedPictureHash {
   uint32_t hash_type = 0;  // 0 MD5, 1 CRC, 2 checksum; other values are reserved (the components are not read)
   std::string_view hash_type_name;
@@ -103,9 +104,127 @@ struct DecodedPictureHash {
   std::array<uint32_t, 3> picture_checksum{};            // hash_type 2
 };
 
+/// One clock timestamp of time_code() (D.2.27).
+struct TimeCodeClock {
+  bool clock_timestamp_flag = false;
+  bool units_field_based_flag = false;
+  uint32_t counting_type = 0;
+  bool full_timestamp_flag = false;
+  bool discontinuity_flag = false;
+  bool cnt_dropped_flag = false;
+  uint32_t n_frames = 0;  // u(9), unlike H.264 pic_timing's u(8)
+  bool seconds_flag = false;
+  bool minutes_flag = false;
+  bool hours_flag = false;
+  uint32_t seconds_value = 0;
+  uint32_t minutes_value = 0;
+  uint32_t hours_value = 0;
+  uint32_t time_offset_length = 0;
+  int32_t time_offset_value = 0;
+  std::string text;  // "hh:mm:ss:ff" (a field that was not sent is 0); empty without clock_timestamp_flag
+};
+
+/// time_code() (D.2.27, type 136).
+struct TimeCode {
+  uint32_t num_clock_ts = 0;
+  std::vector<TimeCodeClock> clock;  // num_clock_ts entries
+};
+
+/// user_data_registered_itu_t_t35() (D.2.5, type 4): identification fields, identified by the §7.3.11 registry. The
+/// payload bytes stay in the tree.
+struct UserDataRegisteredItuTT35 {
+  uint8_t itu_t_t35_country_code = 0;
+  std::optional<uint8_t> itu_t_t35_country_code_extension_byte;
+  std::optional<uint16_t> itu_t_t35_terminal_provider_code;
+  std::optional<uint32_t> itu_t_t35_terminal_provider_oriented_code;
+  std::string enum_name;  // registry name (§7.3.11) or "T.35 provider …"
+  bool has_hdr10plus = false;
+  bool has_dolby_vision = false;
+  uint32_t payload_byte_count = 0;
+  /// HDR10+ (ST 2094-40) summary when has_hdr10plus: application_identifier, application_version, num_windows,
+  /// targeted_system_display_maximum_luminance and maxscl[0..2] of the first processing window.
+  uint32_t hdr10plus_application_identifier = 0;
+  uint32_t hdr10plus_application_version = 0;
+  uint32_t hdr10plus_num_windows = 0;
+  uint32_t hdr10plus_targeted_system_display_maximum_luminance = 0;
+  std::array<uint32_t, 3> hdr10plus_maxscl{};
+};
+
+/// user_data_unregistered() (D.2.6, type 5).
+struct SeiUserDataUnregistered {
+  std::string uuid;       // canonical upper-case 8-4-4-4-12
+  std::string enum_name;  // "x265 options", … or "user data (UUID …)"
+  std::optional<std::string> text;
+  uint32_t payload_byte_count = 0;
+};
+
+/// frame_packing_arrangement() (D.2.16, type 45).
+struct FramePackingArrangement {
+  uint32_t frame_packing_arrangement_id = 0;
+  bool cancel_flag = false;
+  uint32_t type = 0;
+  std::string_view type_name;  // Table D-8 (static storage)
+  bool quincunx_sampling_flag = false;
+  uint32_t content_interpretation_type = 0;
+  bool spatial_flipping_flag = false;
+  bool frame0_flipped_flag = false;
+  bool field_views_flag = false;
+  bool current_frame_is_frame0_flag = false;
+  bool frame0_self_contained_flag = false;
+  bool frame1_self_contained_flag = false;
+  std::array<uint32_t, 4> grid_position{};  // frame0 x, frame0 y, frame1 x, frame1 y
+  uint32_t reserved_byte = 0;
+  bool persistence_flag = false;
+  bool upsampled_aspect_ratio_flag = false;
+};
+
+/// display_orientation() (D.2.17, type 47).
+struct DisplayOrientation {
+  bool cancel_flag = false;
+  bool hor_flip = false;
+  bool ver_flip = false;
+  uint32_t anticlockwise_rotation = 0;
+  double degrees = 0.0;  // anticlockwise_rotation * 360 / 65536
+  bool persistence_flag = false;
+};
+
+/// mastering_display_colour_volume() (D.2.28, type 137).
+struct MasteringDisplayColourVolume {
+  std::array<uint32_t, 3> display_primaries_x{};  // as coded: c = 0 green, 1 blue, 2 red
+  std::array<uint32_t, 3> display_primaries_y{};
+  uint32_t white_point_x = 0;
+  uint32_t white_point_y = 0;
+  uint32_t max_display_mastering_luminance = 0;  // 0.0001 cd/m²
+  uint32_t min_display_mastering_luminance = 0;
+  // derived: R, G, B order of ovt_ColorDescription.mdcv_primaries
+  std::array<uint32_t, 3> mdcv_primaries_x{};
+  std::array<uint32_t, 3> mdcv_primaries_y{};
+  std::string text;  // "R (0.680, 0.320) G (…) B (…) WP (…) max 1000 cd/m² min 0.0001 cd/m²"
+};
+
+/// content_light_level_info() (D.2.35, type 144).
+struct ContentLightLevelInfo {
+  uint32_t max_content_light_level = 0;
+  uint32_t max_pic_average_light_level = 0;
+};
+
+/// alternative_transfer_characteristics() (D.2.38, type 147).
+struct AlternativeTransferCharacteristics {
+  uint32_t preferred_transfer_characteristics = 0;
+};
+
+/// ambient_viewing_environment() (D.2.39, type 148).
+struct AmbientViewingEnvironment {
+  uint32_t ambient_illuminance = 0;  // 0.0001 lux
+  uint32_t ambient_light_x = 0;      // 0.00002 units
+  uint32_t ambient_light_y = 0;
+};
+
 /// The parsed form of one message; std::monostate when the payload is kept as bytes.
-using SeiPayload =
-    std::variant<std::monostate, BufferingPeriod, PicTiming, RecoveryPoint, ActiveParameterSets, DecodedPictureHash>;
+using SeiPayload = std::variant<std::monostate, BufferingPeriod, PicTiming, RecoveryPoint, ActiveParameterSets,
+                                DecodedPictureHash, TimeCode, UserDataRegisteredItuTT35, SeiUserDataUnregistered,
+                                FramePackingArrangement, DisplayOrientation, MasteringDisplayColourVolume,
+                                ContentLightLevelInfo, AlternativeTransferCharacteristics, AmbientViewingEnvironment>;
 
 struct SeiMessage {
   uint32_t payload_type = 0;

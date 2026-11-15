@@ -162,6 +162,33 @@ SeiRbsp parse_sei_rbsp(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, Se
           case 129:
             parse_into(m, b, [&] { return detail::parse_active_parameter_sets(r, ctx.vps_by_id); });
             break;
+          case 4:
+            parse_into(m, b, [&] { return detail::parse_user_data_registered_itu_t_t35(r); });
+            break;
+          case 5:
+            parse_into(m, b, [&] { return detail::parse_user_data_unregistered_sei(r); });
+            break;
+          case 45:
+            parse_into(m, b, [&] { return detail::parse_frame_packing_arrangement(r); });
+            break;
+          case 47:
+            parse_into(m, b, [&] { return detail::parse_display_orientation(r); });
+            break;
+          case 136:
+            parse_into(m, b, [&] { return detail::parse_time_code(r); });
+            break;
+          case 137:
+            parse_into(m, b, [&] { return detail::parse_mastering_display_colour_volume(r); });
+            break;
+          case 144:
+            parse_into(m, b, [&] { return detail::parse_content_light_level_info(r); });
+            break;
+          case 147:
+            parse_into(m, b, [&] { return detail::parse_alternative_transfer_characteristics(r); });
+            break;
+          case 148:
+            parse_into(m, b, [&] { return detail::parse_ambient_viewing_environment(r); });
+            break;
           default:  // row 14: the tree still shows what is present
             keep_as_bytes(r, m.name);
             break;

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Per-payload H.265 SEI parsers (chapter 7 §7.3.5 row 14, WI-1.114). Module-internal: ovt/cxx/syntax/h265/sei.hpp is
-// the public entry point. Every parser reads through the SeiPayloadReader (so no read crosses payloadSize) and
-// throws ParseError on a malformed payload; the caller opens the payload node.
+// Per-payload H.265 SEI parsers (chapter 7 §7.3.5 row 14, WI-1.114 parts a and b). Module-internal:
+// ovt/cxx/syntax/h265/sei.hpp is the public entry point. Every parser reads through the SeiPayloadReader (so no read
+// crosses payloadSize) and throws ParseError on a malformed payload; the caller opens the payload node.
 
 #ifndef OVT_SRC_SYNTAX_H265_SEI_INTERNAL_H
 #define OVT_SRC_SYNTAX_H265_SEI_INTERNAL_H
@@ -76,11 +76,24 @@ inline uint32_t sei_ue_at(SeiPayloadReader& r, std::string_view name, int index)
 BufferingPeriod parse_buffering_period(SeiPayloadReader& r, const Sps& sps);  // type 0; `sps` named by the payload
 PicTiming parse_pic_timing(SeiPayloadReader& r, const Sps& sps);              // type 1
 RecoveryPoint parse_recovery_point(SeiPayloadReader& r, const Sps* sps);      // type 6; `sps` only for the range
+TimeCode parse_time_code(SeiPayloadReader& r);                                // type 136
 
 // sei_parameter_sets.cpp
 /// Type 129. `vps_by_id` resolves active_video_parameter_set_id for the layer_sps_idx loop.
 ActiveParameterSets parse_active_parameter_sets(SeiPayloadReader& r, std::span<const Vps* const> vps_by_id);
 DecodedPictureHash parse_decoded_picture_hash(SeiPayloadReader& r, const Sps& sps);  // type 132
+
+// sei_user_data.cpp
+UserDataRegisteredItuTT35 parse_user_data_registered_itu_t_t35(SeiPayloadReader& r);  // type 4
+SeiUserDataUnregistered parse_user_data_unregistered_sei(SeiPayloadReader& r);        // type 5
+
+// sei_picture.cpp
+FramePackingArrangement parse_frame_packing_arrangement(SeiPayloadReader& r);                        // type 45
+DisplayOrientation parse_display_orientation(SeiPayloadReader& r);                                   // type 47
+MasteringDisplayColourVolume parse_mastering_display_colour_volume(SeiPayloadReader& r);             // type 137
+ContentLightLevelInfo parse_content_light_level_info(SeiPayloadReader& r);                           // type 144
+AlternativeTransferCharacteristics parse_alternative_transfer_characteristics(SeiPayloadReader& r);  // type 147
+AmbientViewingEnvironment parse_ambient_viewing_environment(SeiPayloadReader& r);                    // type 148
 
 }  // namespace ovt::syntax::h265::detail
 
