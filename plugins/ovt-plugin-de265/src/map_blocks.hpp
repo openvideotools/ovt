@@ -119,6 +119,7 @@ struct MappedBlocks {
   flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params;  // nested HevcFilterParams; null when unmapped
   flatbuffers::Offset<flatbuffers::Vector<uint32_t>> qp_hist;
   std::vector<std::string> warnings;  // messages for Warning Diagnostics on the frame
+  uint32_t mv_clamped_cells = 0;      // grid cells whose vector was clamped to ±32767 (MDL-GEN-0003)
 };
 
 /// Grid fields map_blocks() fills (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.2 Caps row): all but bits_x8,

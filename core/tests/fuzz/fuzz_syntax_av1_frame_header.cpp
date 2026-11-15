@@ -4,7 +4,7 @@
 // Fuzz target of the AV1 uncompressed_header() sub-structure parsers (chapter 7 §7.3.6 rows 12–19, chapter 14
 // §14.7.1, WI-1.117): frame_size / superres_params / render_size, frame_size_with_refs, tile_info,
 // quantization_params, segmentation_params, delta_q_params and delta_lf_params, and the whole uncompressed_header()
-// of row 11 (parse_frame_header, selected by bit 7 of byte 1 in case 3). Byte 0 selects the parser and the
+// of row 11 with rows 20–29 (parse_frame_obu, selected by bit 7 of byte 1 in case 3). Byte 0 selects the parser and the
 // sequence header shape (superblock size, superres, frame size bits, chroma layout), byte 1 the frame-level
 // inputs (override flag, primary_ref_frame, MiCols/MiRows scale, slot validity); the rest is the bit stream. Both
 // recording modes run and must return the same typed values. A ParseError is the expected answer to malformed
@@ -87,12 +87,20 @@ uint64_t run_frame_header(ovt::BitReader& br, ovt::syntax::SyntaxBuilder& b, con
   fseq.seq_force_integer_mv = (ctl & 0x08U) != 0 ? kSelectIntegerMv : 0;
   DecoderState st = state;
   ObuHeader obu;
-  obu.obu_type = static_cast<uint8_t>(ObuType::FrameHeader);
+  // WI-1.118: the whole OBU_FRAME, frame_obu(sz) = uncompressed_header() (rows 11–27), byte_alignment() and
+  // tile_group_obu() over the rest of the input.
+  obu.obu_type = static_cast<uint8_t>(ObuType::Frame);
   obu.temporal_id = static_cast<uint8_t>(sel & 0x07U);
   obu.spatial_id = static_cast<uint8_t>((sel >> 3U) & 0x03U);
-  const FrameHeader h = parse_frame_header(br, b, obu, fseq, st, false);
-  const uint64_t summary = mix(mix(static_cast<uint64_t>(h.frame_type), h.show_existing_frame ? 1U : 0U),
-                               mix(h.refresh_frame_flags, mix(h.frame_size.MiCols, h.tile_info.NumTiles)));
+  obu.obu_size = br.bits_left() / 8;
+  const FrameObu f = parse_frame_obu(br, b, obu, fseq, st);
+  const FrameHeader& h = f.frame_header;
+  uint64_t summary = mix(mix(static_cast<uint64_t>(h.frame_type), h.show_existing_frame ? 1U : 0U),
+                         mix(h.refresh_frame_flags, mix(h.frame_size.MiCols, h.tile_info.NumTiles)));
+  summary = mix(summary, mix(h.loop_filter_params.loop_filter_level[0], h.state.film_grain_params.grain_seed));
+  for (const TileGroupTile& t : f.tile_group.tiles) {
+    summary = mix(summary, t.tileSize);
+  }
   return mix(summary, mix(h.quantization_params.base_q_idx, h.lossless.CodedLossless ? 1U : 0U));
 }
 
