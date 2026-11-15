@@ -419,6 +419,36 @@ void OffscreenGpu::hold(HostTexture& t) {
   params.semaphore.sem = hold_sem_;
   params.semaphore.value = ++hold_value_;
   t.held = pl_vulkan_hold_ex(gpu_, &params);
+  if (t.held) {
+    hold_signalled_ = params.semaphore.value;
+  }
+}
+
+void OffscreenGpu::wait_hold_sem() {
+  // pl_gpu_finish() waits on libplacebo's own per-command timeline semaphore, which vk_cmd_begin() puts first in the
+  // submission's signal list, ahead of hold_sem_. Mesa's common queue code (lavapipe, threaded submit, emulated
+  // timelines) publishes the signal points one after another after the driver submit, so that wait can return
+  // while hold_sem_'s point is still being installed; destroying hold_sem_ in that window links the point into a
+  // freed timeline and LeakSanitizer reports it (160 bytes + 112 for its fence inside libvulkan_lvp.so; seen on
+  // render_test_interop). Waiting on hold_sem_'s own last value closes the window: the wait returns only once its
+  // point is installed and signalled. Bounded, because a hold whose submission failed never signals.
+  if (hold_signalled_ == 0) {
+    return;
+  }
+  const auto wait_semaphores = device_fn<PFN_vkWaitSemaphores>(vk_, "vkWaitSemaphores");
+  if (wait_semaphores == nullptr) {
+    return;
+  }
+  VkSemaphoreWaitInfo wait = {};
+  wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+  wait.semaphoreCount = 1;
+  wait.pSemaphores = &hold_sem_;
+  wait.pValues = &hold_signalled_;
+  constexpr uint64_t kTimeoutNs = 1'000'000'000;  // the GPU work is already done (pl_gpu_finish); this is a backstop
+  if (wait_semaphores(vk_->device, &wait, kTimeoutNs) != VK_SUCCESS) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    pl_msg(log_, PL_LOG_WARN, "offscreen: the hold semaphore did not reach its last value before destroy");
+  }
 }
 
 bool OffscreenGpu::begin_frame() {
@@ -564,10 +594,12 @@ void OffscreenGpu::destroy() {
   destroy_host_texture(out_);
   if (vk_ != nullptr && hold_sem_ != VK_NULL_HANDLE) {
     pl_gpu_finish(gpu_);  // nothing may still signal the semaphore
+    wait_hold_sem();      // ... including Mesa's bookkeeping of the signal (see wait_hold_sem)
     pl_vulkan_sem_destroy(gpu_, &hold_sem_);
   }
   hold_sem_ = VK_NULL_HANDLE;
   hold_value_ = 0;
+  hold_signalled_ = 0;
   if (imported_) {
     // libplacebo's state on the host's device; the VkDevice stays the host's. The host may be using its queue, so a
     // pl_gpu_finish() (not the own-device teardown wait of video_surface_impl.cpp) is all that is needed.
