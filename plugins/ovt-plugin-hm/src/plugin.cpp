@@ -136,6 +136,10 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
     info.add_bit_depth_chroma(f.bit_depth_chroma);
     info.add_qp_base(f.qp_base);
     info.add_slice_count(f.slice_count);
+    if (!mapped.ref_state.IsNull()) {
+      info.add_ref_state(mapped.ref_state);
+      info.add_ref_state_type(mapped.ref_state_type);
+    }
   }
   const auto info_off = info.Finish();
 
@@ -151,6 +155,11 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::hm::Frame frame, uint32_
     fa.add_blocks(mapped.blocks);
     fa.add_mvs(mapped.mvs);
     fa.add_refs(mapped.refs);
+    fa.add_partitions(mapped.partitions);
+    if (!mapped.filter_params.IsNull()) {
+      fa.add_filter_params(mapped.filter_params);
+      fa.add_filter_params_type(mapped.filter_params_type);
+    }
   }
   fa.add_planes(planes_v);
   fa.add_diagnostics(diags_v);

@@ -200,10 +200,23 @@ struct Decoder::Impl {
   }
 
   void export_picture(TComPic* pic);
+  [[nodiscard]] int dpb_fullness(const TComPic* pic) const;
   void finish_picture(bool eos);
   void manage_buffer(NalUnitType type, bool new_picture);
   ovt_status decode_unit(std::span<const uint8_t> unit, int32_t hint, int64_t host_pts);
 };
+
+// HevcRps.dpb_fullness_after: the pictures HM holds marked as used for reference, this one included. Pictures
+// waiting only for output do not count, because the plugin releases each picture once it has copied it.
+int Decoder::Impl::dpb_fullness(const TComPic* pic) const {
+  int n = 0;
+  if (pic_list != nullptr) {
+    for (const TComPic* p : *pic_list) {
+      n += (p == pic || (p->getReconMark() && p->getSlice(0)->isReferenced())) ? 1 : 0;
+    }
+  }
+  return n;
+}
 
 void Decoder::Impl::export_picture(TComPic* pic) {
   Frame f;
@@ -251,7 +264,7 @@ void Decoder::Impl::export_picture(TComPic* pic) {
     const auto comp = static_cast<ComponentID>(c);
     copy_plane(*rec, comp, sps->getBitDepth(toChannelType(comp)), &f.planes[c]);
   }
-  map_cu(*pic, pic_index, &f.analysis);
+  map_cu(*pic, pic_index, dpb_fullness(pic), &f.analysis);
   pic_index[pic] = f.decode_index;
   if (f.analysis.mv_clamped_cells > 0) {
     add_diag(kWarning, "MDL-GEN-0003",
