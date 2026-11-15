@@ -12,6 +12,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -27,6 +28,7 @@ namespace ovt::syntax::h264 {
 namespace {
 
 constexpr std::string_view kMissingParameterSet = "SYN-H264-0010";
+constexpr std::string_view kEnhancementLayerKept = "SYN-H264-0070";
 
 // nal_unit_type 20 / 21 whose header carries the MVC extension: H.7.3.3.4 reads slice_header() with the subset SPS.
 bool is_mvc_slice(const NalHeader& nal) noexcept {
@@ -66,7 +68,7 @@ Active activate(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const Par
   sh.uses_subset_sps = nal.nal_unit_type == 20 || nal.nal_unit_type == 21;
   const Sps* sps = (sh.uses_subset_sps ? sets.subset_sps : sets.sps).find(pps->seq_parameter_set_id);
   if (sps == nullptr) {
-    // SPEC-ASSUMPTION(#529): a PPS whose SPS is missing is reported with the missing-PPS code SYN-H264-0010.
+    // §7.9 table: SYN-H264-0010 covers every activation failure, also a PPS whose (subset) SPS is missing (#529).
     throw ParseError{std::string{kMissingParameterSet},
                      fmt::format("slice references PPS {} whose {} {} is missing", sh.pic_parameter_set_id,
                                  sh.uses_subset_sps ? "subset SPS" : "SPS", pps->seq_parameter_set_id),
@@ -258,7 +260,8 @@ std::string_view slice_type_name(uint32_t slice_type) noexcept {
 SliceHeader parse_slice_header(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const ParameterSets& sets) {
   const uint32_t nut = nal.nal_unit_type;
   if (nut != 1 && nut != 2 && nut != 5 && !is_mvc_slice(nal)) {
-    // SPEC-ASSUMPTION(#529): SVC (G.7.3.3.4) and 3D-AVC slice headers are WI-4.111's.
+    // §7.9 table: SVC (G.7.3.3.4) and 3D-AVC (J.7.3.3.4) slice headers are WI-4.111's (#529); parse_slice_layer()
+    // keeps those NAL units as bytes with SYN-H264-0070 instead of calling this function.
     throw ParseError{std::string{detail::kRangeCode},
                      fmt::format("slice_header() is not defined for nal_unit_type {} with this extension header", nut),
                      br.bit_pos()};
@@ -303,10 +306,19 @@ SliceHeader parse_slice_header(BitReader& br, SyntaxBuilder& b, const NalHeader&
   return sh;
 }
 
-SliceHeader parse_slice_layer(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const ParameterSets& sets) {
+std::optional<SliceHeader> parse_slice_layer(BitReader& br, SyntaxBuilder& b, const NalHeader& nal,
+                                             const ParameterSets& sets) {
   const bool ext = nal.nal_unit_type == 20 || nal.nal_unit_type == 21;
   auto scope = b.scoped(ext ? "slice_layer_extension_rbsp" : "slice_layer_without_partitioning_rbsp",
                         ext ? "H.264 7.3.2.13" : "H.264 7.3.2.8");
+  if (ext && !is_mvc_slice(nal)) {
+    // §7.9 table, SYN-H264-0070 (#529): slice_header_in_scalable_extension() is WI-4.111's.
+    b.opaque_rest("slice_layer_extension_bytes");
+    b.diag(Severity::Info, kEnhancementLayerKept,
+           fmt::format("enhancement-layer slice header of nal_unit_type {} kept as bytes", nal.nal_unit_type),
+           nal.nal_unit_type == 20 ? "H.264 G.7.3.3.4" : "H.264 J.7.3.3.4", true);
+    return std::nullopt;
+  }
   SliceHeader sh = parse_slice_header(br, b, nal, sets);
   b.opaque_rest("slice_data");
   return sh;

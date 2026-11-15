@@ -2,6 +2,35 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc33 — 2026-11-15
+
+PATCH-level: spec-amendment pass 13 folds in the accepted answers of `spec-question` issues #546 from WI-1.118 part c (AV1 tile groups) and #547 from WI-0.035/WI-0.050 (Android native-library packaging, PR #548). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. Also corrects the rc32 entry's count ("seventeen" → "eighteen").
+
+- 7 §7.3.6 row 29 — a tile group with `tg_end ≥ NumTiles` or `tg_start > tg_end` is ParseError `SYN-GEN-0003`; the read values stay in the partial tree, no tile is visited, and the frame is reported truncated (`SYN-AV1-0101`) as after a `SYN-AV1-0020` overrun — WI-1.118 (#546)
+- 13 §13.4.2, §13.4.5, §13.4.6 W^X paragraph, WI-0.050 notes — the app module uses `useLegacyPackaging = true` (libraries extracted at install) because Qt 6.8.3's `QtLoader` reads only `ApplicationInfo.nativeLibraryDir` (direct-from-APK loading arrives in Qt 6.9.0); no `android:extractNativeLibs` in the source manifest; user-plugin W^X rule unchanged; Play policy check before a `play` release (WI-0.056) — WI-0.050 (#547, PR #548)
+
+## 1.0.0-rc32 — 2026-11-15
+
+MINOR-level: spec-amendment pass 12 folds in the accepted answers of eighteen `spec-question` items on chapters 6, 7, 8, 9, 10, 13 and 14 (#159, #366 ranking wording, #406, #419 accumulation wording, #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510). #470, #471, #480, #486 and #499 were accepted by the owner on 2026-11-14 ("OK all"); the rest under the Level-3 spec-question triage. No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; §7.5.3 adds a priming `pull()` to the host/plugin contract text and §10.2.2 pins field semantics of `ExternalTexture`/`VulkanDeviceInfo` without changing a declaration.
+
+- 14 §14.3.3 recipe 45 — `syn_h265_multi_pps` clones differ in `num_extra_slice_header_bits` / `output_flag_present_flag`, not `init_qp_minus26` (decoding unchanged, formally non-conforming) — WI-0.553 (#159)
+- 8 §8.6.6 step 4 — ranking prefers the larger picture (width × height); chroma and bit-depth tie-breaks at equal geometry — WI-1.229 (#366)
+- 13 §13.2.2, §13.3.3 — `OVT_FFMPEG_CORE_STATIC` (fuzz-only static core FFmpeg for OSS-Fuzz) — WI-0.569 (#406)
+- 14 §14.4.3, 7 §7.6.3 — phase-2 QP test rebuilds QP_Y from `trace_headers` + `mb_qp_delta` (the `jm-trace` `qp` key is unreliable, normaliser fix owed); I_PCM macroblocks report `qp = 0` in the public-API FFmpeg mapping, test accepts either — WI-2.583 (#431, #433)
+- 8 §8.6.7, §8.10 rows, WI-4.205 — `PSIT` root for PSI/SI sections; `CNT-TS-1007`/`2007` whole-file forms until WI-4.207; `0x3F` extension descriptor (HEVC timing/HRD) decoded, `0x7F` DVB extension as hex — WI-4.205 (#434)
+- 7 §7.5.3 — priming `pull()` with the stage mask after `create()`; a plugin treats any `pull()` mask as a standing request for later pictures — WI-2.166, WI-2.151 (#449)
+- 6 §6.6.1, 7 §7.6.2 — `Residual = PreDeblock − Prediction` after clipping (so `Prediction + Residual == PreDeblock`), PCM/bypass convention and `bit_depth` recorded there; patch 0003 copy points in `decode_some()` and `run_postprocessing_filters_*` — WI-2.166 (#450)
+- 10 §10.3.3, §10.4.1, §10.10 `RND-0040`, WI-1.406 AT2 — at libplacebo v7.349.0 the NATIVE EDR target uses `{R16G16B16A16_SFLOAT, BT2020_LINEAR_EXT}` via `pl_swapchain_colorspace_hint`; AT2 checks `DisplayTarget.hdr_capable` — WI-1.406 (#470)
+- 10 §10.5.1 — `viridis` CC0; `cividis` from pnnl/cmaputil under `LicenseRef-Battelle-cmaputil` (owner decision), viridis fallback until the licence entry lands — WI-2.431 (#471)
+- 10 §10.2.2, WI-1.404 — Metal export via a self-created `VkImage` + `vkExportMetalObjectsEXT`; host Vulkan device ≥ 1.2 with `timelineSemaphore`/`hostQueryReset`, `queue_index` must be 0, held layout `SHADER_READ_ONLY_OPTIMAL`; `handle2` carries the `GLsync` for `GlTexture` — WI-1.404 (#477)
+- 10 §10.6.4, WI-1.410 AT1 — B converted inside `set_compare()`; RND-0010 behaviour per mode; SideBySide/Split geometry; difference/divider output on non-sRGB targets; overlay blend on linear intermediates; overlays in Single/Flicker-A only; `region_psnr` readback in `measure()`, finite values unclamped — WI-1.410 (#478)
+- 7 §7.6.1, WI-2.159 — `OVT_AOM_SNAPSHOTS` from `INSPECTION_FRAME_SNAPSHOTS`; mvd in `MB_MODE_INFO` under `CONFIG_INSPECTION`; patch 0002 carries the three filter snapshots only (Prediction/Residual and hidden-frame recon to a follow-up part); AT1 every frame, AT2/AT3 on corpus `aom` vectors instead of Argon — WI-2.159 (#480)
+- 13 §13.7.1, WI-0.035 — emulator smoke runs `ovt --version` now and `ovt info` once the CLI has it (`OVT_SMOKE_REQUIRE_INFO`) — WI-0.035 (#486)
+- 10 §10.3.4, §10.7.5, §10.7.8 — out-of-gamut rule (0.2 % relative tolerance, container peak), band fractions counted per pixel, grey = PQ of CIE Y, §10.7.8 wins over §10.3.4, false colour wins over the gamut overlay, conformance window placed in the viewport, no dithering — WI-4.453 (#490)
+- 14 §14.4.5, WI-2.581 — suite driven through `PluginRegistry` until `ovt analyze --plugin aom`; first accounting symbol re-added until the goldens come from the patched oracle; masked layers; IVF/Section 5 only; bench row via WI-0.560 part b — WI-2.581 (#499)
+- 9 §9.4.4 step 3 — `ssim_x264` plane accumulation is `float` in x264's order (`ssim_end4` groups of four, `float` plane total, `double(total) / count`); only the per-window division is `double`; a `double` plane mean is not allowed (≈ 1.5e-6 off the unmodified oracle on the Netflix pair) — WI-3.308 (#419, PR #447)
+- 10 WI-1.405 AT1 — frame 0 built from `sdr709_ramp.expected.json` through `PictureHost::set_picture()`, reference from a 1:1 `Interop::None` surface, until WI-2.171 — WI-1.405 (#510)
+
 ## 1.0.0-rc31 — 2026-11-14
 
 PATCH-level: spec-amendment pass 11 folds in the accepted answers of `spec-question` issues #528 from WI-1.110 part a (H.264 SEI, PR #530), #533 from WI-1.118 part a (AV1 film grain, PR #535) and #529 from WI-1.109 part a (H.264 slice header). Three diagnostic codes are registered and two widened (D2, additive); `parse_slice_header()` takes a `ParameterSets` instead of the not-yet-existing `ActiveSets` (D22 semi-public C++ helper header); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.

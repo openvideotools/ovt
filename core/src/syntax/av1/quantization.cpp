@@ -67,18 +67,20 @@ QuantizationParams parse_quantization_params(BitReader& br, SyntaxBuilder& b, co
 }
 
 int32_t get_qindex(bool ignoreDeltaQ, int segmentId, const QuantizationParams& q, const SegmentationParams& seg,
-                   int32_t CurrentQIndex) noexcept {
-  // AV1 §7.12.2 get_qindex(ignoreDeltaQ, segmentId)
+                   bool delta_q_present, int32_t CurrentQIndex) noexcept {
+  // AV1 §7.12.2 get_qindex(ignoreDeltaQ, segmentId): CurrentQIndex is used only when ignoreDeltaQ == 0 &&
+  // delta_q_present == 1 (#524 review); otherwise the values rest on base_q_idx.
+  const bool useCurrent = !ignoreDeltaQ && delta_q_present;
   const auto sid = static_cast<size_t>(std::clamp(segmentId, 0, kMaxSegments - 1));
   if (seg.segmentation_enabled && seg.FeatureEnabled[sid][kSegLvlAltQ]) {
     const int32_t data = seg.FeatureData[sid][kSegLvlAltQ];
     int32_t qindex = static_cast<int32_t>(q.base_q_idx) + data;
-    if (!ignoreDeltaQ) {
+    if (useCurrent) {
       qindex = CurrentQIndex + data;
     }
     return std::clamp(qindex, 0, kMaxQIndex);
   }
-  if (!ignoreDeltaQ) {
+  if (useCurrent) {
     return CurrentQIndex;
   }
   return static_cast<int32_t>(q.base_q_idx);
@@ -91,7 +93,7 @@ Lossless compute_lossless(const QuantizationParams& q, const SegmentationParams&
   l.CodedLossless = true;
   for (int segmentId = 0; segmentId < kMaxSegments; ++segmentId) {
     const auto sid = static_cast<size_t>(segmentId);
-    const int32_t qindex = get_qindex(true, segmentId, q, seg, q.base_q_idx);
+    const int32_t qindex = get_qindex(true, segmentId, q, seg, false, q.base_q_idx);
     l.LosslessArray[sid] =
         qindex == 0 && q.DeltaQYDc == 0 && q.DeltaQUAc == 0 && q.DeltaQUDc == 0 && q.DeltaQVAc == 0 && q.DeltaQVDc == 0;
     if (!l.LosslessArray[sid]) {

@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Fuzz target of the H.264 slice header parsers (chapter 7 §7.3.4 rows 24–27, chapter 14 §14.7.1, WI-1.109a).
+// Fuzz target of the H.264 slice-level parsers (chapter 7 §7.3.4 rows 19, 20, 24–28, chapter 14 §14.7.1, WI-1.109a/b).
 // Input: byte 0 = SPS length, byte 1 = PPS length, then the SPS NAL unit, the PPS NAL unit and one more NAL unit
 // (headers included, emulation prevention bytes present). When the SPS and PPS parse they seed a fresh
 // ParameterSets (the SPS in both the SPS and the subset SPS table, so NAL 20 / 21 reach the slice header too); the
-// third unit is parsed as a slice layer whatever its nal_unit_type (WI-1.109b adds the dispatch to the AUD, filler data
-// and data partition parsers). Invariants, each an abort when violated: only ovt::ParseError
+// third unit is dispatched on its nal_unit_type: slices and partition A through the slice header, partitions B / C,
+// AUD, end of sequence / stream and filler data. Invariants, each an abort when violated: only ovt::ParseError
 // escapes; two parses of the same bytes give the same JSON (determinism, §0.7.5); a parse with recording off leaves
 // the reader at the same position and returns the same header length.
 
@@ -20,6 +20,8 @@
 
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/rbsp.hpp"
+#include "ovt/cxx/syntax/h264/aud.hpp"
+#include "ovt/cxx/syntax/h264/data_partition.hpp"
 #include "ovt/cxx/syntax/h264/nal_header.hpp"
 #include "ovt/cxx/syntax/h264/pps.hpp"
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
@@ -46,14 +48,43 @@ struct Result {
   std::string json;
 };
 
-Result parse_unit(const ovt::Rbsp& rbsp, const h264::ParameterSets& sets, bool recording) {
+Result parse_unit(const ovt::Rbsp& rbsp, const h264::ParameterSets& sets, const h264::Sps& sps, const h264::Pps& pps,
+                  bool recording) {
   Result r;
   BitReader br(rbsp.rbsp);
   SyntaxBuilder b(br);
   b.set_recording(recording);
   try {
     const h264::NalHeader h = h264::parse_nal_header(br, b);
-    r.header_bits = h264::parse_slice_layer(br, b, h, sets).header_bits;
+    switch (h.nal_unit_type) {
+      case 1:
+      case 5:
+      case 20:
+      case 21: {
+        const auto sh = h264::parse_slice_layer(br, b, h, sets);
+        r.header_bits = sh ? sh->header_bits : 0;
+        break;
+      }
+      case 2:
+        r.header_bits = h264::parse_slice_data_partition_a(br, b, h, sets).slice_header.header_bits;
+        break;
+      case 3:
+      case 4:
+        (void)h264::parse_slice_data_partition_bc(br, b, h, sps, pps);
+        break;
+      case 9:
+        (void)h264::parse_access_unit_delimiter(br, b);
+        break;
+      case 10:
+        (void)h264::parse_end_of_seq(br, b);
+        break;
+      case 11:
+        (void)h264::parse_end_of_stream(br, b);
+        break;
+      default:
+        (void)h264::parse_filler_data(br, b);
+        break;
+    }
     r.ok = true;
   } catch (const ovt::ParseError&) {
     r.ok = false;
@@ -114,10 +145,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
   const ovt::Rbsp rbsp = ovt::rbsp_from_nal(nal);
-  const Result first = parse_unit(rbsp, sets, true);
-  const Result again = parse_unit(rbsp, sets, true);
+  const Result first = parse_unit(rbsp, sets, *sps, *pps, true);
+  const Result again = parse_unit(rbsp, sets, *sps, *pps, true);
   require(first.ok == again.ok && first.json == again.json && first.end_bit == again.end_bit);
-  const Result quiet = parse_unit(rbsp, sets, false);
+  const Result quiet = parse_unit(rbsp, sets, *sps, *pps, false);
   require(quiet.ok == first.ok && quiet.end_bit == first.end_bit && quiet.header_bits == first.header_bits);
   return 0;
 }
