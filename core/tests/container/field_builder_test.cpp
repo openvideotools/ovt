@@ -59,7 +59,21 @@ TEST_CASE("FieldBuilder records spans relative to the box start", "[container][f
   CHECK(field(node, 0).span->bit_length() == 32);
   CHECK(field(node, 1).span->bit_offset() == kHeaderBits + 32);
   CHECK(field(node, 1).span->bit_length() == 32);
+  CHECK(field(node, 0).name == "a");
+  CHECK(field(node, 0).kind == SyntaxValueKind::UInt);
+  CHECK(field(node, 1).uvalue == 2);
   CHECK(fb.bytes_consumed() == 8);
+}
+
+TEST_CASE("FieldBuilder: an explicit payload base moves every span", "[container][fieldbuilder]") {
+  const Bytes payload = {0xAA, 0xBB};
+  ovt::BitReader br(payload);
+  auto node = make_node();
+  iso::FieldBuilder fb(node, 100, br, kHeaderBits + 32U);  // FullBox: header + version/flags
+  fb.u8("x");
+  fb.u8("y");
+  CHECK(field(node, 0).span->bit_offset() == 96);  // 8 * 8 + 32
+  CHECK(field(node, 1).span->bit_offset() == 104);
 }
 
 TEST_CASE("FieldBuilder integer readers and sub-byte spans", "[container][fieldbuilder]") {
@@ -79,8 +93,12 @@ TEST_CASE("FieldBuilder integer readers and sub-byte spans", "[container][fieldb
   CHECK(fb.u24("three") == 0x010203);
   CHECK(fb.i32or64("s32", false) == -2);
   CHECK(fb.u32or64("u64", true) == 9);
+  CHECK(field(node, 0).span->bit_offset() == 0);
+  CHECK(field(node, 0).span->bit_length() == 3);
   CHECK(field(node, 1).span->bit_offset() == 3);  // crosses no byte boundary, but starts mid-byte
+  CHECK(field(node, 2).kind == SyntaxValueKind::Int);
   CHECK(field(node, 2).ivalue == -2);
+  CHECK(field(node, 5).span->bit_length() == 64);
 }
 
 TEST_CASE("FieldBuilder fixed point", "[container][fieldbuilder]") {
@@ -90,6 +108,7 @@ TEST_CASE("FieldBuilder fixed point", "[container][fieldbuilder]") {
   put32(p, 0xFFFF0000);             // -1.0 signed
   p.insert(p.end(), {0x01, 0x00});  // 8.8 1.0
   put32(p, 0x40000000);             // 2.30 1.0
+  put32(p, 0x00000001);             // 1/65536 -> 0.0
   ovt::BitReader br(p);
   auto node = make_node();
   iso::FieldBuilder fb(node, 100, br, 0);
@@ -98,11 +117,25 @@ TEST_CASE("FieldBuilder fixed point", "[container][fieldbuilder]") {
   CHECK(fb.fixed16_16("minus") == -1.0);
   CHECK(fb.fixed8_8("vol") == 1.0);
   CHECK(fb.fixed2_30("w") == 1.0);
+  fb.fixed16_16("tiny");
   CHECK(field(node, 0).kind == SyntaxValueKind::Fixed);
   CHECK(field(node, 0).ivalue == 0x10000);
   CHECK(field(node, 0).svalue == "1.0");
+  CHECK(field(node, 1).svalue == "0.5");
   CHECK(field(node, 2).svalue == "-1.0");
+  CHECK(field(node, 3).svalue == "1.0");
   CHECK(field(node, 4).svalue == "1.0");
+  CHECK(field(node, 5).svalue == "0.0");
+}
+
+TEST_CASE("FieldBuilder unsigned 16.16 keeps large values", "[container][fieldbuilder]") {
+  Bytes p;
+  put32(p, 0xF0000000U);  // width 61440.0, would be negative if signed
+  ovt::BitReader br(p);
+  auto node = make_node();
+  iso::FieldBuilder fb(node, 100, br, 0);
+  CHECK(fb.fixed16_16("width", false) == 61440.0);
+  CHECK(field(node, 0).svalue == "61440.0");
 }
 
 TEST_CASE("FieldBuilder fourcc, strings and blobs", "[container][fieldbuilder]") {
@@ -112,17 +145,32 @@ TEST_CASE("FieldBuilder fourcc, strings and blobs", "[container][fieldbuilder]")
   iso::FieldBuilder fb(node, 100, br, 0);
   const auto cc = fb.fourcc("major_brand");
   CHECK(std::string(cc.data(), 4) == "isom");
-  CHECK(fb.str_nul("name", 64) == "hi");
   CHECK(field(node, 0).kind == SyntaxValueKind::String);
   CHECK(field(node, 0).svalue == "isom");
+  CHECK(field(node, 0).uvalue == 0x69736F6D);
+  CHECK(fb.str_nul("name", 64) == "hi");
+  CHECK(field(node, 1).span->bit_offset() == 32);
   CHECK(field(node, 1).span->bit_length() == 24);  // 'h' 'i' NUL
   CHECK(fb.str_fixed("fixed", 6) == "xabc");
+  CHECK(field(node, 2).span->bit_length() == 48);
   const auto blob = fb.bytes("Data", 3);
   REQUIRE(blob.size() == 3);
   CHECK(blob[2] == 3);
+  CHECK(field(node, 3).kind == SyntaxValueKind::Bytes);
   CHECK(field(node, 3).bytes == Bytes{1, 2, 3});
   CHECK_THROWS_AS(fb.bytes("too_long", 9), ovt::ParseError);
   CHECK(node.fields.size() == 4);
+}
+
+TEST_CASE("FieldBuilder fourcc with non-printable bytes", "[container][fieldbuilder]") {
+  const Bytes p = {0xA9, 'n', 'a', 'm', 0, 1, 2, 3};
+  ovt::BitReader br(p);
+  auto node = make_node();
+  iso::FieldBuilder fb(node, 100, br, 0);
+  fb.fourcc("a");
+  fb.fourcc("b");
+  CHECK(field(node, 0).svalue == "\xC2\xA9nam");
+  CHECK(field(node, 1).svalue == "\\x00\\x01\\x02\\x03");
 }
 
 TEST_CASE("FieldBuilder bytes keeps a prefix of a huge blob", "[container][fieldbuilder]") {
@@ -148,10 +196,11 @@ TEST_CASE("FieldBuilder lang_packed", "[container][fieldbuilder]") {
   CHECK(fb.lang_packed("language") == "und");
   CHECK(fb.lang_packed("language") == "und");
   CHECK(fb.lang_packed("language") == "und");  // pad bit set
+  CHECK(field(node, 0).uvalue == 0x15C7);
 }
 
 TEST_CASE("FieldBuilder reserved", "[container][fieldbuilder]") {
-  const Bytes p = {0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  const Bytes p = {0, 0, 0, 5, 0xFF, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   ovt::BitReader br(p);
   auto node = make_node();
   iso::FieldBuilder fb(node, 100, br, 0);
@@ -162,8 +211,10 @@ TEST_CASE("FieldBuilder reserved", "[container][fieldbuilder]") {
   CHECK(node.diagnostics[0]->code == "CNT-1007");
   CHECK(node.diagnostics[0]->severity == ovt::fb::Severity::Info);
   CHECK(node.diagnostics[0]->span->bit_offset() == 16);
-  fb.reserved(72);  // wider than 64 bits
+  fb.reserved(8, 0xFF);  // matches expectation
+  fb.reserved(72);       // wider than 64 bits, all zero
   CHECK(node.diagnostics.size() == 1);
+  CHECK(field(node, 3).span->bit_length() == 72);
   CHECK(field(node, 0).name == "reserved");
 }
 
@@ -172,6 +223,7 @@ TEST_CASE("FieldBuilder datetime1904", "[container][fieldbuilder]") {
   put32(p, 0);
   put32(p, 2082844800U);  // 1970-01-01
   put32(p, 3034627200U);  // 2000-02-29 (leap day)
+  put32(p, 3850070400U);  // 2026-01-01
   for (int i = 0; i < 8; ++i) {
     p.push_back(0xFF);  // u64 all ones
   }
@@ -183,9 +235,11 @@ TEST_CASE("FieldBuilder datetime1904", "[container][fieldbuilder]") {
   CHECK(fb.datetime1904("creation_time", false) == "1904-01-01T00:00:00Z");
   CHECK(fb.datetime1904("t", false) == "1970-01-01T00:00:00Z");
   CHECK(fb.datetime1904("t", false) == "2000-02-29T00:00:00Z");
+  CHECK(fb.datetime1904("t", false) == "2026-01-01T00:00:00Z");
   CHECK(fb.datetime1904("t", true) == "out of range");
   CHECK(fb.datetime1904("t", true) == "2026-01-01T01:01:01Z");
   CHECK(field(node, 0).svalue == "1904-01-01T00:00:00Z");
+  CHECK(field(node, 0).kind == SyntaxValueKind::UInt);
 }
 
 TEST_CASE("FieldBuilder duration", "[container][fieldbuilder]") {
@@ -193,6 +247,7 @@ TEST_CASE("FieldBuilder duration", "[container][fieldbuilder]") {
   put32(p, 12345);
   put32(p, 0xFFFFFFFFU);
   put32(p, 7);
+  put32(p, 1999);
   ovt::BitReader br(p);
   auto node = make_node();
   iso::FieldBuilder fb(node, 100, br, 0);
@@ -202,6 +257,8 @@ TEST_CASE("FieldBuilder duration", "[container][fieldbuilder]") {
   CHECK(field(node, 1).svalue == "unknown");
   fb.duration("duration", false, 0);
   CHECK(field(node, 2).svalue == "unknown timescale");
+  fb.duration("duration", false, 1000);
+  CHECK(field(node, 3).svalue == "1.999 s");
 }
 
 TEST_CASE("FieldBuilder matrix", "[container][fieldbuilder]") {
@@ -222,6 +279,8 @@ TEST_CASE("FieldBuilder matrix", "[container][fieldbuilder]") {
     REQUIRE(node.fields.size() == 1);
     CHECK(node.fields[0]->name == "matrix");
     CHECK(node.fields[0]->children.size() == 9);
+    CHECK(node.fields[0]->span->bit_length() == 288);
+    CHECK(node.fields[0]->children[2]->name == "matrix[2]");
     return node.fields[0]->svalue;
   };
   CHECK(derived_of(words({kOne, 0, 0, 0, kOne, 0, 0, 0, kW})) == "identity");
@@ -229,7 +288,8 @@ TEST_CASE("FieldBuilder matrix", "[container][fieldbuilder]") {
   CHECK(derived_of(words({0xFFFF0000U, 0, 0, 0, 0xFFFF0000U, 0, 0, 0, kW})) == "rotation 180°");
   CHECK(derived_of(words({0, 0xFFFF0000U, 0, kOne, 0, 0, 0, 0, kW})) == "rotation 270°");
   CHECK(derived_of(words({2 * kOne, 0, 0, 0, kOne, 0, 0, 0, kW})) == "custom");
-  CHECK(derived_of(words({2 * kOne, 0, 0, 0, kOne, 0, 0, 0, kW})) == "custom");
+  CHECK(derived_of(words({kOne, 0, 0, 0, kOne, 0, 5, 0, kW})) == "custom");
+  CHECK(derived_of(words({kOne, 0, 1, 0, kOne, 0, 0, 0, kW})) == "custom");
 }
 
 TEST_CASE("FieldBuilder groups, arrays and the large-array policy", "[container][fieldbuilder]") {
@@ -270,10 +330,34 @@ TEST_CASE("FieldBuilder groups, arrays and the large-array policy", "[container]
     CHECK(arr.uvalue == 2000);
     CHECK(arr.svalue == "see Sample Table view");
     CHECK(arr.children.size() == 80);
+    CHECK(arr.children.front()->name == "entry[0]");
     CHECK(arr.children.back()->name == "entry[1999]");
     CHECK(arr.children.back()->children.at(0)->uvalue == 1999);
+    CHECK(arr.span->bit_offset() == kHeaderBits);
     CHECK(arr.span->bit_length() == uint64_t{2000} * 32U);
     CHECK(arr.children.back()->span->bit_offset() == kHeaderBits + uint64_t{1999} * 32U);
+  }
+  SECTION("a small array is not summarised") {
+    const Bytes p(8, 0);
+    ovt::BitReader br(p);
+    auto node = make_node();
+    iso::FieldBuilder fb(node, 100, br, 0);
+    fb.array("entries", 2);
+    fb.array_element("entry", 0).u32("a");
+    fb.end();
+    fb.array_element("entry", 1).u32("a");
+    fb.end();
+    fb.end();
+    CHECK(node.fields[0]->svalue.empty());
+    CHECK(node.fields[0]->children.size() == 2);
+  }
+  SECTION("end() without a group is harmless") {
+    const Bytes none;
+    ovt::BitReader br(none);
+    auto node = make_node();
+    iso::FieldBuilder fb(node, 100, br, 0);
+    fb.end();
+    CHECK(node.fields.empty());
   }
 }
 
@@ -292,11 +376,15 @@ TEST_CASE("FieldBuilder annotations and diagnostics", "[container][fieldbuilder]
   fb.derived("two");
   CHECK(field(node, 1).svalue == "two");
   fb.str_nul("s", 8);
+  fb.derived("ignored");  // String: svalue is the value
+  CHECK(field(node, 2).svalue == "eng");
   fb.diag(Severity::Warning, "CNT-9999", "something odd");
   REQUIRE(node.diagnostics.size() == 1);
   CHECK(node.diagnostics[0]->severity == ovt::fb::Severity::Warning);
   CHECK(node.diagnostics[0]->code == "CNT-9999");
   CHECK(node.diagnostics[0]->span->bit_offset() == field(node, 2).span->bit_offset());
+  CHECK(&fb.reader() == &br);
+  CHECK(fb.box_file_offset() == 100);
 }
 
 namespace {
@@ -306,6 +394,10 @@ uint64_t decode_throws(iso::BoxContext& /*ctx*/, ovt::BitReader& /*br*/, iso::Fi
   fb.u16("second");
   fb.u32("third");  // only 2 bytes left: BR-0001
   return 0;
+}
+uint64_t decode_prefix(iso::BoxContext& /*ctx*/, ovt::BitReader& /*br*/, iso::FieldBuilder& fb) {
+  fb.u16("prefix");
+  return fb.bytes_consumed();
 }
 }  // namespace
 
@@ -330,4 +422,17 @@ TEST_CASE("A decoder that throws keeps its earlier fields and adds CNT-1002", "[
   CHECK(d.severity == ovt::fb::Severity::Error);
   CHECK(d.message.starts_with("truncated tkhd: "));
   CHECK(d.span->bit_offset() == kHeaderBits + 48);  // where the failing read started
+}
+
+TEST_CASE("run_decoder returns the ContainerWithPrefix offset", "[container][fieldbuilder]") {
+  const Bytes p = {0, 7, 9};
+  ovt::BitReader br(p);
+  auto node = make_node("stsd");
+  iso::FieldBuilder fb(node, 100, br);
+  iso::BoxContext ctx;
+  const iso::BoxDecoder dec{"stsd", "*", &decode_prefix};
+  const auto out = iso::run_decoder(dec, ctx, br, fb);
+  CHECK_FALSE(out.truncated);
+  CHECK(out.children_offset == 2);
+  CHECK(node.diagnostics.empty());
 }
