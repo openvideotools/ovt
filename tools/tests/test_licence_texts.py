@@ -33,6 +33,7 @@ EXPECTED = {
     "GPL-2.0-or-later.txt",  # tests/oracles/x264_ssim, x264's SSIM kernel vendored for the oracle (WI-0.565)
     "Apache-2.0.txt",  # core/share/models/uvq/labels_yt8m.txt, data from google/uvq (WI-3.314)
     "BSD-3-Clause-Clear.txt",  # box_registry.gen.cpp, facts from MPEG FileFormatConformance (WI-1.203, #574)
+    "Bitstream-Vera.txt",  # render/fonts/dejavu_sans_mono_sdf.h, SDF atlas of DejaVu Sans Mono (WI-2.433)
 }
 
 

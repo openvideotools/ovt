@@ -25,7 +25,7 @@ permissiveness = [
   # SPEC-ASSUMPTION(#31): ids below are allowed in `any` but were missing from the §15.4.2 ordering, so an OR
   # containing them could never be chosen; they rank with their closest siblings.
   "LicenseRef-AOM-Patent-License-1.0", "GPL-3.0-only WITH Bison-exception-2.2",
-  "GPL-3.0-or-later WITH Autoconf-exception-3.0", "OFL-1.1", "CC-BY-4.0", "CC-BY-SA-4.0",
+  "GPL-3.0-or-later WITH Autoconf-exception-3.0", "OFL-1.1", "CC-BY-4.0", "CC-BY-SA-4.0", "Bitstream-Vera",
 ]
 
 [allow.any]                 # permitted in any directory/target
@@ -43,6 +43,9 @@ ids = [
   # MPEG FileFormatConformance data (box facts behind core/src/container/isobmff/box_registry.gen.cpp, WI-1.203).
   # Owner approval 2026-11-16 (#574).
   "BSD-3-Clause-Clear",
+  # DejaVu Sans Mono glyph outlines behind render/fonts/dejavu_sans_mono_sdf.h (WI-2.433); permissive font licence.
+  # PENDING OWNER APPROVAL: new licence type.
+  "Bitstream-Vera",
 ]
 
 [allow.gpl_targets]         # additionally permitted for targets whose own licence is GPL-3.0-or-later (cli, app, android, python)
@@ -109,6 +112,8 @@ ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level dir
 # WI-2.431: heatmap LUT headers generated from upstream colour data keep the data's licence (tools/gen_luts.py).
 "render/luts/viridis.h" = "CC0-1.0"
 "render/luts/turbo.h" = "Apache-2.0"
+# WI-2.433: the SDF glyph atlas generated from DejaVu Sans Mono keeps the font's licence (tools/gen_sdf_atlas.py).
+"render/fonts/dejavu_sans_mono_sdf.h" = "Bitstream-Vera"
 "cli" = "GPL-3.0-or-later"
 "app" = "GPL-3.0-or-later"
 "android" = "GPL-3.0-or-later"

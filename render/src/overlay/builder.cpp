@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "overlay/heatmap_source.h"
+#include "overlay/label_text.h"
 #include "overlay/overlay_set_impl.h"
 #include "ovt/render/overlay_set.h"
 
@@ -34,6 +35,23 @@ constexpr uint32_t kAttrLayers = static_cast<uint32_t>(OverlayLayer::PredFill) |
 
 bool contains(std::string_view hay, std::string_view needle) {
   return hay.find(needle) != std::string_view::npos;
+}
+
+detail::LabelCodec label_codec(const ovt::fb::FrameAnalysis& fa, bool av1) {
+  if (av1) {
+    return detail::LabelCodec::Av1;
+  }
+  if (fa.blocks() != nullptr) {
+    for (const ovt::fb::Block* b : *fa.blocks()) {
+      if (b->ext_type() != nullptr && contains(b->ext_type()->string_view(), "Avc")) {
+        return detail::LabelCodec::H264;
+      }
+      if (b->ext_type() != nullptr && contains(b->ext_type()->string_view(), "Hevc")) {
+        return detail::LabelCodec::H265;
+      }
+    }
+  }
+  return detail::LabelCodec::Unknown;
 }
 
 bool is_av1_frame(const ovt::fb::FrameAnalysis& fa) {
@@ -192,6 +210,9 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   }
   if ((cfg.layers & static_cast<uint32_t>(OverlayLayer::GridPartition)) != 0) {
     build_partition_lines(*fa, *set);
+  }
+  if ((cfg.layers & static_cast<uint32_t>(OverlayLayer::Labels)) != 0 && set->cells_w > 0) {
+    detail::build_block_labels(*fa, cfg.label, label_codec(*fa, is_av1_frame(*fa)), *set);  // WI-2.433
   }
   return set;
 }
