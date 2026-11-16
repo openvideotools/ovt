@@ -1,9 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-1.109a–c: H.264 slice_header() with ref_pic_list_modification(), pred_weight_table() and dec_ref_pic_marking(),
+// WI-1.109a–d: H.264 slice_header() with ref_pic_list_modification(), pred_weight_table() and dec_ref_pic_marking(),
 // the access unit delimiter, end of sequence / stream, filler data, the slice data partitions, the SPS extension,
-// the subset SPS (MVC extension) and the prefix NAL unit (chapter 7 §7.3.4 rows 19–28).
+// the subset SPS (SVC, MVC and MVCD extensions with their VUI extensions) and the prefix NAL unit (chapter 7 §7.3.4
+// rows 19–28).
 //
 // Oracles:
 // - x264 fixtures (FFmpeg 6.1.1 libx264, 2026-11-14, lavfi testsrc2 176x144): `wp.264` (fade-in, weightp=2, ref=3,
@@ -21,7 +22,10 @@
 //   Mac Mini with GStreamer 1.24.2 gst_h264_parser_parse_subset_sps(), probe
 //   /mnt/project-files/wi1109-gst-subset-sps-probe.c, 2026-11-15) and two script-written MVC subset SPS units whose
 //   expected values are GStreamer 1.24.2's parse of the same bytes (Ubuntu 24.04 libgstcodecparsers, 2026-11-15; the
-//   same probe agreed with this parser on 700 random MVC subset SPS units).
+//   same probe agreed with this parser on 700 random MVC subset SPS units, again after WI-1.109d).
+// - SVC / MFC / MVCD subset SPS, the VUI extensions and prefix_nal_unit_svc() (WI-1.109d): units written by a script
+//   from the ITU-T H.264 syntax tables; no open-source parser reads these structures, so the expected values are the
+//   script's inputs (see the fixtures).
 // - Everything else uses hand-written bit strings.
 
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
@@ -1579,11 +1583,19 @@ constexpr std::string_view kMvcnv1SubsetSps = "6f76001f4b0d30420a03d974d6956963d
 // Script-written MVC subset SPS units; expected values from GStreamer 1.24.2 (see the file comment).
 constexpr std::string_view kMvc4Views = "6f80002822ce80780226492b3ad515ba2ad69a2a2843a52a29c24ace42";
 constexpr std::string_view kMvc2ViewsExt2 = "6f760028040b3a01e008994614ab599fc526e0";
-// seq_parameter_set_data() then an SVC (83) / MVCD (138) extension, an MVC VUI extension, and High (100).
-constexpr std::string_view kSvcSubsetSps = "6f5300286b3a01e008996a40";
-constexpr std::string_view kMvcdSubsetSps = "6f8a00282ace807802265780";
-constexpr std::string_view kMvcVuiSubsetSps = "6f76002832ce8078022679447c61";
+// seq_parameter_set_data() of High (100) with no extension.
 constexpr std::string_view kHighSubsetSps = "6f6400283ace8078022620";
+// WI-1.109d: units written by a script from the H.264 syntax tables (G.7.3.2.1.4, G.14.1, H.7.3.2.1.4, H.14.1,
+// I.7.3.2.1.5, I.14.1, G.7.3.2.12.1, G.7.3.3.5). No open-source parser reads these structures (GStreamer 1.24.2 stops
+// after the MVC extension and treats 134 as having none), so the expected values are the script's inputs, listed in
+// each test.
+constexpr std::string_view kSvcSubsetSps =
+    "6f53001e6b3a0507e5502220000200020003fffb512700000303e90000ea60e4600fa400fa2bd2b8600020";
+constexpr std::string_view kSvcMonoSubsetSps = "6f56001ef3a0507e156448";
+constexpr std::string_view kMfcSubsetSps = "6f86001e2ace814104aa5ae510a9021234f4a8a2331e204af4ae24";
+constexpr std::string_view kMfcReservedSubsetSps = "6f86001e32ce8141f955f288a42880";
+constexpr std::string_view kMvcdSubsetSps = "6f8a001e10b3a0507e5f2269512b3395cd27c9a8000003000800000301907314";
+constexpr std::string_view k3dAvcSubsetSps = "6f8b001e12b3a0507e5f2269512b3395cd264c20";
 
 using Refs = std::vector<std::vector<uint32_t>>;
 
@@ -1712,18 +1724,6 @@ TEST_CASE("h264_subset_sps_mvc_unit", "[syntax][h264][fast]") {
     CHECK(s.additional_extension2_data_bits == 4);
     CHECK(diag_codes(p.tree.root()).empty());
   }
-  SECTION("SVC, MVCD and the MVC VUI extension are kept as bytes with SYN-H264-0071 (#552)") {
-    for (const auto hex : {kSvcSubsetSps, kMvcdSubsetSps, kMvcVuiSubsetSps}) {
-      h264::SubsetSps s;
-      const auto p = parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
-        s = h264::parse_subset_sps(br, b);
-      });
-      CAPTURE(hex);
-      CHECK(s.sps.pic_width_in_mbs_minus1 == 119);
-      CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0071"});
-      CHECK(find_node(p.tree.root(), "subset_sps_extension") != nullptr);
-    }
-  }
   SECTION("a profile without an extension: seq_parameter_set_data() then additional_extension2_flag") {
     h264::SubsetSps s;
     const auto p = parse_plain(from_hex(kHighSubsetSps), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
@@ -1752,6 +1752,146 @@ TEST_CASE("h264_subset_sps_mvc_unit", "[syntax][h264][fast]") {
   }
 }
 
+namespace {
+
+h264::SubsetSps parse_subset(std::string_view hex, std::vector<std::string>* codes = nullptr) {
+  h264::SubsetSps s;
+  const auto p = parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+    s = h264::parse_subset_sps(br, b);
+  });
+  if (codes != nullptr) {
+    *codes = diag_codes(p.tree.root());
+  }
+  CHECK(find_node(p.tree.root(), "rbsp_stop_one_bit") != nullptr);
+  return s;
+}
+
+}  // namespace
+
+TEST_CASE("h264_subset_sps_svc_mvcd_unit", "[syntax][h264][fast]") {
+  std::vector<std::string> codes;
+  SECTION("SVC (83, 4:2:0): ESS 1 with chroma phases, offsets at the range ends and two SVC VUI entries") {
+    const auto s = parse_subset(kSvcSubsetSps, &codes);
+    CHECK(codes.empty());
+    REQUIRE(s.extension == h264::SubsetSpsExtension::Svc);
+    CHECK(s.sps.seq_parameter_set_id == 2);
+    CHECK(s.svc.inter_layer_deblocking_filter_control_present_flag);
+    CHECK(s.svc.extended_spatial_scalability_idc == 1);
+    CHECK_FALSE(s.svc.chroma_phase_x_plus1_flag);
+    CHECK(s.svc.chroma_phase_y_plus1 == 2);
+    CHECK(s.svc.seq_ref_layer_chroma_phase_x_plus1_flag);
+    CHECK(s.svc.seq_ref_layer_chroma_phase_y_plus1 == 0);
+    CHECK(s.svc.seq_scaled_ref_layer_left_offset == -8);
+    CHECK(s.svc.seq_scaled_ref_layer_top_offset == 4);
+    CHECK(s.svc.seq_scaled_ref_layer_right_offset == -32768);
+    CHECK(s.svc.seq_scaled_ref_layer_bottom_offset == 32767);
+    CHECK(s.svc.adaptive_tcoeff_level_prediction_flag);
+    CHECK_FALSE(s.svc.slice_header_restriction_flag);
+    REQUIRE(s.svc_vui_parameters_present_flag);
+    REQUIRE(s.svc_vui.size() == 2);
+    const auto& e = s.svc_vui[0];
+    CHECK((e.dependency_id == 1 && e.quality_id == 2 && e.temporal_id == 3));
+    CHECK((e.num_units_in_tick == 1001 && e.time_scale == 60000 && e.fixed_frame_rate_flag));
+    REQUIRE(e.nal_hrd_parameters_present_flag);
+    CHECK(e.nal_hrd.bit_rate_value_minus1 == std::vector<uint32_t>{1000});
+    CHECK(e.nal_hrd.cpb_size_value_minus1 == std::vector<uint32_t>{2000});
+    CHECK(e.nal_hrd.time_offset_length == 24);
+    CHECK_FALSE(e.vcl_hrd_parameters_present_flag);
+    CHECK((e.low_delay_hrd_flag && e.pic_struct_present_flag));
+    CHECK_FALSE(s.svc_vui[1].timing_info_present_flag);
+    CHECK_FALSE(s.svc_vui[1].low_delay_hrd_flag);
+    CHECK_FALSE(s.additional_extension2_flag);
+  }
+  SECTION("SVC (86, 4:0:0): absent chroma phases take their inferred values") {
+    const auto s = parse_subset(kSvcMonoSubsetSps, &codes);
+    CHECK(codes.empty());
+    CHECK(s.sps.ChromaArrayType == 0);
+    CHECK(s.svc.extended_spatial_scalability_idc == 1);
+    CHECK((s.svc.chroma_phase_x_plus1_flag && s.svc.chroma_phase_y_plus1 == 1));
+    CHECK((s.svc.seq_ref_layer_chroma_phase_x_plus1_flag && s.svc.seq_ref_layer_chroma_phase_y_plus1 == 1));
+    CHECK(s.svc.seq_scaled_ref_layer_left_offset == 1);
+    CHECK(s.svc.seq_scaled_ref_layer_right_offset == -1);
+    CHECK(s.svc.seq_scaled_ref_layer_bottom_offset == 2);
+    CHECK(s.svc.seq_tcoeff_level_prediction_flag == false);
+    CHECK(s.svc.slice_header_restriction_flag);
+    CHECK_FALSE(s.svc_vui_parameters_present_flag);
+  }
+  SECTION("MFC High (134), field coding: the mfc_format_idc tail and an MVC VUI extension") {
+    const auto s = parse_subset(kMfcSubsetSps, &codes);
+    CHECK(codes.empty());
+    REQUIRE(s.extension == h264::SubsetSpsExtension::Mvc);
+    CHECK(s.mvc.view_id == std::vector<uint32_t>{0, 1});
+    CHECK(s.mvc.level_values[0].ops[0].target_view_id == std::vector<uint32_t>{0, 1});
+    CHECK(s.mvc.mfc_format_idc == 1);
+    CHECK_FALSE(s.mvc.default_grid_position_flag);
+    CHECK((s.mvc.view0_grid_position_x == 1 && s.mvc.view0_grid_position_y == 2));
+    CHECK((s.mvc.view1_grid_position_x == 3 && s.mvc.view1_grid_position_y == 4));
+    CHECK((s.mvc.rpu_filter_enabled_flag && s.mvc.rpu_field_processing_flag));
+    REQUIRE(s.mvc_vui_parameters_present_flag);
+    REQUIRE(s.mvc_vui.size() == 1);
+    CHECK(s.mvc_vui[0].temporal_id == 2);
+    CHECK(s.mvc_vui[0].view_id == std::vector<uint32_t>{0, 1});
+    REQUIRE(s.mvc_vui[0].vcl_hrd_parameters_present_flag);
+    CHECK(s.mvc_vui[0].vcl_hrd.bit_rate_value_minus1 == std::vector<uint32_t>{5, 7});
+    CHECK(s.mvc_vui[0].vcl_hrd.cbr_flag == std::vector<bool>{true, false});
+    CHECK(s.mvc_vui[0].low_delay_hrd_flag);
+    CHECK_FALSE(s.mvc_vui[0].pic_struct_present_flag);
+  }
+  SECTION("a reserved mfc_format_idc is a Warning and skips the grid positions") {
+    const auto s = parse_subset(kMfcReservedSubsetSps, &codes);
+    CHECK(codes == std::vector<std::string>{"SYN-H264-0003"});
+    CHECK(s.mvc.mfc_format_idc == 5);
+    CHECK_FALSE(s.mvc.rpu_filter_enabled_flag);
+    CHECK_FALSE(s.mvc_vui_parameters_present_flag);
+  }
+  SECTION("MVCD (138): depth-only reference lists, texture/depth op counts, MVCD and texture VUI") {
+    const auto s = parse_subset(kMvcdSubsetSps, &codes);
+    CHECK(codes.empty());
+    REQUIRE(s.extension == h264::SubsetSpsExtension::Mvcd);
+    CHECK(s.mvc.view_id == std::vector<uint32_t>{0, 3, 5});
+    CHECK(s.mvc.depth_view_present_flag == std::vector<bool>{true, false, true});
+    CHECK(s.mvc.texture_view_present_flag == std::vector<bool>{true, true, false});
+    CHECK(s.mvc.NumDepthViews == 2);
+    CHECK(s.mvc.anchor_ref_l0 == Refs{{}, {}, {0}});
+    CHECK(s.mvc.anchor_ref_l1 == Refs{{}, {}, {3}});
+    CHECK(s.mvc.non_anchor_ref_l0 == Refs{{}, {}, {}});
+    CHECK(s.mvc.non_anchor_ref_l1 == Refs{{}, {}, {0}});
+    REQUIRE(s.mvc.level_values.size() == 1);
+    CHECK(s.mvc.level_values[0].level_idc == 51);
+    const auto& op = s.mvc.level_values[0].ops.at(0);
+    CHECK(op.temporal_id == 1);
+    CHECK(op.target_view_id == std::vector<uint32_t>{0, 5});
+    CHECK(op.depth_flag == std::vector<bool>{true, true});
+    CHECK(op.texture_flag == std::vector<bool>{true, false});
+    CHECK((op.num_texture_views_minus1 == 1 && op.num_depth_views == 2));
+    REQUIRE(s.mvcd_vui_parameters_present_flag);
+    REQUIRE(s.mvcd_vui.size() == 1);
+    CHECK(s.mvcd_vui[0].temporal_id == 4);
+    CHECK(s.mvcd_vui[0].view_id == std::vector<uint32_t>{5});
+    CHECK(s.mvcd_vui[0].depth_flag == std::vector<bool>{true});
+    CHECK(s.mvcd_vui[0].texture_flag == std::vector<bool>{false});
+    CHECK((s.mvcd_vui[0].num_units_in_tick == 1 && s.mvcd_vui[0].time_scale == 50));
+    REQUIRE(s.texture_vui_parameters_present_flag);
+    REQUIRE(s.mvc_vui.size() == 1);
+    CHECK(s.mvc_vui[0].view_id == std::vector<uint32_t>{0});
+    CHECK(s.mvc_vui[0].pic_struct_present_flag);
+    CHECK_FALSE(s.additional_extension2_flag);
+  }
+  SECTION("3D-AVC (139): the MVCD extension is parsed and the 3D-AVC extension kept as bytes (#552)") {
+    h264::SubsetSps s;
+    const auto p = parse_plain(from_hex(k3dAvcSubsetSps), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader&) {
+      s = h264::parse_subset_sps(br, b);
+    });
+    CHECK(s.extension == h264::SubsetSpsExtension::Mvcd3dAvc);
+    CHECK(s.mvc.view_id == std::vector<uint32_t>{0, 3, 5});
+    CHECK(s.mvc.level_values.at(0).ops.at(0).num_depth_views == 2);
+    CHECK_FALSE(s.mvcd_vui_parameters_present_flag);
+    CHECK_FALSE(s.texture_vui_parameters_present_flag);
+    CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0071"});
+    CHECK(find_node(p.tree.root(), "subset_sps_extension") != nullptr);
+  }
+}
+
 TEST_CASE("h264_subset_sps_mvc_unit_corpus_mvcnv1", "[syntax][h264][slow][needs-corpus]") {
   const auto path = ovt::test::corpus_or_skip("jvt_MVCNV_1");
   const auto file = ovt::io::RandomAccessFile::open(path.string());
@@ -1769,6 +1909,17 @@ TEST_CASE("h264_subset_sps_mvc_unit_corpus_mvcnv1", "[syntax][h264][slow][needs-
   check_mvcnv1(*found);
 }
 
+namespace {
+
+// Prefix NAL units (nal_unit_type 14, svc_extension_flag 1) written by the same script as kSvcSubsetSps.
+constexpr std::string_view kPrefixSvcMarking = "4e808037d11aec";  // nal_ref_idc 2, use_ref_base_pic_flag 1
+constexpr std::string_view kPrefixSvcIdr = "6ec08027a0";          // nal_ref_idc 3, idr_flag 1
+constexpr std::string_view kPrefixSvcNonRefStop = "0e80802780";   // nal_ref_idc 0, rbsp_trailing_bits() only
+constexpr std::string_view kPrefixSvcNonRefData = "0e808027e0";   // nal_ref_idc 0, two extension data bits
+constexpr std::string_view kPrefixSvcBadMmco = "2e808027c9";      // memory_management_base_control_operation 3
+
+}  // namespace
+
 TEST_CASE("h264_prefix_nal", "[syntax][h264][fast]") {
   SECTION("an MVC prefix is empty") {
     h264::PrefixNalUnit pn;
@@ -1780,15 +1931,45 @@ TEST_CASE("h264_prefix_nal", "[syntax][h264][fast]") {
     CHECK(diag_codes(p.tree.root()).empty());
     CHECK(find_node(p.tree.root(), "prefix_nal_unit_rbsp") != nullptr);
   }
-  SECTION("an SVC prefix payload is kept as bytes with SYN-H264-0071 (#552)") {
+  SECTION("an SVC reference prefix with dec_ref_base_pic_marking() and extension data") {
     h264::PrefixNalUnit pn;
-    const auto p = parse_plain(from_hex("6e80800720"), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
-      pn = h264::parse_prefix_nal_unit(br, b, h);
-    });
-    CHECK(pn.svc);
-    CHECK(pn.svc_kept_as_bytes);
-    CHECK(diag_codes(p.tree.root()) == std::vector<std::string>{"SYN-H264-0071"});
-    CHECK(find_node(p.tree.root(), "prefix_nal_unit_svc") != nullptr);
+    const auto p = parse_plain(
+        from_hex(kPrefixSvcMarking),
+        [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) { pn = h264::parse_prefix_nal_unit(br, b, h); });
+    CHECK(diag_codes(p.tree.root()).empty());
+    REQUIRE(pn.svc);
+    const auto& v = pn.prefix_svc;
+    CHECK(v.store_ref_base_pic_flag);
+    REQUIRE(v.has_dec_ref_base_pic_marking);
+    CHECK(v.dec_ref_base_pic_marking.adaptive_ref_base_pic_marking_mode_flag);
+    REQUIRE(v.dec_ref_base_pic_marking.ops.size() == 2);
+    CHECK(v.dec_ref_base_pic_marking.ops[0].memory_management_base_control_operation == 1);
+    CHECK(v.dec_ref_base_pic_marking.ops[0].difference_of_base_pic_nums_minus1 == 3);
+    CHECK(v.dec_ref_base_pic_marking.ops[1].memory_management_base_control_operation == 2);
+    CHECK(v.dec_ref_base_pic_marking.ops[1].long_term_base_pic_num == 1);
+    CHECK(v.additional_prefix_nal_unit_extension_flag);
+    CHECK(v.additional_prefix_nal_unit_extension_data_bits == 3);
+    CHECK(find_node(p.tree.root(), "memory_management_base_control_operation")->enum_name == "short-term base unused");
+    CHECK(find_node(p.tree.root(), "rbsp_stop_one_bit") != nullptr);
+  }
+  SECTION("an IDR SVC prefix has no base marking; non-reference prefixes read only extension data") {
+    h264::PrefixNalUnit pn;
+    auto parse = [&](std::string_view hex) {
+      const auto p = parse_plain(from_hex(hex), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
+        pn = h264::parse_prefix_nal_unit(br, b, h);
+      });
+      CHECK(diag_codes(p.tree.root()).empty());
+      CHECK(find_node(p.tree.root(), "rbsp_stop_one_bit") != nullptr);
+    };
+    parse(kPrefixSvcIdr);
+    CHECK(pn.prefix_svc.store_ref_base_pic_flag);
+    CHECK_FALSE(pn.prefix_svc.has_dec_ref_base_pic_marking);
+    CHECK_FALSE(pn.prefix_svc.additional_prefix_nal_unit_extension_flag);
+    parse(kPrefixSvcNonRefStop);
+    CHECK(pn.prefix_svc.additional_prefix_nal_unit_extension_data_bits == 0);
+    parse(kPrefixSvcNonRefData);
+    CHECK_FALSE(pn.prefix_svc.store_ref_base_pic_flag);
+    CHECK(pn.prefix_svc.additional_prefix_nal_unit_extension_data_bits == 2);
   }
   SECTION("an SVC prefix without payload (nal_ref_idc 0) records nothing") {
     h264::PrefixNalUnit pn;
@@ -1796,7 +1977,17 @@ TEST_CASE("h264_prefix_nal", "[syntax][h264][fast]") {
       pn = h264::parse_prefix_nal_unit(br, b, h);
     });
     CHECK(pn.svc);
-    CHECK_FALSE(pn.svc_kept_as_bytes);
+    CHECK(pn.span.bit_length == 0);
     CHECK(diag_codes(p.tree.root()).empty());
+  }
+  SECTION("memory_management_base_control_operation 3 throws") {
+    try {
+      (void)parse_plain(from_hex(kPrefixSvcBadMmco), [&](BitReader& br, SyntaxBuilder& b, const h264::NalHeader& h) {
+        (void)h264::parse_prefix_nal_unit(br, b, h);
+      });
+      FAIL("memory_management_base_control_operation 3 accepted");
+    } catch (const ParseError& e) {
+      CHECK(e.code == "SYN-H264-0002");
+    }
   }
 }
