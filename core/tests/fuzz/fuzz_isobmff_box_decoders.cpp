@@ -78,6 +78,10 @@ constexpr auto kCases = std::to_array<Case>({
     {"uriI", "urim", true, "stsd"},
     {"tmcd", "stsd", false},
     {"name", "tmcd", false, "stsd"},
+    // WI-1.207 group C part 1: the codec configuration records (their parameter sets go through the syntax module).
+    {"avcC", "avc1", false, "stsd"},
+    {"hvcC", "hvc1", false, "stsd"},
+    {"av1C", "av01", false, "stsd"},
 });
 
 void require(bool ok) {
