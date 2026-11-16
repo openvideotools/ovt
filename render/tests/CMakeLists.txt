@@ -119,3 +119,6 @@ target_compile_definitions(ovt_tests_render
 
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-2.434a: MV arrow and intra stroke instance builder (§10.5.4); the GPU pass tests follow in WI-2.434b.
+target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
