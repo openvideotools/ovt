@@ -937,6 +937,9 @@ std::map<std::string, Mismatch> compare_frame(const fb::FrameAnalysis& fa, const
     const int hm_tx = f.at("tx_log2_w")[i].get<int>();
     if (tx != 255) {
       cmp("tx_log2", tx, hm_tx);
+      cmp("tx_log2_h", g.tx_log2_h()->Get(u), f.at("tx_log2_h")[i].get<int>());
+      // SPEC-ASSUMPTION(#589): cbf is compared on bit 0 (luma); Cb/Cr need libde265 patch 0002. partition_id has no HM
+      // golden.
       cmp("cbf_luma", g.cbf()->Get(u) & 1, f.at("cbf")[i].get<int>() & 1);
     } else if (pred != 3 && pred != 5) {
       cmp("tx_log2 (no transform tree)", 6, hm_tx);
@@ -945,11 +948,40 @@ std::map<std::string, Mismatch> compare_frame(const fb::FrameAnalysis& fa, const
   return m;
 }
 
-// The `h265-cu-golden` streams (chapter 14 §14.2.4) that have an HM grid golden, and the MV stream of AT2. AMP_A,
-// DBLK_A, TILES_B and TSKIP_A have none (tests/golden/h26x-index.json); AT1 uses AMP_A's hm-cutree golden instead.
-constexpr std::array<std::string_view, 7> kGoldenStreams = {
-    "jctvc_CAINIT_A_SHARP_4",      "jctvc_MERGE_B_TI_3", "jctvc_PMERGE_A_TI_3",       "jctvc_SAO_A_MediaTek_4",
-    "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_ipcm_A_NEC_3", "jctvc_MVEDGE_A_qualcomm_3",
+// The `jctvc` Main / Main 10 fast streams that have an HM grid golden (WI-2.582 AT1): every one of them but
+// MVCLIP_A_qualcomm_3 (nightly, below) and SLIST_A_Sony_5, which libde265 1.0.15 mis-decodes (#254). AMP_A, DBLK_A,
+// TILES_B and TSKIP_A have no grid golden (tests/golden/h26x-index.json); AT1 uses AMP_A's hm-cutree golden instead.
+constexpr std::array<std::string_view, 30> kGoldenStreams = {
+    "jctvc_CAINIT_A_SHARP_4",
+    "jctvc_CONFWIN_A_Sony_1",
+    "jctvc_EXT_A_ericsson_4",
+    "jctvc_FILLER_A_Sony_1",
+    "jctvc_HRD_A_Fujitsu_3",
+    "jctvc_MAXBINS_A_TI_5",
+    "jctvc_MERGE_B_TI_3",
+    "jctvc_MVEDGE_A_qualcomm_3",
+    "jctvc_NUT_A_ericsson_5",
+    "jctvc_NoOutPrior_A_Qualcomm_1",
+    "jctvc_OPFLAG_A_Qualcomm_1",
+    "jctvc_PMERGE_A_TI_3",
+    "jctvc_POC_A_Bossen_3",
+    "jctvc_PPS_A_qualcomm_7",
+    "jctvc_RAP_A_docomo_6",
+    "jctvc_RAP_B_Bossen_2",
+    "jctvc_RPS_A_docomo_5",
+    "jctvc_RPS_B_qualcomm_5",
+    "jctvc_RPS_C_ericsson_5",
+    "jctvc_RPS_D_ericsson_6",
+    "jctvc_RPS_E_qualcomm_5",
+    "jctvc_RPS_F_docomo_2",
+    "jctvc_SAO_A_MediaTek_4",
+    "jctvc_STRUCT_B_Samsung_7",
+    "jctvc_TSCL_A_VIDYO_5",
+    "jctvc_VPSID_A_VIDYO_2",
+    "jctvc_WPP_A_ericsson_MAIN10_2",
+    "jctvc_WPP_A_ericsson_MAIN_2",
+    "jctvc_WP_A_Toshiba_3",
+    "jctvc_ipcm_A_NEC_3",
 };
 
 void check_against_hm(std::string_view id) {

@@ -39,6 +39,19 @@ add_dependencies(ovt_plugin_de265_smoke_tests ovt_plugin_de265)
 ovt_set_license(ovt_plugin_de265_smoke_tests "LGPL-3.0-or-later")
 ovt_catch_discover_tests(ovt_plugin_de265_smoke_tests)
 
+# ---- WI-2.582: the plugin's reconstruction against the FFmpeg hevc software decode ---------------------------------
+# AT2 of WI-2.582 (chapter 14 §14.4.4): every picture of the jctvc Main / Main 10 fast subset, bit-exact in output
+# order, no SEI needed. FFmpeg is the core flavour (raw hevc demuxer, software decoder). Same licence and name prefix
+# rules as the smoke tests.
+add_executable(ovt_plugin_de265_recon_tests test_de265_recon_vs_ffmpeg.cpp)
+target_link_libraries(ovt_plugin_de265_recon_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas
+                                                           ovt_test_support ovt::flags ${Catch2_TARGET})
+target_compile_definitions(ovt_plugin_de265_recon_tests
+                           PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\"")
+add_dependencies(ovt_plugin_de265_recon_tests ovt_plugin_de265)
+ovt_set_license(ovt_plugin_de265_recon_tests "LGPL-3.0-or-later")
+ovt_catch_discover_tests(ovt_plugin_de265_recon_tests)
+
 if(NOT OVT_SYSTEM_DE265)
   # ---- WI-2.164: the block mapping ---------------------------------------------------------------------------------
   # map_grid.cpp and map_blocks.cpp on hand-made libde265 metadata (each result checked by the chapter 06 validator),

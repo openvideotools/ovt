@@ -116,5 +116,18 @@ if(OVT_BUILD_PLUGIN_AOM AND NOT OVT_SYSTEM_LIBAOM)
   endforeach()
 endif()
 
+# WI-2.582: push() of ovt-plugin-de265 (chapter 14 §14.7.1). Same shape as plugin_push_aom above; the target loads the
+# built plugin module from its output directory, so it follows the plugin's own option.
+if(OVT_BUILD_PLUGIN_DE265)
+  ovt_add_fuzz_target(plugin_push_de265
+                      "${PROJECT_SOURCE_DIR}/plugins/ovt-plugin-de265/tests/fuzz/fuzz_plugin_push_de265.cpp")
+  foreach(_target ovt_fuzz_plugin_push_de265_regress ovt_fuzz_plugin_push_de265)
+    if(TARGET ${_target})
+      target_compile_definitions(${_target} PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\"")
+      add_dependencies(${_target} ovt_plugin_de265)
+    endif()
+  endforeach()
+endif()
+
 # WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
 ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
