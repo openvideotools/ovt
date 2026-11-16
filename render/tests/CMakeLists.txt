@@ -85,6 +85,8 @@ target_compile_definitions(ovt_tests_render
 # headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
 # CAMetalLayer through MoltenVK.
 target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+# WI-1.411: the swapchain hint carries the content's static HDR metadata (§10.3.6).
+target_sources(ovt_tests_render PRIVATE test_hint.cpp)
 if(APPLE)
   target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
   set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
@@ -92,6 +94,9 @@ if(APPLE)
   target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
                                                  "-framework CoreFoundation")
 endif()
+
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
 
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
 if(APPLE)
@@ -111,3 +116,9 @@ target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
 target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
+# WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
+target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-2.434a: MV arrow and intra stroke instance builder (§10.5.4); the GPU pass tests follow in WI-2.434b.
+target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)

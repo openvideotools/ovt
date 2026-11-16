@@ -646,7 +646,7 @@ ovt hdr clip.mp4 --dynamic -f json | jq '.result.dynamic[0]'
 | `--stop-on-first` | flag | off | Exit at the first mismatching frame. |
 | `--report-planes` | flag | off | Write the first mismatching frame's planes from both decoders to `--planes-dir`. |
 
-**Output.** `result` = `VerifyReport` (chapter 06 §6.3, index in §12.2.17): `checks` (`hash`, `levels`, `against`: `pass|fail|skipped`) and per frame `ok`, `plane_mismatch_mask`, `max_abs_diff`, `first_mismatch_xy`, `declared_hash`, `computed_hash`. Exit 0 only when every requested check passes; 8 if any frame mismatches or a level limit is violated; exit 4 if the stream has no hash SEI and neither `--against` nor `--levels` was given.
+**Output.** `result` = `VerifyReport` (chapter 06 §6.3, index in §12.2.17): `checks` (`hash`, `levels`, `against`: `pass|fail|skipped`) and per frame `ok`, `plane_mismatch_mask`, `max_abs_diff`, `first_mismatch_xy`, `declared_hash`, `computed_hash`, `diagnostics` (the frame's `VER-*` Diagnostics), `mismatch_map_blob` with `mismatch_cells_w`/`mismatch_cells_h` (chapter 7 §7.6.4), plus the run-level `diagnostics` (issue #606). Exit 0 only when every requested check passes; 8 if any frame mismatches or a level limit is violated; exit 4 if the stream has no hash SEI and neither `--against` nor `--levels` was given.
 
 **Examples.**
 
@@ -958,7 +958,7 @@ ovt_status ovt_container_open(ovt_File*, ovt_Container** out);                 /
 ovt_status ovt_container_open_format(ovt_File*, const char* format /*"isobmff","ivf","annexb","obu","y4m","raw"; phase 4: "ts","mkv"*/,
                                      const char* raw_format /*nullable; "1920x1080:yuv420p10le:30000/1001" (§12.1.5 grammar); for "raw" NULL runs the sidecar/heuristics resolution of chapter 08 §8.6.6 (OVT_E_INVALID_ARG + CNT-RAW-0002 when not exactly one candidate)*/,
                                      const char* codec_hint /*nullable "h264","h265","av1"*/, ovt_Container** out);
-ovt_status ovt_container_open_manifest(const char* url_or_path, const char* variant_selector /*nullable; "1" = Representation/variant index*/, ovt_Container** out);   /* phase 4, DASH MPD / HLS playlist (chapter 08 §8.6.9, WI-4.210) */
+ovt_status ovt_container_open_manifest(const char* url_or_path, const char* variant_selector /*nullable: NULL/empty = first video Representation; else a DASH Representation id or a zero-based index (chapter 08 §8.6.7, #629)*/, ovt_Container** out);   /* phase 4, DASH MPD / HLS playlist (chapter 08 §8.6.9, WI-4.210) */
 const char* ovt_container_format(const ovt_Container*);
 ovt_Buffer ovt_container_tree(ovt_Container*);                                  /* ContainerTree; by-value → handle-owned (rule 3b); boxes not yet expanded have fields == [] and children == [] and carry Diagnostic CNT-0007 (lazy, chapter 08 §8.5) */
 ovt_status ovt_container_expand(ovt_Container*, uint64_t box_offset);           /* decodes fields/children of that box; tree buffer invalidated */
@@ -976,7 +976,7 @@ ovt_status ovt_container_list_diagnostics(ovt_Buffer* out /* DiagnosticRegistry:
 /* Byte service (chapter 08 §8.8): the only functions that may be called concurrently on one handle (rule 4). */
 ovt_status ovt_container_bytes(ovt_Container*, uint64_t offset, uint32_t len /*≤ 1 MiB*/, ovt_Buffer* out);
 ovt_status ovt_container_box_at(ovt_Container*, uint64_t offset, uint64_t* out_box_offset, int* out_depth);   /* innermost box containing offset */
-ovt_status ovt_container_segment_for_offset(ovt_Container*, uint64_t offset, ovt_Buffer* out_json);          /* {"kind":"box|sample|fragment|gap","track":n,"index":n,"span":{...}} */
+ovt_status ovt_container_segment_for_offset(ovt_Container*, uint64_t offset, ovt_Buffer* out_json);          /* virtual file (chapter 08 §8.6.7, #629): {"kind":"segment","segment_index":n,"is_init":b,"url":s,"logical_offset":n,"length":n,"offset_in_segment":n,"byte_range":{...},"period_id":s,"discontinuity_sequence":n}; other containers OVT_E_UNSUPPORTED */
 uint64_t   ovt_container_size(const ovt_Container*);                                                         /* file size in bytes */
 ovt_status ovt_container_stats_json(ovt_Container*, ovt_Buffer* out_json);                                   /* {"bytes_read":n,"boxes_parsed":n,"expanded":n,...} */
 void       ovt_container_close(ovt_Container*);                                 /* only after all streams on it are closed */

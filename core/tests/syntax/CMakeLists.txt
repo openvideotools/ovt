@@ -26,3 +26,5 @@ add_subdirectory(av1)
 add_subdirectory(h265)
 # H.264 header parsers (WI-1.108 onward).
 add_subdirectory(h264)
+# WI-1.572: the header-parser golden suite (trace_headers / gstparse goldens of every codec).
+add_subdirectory(golden)

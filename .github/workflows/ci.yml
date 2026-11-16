@@ -59,7 +59,7 @@ jobs:
           cat "$RUNNER_TEMP/changed.txt"
           # A file outside the list below (or an empty diff) means Android must build.
           if [ -s "$RUNNER_TEMP/changed.txt" ] && ! grep -qvE \
-              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image)\.yml$' \
+              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image|corpora-cache)\.yml$' \
               "$RUNNER_TEMP/changed.txt"; then
             echo "android=false" >> "$GITHUB_OUTPUT"
           else
@@ -166,6 +166,12 @@ jobs:
       - name: Patch headers
         run: |
           if [ -f tools/check_patches.py ]; then python -I tools/check_patches.py; else echo "::notice::WI-0.607; skipped"; fi
+
+      # WI-1.203 (chapter 08 §8.2.10 step 7): re-running the box registry generator must reproduce the committed
+      # box_registry.gen.cpp, REGISTRY_DIFF.md and INPUTS.sha256 byte for byte. It fetches the upstream snapshots at
+      # the commits pinned in tools/registry_inputs/INPUTS.sha256 and checks their hashes.
+      - name: registry-check
+        run: python -I tools/gen_box_registry.py --check
 
       - name: Rename dry run
         run: |

@@ -1,0 +1,30 @@
+{
+ "_comment": "Test-side map between the gstparse goldens (GStreamer codecparsers struct members, chapter 14 \u00a714.4.2) and OVT's syntax trees, used by ovt_syntax_golden_run --oracle gstparse (WI-1.572). structs: golden structure key -> unit types that carry it. qualified_parents: members whose leaves are keyed '<parent>.<leaf>' (the same leaf name occurs under several parents). rename: '<structure>.<key>' -> OVT key, for GStreamer names that tools/gen_gst_fields.py RENAMES does not map. skip: '<structure>.<key>' -> why the member is not compared.",
+ "h264": {
+  "structs": {
+   "sps": [
+    7
+   ],
+   "pps": [
+    8
+   ],
+   "slice_header": [
+    1,
+    5
+   ]
+  },
+  "qualified_parents": [
+   "nal_hrd_parameters",
+   "vcl_hrd_parameters",
+   "ref_pic_list_modification_l0",
+   "ref_pic_list_modification_l1"
+  ],
+  "rename": {
+   "sps.num_reorder_frames": "max_num_reorder_frames",
+   "sps.scaling_matrix_present_flag": "seq_scaling_matrix_present_flag",
+   "pps.num_ref_idx_l0_active_minus1": "num_ref_idx_l0_default_active_minus1",
+   "pps.num_ref_idx_l1_active_minus1": "num_ref_idx_l1_default_active_minus1"
+  },
+  "skip": {}
+ }
+}

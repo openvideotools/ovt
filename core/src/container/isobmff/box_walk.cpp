@@ -14,6 +14,8 @@
 #include <utility>
 
 #include "container/diagnostics.h"
+#include "container/isobmff/box_registry.h"
+#include "container/isobmff/field_builder.h"
 
 namespace ovt::container::isobmff {
 
@@ -21,35 +23,8 @@ namespace {
 
 using fb::BoxNodeT;
 
-constexpr uint64_t kHeaderProbe = 32;  // 8 + 8 (largesize) + 16 (usertype)
-
-struct Kinds {
-  std::string_view name;
-  WalkKind kind;
-};
-
-// SPEC-ASSUMPTION(#323): stand-in for the registry until WI-1.203. The container list is the one in the WI-1.201
-// steps; Opaque is §8.2.3 step 2.12; the leaves are the fourccs a size < 8 recovery (step 2.6) may keep.
-constexpr std::array kKinds = {
-    Kinds{"moov", WalkKind::Container}, Kinds{"trak", WalkKind::Container}, Kinds{"mdia", WalkKind::Container},
-    Kinds{"minf", WalkKind::Container}, Kinds{"stbl", WalkKind::Container}, Kinds{"edts", WalkKind::Container},
-    Kinds{"dinf", WalkKind::Container}, Kinds{"udta", WalkKind::Container}, Kinds{"mvex", WalkKind::Container},
-    Kinds{"moof", WalkKind::Container}, Kinds{"traf", WalkKind::Container}, Kinds{"mfra", WalkKind::Container},
-    Kinds{"meta", WalkKind::Container}, Kinds{"ipco", WalkKind::Container}, Kinds{"iprp", WalkKind::Container},
-    Kinds{"sinf", WalkKind::Container}, Kinds{"schi", WalkKind::Container}, Kinds{"tref", WalkKind::Container},
-    Kinds{"wave", WalkKind::Container}, Kinds{"gmhd", WalkKind::Container}, Kinds{"tapt", WalkKind::Container},
-    Kinds{"mdat", WalkKind::Opaque},    Kinds{"idat", WalkKind::Opaque},    Kinds{"free", WalkKind::Opaque},
-    Kinds{"skip", WalkKind::Opaque},    Kinds{"wide", WalkKind::Opaque},    Kinds{"ftyp", WalkKind::Leaf},
-    Kinds{"styp", WalkKind::Leaf},      Kinds{"mvhd", WalkKind::Leaf},      Kinds{"tkhd", WalkKind::Leaf},
-    Kinds{"mdhd", WalkKind::Leaf},      Kinds{"hdlr", WalkKind::Leaf},      Kinds{"vmhd", WalkKind::Leaf},
-    Kinds{"smhd", WalkKind::Leaf},      Kinds{"dref", WalkKind::Leaf},      Kinds{"stsd", WalkKind::Leaf},
-    Kinds{"stts", WalkKind::Leaf},      Kinds{"ctts", WalkKind::Leaf},      Kinds{"stsc", WalkKind::Leaf},
-    Kinds{"stsz", WalkKind::Leaf},      Kinds{"stz2", WalkKind::Leaf},      Kinds{"stco", WalkKind::Leaf},
-    Kinds{"co64", WalkKind::Leaf},      Kinds{"stss", WalkKind::Leaf},      Kinds{"elst", WalkKind::Leaf},
-    Kinds{"mfhd", WalkKind::Leaf},      Kinds{"tfhd", WalkKind::Leaf},      Kinds{"tfdt", WalkKind::Leaf},
-    Kinds{"trun", WalkKind::Leaf},      Kinds{"trex", WalkKind::Leaf},      Kinds{"sidx", WalkKind::Leaf},
-    Kinds{"mfro", WalkKind::Leaf},      Kinds{"tfra", WalkKind::Leaf},      Kinds{"uuid", WalkKind::Leaf},
-};
+constexpr uint64_t kHeaderProbe = 32;             // 8 + 8 (largesize) + 16 (usertype)
+constexpr uint64_t kMaxDecodedPayload = 1 << 20;  // §8.2.3 reading strategy: decoders see at most 1 MiB (WI-1.204)
 
 std::string_view sv(const FourCC& t) {
   return {t.data(), 4};
@@ -212,7 +187,7 @@ Header read_header(Span hdr, uint64_t pos, uint64_t remaining, unsigned depth, c
   } else if (size32 < 8) {  // 2.6 impossible size; recover when the type is a known one
     const std::string what = "box size " + std::to_string(size32) + " < 8" + at(pos);
     // SPEC-ASSUMPTION(#323): a `uuid` box can never be 8 bytes, so it is never recovered (no size 8): CNT-0106, stop.
-    if (sv(h.type) != "uuid" && plausible_type(h.type, ctx) && box_kind(h.type) != WalkKind::Unknown) {
+    if (sv(h.type) != "uuid" && plausible_type(h.type, ctx) && lookup(sv(h.type), ctx) != nullptr) {
       h.size = 8;
       h.finding = DiagCode::CNT_0106;
       h.finding_msg = what + "; treated as 8";
@@ -298,42 +273,109 @@ uint64_t read_meta_prefix(const io::RandomAccessFile& file, BoxNodeT& n, uint64_
   return payload_begin;
 }
 
-// Steps 2.11-2.13 for one box: the top-level bookkeeping, then children (containers) or the payload span.
+// Step 2.10: the registry row of a box; nullptr for an unknown (or implausible) type.
+const RegistryEntry* registry_row(const BoxNodeT& n, const FourCC& type, const BoxContext& ctx) {
+  if (!plausible_type(type, ctx)) {
+    return nullptr;  // never decode junk types (step 2.9)
+  }
+  if (sv(type) == "uuid") {
+    std::array<uint8_t, 16> usertype{};
+    std::copy_n(n.uuid.begin(), std::min(n.uuid.size(), usertype.size()), usertype.begin());
+    return lookup_uuid(usertype);
+  }
+  return lookup(sv(type), ctx);
+}
+
+// Step 2.11 for a FullBox other than `meta`: version/flags into the node and as its first two fields. False (with
+// CNT-0110) when the payload is shorter than 4 bytes.
+bool read_fullbox_header(const io::RandomAccessFile& file, BoxNodeT& n, uint64_t payload_begin, uint64_t end) {
+  std::array<uint8_t, 4> vf{};
+  if (end - payload_begin < 4 || file.read(payload_begin, 4, vf.data()) != 4) {
+    add_diag(n, DiagCode::CNT_0110, "FullBox shorter than 4 bytes" + at(n.file_span->offset()), n.file_span->offset());
+    return false;
+  }
+  const uint64_t bits = static_cast<uint64_t>(n.header_length) * 8U;
+  n.version = vf[0];
+  n.flags = static_cast<int32_t>(be32(vf) & 0xFFFFFFU);
+  add_uint_field(n, "version", vf[0], bits, 8);
+  add_uint_field(n, "flags", static_cast<uint32_t>(n.flags), bits + 8U, 24);
+  return true;
+}
+
+// Step 2.12 hand decoder: the payload (at most 1 MiB) through a BitReader; returns the payload offset where the
+// children of a ContainerWithPrefix start (clamped to the payload), else 0.
+uint64_t run_hand_decoder(const io::RandomAccessFile& file, BoxNodeT& n, const BoxDecoder& d, BoxContext& ctx,
+                          uint64_t payload_begin, uint64_t end, bool fullbox) {
+  const uint64_t len = std::min(end - payload_begin, kMaxDecodedPayload);
+  std::vector<uint8_t> payload(static_cast<size_t>(len));
+  if (len > 0) {  // an empty vector's data() may be null, which read() must not get
+    payload.resize(file.read(payload_begin, payload.size(), payload.data()));
+  }
+  BitReader br(payload);
+  const uint64_t base_bits = (static_cast<uint64_t>(n.header_length) + (fullbox ? 4U : 0U)) * 8U;
+  FieldBuilder fb(n, n.file_span->offset(), br, base_bits);
+  const DecodeOutcome out = run_decoder(d, ctx, br, fb);
+  return out.truncated ? end - payload_begin : std::min(out.children_offset, end - payload_begin);
+}
+
+// Step 2.10: registry metadata, or CNT-1001 for an unknown type. build_node already marked a truncated box by
+// setting its description to "[truncated]"; keep that suffix.
+void apply_registry_metadata(BoxNodeT& n, const RegistryEntry* entry, const FourCC& type, const BoxContext& ctx,
+                             uint64_t pos) {
+  const bool truncated = !n.description.empty();
+  if (entry != nullptr) {
+    n.spec_ref = entry->spec_ref;
+    n.description = std::string(entry->description) + (truncated ? " [truncated]" : "");
+  } else if (plausible_type(type, ctx)) {
+    n.description = truncated ? "unknown [truncated]" : "unknown";
+    add_diag(n, DiagCode::CNT_1001, "unknown box type " + n.fourcc + at(pos), pos);
+  }
+}
+
+// Steps 2.10-2.13 for one box: registry metadata, FullBox header, the top-level bookkeeping, then the hand decoder,
+// children (containers) or the payload span. `ctx` is the sibling context a decoder may update for later siblings.
 // Recursion is bounded by kMaxBoxDepth (step 2.1).
 // NOLINTNEXTLINE(misc-no-recursion)
-void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth, const BoxContext& ctx) {
+void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth, BoxContext& ctx) {
   const uint64_t pos = n.file_span->offset();
   const uint64_t end = pos + n.file_span->length();
   uint64_t payload_begin = pos + n.header_length;
-  WalkKind kind = plausible_type(type, ctx) ? box_kind(type) : WalkKind::Unknown;  // never decode junk types
-  if (sv(type) == "uuid") {
-    kind = WalkKind::Leaf;
-  }
+  const RegistryEntry* entry = registry_row(n, type, ctx);
+  apply_registry_metadata(n, entry, type, ctx, pos);
+  BoxKind kind = entry != nullptr ? entry->kind : BoxKind::Leaf;
   if (depth == 0) {
     track_top_level_flags(st, type, n);
   }
-  if (sv(type) == "meta" && kind == WalkKind::Container) {
+  bool decode = entry != nullptr && kind != BoxKind::Opaque;
+  if (sv(type) == "meta" && kind != BoxKind::Opaque) {  // §8.2.6 rule 4 replaces step 2.11 for `meta`
     bool leaf = false;
     payload_begin = read_meta_prefix(*st.file, n, payload_begin, end, leaf);
-    kind = leaf ? WalkKind::Leaf : kind;
+    kind = leaf ? BoxKind::Leaf : BoxKind::Container;
+    decode = !leaf;
+  } else if (decode && entry->is_fullbox) {  // 2.11
+    decode = read_fullbox_header(*st.file, n, payload_begin, end);
+    payload_begin += decode ? 4U : 0U;
   }
-  if (kind == WalkKind::Container) {
-    n.children = walk_children(st, pos, payload_begin, end, depth + 1, ctx.push(type, &n), n.diagnostics);
-  } else {
+  const BoxDecoder* dec = decode ? entry->decoder : nullptr;
+  uint64_t children_begin = payload_begin;
+  if (dec != nullptr && kind != BoxKind::Container) {
+    children_begin += run_hand_decoder(*st.file, n, *dec, ctx, payload_begin, end, entry->is_fullbox);
+  }
+  // 2.12. SPEC-ASSUMPTION(#574): a ContainerWithPrefix without a decoder cannot know where its children start, so it
+  // stays a leaf; a decoder's children offset counts from the reader start (after FullBox version/flags). A decoder
+  // that returns a children offset inside the payload is walked whatever the row's kind: a "<parent>/*" decoder
+  // (the `stsd/*` sample entries) reaches unlisted fourccs through a row that has no kind of its own.
+  const bool prefix_children = dec != nullptr && children_begin > payload_begin && children_begin < end;
+  const bool walk = decode && (kind == BoxKind::Container || (kind == BoxKind::ContainerWithPrefix && dec != nullptr) ||
+                               prefix_children);
+  if (walk) {
+    n.children = walk_children(st, pos, children_begin, end, depth + 1, ctx.push(type, &n), n.diagnostics);
+  } else if (dec == nullptr) {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
   }
 }
 
 }  // namespace
-
-WalkKind box_kind(const FourCC& type) noexcept {
-  for (const Kinds& k : kKinds) {
-    if (k.name == sv(type)) {
-      return k.kind;
-    }
-  }
-  return WalkKind::Unknown;
-}
 
 // Recursion is bounded by kMaxBoxDepth (step 2.1).
 // NOLINTNEXTLINE(misc-no-recursion)
@@ -346,6 +388,8 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
     return out;
   }
   const io::RandomAccessFile& file = *st.file;
+  // SPEC-ASSUMPTION(#574): decoders update this copy for the siblings that follow and their subtrees (§8.2.9).
+  BoxContext sib_ctx = ctx;
   uint64_t pos = parent_payload_begin;
   while (pos < parent_end) {  // 2.
     const uint64_t remaining = parent_end - pos;
@@ -375,7 +419,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
       break;
     }
     const Span hdr = Span(buf).first(got);
-    const Header h = read_header(hdr, pos, remaining, depth, ctx);
+    const Header h = read_header(hdr, pos, remaining, depth, sib_ctx);
     if (h.wide) {  // 2.3
       ++st.nodes;
       auto n = make_node(pos, 8);
@@ -389,10 +433,10 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
       out.push_back(trailing_node(pos, parent_end, h.finding, h.finding_msg));
       break;
     }
-    auto n = build_node(h, hdr, pos, parent_end, ctx);
+    auto n = build_node(h, hdr, pos, parent_end, sib_ctx);
     ++st.nodes;
     const uint64_t end = pos + n->file_span->length();
-    fill_payload(st, *n, h.type, depth, ctx);
+    fill_payload(st, *n, h.type, depth, sib_ctx);
     out.push_back(std::move(n));
     pos = end;  // 2.14
   }

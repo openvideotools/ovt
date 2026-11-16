@@ -3,8 +3,10 @@
 #
 # When a pull request is closed or merged, cancel its queued and running ci, fuzz-smoke and static-analysis runs so
 # they stop holding runners. Each job joins one of those workflows' concurrency groups (`<workflow>-<github.ref>`,
-# where github.ref is refs/pull/<n>/merge for every pull_request event) with cancel-in-progress, which cancels the
-# run in that group, then does nothing. Groups of main, scheduled and manual runs have other names and are never
+# where github.ref is refs/pull/<n>/merge for the PR's own runs) with cancel-in-progress, which cancels the run in
+# that group, then does nothing. The group is spelled from the PR number, not from github.ref: on a `closed` event
+# of a merged PR github.ref is the base branch (refs/heads/main), so `<workflow>-${{ github.ref }}` joined main's
+# group and cancelled the push run of every merge (#654). Groups of main, scheduled and manual runs are never
 # touched. The job names below must match the `name:` of those workflows.
 name: pr-closed
 
@@ -23,7 +25,7 @@ jobs:
       matrix:
         workflow: [ci, fuzz-smoke, static-analysis]
     concurrency:
-      group: ${{ matrix.workflow }}-${{ github.ref }}
+      group: ${{ matrix.workflow }}-refs/pull/${{ github.event.pull_request.number }}/merge
       cancel-in-progress: true
     steps:
-      - run: echo "Cancelled the ${{ matrix.workflow }} runs of ${{ github.ref }}"
+      - run: echo "Cancelled the ${{ matrix.workflow }} runs of refs/pull/${{ github.event.pull_request.number }}/merge"
