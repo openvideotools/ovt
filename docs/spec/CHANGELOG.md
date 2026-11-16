@@ -2,6 +2,15 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc40 — 2026-11-16
+
+PATCH-level: spec-amendment pass 20 folds in the accepted answer of `spec-question` issue #662 from the WI-1.112 AUD/EOS/EOB/FD follow-up (PR #664), and records the WI-1.415 partial (PR #625), the WI-1.204 landing (PR #639) and the WI-1.209 `PagedSpan` reading (PR #681). One new diagnostic code is registered (D2: `SYN-H265-0033`, with its `tests/corpora/corrupt_conditions.json` `not_in_table` entry); no public C header under `core/include/`, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.5 row 15, §7.9 — bytes after the NAL unit header of the empty H.265 `end_of_seq_rbsp()` / `end_of_bitstream_rbsp()` are kept as the opaque node `trailing_data` and reported with the new Info `SYN-H265-0033` (mirrors `SYN-H264-0033`, #551); the `filler_data_rbsp()` `ff_byte` run is one Bytes node `ff_byte` (`f(8)*<n>`, `ff_byte_count` derived) expanded per byte by the golden comparison — WI-1.112 follow-up (#662)
+- 10 WI-1.415 notes, 16 §16.4 row — WI-1.415 landed as a partial in PR #625 with `gpu_time: null`; the per-pass GPU counters are its only open item and are tracked in issue #628, not in a second WI — WI-1.415
+- 8 WI-1.204 Produces and notes, 16 §16.4 row — WI-1.204 landed in PR #639; the benchmark is `tests/perf/core/bench_container_open_moov_1h.cpp` (per-area layout of chapter 14 §14.2.1, D14) and the fuzz seeds live under `core/tests/fuzz/corpus/isobmff_tree/`; the `PagedSpan` windowed reads belong to WI-1.209 step 6 (#630) — WI-1.204
+- 8 §8.2.3 reading strategy, WI-1.209 step 6 — a leaf larger than 1 MiB is walked through a `PagedSpan` with one `BitReader` per 1 MiB window, not one reader over a paged source, because the chapter 7 `BitReader` helper is a public header left untouched — WI-1.209 (PR #681)
+
 ## 1.0.0-rc39 — 2026-11-16
 
 PATCH-level: spec-amendment pass 19 folds in the accepted answers of `spec-question` issues #637 and #638 from WI-1.412 (PR #643), #644 and #645 from WI-2.434 (PR #647), #650 from WI-1.456 (PR #651), #624 from WI-2.432 (PR #652), #648 from WI-2.433 (PR #653), and #641 and #642 from WI-1.121. No new diagnostic code; no FlatBuffers schema, plugin ABI or CLI grammar change. `core/include/ovt/index.h` (#642) declares the §12.3.8 block verbatim, so no declaration changes; the header itself lands with the WI-1.121 part c PR under the Fable reviewer's approval.

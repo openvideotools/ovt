@@ -156,12 +156,12 @@ TEST_CASE("container C API: exceptions while opening become statuses", "[contain
 TEST_CASE("container C API: expand without a reader, and a throwing reader", "[container][open][fast]") {
   ovt_File handle{std::make_unique<ovt::io::MemoryFile>(Bytes(8, 0))};
   // The handle is an aggregate (container.hpp); tests build it directly to reach paths no shipped reader takes.
-  auto* bare = new ovt_Container{&handle, ovt::container::Format::Ivf, nullptr, {}};
+  auto* bare = new ovt_Container{&handle, ovt::container::Format::Ivf, nullptr, {}, {}};
   CHECK(ovt_container_expand(bare, 0) == OVT_E_UNSUPPORTED);
   CHECK(ovt_container_track_count(bare) == 0);
   ovt_container_close(bare);
 
-  auto* throwing = new ovt_Container{&handle, ovt::container::Format::Ivf, std::make_unique<ThrowingReader>(), {}};
+  auto* throwing = new ovt_Container{&handle, ovt::container::Format::Ivf, std::make_unique<ThrowingReader>(), {}, {}};
   CHECK(ovt_container_expand(throwing, 0) == OVT_E_IO);
   CHECK(ovt_container_track_count(throwing) == 0);
   // The Reader defaults: no raw format, no sample table.

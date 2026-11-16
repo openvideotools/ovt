@@ -77,7 +77,7 @@ Bytes large_box_header(std::string_view type, uint64_t total) {
   return b;
 }
 
-// SPEC-ASSUMPTION(#630): RandomAccessFile has no bytes_read(); this subclass counts the bytes served.
+// Chapter 8 §8.2.2 (issue #630): RandomAccessFile has no bytes_read(); this subclass counts the bytes served.
 // A sparse file: the listed pieces are real, every other byte below `size` reads as zero. Counts the bytes served.
 class SparseFile final : public ovt::io::RandomAccessFile {
  public:

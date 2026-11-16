@@ -23,7 +23,7 @@ const std::array<uint32_t, 33> kOverlayColors = {
     0xE53935FFU, 0x1E88E5FFU, 0x43A047FFU,                                                                   // 30-32
 };
 
-// Okabe-Ito: intra #009E73 (rows 0 and 20), L0 #E69F00, L1 #56B4E9, bi #0072B2 (SPEC-ASSUMPTION(#632)).
+// Okabe-Ito: intra #009E73 (rows 0 and 20), L0 #E69F00, L1 #56B4E9, bi #0072B2, §10.5.2.
 const std::array<uint32_t, 33> kOverlayColorsCvd = {
     0x009E7366U, 0xE69F00FFU, 0x56B4E9FFU, 0x0072B2FFU, 0xAAAAAA99U, 0x20C99766U, 0xFFDC0066U, 0xF012BE66U,  //  0- 7
     0xFFFFFFE6U, 0xFFFF00CCU, 0x00FFFFB3U, 0xFF00FF99U, 0xFF4136FFU, 0x7FDBFFCCU, 0x0074D9FFU, 0xFFFFFFFFU,  //  8-15

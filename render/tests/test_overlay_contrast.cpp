@@ -156,9 +156,9 @@ struct Backgrounds {
   Rgb light;  // average of the 10 % lightest luma pixels
 };
 
-// SPEC-ASSUMPTION(#634): the 12 golden frames of §10.9.2 named by AT2 do not exist yet (the manifest has no
-// render-ref entries), so the dark/light averages are the extremes any SdrPng8 frame can reach: full-range black and
-// white, and video-range black and white (16 and 235), which real content's 10 % averages sit close to.
+// Interim AT2 backgrounds (WI-2.439 AT2, §10.9.2): until the WI-1.575 render-ref frames exist, the dark/light averages
+// are the extremes any SdrPng8 frame can reach: full-range black and white, and video-range black and white (16 and
+// 235). The halo tables are derived from the 16/235 pair.
 const std::array<Backgrounds, 2> kBackgrounds = {{
     {"full-range black/white", grey(0), grey(255)},
     {"video-range 16/235", grey(16), grey(235)},

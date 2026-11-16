@@ -23,18 +23,16 @@ struct OverlayConfig;                // overlay_set.h
 // carry the line/arrow alpha here; overlay_fill_rgba() gives the fill variant.
 OVT_RENDER_API extern const std::array<uint32_t, 33> kOverlayColors;
 // Colour-blind-safe variant; same indices. Only the four coded roles differ (L0, L1, bi, intra: rows 0-3 and 20).
-// SPEC-ASSUMPTION(#632): bi is Okabe-Ito blue #0072B2, not #CC79A7, which misses the ΔE2000 >= 15 criterion
-// of WI-2.439 AT3 against L1 under protanopia (14.0); row 20 (intra direction stroke) takes the intra colour too.
+// Okabe-Ito per §10.5.2; row 20 (intra direction stroke) takes the intra colour too.
 OVT_RENDER_API extern const std::array<uint32_t, 33> kOverlayColorsCvd;
 
-// SPEC-ASSUMPTION(#633): the halo rule of WI-2.439 AT2 lives with the palettes rather than in OverlayConfig.
-// RGBA of the 1-px halo drawn around each line/arrow/label colour of the matching palette (#000000 or #FFFFFF at the
-// table alpha), 0 = no halo. Rows 15 and 19 carry the outer outline of the §10.5.2 table.
+// The halo rule of WI-2.439 AT2 (§10.5.2): RGBA of the 1-px halo drawn around each line/arrow/label colour of the
+// matching palette (#000000 or #FFFFFF at the table alpha), 0 = no halo. Rows 15 and 19 carry the outer outline of the
+// §10.5.2 table.
 OVT_RENDER_API extern const std::array<uint32_t, 33> kOverlayHalo;
 OVT_RENDER_API extern const std::array<uint32_t, 33> kOverlayHaloCvd;
 
-// SPEC-ASSUMPTION(#633): WI-2.439 step 2 asks for the swatch shape, which the §10.5.2 struct lacks; it is
-// added as the last member of LegendEntry.
+// Swatch kind of a legend entry (§10.5.2, WI-2.439 step 2).
 enum class LegendShape : uint8_t {
   Fill,      // tinted block
   Line,      // grid, boundary, edge, outline or crosshair stroke
