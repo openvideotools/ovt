@@ -215,7 +215,7 @@ ovt_set_license(ovt_studio "GPL-3.0-or-later")
 # Flatpak builds, from the system; the licence manifest records it either way (chapter 15 §15.4). Walks the
 # link closure of the Qt targets above: Qt's own targets (Qt6::*, the versionless Qt::* and Qt's Wrap*
 # helper targets) carry Qt's licence; the system OpenGL targets that QtGui pulls in on Linux are libglvnd /
-# Mesa (MIT). Items already described keep their description.
+# Mesa (MIT), and XKB::XKB, which Qt6::GuiPrivate adds on Linux (WI-1.405), is libxkbcommon (MIT). Items already described keep their description.
 function(_ovt_studio_describe_qt)
   if(OVT_USE_VCPKG)
     set(source third_party)
@@ -234,7 +234,7 @@ function(_ovt_studio_describe_qt)
     if(current MATCHES "^(Qt6?|Wrap[A-Za-z0-9]*)::")
       set(spdx "LGPL-3.0-only")
       set(version "${Qt6_VERSION}")
-    elseif(current MATCHES "^OpenGL::")
+    elseif(current MATCHES "^(OpenGL|XKB)::")
       set(spdx "MIT")
       set(version "")
     elseif(imported)
