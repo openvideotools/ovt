@@ -1,34 +1,51 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-2.434a (chapter 10 §10.11): the CPU side of the MV arrow and intra direction stroke passes (§10.5.1, §10.5.4,
-// §10.5.8 R-8K-1). The GPU pass, AT1, AT2 and the golden synthetic_4k_mv.png follow in WI-2.434b.
+// WI-2.434 (chapter 10 §10.11): MV arrow pass by vertex pulling and intra direction strokes (§10.5.1, §10.5.4,
+// §10.5.6 passes 8-9, §10.5.8 R-MV-1 / R-8K-1), with the golden tests/golden/render/synthetic_4k_mv.png.gz.
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <fstream>
+#include <iterator>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
 
 #include "fixtures/make_synthetic.h"
 #include "overlay/arrow_instances.h"
+#include "overlay/overlay_set_impl.h"
 #include "ovt/render/overlay_set.h"
+#include "ovt/render/video_surface.h"
 #include "ovt_model_generated.h"
+#include "png_io.h"
+#include "render_test_support.h"
+#include "surface/output_download.h"
 
 namespace {
 
 namespace fb = ovt::fb;
+using ovt::render::OverlayBuilder;
 using ovt::render::OverlayConfig;
 using ovt::render::OverlayLayer;
+using ovt::render::VideoSurface;
+using ovt::render::ViewState;
 using ovt::render::detail::ArrowInstances;
 using ovt::render::detail::IntraCodec;
+using ovt::render::detail::OutputPixels;
+using ovt::render::test::OwnedPicture;
+using ovt::render::test::RgbImage;
+using ovt::render::test::surface_or_skip;
 
 constexpr uint32_t bit(OverlayLayer l) {
   return static_cast<uint32_t>(l);
@@ -106,6 +123,148 @@ uint32_t id_of(const ArrowInstances& a, size_t i) {
   return a.attr.at((i * 4) + 1);
 }
 
+// --- GPU helpers -----------------------------------------------------------------------------------------------
+
+OwnedPicture grey_picture(uint32_t w, uint32_t h) {
+  OwnedPicture op(w, h, 8, 1, 1);
+  op.fill_plane(0, 126);
+  op.fill_plane(1, 128);
+  op.fill_plane(2, 128);
+  op.pic.generation = 1;
+  return op;
+}
+
+ViewState centred(double zoom, double cx, double cy) {
+  ViewState view;
+  view.zoom = zoom;
+  view.pan_x = cx;
+  view.pan_y = cy;
+  view.dither = false;
+  return view;
+}
+
+OutputPixels render_fa(VideoSurface& surface, const std::vector<uint8_t>& fa, const OverlayConfig& cfg,
+                       const ViewState& view) {
+  OverlayBuilder builder(surface);
+  auto set = builder.build(fa.data(), fa.size(), cfg);
+  REQUIRE(set != nullptr);
+  surface.set_overlays(std::move(set));
+  REQUIRE(std::string(surface.last_error()).empty());
+  surface.render(view);
+  REQUIRE(std::string(surface.last_error()).empty());
+  OutputPixels px;
+  REQUIRE(ovt::render::detail::download_output(surface, px));
+  return px;
+}
+
+std::array<int, 3> rgb_at(const OutputPixels& px, int x, int y) {
+  const size_t i = ((static_cast<size_t>(y) * static_cast<size_t>(px.width)) + static_cast<size_t>(x)) * 4;
+  return {px.bytes.at(i), px.bytes.at(i + 1), px.bytes.at(i + 2)};
+}
+
+bool near(const std::array<int, 3>& a, uint32_t rgba) {
+  const std::array<int, 3> e = {static_cast<int>(rgba >> 24U), static_cast<int>((rgba >> 16U) & 0xFFU),
+                                static_cast<int>((rgba >> 8U) & 0xFFU)};
+  for (size_t c = 0; c < 3; ++c) {
+    if (std::abs(a.at(c) - e.at(c)) > 2) {
+      return false;
+    }
+  }
+  return true;
+}
+
+constexpr uint32_t kOrange = 0xFF851BFFU;  // §10.5.2 row 1
+constexpr uint32_t kPurple = 0xB10DC9FFU;  // row 2
+constexpr uint32_t kCyan = 0x00E5FFFFU;    // row 3
+constexpr uint32_t kGreen = 0x2ECC40FFU;   // row 20
+
+int count_near(const OutputPixels& px, uint32_t rgba) {
+  int n = 0;
+  for (int y = 0; y < px.height; ++y) {
+    for (int x = 0; x < px.width; ++x) {
+      n += near(rgb_at(px, x, y), rgba) ? 1 : 0;
+    }
+  }
+  return n;
+}
+
+RgbImage to_rgb(const OutputPixels& px, int x0 = 0, int y0 = 0, int w = -1, int h = -1) {
+  w = w < 0 ? px.width : w;
+  h = h < 0 ? px.height : h;
+  RgbImage img;
+  img.width = w;
+  img.height = h;
+  img.rgb.reserve(static_cast<size_t>(w) * static_cast<size_t>(h) * 3);
+  for (int y = y0; y < y0 + h; ++y) {
+    for (int x = x0; x < x0 + w; ++x) {
+      const auto c = rgb_at(px, x, y);
+      img.rgb.insert(img.rgb.end(),
+                     {static_cast<uint8_t>(c[0]), static_cast<uint8_t>(c[1]), static_cast<uint8_t>(c[2])});
+    }
+  }
+  return img;
+}
+
+// A golden over 2 MB is stored gzip-compressed (`<name>.png.gz`, .pre-commit-config.yaml / chapter 14 §14.4): the
+// stored-deflate PNG of a 1920x1080 overlay is 6 MB. gzip is on every desktop CI image (as for the metrics goldens);
+// -n keeps the bytes reproducible. The plain PNG goes to the working directory.
+bool run_gzip(const std::string& args) {
+  const std::string cmd = "gzip " + args;
+  return std::system(cmd.c_str()) == 0;  // NOLINT(cert-env33-c,concurrency-mt-unsafe): test-only, fixed arguments
+}
+
+// §10.9.2 item 4 comparison rule (same as the WI-2.431 tests): a pixel differs when a channel is > 2 codes off; at
+// most 0.1 % may differ. OVT_UPDATE_GOLDEN=1 rewrites the golden (never on CI).
+void check_golden(const RgbImage& actual, const std::string& name) {
+  const std::string golden = std::string(OVT_RENDER_GOLDEN_DIR) + "/" + name + ".gz";
+  const std::string& plain = name;                        // decompressed copy in the working directory
+  const char* update = std::getenv("OVT_UPDATE_GOLDEN");  // NOLINT(concurrency-mt-unsafe): test setup
+  const char* ci = std::getenv("CI");                     // NOLINT(concurrency-mt-unsafe)
+  if (update != nullptr && std::string(update) == "1" && (ci == nullptr || std::string(ci).empty())) {
+    REQUIRE(ovt::render::test::write_png(plain, actual));
+    REQUIRE(run_gzip("-n -9 -c '" + plain + "' > '" + golden + "'"));
+    WARN("rewrote golden " << golden);
+    return;
+  }
+  REQUIRE(run_gzip("-dc '" + golden + "' > '" + plain + "'"));
+  const std::optional<RgbImage> read = ovt::render::test::read_png(plain);
+  REQUIRE(read.has_value());
+  const RgbImage expected = read.value_or(RgbImage{});
+  REQUIRE(expected.width == actual.width);
+  REQUIRE(expected.height == actual.height);
+  size_t differing = 0;
+  for (size_t p = 0; p < actual.rgb.size(); p += 3) {
+    for (size_t c = 0; c < 3; ++c) {
+      if (std::abs(int{actual.rgb.at(p + c)} - int{expected.rgb.at(p + c)}) > 2) {
+        ++differing;
+        break;
+      }
+    }
+  }
+  const size_t pixels = actual.rgb.size() / 3;
+  if (differing * 1000 > pixels) {
+    const std::string out = name.substr(0, name.size() - 4) + ".actual.png";
+    static_cast<void>(ovt::render::test::write_png(out, actual));
+    FAIL(differing << " of " << pixels << " pixels differ from " << golden << "; this render: " << out);
+  }
+}
+
+// synthetic_4k_mv.fb: the generated fixture when present (tests/corpora/synthetic/generate.py --fixtures writes it),
+// else its in-memory twin (make_synthetic_mv), which draws the same arrows.
+std::vector<uint8_t> synthetic_4k_mv() {
+  std::ifstream in(std::string(OVT_RENDER_FIXTURE_DIR) + "/synthetic_4k_mv.fb", std::ios::binary);
+  if (in) {
+    std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    flatbuffers::Verifier::Options opts;
+    opts.max_tables = size_t{1} << 28U;
+    flatbuffers::Verifier v(bytes.data(), bytes.size(), opts);
+    if (fb::VerifyFrameAnalysisBuffer(v)) {
+      return bytes;
+    }
+  }
+  return ovt::render::test::make_synthetic_mv(3840, 2160);
+}
+
 }  // namespace
 
 // ---- CPU: instance builder (steps 1, 4, 5) ------------------------------------------------------------------
@@ -146,8 +305,9 @@ TEST_CASE("render_test_arrows: instance segments, colours and flags (§10.5.4)",
   CHECK(a.geom.at(17) == 4.0F);
   CHECK(a.geom.at(18) == 2.0F);   // 16 / 16 * 2
   CHECK(a.geom.at(19) == -4.0F);  // -32 / 16 * 2
-  REQUIRE(diag.size() == 1);
+  REQUIRE(diag.size() == 2);
   CHECK(diag[0].find("1 MotionVector") != std::string::npos);
+  CHECK(diag[1].rfind("RND-0060 ", 0) == 0);  // mvs[6] is a field MV: one note per build (§10.10)
 
   // No MV layer: no arrows. Determinism and thread independence: a large set builds the same in any chunking, so a
   // repeated build is byte-identical.
@@ -175,6 +335,38 @@ TEST_CASE("render_test_arrows: threaded build keeps the MotionVector order", "[f
     }
   }
   CHECK(diag.empty());
+}
+
+// Above parallel_ranges' 4096-item threshold with every class mixed: the threaded scatter must equal a sequential
+// stable partition by segment (review note on #647).
+TEST_CASE("render_test_arrows: threaded build of mixed lists equals a stable partition", "[fast][render][overlay]") {
+  Fa f;
+  for (int i = 0; i < 6007; ++i) {
+    const auto list = static_cast<uint8_t>(i % 3 == 0 ? 1 : 0);
+    const auto flags = static_cast<uint16_t>(i % 5 == 0 ? 0x1 : 0);
+    f.mvs.push_back({list, (i % 64) * 8, (i / 64) * 8, 8, 8, static_cast<int16_t>(i % 97), 0, flags});
+  }
+  OverlayConfig cfg;
+  cfg.layers = kAllMv;
+  const ArrowInstances a = instances_of(f, cfg);
+  REQUIRE(a.size() == f.mvs.size());
+  // Reference: segment of each MV (L1 uni, L1 bi, L0 bi, L0 uni), then MV order inside a segment.
+  std::vector<uint32_t> ref(f.mvs.size());
+  for (uint32_t i = 0; i < ref.size(); ++i) {
+    ref[i] = i;
+  }
+  auto seg = [&](uint32_t i) {
+    const bool bi = (f.mvs[i].flags & 1U) != 0;
+    return f.mvs[i].list == 1 ? (bi ? 1 : 0) : (bi ? 2 : 3);
+  };
+  std::stable_sort(ref.begin(), ref.end(), [&](uint32_t x, uint32_t y) { return seg(x) < seg(y); });
+  for (size_t i = 0; i < ref.size(); ++i) {
+    if (id_of(a, i) != ref[i]) {
+      FAIL("instance " << i << " is mvs[" << id_of(a, i) << "], expected mvs[" << ref[i] << "]");
+    }
+  }
+  CHECK(a.seg.l1_bi ==
+        static_cast<uint32_t>(std::count_if(ref.begin(), ref.end(), [&](uint32_t i) { return seg(i) == 0; })));
 }
 
 TEST_CASE("render_test_arrows: intra directions per codec (§6.3.1 numbering)", "[fast][render][overlay]") {
@@ -270,4 +462,160 @@ TEST_CASE("render_test_arrows: R-8K-1 viewport-culled subset keeps the segments"
   ovt::render::detail::cull_instances(all, {-30.0F, 0.0F, -10.0F, 10.0F}, cut);
   REQUIRE(cut.size() == 1);
   CHECK(id_of(cut, 0) == 3);
+}
+
+// ---- GPU: the pass on lavapipe / MoltenVK ------------------------------------------------------------------------
+
+// Acceptance test 2: MV (16, 0) = 1 luma sample at zoom 1 is a 2x2 px dot (mv_min_px = 2).
+TEST_CASE("render_test_arrows: a 1-sample MV is a 2x2 dot (AT2)", "[fast][render][vulkan][overlay]") {
+  const OwnedPicture pic = grey_picture(64, 64);
+  auto surface = surface_or_skip(64, 64);
+  surface->set_frame(pic.pic);
+  Fa f;
+  f.mvs = {{0, 24, 24, 8, 8, 16, 0, 0}};  // centre (28, 28)
+  OverlayConfig cfg;
+  cfg.layers = bit(OverlayLayer::MvL0);
+  REQUIRE(cfg.mv_min_px == 2.0F);
+  const OutputPixels px = render_fa(*surface, f.bytes(), cfg, centred(1.0, 32.0, 32.0));
+  CHECK(count_near(px, kOrange) == 4);
+  for (int y = 27; y <= 28; ++y) {
+    for (int x = 27; x <= 28; ++x) {
+      CHECK(near(rgb_at(px, x, y), kOrange));
+    }
+  }
+  // Two samples long (32, 0) is an arrow, not a dot: shaft + head.
+  f.mvs = {{0, 24, 24, 8, 8, 32 * 8, 0, 0}};  // 16 samples to the right
+  const OutputPixels arrow = render_fa(*surface, f.bytes(), cfg, centred(1.0, 32.0, 32.0));
+  CHECK(near(rgb_at(arrow, 30, 28), kOrange));  // shaft on the row of the origin
+  CHECK(near(rgb_at(arrow, 42, 28), kOrange));  // head near the tip (28 + 16 = 44)
+  CHECK_FALSE(near(rgb_at(arrow, 30, 25), kOrange));
+  CHECK(count_near(arrow, kOrange) > 20);
+}
+
+TEST_CASE("render_test_arrows: list coding, MvBi, strokes and R-MV-1 (§10.5.4)", "[fast][render][vulkan][overlay]") {
+  const OwnedPicture pic = grey_picture(128, 64);
+  auto surface = surface_or_skip(128, 64);
+  surface->set_frame(pic.pic);
+  Fa f;
+  f.cells_w = 32;
+  f.cells_h = 16;
+  // A horizontal L1 arrow of 40 samples on row 12 and an L0 arrow of a bi block on row 36.
+  f.mvs = {{1, 0, 8, 8, 8, 40 * 16, 0, 0}, {0, 0, 32, 8, 8, 40 * 16, 0, 0x1}};
+  const ViewState view = centred(1.0, 64.0, 32.0);
+
+  SECTION("L1 shafts are dashed 4 on / 2 off, L0 solid") {
+    OverlayConfig cfg;
+    cfg.layers = kAllMv;
+    const OutputPixels px = render_fa(*surface, f.bytes(), cfg, view);
+    int on = 0;
+    int off = 0;
+    for (int x = 5; x < 36; ++x) {
+      (near(rgb_at(px, x, 12), kPurple) ? on : off)++;
+    }
+    CHECK(on > 15);
+    CHECK(off > 6);  // gaps
+    for (int x = 5; x < 36; ++x) {
+      CHECK(near(rgb_at(px, x, 36), kOrange));  // solid
+    }
+  }
+  SECTION("MvBi draws the bi block's arrow in cyan, solid") {
+    OverlayConfig cfg;
+    cfg.layers = kAllMv | bit(OverlayLayer::MvBi);
+    const OutputPixels px = render_fa(*surface, f.bytes(), cfg, view);
+    CHECK(near(rgb_at(px, 20, 36), kCyan));
+    CHECK(count_near(px, kOrange) == 0);
+    CHECK(count_near(px, kPurple) > 15);  // the uni L1 arrow keeps its colour
+  }
+  SECTION("Only MvL0: no L1 arrow") {
+    OverlayConfig cfg;
+    cfg.layers = bit(OverlayLayer::MvL0);
+    const OutputPixels px = render_fa(*surface, f.bytes(), cfg, view);
+    CHECK(count_near(px, kPurple) == 0);
+    CHECK(count_near(px, kOrange) > 30);
+  }
+  SECTION("R-MV-1: no arrows when a cell is under 4 device px") {
+    OverlayConfig cfg;
+    cfg.layers = kAllMv;
+    const OutputPixels px = render_fa(*surface, f.bytes(), cfg, centred(0.5, 64.0, 32.0));
+    CHECK(count_near(px, kOrange) == 0);
+    CHECK(count_near(px, kPurple) == 0);
+  }
+  SECTION("intra strokes in colour 20") {
+    Fa g;
+    g.cells_w = 32;
+    g.cells_h = 16;
+    g.intra.assign(size_t{32} * 16, -1);
+    g.block_id.assign(size_t{32} * 16, 0);
+    g.blocks = {fb::Rect(0, 0, 128, 64)};
+    for (uint32_t cy = 0; cy < 16; ++cy) {
+      for (uint32_t cx = 0; cx < 32; ++cx) {
+        g.intra[(cy * 32) + cx] = 26;  // one vertical stroke through the whole 128 x 64 block
+      }
+    }
+    OverlayConfig cfg;
+    cfg.layers = bit(OverlayLayer::IntraDirs);
+    const OutputPixels px = render_fa(*surface, g.bytes(), cfg, view);
+    CHECK(near(rgb_at(px, 64, 32), kGreen));
+    CHECK(near(rgb_at(px, 64, 10), kGreen));
+    CHECK_FALSE(near(rgb_at(px, 64, 2), kGreen));  // 80 % of 64: from y = 6.4 to 57.6
+    CHECK_FALSE(near(rgb_at(px, 70, 32), kGreen));
+  }
+}
+
+// SPEC-ASSUMPTION(#645): the golden is §10.9.2's 1080p viewport; the 4K AT1 test compares its centre with it.
+// The overlay golden (§10.9.2 item 4: 1920x1080 viewport, dpr 1): the centre of synthetic_4k_mv at zoom 1, so most of
+// the frame's 518,400 instances are culled in the vertex shader and the rest are drawn. Determinism: two renders
+// are byte-identical (§10.9.2 item 5).
+TEST_CASE("render_test_arrows: synthetic_4k_mv golden (§10.9.2)", "[fast][render][vulkan][overlay]") {
+  const std::vector<uint8_t> fa = synthetic_4k_mv();
+  const OwnedPicture pic = grey_picture(3840, 2160);
+  auto surface = surface_or_skip(1920, 1080);
+  surface->set_frame(pic.pic);
+  OverlayConfig cfg;
+  cfg.layers = kAllMv;
+  const ViewState view = centred(1.0, 1920.0, 1080.0);
+  const OutputPixels first = render_fa(*surface, fa, cfg, view);
+  const OutputPixels second = render_fa(*surface, fa, cfg, view);
+  CHECK(first.bytes == second.bytes);
+  check_golden(to_rgb(first), "synthetic_4k_mv.png");
+}
+
+// Acceptance test 1: all 518,400 arrows at zoom 1 in a 3840x2160 viewport, on the GPU runners only (chapter 14
+// §14.9.2). The central 1920x1080 of the render must match the same golden (the view is the 1080p golden's, moved
+// by whole pixels), and the arrow passes' time is reported as the bench_overlay_4k_mv_arrows counter.
+// SPEC-ASSUMPTION(#645): libovt-render disables libplacebo's timestamp queries (vk_no_timestamps.cpp, a
+// MoltenVK use-after-free), so the counter is the median wall time of render() + readback with arrows minus without.
+TEST_CASE("render_test_arrows: 518,400 arrows at 4K (AT1)", "[.gpu][render][overlay]") {
+  const std::vector<uint8_t> fa = synthetic_4k_mv();
+  const OwnedPicture pic = grey_picture(3840, 2160);
+  auto surface = surface_or_skip(3840, 2160);
+  surface->set_frame(pic.pic);
+  OverlayConfig cfg;
+  cfg.layers = kAllMv;
+  const ViewState view = centred(1.0, 1920.0, 1080.0);
+  const OutputPixels first = render_fa(*surface, fa, cfg, view);
+  const OutputPixels second = render_fa(*surface, fa, cfg, view);
+  CHECK(first.bytes == second.bytes);
+  check_golden(to_rgb(first, 960, 540, 1920, 1080), "synthetic_4k_mv.png");
+
+  auto median_ms = [&](uint32_t layers) {
+    OverlayConfig c = cfg;
+    c.layers = layers;
+    OverlayBuilder builder(*surface);
+    surface->set_overlays(builder.build(fa.data(), fa.size(), c));
+    std::vector<double> ms;
+    for (int i = 0; i < 21; ++i) {
+      const auto t0 = std::chrono::steady_clock::now();
+      surface->render(view);
+      OutputPixels px;
+      REQUIRE(ovt::render::detail::download_output(*surface, px));
+      ms.push_back(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count());
+    }
+    std::sort(ms.begin(), ms.end());
+    return ms[ms.size() / 2];
+  };
+  const double with = median_ms(kAllMv);
+  const double without = median_ms(0);
+  WARN("bench_overlay_4k_mv_arrows arrow_pass_ms=" << (with - without) << " (render+readback " << with
+                                                   << " ms with arrows, " << without << " ms without)");
 }
