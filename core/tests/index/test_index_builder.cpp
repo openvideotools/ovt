@@ -82,7 +82,8 @@ Bytes index_ivf(const std::filesystem::path& path, size_t cut = 0) {
   const auto tmp = std::filesystem::temp_directory_path() / ("ovt_index_builder_" + path.filename().string());
   {
     std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-    out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));  // NOLINT
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): std::ostream::write takes char*
+    out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
   }
   const auto file = ovt::io::RandomAccessFile::open(tmp.string());
   const auto ivf = ovt::container::ivf::parse(*file);
