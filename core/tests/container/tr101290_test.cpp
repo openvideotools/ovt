@@ -113,6 +113,7 @@ struct Plan {
   size_t corrupt_crc_at = SIZE_MAX;  // the PAT at this slot gets a damaged CRC
 };
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity): one flat table of slot rules
 Bytes build(const Plan& p) {
   Bytes out;
   std::array<uint8_t, 8192> cc{};
@@ -125,7 +126,7 @@ Bytes build(const Plan& p) {
   for (size_t k = 0; k < p.packets; ++k) {
     const auto pcr = static_cast<int64_t>(k) * 27000;
     if (k % 100 == 0) {
-      if (p.skip_pat.count(k) == 0) {
+      if (!p.skip_pat.contains(k)) {
         const uint8_t c = next(0);
         Bytes body = pat;
         if (p.corrupt_crc_at == k) {
@@ -135,31 +136,31 @@ Bytes build(const Plan& p) {
         continue;
       }
     } else if (k % 100 == 1) {
-      if (p.skip_pmt.count(k) == 0) {
+      if (!p.skip_pmt.contains(k)) {
         add(make_packet(kPmtPid, next(kPmtPid), pmt, -1, 0, true));
         continue;
       }
     } else if (k % 100 == 2 && p.with_cat) {
-      if (p.skip_cat.count(k) == 0) {
+      if (!p.skip_cat.contains(k)) {
         add(make_packet(1, next(1), cat, -1, 0, true));
         continue;
       }
     } else if (k % 20 == 4) {
-      add(make_packet(kVideoPid, next(kVideoPid), Bytes(40, 0x11), p.with_pcr && p.skip_pcr.count(k) == 0 ? pcr : -1));
+      add(make_packet(kVideoPid, next(kVideoPid), Bytes(40, 0x11), p.with_pcr && !p.skip_pcr.contains(k) ? pcr : -1));
       continue;
     } else if (k % 20 == 12) {
       const uint8_t c = next(kAudioPid);
-      if (p.skip_audio.count(k) == 0) {
+      if (!p.skip_audio.contains(k)) {
         add(make_packet(kAudioPid, c, Bytes(40, 0x22), -1,
                         k >= p.scrambled_from && k <= p.scrambled_to ? uint8_t{2} : uint8_t{0}));
         continue;
       }
     }
     Bytes n = make_packet(ts::kNullPid, 0, filler);
-    if (p.bad_sync.count(k) != 0) {
+    if (p.bad_sync.contains(k)) {
       n[0] = 0x48;
     }
-    if (p.error_indicator.count(k) != 0) {
+    if (p.error_indicator.contains(k)) {
       n[1] |= 0x80U;
     }
     add(n);
@@ -232,7 +233,7 @@ TEST_CASE("tr101290: the report lists every priority 1 and 2 check in order", "[
 TEST_CASE("tr101290: a clean capture has no priority 1 or 2 error", "[container][mpegts][tr101290][fast]") {
   const Report rep = report_of(build({}));
   require_all_zero(rep);
-  CHECK(rep.r->diagnostics()->size() == 0);
+  CHECK(rep.r->diagnostics()->empty());
   CHECK(rep.check("1.4")->first_offset() == 0);
 }
 
