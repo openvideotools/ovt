@@ -35,9 +35,11 @@
 #include <QQuickRenderControl>
 #include <QQuickRenderTarget>
 #include <QQuickWindow>
+#include <QRect>
 #include <QSGRendererInterface>
 #include <QSize>
 #include <QString>
+#include <QVariantList>
 
 #include <array>
 #include <cmath>
@@ -364,4 +366,31 @@ TEST_CASE("picture_host_resize_once_per_size_without_flicker", "[fast][gui]") {
     CHECK(harness.host().stats().surface_height == size.height());
   }
   CHECK(harness.host().last_error().isEmpty());
+}
+
+// WI-1.456: the Picture panel's read-out and crop come from the frame the host shows, without the GPU.
+// Catch2's REQUIRE/CHECK expand to branches; the test itself is straight-line.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+TEST_CASE("picture_host_code_values_and_crop", "[fast][gui]") {
+  if (app_or_null() == nullptr) {
+    SKIP("no X display (run under xvfb-run)");
+  }
+  ovt_ColorDescription color{};
+  color.bit_depth = 10;
+  color.chroma_format = 1;  // 4:2:0
+  const std::shared_ptr<PictureFrame> frame = ovt::app::make_picture_frame(64, 36, color);
+  REQUIRE(frame != nullptr);
+  frame->set(0, 13, 7, 700);
+  frame->set(1, 6, 3, 300);  // chroma sample covering luma (12..13, 6..7)
+  frame->set(2, 6, 3, 1023);
+  frame->picture.crop = ovt::fb::Rect(0, 0, 64, 34);
+  ovt::app::PictureHost host;
+  CHECK(host.codeValues(0, 0).isEmpty());
+  CHECK(host.crop().isNull());
+  host.set_picture(frame);
+  CHECK(host.codeValues(13, 7) == QVariantList{700, 300, 1023});
+  CHECK(host.codeValues(12, 6) == QVariantList{0, 300, 1023});
+  CHECK(host.codeValues(64, 0).isEmpty());
+  CHECK(host.codeValues(-1, 0).isEmpty());
+  CHECK(host.crop() == QRect(0, 0, 64, 34));
 }
