@@ -14,9 +14,9 @@ import struct
 from pathlib import Path
 
 import numpy as np
+import ovt.fb.FrameAnalysis  # noqa: F401  (acceptance test 1: the generated package imports)
 import pytest
-
-zstandard = pytest.importorskip("zstandard")
+from ovt import model
 
 GOLDEN = Path(
     os.environ.get(
@@ -24,9 +24,6 @@ GOLDEN = Path(
         Path(__file__).resolve().parents[2] / "core" / "tests" / "golden",
     )
 )
-
-import ovt.fb.FrameAnalysis  # noqa: F401  (acceptance test 1: the generated package imports)
-from ovt import model
 
 
 def _fa(name: str):
@@ -71,6 +68,7 @@ def test_empty_vectors_have_right_dtype():
 
 
 def test_size_prefixed_and_zstd(tmp_path):
+    zstandard = pytest.importorskip("zstandard")
     raw = (GOLDEN / "tiny16_hevc.fa").read_bytes()
     prefixed = struct.pack("<I", len(raw)) + raw
     p = tmp_path / "00000000.fa.zst"
