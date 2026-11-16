@@ -76,7 +76,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       require_status(st, out);
       if (st == OVT_OK) {
         ovt_Buffer exported{nullptr, 0};
-        require(ovt_fb_to_json(out.data, out.size, root, static_cast<int>(selector >> 7U), &exported) == OVT_OK);
+        require(ovt_fb_to_json(out.data, out.size, root, selector >> 7U, &exported) == OVT_OK);
         require(exported.data[exported.size] == 0);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
         ovt_Buffer again{nullptr, 0};
         require(ovt_json_to_fb(reinterpret_cast<const char*>(exported.data), root, &again) == OVT_OK);
@@ -93,7 +93,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
     case 2: {  // FrameAnalysis validator, with the first 32 payload bytes as the expected hash when bit 2 is set
       const bool with_hash = ((selector >> 2U) & 1U) != 0 && len >= 32;
-      const int codec = static_cast<int>(selector >> 3U) - 1;  // -1 .. 30: valid and invalid overrides
+      const int codec = (selector >> 3U) - 1;  // -1 .. 30: valid and invalid overrides
       const ovt_status st = ovt_validate_frame_analysis(payload, len, with_hash ? payload : nullptr, codec, &out);
       require_status(st, out);
       if (st == OVT_OK) {
