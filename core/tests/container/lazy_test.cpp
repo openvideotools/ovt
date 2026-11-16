@@ -190,7 +190,8 @@ TEST_CASE("lazy: moov first with a multi-GiB mdat reads only headers", "[contain
   const SparseFile* raw = file.get();
   Opened o(std::move(file));
   CHECK(raw->bytes_read() < 16 * kMiB);
-  CHECK(raw->bytes_read() < kMiB);  // nothing here decodes `stsz`, so its payload is never touched either
+  // The `stsz` decoder (WI-1.209) sees at most its first 1 MiB window; the zero entries after it are never fetched.
+  CHECK(raw->bytes_read() < 2 * kMiB);
   const auto* t = tree_of(o.container);
   REQUIRE(t->root()->size() == 3);
   const auto* mdat = t->root()->Get(2);

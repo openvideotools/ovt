@@ -111,7 +111,18 @@ FieldBuilder::FieldBuilder(fb::BoxNodeT& node, uint64_t box_file_offset, BitRead
     : FieldBuilder(node, box_file_offset, br, static_cast<uint64_t>(node.header_length) * 8U) {}
 
 FieldBuilder::FieldBuilder(fb::BoxNodeT& node, uint64_t box_file_offset, BitReader& br, uint64_t payload_bit_base)
-    : node_(&node), box_off_(box_file_offset), br_(&br), base_(payload_bit_base), origin_(br.bit_pos()) {}
+    : node_(&node),
+      box_off_(box_file_offset),
+      br_(&br),
+      base0_(payload_bit_base),
+      base_(payload_bit_base),
+      origin_(br.bit_pos()) {}
+
+void FieldBuilder::rebind(BitReader& br, uint64_t payload_byte) {
+  br_ = &br;
+  origin_ = br.bit_pos();
+  base_ = base0_ + payload_byte * 8U;
+}
 
 std::vector<std::unique_ptr<fb::FieldT>>& FieldBuilder::sink() {
   return stack_.empty() ? node_->fields : stack_.back()->children;
@@ -348,7 +359,7 @@ FieldBuilder& FieldBuilder::group(std::string_view name) {
   const uint64_t start = br_->bit_pos();
   add(name, SyntaxValueKind::None, start);
   stack_.push_back(last_);
-  stack_start_.push_back(start);
+  stack_start_.push_back(rel(start));
   return *this;
 }
 
@@ -370,7 +381,7 @@ void FieldBuilder::end() {
     return;
   }
   fb::FieldT* g = stack_.back();
-  const uint64_t len = br_->bit_pos() - stack_start_.back();
+  const uint64_t len = rel(br_->bit_pos()) - stack_start_.back();
   g->span =
       std::make_unique<fb::BitSpan>(g->span->bit_offset(), static_cast<uint32_t>(std::min<uint64_t>(len, UINT32_MAX)));
   stack_.pop_back();

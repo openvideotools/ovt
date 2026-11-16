@@ -16,6 +16,8 @@
 #include "container/diagnostics.h"
 #include "container/isobmff/box_registry.h"
 #include "container/isobmff/field_builder.h"
+#include "container/isobmff/paged_span.h"
+#include "container/isobmff/sample_tables.h"
 
 namespace ovt::container::isobmff {
 
@@ -24,8 +26,8 @@ namespace {
 using fb::BoxNodeT;
 
 constexpr uint64_t kHeaderProbe = 32;  // 8 + 8 (largesize) + 16 (usertype)
-// SPEC-ASSUMPTION(#630): no PagedSpan yet (the first decoder of a >1 MiB leaf, WI-1.209, adds it); decoders see at
-// most 1 MiB (§8.2.3 reading strategy).
+// SPEC-ASSUMPTION(#630): a decoder's BitReader sees at most 1 MiB (§8.2.3 reading strategy); the decoders of the
+// large tables (stts, ctts, stsz, stz2, stco, co64, stss, stps) read the rest through BoxContext::payload_pages.
 constexpr uint64_t kMaxDecodedPayload = 1 << 20;
 
 std::string_view sv(const FourCC& t) {
@@ -305,6 +307,18 @@ bool read_fullbox_header(const io::RandomAccessFile& file, BoxNodeT& n, uint64_t
   return true;
 }
 
+// Makes the whole payload of the box being decoded reachable through the context for the duration of the decoder.
+class PagesScope {
+ public:
+  PagesScope(BoxContext& ctx, PagedSpan& pages) : ctx_(ctx) { ctx_.payload_pages = &pages; }
+  PagesScope(const PagesScope&) = delete;
+  PagesScope& operator=(const PagesScope&) = delete;
+  ~PagesScope() { ctx_.payload_pages = nullptr; }
+
+ private:
+  BoxContext& ctx_;
+};
+
 // Step 2.12 hand decoder: the payload (at most 1 MiB) through a BitReader; returns the payload offset where the
 // children of a ContainerWithPrefix start (clamped to the payload), else 0.
 uint64_t run_hand_decoder(const io::RandomAccessFile& file, BoxNodeT& n, const BoxDecoder& d, BoxContext& ctx,
@@ -315,6 +329,8 @@ uint64_t run_hand_decoder(const io::RandomAccessFile& file, BoxNodeT& n, const B
     payload.resize(file.read(payload_begin, payload.size(), payload.data()));
   }
   BitReader br(payload);
+  PagedSpan pages(file, payload_begin, end - payload_begin);
+  const PagesScope pages_scope(ctx, pages);
   const uint64_t base_bits = (static_cast<uint64_t>(n.header_length) + (fullbox ? 4U : 0U)) * 8U;
   FieldBuilder fb(n, n.file_span->offset(), br, base_bits);
   const DecodeOutcome out = run_decoder(d, ctx, br, fb);
@@ -475,6 +491,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
     out.push_back(std::move(n));
     pos = end;  // 2.14
   }
+  finish_sample_tables(out, sib_ctx);
   return out;
 }
 
@@ -496,6 +513,7 @@ WalkResult walk(const io::RandomAccessFile& file, std::vector<DeferredBox>* defe
   WalkState st;
   st.file = &file;
   st.deferred = deferred;
+  r.root_ctx.file_size = size;
   DiagList top_diags;  // CNT-0105 cannot occur at depth 0
   r.top_level = walk_children(st, 0, 0, size, 0, r.root_ctx, top_diags);
   for (auto& d : top_diags) {

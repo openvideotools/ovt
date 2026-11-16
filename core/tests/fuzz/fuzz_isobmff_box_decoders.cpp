@@ -78,6 +78,18 @@ constexpr auto kCases = std::to_array<Case>({
     {"uriI", "urim", true, "stsd"},
     {"tmcd", "stsd", false},
     {"name", "tmcd", false, "stsd"},
+    // WI-1.209 group D part 1: the sample tables of `stbl` (windowed decoders; the payload is read from memory here).
+    {"stts", "stbl", true},
+    {"ctts", "stbl", true},
+    {"cslg", "stbl", true},
+    {"stsc", "stbl", true},
+    {"stsz", "stbl", true},
+    {"stz2", "stbl", true},
+    {"stco", "stbl", true},
+    {"co64", "stbl", true},
+    {"stss", "stbl", true},
+    {"stps", "stbl", true},
+    {"sdtp", "stbl", true},
 });
 
 void require(bool ok) {

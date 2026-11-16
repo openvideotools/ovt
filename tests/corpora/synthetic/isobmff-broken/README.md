@@ -3,7 +3,7 @@
 # isobmff-broken
 
 Small ISOBMFF files (about 20 KiB each, 260 KiB in all) with one deliberate defect in the box headers, used by
-`core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201). Each is the base file of
+`core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209). Each is the base file of
 `tools/make_broken.py` with one change; regenerate a file with the command in the table (the output is
 byte-for-byte reproducible).
 
@@ -23,6 +23,9 @@ byte-for-byte reproducible).
 | `nonprintable_type.mp4` | `--nonprintable` | `CNT-0109` |
 | `trailing_5_bytes.mp4` | `--trailing 5` | `CNT-0101` |
 | `truncated_at_1000.mp4` | `--truncate 1000` | `CNT-0108` |
+| `stsc_descending.mp4` | `--stsc-descending` | `CNT-2003` |
+| `ctts_v0_negative.mp4` | `--ctts-v0-negative` | `CNT-2002` |
+| `stco_beyond_eof.mp4` | `--stco-beyond-eof` | `CNT-2007` |
 
 The other truncation offsets and the 0/1/7/0xFFFFFFFF size words are exercised in memory by the test, which
 mutates a base file of its own, so the committed set stays small.
