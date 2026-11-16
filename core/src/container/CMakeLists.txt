@@ -13,7 +13,6 @@ target_sources(
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
           isobmff/decoders/movie.cpp
-          isobmff/decoders/sample_entries.cpp
           isobmff/field_builder.cpp
           diagnostics.cpp
           format_sniff.cpp
