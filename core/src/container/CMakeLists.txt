@@ -15,6 +15,8 @@ target_sources(
           isobmff/decoders/movie.cpp
           isobmff/field_builder.cpp
           diagnostics.cpp
+          ebml/ebml_schema.cpp
+          ebml/ebml_schema.gen.cpp
           format_sniff.cpp
           ivf.cpp
           mpegts/descriptors.cpp

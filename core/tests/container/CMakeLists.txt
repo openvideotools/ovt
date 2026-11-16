@@ -10,6 +10,7 @@ add_executable(
   box_walk_test.cpp
   c_api_test.cpp
   decoders_movie_test.cpp
+  ebml_schema_test.cpp
   field_builder_test.cpp
   ivf_test.cpp
   m3u8_test.cpp
@@ -45,4 +46,8 @@ if(Python3_Interpreter_FOUND)
   add_test(NAME registry_gen_check COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/gen_box_registry.py"
                                            --check)
   set_tests_properties(registry_gen_check PROPERTIES LABELS "registry;tools")
+  # WI-4.200: the committed EBML table matches a fresh generator run. The inputs are committed, so it needs no network.
+  add_test(NAME ebml_schema_gen_check COMMAND "${Python3_EXECUTABLE}" -I
+                                              "${PROJECT_SOURCE_DIR}/tools/gen_ebml_schema.py" --check)
+  set_tests_properties(ebml_schema_gen_check PROPERTIES LABELS "registry;tools;fast")
 endif()

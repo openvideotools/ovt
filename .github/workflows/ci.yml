@@ -173,6 +173,11 @@ jobs:
       - name: registry-check
         run: python -I tools/gen_box_registry.py --check
 
+      # WI-4.200 (chapter 08 §8.6.7): the EBML/Matroska element table is regenerated from the committed CELLAR
+      # schemas in tools/registry_inputs/ebml/ and must match ebml_schema.gen.cpp byte for byte. No network.
+      - name: ebml-schema-check
+        run: python -I tools/gen_ebml_schema.py --check
+
       - name: Rename dry run
         run: |
           if [ -f tools/rename_dry_run.sh ]; then tools/rename_dry_run.sh; else echo "::notice::WI-0.606; skipped"; fi

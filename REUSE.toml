@@ -237,3 +237,10 @@ SPDX-License-Identifier = "LGPL-2.1-or-later"
 path = "android/gradle/wrapper/gradle-wrapper.jar"
 SPDX-FileCopyrightText = "2015-2021 the original authors of Gradle"
 SPDX-License-Identifier = "Apache-2.0"
+
+# The IETF CELLAR EBML and Matroska schemas, byte-exact snapshots that tools/gen_ebml_schema.py turns into
+# core/src/container/ebml/ebml_schema.gen.cpp (WI-4.200). Both repositories are CC-BY-4.0.
+[[annotations]]
+path = ["tools/registry_inputs/ebml/*.xml"]
+SPDX-FileCopyrightText = "IETF CELLAR working group contributors (ietf-wg-cellar/ebml-specification, ietf-wg-cellar/matroska-specification)"
+SPDX-License-Identifier = "CC-BY-4.0"
