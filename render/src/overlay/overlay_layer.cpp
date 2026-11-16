@@ -90,7 +90,7 @@ void OverlayLayerGpu::drop_set() {
 bool OverlayLayerGpu::ensure_static(std::string& err) {
   if (palette_ == nullptr) {
     // The fill colours of §10.5.2 (WI-2.439). The palette is always the standard one: OverlayConfig has no
-    // colour-blind switch yet (SPEC-ASSUMPTION(#633)).
+    // colour-blind switch yet; the GUI work item for the K toggle adds it.
     std::array<uint8_t, kOverlayColors.size() * 4> bytes{};
     for (size_t i = 0; i < kOverlayColors.size(); ++i) {
       const uint32_t rgba = overlay_fill_rgba(i, false);
