@@ -164,7 +164,8 @@ TEST_CASE("AT3: plane actions 1-5 set plane_mode 0-4", "[fast][gui][picture][at3
   ovt::app::testing::qt_app();
   PictureController c;
   const QSignalSpy spy(&c, &PictureController::planeChanged);
-  const std::array<const char*, 5> ids = {"view.plane.yuv", "view.plane.y", "view.plane.u", "view.plane.v", "view.plane.gray"};
+  const std::array<const char*, 5> ids = {"view.plane.yuv", "view.plane.y", "view.plane.u", "view.plane.v",
+                                          "view.plane.gray"};
   for (int i = 4; i >= 0; --i) {
     CHECK(c.handleAction(QLatin1String(ids.at(static_cast<std::size_t>(i)))));
     CHECK(c.plane_mode() == i);
