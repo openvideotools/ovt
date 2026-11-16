@@ -191,7 +191,17 @@ ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             actions: actions
-            panelComponents: ({"diagnostics": diagnosticsComponent, "bookmarks": bookmarksComponent})
+            panelComponents: ({"picture": pictureComponent, "diagnostics": diagnosticsComponent,
+                               "bookmarks": bookmarksComponent})
+        }
+    }
+
+    // The Picture panel (§11.3.2): the Welcome page while no file is open, the decoded picture after (WI-1.405).
+    Component {
+        id: pictureComponent
+
+        PicturePanel {
+            shellActions: actions
         }
     }
 

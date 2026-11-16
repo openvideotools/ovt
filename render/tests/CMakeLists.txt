@@ -95,6 +95,9 @@ if(APPLE)
                                                  "-framework CoreFoundation")
 endif()
 
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
+
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
 if(APPLE)
   add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
@@ -113,3 +116,6 @@ target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
 target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
+# WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
+target_sources(ovt_tests_render PRIVATE test_compare.cpp)

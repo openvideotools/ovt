@@ -30,6 +30,7 @@ class Platform : public QObject {
   Q_PROPERTY(QString layoutsPath READ layoutsPath CONSTANT)
   Q_PROPERTY(QString keymapPath READ keymapPath CONSTANT)
   Q_PROPERTY(QString rhiBackend READ rhiBackend CONSTANT)
+  Q_PROPERTY(bool pictureHostAvailable READ pictureHostAvailable CONSTANT)
 
  public:
   Platform() = default;
@@ -51,6 +52,10 @@ class Platform : public QObject {
   // RHI backend name of the process: "metal", "vulkan", "opengl", "d3d11", "software" or "null".
   // Valid after selectGraphicsApi(), otherwise it is the default of this platform.
   static QString rhiBackend();
+
+  // True when this build has the PictureHost item (WI-1.405): Qt >= 6.7 (QQuickRhiItem) and libovt-render, desktop
+  // only (Android's EMBEDDED host is WI-A.403). The Picture panel loads PictureView.qml only then.
+  static bool pictureHostAvailable();
 
   // The backend fixed per platform (macOS Metal, Linux Vulkan, Android OpenGL ES), and the OVT_RHI override.
   // Returns false when `name` is not a backend name.
