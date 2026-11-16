@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of the psnr metric (chapter 9 §9.4.2, §9.4.7; WI-3.306 acceptance tests 1-3).
+// Tests of the psnr metric (chapter 9 §9.4.2, §9.4.7; WI-3.306 acceptance tests 1-3) and its golden suite against
+// the FFmpeg psnr goldens of WI-0.565 (chapter 14 §14.4.10; WI-3.590 acceptance test 1).
 
+#include <algorithm>
 #include <array>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -13,6 +15,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <nlohmann/json.hpp>
@@ -24,6 +27,7 @@
 #include "metrics/kernels/map_sink.h"
 #include "metrics/kernels/psnr_kernels.h"
 #include "metrics/kernels/psnr_metric.h"
+#include "metrics_golden_suite.hpp"
 #include "ovt_metrics_generated.h"
 #include "test_support/corpus.h"
 
@@ -417,4 +421,116 @@ TEST_CASE("psnr 16-bit samples at odd strides are read without misaligned loads"
       CHECK(inst.score(r, d).values[0] > 0.0);
     }
   }
+}
+
+// ---- WI-3.590: the PSNR golden suite of chapter 14 §14.4.10 against the FFmpeg psnr goldens of WI-0.565 ----------
+
+namespace {
+
+namespace suite = ovt::test::metrics_suite;
+
+// The float64 recomputation of §14.4.10 "Tolerance": the PSNR of plane p (p == 3: all planes, FFmpeg's psnr_avg)
+// summed sample by sample, independent of the kernels. Also returns the MSE through `mse_out`.
+double psnr_reference(const suite::Picture& r, const suite::Picture& d, size_t p, double& mse_out) {
+  const double peak = std::ldexp(1.0, r.planes.bit_depth) - 1.0;
+  const double psnr_max = 60.0 + (6.0 * (r.planes.bit_depth - 8.0));
+  double sse = 0.0;
+  double samples = 0.0;
+  for (size_t q = (p == 3 ? 0 : p); q <= (p == 3 ? 2 : p); ++q) {
+    for (uint32_t y = 0; y < r.planes.height[q]; ++y) {
+      for (uint32_t x = 0; x < r.planes.width[q]; ++x) {
+        const double diff = static_cast<double>(r.sample(q, x, y)) - static_cast<double>(d.sample(q, x, y));
+        sse += diff * diff;
+      }
+    }
+    samples += static_cast<double>(r.planes.width[q]) * r.planes.height[q];
+  }
+  mse_out = sse / samples;
+  return mse_out > 0.0 ? std::min(10.0 * std::log10(peak * peak / mse_out), psnr_max) : psnr_max;
+}
+
+// FFmpeg prints `%0.2f`, or `inf` for an identical plane: OVT's value rounded the same way must equal the printed one.
+// An infinite (or, after #385's clipping, a larger than psnr_max) FFmpeg value maps to psnr_max.
+void check_ffmpeg_psnr(double ovt, const nlohmann::json& printed, double psnr_max) {
+  const double ff = suite::golden_value(printed);
+  if (!std::isfinite(ff) || ff > psnr_max) {
+    CHECK(ovt == psnr_max);
+  } else {
+    CHECK(suite::round2(ovt) == ff);
+  }
+}
+
+void check_psnr_pair(const suite::GoldenPair& pair) {
+  const auto golden = suite::read_golden_gz(std::string(pair.id) + ".ffpsnr.json.gz");
+  const auto& frames = golden.at("frames");
+  REQUIRE(frames.size() == pair.frames);
+  const double psnr_max = 60.0 + (6.0 * (pair.bit_depth - 8.0));
+  suite::Metric inst(psnr_metric_api(), "{}");
+  const uint32_t n = suite::for_each_frame(pair, [&](uint32_t i, const suite::Picture& r, const suite::Picture& d) {
+    const auto& g = frames.at(i);
+    REQUIRE(g.at("i").get<uint32_t>() == i);
+    const suite::Score s = inst.score(r.planes, d.planes, static_cast<int32_t>(i));
+    REQUIRE(s.values.size() == 8);
+    INFO(pair.id << " frame " << i);
+    static constexpr std::array<const char*, 3> kPsnr = {"psnr_y", "psnr_u", "psnr_v"};
+    static constexpr std::array<const char*, 3> kMse = {"mse_y", "mse_u", "mse_v"};
+    for (size_t p = 0; p < 3; ++p) {
+      double mse = 0.0;
+      const double ref = psnr_reference(r, d, p, mse);
+      CHECK(std::fabs(s.values[p] - ref) <= 1e-6);
+      CHECK(std::fabs(s.values[5 + p] - mse) <= 1e-9 * std::max(1.0, mse));
+      check_ffmpeg_psnr(s.values[p], g.at(kPsnr.at(p)), psnr_max);
+      CHECK(suite::round2(s.values[5 + p]) == suite::golden_value(g.at(kMse.at(p))));
+    }
+    double mse_avg = 0.0;
+    const double ref_avg = psnr_reference(r, d, 3, mse_avg);
+    CHECK(std::fabs(s.values[4] - ref_avg) <= 1e-6);
+    check_ffmpeg_psnr(s.values[4], g.at("psnr_avg"), psnr_max);
+    CHECK(suite::round2(mse_avg) == suite::golden_value(g.at("mse_avg")));
+  });
+  CHECK(n == pair.frames);
+}
+
+}  // namespace
+
+TEST_CASE("psnr golden suite: FFmpeg's printed value and the inf rule", "[metrics][psnr][fast]") {
+  // The comparison rule itself, on a pair whose answer is known: identical planes print `inf` and map to psnr_max,
+  // a 0.004 dB difference disappears in FFmpeg's two decimals, a 0.006 dB one does not.
+  CHECK(suite::round2(34.764) == 34.76);
+  CHECK(suite::round2(34.766) == 34.77);
+  CHECK(suite::golden_value(nlohmann::json("inf")) == std::numeric_limits<double>::infinity());
+  for (const uint32_t bits : {8U, 10U}) {
+    suite::Picture r(64, 36, bits);
+    std::mt19937 rng(9);  // NOLINT(cert-msc32-c,cert-msc51-cpp): fixed seed
+    for (auto& plane : r.buf) {
+      for (auto& b : plane) {
+        b = static_cast<uint8_t>(rng());
+      }
+      if (bits > 8) {
+        for (size_t i = 1; i < plane.size(); i += 2) {
+          plane[i] &= 0x03U;  // keep the 10-bit samples in range
+        }
+      }
+    }
+    suite::Metric inst(psnr_metric_api(), "{}");
+    const suite::Score s = inst.score(r.planes, r.planes, 0);
+    const double psnr_max = 60.0 + (6.0 * (bits - 8.0));
+    for (size_t p = 0; p < 5; ++p) {
+      check_ffmpeg_psnr(s.values[p], nlohmann::json("inf"), psnr_max);
+    }
+    check_ffmpeg_psnr(s.values[0], nlohmann::json(psnr_max + 3.5), psnr_max);  // clipped (#385)
+  }
+}
+
+TEST_CASE("psnr golden suite: FFmpeg psnr on the Netflix pair", "[metrics][psnr][golden][needs-corpus]") {
+  check_psnr_pair(suite::kPairs[0]);
+}
+
+TEST_CASE("psnr golden suite: FFmpeg psnr on syn_metrics_1080p", "[metrics][psnr][golden][needs-corpus]") {
+  check_psnr_pair(suite::kPairs[1]);
+}
+
+TEST_CASE("psnr golden suite: FFmpeg psnr on the 10-bit syn_metrics_pq_1080p",
+          "[metrics][psnr][golden][needs-corpus]") {
+  check_psnr_pair(suite::kPairs[2]);
 }

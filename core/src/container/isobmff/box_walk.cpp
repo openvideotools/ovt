@@ -25,30 +25,30 @@ constexpr uint64_t kHeaderProbe = 32;  // 8 + 8 (largesize) + 16 (usertype)
 
 struct Kinds {
   std::string_view name;
-  BoxKind kind;
+  WalkKind kind;
 };
 
 // SPEC-ASSUMPTION(#323): stand-in for the registry until WI-1.203. The container list is the one in the WI-1.201
 // steps; Opaque is §8.2.3 step 2.12; the leaves are the fourccs a size < 8 recovery (step 2.6) may keep.
 constexpr std::array kKinds = {
-    Kinds{"moov", BoxKind::Container}, Kinds{"trak", BoxKind::Container}, Kinds{"mdia", BoxKind::Container},
-    Kinds{"minf", BoxKind::Container}, Kinds{"stbl", BoxKind::Container}, Kinds{"edts", BoxKind::Container},
-    Kinds{"dinf", BoxKind::Container}, Kinds{"udta", BoxKind::Container}, Kinds{"mvex", BoxKind::Container},
-    Kinds{"moof", BoxKind::Container}, Kinds{"traf", BoxKind::Container}, Kinds{"mfra", BoxKind::Container},
-    Kinds{"meta", BoxKind::Container}, Kinds{"ipco", BoxKind::Container}, Kinds{"iprp", BoxKind::Container},
-    Kinds{"sinf", BoxKind::Container}, Kinds{"schi", BoxKind::Container}, Kinds{"tref", BoxKind::Container},
-    Kinds{"wave", BoxKind::Container}, Kinds{"gmhd", BoxKind::Container}, Kinds{"tapt", BoxKind::Container},
-    Kinds{"mdat", BoxKind::Opaque},    Kinds{"idat", BoxKind::Opaque},    Kinds{"free", BoxKind::Opaque},
-    Kinds{"skip", BoxKind::Opaque},    Kinds{"wide", BoxKind::Opaque},    Kinds{"ftyp", BoxKind::Leaf},
-    Kinds{"styp", BoxKind::Leaf},      Kinds{"mvhd", BoxKind::Leaf},      Kinds{"tkhd", BoxKind::Leaf},
-    Kinds{"mdhd", BoxKind::Leaf},      Kinds{"hdlr", BoxKind::Leaf},      Kinds{"vmhd", BoxKind::Leaf},
-    Kinds{"smhd", BoxKind::Leaf},      Kinds{"dref", BoxKind::Leaf},      Kinds{"stsd", BoxKind::Leaf},
-    Kinds{"stts", BoxKind::Leaf},      Kinds{"ctts", BoxKind::Leaf},      Kinds{"stsc", BoxKind::Leaf},
-    Kinds{"stsz", BoxKind::Leaf},      Kinds{"stz2", BoxKind::Leaf},      Kinds{"stco", BoxKind::Leaf},
-    Kinds{"co64", BoxKind::Leaf},      Kinds{"stss", BoxKind::Leaf},      Kinds{"elst", BoxKind::Leaf},
-    Kinds{"mfhd", BoxKind::Leaf},      Kinds{"tfhd", BoxKind::Leaf},      Kinds{"tfdt", BoxKind::Leaf},
-    Kinds{"trun", BoxKind::Leaf},      Kinds{"trex", BoxKind::Leaf},      Kinds{"sidx", BoxKind::Leaf},
-    Kinds{"mfro", BoxKind::Leaf},      Kinds{"tfra", BoxKind::Leaf},      Kinds{"uuid", BoxKind::Leaf},
+    Kinds{"moov", WalkKind::Container}, Kinds{"trak", WalkKind::Container}, Kinds{"mdia", WalkKind::Container},
+    Kinds{"minf", WalkKind::Container}, Kinds{"stbl", WalkKind::Container}, Kinds{"edts", WalkKind::Container},
+    Kinds{"dinf", WalkKind::Container}, Kinds{"udta", WalkKind::Container}, Kinds{"mvex", WalkKind::Container},
+    Kinds{"moof", WalkKind::Container}, Kinds{"traf", WalkKind::Container}, Kinds{"mfra", WalkKind::Container},
+    Kinds{"meta", WalkKind::Container}, Kinds{"ipco", WalkKind::Container}, Kinds{"iprp", WalkKind::Container},
+    Kinds{"sinf", WalkKind::Container}, Kinds{"schi", WalkKind::Container}, Kinds{"tref", WalkKind::Container},
+    Kinds{"wave", WalkKind::Container}, Kinds{"gmhd", WalkKind::Container}, Kinds{"tapt", WalkKind::Container},
+    Kinds{"mdat", WalkKind::Opaque},    Kinds{"idat", WalkKind::Opaque},    Kinds{"free", WalkKind::Opaque},
+    Kinds{"skip", WalkKind::Opaque},    Kinds{"wide", WalkKind::Opaque},    Kinds{"ftyp", WalkKind::Leaf},
+    Kinds{"styp", WalkKind::Leaf},      Kinds{"mvhd", WalkKind::Leaf},      Kinds{"tkhd", WalkKind::Leaf},
+    Kinds{"mdhd", WalkKind::Leaf},      Kinds{"hdlr", WalkKind::Leaf},      Kinds{"vmhd", WalkKind::Leaf},
+    Kinds{"smhd", WalkKind::Leaf},      Kinds{"dref", WalkKind::Leaf},      Kinds{"stsd", WalkKind::Leaf},
+    Kinds{"stts", WalkKind::Leaf},      Kinds{"ctts", WalkKind::Leaf},      Kinds{"stsc", WalkKind::Leaf},
+    Kinds{"stsz", WalkKind::Leaf},      Kinds{"stz2", WalkKind::Leaf},      Kinds{"stco", WalkKind::Leaf},
+    Kinds{"co64", WalkKind::Leaf},      Kinds{"stss", WalkKind::Leaf},      Kinds{"elst", WalkKind::Leaf},
+    Kinds{"mfhd", WalkKind::Leaf},      Kinds{"tfhd", WalkKind::Leaf},      Kinds{"tfdt", WalkKind::Leaf},
+    Kinds{"trun", WalkKind::Leaf},      Kinds{"trex", WalkKind::Leaf},      Kinds{"sidx", WalkKind::Leaf},
+    Kinds{"mfro", WalkKind::Leaf},      Kinds{"tfra", WalkKind::Leaf},      Kinds{"uuid", WalkKind::Leaf},
 };
 
 std::string_view sv(const FourCC& t) {
@@ -211,7 +211,8 @@ Header read_header(Span hdr, uint64_t pos, uint64_t remaining, unsigned depth, c
     }
   } else if (size32 < 8) {  // 2.6 impossible size; recover when the type is a known one
     const std::string what = "box size " + std::to_string(size32) + " < 8" + at(pos);
-    if (plausible_type(h.type, ctx) && box_kind(h.type) != BoxKind::Unknown) {
+    // SPEC-ASSUMPTION(#323): a `uuid` box can never be 8 bytes, so it is never recovered (no size 8): CNT-0106, stop.
+    if (sv(h.type) != "uuid" && plausible_type(h.type, ctx) && box_kind(h.type) != WalkKind::Unknown) {
       h.size = 8;
       h.finding = DiagCode::CNT_0106;
       h.finding_msg = what + "; treated as 8";
@@ -304,19 +305,19 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
   const uint64_t pos = n.file_span->offset();
   const uint64_t end = pos + n.file_span->length();
   uint64_t payload_begin = pos + n.header_length;
-  BoxKind kind = plausible_type(type, ctx) ? box_kind(type) : BoxKind::Unknown;  // never decode junk types
+  WalkKind kind = plausible_type(type, ctx) ? box_kind(type) : WalkKind::Unknown;  // never decode junk types
   if (sv(type) == "uuid") {
-    kind = BoxKind::Leaf;
+    kind = WalkKind::Leaf;
   }
   if (depth == 0) {
     track_top_level_flags(st, type, n);
   }
-  if (sv(type) == "meta" && kind == BoxKind::Container) {
+  if (sv(type) == "meta" && kind == WalkKind::Container) {
     bool leaf = false;
     payload_begin = read_meta_prefix(*st.file, n, payload_begin, end, leaf);
-    kind = leaf ? BoxKind::Leaf : kind;
+    kind = leaf ? WalkKind::Leaf : kind;
   }
-  if (kind == BoxKind::Container) {
+  if (kind == WalkKind::Container) {
     n.children = walk_children(st, pos, payload_begin, end, depth + 1, ctx.push(type, &n), n.diagnostics);
   } else {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
@@ -325,13 +326,13 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
 
 }  // namespace
 
-BoxKind box_kind(const FourCC& type) noexcept {
+WalkKind box_kind(const FourCC& type) noexcept {
   for (const Kinds& k : kKinds) {
     if (k.name == sv(type)) {
       return k.kind;
     }
   }
-  return BoxKind::Unknown;
+  return WalkKind::Unknown;
 }
 
 // Recursion is bounded by kMaxBoxDepth (step 2.1).
@@ -348,6 +349,21 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
   uint64_t pos = parent_payload_begin;
   while (pos < parent_end) {  // 2.
     const uint64_t remaining = parent_end - pos;
+    // SPEC-ASSUMPTION(#323): node bound. Once kMaxBoxNodes BoxNodes exist the rest of every open parent becomes one
+    // trailing-bytes node (so the sum of child spans still equals the parent size); CNT-0111 is emitted once, on the
+    // parent that hit the bound. The trailing nodes themselves are not counted against the bound.
+    if (st.nodes >= kMaxBoxNodes) {
+      if (!st.node_bound_hit) {
+        st.node_bound_hit = true;
+        parent_diags.push_back(
+            make_diag(DiagCode::CNT_0111, "more than 1000000 boxes; remaining bytes not walked", pos - parent_offset));
+      }
+      auto n = make_node(pos, remaining);
+      n->payload_span = std::make_unique<fb::ByteSpan>(pos, remaining);
+      n->description = "trailing bytes";
+      out.push_back(std::move(n));
+      break;
+    }
     std::array<uint8_t, kHeaderProbe> buf{};
     const size_t got =
         remaining < 8 ? 0
@@ -361,6 +377,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
     const Span hdr = Span(buf).first(got);
     const Header h = read_header(hdr, pos, remaining, depth, ctx);
     if (h.wide) {  // 2.3
+      ++st.nodes;
       auto n = make_node(pos, 8);
       n->fourcc = "wide";
       n->header_length = 8;
@@ -373,6 +390,7 @@ BoxNodes walk_children(WalkState& st, uint64_t parent_offset, uint64_t parent_pa
       break;
     }
     auto n = build_node(h, hdr, pos, parent_end, ctx);
+    ++st.nodes;
     const uint64_t end = pos + n->file_span->length();
     fill_payload(st, *n, h.type, depth, ctx);
     out.push_back(std::move(n));

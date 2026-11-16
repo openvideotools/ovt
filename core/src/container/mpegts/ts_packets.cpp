@@ -82,15 +82,6 @@ uint64_t flag(bool b) {
   return b ? 1U : 0U;
 }
 
-std::string hex_pid(uint16_t pid) {
-  constexpr std::string_view digits = "0123456789ABCDEF";
-  std::string s = "0x0000";
-  for (size_t i = 0; i < 4; ++i) {
-    s[5 - i] = digits[(pid >> (4U * i)) & 15U];
-  }
-  return s;
-}
-
 // Reads the 33-bit base and 9-bit extension of a PCR / OPCR from its six bytes.
 uint64_t read_pcr_base(std::span<const uint8_t> p) {
   return (static_cast<uint64_t>(p[0]) << 25U) | (static_cast<uint64_t>(p[1]) << 17U) |
@@ -222,6 +213,10 @@ class Walker {
         size_(f.file_size),
         stats_(kPidCount),
         cc_(kPidCount),
+        timing_([this](DiagCode code, std::string message, uint64_t offset) {
+          add_diag(f_, code, std::move(message), offset);
+        }),
+        es_type_(kPidCount, -1),
         pos_(f.geometry.first_sync),
         last_good_(f.geometry.first_sync) {
     for (size_t i = 0; i < kPidCount; ++i) {
@@ -243,10 +238,27 @@ class Walker {
         break;
       }
     }
+    uint64_t scrambled_elsewhere = 0;
     for (const PidStats& st : stats_) {
       if (st.packets > 0) {
         f_.pids.push_back(st);
       }
+      if (st.pid != kPatPid && st.pid != kCatPid) {
+        scrambled_elsewhere += st.scrambled_packets;
+      }
+    }
+    psi_.finish([this](uint16_t pid) { return stats_[pid].packets; }, scrambled_elsewhere);
+    f_.psi = std::move(psi_.tables());
+    for (PesStream& st : pes_.finish()) {  // only the PIDs that some PMT named as elementary streams
+      if (es_type_[st.pid] >= 0) {
+        st.stream_type = static_cast<uint8_t>(es_type_[st.pid]);
+        f_.pes.push_back(std::move(st));
+      }
+    }
+    f_.timing = timing_.finish();
+    f_.pcr_pid = choose_pcr_pid();
+    for (const PsiDiagnostic& d : f_.psi.diagnostics) {  // the PSI diagnostics join the file list (same cap)
+      add_diag(f_, d.code, d.message, d.offset);
     }
   }
 
@@ -258,6 +270,11 @@ class Walker {
   uint64_t size_;
   std::vector<PidStats> stats_;
   std::vector<CcState> cc_;
+  PsiParser psi_;
+  PesAssembler pes_;
+  TimingBuilder timing_;
+  std::vector<int16_t> es_type_;  // stream_type of the PIDs that a PMT named as elementary streams, else -1
+  uint64_t seen_sections_ = 0;
   uint64_t pos_;        // file offset of the next sync byte slot
   uint64_t last_good_;  // sync offset of the last packet taken
   bool in_run_ = false;
@@ -289,10 +306,64 @@ class Walker {
     }
     ++f_.runs.back().count;
     account(*h);
+    if (psi_.wants(h->pid) && h->has_payload() && !h->transport_error_indicator) {
+      psi_.feed(h->pid, h->payload_unit_start_indicator, h->transport_scrambling_control != 0,
+                std::span<const uint8_t>(buf).subspan(h->payload_offset, h->payload_size), f_.packet_count,
+                pos_ + h->payload_offset);
+    }
+    take_timing_and_pes(*h, buf);
     ++f_.packet_count;
     last_good_ = pos_;
     pos_ += stride_;
     return true;
+  }
+
+  // The PCR checks for every packet; PES reassembly for the payload of every PID that is not PSI (WI-4.206).
+  void take_timing_and_pes(const PacketHeader& h, std::span<const uint8_t> buf) {
+    const AdaptationField* af = h.adaptation ? &*h.adaptation : nullptr;
+    const bool has_pcr = af != nullptr && af->pcr_flag && af->length >= 7 && !h.transport_error_indicator;
+    timing_.packet(h.pid, has_pcr, has_pcr ? af->pcr() : 0, af != nullptr && af->discontinuity_indicator,
+                   f_.packet_count, pos_);
+    refresh_streams();
+    if (h.pid == kNullPid || psi_.wants(h.pid) || !h.has_payload() || h.transport_error_indicator ||
+        h.transport_scrambling_control != 0) {
+      return;
+    }
+    const PesPacket* started = pes_.feed(
+        h.pid, h.payload_unit_start_indicator, af != nullptr && af->random_access_indicator, h.continuity_counter,
+        buf.subspan(h.payload_offset, h.payload_size), f_.packet_count, pos_ + h.payload_offset);
+    if (started != nullptr && es_type_[h.pid] >= 0) {
+      timing_.pes_start(h.pid, started->pts, f_.sync_offset(started->first_packet));
+    }
+  }
+
+  // Elementary-stream PIDs become known as PMTs arrive; a PID once named stays one.
+  void refresh_streams() {
+    const PsiTables& t = psi_.tables();
+    if (t.section_count == seen_sections_) {
+      return;
+    }
+    seen_sections_ = t.section_count;
+    for (const Program& p : t.programs) {
+      for (const EsInfo& es : p.streams) {
+        if (es.pid != kNullPid && !psi_.wants(es.pid)) {
+          es_type_[es.pid & 0x1FFFU] = es.stream_type;
+        }
+      }
+    }
+  }
+
+  [[nodiscard]] uint16_t choose_pcr_pid() const {
+    const auto carries = [this](uint16_t pid) {
+      return std::any_of(f_.timing.pcr.begin(), f_.timing.pcr.end(),
+                         [pid](const PcrStream& s) { return s.pid == pid; });
+    };
+    for (const Program& p : f_.psi.programs) {
+      if (p.has_pmt && carries(p.pcr_pid)) {
+        return p.pcr_pid;
+      }
+    }
+    return f_.timing.pcr.empty() ? kNullPid : f_.timing.pcr.front().pid;
   }
 
   void account(const PacketHeader& h) {
@@ -310,6 +381,7 @@ class Walker {
                "Transport_error: `transport_error_indicator` set at packet `" + std::to_string(k) + "`", pos_);
       // The header of a packet with the error indicator is unreliable: the PID restarts its counter afterwards.
       cc_[h.pid] = CcState{};
+      pes_.damage(h.pid);
     } else if (h.pid != kNullPid && h.adaptation_field_control != 0) {
       check_continuity(h, st, k);
     }
@@ -333,11 +405,13 @@ class Walker {
     } else {
       ++st.continuity_errors;
       add_diag(f_, DiagCode::CNT_TS_1006,
-               "Continuity_count_error on PID `" + hex_pid(h.pid) + "` at packet `" + std::to_string(k) + "` (`" +
+               "Continuity_count_error on PID `" + format_pid(h.pid) + "` at packet `" + std::to_string(k) + "` (`" +
                    std::to_string(expected) + "`/`" + std::to_string(h.continuity_counter) + "`)",
                pos_);
       c.last = h.continuity_counter;
       c.dup_used = false;
+      psi_.discontinuity(h.pid);  // a section that was being collected is incomplete
+      pes_.damage(h.pid);
     }
   }
 
@@ -462,6 +536,18 @@ class MpegtsReader final : public Reader {
 
   [[nodiscard]] std::vector<uint8_t> tree() const override { return build_tree(); }
 
+  // One track per elementary-stream PID with PES packets (WI-4.206).
+  [[nodiscard]] int track_count() const noexcept override { return static_cast<int>(f_.pes.size()); }
+
+  [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override {
+    if (track_index < 0 || static_cast<size_t>(track_index) >= f_.pes.size()) {
+      return {};
+    }
+    return build_sample_table(f_.pes[static_cast<size_t>(track_index)], first, count);
+  }
+
+  [[nodiscard]] std::vector<uint8_t> ts_timing() const override { return build_ts_timing(f_); }
+
   ovt_status expand(uint64_t box_offset) override {
     if (box_offset == 0) {  // the root: the next window of TSPK children
       materialised_ = std::min<uint64_t>(f_.packet_count, materialised_ + kChildWindow);
@@ -582,6 +668,54 @@ class MpegtsReader final : public Reader {
                              fbb.CreateString("adaptation_field"));
   }
 
+  // TrackInfo per PES stream: track_id = PID (§8.6.7), timescale 90000, handler and codec from stream_type.
+  [[nodiscard]] std::vector<flatbuffers::Offset<fb::TrackInfo>> track_infos(Fbb& fbb) const {
+    std::vector<flatbuffers::Offset<fb::TrackInfo>> out;
+    for (size_t i = 0; i < f_.pes.size(); ++i) {
+      const PesStream& s = f_.pes[i];
+      auto handler = fb::HandlerType::Unknown;
+      auto codec = fb::Codec::Unknown;
+      switch (s.stream_type) {
+        case 0x1B:
+          codec = fb::Codec::H264;
+          handler = fb::HandlerType::Video;
+          break;
+        case 0x24:
+          codec = fb::Codec::H265;
+          handler = fb::HandlerType::Video;
+          break;
+        case 0x33:
+          codec = fb::Codec::H266;
+          handler = fb::HandlerType::Video;
+          break;
+        case 0x01:
+        case 0x02:
+          codec = fb::Codec::MPEG2;
+          handler = fb::HandlerType::Video;
+          break;
+        case 0x03:
+        case 0x04:
+        case 0x0F:
+        case 0x11:
+        case 0x81:
+        case 0x87:
+          handler = fb::HandlerType::Audio;
+          break;
+        default:
+          break;
+      }
+      fb::TrackInfoBuilder b(fbb);
+      b.add_index(static_cast<uint32_t>(i));
+      b.add_track_id(s.pid);
+      b.add_handler(handler);
+      b.add_codec(codec);
+      b.add_timescale(90000);
+      b.add_sample_count(s.packets.size());
+      out.push_back(b.Finish());
+    }
+    return out;
+  }
+
   [[nodiscard]] std::vector<uint8_t> build_tree() const {
     using treefb::uint_field;
     Fbb fbb;
@@ -623,7 +757,7 @@ class MpegtsReader final : public Reader {
                                               0));
     }
     const fb::ByteSpan root_span(0, f_.file_size);
-    const auto root =
+    const auto packets_root =
         fb::CreateBoxNode(fbb, fbb.CreateString("MPTS"), 0, &root_span, 0, -1, -1, fbb.CreateVector(fields), nullptr,
                           fbb.CreateVector(packets), fbb.CreateString("ISO/IEC 13818-1 §2.4.3"),
                           fbb.CreateString("MPEG transport stream"), fbb.CreateVector(root_diags));
@@ -633,8 +767,14 @@ class MpegtsReader final : public Reader {
     for (const Diagnostic& d : f_.diagnostics) {
       tree_diags.push_back(treefb::diagnostic(fbb, d.code, d.message, d.offset));
     }
-    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(&root, 1), 0,
-                                       fbb.CreateVector(tree_diags)));
+    // A second root `PSIT` carries the PSI/SI sections once any was found (WI-4.205).
+    std::vector<flatbuffers::Offset<fb::BoxNode>> roots = {packets_root};
+    if (f_.psi.section_count > 0) {
+      roots.push_back(build_psi_node(fbb, f_.psi, f_.file_size));
+    }
+    const auto tracks = track_infos(fbb);
+    fbb.Finish(fb::CreateContainerTree(fbb, fbb.CreateString("mpegts"), fbb.CreateVector(roots),
+                                       fbb.CreateVector(tracks), fbb.CreateVector(tree_diags)));
     const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
     return {bytes.begin(), bytes.end()};
   }

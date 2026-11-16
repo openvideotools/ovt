@@ -10,7 +10,7 @@
 // a node. Nothing is allocated while SyntaxBuilder::set_recording(false) is in effect, unless a diagnostic is
 // raised.
 //
-// SPEC-ASSUMPTION(#97): the root is a synthetic container node named "unit" (kind None) that holds the
+// The root is a synthetic container node named "unit" (kind None) that holds the
 // top-level structs and the diagnostics raised outside any struct; its span runs from the reader position at
 // SyntaxBuilder construction to the position at finish(). The caller that knows the codec renames it with
 // set_root_name() (e.g. "nal_unit", "open_bitstream_unit").
