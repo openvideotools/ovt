@@ -15,6 +15,7 @@
 
 #include "container/ivf.hpp"
 #include "container/mpegts/ts_packets.hpp"
+#include "container/mxf_placeholder.hpp"
 #include "container/rawyuv.hpp"
 #include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
@@ -32,6 +33,7 @@ bool has_reader(Format f) noexcept {
     case Format::Obu:
     case Format::Raw:
     case Format::Mpegts:
+    case Format::Mxf:  // libavformat-backed placeholder (WI-4.211)
       return true;
     default:  // phase 4 formats and unknown
       return false;
@@ -49,6 +51,8 @@ std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, 
       return mpegts::make_reader(file);
     case Format::Y4m:
       return y4m::make_reader(file, why);
+    case Format::Mxf:
+      return mxf::make_reader(file, why);
     case Format::Isobmff:
     case Format::AnnexB:
     case Format::Obu:
@@ -141,10 +145,18 @@ OVT_API ovt_status ovt_container_open_format(ovt_File* file, const char* format,
   if (!f) {
     return OVT_E_INVALID_ARG;
   }
-  if (*f == ovt::container::Format::Raw && (raw_format == nullptr || *raw_format == '\0')) {
-    return OVT_E_INVALID_ARG;
-  }
   try {
+    if (*f == ovt::container::Format::Raw && raw_format == nullptr) {
+      // §8.6.6 step 2: NULL runs the sidecar, then the heuristics, so a sidecar's `header_bytes` reaches the C API.
+      // Other than exactly one candidate is CNT-RAW-0002 and OVT_E_INVALID_ARG; the ranked list is
+      // ovt::container::raw::resolve()'s, which the CLI and the GUI call.
+      const auto res = ovt::container::raw::resolve(*file->file);
+      if (!res.format) {
+        return res.status == OVT_OK ? OVT_E_INVALID_ARG : res.status;
+      }
+      return ovt::container::finish_container(file, *f, ovt::container::raw::make_reader(*file->file, *res.format),
+                                              out);
+    }
     if (*f == ovt::container::Format::Raw) {
       // §8.6.6 step 2: the explicit `WxH:pix_fmt[:fps]` string. The sidecar and the heuristics are
       // ovt::container::raw::resolve(), which the CLI and the GUI run before they call this function.

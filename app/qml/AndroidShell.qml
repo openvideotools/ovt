@@ -5,8 +5,9 @@
 // QtQuickView shows an Item inside the Activity and cannot take a Window, so the desktop Main.qml (an
 // ApplicationWindow) is not loaded here; WI-A.450 brings the desktop shell into the Activity. Until then this is the
 // empty window of WI-0.019: the product name, which main.cpp sets as the application display name (OVT_PRODUCT_NAME,
-// chapter 15 §15.7.4), on the window colour. The text is exposed to accessibility so that UI Automator finds it
-// (WI-0.050 acceptance test 2).
+// chapter 15 §15.7.4), on the window colour. Qt 6.8 does not expose this accessibility tree through QtQuickView
+// (issue #547), so MainActivity reads `productName` once the root is ready and puts it on the Qt view's own
+// accessibility node, which UI Automator finds (WI-0.050 acceptance test 2).
 //
 // WI-0.052: only the header band is painted; the rest of the window is transparent, so the HDR test pattern of
 // HdrSurfaceView (below QtQuickView, chapter 13 §13.4.4 item 1) shows through. MainActivity.SHELL_HEADER_FRACTION
@@ -20,6 +21,8 @@ Item {
 
     // Keep in step with MainActivity.SHELL_HEADER_FRACTION.
     readonly property real headerFraction: 0.25
+    // The product name this root displays, read by MainActivity through QtQuickView.getProperty().
+    readonly property string productName: productLabel.text
 
     Component.onCompleted: {
         if (root.Window.window)
@@ -34,6 +37,8 @@ Item {
         color: OvtStyle.window
 
         Text {
+            id: productLabel
+
             anchors.centerIn: parent
             text: Qt.application.displayName
             color: OvtStyle.text

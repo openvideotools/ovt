@@ -25,12 +25,20 @@ struct MappedBlocks {
   flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::MotionVector>>> mvs;
   flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::RefSlot>>> refs;
   flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::PartitionInfo>>> partitions;
-  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params;  // nested Av1FilterParams
-  std::vector<std::string> warnings;                                // messages for Warning Diagnostics on the frame
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> filter_params;                             // nested Av1FilterParams
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<ovt::fb::SymbolCost>>> symbols;  // WI-2.157
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<flatbuffers::String>>> symbol_names;
+  std::vector<std::string> warnings;  // messages for Warning Diagnostics on the frame
+  struct Note {
+    std::string code;
+    std::string message;
+  };
+  std::vector<Note> notes;  // Info Diagnostics on the frame
 };
 
-/// Grid fields map_blocks() fills (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.1 Caps row): everything except
-/// tx_type (stock ifd_inspect() writes 0 for coded blocks), bits_x8 (accounting, WI-2.157) and deblock_bs.
+/// Grid fields map_blocks() fills from insp_mi_data (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.1 Caps row):
+/// everything except tx_type (stock ifd_inspect() writes 0 for coded blocks), bits_x8 (from accounting:
+/// kGridFieldBits of map_accounting.hpp, added when libaom records it) and deblock_bs.
 constexpr uint32_t kGridFields = 0x9FFFU & ~(1U << 11);
 
 /// Maps @p d for a frame of @p coded_w x @p coded_h luma samples (FrameWidth x FrameHeight) into @p fbb. Must not

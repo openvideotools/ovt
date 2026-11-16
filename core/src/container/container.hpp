@@ -44,12 +44,15 @@ class Reader {
     (void)count;
     return {};
   }
+  // TsTiming FlatBuffer (MPEG-TS reader); empty otherwise.
+  [[nodiscard]] virtual std::vector<uint8_t> ts_timing() const { return {}; }
 };
 
-// True when a reader exists for `f` in this build (phase 1 formats only).
+// True when a reader exists for `f` in this build (phase 1 formats, MPEG-TS and the MXF placeholder).
 [[nodiscard]] bool has_reader(Format f) noexcept;
 // nullptr when there is no reader for `f` (has_reader false) or `file` is not a valid `f` stream; then *why (if
-// given) says OVT_E_UNSUPPORTED or OVT_E_CORRUPT.
+// given) says OVT_E_UNSUPPORTED or OVT_E_CORRUPT (the libavformat-backed MXF placeholder may also report
+// OVT_E_IO or OVT_E_NOMEM).
 [[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file,
                                                   ovt_status* why = nullptr);
 
