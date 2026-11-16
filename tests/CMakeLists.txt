@@ -33,6 +33,11 @@ if(Python3_Interpreter_FOUND)
   unset(_ovt_no_pytest)
 endif()
 
+# WI-0.052: host test of the Android HDR pattern and dataspace rules (android/app/src/main/cpp/hdr_pattern.cpp).
+if(NOT ANDROID)
+  add_subdirectory("${PROJECT_SOURCE_DIR}/android/app/src/test/cpp" "${CMAKE_CURRENT_BINARY_DIR}/android_hdr")
+endif()
+
 # Golden glue (WI-0.556) and the perf harness (WI-0.560) add their directories when they land.
 foreach(_dir golden oracles perf downstream)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/${_dir}/CMakeLists.txt")

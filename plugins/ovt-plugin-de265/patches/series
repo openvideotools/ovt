@@ -3,6 +3,7 @@
 #
 # Patches applied to the pristine libde265 tarball (third_party/VERSIONS.md row "libde265"), in this order,
 # by tools/apply_patches.py from third_party/libde265.cmake (chapter 13 §13.3.6). One path per line,
-# relative to this file. Chapter 07 §7.6 adds 0002 and 0003 here.
+# relative to this file (chapter 07 §7.6.2).
 0001-de265-internals-api.patch
+0002-de265-persist-pu-tu-syntax.patch
 0003-de265-plane-snapshots.patch
