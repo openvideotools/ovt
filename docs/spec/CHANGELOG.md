@@ -2,12 +2,20 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc36 — 2026-11-16
+## 1.0.0-rc37 — 2026-11-16
 
 MINOR-level (FlatBuffers schema, additive): WI-4.106 part a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
 
 - 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
 - 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
+
+## 1.0.0-rc36 — 2026-11-16
+
+PATCH-level: spec-amendment pass 16 folds in the accepted answers of `spec-question` issue #574 from WI-1.203 (PR #579): points 2–7 under the Level-3 triage, point 1 half-ruled: the owner accepted BSD-3-Clause-Clear for the FileFormatConformance snapshots on 2026-11-16; the unlicensed MP4RA CSVs stay uncommitted and unused until he rules, so the issue stays open. No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 8 §8.2.10 steps 2–4 and snippet — one `"*"` row per fourcc plus `*/<container>` rows for differing definitions (~600 rows); class containers expand to fourccs, `file` is the top-level token, bare classes leave `allowed_parents` empty; sample entries are `ContainerWithPrefix`; strict child-box heuristic; `0xFF` / `0xFFFFFF` unknown masks; `has_trailing_data_ok` list; `spec_ref` sources; extras with `spec_ref`, `kind` override and several entries per fourcc — WI-1.203 (#574 points 2–6)
+- 8 §8.2.3 step 12 — a `ContainerWithPrefix` without a hand decoder stays a leaf; the children offset is relative to the reader start after version/flags; one mutable `BoxContext` per child list; a `"*"` decoder decorates every more specific row of its fourcc — WI-1.203, WI-1.204 (#574 point 7)
+- 8 §8.2.10 inputs — the FileFormatConformance snapshots are committed under BSD-3-Clause-Clear (new `tools/license_policy.toml` row, test-input use only); the MP4RA CSVs (no stated licence) are not committed and contribute no descriptions until the owner rules — WI-1.203 (#574 point 1, FFC part owner 2026-11-16)
 
 ## 1.0.0-rc35 — 2026-11-15
 

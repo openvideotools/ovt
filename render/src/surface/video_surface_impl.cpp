@@ -8,7 +8,8 @@
 // dithering (WI-1.403), interop (WI-1.404, render/src/platform/offscreen.cpp), compare modes, overlays, measurements
 // (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are
 // inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
-// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1.
+// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the
+// swapchain with the content's static HDR metadata on init and on source change (§10.3.6).
 
 #include <array>
 #include <cstdint>
@@ -25,6 +26,7 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
 #include "measure/measure.h"
 #include "output_download.h"
@@ -115,6 +117,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+    overlay_gpu_ = std::make_unique<detail::OverlayLayerGpu>(gpu_);  // WI-2.431
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
     static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
@@ -275,9 +278,28 @@ class VideoSurfaceImpl final : public VideoSurface {
       return;
     }
     error_.clear();
+    // §10.3.6: a source whose static HDR metadata differs from the hinted one re-sends the hint.
+    if (sw_ != nullptr) {
+      const struct pl_color_space hint = content_hint();
+      if (!pl_color_space_equal(&hint, &hinted_)) {
+        send_hint();
+      }
+    }
   }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
-  void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
+    overlays_ = std::move(overlays);
+    if (overlay_gpu_ == nullptr) {
+      return;
+    }
+    std::string err;
+    if (!overlay_gpu_->upload(overlays_.get(), err)) {
+      error_ = "RND-0002 renderer init failed: overlays: " + err;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+    }
+  }
 
   void render(const ViewState& view) override {
     if (native_ != nullptr) {
@@ -290,6 +312,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     offscreen_.begin_frame();  // the host hands the texture back (§10.2.2 sync rules)
     pl_tex_clear_ex(gpu_, tex, background(view));
+    measurer_.begin_render();
     if (slot_a_.valid) {
       struct pl_frame target = {};
       target.num_planes = 1;
@@ -299,7 +322,7 @@ class VideoSurfaceImpl final : public VideoSurface {
         target.planes[0].component_mapping[c] = c;
       }
       target.color = detail::target_color(target_, active_);
-      draw_slot_a(view, target, true);
+      draw_picture(view, target, true);
     }
     // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
     // being called.
@@ -410,7 +433,53 @@ class VideoSurfaceImpl final : public VideoSurface {
     image.crop = detail::source_rect(slot_a_, view.show_cropped);
     target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
     params_.build(view, active_, offscreen, image.color, target);
+    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1).
+    struct pl_overlay overlay = {};
+    std::string overlay_err;
+    if (overlay_gpu_ != nullptr && overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio,
+                                                      target.crop, overlay, overlay_err)) {
+      target.overlays = &overlay;
+      target.num_overlays = 1;
+    } else if (!overlay_err.empty()) {
+      error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
+    }
     if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
+      error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
+    }
+  }
+
+  // Draws picture A, or the analysis view that replaces it (§10.7.5 / §10.7.8), over the cleared target. Without the
+  // measurement passes (measurer_.error() says why) the picture is drawn as usual.
+  void draw_picture(const ViewState& view, struct pl_frame& target, bool offscreen) {
+    const detail::AnalysisView mode = detail::analysis_view(view);
+    pl_tex analysis = mode != detail::AnalysisView::None ? measurer_.analysis_view(slot_a_, mode) : nullptr;
+    if (analysis != nullptr) {
+      draw_analysis(view, analysis, target, offscreen);
+    } else {
+      draw_slot_a(view, target, offscreen);
+    }
+  }
+
+  // Draws an analysis view (§10.7.5, §10.7.8): an RGBA8 texture of the conformance window holding sRGB-encoded BT.709,
+  // presented as an SDR sRGB frame at the window's place in the viewport, with the ViewState filters but no dithering
+  // (the band colours are exact code values). The caller set the target's planes and colour space.
+  void draw_analysis(const ViewState& view, pl_tex analysis, struct pl_frame& target, bool offscreen) {
+    struct pl_frame image = {};
+    image.num_planes = 1;
+    image.planes[0].texture = analysis;
+    image.planes[0].components = 3;
+    for (int c = 0; c < 3; ++c) {
+      image.planes[0].component_mapping[c] = c;
+    }
+    image.repr = pl_color_repr_rgb;
+    image.color = pl_color_space_srgb;
+    image.crop = pl_rect2df{0.0F, 0.0F, static_cast<float>(analysis->params.w), static_cast<float>(analysis->params.h)};
+
+    target.crop = detail::target_rect(detail::source_rect(slot_a_, true), view, target_.width, target_.height);
+    params_.build(view, active_, offscreen, image.color, target);
+    struct pl_render_params params = params_.params();
+    params.dither_params = nullptr;
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
@@ -482,6 +551,15 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (sw_ == nullptr || !pl_swapchain_start_frame(sw_, &frame)) {
       return;  // no swapchain, or no image now (window hidden or minimised); not an error
     }
+    if (check_hint_) {  // the hint is advisory: compare with what the swapchain now renders to (§10.3.6)
+      check_hint_ = false;
+      const std::string differs = detail::hint_mismatch(hinted_, frame.color_space);
+      if (!differs.empty()) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        (void)std::fprintf(stderr, "[%s] swapchain colour space differs from the hint: %s\n", prefix_.c_str(),
+                           differs.c_str());
+      }
+    }
     offscreen_.begin_frame();  // scope textures (§10.7.9)
     struct pl_frame target = {};
     pl_frame_from_swapchain(&target, &frame);
@@ -489,8 +567,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (frame.fbo->params.blit_dst) {
       pl_tex_clear_ex(gpu_, frame.fbo, background(view));
     }
+    measurer_.begin_render();
     if (slot_a_.valid) {
-      draw_slot_a(view, target, false);
+      draw_picture(view, target, false);
     }
     if (measurer_.due()) {  // §10.7.9, as in render()
       measurer_.run(slot_a_);
@@ -529,8 +608,23 @@ class VideoSurfaceImpl final : public VideoSurface {
       close_native();
       return fail("swapchain", "pl_vulkan_create_swapchain failed");
     }
-    pl_swapchain_colorspace_hint(sw_, &choice.hint);
+    base_hint_ = choice.hint;
+    send_hint();
     return resize_swapchain();
+  }
+
+  // §10.3.6: the swapchain hint for the active encoding with the static HDR metadata of the picture in slot A.
+  [[nodiscard]] struct pl_color_space content_hint() const {
+    return detail::swapchain_hint(base_hint_, active_, slot_a_.valid ? slot_a_.frame.color.hdr : pl_hdr_metadata_empty);
+  }
+
+  // Hands the hint to libplacebo (which forwards the metadata with vkSetHdrMetadataEXT where the device has
+  // VK_EXT_hdr_metadata) and to the platform object, and checks it after the next pl_swapchain_start_frame().
+  void send_hint() {
+    hinted_ = content_hint();
+    pl_swapchain_colorspace_hint(sw_, &hinted_);
+    native_->set_content_metadata(hinted_.hdr);
+    check_hint_ = true;
   }
 
   // Not an error when it fails: libplacebo cannot size a swapchain on a 0x0 extent (hidden window, layer not laid out)
@@ -695,6 +789,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    overlay_gpu_.reset();
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
@@ -725,11 +820,17 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
-  detail::Measurer measurer_;  // §10.7 (WI-4.452)
+  std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
+  detail::Measurer measurer_;                             // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
   pl_swapchain sw_ = nullptr;
+  // WI-1.411 (§10.3.6): the encoding's hint without metadata, the last hint sent, and whether the swapchain's colour
+  // space is still to be compared with it.
+  struct pl_color_space base_hint_ = {};
+  struct pl_color_space hinted_ = {};
+  bool check_hint_ = false;
 };
 
 }  // namespace

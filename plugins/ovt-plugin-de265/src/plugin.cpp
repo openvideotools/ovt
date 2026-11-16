@@ -50,7 +50,7 @@ const ovt_AnalysisCaps kCaps = {
     kCodecH265,
     ovt::de265::kSupportedStageMask,  // plane_stages: Reconstruction, + the patch-0003 stages (WI-2.166)
 #ifdef OVT_DE265_INTERNALS
-    ovt::de265::kGridFields,  // grid_fields: every CellGrid vector but bits_x8 (patch 0002, WI-2.165)
+    ovt::de265::kGridFields,  // grid_fields: every CellGrid vector (bits_x8 from patch 0002, WI-2.165)
 #else
     0U,  // grid_fields: a system libde265 has no internals API, so no block data (OVT_SYSTEM_DE265)
 #endif
@@ -61,7 +61,7 @@ const ovt_AnalysisCaps kCaps = {
     "0.1.0+libde265." LIBDE265_VERSION,
     "LGPL-3.0-or-later",
     "HEVC Main / Main 10 / Main Still Picture via libde265 " LIBDE265_VERSION
-    " (OVT patches 0001, 0003); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
+    " (OVT patches 0001 to 0003); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
 };
 
 std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint32_t plane_stage_mask) {
