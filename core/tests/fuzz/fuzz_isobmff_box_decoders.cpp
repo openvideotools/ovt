@@ -35,7 +35,8 @@ struct Case {
   std::string_view fourcc;
   std::string_view parent;  // innermost ancestor ("" = top level)
   bool fullbox;
-  std::string_view outer{};  // ancestor of `parent`, "" = none (sample entry children: stsd)
+  std::string_view outer{};  // NOLINT(readability-redundant-member-init): keeps -Wmissing-field-initializers quiet;
+                             // ancestor of `parent`, "" = none (sample entry children: stsd)
 };
 
 constexpr auto kCases = std::to_array<Case>({
