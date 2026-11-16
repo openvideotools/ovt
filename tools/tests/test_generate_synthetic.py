@@ -83,7 +83,7 @@ def env(tmp_path, monkeypatch):
 def test_recipes_load_and_cover_every_numbered_recipe():
     doc = generate.load_recipes(generate.DEFAULT_RECIPES)
     numbers = {r["recipe"] for r in doc["recipes"]}
-    assert numbers == {str(n) for n in range(1, 77)} | {"15a"}
+    assert numbers == {str(n) for n in range(1, 78)} | {"15a"}
     for rec in doc["recipes"]:
         assert generate.closure(doc, [rec["id"]])[-1]["id"] == rec["id"]
 

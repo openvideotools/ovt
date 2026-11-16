@@ -21,11 +21,13 @@ add_executable(
   models/test_series_aggregator.cpp
   models/test_stream_index_model.cpp
   models/test_timeline_viewport.cpp
+  models/test_ref_graph_layout.cpp
   models/test_unit_list_model.cpp
   ../src/project.cpp
   models/test_keymap.cpp
   models/test_goto_parser.cpp
   models/test_dock_model.cpp
+  models/test_bookmarks_model.cpp
   models/test_sample_streams.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
@@ -42,7 +44,9 @@ add_executable(
   ../src/models/stream_index_model.cpp
   ../src/models/timeline_viewport.cpp
   ../src/models/timeline_geometry.cpp
+  ../src/models/ref_graph_layout.cpp
   ../src/models/unit_list_model.cpp
+  ../src/models/bookmarks_model.cpp
   ../src/dock/dock_model.cpp)
 set_target_properties(ovt_tests_app_models PROPERTIES AUTOMOC ON)
 qt_add_resources(

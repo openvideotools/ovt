@@ -59,6 +59,46 @@ target_compile_definitions(ovt_tests_render PRIVATE "OVT_PATTERNS_DIR=\"${PROJEC
 # acceptance test synthesises tests/corpora/patterns/pq_patches_1000 from its expected.json.
 target_sources(ovt_tests_render PRIVATE test_render_params.cpp)
 
+# WI-1.404: offscreen interop export (§10.2.2). The shared-device test plays the Vulkan host on any desktop with a
+# Vulkan 1.2 device; the Metal test (Objective-C++) reads the exported MTLTexture on macOS.
+target_sources(ovt_tests_render PRIVATE test_interop_vulkan.cpp)
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(ovt_tests_render PRIVATE test_interop_metal.mm)
+  set_source_files_properties(test_interop_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  target_link_libraries(ovt_tests_render PRIVATE "-framework Metal" "-framework Foundation")
+endif()
+
+# WI-4.452: measure() — linear measurement texture, reductions, PQ histogram, readback (§10.7.1-§10.7.4, §10.7.9).
+target_sources(ovt_tests_render PRIVATE test_measure.cpp)
+
+# WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
+
+# WI-1.406: NATIVE targets (§10.4.1): encoding choice, CAMetalLayer table, headroom rule, and the swapchain path on a
+# headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
+# CAMetalLayer through MoltenVK.
+target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+if(APPLE)
+  target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
+  set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_tests_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
+                                                 "-framework CoreFoundation")
+endif()
+
+# WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
+if(APPLE)
+  add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
+  set_source_files_properties(manual_edr_window.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_manual_edr_pattern PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_manual_edr_pattern PRIVATE ovt::render ovt::flags ${nlohmann_json_TARGET}
+                                                       "-framework AppKit" "-framework QuartzCore")
+  target_compile_definitions(ovt_manual_edr_pattern
+                             PRIVATE "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
+  ovt_set_license(ovt_manual_edr_pattern "LGPL-2.1-or-later")
+endif()
+
 # WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1). The image goldens are tests/golden/render/plane_*.png
 # (png_io.h; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
 target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)

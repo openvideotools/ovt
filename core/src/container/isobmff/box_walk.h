@@ -17,14 +17,16 @@
 
 namespace ovt::container::isobmff {
 
-inline constexpr unsigned kMaxBoxDepth = 32;  // §8.2.3 step 1
+inline constexpr unsigned kMaxBoxDepth = 32;         // §8.2.3 step 1
+inline constexpr uint64_t kMaxBoxNodes = 1'000'000;  // §8.2.3 node bound per walk (CNT-0111)
 
 using BoxNodes = std::vector<std::unique_ptr<fb::BoxNodeT>>;
 using DiagList = std::vector<std::unique_ptr<fb::DiagnosticT>>;
 
-// What the registry will say about a fourcc (WI-1.203 replaces this table).
-enum class BoxKind : uint8_t { Unknown, Leaf, Container, Opaque };
-[[nodiscard]] BoxKind box_kind(const FourCC& type) noexcept;
+// What the walk needs to know about a fourcc until WI-1.203 wires the generated registry (box_registry.h) in. Named
+// WalkKind so it does not clash with the registry's BoxKind (§8.2.9).
+enum class WalkKind : uint8_t { Unknown, Leaf, Container, Opaque };
+[[nodiscard]] WalkKind box_kind(const FourCC& type) noexcept;
 
 // The state the walk shares between siblings and across levels (what the spec keeps in `ctx`).
 struct WalkState {
@@ -33,6 +35,8 @@ struct WalkState {
   bool saw_mdat = false;
   bool mdat_before_moov = false;
   bool saw_moof = false;
+  uint64_t nodes = 0;           // BoxNodes created so far in this walk
+  bool node_bound_hit = false;  // CNT-0111 already emitted
 };
 
 // §8.2.3 `walk_children`. `parent_offset` is the file offset of the enclosing box (0 for the root); diagnostics that

@@ -86,7 +86,7 @@ def test_tag_sets_named_in_the_catalogue_have_the_documented_sizes():
         for tag in e.get("tags", []):
             by_tag.setdefault(tag, []).append(e["id"])
     assert len(by_tag["h264-ps-golden"]) == 20
-    assert len(by_tag["h264-slice-golden"]) == 40  # 38 fast streams + MVCNV-1 + SVCBST-1
+    assert len(by_tag["h264-slice-golden"]) == 38  # 36 streams of the §14.3.2 list + MVCNV-1 + SVCBST-1 (#507)
     assert len(by_tag["h264-analysis-smoke"]) == 10
     assert len(by_tag["h265-cu-golden"]) == 10
     assert all(e["codecs"] == ["h265"] for e in entries() if "rext" in e.get("tags", []))

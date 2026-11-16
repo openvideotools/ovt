@@ -1238,6 +1238,38 @@
    },
    "skipped": {}
   },
+  "jvt_CAMA1_Sony_C": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "jm": {
+     "file": "h264/jvt_CAMA1_Sony_C.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CAMA1_Sony_C.trace_headers.json.gz",
+     "pictures": 5
+    }
+   },
+   "input_sha256": "db49b84b320b2cc87c6ef9daaf1653c492fae113299c9eaf8ed62155d2c937bf",
+   "skipped": {}
+  },
+  "jvt_CAPAMA3_Sand_F": {
+   "codec": "h264",
+   "failed": {},
+   "goldens": {
+    "jm": {
+     "file": "h264/jvt_CAPAMA3_Sand_F.jm-trace.json.gz",
+     "pictures": 2
+    },
+    "trace_headers": {
+     "file": "h264/jvt_CAPAMA3_Sand_F.trace_headers.json.gz",
+     "pictures": 6
+    }
+   },
+   "input_sha256": "a6490cfa63b5a3a8ce7e0a9d64af5dc2b32a1e66d2f0630bbcb182dceeef336c",
+   "skipped": {}
+  },
   "jvt_CI1_FT_B": {
    "codec": "h264",
    "failed": {},
@@ -2492,13 +2524,6 @@
   "hdr_hlg_bt2020": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
   "heif_C001": "an image item, not a video track",
   "heif_heic_grid": "an image item, not a video track",
-  "jctvc_DBLK_A_SONY_4": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jctvc_GENERAL_444_8bit_RExt_Sony_2": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jctvc_INITQP_B_Sony_1": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jctvc_LTRPSPS_A_FJ_1": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jvt_ALPHACONFORMANCEG": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jvt_CVFC1_SVA_C": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
-  "jvt_src19td_IBP_264": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
   "mpegff_hev1_clg1_header": "an initialisation or media segment on its own: no sample description or no samples",
   "mpegff_hev1_clg1_segment": "an initialisation or media segment on its own: no sample description or no samples",
   "mpegff_video_cenc_128iv": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",

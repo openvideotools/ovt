@@ -18,7 +18,8 @@
 #     directory (an absolute entry is a text kept in this repository, third_party/licenses/<dep>/) into
 #     ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
 #   * vcpkg ports: <vcpkg installed dir>/<triplet>/share/<port>/copyright;
-#   * Qt: ${QT_ROOT_DIR}/Licenses.
+#   * Qt: ${QT_ROOT_DIR}/Licenses (CMake or environment variable), else the GNU texts of LICENSES/;
+#   * system libraries OVT links but does not build (zlib): third_party/system-licenses/<component>/.
 #
 # Install rules (component `notices`, OPTIONAL so a plain `cmake --install` works without building ovt_notices;
 # release jobs must build the target first): Linux, AppImage and Flatpak (and the macOS CLI) -> share/doc/ovt/; the macOS
@@ -88,6 +89,8 @@ set(_ovt_notices_args
     "${CMAKE_SOURCE_DIR}/third_party/VERSIONS.md"
     --licenses-dir
     "${_ovt_notices_staging}"
+    --licenses-dir
+    "${CMAKE_SOURCE_DIR}/third_party/system-licenses"
     --derived
     "${CMAKE_SOURCE_DIR}/tools/derived_files.toml"
     --artifact
@@ -99,9 +102,33 @@ set(_ovt_notices_args
 if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
   list(APPEND _ovt_notices_args --vcpkg-share "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share")
 endif()
-if(QT_ROOT_DIR)
-  list(APPEND _ovt_notices_args --qt-licenses "${QT_ROOT_DIR}/Licenses")
+# Qt's licence texts: QT_ROOT_DIR is usually only an environment variable (tools/install_qt.py, CMakePresets.json). An
+# aqt install has no Licenses/ directory, so without one the texts of Qt's licences (LGPL-3.0-only, GPL-3.0-only for
+# qtgraphs; [versions_overrides] of tools/license_policy.toml) are staged from LICENSES/: the -only and -or-later
+# texts of a GNU licence are the same document. gen_notices.py takes the files whose name contains "GPL".
+set(_ovt_qt_root "${QT_ROOT_DIR}")
+if(NOT _ovt_qt_root AND DEFINED ENV{QT_ROOT_DIR})
+  set(_ovt_qt_root "$ENV{QT_ROOT_DIR}")
 endif()
+set(_ovt_qt_licenses "")
+if(_ovt_qt_root)
+  foreach(_dir IN ITEMS "${_ovt_qt_root}/Licenses" "${_ovt_qt_root}/../Licenses")
+    if(IS_DIRECTORY "${_dir}")
+      set(_ovt_qt_licenses "${_dir}")
+      break()
+    endif()
+  endforeach()
+  unset(_dir)
+endif()
+if(NOT _ovt_qt_licenses)
+  set(_ovt_qt_licenses "${CMAKE_BINARY_DIR}/notices/qt-licenses")
+  file(MAKE_DIRECTORY "${_ovt_qt_licenses}")
+  configure_file("${CMAKE_SOURCE_DIR}/LICENSES/LGPL-3.0-or-later.txt" "${_ovt_qt_licenses}/LGPL-3.0.txt" COPYONLY)
+  configure_file("${CMAKE_SOURCE_DIR}/LICENSES/GPL-3.0-or-later.txt" "${_ovt_qt_licenses}/GPL-3.0.txt" COPYONLY)
+endif()
+list(APPEND _ovt_notices_args --qt-licenses "${_ovt_qt_licenses}")
+unset(_ovt_qt_root)
+unset(_ovt_qt_licenses)
 if(OVT_NOTICES_PATENT)
   list(APPEND _ovt_notices_args --patent-notice)
 endif()
