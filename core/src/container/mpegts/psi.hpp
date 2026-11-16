@@ -34,8 +34,9 @@ inline constexpr uint16_t kPatPid = 0x0000;
 inline constexpr uint16_t kCatPid = 0x0001;
 inline constexpr uint16_t kSdtPid = 0x0011;
 inline constexpr uint16_t kEitPid = 0x0012;
-inline constexpr uint16_t kTimePid = 0x0014;  // TDT and TOT
-inline constexpr size_t kMaxSections = 4096;  // recorded sections per file; the counters stay exact
+inline constexpr uint16_t kTimePid = 0x0014;              // TDT and TOT
+inline constexpr size_t kMaxSections = 4096;              // recorded sections per file; the counters stay exact
+inline constexpr size_t kMaxArrivals = size_t{1} << 20U;  // section arrivals kept per PID for the timer checks
 
 // CRC-32/MPEG-2 (poly 0x04C11DB7, init 0xFFFFFFFF, no reflection, no final XOR). The CRC of a section that
 // includes its own CRC_32 field is 0.
@@ -148,6 +149,13 @@ struct PsiTables {
   uint64_t crc_errors = 0;
   uint64_t dropped_sections = 0;  // distinct sections beyond kMaxSections
   std::vector<PsiDiagnostic> diagnostics;
+  std::map<DiagCode, uint64_t> diag_counts;  // exact count per code; `diagnostics` is capped
+  // WI-4.207 timer checks: packet index of the first packet of every PAT section (PID 0, table_id 0), of every
+  // PMT section on a PMT PID the PAT named, and of every CAT section (PID 1, table_id 1), repeats included, at
+  // most kMaxArrivals per PID (later ones are not recorded); with the packet index at which a PMT PID was first
+  // named by a PAT.
+  std::map<uint16_t, std::vector<uint64_t>> arrivals;
+  std::map<uint16_t, uint64_t> pmt_named_at;
 };
 
 // Section reassembly and table decoding for the PSI/SI PIDs. Feed every packet in file order; `wants(pid)` says
@@ -186,6 +194,7 @@ class PsiParser {
   std::map<Key, std::vector<uint8_t>> last_;  // last content per table section
   std::map<uint8_t, std::vector<PatEntry>> pat_sections_;
   uint8_t pat_version_ = 0xFF;
+  uint64_t current_packet_ = 0;     // first packet of the section being taken
   std::vector<uint8_t> pmt_mask_;   // PIDs that the PAT names as PMT PIDs
   std::vector<uint16_t> bad_pids_;  // PIDs that already reported a scrambled PSI packet
 

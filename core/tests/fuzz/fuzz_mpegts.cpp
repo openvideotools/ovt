@@ -71,6 +71,21 @@ void check_timing(const ts::File& a, const ovt::container::Reader& reader) {
   require(tt->bitrate_per_pid()->size() <= a.pids.size() * ts::kBitrateWindowsMs.size());
 }
 
+// The TR 101 290 report (WI-4.207): a verifiable table of 14 checks whose first occurrences lie inside the file.
+void check_report(const ts::File& a, const ovt::container::Reader& reader, size_t size) {
+  const auto bytes = reader.ts_report();
+  flatbuffers::Verifier verifier(bytes.data(), bytes.size());
+  require(verifier.VerifyBuffer<ovt::fb::TsReport>(nullptr));
+  const auto* r = flatbuffers::GetRoot<ovt::fb::TsReport>(bytes.data());
+  require(r->packets() == a.packet_count && r->checks()->size() == 14);
+  for (const auto* c : *r->checks()) {
+    require(c->count() > 0 || (c->first_offset() == 0 && c->first_packet_index() == 0));
+    require(c->first_packet_index() < a.packet_count && c->first_offset() <= size);
+  }
+  require(r->diagnostics()->size() <= ts::kMaxDiagnostics);
+  require(bytes == reader.ts_report());
+}
+
 }  // namespace
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -135,6 +150,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     check_pes(file, *a, *b, *reader, size);
     check_timing(*a, *reader);
+    check_report(*a, *reader, size);
   } catch (...) {
     std::abort();
   }
