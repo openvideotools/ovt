@@ -24,6 +24,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <regex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -34,14 +35,24 @@
 #include "libmd5/MD5.h"            // HM's public-domain MD5 (Colin Plumb), compiled into tp::hm_common
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
+#include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/model/tree.hpp"
 #include "ovt/cxx/model/validator.hpp"
+#include "ovt/cxx/rbsp.hpp"
+#include "ovt/cxx/syntax/h265/active_sets.hpp"
+#include "ovt/cxx/syntax/h265/nal_header.hpp"
+#include "ovt/cxx/syntax/h265/pps.hpp"
+#include "ovt/cxx/syntax/h265/slice_segment_header.hpp"
+#include "ovt/cxx/syntax/h265/sps.hpp"
+#include "ovt/cxx/syntax/h265/vps.hpp"
+#include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "ovt_model_generated.h"
 #include "test_support/corpus.h"
 
 namespace {
 
 constexpr uint32_t kReconMask = 1U << 0;  // ovt.fb.PlaneStage.Reconstruction
+constexpr uint32_t kCoeffMask = 1U << 6;  // ovt.fb.PlaneStage.Coefficients
 
 const ovt_AnalysisDecoderApi& plugin_api() {
   static ovt::analysis::PluginRegistry registry(
@@ -221,6 +232,7 @@ struct PictureOut {
   std::vector<uint8_t> plane_bit_depths;
   std::vector<uint8_t> plane_sample_bytes;
   std::shared_ptr<const struct GridOut> grid;  // when StreamResult::keep_grids
+  std::shared_ptr<const struct PicOut> pic;    // partitions, filter parameters and RPS
 };
 
 // The CellGrid of one picture, with ref0/ref1 resolved to the refIdx of their RefSlot ("L0[i]", "S<n>:L1[i]") and,
@@ -232,6 +244,119 @@ struct GridOut {
   std::vector<std::size_t> cu_origin;
   bool mv_clamp_reported = false;  // FrameAnalysis.diagnostics holds MDL-GEN-0003
 };
+
+// The picture-level data of one FrameAnalysis: partitions (slice segments, then tiles), the per-slice-segment
+// HevcFilterParams vectors and HevcRps, plus the cells' partition_id and HevcCtu partition fields per CTU.
+struct PicOut {
+  struct Part {
+    ovt::fb::PartitionKind kind{};
+    int parent = -1;
+    int slice_type = 255;
+    ovt::fb::Rect rect;
+    uint32_t first_block_addr = 0;
+    uint32_t block_count = 0;
+    int qp = 0, qp_delta = 0, deblocking_disable = 0, beta = 0, tc = 0, lf_across = 0, sao_luma = 0, sao_chroma = 0;
+    int num_entry_points = 0, cabac_init = 0, max_merge = 0, tile_row = 0, tile_col = 0;
+  };
+  std::vector<Part> parts;
+  std::vector<int> filter_disabled, filter_beta, filter_tc, filter_sao_luma, filter_sao_chroma;
+  bool has_filter = false;
+  bool has_rps = false;
+  int num_pic_total_curr = 0, sps_flag = 0, sps_idx = 0, col_l0 = 0, col_idx = 0, output_flag = 0;
+  int dpb_fullness = 0, max_dec_pic_buffering = 0;  // dpb_fullness_after, sps_max_dec_pic_buffering_minus1 + 1
+  std::array<std::vector<int>, 3> st_deltas;        // PicOrderCntVal - current POC of StCurrBefore, StCurrAfter, StFoll
+  std::array<std::size_t, 7> rps_sizes{};           // StCurrBefore, StCurrAfter, StFoll, LtCurr, LtFoll, L0, L1
+  std::array<std::vector<int>, 2> list_frames;      // RefPicList0/1 decode indices
+  std::array<std::vector<int>, 2> slot_frames;      // decode index of RefSlot "L0[i]" / "L1[i]"
+  // Per CTU in tile scan: HevcCtu slice_segment_idx, tile_idx, CtbAddrInRs, the partition_id of its first cell, and
+  // the CTU's x and y in luma samples.
+  std::vector<std::array<uint32_t, 6>> ctus;
+};
+
+void rps_of(const ovt::fb::HevcRps& r, PicOut* out) {
+  out->has_rps = true;
+  out->num_pic_total_curr = r.NumPicTotalCurr();
+  out->sps_flag = r.short_term_ref_pic_set_sps_flag();
+  out->sps_idx = r.short_term_ref_pic_set_idx();
+  out->col_l0 = r.collocated_from_l0_flag();
+  out->col_idx = r.collocated_ref_idx();
+  out->output_flag = r.pic_output_flag();
+  out->dpb_fullness = r.dpb_fullness_after();
+  out->max_dec_pic_buffering = r.sps_max_dec_pic_buffering_minus1() + 1;
+  int set = 0;
+  for (const auto* v : {r.RefPicSetStCurrBefore(), r.RefPicSetStCurrAfter(), r.RefPicSetStFoll()}) {
+    std::vector<int>& d = out->st_deltas.at(static_cast<std::size_t>(set++));
+    if (v != nullptr) {
+      for (const ovt::fb::HevcRpsPic* e : *v) {
+        d.push_back(e->PicOrderCntVal() - r.PicOrderCntVal());
+      }
+    }
+    std::sort(d.begin(), d.end());
+  }
+  const auto size = [](const auto* v) { return v == nullptr ? std::size_t{0} : std::size_t{v->size()}; };
+  out->rps_sizes = {size(r.RefPicSetStCurrBefore()),
+                    size(r.RefPicSetStCurrAfter()),
+                    size(r.RefPicSetStFoll()),
+                    size(r.RefPicSetLtCurr()),
+                    size(r.RefPicSetLtFoll()),
+                    size(r.RefPicList0()),
+                    size(r.RefPicList1())};
+  for (int l = 0; l < 2; ++l) {
+    if (const auto* v = l == 0 ? r.RefPicList0() : r.RefPicList1()) {
+      for (const ovt::fb::HevcRpsPic* e : *v) {
+        out->list_frames.at(static_cast<std::size_t>(l)).push_back(e->frame()->decode_index());
+      }
+    }
+  }
+}
+
+std::shared_ptr<const PicOut> pic_of(const ovt::fb::FrameAnalysis& fa) {
+  auto out = std::make_shared<PicOut>();
+  if (fa.partitions() != nullptr) {
+    for (const ovt::fb::PartitionInfo* p : *fa.partitions()) {
+      out->parts.push_back({p->kind(), p->parent(), p->slice_type(), *p->rect(), p->first_block_addr(),
+                            p->block_count(), p->qp(), p->qp_delta(), p->deblocking_disable(),
+                            p->deblock_alpha_or_beta_offset_div2(), p->deblock_beta_or_tc_offset_div2(),
+                            p->loop_filter_across_slices(), p->sao_luma(), p->sao_chroma(), p->num_entry_points(),
+                            p->cabac_init(), p->max_num_merge_cand(), p->tile_row(), p->tile_col()});
+    }
+  }
+  if (const auto* f = ovt::model::nested_as<ovt::fb::HevcFilterParams>(fa.filter_params(), fa.filter_params_type())) {
+    out->has_filter = true;
+    const auto copy = [](const auto* v, std::vector<int>* dst) {
+      if (v != nullptr) {
+        dst->assign(v->begin(), v->end());
+      }
+    };
+    copy(f->slice_deblocking_filter_disabled_flag(), &out->filter_disabled);
+    copy(f->slice_beta_offset_div2(), &out->filter_beta);
+    copy(f->slice_tc_offset_div2(), &out->filter_tc);
+    copy(f->slice_sao_luma_flag(), &out->filter_sao_luma);
+    copy(f->slice_sao_chroma_flag(), &out->filter_sao_chroma);
+  }
+  if (const auto* r = ovt::model::nested_as<ovt::fb::HevcRps>(fa.frame()->ref_state(), fa.frame()->ref_state_type())) {
+    rps_of(*r, out.get());
+  }
+  if (fa.refs() != nullptr) {
+    for (const ovt::fb::RefSlot* r : *fa.refs()) {
+      const std::string name = r->name()->str();
+      if (name.starts_with("L0[") || name.starts_with("L1[")) {
+        out->slot_frames.at(name[1] == '0' ? 0 : 1).push_back(r->frame()->decode_index());
+      }
+    }
+  }
+  const ovt::fb::CellGrid& g = *fa.grid();
+  for (const uint32_t id : *fa.blocks()->Get(0)->children()) {
+    const ovt::fb::Block& b = *fa.blocks()->Get(id);
+    const auto* ctu = ovt::model::ext_as<ovt::fb::HevcCtu>(b);
+    REQUIRE(ctu != nullptr);
+    const uint32_t cell =
+        (static_cast<uint32_t>(b.rect()->y() / 4) * g.cells_w()) + static_cast<uint32_t>(b.rect()->x() / 4);
+    out->ctus.push_back({ctu->slice_segment_idx(), ctu->tile_idx(), ctu->CtbAddrInRs(), g.partition_id()->Get(cell),
+                         static_cast<uint32_t>(b.rect()->x()), static_cast<uint32_t>(b.rect()->y())});
+  }
+  return out;
+}
 
 int ref_idx(const ovt::fb::FrameAnalysis& fa, int slot) {
   if (slot < 0 || fa.refs() == nullptr || static_cast<uint32_t>(slot) >= fa.refs()->size()) {
@@ -289,6 +414,11 @@ struct StreamResult {
   int push_errors = 0;
   std::vector<std::string> violations;  // chapter 06 §6.9 validator findings (first few)
   bool keep_grids = false;
+  bool coefficients = false;              // pull Coefficients planes too and check them (check_coefficients)
+  int coeff_pictures = 0;                 // pictures whose Coefficients planes were checked
+  std::size_t coeff_nodes = 0;            // transform-tree nodes with num_nonzero / coeff_abs_sum
+  std::size_t coeff_nonzero_nodes = 0;    // ... of which with a non-zero level
+  std::vector<std::string> coeff_errors;  // first few mismatches
   // 4:2:2 HevcTu.cbf_cb / cbf_cr (ovt_model.fbs: two entries per chroma-coding node, one per vertical half).
   int tu422_two_entry_nodes = 0;   // nodes that carry two entries per component
   int tu422_halves_differ = 0;     // ... of which the two halves of a component differ (so they are not the OR twice)
@@ -374,17 +504,227 @@ void check_tu_cbf_422(const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
   }
 }
 
-// Validator findings on what the host completes: the timebase and the source-hash prefix of blob ids.
+// ---- Coefficients planes ------------------------------------------------------------------------------------------
+
+// One Coefficients plane: S32LE levels, width x height.
+struct CoeffView {
+  const uint8_t* data = nullptr;
+  uint32_t w = 0;
+  uint32_t h = 0;
+  [[nodiscard]] int32_t at(uint32_t x, uint32_t y) const {
+    const uint8_t* q = data + ((static_cast<std::size_t>(y) * w + x) * 4);
+    return static_cast<int32_t>(static_cast<uint32_t>(q[0]) | (static_cast<uint32_t>(q[1]) << 8) |
+                                (static_cast<uint32_t>(q[2]) << 16) | (static_cast<uint32_t>(q[3]) << 24));
+  }
+};
+
+// Non-zero count and absolute sum of a plane rectangle.
+std::pair<uint64_t, uint64_t> region_stats(const CoeffView& v, uint32_t x0, uint32_t y0, uint32_t w, uint32_t h) {
+  uint64_t nonzero = 0;
+  uint64_t sum = 0;
+  for (uint32_t y = y0; y < std::min(y0 + h, v.h); ++y) {
+    for (uint32_t x = x0; x < std::min(x0 + w, v.w); ++x) {
+      const int64_t level = v.at(x, y);
+      nonzero += level != 0 ? 1U : 0U;
+      sum += static_cast<uint64_t>(level < 0 ? -level : level);
+    }
+  }
+  return {nonzero, sum};
+}
+
+// The Coefficients planes of a picture, checked against the PlaneRef contract (chapter 06 §6.6.1).
+std::array<CoeffView, 3> coeff_views(Instance& in, const ovt::fb::FrameAnalysis& fa, int sx, int sy, StreamResult* r) {
+  std::array<CoeffView, 3> views;
+  const auto coded_w = static_cast<uint32_t>(fa.frame()->coded_size()->w());
+  const auto coded_h = static_cast<uint32_t>(fa.frame()->coded_size()->h());
+  for (const ovt::fb::PlaneRef* p : *fa.planes()) {
+    if (p->stage() != ovt::fb::PlaneStage::Coefficients) {
+      continue;
+    }
+    CHECK(p->is_signed());
+    CHECK(p->sample_bytes() == 4);
+    CHECK(p->bit_depth() == 16);
+    CHECK(p->blob_id()->str() == std::to_string(fa.frame()->id()->decode_index()) + "/coeff/" + "yuv"[p->plane()]);
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+    REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
+    REQUIRE(size == static_cast<size_t>(p->width()) * p->height() * 4);
+    const int shift_x = p->plane() == 0 ? 0 : sx;
+    const int shift_y = p->plane() == 0 ? 0 : sy;
+    CHECK(p->width() == coded_w >> shift_x);
+    CHECK(p->height() == coded_h >> shift_y);
+    views.at(p->plane()) = {data, p->width(), p->height()};
+  }
+  const std::size_t want = fa.frame()->chroma_format() == 0 ? 1 : 3;
+  for (std::size_t c = 0; c < 3; ++c) {
+    if ((views.at(c).data != nullptr) != (c < want) && r->coeff_errors.size() < 8) {
+      r->coeff_errors.push_back("decode index " + std::to_string(fa.frame()->id()->decode_index()) +
+                                ": Coefficients plane " + std::to_string(c) + " missing or unexpected");
+    }
+  }
+  return views;
+}
+
+// The cbf of component c for the blocks a HevcTu node codes: cbf_luma, or the OR of the node's cbf_cb / cbf_cr entries.
+int node_cbf(const ovt::fb::HevcTu& tu, std::size_t c, bool coded) {
+  if (!coded) {
+    return 0;
+  }
+  if (c == 0) {
+    return tu.cbf_luma();
+  }
+  const auto* f = c == 1 ? tu.cbf_cb() : tu.cbf_cr();
+  return f != nullptr && std::any_of(f->begin(), f->end(), [](uint8_t e) { return e != 0; }) ? 1 : 0;
+}
+
+// Where a TU node's coefficients are: its luma rectangle and the chroma subsampling shifts.
+struct TuRegion {
+  uint32_t x = 0;
+  uint32_t y = 0;
+  uint32_t s = 0;
+  int sx = 0;
+  int sy = 0;
+};
+
+// One component of a HevcTu node: its num_nonzero / coeff_abs_sum entries against the plane, and its cbf against
+// the count. Returns an error or "".
+std::string check_tu_component(const ovt::fb::HevcTu& tu, std::size_t c, bool coded, const CoeffView& v,
+                               const TuRegion& at) {
+  const auto i = static_cast<uint32_t>(c);
+  const uint64_t nonzero = tu.num_nonzero()->Get(i);
+  const uint64_t sum = tu.coeff_abs_sum()->Get(i);
+  std::pair<uint64_t, uint64_t> got{0, 0};
+  if (coded && v.data != nullptr) {
+    const int shift_x = c == 0 ? 0 : at.sx;
+    const int shift_y = c == 0 ? 0 : at.sy;
+    got = region_stats(v, at.x >> shift_x, at.y >> shift_y, at.s >> shift_x, at.s >> shift_y);
+  }
+  const std::string comp = "component " + std::to_string(c);
+  if (got.first != nonzero || got.second != sum) {
+    return comp + " num_nonzero " + std::to_string(nonzero) + " coeff_abs_sum " + std::to_string(sum) + ", plane has " +
+           std::to_string(got.first) + " / " + std::to_string(got.second);
+  }
+  const int cbf = node_cbf(tu, c, coded);
+  if ((cbf != 0) != (nonzero > 0)) {
+    return comp + " cbf " + std::to_string(cbf) + " but " + std::to_string(nonzero) + " non-zero levels";
+  }
+  return "";
+}
+
+// One HevcTu node against the planes: its num_nonzero / coeff_abs_sum equal the plane's over the transform blocks
+// the node codes (luma at a leaf; chroma at a leaf with chroma TBs of its own or at the 8x8 node of four 4x4 luma
+// TUs), and a component has a non-zero level exactly when its cbf is set.
+void check_tu_coefficients(const ovt::fb::Block& b, const ovt::fb::HevcTu& tu, const std::array<CoeffView, 3>& v,
+                           int chroma_format, const TuRegion& shifts, std::array<uint64_t, 3>* node_totals,
+                           std::vector<std::string>* errors) {
+  const int l2 = tu.log2TrafoSize();
+  const bool split = tu.split_transform_flag() == 1;
+  const bool luma = !split;
+  const bool chroma = chroma_format != 0 && (chroma_format == 3 ? !split : ((!split && l2 > 2) || (split && l2 == 3)));
+  const auto* nz = tu.num_nonzero();
+  const auto* sums = tu.coeff_abs_sum();
+  const std::string where = "TU at " + std::to_string(b.rect()->x()) + "," + std::to_string(b.rect()->y()) + " log2 " +
+                            std::to_string(l2) + ": ";
+  const bool present = nz != nullptr && nz->size() == 3 && sums != nullptr && sums->size() == 3;
+  if ((nz != nullptr) != (luma || chroma) || (nz != nullptr && !present)) {
+    errors->push_back(where + "num_nonzero / coeff_abs_sum present where the node codes no block, or not 3 entries");
+    return;
+  }
+  if (!present) {
+    return;
+  }
+  TuRegion at = shifts;
+  at.x = static_cast<uint32_t>(b.rect()->x());
+  at.y = static_cast<uint32_t>(b.rect()->y());
+  at.s = static_cast<uint32_t>(b.rect()->w());
+  for (std::size_t c = 0; c < 3; ++c) {
+    node_totals->at(c) += nz->Get(static_cast<uint32_t>(c));
+    if (const std::string e = check_tu_component(tu, c, c == 0 ? luma : chroma, v.at(c), at); !e.empty()) {
+      errors->push_back(where + e);
+    }
+  }
+}
+
+// The Coefficients planes of a picture and the num_nonzero / coeff_abs_sum of its HevcTu nodes: every non-zero
+// level of a plane lies in a block some node codes, and the nodes' counts match the planes.
+void check_coefficients(Instance& in, const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
+  const int chroma_format = fa.frame()->chroma_format();
+  const int sx = chroma_format == 1 || chroma_format == 2 ? 1 : 0;
+  const int sy = chroma_format == 1 ? 1 : 0;
+  const std::array<CoeffView, 3> views = coeff_views(in, fa, sx, sy, r);
+  std::array<uint64_t, 3> node_totals{};
+  std::vector<std::string> errors;
+  for (const ovt::fb::Block* b : *fa.blocks()) {
+    if (const auto* tu = ovt::model::ext_as<ovt::fb::HevcTu>(*b)) {
+      check_tu_coefficients(*b, *tu, views, chroma_format, TuRegion{0, 0, 0, sx, sy}, &node_totals, &errors);
+      if (tu->num_nonzero() != nullptr) {
+        ++r->coeff_nodes;
+        const auto* nz = tu->num_nonzero();
+        r->coeff_nonzero_nodes += std::any_of(nz->begin(), nz->end(), [](uint16_t n) { return n > 0; }) ? 1U : 0U;
+      }
+    }
+  }
+  for (std::size_t c = 0; c < 3; ++c) {
+    if (views.at(c).data == nullptr) {
+      continue;
+    }
+    const uint64_t plane_total = region_stats(views.at(c), 0, 0, views.at(c).w, views.at(c).h).first;
+    if (plane_total != node_totals.at(c)) {
+      errors.push_back("component " + std::to_string(c) + ": " + std::to_string(plane_total) +
+                       " non-zero levels in the plane, " + std::to_string(node_totals.at(c)) + " in the TUs");
+    }
+  }
+  for (const std::string& e : errors) {
+    if (r->coeff_errors.size() < 8) {
+      r->coeff_errors.push_back("decode index " + std::to_string(fa.frame()->id()->decode_index()) + " " + e);
+    }
+  }
+  ++r->coeff_pictures;
+}
+
+// Validator findings on what the host completes (A6): the timebase, PartitionInfo.unit_index and the source-hash
+// prefix of blob ids.
 bool host_fills(const ovt::model::Violation& v) {
+  static const std::regex unit_index(R"(partitions\[[0-9]+\]\.unit_index)");
   return (v.rule == "V-002" && v.path == "frame.timebase_den") ||
+         (v.rule == "V-017" && std::regex_match(v.path, unit_index)) ||
          (v.rule == "V-023" && v.path.ends_with(".blob_id") && v.message.find("source-hash") != std::string::npos);
+}
+
+// The Reconstruction planes of a pulled picture: PlaneRef contract and the three SEI hash types of each plane. The
+// Coefficients planes, when asked for, are left to check_coefficients; any other stage fails.
+void reconstruction_planes(Instance& in, const ovt::fb::FrameAnalysis& fa, bool coefficients, PictureOut* out) {
+  const auto* coded = fa.frame()->coded_size();
+  for (const ovt::fb::PlaneRef* p : *fa.planes()) {
+    if (coefficients && p->stage() == ovt::fb::PlaneStage::Coefficients) {
+      continue;
+    }
+    CHECK(p->stage() == ovt::fb::PlaneStage::Reconstruction);
+    // V-023: one byte per sample exactly for unsigned 8-bit planes.
+    CHECK((p->sample_bytes() == 1) == (p->bit_depth() == 8 && !p->is_signed()));
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+    REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
+    REQUIRE(size == static_cast<size_t>(p->stride_bytes()) * p->height());
+    REQUIRE(p->stride_bytes() == p->width() * p->sample_bytes());
+    if (p->plane() == 0) {
+      CHECK(static_cast<int>(p->width()) == coded->w());
+      CHECK(static_cast<int>(p->height()) == coded->h());
+    }
+    out->plane_bit_depths.push_back(p->bit_depth());
+    out->plane_sample_bytes.push_back(p->sample_bytes());
+    for (int type = 0; type < 3; ++type) {
+      out->hashes[static_cast<size_t>(type)].planes.push_back(
+          plane_hash(type, data, p->width(), p->height(), p->sample_bytes()));
+    }
+  }
 }
 
 // Pulls every ready frame; hashes its Reconstruction planes the way the stream's SEI for that picture does.
 void drain(Instance& in, StreamResult* r) {
   for (;;) {
     ovt_Buffer fb{};
-    REQUIRE(in.api.pull(in.dec, kReconMask, &fb) == OVT_OK);
+    REQUIRE(in.api.pull(in.dec, kReconMask | (r->coefficients ? kCoeffMask : 0U), &fb) == OVT_OK);
     if (fb.data == nullptr) {
       return;
     }
@@ -414,28 +754,13 @@ void drain(Instance& in, StreamResult* r) {
     REQUIRE(fa->grid() != nullptr);
     CHECK(static_cast<int>(fa->grid()->cells_w()) == (coded->w() + 3) / 4);
     CHECK(static_cast<int>(fa->grid()->cells_h()) == (coded->h() + 3) / 4);
-    for (const ovt::fb::PlaneRef* p : *fa->planes()) {
-      CHECK(p->stage() == ovt::fb::PlaneStage::Reconstruction);
-      // V-023: one byte per sample exactly for unsigned 8-bit planes.
-      CHECK((p->sample_bytes() == 1) == (p->bit_depth() == 8 && !p->is_signed()));
-      const uint8_t* data = nullptr;
-      size_t size = 0;
-      REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
-      REQUIRE(size == static_cast<size_t>(p->stride_bytes()) * p->height());
-      REQUIRE(p->stride_bytes() == p->width() * p->sample_bytes());
-      if (p->plane() == 0) {
-        CHECK(static_cast<int>(p->width()) == coded->w());
-        CHECK(static_cast<int>(p->height()) == coded->h());
-      }
-      out.plane_bit_depths.push_back(p->bit_depth());
-      out.plane_sample_bytes.push_back(p->sample_bytes());
-      for (int type = 0; type < 3; ++type) {
-        out.hashes[static_cast<size_t>(type)].planes.push_back(
-            plane_hash(type, data, p->width(), p->height(), p->sample_bytes()));
-      }
-    }
+    reconstruction_planes(in, *fa, r->coefficients, &out);
     if (r->keep_grids) {
       out.grid = grid_of(*fa);
+    }
+    out.pic = pic_of(*fa);
+    if (r->coefficients) {
+      check_coefficients(in, *fa, r);
     }
     if (out.chroma_format == 2) {
       check_tu_cbf_422(*fa, r);
@@ -454,6 +779,11 @@ class StreamFeeder {
 
   [[nodiscard]] bool done() const { return next_ >= nals_.size(); }
   void keep_grids(bool keep) { r_.keep_grids = keep; }
+  // Asks for the Coefficients planes with a pull before the first push, as the host primes a decoder.
+  void coefficients() {
+    r_.coefficients = true;
+    drain(in_, &r_);
+  }
 
   // Pushes the next NAL unit and pulls what is ready.
   void step() {
@@ -514,11 +844,14 @@ class StreamFeeder {
   StreamResult r_;
 };
 
-StreamResult run_stream(const std::vector<uint8_t>& bytes, bool keep_grids = false) {
+StreamResult run_stream(const std::vector<uint8_t>& bytes, bool keep_grids = false, bool coefficients = false) {
   Instance in(plugin_api());
   REQUIRE(in.status == OVT_OK);
   StreamFeeder feeder(in, bytes);
   feeder.keep_grids(keep_grids);
+  if (coefficients) {
+    feeder.coefficients();
+  }
   while (!feeder.done()) {
     feeder.step();
   }
@@ -613,6 +946,281 @@ constexpr std::array<At1Stream, 40> kAt1Streams = {{
     {"jctvc_RPS_F_docomo_2", false},
 }};
 
+// ---- Picture-level data against the slice segment headers -------------------------------------------------------
+
+namespace h265 = ovt::syntax::h265;
+
+// The layer-0 slice segment headers of one picture, parsed by the core H.265 parser, with its tile and CTB counts.
+struct HeaderPic {
+  std::vector<h265::SliceSegmentHeader> segs;
+  std::size_t tiles = 1;
+  uint32_t ctbs = 0;
+  bool idr = false;      // IDR_W_RADL or IDR_N_LP: the slice headers carry no RPS syntax
+  bool bla = false;      // BLA_W_LP, BLA_W_RADL or BLA_N_LP
+  h265::StRefPicSet st;  // the short-term RPS of the picture (the SPS's or the slice header's own)
+};
+
+// Stores a VPS, SPS or PPS NAL unit in @p sets.
+void put_parameter_set(const h265::NalHeader& h, ovt::BitReader& br, ovt::syntax::SyntaxBuilder& b,
+                       std::span<const uint8_t> rbsp, uint64_t unit, h265::ActiveSets* sets,
+                       std::vector<h265::SetDiagnostic>* diags) {
+  if (h.nal_unit_type < h265::kVpsNut || h.nal_unit_type > h265::kPpsNut) {
+    return;
+  }
+  sets->end_picture();  // conforming streams change a set's content only between pictures
+  if (h.nal_unit_type == h265::kVpsNut) {
+    sets->put_vps(h265::parse_vps(br, b), rbsp, unit, *diags);
+  } else if (h.nal_unit_type == h265::kSpsNut) {
+    sets->put_sps(h265::parse_sps(br, b, h.nuh_layer_id), rbsp, unit, *diags);
+  } else {
+    sets->put_pps(h265::parse_pps(br, b), rbsp, unit, *diags);
+  }
+}
+
+// The picture-level fields of a HeaderPic, from its first slice segment.
+HeaderPic header_pic(const h265::NalHeader& h, const h265::SliceSegmentHeader& sh, const h265::Activation& act) {
+  HeaderPic out;
+  out.tiles = (act.active->colBd.size() - 1) * (act.active->rowBd.size() - 1);
+  out.ctbs = act.sps->PicSizeInCtbsY;
+  out.idr = h.nal_unit_type == h265::kIdrWRadl || h.nal_unit_type == h265::kIdrNLp;
+  out.bla = h.nal_unit_type >= h265::kBlaWLp && h.nal_unit_type <= h265::kBlaNLp;
+  if (!out.idr) {
+    out.st = sh.short_term_ref_pic_set_sps_flag ? act.sps->st_ref_pic_set.at(sh.short_term_ref_pic_set_idx)
+                                                : sh.st_ref_pic_set;
+  }
+  return out;
+}
+
+// Parses every layer-0 slice segment header of @p bytes, keyed by the picture counter StreamFeeder hints with.
+std::map<int, HeaderPic> headers_of(const std::vector<uint8_t>& bytes) {
+  std::map<int, HeaderPic> out;
+  h265::ActiveSets sets;
+  std::vector<h265::SetDiagnostic> diags;
+  std::optional<h265::SliceSegmentHeader> prev_independent;
+  int pic = -1;
+  uint64_t unit = 0;
+  for (const Nal& n : split_annexb(bytes)) {
+    if (n.size < 3) {
+      continue;
+    }
+    const ovt::Rbsp rbsp = ovt::rbsp_from_nal(std::span<const uint8_t>(n.data, n.size));
+    ovt::BitReader br(rbsp.rbsp);
+    ovt::syntax::SyntaxBuilder b(br);
+    const h265::NalHeader h = h265::parse_nal_header(br, b);
+    ++unit;
+    if (h.nuh_layer_id != 0) {
+      continue;
+    }
+    put_parameter_set(h, br, b, rbsp.rbsp, unit, &sets, &diags);
+    if (!h.is_vcl) {
+      continue;
+    }
+    h265::SliceSegmentHeader sh =
+        h265::parse_slice_segment_header(br, b, h, sets.pps_table(), prev_independent ? &*prev_independent : nullptr);
+    const auto act = sets.activate(sh.slice_pic_parameter_set_id, sh.first_slice_segment_in_pic_flag, diags);
+    REQUIRE(act.has_value());
+    if (!sh.dependent_slice_segment_flag) {
+      prev_independent = sh;
+    }
+    if (sh.first_slice_segment_in_pic_flag) {
+      out[++pic] = header_pic(h, sh, *act);
+    }
+    if (pic >= 0) {
+      out[pic].segs.push_back(std::move(sh));
+    }
+  }
+  return out;
+}
+
+// Accumulates mismatches as "field: got X, want Y" lines (the first few).
+struct Mismatches {
+  std::vector<std::string> lines;
+  std::size_t count = 0;
+  void check(int idx, const std::string& what, long long got, long long want) {
+    if (got != want && ++count <= 16) {
+      lines.push_back("decode index " + std::to_string(idx) + " " + what + ": got " + std::to_string(got) + ", want " +
+                      std::to_string(want));
+    }
+  }
+};
+
+// One slice segment's PartitionInfo and HevcFilterParams entries against its header.
+void check_segment(int idx, std::size_t i, const PicOut& p, const h265::SliceSegmentHeader& sh, int independent,
+                   Mismatches* m) {
+  const PicOut::Part& part = p.parts[i];
+  const std::string s = "segment " + std::to_string(i) + " ";
+  const bool intra = sh.slice_type == h265::kSliceI;
+  m->check(idx, s + "kind", static_cast<int>(part.kind),
+           static_cast<int>(sh.dependent_slice_segment_flag ? ovt::fb::PartitionKind::SliceSegment
+                                                            : ovt::fb::PartitionKind::Slice));
+  m->check(idx, s + "parent", part.parent, sh.dependent_slice_segment_flag ? independent : -1);
+  m->check(idx, s + "slice_type", part.slice_type, sh.slice_type);
+  m->check(idx, s + "first_block_addr", part.first_block_addr, sh.slice_segment_address);
+  m->check(idx, s + "qp", part.qp, sh.SliceQpY);
+  m->check(idx, s + "qp_delta", part.qp_delta, sh.slice_qp_delta);
+  m->check(idx, s + "deblocking_disable", part.deblocking_disable, sh.slice_deblocking_filter_disabled_flag ? 1 : 0);
+  m->check(idx, s + "beta_offset_div2", part.beta, sh.slice_beta_offset_div2);
+  m->check(idx, s + "tc_offset_div2", part.tc, sh.slice_tc_offset_div2);
+  m->check(idx, s + "loop_filter_across_slices", part.lf_across,
+           sh.slice_loop_filter_across_slices_enabled_flag ? 1 : 0);
+  m->check(idx, s + "sao_luma", part.sao_luma, sh.slice_sao_luma_flag ? 1 : 0);
+  m->check(idx, s + "sao_chroma", part.sao_chroma, sh.slice_sao_chroma_flag ? 1 : 0);
+  m->check(idx, s + "num_entry_points", part.num_entry_points, sh.num_entry_point_offsets);
+  m->check(idx, s + "cabac_init", part.cabac_init, intra ? 255 : (sh.cabac_init_flag ? 1 : 0));
+  m->check(idx, s + "max_num_merge_cand", part.max_merge, intra ? 255 : sh.MaxNumMergeCand);
+  m->check(idx, s + "filter deblocking_disabled", p.filter_disabled.at(i), part.deblocking_disable);
+  m->check(idx, s + "filter beta_offset_div2", p.filter_beta.at(i), part.beta);
+  m->check(idx, s + "filter tc_offset_div2", p.filter_tc.at(i), part.tc);
+  m->check(idx, s + "filter sao_luma", p.filter_sao_luma.at(i), part.sao_luma);
+  m->check(idx, s + "filter sao_chroma", p.filter_sao_chroma.at(i), part.sao_chroma);
+}
+
+// The expected PicOrderCntVal differences of StCurrBefore, StCurrAfter and StFoll (7-61, 7-62), each sorted.
+std::array<std::vector<int>, 3> expected_st_deltas(const HeaderPic& want) {
+  std::array<std::vector<int>, 3> deltas;
+  // SPEC-ASSUMPTION(#553): HM drops a BLA picture's RPS, so the HM plugin reports its lists empty.
+  const h265::StRefPicSet st = want.bla ? h265::StRefPicSet{} : want.st;
+  for (uint32_t i = 0; i < st.NumNegativePics; ++i) {
+    deltas.at(st.UsedByCurrPicS0.at(i) ? 0 : 2).push_back(st.DeltaPocS0.at(i));
+  }
+  for (uint32_t i = 0; i < st.NumPositivePics; ++i) {
+    deltas.at(st.UsedByCurrPicS1.at(i) ? 1 : 2).push_back(st.DeltaPocS1.at(i));
+  }
+  for (std::vector<int>& d : deltas) {
+    std::sort(d.begin(), d.end());
+  }
+  return deltas;
+}
+
+std::string join_ints(const std::vector<int>& v) {
+  std::string out;
+  for (const int d : v) {
+    out += (out.empty() ? "" : ",") + std::to_string(d);
+  }
+  return "{" + out + "}";
+}
+
+// The PicOrderCntVal differences of the short-term RPS lists against the parser's DeltaPocS0/S1, and
+// dpb_fullness_after within [1 + the "Curr" references, sps_max_dec_pic_buffering_minus1 + 1], 1 at an IDR or BLA.
+void check_st_rps_and_fullness(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
+  const std::array<std::vector<int>, 3> deltas = expected_st_deltas(want);
+  static constexpr std::array<const char*, 3> kNames = {"StCurrBefore", "StCurrAfter", "StFoll"};
+  for (std::size_t l = 0; l < 3; ++l) {
+    if (deltas.at(l) != p.st_deltas.at(l)) {
+      m->check(idx,
+               std::string("RefPicSet") + kNames.at(l) + " POC deltas " + join_ints(p.st_deltas.at(l)) +
+                   " differ from st_ref_pic_set " + join_ints(deltas.at(l)),
+               1, 0);
+    }
+  }
+  const std::size_t curr = p.rps_sizes[0] + p.rps_sizes[1] + p.rps_sizes[3];
+  m->check(idx, "dpb_fullness_after >= 1 + Curr references", std::cmp_greater_equal(p.dpb_fullness, 1 + curr) ? 1 : 0,
+           1);
+  m->check(idx, "dpb_fullness_after <= sps_max_dec_pic_buffering_minus1 + 1",
+           p.dpb_fullness <= p.max_dec_pic_buffering ? 1 : 0, 1);
+  if (want.bla) {
+    m->check(idx, "BLA long-term entries", p.rps_sizes[3] + p.rps_sizes[4] == 0 ? 0 : 1, 0);
+  }
+  if (want.idr || want.bla) {
+    m->check(idx, "dpb_fullness_after at an IDR or BLA", p.dpb_fullness, 1);
+  }
+}
+
+// HevcRps against the first slice segment header.
+void check_rps(int idx, const PicOut& p, const h265::SliceSegmentHeader& sh, bool idr, Mismatches* m) {
+  m->check(idx, "has ref_state", p.has_rps ? 1 : 0, 1);
+  m->check(idx, "NumPicTotalCurr", p.num_pic_total_curr, sh.NumPicTotalCurr);
+  m->check(idx, "StCurrBefore + StCurrAfter + LtCurr",
+           static_cast<long long>(p.rps_sizes[0]) + static_cast<long long>(p.rps_sizes[1]) +
+               static_cast<long long>(p.rps_sizes[3]),
+           sh.NumPicTotalCurr);
+  m->check(idx, "short_term_ref_pic_set_sps_flag", p.sps_flag,
+           idr ? 255 : (sh.short_term_ref_pic_set_sps_flag ? 1 : 0));
+  m->check(idx, "short_term_ref_pic_set_idx", p.sps_idx,
+           !idr && sh.short_term_ref_pic_set_sps_flag ? sh.short_term_ref_pic_set_idx : 255);
+  m->check(idx, "pic_output_flag", p.output_flag, sh.pic_output_flag ? 1 : 0);
+  const bool p_or_b = sh.slice_type != h265::kSliceI;
+  const bool b = sh.slice_type == h265::kSliceB;
+  m->check(idx, "RefPicList0 size", static_cast<long long>(p.rps_sizes[5]),
+           p_or_b ? sh.num_ref_idx_l0_active_minus1 + 1 : 0);
+  m->check(idx, "RefPicList1 size", static_cast<long long>(p.rps_sizes[6]),
+           b ? sh.num_ref_idx_l1_active_minus1 + 1 : 0);
+  const bool tmvp = sh.slice_temporal_mvp_enabled_flag && p_or_b;
+  m->check(idx, "collocated_from_l0_flag", p.col_l0, tmvp ? (sh.collocated_from_l0_flag ? 1 : 0) : 255);
+  m->check(idx, "collocated_ref_idx", p.col_idx, tmvp ? sh.collocated_ref_idx : 255);
+  for (std::size_t l = 0; l < 2; ++l) {
+    if (p.list_frames.at(l) != p.slot_frames.at(l)) {
+      m->check(idx, "RefPicList" + std::to_string(l) + " differs from RefSlots L" + std::to_string(l), 1, 0);
+    }
+  }
+}
+
+// The CTUs' HevcCtu fields and cells against the partitions: each CTU is in exactly one segment, the one its cells'
+// partition_id names, and (with tiles) inside the Tile partition its tile_idx names.
+void check_ctus(int idx, const PicOut& p, std::size_t segments, std::size_t tiles, Mismatches* m) {
+  std::vector<std::size_t> count(segments, 0);
+  for (const auto& c : p.ctus) {
+    m->check(idx, "CTU " + std::to_string(c[2]) + " partition_id", c[3], c[0]);
+    if (c[0] >= segments) {
+      m->check(idx, "CTU " + std::to_string(c[2]) + " slice_segment_idx in range", 0, 1);
+      continue;
+    }
+    ++count[c[0]];
+    if (tiles <= 1) {
+      m->check(idx, "CTU " + std::to_string(c[2]) + " tile_idx", c[1], 65535);
+      continue;
+    }
+    const bool in_range = c[1] >= segments && c[1] < p.parts.size();
+    const ovt::fb::Rect* r = in_range ? &p.parts[c[1]].rect : nullptr;
+    const bool inside = r != nullptr && std::cmp_greater_equal(c[4], r->x()) && std::cmp_less(c[4], r->x() + r->w()) &&
+                        std::cmp_greater_equal(c[5], r->y()) && std::cmp_less(c[5], r->y() + r->h());
+    m->check(idx, "CTU " + std::to_string(c[2]) + " inside its tile", inside ? 1 : 0, 1);
+  }
+  for (std::size_t i = 0; i < segments; ++i) {
+    m->check(idx, "segment " + std::to_string(i) + " block_count", p.parts[i].block_count,
+             static_cast<long long>(count[i]));
+  }
+}
+
+// One decoded picture's PicOut against its slice segment headers.
+void check_picture(int idx, const PicOut& p, const HeaderPic& want, Mismatches* m) {
+  const std::size_t segments = want.segs.size();
+  const std::size_t tile_parts = want.tiles > 1 ? want.tiles : 0;
+  m->check(idx, "partitions", static_cast<long long>(p.parts.size()),
+           static_cast<long long>(segments) + static_cast<long long>(tile_parts));
+  m->check(idx, "CTUs", static_cast<long long>(p.ctus.size()), want.ctbs);
+  m->check(idx, "has filter_params", p.has_filter ? 1 : 0, 1);
+  if (p.parts.size() != segments + tile_parts || p.filter_disabled.size() != segments ||
+      p.filter_beta.size() != segments || p.filter_tc.size() != segments || p.filter_sao_luma.size() != segments ||
+      p.filter_sao_chroma.size() != segments) {
+    m->check(idx, "filter_params vectors sized per segment", 0, 1);
+    return;
+  }
+  int independent = -1;
+  for (std::size_t i = 0; i < segments; ++i) {
+    if (!want.segs[i].dependent_slice_segment_flag) {
+      independent = static_cast<int>(i);
+    }
+    check_segment(idx, i, p, want.segs[i], independent, m);
+  }
+  for (std::size_t t = 0; t < tile_parts; ++t) {
+    m->check(idx, "partition " + std::to_string(segments + t) + " kind", static_cast<int>(p.parts[segments + t].kind),
+             static_cast<int>(ovt::fb::PartitionKind::Tile));
+  }
+  check_ctus(idx, p, segments, want.tiles, m);
+  check_rps(idx, p, want.segs.front(), want.idr, m);
+  check_st_rps_and_fullness(idx, p, want, m);
+}
+
+// Streams with dependent segments, entry points, tiles, WPP, several slices, explicit and SPS RPSs, long-term
+// pictures, PPS changes, SAO, cabac_init_flag and merge candidates.
+constexpr std::array<std::string_view, 16> kPictureLevelStreams = {
+    "jctvc_DSLICE_A_HHI_5",   "jctvc_ENTP_A_QUALCOMM_1",  "jctvc_TILES_B_Cisco_1", "jctvc_WPP_A_ericsson_MAIN_2",
+    "jctvc_SLIST_A_Sony_5",   "jctvc_STRUCT_B_Samsung_7", "jctvc_RPS_A_docomo_5",  "jctvc_RPS_B_qualcomm_5",
+    "jctvc_RPS_E_qualcomm_5", "jctvc_RPS_F_docomo_2",     "jctvc_POC_A_Bossen_3",  "jctvc_PPS_A_qualcomm_7",
+    "jctvc_SAO_A_MediaTek_4", "jctvc_CAINIT_A_SHARP_4",   "jctvc_MERGE_B_TI_3",    "jctvc_NUT_A_ericsson_5",
+};
+
 }  // namespace
 
 TEST_CASE("hm plugin: malformed hvcC, units and arguments are rejected", "[fast][third_party]") {
@@ -666,6 +1274,80 @@ TEST_CASE("hm plugin: hm_md5_vs_sei on the HEVC_v1 conformance streams", "[fast]
   const std::optional<std::filesystem::path> path = ovt::test::corpus_path(s.id);
   REQUIRE(path.has_value());
   check_stream(run_stream(read_file(*path)), s.hashes);
+}
+
+TEST_CASE("hm plugin: partitions, filter parameters and RPS match the slice headers",
+          "[fast][third_party][needs-corpus]") {
+  const std::string_view id = GENERATE(from_range(kPictureLevelStreams));
+  CAPTURE(id);
+  const std::vector<uint8_t> bytes = read_file(ovt::test::corpus_or_skip(id));
+  const StreamResult r = run_stream(bytes);
+  check_stream(r, false);
+  const std::map<int, HeaderPic> headers = headers_of(bytes);
+  REQUIRE(static_cast<int>(headers.size()) == r.pictures);
+  Mismatches m;
+  std::size_t segments = 0;
+  std::size_t dependent = 0;
+  std::size_t tiled = 0;
+  std::size_t long_term = 0;
+  for (const auto& [idx, out] : r.actual) {
+    REQUIRE(out.pic != nullptr);
+    const HeaderPic& want = headers.at(idx);
+    check_picture(idx, *out.pic, want, &m);
+    segments += want.segs.size();
+    dependent += static_cast<std::size_t>(std::count_if(
+        want.segs.begin(), want.segs.end(), [](const auto& sh) { return sh.dependent_slice_segment_flag; }));
+    tiled += want.tiles > 1 ? 1U : 0U;
+    long_term += out.pic->rps_sizes[3] + out.pic->rps_sizes[4] > 0 ? 1U : 0U;
+  }
+  for (const std::string& line : m.lines) {
+    UNSCOPED_INFO(line);
+  }
+  INFO(r.actual.size() << " pictures, " << segments << " slice segments (" << dependent << " dependent), " << tiled
+                       << " with tiles, " << long_term << " with long-term references");
+  CHECK(m.count == 0);
+}
+
+// Coefficients: 4:2:0 conformance streams with transform skip, PCM, sign data hiding, AMP and tiles, plus the RExt
+// 4:2:2 10-bit and 4:4:4 12-bit streams.
+struct CoeffStream {
+  std::string_view id;
+  std::string_view file;  // a second file next to the entry's primary one, or empty
+};
+constexpr std::array<CoeffStream, 7> kCoeffStreams = {{
+    {"jctvc_TSKIP_A_MS_3", ""},
+    {"jctvc_ipcm_A_NEC_3", ""},
+    {"jctvc_SDH_A_Orange_4", ""},
+    {"jctvc_AMP_A_Samsung_7", ""},
+    {"jctvc_TILES_B_Cisco_1", ""},
+    {"syn_h265_422_444_rext", ""},
+    {"syn_h265_422_444_rext", "syn_h265_422_10bit.265"},
+}};
+
+TEST_CASE("hm plugin: Coefficients planes match the TUs' levels", "[fast][third_party][needs-corpus]") {
+  const CoeffStream s = GENERATE(from_range(kCoeffStreams));
+  CAPTURE(s.id, s.file);
+  std::filesystem::path path = ovt::test::corpus_or_skip(s.id);
+  if (!s.file.empty()) {
+    path = path.parent_path() / s.file;
+  }
+  const StreamResult r = run_stream(read_file(path), false, true);
+  check_stream(r, false);
+  for (const std::string& e : r.coeff_errors) {
+    UNSCOPED_INFO(e);
+  }
+  INFO(r.coeff_pictures << " pictures, " << r.coeff_nodes << " TU nodes with levels, " << r.coeff_nonzero_nodes
+                        << " of them non-zero");
+  CHECK(r.coeff_errors.empty());
+  CHECK(r.coeff_pictures == static_cast<int>(r.actual.size()));
+  CHECK(r.coeff_nonzero_nodes > 0);
+}
+
+TEST_CASE("hm plugin: Coefficients planes only on request", "[fast][third_party][needs-corpus]") {
+  const std::vector<uint8_t> bytes = read_file(ovt::test::corpus_or_skip("jctvc_AMP_A_Samsung_7"));
+  const StreamResult r = run_stream(bytes);  // Reconstruction only: drain() fails on any other stage
+  check_stream(r, false);
+  CHECK(r.coeff_pictures == 0);
 }
 
 TEST_CASE("hm plugin: RExt 4:4:4 12-bit yields a FrameAnalysis per picture", "[fast][third_party][needs-corpus]") {
@@ -864,9 +1546,9 @@ TEST_CASE("hm plugin: caps and ABI table", "[fast][third_party]") {
   CHECK(caps->codec == 2);  // ovt.fb.Codec.H265
   CHECK(std::string_view(caps->id) == "hm");
   CHECK(std::string_view(caps->license) == "BSD-3-Clause");
-  CHECK(caps->plane_stages == kReconMask);
+  CHECK(caps->plane_stages == (kReconMask | kCoeffMask));
   // Chapter 07 §7.6.4: every grid vector but bits_x8 and deblock bS; partition_id waits for PartitionInfo.
-  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_PARTITION_ID | OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
+  CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
   CHECK(caps->has_symbol_accounting == 0);
   CHECK(caps->bit_exact == 1);
   CHECK(caps->supports_threads == 0);

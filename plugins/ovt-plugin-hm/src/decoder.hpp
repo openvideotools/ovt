@@ -27,6 +27,9 @@ struct Diag {
   std::string message;
 };
 
+inline constexpr uint32_t kStageRecon = 0;         // ovt.fb.PlaneStage.Reconstruction
+inline constexpr uint32_t kStageCoefficients = 6;  // ovt.fb.PlaneStage.Coefficients
+
 /// One plane of a picture, copied out of HM: the whole decoded picture (pic_width_in_luma_samples ×
 /// pic_height_in_luma_samples, i.e. FrameInfo.coded_size), rows of width × sample_bytes bytes, little-endian.
 struct Plane {
@@ -35,6 +38,7 @@ struct Plane {
   uint32_t height = 0;
   uint8_t bit_depth = 8;
   uint8_t sample_bytes = 1;
+  bool is_signed = false;
 };
 
 /// Everything the plugin keeps of one decoded picture, or a diagnostics-only record (picture == false).
@@ -60,6 +64,7 @@ struct Frame {
   int16_t qp_base = 0;
   uint16_t slice_count = 0;
   std::array<Plane, 3> planes;  // planes 1 and 2 are empty for 4:0:0
+  std::array<Plane, 3> coeff;   // PlaneStage.Coefficients (S32LE levels); empty unless requested
   Analysis analysis;            // grid, blocks, motion vectors and references (map_cu.cpp)
   std::vector<Diag> diagnostics;
 };
@@ -84,6 +89,9 @@ class Decoder {
   /// Moves the next finished frame (decode order) into @p out; false when there is none. Takes no lock: a frame
   /// queue is touched only by the thread that owns the instance, as with the other plugins.
   bool pop(Frame* out);
+  /// A pull's plane-stage mask: with the Coefficients bit set, the pictures that finish from now on keep their
+  /// Coefficients planes.
+  void request_stages(uint32_t plane_stage_mask);
 
   struct Impl;  // HM state; defined in decoder.cpp
 

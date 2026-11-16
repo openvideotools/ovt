@@ -56,7 +56,6 @@ TEST_CASE("context patterns", "[container][registry]") {
   CHECK(m("*", {"moov", "trak"}));
   CHECK(m("*/stsd/*", {"moov", "trak", "mdia", "minf", "stbl", "stsd", "hvc1"}));
   CHECK_FALSE(m("*/stsd/*", {"meta", "iprp", "ipco"}));
-  CHECK_FALSE(m("*/stsd/*", {}));
   CHECK(m("*/ipco", {"meta", "iprp", "ipco"}));
   CHECK(m("*/ipco", {"ipco"}));
   CHECK_FALSE(m("*/ipco", {"ipco", "colr"}));
@@ -64,6 +63,7 @@ TEST_CASE("context patterns", "[container][registry]") {
   CHECK_FALSE(m("moov/trak", {"x   ", "moov", "trak"}));
   CHECK_FALSE(m("moov/trak", {"moov"}));
   CHECK(m("*/meta/hdlr/*", {"moov", "meta", "hdlr"}));
+  CHECK_FALSE(m("*/stsd/*", {}));
   CHECK(iso::pattern_specificity("*") == 0);
   CHECK(iso::pattern_specificity("*/ipco") == 1);
   CHECK(iso::pattern_specificity("*/stsd/*") == 1);
@@ -73,6 +73,7 @@ TEST_CASE("context patterns", "[container][registry]") {
 TEST_CASE("the most specific matching pattern wins", "[container][registry]") {
   const iso::BoxDecoder stsd_children{"colr", "*/stsd/*", &dec_a};
   const iso::BoxDecoder ipco{"colr", "*/ipco", &dec_b};
+  const iso::BoxDecoder any{"colr", "*", &dec_c};
   iso::BoxRegistry reg;
   REQUIRE(reg.add(&stsd_children));
   REQUIRE(reg.add(&ipco));
@@ -92,6 +93,16 @@ TEST_CASE("the most specific matching pattern wins", "[container][registry]") {
   SECTION("no pattern matches: nullptr") {
     CHECK(reg.lookup("colr", ctx_of({"moov", "udta"})) == nullptr);
     CHECK(reg.lookup("zzzz", ctx_of({"moov"})) == nullptr);
+  }
+  SECTION("(fourcc, \"*\") is the fallback and loses to a literal pattern") {
+    REQUIRE(reg.add(&any));
+    CHECK(reg.lookup("colr", ctx_of({"moov", "udta"}))->decoder->decode == &dec_c);
+    CHECK(reg.lookup("colr", ctx_of({"meta", "iprp", "ipco"}))->decoder->decode == &dec_b);
+  }
+  SECTION("decoders added after a lookup are seen by the next one") {
+    CHECK(reg.lookup("colr", ctx_of({"moov", "udta"})) == nullptr);
+    REQUIRE(reg.add(&any));
+    CHECK(reg.lookup("colr", ctx_of({"moov", "udta"}))->decoder->decode == &dec_c);
   }
 }
 
@@ -139,6 +150,14 @@ TEST_CASE("decoders join the entry table", "[container][registry]") {
     CHECK(e->known_versions_mask == 0x03);
     CHECK(e->kind == iso::BoxKind::Leaf);
   }
+  SECTION("a decoder for an unlisted fourcc gets a leaf shell") {
+    const iso::BoxDecoder d{"zzzy", "*", &dec_a};
+    REQUIRE(reg.add(&d));
+    const auto* e = reg.lookup("zzzy", ctx_of({}));
+    REQUIRE(e != nullptr);
+    CHECK(e->kind == iso::BoxKind::Leaf);
+    CHECK(e->decoder == &d);
+  }
 }
 
 TEST_CASE("parent wildcard and uuid decoders", "[container][registry]") {
@@ -160,6 +179,15 @@ TEST_CASE("parent wildcard and uuid decoders", "[container][registry]") {
   std::array<uint8_t, 16> other = id;
   other[15] ^= 1U;
   CHECK(reg.lookup_uuid(other) == nullptr);
+}
+
+TEST_CASE("add() rejects malformed decoders", "[container][registry]") {
+  iso::BoxRegistry reg;
+  const iso::BoxDecoder bad_uuid{"uuid:nothex", "*", &dec_a};
+  const iso::BoxDecoder no_fn{"abcd", "*", nullptr};
+  CHECK_FALSE(reg.add(nullptr));
+  CHECK_FALSE(reg.add(&bad_uuid));
+  CHECK_FALSE(reg.add(&no_fn));
 }
 
 TEST_CASE("OVT_BOX_DECODER registers into the global registry", "[container][registry]") {

@@ -2,6 +2,31 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc35 — 2026-11-15
+
+PATCH-level: spec-amendment pass 15 folds in the accepted answers of `spec-question` issues #558 from WI-1.230 (PR #518), #567 from WI-1.205 (PR #571), #568 from WI-1.111 (PR #573), #569 from WI-4.206 (PR #572), #570 from WI-1.114 (PR #575) and #566 from WI-3.590 (PR #576). New diagnostic codes are registered (D2: `SYN-H265-0051`, `SYN-H265-0052`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
+
+- 8 §8.7 WI-1.230 AT1 — for a manifest entry carrying `expected.demux = {packets, error}` the parity sweep asserts exactly that packet count, `file_pos` parity for those packets and then a read error of that class (`mpegff_FX_VY_9436R_3_qhd`: 216 of 483 samples, libavformat CENC/seig limitation); an acceptance-test narrowing for one entry, listed for the owner's check-in — WI-1.230 (#558)
+- 8 §8.3 field rules, builder note and §8.3.1 notation — derived text of a `String` (fourcc) field is a sibling `<field>.derived` (`kind = String`, empty `span`), `compatible_brands.derived` for the array; non-`String` kinds keep it in `svalue` (#415); the two sentences no longer disagree — WI-1.205, WI-1.203 (#567 point 2)
+- 8 §8.3.1 `hdlr` — a QuickTime counted `name` is two fields, `name_length u8` then `name str_fixed(name_length)` — WI-1.205 (#567 point 3)
+- 8 §8.10 WI-1.205 AT1 — `mvhd`/`tkhd`/`mdhd` on `mpegff_a1_foreman_qcif`, `elst.entries[0].media_time` on `mpegff_hvc1_only` (the former has no `edts`); an acceptance-test substitution listed for the owner's check-in — WI-1.205 (#567 point 1)
+- 7 §7.3.9 rule 10 — a prefix NAL (14) does not start a picture; it belongs to the base-layer slice that follows — WI-1.111 (#568 point 1)
+- 7 §7.3.9 field pairing — both fields of a complementary pair are reference or both non-reference (H.264 3.29/3.30) — WI-1.111 (#568 point 4)
+- 7 §7.8 WI-1.111 AT2 and notes — AT2 uses `jvt_sp1_bt_a` (`MR9_BT_B` has no mmco 5; an acceptance-test substitution listed for the owner's check-in); JM 19.0 + FFmpeg `-debug pict` per-picture POC oracle in `jm_poc_expected.h`; an SPS changing inside a picture is held to the next picture without a diagnostic; identical repeated parameter sets keep their `generation` — WI-1.111 (#568 points 2, 3, 5, 6)
+- 8 §8.6.7 and WI-4.206 notes — PES reassembly starts at the first `payload_unit_start_indicator` with a `00 00 01` payload on every non-PSI PID (PES before the PMT count, as ffprobe counts them); damaged PES keep their bytes with `complete = false`; file-based TR 101 290 2.3a/2.3b/2.4/2.5 semantics on carried values (`CNT-TS-2003`…`2006`); ffmpeg's 100 ms PCR interval makes `syn_ts_clean.ts` report `CNT-TS-2003` legitimately; `bitrate_per_pid` time axis and memory bound — WI-4.206 (#569)
+- 7 §7.3.5 row 14, §7.9, WI-1.114 ATs — `CpbCnt = cpb_cnt_minus1[0] + 1` from the SPS named by `bp_seq_parameter_set_id` (as HM and `cbs_h265`); new `SYN-H265-0051` (SEI without its SPS/VPS, parsed as bytes) and `SYN-H265-0052` (trailing bytes); AT1 on `jctvc_VPSID_A_VIDYO_2` (+ `HRD_A` checksum), AT2 on `syn_h265_hdr10plus`, AT3 on `jctvc_HRD_A_Fujitsu_3` and `jctvc_CONFWIN_A_Sony_1` — three acceptance-test substitutions listed for the owner's check-in — WI-1.114 (#570)
+- 14 §14.12 WI-3.590 AT3 — the 1e-9 conservation check runs on block SSEs over the map's block grid (plus each map value equal to its block PSNR to float32 precision); the read-back from the float32, `psnr_max`-clipped map values conserves within 1e-6 on content with no clipped block, since the map stores PSNR, not MSE (§9.4.7); an acceptance-test rewording whose read-back tolerance is relaxed, listed for the owner's check-in — WI-3.590 (#566)
+
+## 1.0.0-rc34 — 2026-11-15
+
+PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548), #551 and #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 13 §13.4.4 item 9 — Qt Quick accessibility is not exposed through `QtQuickView` (Qt ≤ 6.10); `MainActivity` mirrors the QML root's `productName` onto the view's accessibility node so TalkBack and UI Automator see one labelled node — WI-0.035, WI-0.050 (#550, PR #548)
+- 17 §17.1 — new risk R-23: screen readers cannot reach QML controls on Android under the `QtQuickView` embedding; mitigation and trigger listed — (#550)
+- 7 §7.3.4 row 20, §7.9 — bytes after an `end_of_seq` / `end_of_stream` NAL header are kept as `trailing_data` and reported with the new Info `SYN-H264-0033`; `SYN-H264-0003` stays for reserved values — WI-1.109 (#551)
+- 7 §7.3.4 rows 22–23, §7.9, WI-1.109 block — SVC / MVCD / 3D-AVC subset-SPS extensions, VUI extensions and `prefix_nal_unit_svc()` are kept as bytes with the new Info `SYN-H264-0071` until WI-1.109 part d (waits for the H.264 Annex G–J text); the WI block records the four-way split — WI-1.109 (#552)
+- 7 §7.6.4 mapping and verify mode, WI-4.106 notes — the `hm` plugin reports empty `HevcRps` lists for BLA pictures (HM resets the slice-header RPS and no HM patch is allowed; every entry would be "no reference picture"); other plugins keep the signalled lists; verify mode does not compare `HevcRps` of BLA pictures — WI-4.105, WI-4.106 (#553)
+
 ## 1.0.0-rc33 — 2026-11-15
 
 PATCH-level: spec-amendment pass 13 folds in the accepted answers of `spec-question` issues #546 from WI-1.118 part c (AV1 tile groups) and #547 from WI-0.035/WI-0.050 (Android native-library packaging, PR #548). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. Also corrects the rc32 entry's count ("seventeen" → "eighteen").

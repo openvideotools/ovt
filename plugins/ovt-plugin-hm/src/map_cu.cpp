@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "analysis.hpp"
+#include "map_pic.hpp"
 
 // HM's headers (system includes: HM's warnings are not OVT's, WI-4.104).
 #include "TLibCommon/CommonDef.h"
@@ -102,9 +103,11 @@ std::vector<uint8_t> finish(flatbuffers::FlatBufferBuilder& fbb, Builder& b) {
 
 class Mapper {
  public:
-  Mapper(TComPic& pic, const PicIndex& index, Analysis* out)
-      : pic_(pic),
+  Mapper(TComPic& pic, const PicIndex& index, const PicMaps& maps, bool coefficients, Analysis* out)
+      : coefficients_(coefficients),
+        pic_(pic),
         index_(index),
+        maps_(maps),
         out_(*out),
         sps_(*pic.getSlice(0)->getSPS()),
         pps_(*pic.getSlice(0)->getPPS()),
@@ -120,6 +123,14 @@ class Mapper {
     BlockRec root;
     root.rect = fb::Rect(0, 0, width_, height_);
     out_.blocks.push_back(std::move(root));
+    if (coefficients_) {
+      for (UInt c = 0; c < getNumberValidComponents(chroma_); ++c) {
+        const auto comp = static_cast<ComponentID>(c);
+        out_.coeff.width.at(c) = static_cast<uint32_t>(width_) >> getComponentScaleX(comp, chroma_);
+        out_.coeff.height.at(c) = static_cast<uint32_t>(height_) >> getComponentScaleY(comp, chroma_);
+        out_.coeff.level.at(c).assign(static_cast<std::size_t>(out_.coeff.width.at(c)) * out_.coeff.height.at(c), 0);
+      }
+    }
     const TComPicSym& sym = *pic_.getPicSym();
     for (UInt ts = 0; ts < pic_.getNumberOfCtusInFrame(); ++ts) {
       ctu(ts, sym.getCtuTsToRsAddrMap(static_cast<Int>(ts)));
@@ -135,8 +146,10 @@ class Mapper {
   }
 
  private:
+  const bool coefficients_;  // fill out_.coeff
   TComPic& pic_;
   const PicIndex& index_;
+  const PicMaps& maps_;
   Analysis& out_;
   const TComSPS& sps_;
   const TComPPS& pps_;
@@ -144,7 +157,8 @@ class Mapper {
   const int width_;
   const int height_;
   const int ctu_;
-  const UInt total_parts_;  // 4x4 units in a CTU
+  const UInt total_parts_;                            // 4x4 units in a CTU
+  std::array<std::span<const TCoeff>, 3> ctu_coeff_;  // the current CTU's levels per component
   flatbuffers::FlatBufferBuilder ext_{256};
   // Per slice segment (by its TComSlice): the RefSlot index of every L0 / L1 entry.
   std::map<const TComSlice*, std::array<std::vector<int8_t>, 2>> slots_;
@@ -223,6 +237,13 @@ class Mapper {
 
   void ctu(UInt ts, UInt rs) {
     TComDataCU* cu = pic_.getCtu(rs);
+    for (UInt c = 0; c < getNumberValidComponents(chroma_); ++c) {
+      // The CTU's levels: a transform block's at 16 per 4x4 luma unit of its z-scan address (TComTURecurse).
+      const auto comp = static_cast<ComponentID>(c);
+      const std::size_t n =
+          (std::size_t{total_parts_} * 16) >> (getComponentScaleX(comp, chroma_) + getComponentScaleY(comp, chroma_));
+      ctu_coeff_.at(c) = std::span<const TCoeff>(cu->getCoeff(comp), n);
+    }
     const auto x0 = static_cast<int>(cu->getCUPelX());
     const auto y0 = static_cast<int>(cu->getCUPelY());
     const TComSlice* slice = cu->getSlice();
@@ -232,7 +253,10 @@ class Mapper {
     b.ext_type = "HevcCtu";
     const uint8_t sao_luma = ctu_ext(ts, rs, *slice, &b.ext);
     const uint32_t id = add_block(0, std::move(b));
-    for_cells(out_.blocks[id].rect, [&](std::size_t i, UInt, UInt) { out_.grid.filter_idx[i] = sao_luma; });
+    for_cells(out_.blocks[id].rect, [&](std::size_t i, UInt, UInt) {
+      out_.grid.filter_idx[i] = sao_luma;
+      out_.grid.partition_id[i] = maps_.segment[rs];
+    });
     const auto& slots = slots_of(slice);
     coding_quadtree(*cu, slots, id, 0, 0, x0, y0, ctu_);
   }
@@ -286,7 +310,9 @@ class Mapper {
     fb::HevcCtuBuilder h(ext_);
     h.add_CtbAddrInRs(rs);
     h.add_CtbAddrInTs(ts);
-    h.add_tile_idx(static_cast<uint16_t>(pic_.getPicSym()->getTileIdxMap(static_cast<Int>(rs))));
+    h.add_slice_segment_idx(maps_.segment[rs]);
+    h.add_tile_idx(maps_.tile[rs]);
+    h.add_end_of_slice_segment_flag(maps_.last_in_segment[rs]);
     if (!sao.type.empty()) {
       h.add_SaoTypeIdx(type_v);
       h.add_SaoOffsetVal(offsets_v);
@@ -560,6 +586,71 @@ class Mapper {
     return pred == fb::PredKind::Intra && l2 == 2 ? 1 : 0;  // DST-VII for 4x4 intra luma (8.6.4.2)
   }
 
+  // HevcTu.num_nonzero / coeff_abs_sum of the transform blocks a transform-tree node codes itself.
+  struct TbStats {
+    bool any = false;  // the node codes a transform block
+    std::array<uint16_t, 3> nonzero{};
+    std::array<uint32_t, 3> abs_sum{};
+  };
+
+  // One transform block of component c: w x h levels at @p offset of the CTU's buffer, placed at (x, y) of the
+  // component's Coefficients plane. HM does not clear the levels of a block with cbf 0, so those count as zero.
+  void take_tb(UInt c, std::size_t offset, int x, int y, int w, int h, bool coded, TbStats* st) {
+    st->any = true;
+    if (!coded) {
+      return;
+    }
+    const auto tw = static_cast<std::size_t>(w);
+    const auto th = static_cast<std::size_t>(h);
+    const auto x0 = static_cast<std::size_t>(x);
+    const auto y0 = static_cast<std::size_t>(y);
+    const std::span<const TCoeff> src = ctu_coeff_.at(c).subspan(offset, tw * th);
+    const std::size_t pw = out_.coeff.width.at(c);
+    const std::size_t ph = out_.coeff.height.at(c);
+    for (std::size_t v = 0; v < th; ++v) {
+      for (std::size_t u = 0; u < tw; ++u) {
+        const auto level = static_cast<int32_t>(src[(v * tw) + u]);
+        if (level != 0) {
+          st->nonzero.at(c) = static_cast<uint16_t>(st->nonzero.at(c) + 1);
+          st->abs_sum.at(c) += static_cast<uint32_t>(level < 0 ? -static_cast<int64_t>(level) : level);
+        }
+        if (coefficients_ && x0 + u < pw && y0 + v < ph) {
+          out_.coeff.level.at(c)[((y0 + v) * pw) + x0 + u] = level;
+        }
+      }
+    }
+  }
+
+  // The transform blocks a node codes itself (7.3.8.10): luma at a leaf; chroma at a leaf that has chroma TBs of its
+  // own, or at the 8x8 node whose four 4x4 luma TUs share them (4:2:0 / 4:2:2), one TB per 4:2:2 vertical half.
+  TbStats node_coefficients(const TComDataCU& cu, UInt z, UInt t, int x, int y, int s, bool split) {
+    TbStats st;
+    const int l2 = log2_of(static_cast<UInt>(s));
+    if (!split) {
+      take_tb(0, std::size_t{z} * 16, x, y, s, s, cu.getCbf(z, COMPONENT_Y, t) != 0, &st);
+    }
+    const bool chroma =
+        chroma_ != CHROMA_400 && (chroma_ == CHROMA_444 ? !split : ((!split && l2 > 2) || (split && l2 == 3)));
+    if (!chroma) {
+      return st;
+    }
+    for (UInt c = 1; c < 3; ++c) {
+      const auto comp = static_cast<ComponentID>(c);
+      const UInt sx = getComponentScaleX(comp, chroma_);
+      const UInt sy = getComponentScaleY(comp, chroma_);
+      std::vector<uint8_t> cbf;
+      chroma_cbf(cu, z, t, l2, split, comp, &cbf);
+      const int w = s >> sx;
+      const int h = (s >> sy) / static_cast<int>(cbf.size());
+      for (std::size_t k = 0; k < cbf.size(); ++k) {
+        const std::size_t offset =
+            ((std::size_t{z} * 16) >> (sx + sy)) + (k * static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+        take_tb(c, offset, x >> sx, (y >> sy) + (static_cast<int>(k) * h), w, h, cbf[k] != 0, &st);
+      }
+    }
+    return st;
+  }
+
   // NOLINTNEXTLINE(misc-no-recursion): depth bounded by the CTU size (at most 4 levels below a 64x64 CTU)
   void transform_tree(const TComDataCU& cu, uint32_t parent, UInt z, UInt d, UInt t, int x, int y, int s,
                       uint8_t blk_idx, fb::PredKind pred) {
@@ -573,6 +664,7 @@ class Mapper {
     b.qp = qp_of(cu, z);
     b.ext_type = "HevcTu";
     const uint32_t id = add_block(parent, std::move(b));
+    const TbStats stats = node_coefficients(cu, z, t, x, y, s, split);
     if (split) {
       const UInt quarter = total_parts_ >> (2 * (d + t + 1));
       const int h = s / 2;
@@ -593,7 +685,7 @@ class Mapper {
                                  (leaf_cbf(cu, u, COMPONENT_Cr, t, l2) << 2));
       });
     }
-    out_.blocks[id].ext = tu_ext(cu, z, t, l2, blk_idx, split, pred);
+    out_.blocks[id].ext = tu_ext(cu, z, t, l2, blk_idx, split, pred, stats);
   }
 
   // cbf_cb / cbf_cr of a transform-tree node (7.3.8.8): one entry, or for 4:2:2 two where the node codes its chroma
@@ -613,7 +705,7 @@ class Mapper {
   }
 
   std::vector<uint8_t> tu_ext(const TComDataCU& cu, UInt z, UInt t, int l2, uint8_t blk_idx, bool split,
-                              fb::PredKind pred) {
+                              fb::PredKind pred, const TbStats& stats) {
     // Chroma flags of a node: none for 4:0:0, and a 4x4 luma node of 4:2:0 / 4:2:2 carries none of its own.
     const bool chroma = chroma_ != CHROMA_400 && (l2 > 2 || chroma_ == CHROMA_444);
     std::vector<uint8_t> cb;
@@ -633,6 +725,12 @@ class Mapper {
     const auto cb_v = ext_.CreateVector(cb);
     const auto cr_v = ext_.CreateVector(cr);
     const auto skip_v = ext_.CreateVector(skip);
+    flatbuffers::Offset<flatbuffers::Vector<uint16_t>> nonzero_v;
+    flatbuffers::Offset<flatbuffers::Vector<uint32_t>> abs_sum_v;
+    if (stats.any) {  // 3 entries [Y, Cb, Cr] for the blocks this node codes; 0 for a component it codes none of
+      nonzero_v = ext_.CreateVector(stats.nonzero.data(), stats.nonzero.size());
+      abs_sum_v = ext_.CreateVector(stats.abs_sum.data(), stats.abs_sum.size());
+    }
     fb::HevcTuBuilder h(ext_);
     h.add_trafoDepth(static_cast<uint8_t>(t));
     h.add_log2TrafoSize(static_cast<uint8_t>(l2));
@@ -649,15 +747,20 @@ class Mapper {
     if (!split) {
       h.add_dst_used(static_cast<uint8_t>(tx_type_of(cu, z, l2, pred) == 1));
     }
+    if (stats.any) {
+      h.add_num_nonzero(nonzero_v);
+      h.add_coeff_abs_sum(abs_sum_v);
+    }
     return finish(ext_, h);
   }
 };
 
 }  // namespace
 
-void map_cu(TComPic& pic, const PicIndex& index, Analysis* out) {
+void map_cu(TComPic& pic, const PicIndex& index, int dpb_fullness, bool coefficients, Analysis* out) {
   *out = Analysis();
-  Mapper(pic, index, out).run();
+  const PicMaps maps = map_pic(pic, index, dpb_fullness, out);
+  Mapper(pic, index, maps, coefficients, out).run();
 }
 
 }  // namespace ovt::hm

@@ -3,7 +3,8 @@
 //
 // Tests of the ssim_x264 metric (chapter 9 §9.4.4, §9.4.7; WI-3.308 acceptance test 1 and the ssim_db_y clause):
 // registration, options, an independent per-window reference, the x264 kernel oracle on synthetic 8-bit and 10-bit
-// pairs and on the Netflix pair, ssim_db_y, odd strides and 4:0:0, and the maps.
+// pairs and on the Netflix pair, ssim_db_y, odd strides and 4:0:0, and the maps; and the golden suite against the
+// x264 kernel oracle goldens of WI-0.565 on all three pairs (chapter 14 §14.4.12; WI-3.590 acceptance test 2).
 
 #include <algorithm>
 #include <array>
@@ -28,6 +29,7 @@
 #include "metrics/kernels/map_sink.h"
 #include "metrics/kernels/psnr_metric.h"
 #include "metrics/kernels/ssim_x264.h"
+#include "metrics_golden_suite.hpp"
 #include "ovt_metrics_generated.h"
 #include "test_support/corpus.h"
 
@@ -490,4 +492,45 @@ TEST_CASE("ssim_x264 1080p single-thread throughput", "[.][bench][metrics][ssim_
     std::printf("ssim_x264 1080p %s: %.1f fps (1 thread)\n", options, kFrames / dt.count());
   }
   SUCCEED();
+}
+
+// ---- WI-3.590: ssim_x264 against the x264 kernel oracle goldens of WI-0.565 (chapter 14 §14.4.12) ----------------
+
+namespace {
+
+namespace suite = ovt::test::metrics_suite;
+
+// Every plane within 1e-6 of x264_ssim: x264's integer branch for the 8-bit pairs, its float branch for the 10-bit one.
+void check_ssim_x264_pair(const suite::GoldenPair& pair) {
+  const auto golden = suite::read_golden_gz(std::string(pair.id) + ".x264ssim.json.gz");
+  const auto& frames = golden.at("frames");
+  REQUIRE(frames.size() == pair.frames);
+  suite::Metric inst(ovt::metrics::ssim_x264_metric_api(), R"({"planes":["y","u","v"]})");
+  const uint32_t n = suite::for_each_frame(pair, [&](uint32_t i, const suite::Picture& r, const suite::Picture& d) {
+    const auto& g = frames.at(i);
+    REQUIRE(g.at("i").get<uint32_t>() == i);
+    const suite::Score s = inst.score(r.planes, d.planes, static_cast<int32_t>(i));
+    INFO(pair.id << " frame " << i);
+    CHECK(std::fabs(s.values.at(0) - g.at("ssim_x264_y").get<double>()) <= 1e-6);
+    CHECK(std::fabs(s.values.at(1) - g.at("ssim_x264_u").get<double>()) <= 1e-6);
+    CHECK(std::fabs(s.values.at(2) - g.at("ssim_x264_v").get<double>()) <= 1e-6);
+  });
+  CHECK(n == pair.frames);
+}
+
+}  // namespace
+
+TEST_CASE("ssim_x264 golden suite: x264 kernel oracle on the Netflix pair",
+          "[metrics][ssim_x264][golden][needs-corpus]") {
+  check_ssim_x264_pair(suite::kPairs[0]);
+}
+
+TEST_CASE("ssim_x264 golden suite: x264 kernel oracle on syn_metrics_1080p",
+          "[metrics][ssim_x264][golden][needs-corpus]") {
+  check_ssim_x264_pair(suite::kPairs[1]);
+}
+
+TEST_CASE("ssim_x264 golden suite: x264 kernel oracle (float branch) on the 10-bit syn_metrics_pq_1080p",
+          "[metrics][ssim_x264][golden][needs-corpus]") {
+  check_ssim_x264_pair(suite::kPairs[2]);
 }

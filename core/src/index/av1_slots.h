@@ -101,6 +101,7 @@ class Av1SlotModel {
 
   syntax::av1::DecoderState state_;
   bool enable_order_hint_ = false;
+  bool no_order_hints_reported_ = false;  // SYN-AV1-0103 is reported once per stream
   uint8_t OrderHintBits_ = 0;
 };
 

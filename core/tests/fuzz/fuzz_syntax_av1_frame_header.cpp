@@ -3,7 +3,8 @@
 //
 // Fuzz target of the AV1 uncompressed_header() sub-structure parsers (chapter 7 §7.3.6 rows 12–19, chapter 14
 // §14.7.1, WI-1.117): frame_size / superres_params / render_size, frame_size_with_refs, tile_info,
-// quantization_params, segmentation_params, delta_q_params and delta_lf_params. Byte 0 selects the parser and the
+// quantization_params, segmentation_params, delta_q_params and delta_lf_params, and the whole uncompressed_header()
+// of row 11 with rows 20–29 (parse_frame_obu, selected by bit 7 of byte 1 in case 3). Byte 0 selects the parser and the
 // sequence header shape (superblock size, superres, frame size bits, chroma layout), byte 1 the frame-level
 // inputs (override flag, primary_ref_frame, MiCols/MiRows scale, slot validity); the rest is the bit stream. Both
 // recording modes run and must return the same typed values. A ParseError is the expected answer to malformed
@@ -17,6 +18,7 @@
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/syntax/av1/decoder_state.hpp"
 #include "ovt/cxx/syntax/av1/frame_header.hpp"
+#include "ovt/cxx/syntax/av1/obu_header.hpp"
 #include "ovt/cxx/syntax/av1/sequence_header.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "syntax/common/syntax_node_buffer.h"
@@ -65,6 +67,41 @@ DecoderState make_state(uint8_t ctl) {
 
 uint64_t mix(uint64_t h, uint64_t v) {
   return (h ^ v) * 0x9E3779B97F4A7C15ULL;
+}
+
+// Case 3 with bit 7 of the control byte: the whole uncompressed_header() (row 11) over the slots of make_state().
+// The sequence shape adds order hints, frame ids and the screen-content / integer-mv selectors so that every
+// branch of AV1 §5.9.2 is reachable.
+uint64_t run_frame_header(ovt::BitReader& br, ovt::syntax::SyntaxBuilder& b, const SequenceHeader& seq,
+                          const DecoderState& state, uint8_t sel, uint8_t ctl) {
+  SequenceHeader fseq = seq;
+  fseq.enable_order_hint = (ctl & 0x01U) != 0;
+  fseq.order_hint_bits_minus_1 = 6;
+  fseq.OrderHintBits = fseq.enable_order_hint ? 7 : 0;
+  fseq.enable_ref_frame_mvs = fseq.enable_order_hint;
+  fseq.frame_id_numbers_present_flag = (ctl & 0x02U) != 0;
+  fseq.delta_frame_id_length_minus_2 = 12;
+  fseq.additional_frame_id_length_minus_1 = 0;
+  fseq.reduced_still_picture_header = (ctl & 0x04U) != 0;
+  fseq.seq_force_screen_content_tools = (ctl & 0x08U) != 0 ? kSelectScreenContentTools : 0;
+  fseq.seq_force_integer_mv = (ctl & 0x08U) != 0 ? kSelectIntegerMv : 0;
+  DecoderState st = state;
+  ObuHeader obu;
+  // WI-1.118: the whole OBU_FRAME, frame_obu(sz) = uncompressed_header() (rows 11–27), byte_alignment() and
+  // tile_group_obu() over the rest of the input.
+  obu.obu_type = static_cast<uint8_t>(ObuType::Frame);
+  obu.temporal_id = static_cast<uint8_t>(sel & 0x07U);
+  obu.spatial_id = static_cast<uint8_t>((sel >> 3U) & 0x03U);
+  obu.obu_size = br.bits_left() / 8;
+  const FrameObu f = parse_frame_obu(br, b, obu, fseq, st);
+  const FrameHeader& h = f.frame_header;
+  uint64_t summary = mix(mix(static_cast<uint64_t>(h.frame_type), h.show_existing_frame ? 1U : 0U),
+                         mix(h.refresh_frame_flags, mix(h.frame_size.MiCols, h.tile_info.NumTiles)));
+  summary = mix(summary, mix(h.loop_filter_params.loop_filter_level[0], h.state.film_grain_params.grain_seed));
+  for (const TileGroupTile& t : f.tile_group.tiles) {
+    summary = mix(summary, t.tileSize);
+  }
+  return mix(summary, mix(h.quantization_params.base_q_idx, h.lossless.CodedLossless ? 1U : 0U));
 }
 
 // Runs the parser selected by the two control bytes on the remaining input; returns a summary of the typed
@@ -116,6 +153,10 @@ uint64_t run(std::span<const uint8_t> input, bool recording) {
         break;
       }
       default: {
+        if ((ctl & 0x80U) != 0) {
+          summary = run_frame_header(br, b, seq, state, sel, ctl);
+          break;
+        }
         const DeltaQParams dq = parse_delta_q_params(br, b, ctl);
         const DeltaLfParams dlf = parse_delta_lf_params(br, b, dq.delta_q_present, override_flag);
         summary =
