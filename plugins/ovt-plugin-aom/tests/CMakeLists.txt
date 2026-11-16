@@ -100,7 +100,7 @@ ovt_catch_discover_tests(ovt_plugin_aom_golden_tests)
 # Like the map_mi tests: hand-made frames through the mapping sources, and the plugin through the registry against
 # `inspect` built with patch 0001 (data/inspect_ext_reference.json).
 add_executable(ovt_plugin_aom_map_mi_ext_tests test_aom_map_mi_ext.cpp ../src/map_mi.cpp ../src/map_mi_ext.cpp
-                                               ../src/partition_reconstruct.cpp)
+                                               ../src/partition_reconstruct.cpp ../src/map_accounting.cpp)
 target_include_directories(ovt_plugin_aom_map_mi_ext_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 target_link_libraries(ovt_plugin_aom_map_mi_ext_tests PRIVATE ovt_core_objects ovt_schemas ovt_test_support ovt::flags
                                                               nlohmann_json::nlohmann_json ${Catch2_TARGET})
