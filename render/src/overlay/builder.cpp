@@ -158,12 +158,10 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
 
 }  // namespace
 
-OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+namespace detail {
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
+std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
   if (fa == nullptr || fa->grid() == nullptr) {
@@ -199,8 +197,8 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   return set;
 }
 
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
+std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
   if (buf == nullptr) {
     return nullptr;
   }
@@ -212,7 +210,25 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t siz
   if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
     return nullptr;
   }
-  return build(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+  return build_overlay_set(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+}
+
+}  // namespace detail
+
+OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
+std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                                  const uint16_t* custom_cells) {
+  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
+  return detail::build_overlay_set(fa, cfg, custom_cells);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): as above
+std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                                  const uint16_t* custom_cells) {
+  (void)owner_;
+  return detail::build_overlay_set(buf, size, cfg, custom_cells);
 }
 
 }  // namespace ovt::render
