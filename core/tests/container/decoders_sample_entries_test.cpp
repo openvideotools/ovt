@@ -231,8 +231,6 @@ TEST_CASE("every group B row with fields has a registered decoder", "[container]
   }
 }
 
-// ---- stsd ----
-
 TEST_CASE("stsd: entry_count, the child offset and the stsd version in the context", "[container][decoders][stsd]") {
   iso::BoxContext ctx = ctx_of({"moov", "trak", "mdia", "minf", "stbl"});
   Decoded d = run("stsd", cat({be(0, 4), be(2, 4), zeros(40)}), ctx);
@@ -282,8 +280,6 @@ TEST_CASE("check_stsd_entry_count: CNT-1010 when entry_count differs from the en
   iso::check_stsd_entry_count(undecoded);
   CHECK(undecoded.diagnostics.empty());
 }
-
-// ---- visual sample entries ----
 
 TEST_CASE("VisualSampleEntry: size, depth, resolution, compressorname and the children offset",
           "[container][decoders][stsd]") {
@@ -343,8 +339,6 @@ TEST_CASE("a visual entry cut short keeps the fields before the cut", "[containe
   CHECK(has_code(d.node, "CNT-1002"));
   CHECK(field(d.node, "width").uvalue == 640);
 }
-
-// ---- audio sample entries and R-AUDIO ----
 
 Bytes iso_audio(uint16_t channels, uint16_t samplesize, uint32_t rate) {
   return cat(
@@ -435,9 +429,13 @@ TEST_CASE("R-AUDIO: a version 1 layout without QuickTime context is QuickTime on
   CHECK_FALSE(has_field(without.node, "samples_per_packet"));
   CHECK(has_field(without.node, "channelcount"));
   CHECK(has_code(without.node, "CNT-1007"));  // the QuickTime bytes read as reserved in the ISO v0 layout
+  iso::BoxContext qt = entry_ctx("soun");     // QuickTime context, version 0: the ISO v0 layout, no reserved noise
+  qt.quicktime = true;
+  const Decoded v0 =
+      run("twos", cat({prefix(), zeros(2), be(0, 2), str("appl"), be(2, 2), be(16, 2), zeros(4), fixed16(44100)}), qt);
+  CHECK(field(v0.node, "channelcount").uvalue == 2);
+  CHECK(v0.node.diagnostics.empty());
 }
-
-// ---- dispatch by handler ----
 
 TEST_CASE("an unknown entry fourcc is decoded as the layout of the track's handler", "[container][decoders][stsd]") {
   iso::BoxContext vide = entry_ctx("vide");
@@ -446,9 +444,11 @@ TEST_CASE("an unknown entry fourcc is decoded as the layout of the track's handl
   const Decoded a = run("zzzz", iso_audio(1, 8, 8000), soun);
   CHECK(field(a.node, "channelcount").svalue == "mono");
   CHECK_FALSE(has_field(a.node, "codec.derived"));
+  iso::BoxContext none = entry_ctx("");  // no handler: the codec tables choose, anything else is the prefix alone
+  CHECK(has_field(run("avc1", visual_fixed(8, 8, 24), none).node, "width"));
+  CHECK(has_field(run("mp4a", iso_audio(2, 16, 44100), none).node, "channelcount"));
+  CHECK(run("mp4s", cat({prefix(), zeros(4)}), none).outcome.children_offset == 8);
 }
-
-// ---- text and metadata entries ----
 
 TEST_CASE("tx3g: display flags, records and the ftab font list", "[container][decoders][stsd]") {
   iso::BoxContext ctx = entry_ctx("text");
@@ -545,8 +545,7 @@ TEST_CASE("tmcd: flags, frame rate and the name child", "[container][decoders][s
   check_contiguous(name);
 }
 
-// ---- walking the entries' children (the walker still treats `stsd` as a leaf until WI-1.203 wires the registry in)
-// ----
+// The walker still treats `stsd` as a leaf until WI-1.203 wires the registry in: walk the children here.
 
 struct Harness {
   const ovt::io::RandomAccessFile* file = nullptr;
