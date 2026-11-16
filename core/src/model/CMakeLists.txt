@@ -38,7 +38,7 @@ unset(_ovt_hash_len)
 # WI-0.086: the §6.9 validator of ovt/cxx/model/validator.hpp.
 # WI-0.090: the libaom inspect-compatible JSON exporter of ovt/cxx/model/aom_inspect_json.hpp.
 # WI-0.085: canonicalize() and structural_diff() of ovt/cxx/model/canonical.hpp.
-# WI-0.088: to_json() of ovt/cxx/model/json.hpp (a reflection walk over the embedded .bfbs).
+# WI-0.088: to_json() and from_json() of ovt/cxx/model/json.hpp (reflection walk and flatbuffers::Parser).
 target_sources(
   ovt_core_objects
   PRIVATE aom_inspect_json.cpp
@@ -46,6 +46,7 @@ target_sources(
           canonical.cpp
           grid.cpp
           json_export.cpp
+          json_import.cpp
           labels.cpp
           picture_store.cpp
           tree.cpp
