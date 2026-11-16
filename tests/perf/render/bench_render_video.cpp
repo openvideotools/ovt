@@ -19,6 +19,9 @@
 //   --frames N         length of the scripted path of bench_render_video_4k (default 100, the "100 frames" of §14.9.3)
 //   --viewport WxH     size of the offscreen target (default: the size of the picture)
 //
+// SPEC-ASSUMPTION(#627): §14.9.3 names "real_*_hevc_frame.fb planes" as input, but those fixtures carry no samples;
+// only their coded size is used and the planes are synthetic.
+//
 // Times are CPU wall-clock times of the calling thread around the call. VideoSurface::render() returns only after the
 // GPU has finished an offscreen frame (the surface waits on its own timeline semaphore before it hands the texture
 // back), so the wall time includes the GPU. libovt-render deliberately hides Vulkan timestamp queries (#304,
