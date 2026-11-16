@@ -66,7 +66,9 @@ class SessionTest {
 
             waitUntil("the VIEW intent's file is open") { OvtSession.openCount == opensBefore + 1 }
             scenario.onActivity { assertSame("the Activity was recreated", first, it) }
-            assertEquals(Lifecycle.State.RESUMED, scenario.state)
+            // The file opens off the main thread, so the count can change before the Activity is resumed again after
+            // onNewIntent (it passes through STARTED); the same instance must return to RESUMED.
+            waitForState(scenario, Lifecycle.State.RESUMED)
             onMain { assertEquals("view_intent.y4m", OvtSession.current?.displayName) }
         }
     }
@@ -139,6 +141,18 @@ class SessionTest {
         val deadline = System.nanoTime() + TIMEOUT_NS
         while (!onMain(condition)) {
             check(System.nanoTime() < deadline) { "timed out waiting until $what" }
+            Thread.sleep(POLL_MS)
+        }
+    }
+
+    /** Polls [ActivityScenario.getState] from the test thread (it is not read on the main thread). */
+    private fun waitForState(
+        scenario: ActivityScenario<*>,
+        state: Lifecycle.State,
+    ) {
+        val deadline = System.nanoTime() + TIMEOUT_NS
+        while (scenario.state != state) {
+            check(System.nanoTime() < deadline) { "timed out waiting for $state, last ${scenario.state}" }
             Thread.sleep(POLL_MS)
         }
     }
