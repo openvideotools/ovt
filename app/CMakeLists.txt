@@ -167,6 +167,10 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/dock/dock_model.cpp"
     "${app_dir}/src/picture_controller.h"
     "${app_dir}/src/picture_controller.cpp"
+    "${app_dir}/src/models/hdr_metadata_model.h"
+    "${app_dir}/src/models/hdr_metadata_model.cpp"
+    # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
+    "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
@@ -175,6 +179,8 @@ function(ovt_studio_add_qml_module target)
   # src/platform too: the generated type registration includes the headers by file name.
   target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
                                                "${app_dir}/src/dock" "${app_dir}/src/items")
+  # core/src for syntax/common/h273_names.h only (see the source list).
+  target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   # ovt::core for ovt/jobs.h and ovt/log.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).
