@@ -42,6 +42,17 @@ if(APPLE)
   target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
 endif()
 
+# WI-1.407: display_probe() (§10.4.5). The rules are portable; one platform file queries the screen.
+target_sources(ovt_render PRIVATE src/platform/display_caps_rules.cpp)
+if(APPLE)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_macos.mm)
+  set_source_files_properties(src/platform/display_caps_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(ANDROID)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_android.cpp)
+else()
+  target_sources(ovt_render PRIVATE src/platform/display_caps_linux.cpp)
+endif()
+
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
