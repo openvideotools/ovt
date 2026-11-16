@@ -24,8 +24,8 @@ namespace {
 using fb::BoxNodeT;
 
 constexpr uint64_t kHeaderProbe = 32;  // 8 + 8 (largesize) + 16 (usertype)
-// SPEC-ASSUMPTION(#630): no PagedSpan yet (the first decoder of a >1 MiB leaf, WI-1.209, adds it); decoders see at
-// most 1 MiB (§8.2.3 reading strategy).
+// No PagedSpan yet (issue #630): the first decoder of a >1 MiB leaf, WI-1.209, adds it. Until then decoders see at most
+// 1 MiB (§8.2.3 reading strategy).
 constexpr uint64_t kMaxDecodedPayload = 1 << 20;
 
 std::string_view sv(const FourCC& t) {
@@ -344,11 +344,10 @@ BoxContext child_context(const BoxContext& ctx, const FourCC& type, const BoxNod
   return c;
 }
 
-// SPEC-ASSUMPTION(#631): an unexpanded `moof` keeps only its `mfhd` child (and CNT-0007), so the sum-of-spans invariant
-// holds for expanded boxes only.
-// §8.2.4 rule 3: the header walk of a `moof`: only its first child, when that is the `mfhd` (which the spec puts
-// first), so the tree carries `mfhd.sequence_number` and correct spans. CNT-0007 marks the box unexpanded.
-// Recursion is bounded by kMaxBoxDepth (step 2.1).
+// Chapter 8 §8.2.4 rule 3 (issue #631): an unexpanded `moof` keeps only its `mfhd` child (and CNT-0007), so the
+// sum-of-spans invariant holds for expanded boxes only. §8.2.4 rule 3: the header walk of a `moof`: only its first
+// child, when that is the `mfhd` (which the spec puts first), so the tree carries `mfhd.sequence_number` and correct
+// spans. CNT-0007 marks the box unexpanded. Recursion is bounded by kMaxBoxDepth (step 2.1).
 // NOLINTNEXTLINE(misc-no-recursion)
 void defer_moof(WalkState& st, BoxNodeT& n, uint64_t children_begin, uint64_t end, const BoxContext& ctx) {
   const uint64_t pos = n.file_span->offset();
@@ -541,8 +540,8 @@ void expand_node(const io::RandomAccessFile& file, fb::BoxNodeT& node, const Box
                                 child_context(ctx, FourCC{'m', 'o', 'o', 'f'}, node), node.diagnostics);
 }
 
-// SPEC-ASSUMPTION(#631): the located offset is a hint the container reader keeps only if the top-level walk finds an
-// `mfra` there.
+// Chapter 8 §8.2.4 rule 4 (issue #631): the located offset is a hint the container reader keeps only if the top-level
+// walk finds an `mfra` there.
 std::optional<uint64_t> locate_mfra(const io::RandomAccessFile& file) {
   constexpr uint64_t kMfroSize = 16;  // size, 'mfro', version/flags, parent_size
   const uint64_t size = file.size();
