@@ -66,6 +66,8 @@ endif()
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
+# WI-2.434a: MV arrow and intra stroke instances, CPU side (§10.5.1, §10.5.4); the GPU pass follows in WI-2.434b.
+target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp)
 foreach(shader IN ITEMS diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
