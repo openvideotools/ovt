@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Reflection-based JSON exporter of the three FlatBuffers schemas (chapter 06 §6.8.1 and §6.11 WI-0.088; the
-// JSON of `--format json`, chapter 12 §12.1.4). C++ helper header (D22): semi-public, no ABI promise, never
-// included from a C header. The declaration is the WI-0.088 Interface line plus [[nodiscard]] and a default
-// for the options. The importer (from_json) is part b of the work item.
+// Reflection-based JSON exporter and importer of the three FlatBuffers schemas (chapter 06 §6.8.1 and §6.11
+// WI-0.088; the JSON of `--format json`, chapter 12 §12.1.4). C++ helper header (D22): semi-public, no ABI
+// promise, never included from a C header. The declarations are the WI-0.088 Interface line plus
+// [[nodiscard]] and a default for the options.
 
 #ifndef OVT_CXX_MODEL_JSON_HPP
 #define OVT_CXX_MODEL_JSON_HPP
@@ -13,6 +13,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "ovt/cxx/model/schema_id.hpp"
 
@@ -51,6 +52,18 @@ struct JsonOptions {
 ///         1 MiB of work (capped below 2 GiB).
 [[nodiscard]] std::string to_json(std::span<const std::uint8_t> buf, SchemaId schema, std::string_view root_table,
                                   JsonOptions options = {});
+
+/// The reverse of to_json: parses @p json (either layout, either number style) as @p root_table and returns
+/// the canonical buffer (canonicalize(), WI-0.085), so that from_json(to_json(b)) == canonicalize(b) for a
+/// buffer without NaN payloads. The schema's file identifier is written when @p root_table is the schema's
+/// root type (root_table_name()), none otherwise. An object under a nested-buffer field is parsed as the
+/// table its `X_type` sibling names (for a palette field, its fixed table) and embedded as bytes; an array of numbers
+/// there is taken as the bytes. A hash-like field accepts a hex string or an array of numbers. Numbers may be quoted.
+/// Unknown keys are ignored (§12.1.4 compatibility policy); a missing key leaves the field at its default.
+/// @throws std::invalid_argument for an unknown schema or root table, and for text the FlatBuffers JSON
+///         parser rejects (the message carries its line and column), an odd or non-hex hash string, an object
+///         under a nested-buffer field whose `X_type` names no table, or nesting deeper than 64 levels.
+[[nodiscard]] std::vector<std::uint8_t> from_json(std::string_view json, SchemaId schema, std::string_view root_table);
 
 }  // namespace ovt::model
 

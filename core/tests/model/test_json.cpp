@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// WI-0.088: to_json() of chapter 06 §6.8.1 on the WI-0.093 fixtures and on small StreamIndex,
+// WI-0.088: to_json() / from_json() of chapter 06 §6.8.1 on the WI-0.093 fixtures and on small StreamIndex,
 // MetricsReport and ContainerRoot buffers built here with the object API (canonical by construction).
 // The goldens are core/tests/golden/tiny16_hevc.json (acceptance test 1), tiny16_hevc.index.json and
 // tiny_metrics.json (step 4); a mismatch writes `<name>.actual.json` into the test's binary directory.
@@ -26,6 +26,7 @@
 #include <utility>
 #include <vector>
 
+#include "ovt/cxx/model/canonical.hpp"
 #include "ovt/cxx/model/json.hpp"
 #include "ovt/cxx/model/schema_id.hpp"
 #include "ovt_container_generated.h"
@@ -34,6 +35,7 @@
 
 namespace {
 
+using ovt::model::from_json;
 using ovt::model::JsonOptions;
 using ovt::model::SchemaId;
 using ovt::model::to_json;
@@ -449,4 +451,181 @@ TEST_CASE("nested buffers follow their _type sibling and bad input is refused", 
   CHECK_THROWS_AS(to_json(Bytes(bytes.begin(), bytes.begin() + 40), SchemaId::Model, kFrameAnalysis),
                   std::invalid_argument);
   CHECK_THROWS_AS(to_json({}, SchemaId::Model, kFrameAnalysis), std::invalid_argument);
+}
+
+// ---- from_json (part b) ---------------------------------------------------------------------------------
+
+TEST_CASE("from_json restores the fixture bytes from the golden JSON (WI-0.088 AT2)", "[model][json][golden]") {
+  const Bytes bytes = fixture("tiny16_hevc.fa");
+  const Bytes imported = from_json(read_golden("tiny16_hevc.json"), SchemaId::Model, kFrameAnalysis);
+  CHECK(ovt::model::canonicalize(imported, SchemaId::Model, kFrameAnalysis) == bytes);
+  CHECK(imported == bytes);  // from_json already returns canonical bytes
+}
+
+TEST_CASE("every fixture round-trips through each JSON layout", "[model][json][golden]") {
+  for (const char* name : {"tiny16_hevc.fa", "tiny32_h264.fa", "tiny64_av1.fa"}) {
+    const Bytes bytes = fixture(name);
+    for (const JsonOptions options : {JsonOptions{}, kCompact, kStrict}) {
+      const std::string text = to_json(bytes, SchemaId::Model, kFrameAnalysis, options);
+      INFO(name << " compact=" << options.compact << " strict=" << options.strict_numbers);
+      CHECK(from_json(text, SchemaId::Model, kFrameAnalysis) == bytes);
+    }
+  }
+}
+
+TEST_CASE("every value rule of the exporter round-trips", "[model][json]") {
+  /// from_json(to_json(bytes)) in both number styles is the canonical form of @p bytes.
+  const auto round_trips = [](const Bytes& bytes, SchemaId schema, const char* root) {
+    INFO(root);
+    const Bytes canonical = ovt::model::canonicalize(bytes, schema, root);
+    CHECK(from_json(to_json(bytes, schema, root), schema, root) == canonical);
+    CHECK(from_json(to_json(bytes, schema, root, {.compact = true, .strict_numbers = true}), schema, root) ==
+          canonical);
+  };
+  // NaN and the infinities, bare and quoted; shortest doubles; a hash; -0.
+  for (const double score : {38.5, std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity()}) {
+    round_trips(tiny_metrics(score), SchemaId::Metrics, kMetricsReport);
+  }
+  // A secondary root table gets no identifier (§6.1.1): the bytes of the index come back as they were.
+  const Bytes index = tiny_index();
+  round_trips(index, SchemaId::Model, kStreamIndex);
+  CHECK(from_json(read_golden("tiny16_hevc.index.json"), SchemaId::Model, kStreamIndex) == index);
+  CHECK(from_json(read_golden("tiny_metrics.json"), SchemaId::Metrics, kMetricsReport) == tiny_metrics(38.5));
+  round_trips(tiny_container(), SchemaId::Container, kContainerRoot);  // hex fields, integers beyond 2^53
+  round_trips(odd_enum(), SchemaId::Model, kFrameAnalysis);            // an enum value as its integer
+  round_trips(shown_two(), SchemaId::Model, "ovt.fb.FrameInfo");       // a bool byte above 1
+  round_trips(float_measure(), SchemaId::Model, kHdrFrameMeasure);     // floats
+  round_trips(odd_string(), SchemaId::Model, kFrameAnalysis);          // every string escape
+  round_trips(untyped_ext(), SchemaId::Model, kFrameAnalysis);         // a nested field left as bytes
+
+  // The importer also takes the FlatBuffers form of a hash (an array of numbers), upper-case hex and quoted
+  // numbers; a number under ExtractManifest.bytes is that ulong, not a hash.
+  const std::string text = R"({"schema_version": "1", "file_size": 9007199254740993,
+    "source_hash": [222, 173, 190, 239],
+    "tree": {"root": [{"fourcc": "uuid", "uuid": "0123456789ABCDEF0123456789abcdef",
+      "file_span": {"offset": 9007199254740992, "length": 24},
+      "fields": [{"name": "payload", "kind": "Bytes", "bytes": "007F80"}]}]}})";
+  CHECK(from_json(text, SchemaId::Container, kContainerRoot) == tiny_container());
+  const Bytes manifest = from_json(R"({"path": "a.bin", "bytes": 12})", SchemaId::Model, "ovt.fb.ExtractManifest");
+  CHECK(flatbuffers::GetRoot<fb::ExtractManifest>(manifest.data())->bytes() == 12);
+}
+
+TEST_CASE("from_json finds the _type sibling of a nested object", "[model][json]") {
+  // `X_type` may come before or after `X` (FrameInfo declares ref_state first, Block ext_type first).
+  const Bytes bytes = fixture("tiny16_hevc.fa");
+  Json json = parse_strict(read_golden("tiny16_hevc.json"));
+  CHECK(from_json(json.dump(), SchemaId::Model, kFrameAnalysis) == bytes);  // nlohmann sorts the keys by name
+  json["blocks"][2].erase("ext_type");
+  CHECK_THROWS_AS(from_json(json.dump(), SchemaId::Model, kFrameAnalysis), std::invalid_argument);
+  json["blocks"][2]["ext_type"] = "Nope";
+  CHECK_THROWS_AS(from_json(json.dump(), SchemaId::Model, kFrameAnalysis), std::invalid_argument);
+  json["blocks"][2]["ext_type"] = "FrameAnalysis";  // an object of the wrong table: unknown keys are ignored
+  CHECK_NOTHROW(from_json(json.dump(), SchemaId::Model, kFrameAnalysis));
+}
+
+TEST_CASE("from_json rebuilds the fixed-type palette nested buffers", "[model][json]") {
+  using ovt::model::canonicalize;
+  using ovt::model::structural_diff;
+  // A palette packed with ForceDefaults is not canonical: canonicalize reaches into it (the nested table is
+  // fixed by the schema, §6.8.1), and the import of its JSON gives the same bytes.
+  fb::HevcPaletteT native;
+  native.num_signalled_palette_entries = 2;
+  native.new_palette_entries = {512, 1023};
+  native.PaletteIndexMap = {0, 1, 1, 0};
+  const Bytes forced = palette_cu(pack(native, nullptr, true));
+  const Bytes plain = palette_cu(hevc_palette());
+  const Bytes canonical = canonicalize(forced, SchemaId::Model, "ovt.fb.HevcCu");
+  CHECK(canonical == canonicalize(plain, SchemaId::Model, "ovt.fb.HevcCu"));
+  CHECK(canonical != canonicalize(palette_cu({}), SchemaId::Model, "ovt.fb.HevcCu"));
+  CHECK(structural_diff(forced, plain, SchemaId::Model, "ovt.fb.HevcCu").empty());
+  for (const JsonOptions options : {JsonOptions{}, kCompact}) {
+    const std::string text = to_json(forced, SchemaId::Model, "ovt.fb.HevcCu", options);
+    CHECK(from_json(text, SchemaId::Model, "ovt.fb.HevcCu") == canonical);
+  }
+
+  fb::Av1PaletteT colors;
+  colors.palette_colors_y = {16, 235};
+  colors.ColorMapY = {1, 0};
+  fb::Av1BlockT av1;
+  av1.PaletteSizeY = 2;
+  av1.palette = pack(colors, nullptr, true);
+  const Bytes block = pack(av1, nullptr);
+  CHECK(from_json(to_json(block, SchemaId::Model, "ovt.fb.Av1Block"), SchemaId::Model, "ovt.fb.Av1Block") ==
+        canonicalize(block, SchemaId::Model, "ovt.fb.Av1Block"));
+
+  // Two nested levels: the palette of the CU in a block's ext.
+  const Bytes in_frame = edited_fixture([&](fb::FrameAnalysisT& frame) { frame.blocks[2]->ext = forced; });
+  const Bytes imported = from_json(to_json(in_frame, SchemaId::Model, kFrameAnalysis), SchemaId::Model, kFrameAnalysis);
+  CHECK(imported == canonicalize(in_frame, SchemaId::Model, kFrameAnalysis));
+  CHECK(structural_diff(in_frame, imported, SchemaId::Model, kFrameAnalysis).empty());
+
+  // An array of numbers is still accepted for a palette (the bytes as they are), when they are a palette.
+  Json json = parse_strict(to_json(plain, SchemaId::Model, "ovt.fb.HevcCu"));
+  json["palette"] = hevc_palette();
+  CHECK(from_json(json.dump(), SchemaId::Model, "ovt.fb.HevcCu") == canonical);
+  json["palette"] = Json::array({1, 2, 3});
+  CHECK_THROWS_AS(from_json(json.dump(), SchemaId::Model, "ovt.fb.HevcCu"), std::invalid_argument);
+}
+
+TEST_CASE("from_json ignores unknown keys and rejects malformed text", "[model][json]") {
+  const Bytes bytes = fixture("tiny16_hevc.fa");
+  Json json = parse_strict(read_golden("tiny16_hevc.json"));
+  json["added_in_1_1"] = Json({{"deep", {1, 2, {{"x", nullptr}}}}});
+  json["blocks"][0]["future"] = "value";
+  CHECK(from_json(json.dump(2), SchemaId::Model, kFrameAnalysis) == bytes);
+  json["frame"].erase("shown");  // a missing key is the default (false)
+  const Bytes hidden = from_json(json.dump(), SchemaId::Model, kFrameAnalysis);
+  CHECK_FALSE(fb::GetFrameAnalysis(hidden.data())->frame()->shown());
+
+  const auto rejects = [](std::string_view text, const char* root = kFrameAnalysis, SchemaId id = SchemaId::Model) {
+    INFO(text);
+    CHECK_THROWS_AS(from_json(text, id, root), std::invalid_argument);
+  };
+  rejects("");
+  rejects("[1]");
+  rejects(R"({"schema_version": 1} x)");
+  rejects(R"({"schema_version": 1)");
+  rejects(R"({"schema_version" 1})");
+  rejects(R"({"schema_version": 1 "plugin_id": "a"})");
+  rejects("{schema_version: 1}");
+  rejects(R"({"schema_version": })");
+  rejects(R"({"schema_version": 4294967296})");
+  rejects(R"({"schema_version": 1, "schema_version": 1})");
+  rejects(R"({"plugin_id": "abc)");
+  rejects(R"({"plugin_id": "abc\)");
+  rejects(R"({"frame": {"type": "NoSuchType"}})");
+  rejects(R"({"blocks": [{"ext_type": "HevcCu", "ext": {"cu_skip_flag": 1}}, ]})");
+  rejects(std::string_view("{\"schema_version\": 1}\0", 22));
+  rejects(R"({"source_hash": "abc"})", kStreamIndex);
+  rejects(R"({"source_hash": "zz"})", kStreamIndex);
+  rejects("{}", "ovt.fb.NoSuchTable");
+  rejects("{}", "ovt.fb.Rect");  // a struct is no root table
+  rejects("{}", kFrameAnalysis, static_cast<SchemaId>(9));
+
+  // Tables nested past the limit (SyntaxNode.children), and nested buffers past theirs (4 levels).
+  const auto nodes = [](int depth) {
+    std::string text;
+    for (int i = 0; i < depth; ++i) {
+      text += R"({"name": "n", "children": [)";
+    }
+    for (int i = 0; i < depth; ++i) {
+      text += "]}";
+    }
+    return text;
+  };
+  CHECK_NOTHROW(from_json(nodes(8), SchemaId::Model, "ovt.fb.SyntaxNode"));
+  rejects(nodes(70), "ovt.fb.SyntaxNode");
+  const auto buffers = [](int levels) {
+    std::string text = "{}";
+    for (int i = 0; i < levels; ++i) {
+      text.insert(0, R"({"filter_params_type": "FrameAnalysis", "filter_params": )");
+      text += '}';
+    }
+    return text;
+  };
+  const Bytes four = from_json(buffers(4), SchemaId::Model, kFrameAnalysis);
+  CHECK(from_json(to_json(four, SchemaId::Model, kFrameAnalysis), SchemaId::Model, kFrameAnalysis) == four);
+  rejects(buffers(5));
+  CHECK_NOTHROW(from_json("{}", SchemaId::Model, kFrameAnalysis));
 }
