@@ -235,18 +235,18 @@ def render_cpp(table: list[Element], inputs: Path) -> str:
         "namespace ovt::container::ebml {",
         "",
         "// clang-format off",
-        "// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)",
+        "// NOLINTBEGIN(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,modernize-raw-string-literal)",
         "// id, name, type, path, min_occurs, max_occurs (-1 = unbounded), default_value, unknown_size_allowed",
         "const EbmlElementDef kEbmlElements[] = {",
     ]
     for e in table:
         lines.append(
-            f"    {{0x{e.id:X}u,{c_str(e.name)},EbmlType::{TYPES[e.type]},{c_str(e.path)},"
+            f"    {{0x{e.id:X}U,{c_str(e.name)},EbmlType::{TYPES[e.type]},{c_str(e.path)},"
             f"{e.min_occurs},{e.max_occurs},{c_str(e.default)},{'true' if e.unknown_size_allowed else 'false'}}},"
         )
     lines += [
         "};",
-        "// NOLINTEND(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)",
+        "// NOLINTEND(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays,modernize-raw-string-literal)",
         "// clang-format on",
         "",
         f"const std::size_t kEbmlElementCount = {len(table)};",

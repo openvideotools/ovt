@@ -44,10 +44,12 @@ TEST_CASE("ebml schema: ids are unique, sorted and valid EBML ids", "[container]
     // The id keeps its length marker (RFC 8794 §5): the marker position equals the byte count, and the value bits
     // are not all ones (reserved).
     int n = 4;
-    while (n > 1 && (e.id >> (8 * (n - 1))) == 0) --n;
+    while (n > 1 && (e.id >> (8 * (n - 1))) == 0) {
+      --n;
+    }
     const uint32_t first = e.id >> (8 * (n - 1));
-    CHECK((first >> (8 - n)) == 1u);
-    CHECK((e.id & ((1ull << (7 * n)) - 1)) != ((1ull << (7 * n)) - 1));
+    CHECK((first >> (8 - n)) == 1U);
+    CHECK((e.id & ((1ULL << (7 * n)) - 1)) != ((1ULL << (7 * n)) - 1));
     CHECK(e.name[0] != '\0');
     CHECK(e.path[0] == '\\');
     CHECK(e.min_occurs >= 0);
@@ -111,7 +113,9 @@ TEST_CASE("ebml schema: types, defaults and occurrence limits are decoded", "[co
 TEST_CASE("ebml schema: only Segment and Cluster allow unknown sizes", "[container][ebml][fast]") {
   std::set<std::string> names;
   for (const auto& e : ebml::ebml_elements()) {
-    if (e.unknown_size_allowed) names.insert(e.name);
+    if (e.unknown_size_allowed) {
+      names.insert(e.name);
+    }
   }
   const std::set<std::string> expected{"Cluster", "Segment"};
   CHECK(names == expected);

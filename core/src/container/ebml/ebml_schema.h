@@ -16,6 +16,7 @@ namespace ovt::container::ebml {
 // The schema `type` of an element (RFC 8794 §7).
 enum class EbmlType : uint8_t { Master, UInteger, Integer, Float, String, Utf8, Date, Binary };
 
+// NOLINTNEXTLINE(clang-analyzer-optin.performance.Padding): field order is the WI-4.200 interface.
 struct EbmlElementDef {
   uint32_t id;       // with the length marker, e.g. 0x1A45DFA3
   const char* name;  // "Segment"
@@ -28,10 +29,12 @@ struct EbmlElementDef {
 };
 
 // Generated, sorted by id, ids unique.
+// NOLINTNEXTLINE(modernize-avoid-c-arrays,cppcoreguidelines-avoid-c-arrays)
 extern const EbmlElementDef kEbmlElements[];
 extern const std::size_t kEbmlElementCount;
 
 [[nodiscard]] inline std::span<const EbmlElementDef> ebml_elements() noexcept {
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-array-to-pointer-decay)
   return {kEbmlElements, kEbmlElementCount};
 }
 
