@@ -593,6 +593,16 @@ ovt_status Session::post_process(int t, uint32_t stage_mask, std::vector<uint8_t
         ovt::fb::CreateDiagnostic(fbb, Severity::Info, fbb.CreateString("ANA-0001"), fbb.CreateString(message)));
     diagnostics_.push_back({Severity::Info, "ANA-0001", std::move(message)});
   }
+  // WI-4.109: the opt-in conformance check (VER-0004 picture hash); its findings travel like the ANA-0001 ones.
+  if (options_.frame_check != nullptr) {
+    std::vector<HostDiagnostic> found;
+    options_.frame_check->check(t, *fa, found);
+    for (HostDiagnostic& d : found) {
+      missing.push_back(
+          ovt::fb::CreateDiagnostic(fbb, d.severity, fbb.CreateString(d.code), fbb.CreateString(d.message)));
+      diagnostics_.push_back(std::move(d));
+    }
+  }
   if (!missing.empty()) {
     std::vector<flatbuffers::Offset<flatbuffers::Table>> all;
     if (fa->diagnostics() != nullptr) {

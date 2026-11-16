@@ -491,6 +491,41 @@ TEST_CASE("cache seam: intermediate frames are stored, a covering hit skips deco
   CHECK(second == first);
 }
 
+namespace {
+struct StubCheck final : ovt::analysis::FrameCheck {
+  std::vector<int> seen;
+  void check(int decode_index, const ovt::fb::FrameAnalysis& /*frame*/,
+             std::vector<ovt::analysis::HostDiagnostic>& out) override {
+    seen.push_back(decode_index);
+    out.push_back({ovt::fb::Severity::Error, "VER-0004", "decoded picture hash mismatch (plugin mock)"});
+  }
+};
+}  // namespace
+
+TEST_CASE("WI-4.109: the opt-in frame check runs on the target frame and its findings reach the result",
+          "[analysis][session][fast]") {
+  const auto plugin = spy_plugin("mock", "mock");
+  auto s = h264_script(30, 30);
+
+  Session off(*s->file, s->index, plugin, {});
+  std::vector<uint8_t> plain;
+  REQUIRE(off.frame(5, 0, nullptr, plain) == OVT_OK);
+  CHECK_FALSE(has_diag(off, "VER-0004"));
+
+  StubCheck check;
+  ovt::analysis::SessionOptions options;
+  options.frame_check = &check;
+  Session on(*s->file, s->index, plugin, std::move(options));
+  std::vector<uint8_t> out;
+  REQUIRE(on.frame(5, 0, nullptr, out) == OVT_OK);
+  CHECK(check.seen == std::vector<int>{5});  // the target only, not the frames decoded on the way
+  CHECK(has_diag(on, "VER-0004"));
+  const auto* fa = as_fa(out);
+  REQUIRE(fa->diagnostics() != nullptr);
+  CHECK(fa->diagnostics()->Get(0)->code()->str() == "VER-0004");
+  CHECK(fa->diagnostics()->Get(0)->severity() == ovt::fb::Severity::Error);
+}
+
 TEST_CASE("invalid requests", "[analysis][session][fast]") {
   const auto plugin = spy_plugin("mock", "mock");
   std::vector<ScriptFrame> frames(3);  // no RAP at all
