@@ -46,7 +46,16 @@ All tests passed (12801 assertions in 104 test cases)
 The lavapipe arrow time above is a software rasteriser on 4 cores; the FR-BLK-018 budget applies to the M1 run of AT1
 and is gated by WI-2.438 (`bench_overlay_4k_mv_arrows`).
 
-## Pending: MoltenVK on the Mac Mini
+## MoltenVK on the Mac Mini
 
-`ctest --preset macos-arm64-debug -R render_test_arrows` plus the hidden AT1 test
-(`./render/tests/ovt_tests_render "[.gpu]"`) on the Mini, recorded here when run.
+Date: 2026-11-16 14:57Z. Machine: Mac Mini (Mac16,10, Apple M4), macOS 15.8.2, MoltenVK 1.2.11, `macos-arm64-debug`.
+Commit 6ce9250. The machine was heavily loaded (load average 129.82), so the timing is noisy.
+
+```console
+$ ./render/tests/ovt_tests_render "render_test_arrows*"
+bench_overlay_4k_mv_arrows arrow_pass_ms=0.861125 (render+readback 141.221 ms with arrows, 140.36 ms without)
+All tests passed (257 assertions in 10 test cases)
+```
+
+The run covers the golden, AT1 (`[.gpu]`, 4K, central 1080p compared with the golden) and AT2. An earlier run at
+de269c7, which used the `r8u` corner format only, also passed all 10 cases.
