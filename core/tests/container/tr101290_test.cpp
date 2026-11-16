@@ -61,7 +61,8 @@ Bytes make_packet(uint16_t pid, uint8_t cc, std::span<const uint8_t> payload, in
   const size_t room = 184 - (af.empty() ? 0 : 1 + af.size());
   const bool stuff = payload.size() < room;
   const bool has_af = !af.empty() || stuff;
-  out[3] = static_cast<uint8_t>((tsc << 6U) | ((has_af ? 2U : 0U) | (payload.empty() ? 0U : 1U)) << 4U | (cc & 15U));
+  out[3] = static_cast<uint8_t>((static_cast<unsigned>(tsc) << 6U) |
+                                ((has_af ? 2U : 0U) | (payload.empty() ? 0U : 1U)) << 4U | (cc & 15U));
   if (has_af) {
     const size_t len = 183 - payload.size();
     if (len > 0 && af.empty()) {
