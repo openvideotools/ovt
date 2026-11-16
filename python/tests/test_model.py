@@ -39,9 +39,7 @@ def test_import_generated_namespace_package():
 
     assert FrameAnalysis.FrameAnalysisBufferHasIdentifier(
         (GOLDEN / "tiny16_hevc.fa").read_bytes(), 0, size_prefixed=False
-    ) or FrameAnalysis.FrameAnalysisBufferHasIdentifier(
-        (GOLDEN / "tiny16_hevc.fa").read_bytes(), 0, size_prefixed=True
-    )
+    ) or FrameAnalysis.FrameAnalysisBufferHasIdentifier((GOLDEN / "tiny16_hevc.fa").read_bytes(), 0, size_prefixed=True)
     assert CellGrid is not None
 
 

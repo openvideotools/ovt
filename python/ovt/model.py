@@ -75,9 +75,7 @@ def _decompress(data: bytes) -> bytes:
     try:
         import zstandard
     except ImportError as exc:  # pragma: no cover - declared dependency
-        raise ImportError(
-            "reading .fa.zst files needs the 'zstandard' package"
-        ) from exc
+        raise ImportError("reading .fa.zst files needs the 'zstandard' package") from exc
     # Frames written by the C++ side carry the content size; fall back to streaming when they do not.
     with zstandard.ZstdDecompressor().stream_reader(data) as reader:
         return reader.read()
@@ -127,9 +125,7 @@ def grid_as_numpy(fa: FrameAnalysis) -> dict[str, np.ndarray]:
             continue
         arr = getattr(grid, accessor + "AsNumpy")()
         if arr.size != w * h:
-            raise ValueError(
-                f"grid.{name} has {arr.size} entries, expected {w}x{h}={w * h}"
-            )
+            raise ValueError(f"grid.{name} has {arr.size} entries, expected {w}x{h}={w * h}")
         out[name] = arr.reshape(h, w)
     return out
 
@@ -150,19 +146,13 @@ def blocks_as_dataframe(fa: FrameAnalysis):
     try:
         import pandas as pd
     except ImportError as exc:
-        raise ImportError(
-            "blocks_as_dataframe needs the optional 'pandas' package"
-        ) from exc
+        raise ImportError("blocks_as_dataframe needs the optional 'pandas' package") from exc
     from ovt.fb.BlockKind import BlockKind
     from ovt.fb.PredKind import PredKind
 
     def names(enum_cls) -> dict[int, str]:
         # flatc appends "_" to names that are Python keywords (`PredKind.None_`); the schema name has none.
-        return {
-            v: k.rstrip("_")
-            for k, v in vars(enum_cls).items()
-            if isinstance(v, int) and not k.startswith("_")
-        }
+        return {v: k.rstrip("_") for k, v in vars(enum_cls).items() if isinstance(v, int) and not k.startswith("_")}
 
     kinds, preds = names(BlockKind), names(PredKind)
     rows = []
