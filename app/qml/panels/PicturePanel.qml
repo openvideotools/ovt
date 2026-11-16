@@ -151,46 +151,49 @@ Rectangle {
 
             objectName: "pictureMarkers"
             anchors.fill: parent
-            // Re-evaluated on every ViewState change.
-            readonly property var probeAt: (controller.zoom, controller.panX, controller.panY, controller.viewportWidth,
-                                            controller.probe.x >= 0 && controller.hasPicture)
-                ? controller.devicePoint(controller.probe.x + 0.5, controller.probe.y + 0.5) : null
+            // The renderer's mapping (PictureController::devicePoint), written out over the controller's
+            // properties so that the bindings track zoom and pan (a comma expression's dependencies are not
+            // tracked by compiled bindings on every Qt version).
+            function devX(ix) {
+                return ((ix - controller.panX) * controller.zoom + controller.viewportWidth / 2) / canvas.dpr
+            }
+            function devY(iy) {
+                return ((iy - controller.panY) * controller.zoom + controller.viewportHeight / 2) / canvas.dpr
+            }
+            readonly property bool hasProbe: controller.hasPicture && controller.probe.x >= 0
             readonly property rect shownRect: controller.dragRect.width > 0 ? controller.dragRect
                                                                              : controller.selectionRect
 
             Rectangle {
                 objectName: "probeCrosshairH"
-                visible: markers.probeAt !== null
+                visible: markers.hasProbe
                 color: "#FF4136"
                 x: 0
                 width: parent.width
                 height: 1
-                y: markers.probeAt ? Math.floor(markers.probeAt.y / canvas.dpr) : 0
+                y: markers.hasProbe ? Math.floor(markers.devY(controller.probe.y + 0.5)) : 0
             }
             Rectangle {
                 objectName: "probeCrosshairV"
-                visible: markers.probeAt !== null
+                visible: markers.hasProbe
                 color: "#FF4136"
                 y: 0
                 height: parent.height
                 width: 1
-                x: markers.probeAt ? Math.floor(markers.probeAt.x / canvas.dpr) : 0
+                x: markers.hasProbe ? Math.floor(markers.devX(controller.probe.x + 0.5)) : 0
             }
             Rectangle {
                 id: rectMarker
 
                 objectName: "selectionRectMarker"
-                readonly property point topLeft: (controller.zoom, controller.panX, controller.panY,
-                    controller.devicePoint(markers.shownRect.x, markers.shownRect.y))
-                readonly property point bottomRight: (controller.zoom, controller.panX, controller.panY,
-                    controller.devicePoint(markers.shownRect.x + markers.shownRect.width,
-                                           markers.shownRect.y + markers.shownRect.height))
+                readonly property real x0: markers.devX(markers.shownRect.x)
+                readonly property real y0: markers.devY(markers.shownRect.y)
 
                 visible: markers.shownRect.width > 0 && markers.shownRect.height > 0
-                x: topLeft.x / canvas.dpr
-                y: topLeft.y / canvas.dpr
-                width: (bottomRight.x - topLeft.x) / canvas.dpr
-                height: (bottomRight.y - topLeft.y) / canvas.dpr
+                x: x0
+                y: y0
+                width: markers.devX(markers.shownRect.x + markers.shownRect.width) - x0
+                height: markers.devY(markers.shownRect.y + markers.shownRect.height) - y0
                 color: "#3339CCCC"
                 border.color: "#39CCCC"
                 border.width: 1
