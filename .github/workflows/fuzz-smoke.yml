@@ -9,7 +9,10 @@
 # shards through the Actions cache (never an artifact: the repository is public). Each shard used to rebuild the
 # whole tree, all unit tests included; from cold caches that alone took about 38 minutes, which pushed shards past
 # the 45-minute timeout.
-# The nightly 20-minute run is WI-0.033's. Third-party actions are pinned by commit SHA, never by tag.
+# The nightly 20-minute run is WI-0.033's (nightly.yml). The required check is the job `fuzz-smoke`, which gates
+# on `fuzz-build` and the four shards (`fuzz-smoke-shard`), so its name does not depend on the matrix. A manual run
+# with the `canary` input also runs ovt_fuzz_canary with OVT_FUZZ_CANARY=1: that run must fail and upload `crash-*`
+# (WI-0.033 AT1). Third-party actions are pinned by commit SHA, never by tag.
 name: fuzz-smoke
 
 on:
@@ -29,6 +32,12 @@ on:
       - "tools/goldens/**"
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      canary:
+        description: "Also run the deliberately crashing canary target (the run is expected to fail)"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -143,7 +152,8 @@ jobs:
           path: fuzz-binaries.tar.zst
           key: fuzz-binaries-${{ github.sha }}
 
-  fuzz-smoke:
+  fuzz-smoke-shard:
+    name: fuzz-smoke-shard (${{ matrix.shard }})
     needs: fuzz-build
     runs-on: ubuntu-22.04
     # Six targets of 60 s each per shard, plus the restore; the fallback build below fits in the same budget as the
@@ -226,6 +236,7 @@ jobs:
       - name: Fuzz 60 s per target
         env:
           SHARD: ${{ matrix.shard }}
+          CANARY: ${{ inputs.canary && '1' || '' }}
         # An explicit `shell: bash` runs `bash -eo pipefail`; the default for a bare `run:` is `bash -e`, which
         # would lose the fuzzer's exit status behind `| tee`.
         shell: bash
@@ -238,23 +249,28 @@ jobs:
             echo "::error::no ovt_fuzz_* targets in build/$PRESET/fuzz (OVT_ENABLE_FUZZ off or not Clang?)"
             exit 1
           fi
+          if [ -n "$CANARY" ]; then export OVT_FUZZ_CANARY=1; fi
           i=0
           for bin in "${bins[@]}"; do
-            if [ $((i % 4)) -eq "$SHARD" ]; then
-              t="${bin##*/ovt_fuzz_}"
-              mkdir -p "corpus_cache/$t"
-              echo "::group::$t"
-              # pipefail (set above) keeps the fuzzer's exit status through tee.
-              "$bin" -max_total_time=60 -max_len=1048576 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1 \
-                -artifact_prefix=fuzz-artifacts/ "corpus_cache/$t" "core/tests/fuzz/corpus/$t" 2>&1 | tee "fuzz-artifacts/$t.log"
-              echo "::endgroup::"
-              # A fuzzer without coverage instrumentation runs but finds nothing: fail instead of passing blind.
-              if ! grep -q "inline 8-bit counters" "fuzz-artifacts/$t.log" || grep -q "Is the code instrumented for coverage" "fuzz-artifacts/$t.log"; then
-                echo "::error::$t runs without coverage instrumentation (OVT_SANITIZER must be fuzz)"
-                exit 1
-              fi
+            t="${bin##*/ovt_fuzz_}"
+            # The canary crashes by design: it runs only when asked for (in shard 0) and is not part of the split.
+            if [ "$t" = canary ]; then
+              [ -n "$CANARY" ] && [ "$SHARD" -eq 0 ] || continue
+            else
+              [ $((i % 4)) -eq "$SHARD" ] || { i=$((i + 1)); continue; }
+              i=$((i + 1))
             fi
-            i=$((i + 1))
+            mkdir -p "corpus_cache/$t"
+            echo "::group::$t"
+            # pipefail (set above) keeps the fuzzer's exit status through tee.
+            "$bin" -max_total_time=60 -max_len=1048576 -timeout=10 -rss_limit_mb=2048 -print_final_stats=1 \
+              -artifact_prefix=fuzz-artifacts/ "corpus_cache/$t" "core/tests/fuzz/corpus/$t" 2>&1 | tee "fuzz-artifacts/$t.log"
+            echo "::endgroup::"
+            # A fuzzer without coverage instrumentation runs but finds nothing: fail instead of passing blind.
+            if ! grep -q "inline 8-bit counters" "fuzz-artifacts/$t.log" || grep -q "Is the code instrumented for coverage" "fuzz-artifacts/$t.log"; then
+              echo "::error::$t runs without coverage instrumentation (OVT_SANITIZER must be fuzz)"
+              exit 1
+            fi
           done
 
       - name: Upload reproducers
@@ -264,3 +280,22 @@ jobs:
           name: fuzz-crashes-shard-${{ matrix.shard }}
           path: fuzz-artifacts/
           if-no-files-found: warn
+
+  # The stable name for the required-check list (chapter 13 §13.7.3): one result for the build and the whole matrix.
+  # A failed fuzz-build skips the shards, so its own result is checked too.
+  fuzz-smoke:
+    needs: [fuzz-build, fuzz-smoke-shard]
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: The build and every shard passed (or were skipped by OVT_HOSTED_RUNNERS=off)
+        env:
+          BUILD: ${{ needs.fuzz-build.result }}
+          SHARDS: ${{ needs.fuzz-smoke-shard.result }}
+        run: |
+          echo "fuzz-build: $BUILD, fuzz-smoke-shard: $SHARDS"
+          case "$BUILD/$SHARDS" in
+            success/success|skipped/skipped) ;;
+            *) exit 1 ;;
+          esac
