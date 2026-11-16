@@ -156,8 +156,7 @@ uint8_t grid_cbf(const TuSyntax& tu);
 
 /// Writes @p bits over the cells of the luma rect (x, y, n, n) of @p grid_bits (CellGrid.bits_x8): floor(bits / cells)
 /// each, plus one for the first `bits % cells` cells in raster order (chapter 06 §6.3.4, rule V-020).
-/// SPEC-ASSUMPTION(#605): V-020 wins over the §7.6.2 row's "remainder to the first cell". Cells outside
-/// the grid are skipped and do not count.
+/// The §7.6.2 row follows V-020 since spec 1.0-rc37 (#605). Cells outside the grid are skipped and do not count.
 void spread_bits(std::vector<uint32_t>& grid_bits, const CellIndex& at, uint32_t cells_h, int32_t x, int32_t y,
                  int32_t n, uint32_t bits);
 
