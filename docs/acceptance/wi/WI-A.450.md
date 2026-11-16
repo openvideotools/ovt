@@ -150,6 +150,7 @@ In that run, the Back checks failed once. Back was sent the moment `OVT: QML roo
 after a fresh install, and the Activity was not destroyed, so the warm relaunch had nothing to do. This did not
 reproduce in 26 later trials at 77a63a1 (project files `wa450-back-bisect-results.txt` and
 `wa450-back-race-results.txt`):
+
 - The first 4 trials sent Back 3 s after root-ready.
 - The other 22 used a timing sweep: fresh install, cold and warm starts, with Back sent 0, 0.5, 1 and 2 s after
   root-ready, three times at 0 s on a fresh install.
