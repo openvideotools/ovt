@@ -8,7 +8,8 @@
 // dithering (WI-1.403), interop (WI-1.404, render/src/platform/offscreen.cpp), compare modes, overlays, measurements
 // (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are
 // inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
-// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1.
+// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the
+// swapchain with the content's static HDR metadata on init and on source change (§10.3.6).
 
 #include <array>
 #include <cstdint>
@@ -277,6 +278,13 @@ class VideoSurfaceImpl final : public VideoSurface {
       return;
     }
     error_.clear();
+    // §10.3.6: a source whose static HDR metadata differs from the hinted one re-sends the hint.
+    if (sw_ != nullptr) {
+      const struct pl_color_space hint = content_hint();
+      if (!pl_color_space_equal(&hint, &hinted_)) {
+        send_hint();
+      }
+    }
   }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
   // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
@@ -543,6 +551,15 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (sw_ == nullptr || !pl_swapchain_start_frame(sw_, &frame)) {
       return;  // no swapchain, or no image now (window hidden or minimised); not an error
     }
+    if (check_hint_) {  // the hint is advisory: compare with what the swapchain now renders to (§10.3.6)
+      check_hint_ = false;
+      const std::string differs = detail::hint_mismatch(hinted_, frame.color_space);
+      if (!differs.empty()) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        (void)std::fprintf(stderr, "[%s] swapchain colour space differs from the hint: %s\n", prefix_.c_str(),
+                           differs.c_str());
+      }
+    }
     offscreen_.begin_frame();  // scope textures (§10.7.9)
     struct pl_frame target = {};
     pl_frame_from_swapchain(&target, &frame);
@@ -591,8 +608,23 @@ class VideoSurfaceImpl final : public VideoSurface {
       close_native();
       return fail("swapchain", "pl_vulkan_create_swapchain failed");
     }
-    pl_swapchain_colorspace_hint(sw_, &choice.hint);
+    base_hint_ = choice.hint;
+    send_hint();
     return resize_swapchain();
+  }
+
+  // §10.3.6: the swapchain hint for the active encoding with the static HDR metadata of the picture in slot A.
+  [[nodiscard]] struct pl_color_space content_hint() const {
+    return detail::swapchain_hint(base_hint_, active_, slot_a_.valid ? slot_a_.frame.color.hdr : pl_hdr_metadata_empty);
+  }
+
+  // Hands the hint to libplacebo (which forwards the metadata with vkSetHdrMetadataEXT where the device has
+  // VK_EXT_hdr_metadata) and to the platform object, and checks it after the next pl_swapchain_start_frame().
+  void send_hint() {
+    hinted_ = content_hint();
+    pl_swapchain_colorspace_hint(sw_, &hinted_);
+    native_->set_content_metadata(hinted_.hdr);
+    check_hint_ = true;
   }
 
   // Not an error when it fails: libplacebo cannot size a swapchain on a 0x0 extent (hidden window, layer not laid out)
@@ -794,6 +826,11 @@ class VideoSurfaceImpl final : public VideoSurface {
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
   pl_swapchain sw_ = nullptr;
+  // WI-1.411 (§10.3.6): the encoding's hint without metadata, the last hint sent, and whether the swapchain's colour
+  // space is still to be compared with it.
+  struct pl_color_space base_hint_ = {};
+  struct pl_color_space hinted_ = {};
+  bool check_hint_ = false;
 };
 
 }  // namespace

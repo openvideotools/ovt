@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <string>
 
 #include "pipeline/render_params.h"
 
@@ -64,7 +65,7 @@ bool pair_format_ok(Encoding encoding, VkFormat f) {
 }
 
 // The pl_swapchain_colorspace_hint() that makes libplacebo pick the pair of `encoding`: its primaries and transfer,
-// no HDR metadata (the content's static metadata is WI-1.411's, §10.3.6).
+// no HDR metadata (swapchain_hint() adds the content's, §10.3.6).
 struct pl_color_space hint_for(const DisplayTarget& target, Encoding encoding) {
   struct pl_color_space c = native_target_color(target, encoding);
   c.hdr = pl_hdr_metadata_empty;
@@ -108,6 +109,45 @@ struct pl_color_space native_target_color(const DisplayTarget& target, Encoding 
     c.primaries = PL_COLOR_PRIM_BT_2020;
   }
   return c;
+}
+
+struct pl_color_space swapchain_hint(const struct pl_color_space& base, Encoding encoding,
+                                     const struct pl_hdr_metadata& content) {
+  struct pl_color_space c = base;
+  c.hdr = pl_hdr_metadata_empty;
+  if (encoding == Encoding::Pq10 || encoding == Encoding::Hlg10) {
+    c.hdr.prim = content.prim;
+    c.hdr.min_luma = content.min_luma;
+    c.hdr.max_luma = content.max_luma;
+    c.hdr.max_cll = content.max_cll;
+    c.hdr.max_fall = content.max_fall;
+  }
+  return c;
+}
+
+std::string hint_mismatch(const struct pl_color_space& hinted, const struct pl_color_space& actual) {
+  // An unknown value is no disagreement: libplacebo reports an SRGB_NONLINEAR swapchain as pl_color_space_monitor
+  // (BT.709, transfer unknown) whatever SDR curve was hinted.
+  std::string out;
+  if (actual.primaries != PL_COLOR_PRIM_UNKNOWN && actual.primaries != hinted.primaries) {
+    out += "primaries " + std::to_string(static_cast<int>(actual.primaries)) + " (hinted " +
+           std::to_string(static_cast<int>(hinted.primaries)) + ")";
+  }
+  if (actual.transfer != PL_COLOR_TRC_UNKNOWN && actual.transfer != hinted.transfer) {
+    out += out.empty() ? "" : ", ";
+    out += "transfer " + std::to_string(static_cast<int>(actual.transfer)) + " (hinted " +
+           std::to_string(static_cast<int>(hinted.transfer)) + ")";
+  }
+  return out;
+}
+
+Hdr10Range edr_hdr10_range(const struct pl_hdr_metadata& hdr) {
+  Hdr10Range r;
+  if (hdr.max_luma > 0.0F && std::isfinite(hdr.max_luma)) {
+    r.max_nits = hdr.max_luma;
+    r.min_nits = (hdr.min_luma >= 0.0F && hdr.min_luma < hdr.max_luma) ? hdr.min_luma : 0.0F;
+  }
+  return r;
 }
 
 bool headroom_changed(float current, float polled) {
