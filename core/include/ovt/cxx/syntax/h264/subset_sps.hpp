@@ -136,7 +136,7 @@ struct SubsetSps {
 /// Row 22. Node `subset_seq_parameter_set_rbsp`. The reader stands after the NAL header. Throws ParseError
 /// SYN-H264-0002 on a loop bound out of range (§7.3.1 rule 3). For profile_idc 139 the rest of the RBSP after the MVCD
 /// extension (seq_parameter_set_3davc_extension() onward) is kept as the opaque node `subset_sps_extension` with Info
-/// SYN-H264-0071 (#552).
+/// SYN-H264-0071 (#552); parsing it belongs to WI-4.111.
 SubsetSps parse_subset_sps(BitReader& br, SyntaxBuilder& b);
 
 }  // namespace ovt::syntax::h264

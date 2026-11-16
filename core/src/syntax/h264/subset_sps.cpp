@@ -361,7 +361,8 @@ SubsetSps parse_subset_sps(BitReader& br, SyntaxBuilder& b) {
       }
     }
     if (profile == 139) {
-      // SPEC-ASSUMPTION(#552): seq_parameter_set_3davc_extension() (J.7.3.2.1.5) is not parsed yet.
+      // SPEC-ASSUMPTION(#552): seq_parameter_set_3davc_extension() (J.7.3.2.1.5) stays bytes; it moves to the
+      // enhancement-layer slice work (WI-4.111) with slice_header_in_3davc_extension(), not to a WI-1.109 part e.
       detail::keep_as_bytes(b, "subset_sps_extension", "H.264 J.7.3.2.1.5");
       s.span = br.span_since(start);
       return s;
