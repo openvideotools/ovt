@@ -34,9 +34,11 @@
 #include <vector>
 
 #include "metrics/host/plugin_registry.h"
+#include "metrics/kernels/identity.h"
 #include "metrics/kernels/map_sink.h"
 #include "metrics/kernels/psnr_kernels.h"
 #include "metrics/kernels/ssim_metric.h"
+#include "metrics/kernels/ssim_x264.h"
 #include "ovt_metrics_generated.h"
 
 namespace ovt::metrics {
@@ -451,6 +453,8 @@ const ovt_MetricApi* psnr_metric_api() noexcept {
 void register_builtin_kernels(PluginRegistry& registry) {
   (void)registry.register_builtin(psnr_metric_api(), "(built-in)");
   (void)registry.register_builtin(ssim_metric_api(), "(built-in)");
+  (void)registry.register_builtin(ssim_x264_metric_api(), "(built-in)");
+  (void)registry.register_builtin(identity_metric_api(), "(built-in)");
 }
 
 }  // namespace ovt::metrics

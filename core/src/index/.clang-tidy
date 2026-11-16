@@ -1,0 +1,6 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Parser of untrusted bytes: pointer arithmetic is an error here (chapter 14 §14.8.2, §0.7.1).
+InheritParentConfig: true
+WarningsAsErrors: "cppcoreguidelines-pro-bounds-pointer-arithmetic"

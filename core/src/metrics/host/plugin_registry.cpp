@@ -10,6 +10,7 @@
 #include "metrics/host/plugin_registry.h"
 
 #include "metrics/kernels/psnr_metric.h"
+#include "metrics/vmaf/vmaf_host.h"
 
 #include <dlfcn.h>
 
@@ -93,8 +94,12 @@ struct OpenedPlugin {
   const ovt_MetricApi* api = nullptr;
 };
 OpenedPlugin open_plugin(const std::string& path, std::string& error) {
+  // RTLD_NODELETE: a rejected plugin's dlclose() below must not unmap the image. Unmapping lets the next candidate
+  // (the broken test variants share one layout) land on the same addresses, and under AddressSanitizer on macOS the
+  // previous image's global shadow can then outlive the unmap and flag in-bounds reads of the new image's globals
+  // (issue #537). Loaded plugins are never dlclose()d anyway (§12.3.11), so a rejected one stays mapped too.
   // NOLINTNEXTLINE(hicpp-signed-bitwise): POSIX flag constants
-  void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+  void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
   if (handle == nullptr) {
     error = "dlopen failed: " + dl_error();
     return {};
@@ -241,8 +246,9 @@ std::optional<std::vector<uint8_t>> validate_metric_api(const ovt_MetricApi* api
 PluginRegistry& PluginRegistry::instance() {
   // Never destroyed: plugins stay loaded (§12.3.11).
   static PluginRegistry* const registry = [] {
-    auto* r = new PluginRegistry();  // NOLINT(cppcoreguidelines-owning-memory)
-    register_builtin_kernels(*r);    // the in-tree kernel metrics (WI-3.306 onward)
+    auto* r = new PluginRegistry();         // NOLINT(cppcoreguidelines-owning-memory)
+    register_builtin_kernels(*r);           // the in-tree kernel metrics (WI-3.306 onward)
+    (void)vmaf::register_builtin_vmaf(*r);  // the libvmaf ids (WI-3.309)
     return r;
   }();
   return *registry;

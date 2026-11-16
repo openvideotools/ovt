@@ -4,14 +4,32 @@
 # Fuzz smoke (chapter 13 §13.7.1 `fuzz-smoke`, chapter 14 §14.7.3, WI-0.557): build the linux-x64-fuzz preset
 # and run every ovt_fuzz_* target for 60 s from its committed seeds. Four shards split the targets (target i
 # runs in shard i mod 4); a crash, timeout or OOM fails the shard and uploads the reproducer.
+# One `fuzz-build` job builds only the fuzz and fuzz-regress targets, replays the regressions and hands the
+# binaries (with the shared libraries and the plugin module they load from the build tree) to the four `fuzz-smoke`
+# shards through the Actions cache (never an artifact: the repository is public). Each shard used to rebuild the
+# whole tree, all unit tests included; from cold caches that alone took about 38 minutes, which pushed shards past
+# the 45-minute timeout.
 # The nightly 20-minute run is WI-0.033's (nightly.yml). The required check is the job `fuzz-smoke`, which gates
-# on the four shards (`fuzz-smoke-shard`), so its name does not depend on the matrix. A manual run with the
-# `canary` input also runs ovt_fuzz_canary with OVT_FUZZ_CANARY=1: that run must fail and upload `crash-*`
+# on `fuzz-build` and the four shards (`fuzz-smoke-shard`), so its name does not depend on the matrix. A manual run
+# with the `canary` input also runs ovt_fuzz_canary with OVT_FUZZ_CANARY=1: that run must fail and upload `crash-*`
 # (WI-0.033 AT1). Third-party actions are pinned by commit SHA, never by tag.
 name: fuzz-smoke
 
 on:
+  # Pull requests that touch only files the linux-x64-fuzz preset never builds or reads (it sets OVT_BUILD_GUI,
+  # OVT_BUILD_CLI and OVT_BUILD_RENDER off) skip the run, to save hosted runners. Every push to main runs it.
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "*.md" # top level only: third_party/VERSIONS.md pins the fuzz build
+      - "android/**"
+      - "app/**"
+      - "cli/**"
+      - "render/**"
+      - "python/**"
+      - "tests/golden/**"
+      - "tests/oracles/**"
+      - "tools/goldens/**"
   push:
     branches: [main]
   workflow_dispatch:
@@ -32,16 +50,11 @@ env:
   PRESET: linux-x64-fuzz
 
 jobs:
-  fuzz-smoke-shard:
-    name: fuzz-smoke-shard (${{ matrix.shard }})
+  fuzz-build:
     # The owner's switch for when GitHub-hosted runners are unavailable (ci.yml header).
     if: vars.OVT_HOSTED_RUNNERS != 'off'
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -61,17 +74,159 @@ jobs:
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
 
-      - name: Configure and build
+      - name: Configure
+        id: configure
+        run: cmake --preset "$PRESET"
+
+      # setup-ovt's actions/cache saves the vcpkg archives only after a green job. Save them as soon as configure has
+      # built them, so that a later failure or timeout does not leave the next run (and every PR) cold again.
+      # Harmless when the key already exists.
+      - name: Save vcpkg binary cache
+        if: always() && steps.configure.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: build/vcpkg-archives
+          key: vcpkg-${{ runner.os }}-x64-linux-ovt-${{ hashFiles('vcpkg.json', 'third_party/vcpkg-triplets/**', 'third_party/vcpkg-overlays/**') }}
+
+      # Only the fuzz executables and their regression-replay twins: the unit tests are other jobs' work.
+      - name: Build fuzz targets
+        shell: bash
         run: |
-          cmake --preset "$PRESET"
-          cmake --build --preset "$PRESET"
+          set -eo pipefail
+          mapfile -t targets < <(ninja -C "build/$PRESET" -t targets all | sed -n 's/^\(ovt_fuzz_[A-Za-z0-9_]*\): phony$/\1/p' | sort -u)
+          if [ ${#targets[@]} -eq 0 ]; then
+            echo "::error::no ovt_fuzz_* targets in build/$PRESET (OVT_ENABLE_FUZZ off or not Clang?)"
+            exit 1
+          fi
+          echo "building ${#targets[@]} targets: ${targets[*]}"
+          cmake --build --preset "$PRESET" --target "${targets[@]}"
 
       - name: Replay regressions
         run: ctest --test-dir "build/$PRESET" -L fuzz-regress --output-on-failure
 
+      # The fuzzers run from their build-tree paths in the shards: the RPATHs and OVT_FFMPEG_PLUGIN_DIR are absolute,
+      # and every hosted runner checks out to the same workspace. Pack the executables, the plugin modules they load,
+      # and every shared library under the workspace that ldd resolves for them. The system libraries they need besides
+      # glibc (libstdc++ and libgcc_s from the GCC 13 toolchain PPA, libva and the other host packages setup-ovt installs
+      # here but the shards do not) go to runtime/, which the shards put on LD_LIBRARY_PATH.
+      - name: Pack fuzz binaries
+        shell: bash
+        run: |
+          set -eo pipefail
+          shopt -s nullglob
+          ws="$GITHUB_WORKSPACE"
+          bins=("build/$PRESET"/fuzz/ovt_fuzz_*)
+          # Plugin modules land in plugins/lib (LIBRARY_OUTPUT_DIRECTORY of every plugin); fuzz_plugin_push_ffmpeg dlopens one.
+          modules=("build/$PRESET"/plugins/lib/*.so)
+          mkdir -p fuzz-stage/runtime
+          { printf '%s\n' "${bins[@]}" "${modules[@]}"
+            for f in "${bins[@]}" "${modules[@]}"; do
+              ldd "$f" | awk '$2 == "=>" && $3 ~ /^\// { print $3 }'
+            done | sort -u | while read -r lib; do
+              case "$lib" in
+                "$ws"/*) echo "${lib#"$ws"/}" ;;
+                # glibc itself matches on every ubuntu-22.04 runner; leave it to the system.
+                */libc.so.*|*/libm.so.*|*/libpthread.so.*|*/libdl.so.*|*/librt.so.*|*/ld-linux*) ;;
+                *) cp -L "$lib" fuzz-stage/runtime/ ;;
+              esac
+            done
+          } | sort -u > fuzz-files.txt
+          echo "packing $(wc -l < fuzz-files.txt) files (${#bins[@]} fuzzers, ${#modules[@]} plugin modules)"
+          # -h stores the file behind each soname symlink at the soname path the loader asks for.
+          tar -C "$ws" -h -cf - -T fuzz-files.txt | tar -C fuzz-stage -xf -
+          # Drop the DWARF (most of the ~590 MB the pack had with it) but keep the symbol tables, so that stack frames
+          # still name functions. Line numbers come from re-running the uploaded reproducer on a local build.
+          find fuzz-stage -type f \( -perm -u+x -o -name '*.so*' \) -print0 \
+            | xargs -0 -n1 -P"$(nproc)" strip --strip-debug 2>/dev/null || true
+          tar -C fuzz-stage -cf - . | zstd -T0 -12 -q -o fuzz-binaries.tar.zst
+          ls -l fuzz-binaries.tar.zst
+
+      # Handed to the shards through the Actions cache, not an artifact: the repository is public and built binaries
+      # must not be published as downloadable artifacts (binary distribution without notices; same rule as the
+      # Android smoke APKs). The cache is not downloadable by others; the key is this commit, so a shard never runs
+      # another commit's build.
+      - name: Save fuzz binaries for the shards
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: fuzz-binaries.tar.zst
+          key: fuzz-binaries-${{ github.sha }}
+
+  fuzz-smoke-shard:
+    name: fuzz-smoke-shard (${{ matrix.shard }})
+    needs: fuzz-build
+    runs-on: ubuntu-22.04
+    # Six targets of 60 s each per shard, plus the restore; the fallback build below fits in the same budget as the
+    # build job's.
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Restore fuzz binaries
+        id: bins
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: fuzz-binaries.tar.zst
+          key: fuzz-binaries-${{ github.sha }}
+
+      # Fallback when the pack is gone: the cache is LRU under a 10 GB repository cap, and a shard can sit queued for
+      # hours while other branches evict it. Then this shard builds the fuzzers itself, as every shard did before.
+      - uses: ./.github/actions/setup-ovt
+        if: steps.bins.outputs.cache-hit != 'true'
+        with:
+          preset: linux-x64-fuzz
+          triplet: x64-linux-ovt
+
+      - name: Clang 16 (fallback build)
+        if: steps.bins.outputs.cache-hit != 'true'
+        run: |
+          echo "::warning::fuzz-binaries-${{ github.sha }} not in the cache (evicted); building the fuzzers in this shard"
+          sudo install -d -m 0755 /etc/apt/keyrings
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/apt.llvm.org.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/apt.llvm.org.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-16 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-16.list
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends clang-16 libclang-rt-16-dev
+
+      - name: Build fuzzers (fallback build)
+        if: steps.bins.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -eo pipefail
+          cmake --preset "$PRESET"
+          mapfile -t targets < <(ninja -C "build/$PRESET" -t targets all \
+            | sed -n 's/^\(ovt_fuzz_[A-Za-z0-9_]*\): phony$/\1/p' | grep -v '_regress$' | sort -u)
+          cmake --build --preset "$PRESET" --target "${targets[@]}"
+
+      - name: Unpack fuzz binaries
+        if: steps.bins.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -eo pipefail
+          zstd -dc fuzz-binaries.tar.zst | tar -C "$GITHUB_WORKSPACE" -xf -
+          rm fuzz-binaries.tar.zst
+          if [ -d runtime ]; then
+            echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/runtime${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+          fi
+
       # The corpus cache is the FIRST corpus directory: libFuzzer writes new units into it, not into the
       # checkout. The committed seeds are the second, read-only one.
+      # Only runs on main save a corpus (one entry per run, so the cache must not grow on every pull request push);
+      # pull requests restore the newest one and start from it.
+      - name: Restore corpus cache (pull request)
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: corpus_cache
+          key: fuzz-corpus-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: fuzz-corpus-${{ matrix.shard }}-
+
       - name: Restore corpus cache
+        if: github.event_name != 'pull_request'
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
           path: corpus_cache
@@ -126,16 +281,21 @@ jobs:
           path: fuzz-artifacts/
           if-no-files-found: warn
 
-  # The stable name for the required-check list (chapter 13 §13.7.3): one result for the whole matrix.
+  # The stable name for the required-check list (chapter 13 §13.7.3): one result for the build and the whole matrix.
+  # A failed fuzz-build skips the shards, so its own result is checked too.
   fuzz-smoke:
-    needs: fuzz-smoke-shard
+    needs: [fuzz-build, fuzz-smoke-shard]
     if: always()
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
-      - name: Every shard passed (or was skipped by OVT_HOSTED_RUNNERS=off)
+      - name: The build and every shard passed (or were skipped by OVT_HOSTED_RUNNERS=off)
         env:
-          RESULT: ${{ needs.fuzz-smoke-shard.result }}
+          BUILD: ${{ needs.fuzz-build.result }}
+          SHARDS: ${{ needs.fuzz-smoke-shard.result }}
         run: |
-          echo "fuzz-smoke-shard: $RESULT"
-          [ "$RESULT" = success ] || [ "$RESULT" = skipped ]
+          echo "fuzz-build: $BUILD, fuzz-smoke-shard: $SHARDS"
+          case "$BUILD/$SHARDS" in
+            success/success|skipped/skipped) ;;
+            *) exit 1 ;;
+          esac

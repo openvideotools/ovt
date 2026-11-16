@@ -30,6 +30,7 @@ namespace {
 constexpr std::string_view kModule = "analysis";
 constexpr int kMaxConsecutiveCorrupt = 32;  // §7.5.3 A4, §7.5.4
 constexpr uint8_t kH265Cra = 21;
+constexpr uint32_t kReconstructionBit = 1U;  // 1 << PlaneStage.Reconstruction
 constexpr uint8_t kH265RaslN = 8;
 constexpr uint8_t kH265RaslR = 9;
 constexpr uint8_t kH265FirstNonVcl = 32;
@@ -338,7 +339,7 @@ ovt_status Session::decode_target(int t, uint32_t stage_mask, const ovt::jobs::C
   const bool continue_ok = dec_ != nullptr && current_rap_ == r && last_decoded_ < t && last_decoded_ >= r - 1;
   if (!continue_ok) {
     destroy_decoder();
-    if (const ovt_status st = create_decoder(r); st != OVT_OK) {
+    if (const ovt_status st = create_decoder(r, stage_mask); st != OVT_OK) {
       return st;
     }
   }
@@ -401,7 +402,7 @@ ovt_status Session::decode_range(int rap, int t, uint32_t stage_mask, const ovt:
   return OVT_OK;
 }
 
-ovt_status Session::create_decoder(int rap) {
+ovt_status Session::create_decoder(int rap, uint32_t stage_mask) {
   int threads = options_.threads;
   if (threads <= 0) {
 #ifdef __ANDROID__
@@ -420,6 +421,19 @@ ovt_status Session::create_decoder(int rap) {
   current_rap_ = rap;
   last_decoded_ = rap - 1;
   consecutive_corrupt_ = 0;
+  // §7.5.3 A3 (#449): the pull() mask is the only channel for the plane stage request, so a plugin treats it as a
+  // standing request for pictures decoded afterwards. Prime it before the first push when it names a stage beyond
+  // Reconstruction (bit 0); the call returns no frame.
+  if ((stage_mask & ~kReconstructionBit) != 0U) {
+    ovt_Buffer primed{nullptr, 0};
+    if (const ovt_status pst = plugin_.api->pull(dec_, stage_mask, &primed); pst != OVT_OK) {
+      destroy_decoder();
+      return pst;
+    }
+    if (primed.data != nullptr) {
+      plugin_.api->release(dec_, primed);
+    }
+  }
   return feed_parameter_sets(rap);
 }
 

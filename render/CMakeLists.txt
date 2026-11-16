@@ -15,6 +15,32 @@ target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
+# WI-1.404: offscreen interop export, one pl_gpu per §10.2.2 interop row (Metal texture, shared Vulkan device, GL).
+target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
+# WI-4.452: HDR measurements (§10.7.1-§10.7.4, §10.7.9). The GLSL of render/src/shaders/ is embedded as string
+# constants in a generated header (cmake/OvtEmbedShaders.cmake).
+target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
+                                  src/measure/measurer.cpp)
+# WI-4.454: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_render PRIVATE src/measure/scopes.cpp src/measure/gamut_tables.cpp)
+include(OvtEmbedShaders)
+ovt_embed_shaders(
+  "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h" kShaderMeasurePrep src/shaders/measure_prep.frag
+  kShaderReduce8 src/shaders/reduce8.frag kShaderAccumulate src/shaders/accumulate.glsl)
+ovt_embed_shaders("${CMAKE_CURRENT_BINARY_DIR}/generated/scope_shaders.h" kShaderScopes src/shaders/scopes.glsl
+                  kShaderScopeClear src/shaders/scope_clear.glsl kShaderScopeResolve src/shaders/scope_resolve.frag)
+target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+# WI-1.406: NATIVE targets (§10.4.1). The portable rules build everywhere; the macOS CAMetalLayer target is
+# Objective-C++ with ARC and links the frameworks it calls (system frameworks, no licence entry).
+target_sources(ovt_render PRIVATE src/platform/native_target.cpp)
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(ovt_render PRIVATE src/platform/macos_metal.mm)
+  set_source_files_properties(src/platform/macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
+endif()
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -28,6 +54,18 @@ target_link_libraries(ovt_render PUBLIC ovt::core "$<BUILD_INTERFACE:ovt_schemas
 # WI-1.400 step 1: on macOS ovt_render links the prebuilt MoltenVK of WI-0.017 directly (§13.5.6).
 if(TARGET tp::moltenvk)
   target_link_libraries(ovt_render PRIVATE tp::moltenvk)
+endif()
+
+# WI-1.404: Interop::GlTexture loads GL through EGL and needs GLES 3.0 for its fence; libplacebo has an OpenGL backend
+# on Android (and in system packages, which a local OVT_SYSTEM_LIBPLACEBO build may use). Elsewhere the GL row is
+# compiled out.
+if(ANDROID OR OVT_SYSTEM_LIBPLACEBO)
+  find_library(OVT_GLES_LIBRARY NAMES GLESv3 GLESv2)
+  find_library(OVT_EGL_LIBRARY NAMES EGL)
+  if(OVT_GLES_LIBRARY AND OVT_EGL_LIBRARY)
+    target_link_libraries(ovt_render PRIVATE "${OVT_GLES_LIBRARY}" "${OVT_EGL_LIBRARY}")
+    target_compile_definitions(ovt_render PRIVATE OVT_RENDER_HAVE_GLES=1)
+  endif()
 endif()
 
 # SONAME libovt_render.so.1 (chapter 13 §13.2.1).

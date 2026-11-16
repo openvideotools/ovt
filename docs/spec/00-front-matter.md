@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc24 (2026-11-13) |
+| **Version** | 1.0-rc35 (2026-11-15) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -79,3 +79,14 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc22 (2026-11-13) | Spec-amendment pass 3 (data model, CLI and C API): accepted answers of 22 `spec-question` issues on chapters 6 and 12 (and the chapter 0, 4, 7, 13 and 14 sentences they touch) plus the review nits of #102, #294 and #301 folded in (see `CHANGELOG.md`). |
 | 1.0-rc23 (2026-11-13) | Spec-amendment pass 4 (container, metrics, rendering, GUI): accepted answers of 28 `spec-question` issues on chapters 8, 9, 10 and 11 (and the chapter 0, 4, 6 and 14 sentences they touch), including the UVQ 1.5 PyTorch pin in D11, §9.6 and §14.4.14 (see `CHANGELOG.md`). |
 | 1.0-rc24 (2026-11-13) | Spec-amendment pass 5 (follow-ups): accepted answers of `spec-question` issues #385, #388, #389, #391 (points 1–3) and #395 (points 1–5), the public-header rulings left open by pass 4 (#209 item 4, #366 item 3, #318), and the WI-0.089 AT3 rewording after the Mac Mini run (see `CHANGELOG.md`). |
+| 1.0-rc25 (2026-11-14) | Spec-amendment pass 6: accepted answers of `spec-question` issues #394 (libvmaf host), #407 (SSIM border policy), #408 (AV1 accounting), #402 (timeline arrows), two follow-ups on #323 (box walker: `uuid` with `size < 8`, node bound `CNT-0111`) and the owner-approved acceptance-test changes of #391 point 4 and #395 point 6 (see `CHANGELOG.md`). |
+| 1.0-rc26 (2026-11-14) | Corpus fix (#507, #160 follow-up): five ITU conformance ids that were never fetchable are replaced by the streams that exist, the absent AV1 Annex B vector gives way to `syn_av1_annexb`, `ALPHACONFORMANCEG` moves to `slow` (see `CHANGELOG.md`). |
+| 1.0-rc27 (2026-11-14) | Spec-amendment pass 7 (unblocking in-flight work items): accepted answers of `spec-question` issues #415, #416, #417, #419, #421, #425, #426, #429, #430, #432, #435, #436, #437, #443, #442, #444, #457, #460, #461, #465, #467, #469, #488, #493 and the WI-1.119 frame-count oracle change (see `CHANGELOG.md`). |
+| 1.0-rc28 (2026-11-14) | Spec-amendment pass 8: accepted answers of `spec-question` issues #466, #473, #512, #513 and the corpus placeholder fix #517 (nine never-fetchable manifest entries deleted, manifest sweeps skip placeholders; see `CHANGELOG.md`). |
+| 1.0-rc29 (2026-11-14) | Spec-amendment pass 9: accepted answers of `spec-question` issues #495, #498 (see `CHANGELOG.md`). |
+| 1.0-rc30 (2026-11-14) | Spec-amendment pass 10: accepted answer of `spec-question` issue #418 (`SYN-H265-0021`, `SYN-H265-0022`; see `CHANGELOG.md`). |
+| 1.0-rc31 (2026-11-14) | Spec-amendment pass 11: accepted answers of `spec-question` issues #528 (SEI payload bound, `SYN-H264-0031`, `SYN-H264-0032`, WI-1.110 AT2) #533 (film grain conformance → `SYN-AV1-0015`) and #529 (H.264 `ParameterSets`, `SYN-H264-0010` variants, `SYN-H264-0070`; see `CHANGELOG.md`). |
+| 1.0-rc32 (2026-11-15) | Spec-amendment pass 12: accepted answers of `spec-question` issues #159, #366 (wording), #406, #419 (float accumulation wording), #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510 (see `CHANGELOG.md`). |
+| 1.0-rc33 (2026-11-15) | Spec-amendment pass 13: accepted answers of `spec-question` issues #546 (tile group range → `SYN-GEN-0003`) and #547 (Android `useLegacyPackaging = true`; see `CHANGELOG.md`). |
+| 1.0-rc34 (2026-11-15) | Spec-amendment pass 14: accepted answers of `spec-question` issues #550 (Qt Quick accessibility under `QtQuickView`: §13.4.4 item 9, risk R-23), #551 (`SYN-H264-0033`), #552 (`SYN-H264-0071`, WI-1.109 four-way split) and #553 (HM plugin: empty RPS lists at BLA pictures); see `CHANGELOG.md`. |
+| 1.0-rc35 (2026-11-15) | Spec-amendment pass 15: accepted answers of `spec-question` issues #558 (WI-1.230 AT1 `expected.demux`), #567 (WI-1.205 fixture, `.derived` siblings, QuickTime `hdlr.name`), #568 (WI-1.111 rule 10, field pairs, AT2), #569 (WI-4.206 PES reassembly and file-based PCR/PTS checks), #570 (WI-1.114 oracle streams, `SYN-H265-0051`/`0052`, CpbCnt) and #566 (WI-3.590 AT3 map conservation); see `CHANGELOG.md`. |
