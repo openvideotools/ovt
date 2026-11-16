@@ -241,7 +241,7 @@ Resolved resolve(const Cli& cli, const Context& ctx) {
   g.output = r.output;
   // #101 (accepted): `completion` ignores OVT_FORMAT and the TTY default, so only a --format flag can make it
   // refuse binary output here.
-  const bool format_used = g.format_from_flag || !cli.completion()->parsed();
+  const bool format_used = g.format_from_flag || !cli.completion()->parsed();  // `cache` uses the format
   if (format_used && g.format == Format::Fb && g.output == "-" && ctx.stdout_tty) {
     return {std::nullopt, UsageError{"CLI-0010", std::string(kRefuseBinaryOnTty), std::string(kName)}};
   }
@@ -478,8 +478,52 @@ std::optional<int> parse(Cli& cli, const std::vector<std::string>& args, Context
   return static_cast<int>(ExitCode::Usage);
 }
 
+int dispatch_cache(const Cli& cli, const Globals& g, Context& ctx) {
+  const cmd::CacheEnv env{ctx.in,
+                          ctx.err,
+                          ctx.stdin_tty,
+                          ctx.stderr_tty,
+                          g.color == ColorMode::Always || (g.color == ColorMode::Auto && ctx.stdout_tty),
+                          ctx.record_io};
+  OutputTarget target(ctx, g);
+  if (auto d = target.open()) {
+    report(ctx, g, *d);
+    return static_cast<int>(ExitCode::Io);
+  }
+  const cmd::CacheOutcome outcome = cmd::run_cache(cli.cache(), g, env, target.stream());
+  if (outcome.usage) {
+    static_cast<void>(target.close(ExitCode::Usage));
+    if (g.output != "-") {
+      static_cast<void>(std::remove(g.output.c_str()));
+    }
+    print_usage_error(ctx, UsageError{outcome.usage->code, outcome.usage->message, outcome.usage->command});
+    return static_cast<int>(ExitCode::Usage);
+  }
+  ExitCode code = outcome.code;
+  if (cancel_requested()) {
+    code = ExitCode::Cancelled;
+  }
+  const auto closed = target.close(code);
+  // json and fb carry the diagnostics in the envelope; text and csv print them on stderr.
+  if (g.format != Format::Json && g.format != Format::Fb) {
+    for (const Diagnostic& d : outcome.diagnostics) {
+      report(ctx, g, d);
+    }
+  }
+  if (outcome.write_failed || closed) {
+    report(
+        ctx, g,
+        closed.value_or(Diagnostic{"Error", "CLI-0004", fmt::format("cannot write '{}'", g.output), std::nullopt, ""}));
+    return static_cast<int>(ExitCode::Io);
+  }
+  return static_cast<int>(code);
+}
+
 int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
   const bool version = cli.raw().version;
+  if (!version && cli.cache().app->parsed()) {
+    return dispatch_cache(cli, g, ctx);
+  }
   if (!version && !cli.completion()->parsed()) {
     print_usage_error(ctx, UsageError{"CLI-0001", "a subcommand is required", std::string(kName)});
     return static_cast<int>(ExitCode::Usage);
@@ -609,6 +653,7 @@ Cli::Cli()
   app_.add_flag("--text", raw_.text, "Alias of --format text")->group("Aliases");
   app_.add_flag("--flatbuffers", raw_.flatbuffers, "Alias of --format fb")->group("Aliases");
 
+  cmd::add_cache_command(*this, cache_);
   completion_ = app_.add_subcommand("completion", "Shell completion scripts (bash, zsh, fish)");
   add_choice(*completion_, "shell", raw_.shell, "Shell to print the completion script for", {"bash", "zsh", "fish"})
       ->required();
@@ -656,7 +701,7 @@ int run(const std::vector<std::string>& args, Context& ctx) {
 }
 
 void install_signal_handlers() {
-  struct sigaction sa{};
+  struct sigaction sa {};
   sa.sa_handler = &ovt_cli_on_signal;
   sigemptyset(&sa.sa_mask);
   static_cast<void>(sigaction(SIGINT, &sa, nullptr));
