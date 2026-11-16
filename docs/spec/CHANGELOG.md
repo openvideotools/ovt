@@ -2,22 +2,22 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc40 — 2026-11-16
+## 1.0.0-rc41 — 2026-11-16
 
-<<<<<<< HEAD
 MINOR-level: the accepted answer of `spec-question` issue #674 (found while adding the C entry points of #673 point 1). One additive FlatBuffers table in `ovt_model.fbs`; no field renumbering, no plugin ABI or CLI grammar change. Two new public C headers under `core/include/ovt/` (`validate.h`, `syntax.h`), reviewed on the implementing PR under the Fable reviewer's approval.
 
 - 6 §6.1.1, §6.3 — `table DiagnosticList { diagnostics:[Diagnostic]; }` appended to the CLI/API report tables, a secondary root table with identifier `"OVTD"`, the out-buffer of `ovt_validate_*`, `ovt_container_validate` and `ovt_BdResult.diagnostics` (not size-prefixed across the C ABI) — WI-0.086, WI-1.509 (#674)
 - 12 §12.3.8 `ovt/validate.h` comment — a violation is `Diagnostic{code "MDL-VAL-0nnn", severity per rule, message "V-nnn: …" + " (at <path>)", spec_ref "chapter 06 §6.9"}`; `ovt_validate_*` return `OVT_OK` whenever the call could run (an empty list = valid, a verifier failure is V-001 in the list), `OVT_E_INVALID_ARG` for NULL pointers or a `codec_override` outside `-1..ovt.fb.Codec` — WI-0.086 (#674)
 - 12 §12.3.8 `ovt_fb_to_json` / `ovt_json_to_fb`, §12.3.1 `ovt/syntax.h` row — `root_type` with or without the `ovt.fb.` prefix, looked up in the model, container and metrics schemas in that order; unknown = `OVT_E_INVALID_ARG`, rejected text or buffer = `OVT_E_CORRUPT`; the text is RFC 8259 (strict numbers) and NUL-terminated past `size`; the buffer is the canonical `from_json` form with the identifier only for the schema's own root type; `ovt/syntax.h` is created with the two JSON functions first — WI-1.509 (#674)
-=======
+
+## 1.0.0-rc40 — 2026-11-16
+
 PATCH-level: spec-amendment pass 20 folds in the accepted answer of `spec-question` issue #662 from the WI-1.112 AUD/EOS/EOB/FD follow-up (PR #664), and records the WI-1.415 partial (PR #625), the WI-1.204 landing (PR #639) and the WI-1.209 `PagedSpan` reading (PR #681). One new diagnostic code is registered (D2: `SYN-H265-0033`, with its `tests/corpora/corrupt_conditions.json` `not_in_table` entry); no public C header under `core/include/`, FlatBuffers schema, plugin ABI or CLI grammar change.
 
 - 7 §7.3.5 row 15, §7.9 — bytes after the NAL unit header of the empty H.265 `end_of_seq_rbsp()` / `end_of_bitstream_rbsp()` are kept as the opaque node `trailing_data` and reported with the new Info `SYN-H265-0033` (mirrors `SYN-H264-0033`, #551); the `filler_data_rbsp()` `ff_byte` run is one Bytes node `ff_byte` (`f(8)*<n>`, `ff_byte_count` derived) expanded per byte by the golden comparison — WI-1.112 follow-up (#662)
 - 10 WI-1.415 notes, 16 §16.4 row — WI-1.415 landed as a partial in PR #625 with `gpu_time: null`; the per-pass GPU counters are its only open item and are tracked in issue #628, not in a second WI — WI-1.415
 - 8 WI-1.204 Produces and notes, 16 §16.4 row — WI-1.204 landed in PR #639; the benchmark is `tests/perf/core/bench_container_open_moov_1h.cpp` (per-area layout of chapter 14 §14.2.1, D14) and the fuzz seeds live under `core/tests/fuzz/corpus/isobmff_tree/`; the `PagedSpan` windowed reads belong to WI-1.209 step 6 (#630) — WI-1.204
 - 8 §8.2.3 reading strategy, WI-1.209 step 6 — a leaf larger than 1 MiB is walked through a `PagedSpan` with one `BitReader` per 1 MiB window, not one reader over a paged source, because the chapter 7 `BitReader` helper is a public header left untouched — WI-1.209 (PR #681)
->>>>>>> origin/main
 
 ## 1.0.0-rc39 — 2026-11-16
 
