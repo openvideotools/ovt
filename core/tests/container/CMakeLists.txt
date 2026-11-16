@@ -9,6 +9,7 @@ add_executable(
   annexb_test.cpp
   box_walk_test.cpp
   c_api_test.cpp
+  decoders_colour_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   field_builder_test.cpp
