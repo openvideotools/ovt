@@ -14,6 +14,10 @@
 // decoder.h gives the AV1_COMMON frame state ifd_inspect() reads; the callback reads a few more of its fields.
 #include "av1/decoder/decoder.h"
 #include "av1/decoder/inspection.h"
+#include "config/aom_config.h"
+#if CONFIG_ACCOUNTING
+#include "av1/decoder/accounting.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -33,6 +37,7 @@ constexpr uint8_t kSeverityError = 2;  // ovt.fb.Severity
 // OBU types (AV1 §6.2.2).
 constexpr unsigned kObuTemporalDelimiter = 2;
 constexpr unsigned kObuFrameHeader = 3;
+constexpr unsigned kObuTileGroup = 4;
 constexpr unsigned kObuFrame = 6;
 
 constexpr const char* kNoInspection = "libaom built without CONFIG_INSPECTION";
@@ -190,7 +195,38 @@ void copy_blocks(const insp_frame_data& fd, const AV1Decoder& pbi, BlockData* ou
   }
 }
 
+#if CONFIG_ACCOUNTING
+// Copies libaom's accounting of the frame (chapter 07 §7.6.1 accounting row, WI-2.157). fd.accounting points at
+// pbi->accounting, which libaom resets when it starts decoding a tile group, so it must be copied here, inside the
+// callback. The dictionary only grows over the decoder's life; it is copied whole, so ids index it unchanged.
+void copy_accounting(const insp_frame_data& fd, AccountingData* out) {
+  const Accounting* acc = fd.accounting;
+  if (acc == nullptr) {
+    return;
+  }
+  const AccountingDictionary& dict = acc->syms.dictionary;
+  const auto n_strs = static_cast<size_t>(std::clamp(dict.num_strs, 0, MAX_SYMBOL_TYPES));
+  out->names.clear();
+  for (const char* str : std::span(dict.strs).first(n_strs)) {
+    out->names.emplace_back(str != nullptr ? str : "");
+  }
+  const auto n_syms = static_cast<size_t>(std::max(acc->syms.num_syms, 0));
+  out->symbols.resize(n_syms);
+  if (n_syms > 0) {
+    const std::span<const AccountingSymbol> syms(acc->syms.syms, n_syms);
+    std::transform(syms.begin(), syms.end(), out->symbols.begin(), [](const AccountingSymbol& s) {
+      return AcctSymbol{s.context.x, s.context.y, s.id, s.bits, s.samples};
+    });
+  }
+  out->valid = true;
+}
+#endif
+
 }  // namespace
+
+bool Decoder::has_accounting() {
+  return CONFIG_ACCOUNTING != 0;
+}
 
 struct Decoder::Impl {
   FramePool pool;  // libaom's frame buffers (planes.hpp); must outlive ctx, which releases them in its destroy
@@ -283,6 +319,11 @@ struct Decoder::Impl {
     const auto* pbi = static_cast<const AV1Decoder*>(decoder);
     self->apply_grain = pbi->common.film_grain_params.apply_grain != 0;
     copy_blocks(self->fd, *pbi, &self->blocks);
+#if CONFIG_ACCOUNTING
+    if (self->blocks.valid) {
+      copy_accounting(self->fd, &self->blocks.accounting);
+    }
+#endif
     self->fired = true;
   }
 };
@@ -374,6 +415,9 @@ ovt_status Decoder::push(const uint8_t* unit, size_t len, int32_t decode_index_h
     }
     tu_frames_.push_back(FrameObu{tu_.size(), pts});
   }
+  if (type == kObuFrame || type == kObuTileGroup) {
+    tu_tile_groups_.push_back(tu_.size());
+  }
   tu_.insert(tu_.end(), obu.begin(), obu.end());
   return st;
 }
@@ -386,7 +430,8 @@ ovt_status Decoder::decode_temporal_unit() {
   Impl& im = *impl_;
   const std::span<const uint8_t> tu(tu_);
   size_t off = 0;
-  size_t next_frame_obu = 0;  // index into tu_frames_
+  size_t next_frame_obu = 0;   // index into tu_frames_
+  size_t next_tile_group = 0;  // index into tu_tile_groups_
   int32_t pos = 0;
   ovt_status st = OVT_OK;
   while (off < tu.size()) {
@@ -420,9 +465,16 @@ ovt_status Decoder::decode_temporal_unit() {
       ++next_frame_obu;
       ++n;
     }
+    // SPEC-ASSUMPTION(#408): the tile-group count alone decides the "last tile group only" note.
+    int32_t tile_groups = 0;  // tile groups consumed by this call: those of the one frame it decoded
+    while (next_tile_group < tu_tile_groups_.size() && tu_tile_groups_[next_tile_group] < off) {
+      ++next_tile_group;
+      ++tile_groups;
+    }
     if (im.fired) {
       n = std::max(n, 1);
       Frame f = im.take_frame(tu_first_hint_ + pos + n - 1, tu_frames_[std::max<size_t>(next_frame_obu, 1) - 1].pts);
+      f.blocks.accounting.tile_groups = std::max(tile_groups, 1);
       f.diagnostics = std::move(pending_diags_);
       pending_diags_.clear();
       frames_.push_back(std::move(f));
@@ -434,6 +486,7 @@ ovt_status Decoder::decode_temporal_unit() {
   expected_next_ = st == OVT_OK ? tu_first_hint_ + pos : -1;
   tu_.clear();
   tu_frames_.clear();
+  tu_tile_groups_.clear();
   tu_first_hint_ = -1;
   return st;
 }

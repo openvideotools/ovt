@@ -2,11 +2,18 @@
 # SPDX-License-Identifier: LGPL-2.1-or-later
 #
 # Files derived from other projects (chapter 15 §15.1.1, §15.6). tools/gen_notices.py lists them in
-# THIRD_PARTY_NOTICES.md under "Files derived from other projects". Empty until the first YUView-derived
-# file lands (phases 2-4). One entry per file, all four keys required:
+# THIRD_PARTY_NOTICES.md under "Files derived from other projects". One entry per file, all four keys required:
 #
 # [[files]]
 # path = "app/src/items/DifferenceItem.cpp"   # file in this repository
 # upstream = "YUView"                         # upstream project
 # commit = "<full sha of the upstream commit>"
 # license = "GPL-3.0-only"                    # SPDX id of the upstream file
+
+# WI-4.454 (#512): the CIE 1931 2-degree locus chromaticities, computed from the colour-matching functions in
+# colour/colorimetry/datasets/cmfs.py of colour-science v0.4.7.
+[[files]]
+path = "render/src/measure/cie1931_locus.h"
+upstream = "colour-science (https://github.com/colour-science/colour), Copyright 2013 Colour Developers"
+commit = "a3bfe349685f528100672e5c8ca2dfeeef64a273"
+license = "BSD-3-Clause"

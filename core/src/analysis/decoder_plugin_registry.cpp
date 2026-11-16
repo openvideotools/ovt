@@ -118,8 +118,10 @@ struct OpenedPlugin {
   const ovt_AnalysisDecoderApi* api = nullptr;
 };
 OpenedPlugin open_plugin(const std::string& path, std::string& error) {
+  // RTLD_NODELETE: a rejected plugin's dlclose() must not unmap the image, or the next candidate can reuse its
+  // addresses and trip over stale AddressSanitizer global shadow (issue #537; same fix as the metrics registry).
   // NOLINTNEXTLINE(hicpp-signed-bitwise): POSIX flag constants
-  void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+  void* handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
   if (handle == nullptr) {
     error = "dlopen failed: " + dl_error();
     return {};

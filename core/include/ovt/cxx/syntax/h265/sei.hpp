@@ -1,0 +1,270 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// H.265 SEI messages (Annex D): sei_rbsp() over the shared framing of WI-1.110 and the payload parsers of chapter 7
+// §7.3.5 rows 13 and 14 (WI-1.114a: buffering_period, pic_timing, recovery_point, active_parameter_sets and
+// decoded_picture_hash; WI-1.114b: time_code, the two user-data payloads, frame_packing_arrangement,
+// display_orientation and the colour payloads 137, 144, 147 and 148). Every other payload type is kept as Bytes under
+// its Annex D name. C++ helper header (D22): semi-public, no ABI promise, never included from a
+// C header.
+//
+// Every message becomes a node `sei_message[i]` whose child is the payload node named after the payload. A payload
+// type that D.2.1 does not allow in this SEI NAL unit type is still parsed, with Diagnostic Warning SYN-H265-0050.
+
+#ifndef OVT_CXX_SYNTAX_H265_SEI_HPP
+#define OVT_CXX_SYNTAX_H265_SEI_HPP
+
+#include <array>
+#include <cstdint>
+#include <optional>
+#include <span>
+#include <string>
+#include <string_view>
+#include <variant>
+#include <vector>
+
+#include "ovt/cxx/bitreader.hpp"
+#include "ovt/cxx/syntax/h265/nal_header.hpp"
+#include "ovt/cxx/syntax/h265/sps.hpp"
+#include "ovt/cxx/syntax/h265/vps.hpp"
+#include "ovt/cxx/syntax/syntax_builder.hpp"
+
+namespace ovt::syntax::h265 {
+
+/// One CPB of buffering_period() (D.2.2), NAL or VCL HRD; the alt fields only when BufferingPeriod::alt_present.
+struct InitialCpbRemoval {
+  uint32_t initial_cpb_removal_delay = 0;
+  uint32_t initial_cpb_removal_offset = 0;
+  uint32_t initial_alt_cpb_removal_delay = 0;
+  uint32_t initial_alt_cpb_removal_offset = 0;
+};
+
+/// buffering_period() (D.2.2, type 0). Field lengths come from the hrd_parameters() of the SPS it names.
+struct BufferingPeriod {
+  uint32_t bp_seq_parameter_set_id = 0;
+  bool irap_cpb_params_present_flag = false;  // inferred 0 when sub_pic_hrd_params_present_flag
+  uint32_t cpb_delay_offset = 0;
+  uint32_t dpb_delay_offset = 0;
+  bool concatenation_flag = false;
+  uint32_t au_cpb_removal_delay_delta_minus1 = 0;
+  bool alt_present = false;                     // the *_alt_* fields of the CPB entries were sent
+  std::vector<InitialCpbRemoval> nal;           // CpbCnt entries when NalHrdBpPresentFlag, else empty
+  std::vector<InitialCpbRemoval> vcl;           // CpbCnt entries when VclHrdBpPresentFlag, else empty
+  std::optional<bool> use_alt_cpb_params_flag;  // present only with payload_extension_present()
+};
+
+/// pic_timing() (D.2.3, type 1).
+struct PicTiming {
+  bool frame_field_info_present = false;  // the VUI frame_field_info_present_flag
+  uint32_t pic_struct = 0;
+  std::string_view pic_struct_name;  // Table D-2 (static storage)
+  uint32_t source_scan_type = 0;
+  bool duplicate_flag = false;
+  bool cpb_dpb_delays_present = false;  // CpbDpbDelaysPresentFlag
+  uint32_t au_cpb_removal_delay_minus1 = 0;
+  uint32_t pic_dpb_output_delay = 0;
+  uint32_t pic_dpb_output_du_delay = 0;  // sub_pic_hrd_params_present_flag
+  bool du_info_present = false;          // sub_pic_hrd_params_present_flag && sub_pic_cpb_params_in_pic_timing_sei_flag
+  uint32_t num_decoding_units_minus1 = 0;
+  bool du_common_cpb_removal_delay_flag = false;
+  uint32_t du_common_cpb_removal_delay_increment_minus1 = 0;
+  std::vector<uint32_t> num_nalus_in_du_minus1;                 // num_decoding_units_minus1 + 1 entries
+  std::vector<uint32_t> du_cpb_removal_delay_increment_minus1;  // num_decoding_units_minus1 entries, or none
+};
+
+/// recovery_point() (D.2.8, type 6).
+struct RecoveryPoint {
+  int32_t recovery_poc_cnt = 0;
+  bool exact_match_flag = false;
+  bool broken_link_flag = false;
+};
+
+/// active_parameter_sets() (D.2.21, type 129).
+struct ActiveParameterSets {
+  uint32_t active_video_parameter_set_id = 0;
+  bool self_contained_cvs_flag = false;
+  bool no_parameter_set_update_flag = false;
+  uint32_t num_sps_ids_minus1 = 0;
+  std::vector<uint32_t> active_seq_parameter_set_id;  // num_sps_ids_minus1 + 1 entries
+  /// layer_sps_idx[i] for i = vps_base_layer_internal_flag..MaxLayersMinus1 (entry k is layer_sps_idx[first_layer +
+  /// k]); empty for a single-layer VPS. Without the VPS the entries the payload holds are read, from index 0, with
+  /// Diagnostic Warning SYN-H265-0051.
+  std::vector<uint32_t> layer_sps_idx;
+  uint32_t first_layer = 0;  // vps_base_layer_internal_flag of the named VPS
+  bool vps_known = false;
+};
+
+/// decoded_picture_hash() (D.2.19, type 132), stored for the verify job (§7.6.4).
+struct DecodedPictureHash {
+  uint32_t hash_type = 0;  // 0 MD5, 1 CRC, 2 checksum; other values are reserved (the components are not read)
+  std::string_view hash_type_name;
+  uint32_t num_components = 0;                           // chroma_format_idc == 0 ? 1 : 3
+  std::array<std::array<uint8_t, 16>, 3> picture_md5{};  // hash_type 0
+  std::array<uint32_t, 3> picture_crc{};                 // hash_type 1 (u(16))
+  std::array<uint32_t, 3> picture_checksum{};            // hash_type 2
+};
+
+/// One clock timestamp of time_code() (D.2.27).
+struct TimeCodeClock {
+  bool clock_timestamp_flag = false;
+  bool units_field_based_flag = false;
+  uint32_t counting_type = 0;
+  bool full_timestamp_flag = false;
+  bool discontinuity_flag = false;
+  bool cnt_dropped_flag = false;
+  uint32_t n_frames = 0;  // u(9), unlike H.264 pic_timing's u(8)
+  bool seconds_flag = false;
+  bool minutes_flag = false;
+  bool hours_flag = false;
+  uint32_t seconds_value = 0;
+  uint32_t minutes_value = 0;
+  uint32_t hours_value = 0;
+  uint32_t time_offset_length = 0;
+  int32_t time_offset_value = 0;
+  std::string text;  // "hh:mm:ss:ff" (a field that was not sent is 0); empty without clock_timestamp_flag
+};
+
+/// time_code() (D.2.27, type 136).
+struct TimeCode {
+  uint32_t num_clock_ts = 0;
+  std::vector<TimeCodeClock> clock;  // num_clock_ts entries
+};
+
+/// user_data_registered_itu_t_t35() (D.2.5, type 4): identification fields, identified by the §7.3.11 registry. The
+/// payload bytes stay in the tree.
+struct UserDataRegisteredItuTT35 {
+  uint8_t itu_t_t35_country_code = 0;
+  std::optional<uint8_t> itu_t_t35_country_code_extension_byte;
+  std::optional<uint16_t> itu_t_t35_terminal_provider_code;
+  std::optional<uint32_t> itu_t_t35_terminal_provider_oriented_code;
+  std::string enum_name;  // registry name (§7.3.11) or "T.35 provider …"
+  bool has_hdr10plus = false;
+  bool has_dolby_vision = false;
+  uint32_t payload_byte_count = 0;
+  /// HDR10+ (ST 2094-40) summary when has_hdr10plus: application_identifier, application_version, num_windows,
+  /// targeted_system_display_maximum_luminance and maxscl[0..2] of the first processing window.
+  uint32_t hdr10plus_application_identifier = 0;
+  uint32_t hdr10plus_application_version = 0;
+  uint32_t hdr10plus_num_windows = 0;
+  uint32_t hdr10plus_targeted_system_display_maximum_luminance = 0;
+  std::array<uint32_t, 3> hdr10plus_maxscl{};
+};
+
+/// user_data_unregistered() (D.2.6, type 5).
+struct SeiUserDataUnregistered {
+  std::string uuid;       // canonical upper-case 8-4-4-4-12
+  std::string enum_name;  // "x265 options", … or "user data (UUID …)"
+  std::optional<std::string> text;
+  uint32_t payload_byte_count = 0;
+};
+
+/// frame_packing_arrangement() (D.2.16, type 45).
+struct FramePackingArrangement {
+  uint32_t frame_packing_arrangement_id = 0;
+  bool cancel_flag = false;
+  uint32_t type = 0;
+  std::string_view type_name;  // Table D-8 (static storage)
+  bool quincunx_sampling_flag = false;
+  uint32_t content_interpretation_type = 0;
+  bool spatial_flipping_flag = false;
+  bool frame0_flipped_flag = false;
+  bool field_views_flag = false;
+  bool current_frame_is_frame0_flag = false;
+  bool frame0_self_contained_flag = false;
+  bool frame1_self_contained_flag = false;
+  std::array<uint32_t, 4> grid_position{};  // frame0 x, frame0 y, frame1 x, frame1 y
+  uint32_t reserved_byte = 0;
+  bool persistence_flag = false;
+  bool upsampled_aspect_ratio_flag = false;
+};
+
+/// display_orientation() (D.2.17, type 47).
+struct DisplayOrientation {
+  bool cancel_flag = false;
+  bool hor_flip = false;
+  bool ver_flip = false;
+  uint32_t anticlockwise_rotation = 0;
+  double degrees = 0.0;  // anticlockwise_rotation * 360 / 65536
+  bool persistence_flag = false;
+};
+
+/// mastering_display_colour_volume() (D.2.28, type 137).
+struct MasteringDisplayColourVolume {
+  std::array<uint32_t, 3> display_primaries_x{};  // as coded: c = 0 green, 1 blue, 2 red
+  std::array<uint32_t, 3> display_primaries_y{};
+  uint32_t white_point_x = 0;
+  uint32_t white_point_y = 0;
+  uint32_t max_display_mastering_luminance = 0;  // 0.0001 cd/m²
+  uint32_t min_display_mastering_luminance = 0;
+  // derived: R, G, B order of ovt_ColorDescription.mdcv_primaries
+  std::array<uint32_t, 3> mdcv_primaries_x{};
+  std::array<uint32_t, 3> mdcv_primaries_y{};
+  std::string text;  // "R (0.680, 0.320) G (…) B (…) WP (…) max 1000 cd/m² min 0.0001 cd/m²"
+};
+
+/// content_light_level_info() (D.2.35, type 144).
+struct ContentLightLevelInfo {
+  uint32_t max_content_light_level = 0;
+  uint32_t max_pic_average_light_level = 0;
+};
+
+/// alternative_transfer_characteristics() (D.2.38, type 147).
+struct AlternativeTransferCharacteristics {
+  uint32_t preferred_transfer_characteristics = 0;
+};
+
+/// ambient_viewing_environment() (D.2.39, type 148).
+struct AmbientViewingEnvironment {
+  uint32_t ambient_illuminance = 0;  // 0.0001 lux
+  uint32_t ambient_light_x = 0;      // 0.00002 units
+  uint32_t ambient_light_y = 0;
+};
+
+/// The parsed form of one message; std::monostate when the payload is kept as bytes.
+using SeiPayload = std::variant<std::monostate, BufferingPeriod, PicTiming, RecoveryPoint, ActiveParameterSets,
+                                DecodedPictureHash, TimeCode, UserDataRegisteredItuTT35, SeiUserDataUnregistered,
+                                FramePackingArrangement, DisplayOrientation, MasteringDisplayColourVolume,
+                                ContentLightLevelInfo, AlternativeTransferCharacteristics, AmbientViewingEnvironment>;
+
+struct SeiMessage {
+  uint32_t payload_type = 0;
+  uint32_t payload_size = 0;
+  std::string_view name;  // Annex D name or "reserved_sei_message" (static storage)
+  BitSpan payload_span{0, 0};
+  bool allowed = true;  // false: D.2.1 does not allow the type in this SEI NAL unit type (SYN-H265-0050)
+  bool parsed = false;  // false: kept as Bytes (no parser, parameter set missing) or the payload failed to parse
+  SeiPayload payload;
+};
+
+/// The parameter sets the SEI parsers look at. buffering_period() names its SPS by id; pic_timing() and
+/// decoded_picture_hash() use the SPS of the current picture, or for a prefix SEI before the first slice of the
+/// access unit the SPS named by a buffering_period() of the same access unit, else the SPS of the previous picture.
+struct SeiContext {
+  std::span<const Vps* const> vps_by_id;  // indexed by the VPS id (0..15); null entries are unknown
+  std::span<const Sps* const> sps_by_id;  // indexed by the SPS id (0..15); null entries are unknown
+  const Sps* active_sps = nullptr;        // SPS of the current (suffix SEI) or previous (prefix SEI) picture
+  /// Set by parse_sei_rbsp() from a buffering_period() of this access unit; the caller clears it at the next one.
+  std::optional<uint32_t> buffering_period_sps_id;
+};
+
+struct SeiRbsp {
+  bool suffix = false;  // nal_unit_type 40
+  std::vector<SeiMessage> messages;
+  bool complete = true;  // false when the framing stopped early (payloadSize beyond the RBSP)
+  BitSpan span{0, 0};
+  const SyntaxNodeBuffer* tree = nullptr;  // set by the owning Unit
+};
+
+/// Annex D payload name of payloadType 0..205 (H.265 (08/2021) D.2.1); "reserved_sei_message" for an unassigned type.
+[[nodiscard]] std::string_view sei_payload_name(uint32_t payload_type) noexcept;
+
+/// True when D.2.1 allows the payload type in a prefix (`suffix == false`) or suffix SEI NAL unit.
+[[nodiscard]] bool sei_payload_allowed(uint32_t payload_type, bool suffix) noexcept;
+
+/// sei_rbsp() (§7.3.2.4) of a PREFIX_SEI_NUT or SUFFIX_SEI_NUT unit. Node `sei_rbsp`. Only a failure to read the
+/// framing itself stops the message loop; it is not thrown but recorded (SeiRbsp::complete, Diagnostic).
+SeiRbsp parse_sei_rbsp(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, SeiContext& ctx);
+
+}  // namespace ovt::syntax::h265
+
+#endif  // OVT_CXX_SYNTAX_H265_SEI_HPP

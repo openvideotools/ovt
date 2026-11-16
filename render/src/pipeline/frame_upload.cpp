@@ -211,6 +211,7 @@ std::string upload_picture(pl_gpu gpu, const Picture& pic, FrameSlot& slot, H273
   slot.crop = pic.crop;
   slot.chroma_format = pic.color.chroma_format;
   slot.bit_depth = pic.color.bit_depth;
+  slot.id = pic.id;
   slot.generation = pic.generation;
   slot.valid = true;
   return "";
