@@ -7,7 +7,12 @@
 # The flatc-generated namespace package build/<preset>/generated/python/ovt/fb/ is never committed; it is installed
 # next to python/ovt/model.py into the wheel's ovt/ package (chapter 13 §13.2.3).
 if(OVT_BUILD_PYTHON)
-  install(DIRECTORY "${OVT_GENERATED_DIR}/python/ovt/fb" DESTINATION ovt COMPONENT python FILES_MATCHING PATTERN "*.py")
+  install(
+    DIRECTORY "${OVT_GENERATED_DIR}/python/ovt/fb"
+    DESTINATION ovt
+    COMPONENT python
+    FILES_MATCHING
+    PATTERN "*.py")
   install(FILES ovt/model.py DESTINATION ovt COMPONENT python)
 endif()
 
@@ -28,14 +33,14 @@ if(OVT_BUILD_TESTS)
       COMMAND "${CMAKE_COMMAND}" -E copy_directory "${OVT_GENERATED_DIR}/python/ovt" "${_stage}/ovt"
       COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/ovt/model.py" "${_stage}/ovt/model.py"
       DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/ovt/model.py"
-      COMMENT "Staging the ovt Python package for python/tests" VERBATIM)
+      COMMENT "Staging the ovt Python package for python/tests"
+      VERBATIM)
     add_dependencies(ovt_py_model_stage ovt_schemas)
-    add_test(NAME python_model_pytest
-             COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
-                     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_model.py")
+    add_test(NAME python_model_pytest COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider
+                                              "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_model.py")
     set_tests_properties(
-      python_model_pytest PROPERTIES LABELS "fast;python" TIMEOUT 120
-      ENVIRONMENT "PYTHONPATH=${_stage};OVT_GOLDEN_DIR=${PROJECT_SOURCE_DIR}/core/tests/golden")
+      python_model_pytest PROPERTIES LABELS "fast;python" TIMEOUT 120 ENVIRONMENT
+                                     "PYTHONPATH=${_stage};OVT_GOLDEN_DIR=${PROJECT_SOURCE_DIR}/core/tests/golden")
   else()
     message(STATUS "pytest, numpy, flatbuffers or zstandard missing for ${Python3_EXECUTABLE}: python_model_pytest not "
                    "registered (pip install -r tools/requirements-test.txt flatbuffers==25.12.19 numpy zstandard)")
