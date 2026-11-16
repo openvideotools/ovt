@@ -55,7 +55,9 @@ endif()
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
-foreach(shader IN ITEMS diff fill hatch heatmap)
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3).
+target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+foreach(shader IN ITEMS diff fill hatch heatmap lines)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
   file(READ "${shader_src}" OVT_SHADER_TEXT)

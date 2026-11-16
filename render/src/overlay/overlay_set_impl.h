@@ -8,7 +8,9 @@
 #ifndef OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 #define OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 
+#include <array>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -21,6 +23,19 @@ struct PartitionLine {
   int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
   uint8_t kind = 0;                        // ovt::fb::PartitionKind of the first partition that owns the edge
   uint16_t partition = 0;                  // PartitionInfo.index of that partition
+};
+
+// Grid level slots of §10.5.3, in OverlayLayer bit order (GridTU = 1u << 3 ... GridCTU = 1u << 6).
+enum class GridLevel : uint8_t { TU = 0, PU = 1, CU = 2, CTU = 3, None = 0xFF };
+
+// One node of the block tree kept for the grid line pass (WI-2.432, §10.5.3), rect clipped to the coded picture
+// (luma samples). The children of a node are grid_nodes[first_child .. first_child + child_count), so the tree can be
+// walked with rect pruning without the FrameAnalysis buffer, which does not outlive build().
+struct GridNode {
+  int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
+  uint32_t first_child = 0;
+  uint32_t child_count = 0;
+  GridLevel level = GridLevel::None;
 };
 
 class OverlaySet {
@@ -49,6 +64,14 @@ class OverlaySet {
 
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
+
+  // Block tree for the grid line pass (§10.5.3), node 0 = the frame root blocks[0]. Empty unless a Grid* layer
+  // (GridTU..GridCTU) is set. grid_min_side[level] is the smallest unclipped block side of that level in luma samples
+  // (R-GRID-1 tests it against 6 device px); INT32_MAX when the level has no block.
+  std::vector<GridNode> grid_nodes;
+  std::array<int32_t, 4> grid_min_side{std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max(),
+                                       std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
+  int32_t picture_w = 0, picture_h = 0;  // NOLINT(readability-isolate-declaration): coded size, luma samples
 
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.

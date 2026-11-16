@@ -31,6 +31,9 @@ constexpr unsigned kChunks = 4;             // WI-2.430 step 5
 constexpr uint32_t kAttrLayers = static_cast<uint32_t>(OverlayLayer::PredFill) |
                                  static_cast<uint32_t>(OverlayLayer::SkipHatch) |
                                  static_cast<uint32_t>(OverlayLayer::RefIdxFill);
+constexpr uint32_t kGridLayers =
+    static_cast<uint32_t>(OverlayLayer::GridTU) | static_cast<uint32_t>(OverlayLayer::GridPU) |
+    static_cast<uint32_t>(OverlayLayer::GridCU) | static_cast<uint32_t>(OverlayLayer::GridCTU);
 
 bool contains(std::string_view hay, std::string_view needle) {
   return hay.find(needle) != std::string_view::npos;
@@ -155,6 +158,76 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   }
 }
 
+// §10.5.3 codec mapping, indexed by BlockKind {MB, SubMB, CTU, CU, PU, TU, SB, Block, TXB, Other}: H.264 MB -> CTU
+// slot, SubMB -> PU slot, transform blocks -> TU slot, no CU; AV1 SB -> CTU, Block -> CU, TXB -> TU, no PU.
+constexpr std::array<GridLevel, 10> kGridLevelOfKind = {GridLevel::CTU, GridLevel::PU,  GridLevel::CTU, GridLevel::CU,
+                                                        GridLevel::PU,  GridLevel::TU,  GridLevel::CTU, GridLevel::CU,
+                                                        GridLevel::TU,  GridLevel::None};
+
+GridLevel grid_level_of(ovt::fb::BlockKind kind) {
+  const auto k = static_cast<size_t>(kind);
+  return k < kGridLevelOfKind.size() ? kGridLevelOfKind.at(k) : GridLevel::None;
+}
+
+// Flattens the block tree breadth-first so that every node's children are contiguous (WI-2.432 step 1). Children are
+// followed only by id, each block at most once (a malformed tree with cycles or shared children cannot loop), and a
+// node whose rect misses the coded picture is dropped with its subtree (FR-BLK-003: children lie inside the parent).
+void build_grid_tree(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
+  const auto* blocks = fa.blocks();
+  if (blocks == nullptr || blocks->empty() || blocks->Get(0)->rect() == nullptr) {
+    set.diagnostics.emplace_back("FrameAnalysis has no block tree; grid lines are empty");
+    return;
+  }
+  const ovt::fb::Rect& root = *blocks->Get(0)->rect();
+  set.picture_w = std::max(root.w(), 0);
+  set.picture_h = std::max(root.h(), 0);
+  if (set.picture_w == 0 || set.picture_h == 0) {
+    set.diagnostics.emplace_back("blocks[0] has an empty rect; grid lines are empty");
+    return;
+  }
+  std::vector<bool> taken(blocks->size(), false);
+  std::vector<uint32_t> source;  // FrameAnalysis block id of grid_nodes[i]
+  taken[0] = true;
+  source.push_back(0);
+  set.grid_nodes.push_back({0, 0, set.picture_w, set.picture_h, 0, 0, GridLevel::None});
+  for (size_t n = 0; n < set.grid_nodes.size(); ++n) {
+    const auto* children = blocks->Get(source[n])->children();
+    set.grid_nodes[n].first_child = static_cast<uint32_t>(set.grid_nodes.size());
+    if (children == nullptr) {
+      continue;
+    }
+    for (const uint32_t id : *children) {
+      if (id >= blocks->size() || taken[id]) {
+        continue;
+      }
+      const auto* b = blocks->Get(id);
+      if (b->rect() == nullptr || b->rect()->w() <= 0 || b->rect()->h() <= 0) {
+        continue;
+      }
+      const ovt::fb::Rect& r = *b->rect();
+      const int64_t rx1 = int64_t{r.x()} + r.w();
+      const int64_t ry1 = int64_t{r.y()} + r.h();
+      GridNode node;
+      node.x0 = std::max(r.x(), 0);
+      node.y0 = std::max(r.y(), 0);
+      node.x1 = static_cast<int32_t>(std::min<int64_t>(rx1, set.picture_w));
+      node.y1 = static_cast<int32_t>(std::min<int64_t>(ry1, set.picture_h));
+      if (node.x1 <= node.x0 || node.y1 <= node.y0) {
+        continue;
+      }
+      node.level = grid_level_of(b->kind());
+      if (node.level != GridLevel::None) {
+        int32_t& side = set.grid_min_side.at(static_cast<size_t>(node.level));
+        side = std::min({side, r.w(), r.h()});
+      }
+      taken[id] = true;
+      source.push_back(id);
+      set.grid_nodes.push_back(node);
+      ++set.grid_nodes[n].child_count;
+    }
+  }
+}
+
 }  // namespace
 
 OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
@@ -165,6 +238,9 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
+  if (fa != nullptr && (cfg.layers & kGridLayers) != 0) {
+    build_grid_tree(*fa, *set);  // the grid lines need the block tree only, not the CellGrid
+  }
   if (fa == nullptr || fa->grid() == nullptr) {
     set->diagnostics.emplace_back("FrameAnalysis has no CellGrid; overlay data is empty");
     return set;
@@ -193,6 +269,7 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   if ((cfg.layers & static_cast<uint32_t>(OverlayLayer::GridPartition)) != 0) {
     build_partition_lines(*fa, *set);
   }
+
   return set;
 }
 

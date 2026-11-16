@@ -33,6 +33,18 @@ std::vector<uint8_t> make_synthetic(const SyntheticOptions& opts = {});
 
 int expected_qp(uint32_t cx, uint32_t cy);
 
+struct GridFixtureOptions {
+  uint32_t width = 3840;  // luma samples; 3840 x 2160 is the 4K fixture of §10.9.2 item 4
+  uint32_t height = 2160;
+  bool tus = false;        // each CU additionally gets four TU children (half its size): exercises TU culling
+  bool tiles_2x2 = false;  // four Tile partitions split at the picture centre (slice/tile boundary pass)
+};
+
+// The partition-grid fixture of `tools/gen_fixture_fb.py --kind grid` (synthetic_4k_grid.fb, chapter 14 §14.3.3),
+// built in C++ so the render tests need no corpus fetch: an H.265 intra picture, CTU 64 in raster order, the CU size
+// of CTU (cx, cy) is 64 >> ((cx + cy) % 4), and a CU larger than 8 that crosses the picture edge is split further.
+std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
+
 }  // namespace ovt::render::test
 
 #endif  // OVT_RENDER_TESTS_FIXTURES_MAKE_SYNTHETIC_H
