@@ -125,6 +125,9 @@ endif()
 # WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
 ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
 
+# WI-1.121: the StreamIndex builder end to end (unit scan -> add_unit -> finish -> validate_stream_index).
+ovt_add_fuzz_target(index_builder fuzz_index_builder.cpp)
+
 # The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
 # only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
 ovt_add_fuzz_target(canary fuzz_canary.cpp)
