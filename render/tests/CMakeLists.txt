@@ -98,3 +98,10 @@ if(APPLE)
                              PRIVATE "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
   ovt_set_license(ovt_manual_edr_pattern "LGPL-2.1-or-later")
 endif()
+
+# WI-2.431: overlay layer, heatmap LUTs and the heatmap/fill/hatch passes (§10.5). The tests read render/luts/ and the
+# image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")

@@ -25,6 +25,7 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
 #include "measure/measure.h"
 #include "output_download.h"
@@ -115,6 +116,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+    overlay_gpu_ = std::make_unique<detail::OverlayLayerGpu>(gpu_);  // WI-2.431
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
     static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
@@ -277,7 +279,19 @@ class VideoSurfaceImpl final : public VideoSurface {
     error_.clear();
   }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
-  void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
+    overlays_ = std::move(overlays);
+    if (overlay_gpu_ == nullptr) {
+      return;
+    }
+    std::string err;
+    if (!overlay_gpu_->upload(overlays_.get(), err)) {
+      error_ = "RND-0002 renderer init failed: overlays: " + err;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+    }
+  }
 
   void render(const ViewState& view) override {
     if (native_ != nullptr) {
@@ -410,6 +424,16 @@ class VideoSurfaceImpl final : public VideoSurface {
     image.crop = detail::source_rect(slot_a_, view.show_cropped);
     target.crop = detail::target_rect(image.crop, view, target_.width, target_.height);
     params_.build(view, active_, offscreen, image.color, target);
+    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1).
+    struct pl_overlay overlay = {};
+    std::string overlay_err;
+    if (overlay_gpu_ != nullptr && overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio,
+                                                      target.crop, overlay, overlay_err)) {
+      target.overlays = &overlay;
+      target.num_overlays = 1;
+    } else if (!overlay_err.empty()) {
+      error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
+    }
     if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
@@ -695,6 +719,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    overlay_gpu_.reset();
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
@@ -725,7 +750,8 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
-  detail::Measurer measurer_;  // §10.7 (WI-4.452)
+  std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
+  detail::Measurer measurer_;                             // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
