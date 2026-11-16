@@ -16,7 +16,8 @@ tree (AMP_A) and the SAO parameters (SAO_A) compare against the two `hm-cutree` 
 Found on CI's first run and handled in the test (each is a plugin or libde265 behaviour, listed in #589): with no worker
 threads a conformance window makes the plugin report the cropped picture, so `CONFWIN_A` runs with one thread; RPS_C and
 CONFWIN_A raise mapping warnings with an empty Diagnostic code (V-029, SPEC-ASSUMPTION #261), which the plugin runs now
-allow as the one validator finding. Not compared, issue #589: `cbf` Cb/Cr (patch 0002), `partition_id` and the block
+allow as the one validator finding (RPS_C and CONFWIN_A only). Not compared, issue #589: `cbf` Cb/Cr (patch 0002),
+`partition_id` and the block
 tree on the other streams (no HM data).
 Local run: skipped (no corpus); compiled and linked clean under `-Werror`.
 
@@ -26,7 +27,7 @@ Local run: skipped (no corpus); compiled and linked clean under `-Werror`.
 `PlaneStage::Reconstruction` planes against libavcodec's `hevc` decoder (one thread, `apply_cropping = 0`), picture by
 picture in output order, one MD5 per plane, plus 1 thread against 4 threads. Same stream list as test 1 plus AMP_A.
 `NoOutPrior_A` is compared as a subsequence: libde265 outputs 10
-pictures there that FFmpeg drops (no_output_of_prior_pics); every FFmpeg picture must
+pictures there that FFmpeg drops (no_output_of_prior_pics, #619); exactly 10 extra; every FFmpeg picture must
 still
 equal a plugin picture in order. All other streams must give the same sequence.
 
@@ -50,5 +51,5 @@ Not done in this PR. The budget row exists in `tests/perf/budgets.json`, but the
 violation. The 60 s libFuzzer run belongs to CI (`OVT_ENABLE_FUZZ`).
 
 `RAP_B_Bossen_2` is not in the recon list: on CI FFmpeg's output picture 69 of 80 equals no libde265
-picture (the stream has end-of-sequence CRAs with RASL pictures). Which decoder is wrong is open (#589); its HM
+picture (the stream has end-of-sequence CRAs with RASL pictures). Which decoder is wrong is open (#620); its HM
 grid comparison passes.

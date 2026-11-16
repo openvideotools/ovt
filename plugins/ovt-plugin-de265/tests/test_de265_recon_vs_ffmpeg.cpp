@@ -15,7 +15,7 @@
 // SLIST_A_Sony_5 is left out: libde265 1.0.15 mis-decodes it (#254, the same exclusion as the SEI test). RAP_B_Bossen_2
 // is left out too: on CI FFmpeg outputs a picture (output index 69 of 80) that no libde265 picture equals, after the
 // end-of-sequence CRA with RASL pictures, and without the stream here which of the two decoders is right is open
-// (#589); the HM grid test still covers its decode.
+// (#620); the HM grid test still covers its decode.
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
@@ -263,13 +263,12 @@ void compare_with_ffmpeg(std::string_view id) {
   const std::vector<Picture> got = plugin_pictures(bytes, 1);
   REQUIRE(!ref.empty());
   INFO("FFmpeg output " << ref.size() << " pictures, ovt-plugin-de265 " << got.size());
-  // libde265 outputs pictures that H.265 C.5.2.2 / 8.3.1 do not output, which FFmpeg drops: the pictures cut by
-  // no_output_of_prior_pics_flag (NoOutPrior_A). On that
-  // stream every FFmpeg picture must still equal a plugin picture, in order, and the plugin has the
-  // extra ones (#590); everywhere else the two outputs must be the same sequence.
+  // libde265 outputs 10 pictures of NoOutPrior_A that no_output_of_prior_pics_flag discards (H.265 C.5.2.2) and FFmpeg
+  // drops, a plugin output bug tracked in #619. On that stream every FFmpeg picture must still equal a plugin picture,
+  // in order, and the plugin has exactly 10 more; everywhere else the two outputs must be the same sequence.
   std::vector<size_t> match(ref.size());
   if (id == "jctvc_NoOutPrior_A_Qualcomm_1") {
-    REQUIRE(got.size() > ref.size());
+    REQUIRE(got.size() == ref.size() + 10);  // #619
     size_t g = 0;
     for (size_t i = 0; i < ref.size(); ++i, ++g) {
       while (g < got.size() && !(got[g] == ref[i])) {

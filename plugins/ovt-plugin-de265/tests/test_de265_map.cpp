@@ -278,7 +278,8 @@ bool expected_finding(const ovt::model::Violation& v) {
 }
 
 // SPEC-ASSUMPTION(#261): the plugin gives a libde265 mapping warning an empty Diagnostic code, which V-029 reports; the
-// conformance streams raise such warnings (RPS_C), so the plugin runs allow exactly that finding (@p empty_codes).
+// RPS_C and CONFWIN_A raise such warnings, so only their runs allow exactly that finding (@p empty_codes); every
+// other stream stays strict.
 void check_valid(std::span<const uint8_t> buf, bool empty_codes = false) {
   for (const auto& v : ovt::model::validate_frame_analysis(buf, fb::Codec::H265)) {
     INFO(v.rule << " " << v.path << ": " << v.message);
@@ -796,7 +797,7 @@ std::map<int32_t, std::vector<uint8_t>> analyse_stream(const std::filesystem::pa
       const fb::FrameAnalysis& f = *fb::GetFrameAnalysis(buf.data);
       const int32_t index = f.frame()->id()->decode_index();
       if (index < max_frames && f.grid() != nullptr) {
-        check_valid(fa, true);
+        check_valid(fa, empty_codes);
         out.emplace(index, std::vector<uint8_t>(fa.begin(), fa.end()));
       }
       api.release(dec, buf);
@@ -995,7 +996,8 @@ void check_against_hm(std::string_view id) {
   // Without worker threads libde265 reports only the cropped picture, and the grid with it (README, WI-2.166 limit):
   // CONFWIN_A has a conformance window, whose HM grid is the coded picture's, so it runs with one worker thread.
   const int threads = id == "jctvc_CONFWIN_A_Sony_1" ? 1 : 0;
-  const auto analyses = analyse_stream(stream, static_cast<int32_t>(frames.size()), threads);
+  const bool empty_codes = id == "jctvc_CONFWIN_A_Sony_1" || id == "jctvc_RPS_C_ericsson_5";
+  const auto analyses = analyse_stream(stream, static_cast<int32_t>(frames.size()), threads, empty_codes);
   REQUIRE(analyses.size() == frames.size());
   for (const json& frame : frames) {
     const auto index = frame.at("frame").get<uint32_t>();
