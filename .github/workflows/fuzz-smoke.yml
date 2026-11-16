@@ -284,7 +284,7 @@ jobs:
     steps:
       - name: Delete this commit's fuzz binaries
         run: |
-          gh api -X DELETE "repos/$GH_REPO/actions/caches?key=fuzz-binaries-${{ github.sha }}" \
+          gh api -X DELETE "repos/$GH_REPO/actions/caches?key=fuzz-binaries-${{ github.sha }}&ref=${{ github.ref }}" \
             || echo "::warning::could not delete fuzz-binaries-${{ github.sha }} (read-only token or already evicted)"
 
       - name: Delete stale fuzz binaries
