@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The ISOBMFF box header walk (chapter 08 §8.2.3, WI-1.201): a complete BoxNode tree with exact spans, no field
-// decoding. Until the generated registry (WI-1.203) lands, box kinds come from a hard-coded table.
+// The ISOBMFF box walk (chapter 08 §8.2.3, WI-1.201): a complete BoxNode tree with exact spans. Box kinds,
+// descriptions and FullBox headers come from the generated registry (box_registry.h, WI-1.203); fields come from the
+// hand decoders it joins to each box type.
 
 #ifndef OVT_CONTAINER_ISOBMFF_BOX_WALK_H
 #define OVT_CONTAINER_ISOBMFF_BOX_WALK_H
@@ -22,11 +23,6 @@ inline constexpr uint64_t kMaxBoxNodes = 1'000'000;  // §8.2.3 node bound per w
 
 using BoxNodes = std::vector<std::unique_ptr<fb::BoxNodeT>>;
 using DiagList = std::vector<std::unique_ptr<fb::DiagnosticT>>;
-
-// What the walk needs to know about a fourcc until WI-1.203 wires the generated registry (box_registry.h) in. Named
-// WalkKind so it does not clash with the registry's BoxKind (§8.2.9).
-enum class WalkKind : uint8_t { Unknown, Leaf, Container, Opaque };
-[[nodiscard]] WalkKind box_kind(const FourCC& type) noexcept;
 
 // The state the walk shares between siblings and across levels (what the spec keeps in `ctx`).
 struct WalkState {
