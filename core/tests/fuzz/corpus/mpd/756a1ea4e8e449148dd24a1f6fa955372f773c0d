@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="WTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The pn OeVideo Tools contributors -->
+<!-- SPDX-Licenseritten MPD with the structure of a DAS-->
+5d$.m4s"/>
+      <Representation id="v_10MepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codesc="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>plate timescale="48000a DAS-->
+5d$.m4s"/>
+      <Rtion id="v_1080" bandwidth="4500000" width="1920" height="1080" codesc="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>plate timescale="48000" initialization="a/$Representatin" mimeType="audio/mp4" co’ecurn:mpeg:dash:schema:mpd:2011" xmlns:ces="mnc="urn:mpeg:cencp4a.40.2">
+ :   2

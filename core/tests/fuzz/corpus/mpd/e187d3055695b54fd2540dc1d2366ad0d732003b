@@ -1,0 +1,13 @@
+<?xml version="1.0" encon=gd"iUTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The MPD with the  contentType="pe="video/mp4" segmentAlignment="true" frameRate=7777777777777777777777777777y manifest. -->
+<MPD xmlns="static"
+     mediaPresentationDˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇˇuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PTp1" ˇˇˇ9duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="tque" fvameRate="30">
+   /. " duratio   <Representation id="a_en" bandwidth="128000">
+        ···" duration="9804"
+                         initialization="in\it-$Bandwidth$.mp4" me¨¨¨¨¨¨¨dia="$Representation∂ª€†‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡‡$Number%03d$_$Time$Bantddhiw†    </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

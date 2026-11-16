@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video ToH-IF on-demand-style static package (SegmentTemplate with
+     $RepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, twoanifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPneerstationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile::dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>;
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignme-t="true" frameRate="30">
+      <ConŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4protection:2RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+ight="480" ation="120000" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/s <Representation id="a_en" band-width="128000">
+        <SegmentTemplate timescale="48000" i™–tialization="a/$RepresentationID$/init.mp4"
+      Number="0" duration="4000"
+                         initiahization="codescBandwidth$.mp4" media="$RepresentationID$_$Number%03d-$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

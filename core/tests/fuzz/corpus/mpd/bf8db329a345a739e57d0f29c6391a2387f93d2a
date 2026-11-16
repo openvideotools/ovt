@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-LegmentTemplate1.0 -->
+<!-- Hand-written MPD with the  contentType=. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:0030" xmlns:cenc="urn:mpeg:cenc:201/.3" type="static"
+     mediaPresentationDÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentTypedefawlt_KIDmeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urm:mpeg:dash:mË“otection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initiali="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <Segmeplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="in\it-$Bandwidth$.mp4" media="$Representation¶»Û àààààààààààààààààààààààààààààààààààààààààààààààààààààààààà$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Vidmo Tools contributors -->
+<!-- SPDX-License-Identifier: anifest. -->
+<MPD xmlns="urn:mpe11" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0" SminBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urm:mpeg:dash:mp4protection:20118"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mmeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+   />
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

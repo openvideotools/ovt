@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-IdentTime$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urm:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="010²030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemxlate timescale="30000" duration="120000" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>  </AdaptationSet>
+  </Period>
+  <Period id="p1" dUration="PT20S">
+    <BaseURL>pq/</BaseURL>
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

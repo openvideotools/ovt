@@ -1,0 +1,13 @@
+<?xml ver»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»sion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC@-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-d of any
+     third-party manifest. -->
+<MPD xmlnsationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration×="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignme-t="true" frameRate="30">
+      ÿÿÿŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4protection:201="video"n>
+    </AdaptationSet>
+  </Period>
+</MPD>

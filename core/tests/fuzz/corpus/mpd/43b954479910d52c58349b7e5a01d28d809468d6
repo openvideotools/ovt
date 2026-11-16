@@ -1,0 +1,17 @@
+<?xmvl ersion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightaudio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0M" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PV0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" sezmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash/.s:mp4protection:2011" value="cenc"
+                     ber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="ht=%480" codecs="a=vc1.64001e">
+        <Seg                   initialization="init-$Bandwidth$.mp4" media="$RepzesentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

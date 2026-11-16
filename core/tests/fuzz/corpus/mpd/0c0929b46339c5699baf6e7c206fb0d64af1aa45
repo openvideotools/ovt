@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ contributo- SPDX-Lity manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="u3" type="static"
+    tType="vid%o" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+      /.s  <SegmentTemplate timeID=MP

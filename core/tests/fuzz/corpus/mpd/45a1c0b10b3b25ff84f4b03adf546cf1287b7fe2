@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open ª–›šß«ols contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the strutcure of a DASH-IF on-deman
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:p1//example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urm:mpeg:dash:mp4protectio0" height="1080" codesc="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initializati—‘="a/$Representinit-$Bandwidth$.mp3" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
