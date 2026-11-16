@@ -9,6 +9,7 @@
 #include <chrono>
 #include <cstring>
 #include <fstream>
+#include <span>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -34,18 +35,25 @@ constexpr uint32_t rotr(uint32_t x, unsigned n) {
   return (x >> n) | (x << (32 - n));
 }
 
-void compress(std::array<uint32_t, 8>& h, const uint8_t* block) {
+void compress(std::array<uint32_t, 8>& h, std::span<const uint8_t, 64> block) {
   std::array<uint32_t, 64> w{};
   for (size_t i = 0; i < 16; ++i) {
-    w[i] = (uint32_t{block[4 * i]} << 24) | (uint32_t{block[4 * i + 1]} << 16) | (uint32_t{block[4 * i + 2]} << 8) |
-           uint32_t{block[4 * i + 3]};
+    const auto word = block.subspan(4 * i, 4);
+    w[i] = (uint32_t{word[0]} << 24) | (uint32_t{word[1]} << 16) | (uint32_t{word[2]} << 8) | uint32_t{word[3]};
   }
   for (size_t i = 16; i < 64; ++i) {
     const uint32_t s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >> 3);
     const uint32_t s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >> 10);
     w[i] = w[i - 16] + s0 + w[i - 7] + s1;
   }
-  uint32_t a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+  uint32_t a = h[0];
+  uint32_t b = h[1];
+  uint32_t c = h[2];
+  uint32_t d = h[3];
+  uint32_t e = h[4];
+  uint32_t f = h[5];
+  uint32_t g = h[6];
+  uint32_t hh = h[7];
   for (size_t i = 0; i < 64; ++i) {
     const uint32_t t1 = hh + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + kRound[i] + w[i];
     const uint32_t t2 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c));
@@ -75,16 +83,16 @@ std::atomic<uint64_t> g_temp_counter{0};
 std::string sha256_hex(std::string_view data) {
   std::array<uint32_t, 8> h = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
                                0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-  const auto* p = reinterpret_cast<const uint8_t*>(data.data());
-  size_t n = data.size();
+  const std::span<const uint8_t> in(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+  const size_t n = in.size();
   size_t pos = 0;
   for (; n - pos >= 64; pos += 64) {
-    compress(h, p + pos);
+    compress(h, in.subspan(pos, 64).first<64>());
   }
   std::array<uint8_t, 128> tail{};
   const size_t rest = n - pos;
   if (rest > 0) {
-    std::memcpy(tail.data(), p + pos, rest);
+    std::memcpy(tail.data(), in.subspan(pos).data(), rest);
   }
   tail[rest] = 0x80;
   const size_t tail_len = rest < 56 ? 64 : 128;
@@ -93,9 +101,9 @@ std::string sha256_hex(std::string_view data) {
     tail[tail_len - 1 - i] = static_cast<uint8_t>(bits >> (8 * i));
   }
   for (size_t off = 0; off < tail_len; off += 64) {
-    compress(h, tail.data() + off);
+    compress(h, std::span<const uint8_t>(tail).subspan(off, 64).first<64>());
   }
-  static constexpr char kHex[] = "0123456789abcdef";
+  static constexpr std::string_view kHex = "0123456789abcdef";
   std::string out;
   out.reserve(64);
   for (const uint32_t v : h) {

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <mutex>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -43,7 +44,8 @@ size_t on_body(char* data, size_t size, size_t nmemb, void* user) {
     body->too_big = true;
     return 0;  // aborts the transfer
   }
-  body->bytes.insert(body->bytes.end(), reinterpret_cast<uint8_t*>(data), reinterpret_cast<uint8_t*>(data) + n);
+  const std::span<const uint8_t> chunk(reinterpret_cast<const uint8_t*>(data), n);
+  body->bytes.insert(body->bytes.end(), chunk.begin(), chunk.end());
   return n;
 }
 
@@ -60,7 +62,7 @@ class Handle {
     curl_slist_free_all(headers_);
     curl_easy_cleanup(easy_);
   }
-  CURL* get() const noexcept { return easy_; }
+  [[nodiscard]] CURL* get() const noexcept { return easy_; }
   void identity_encoding() {
     headers_ = curl_slist_append(headers_, "Accept-Encoding: identity");
     curl_easy_setopt(easy_, CURLOPT_HTTPHEADER, headers_);

@@ -108,7 +108,7 @@ inline Bytes media_segment(uint32_t n, size_t mdat_bytes) {
   put64(tfdt, uint64_t{n - 1} * 1000);
   Bytes mdat(mdat_bytes);
   for (size_t i = 0; i < mdat.size(); ++i) {
-    mdat[i] = static_cast<uint8_t>(n * 31 + i);
+    mdat[i] = static_cast<uint8_t>((size_t{n} * 31) + i);
   }
   return cat({box("styp", styp),
               box("moof", cat({box("mfhd", mfhd), box("traf", cat({box("tfhd", tfhd), box("tfdt", tfdt)}))})),
@@ -132,7 +132,7 @@ inline Bytes write_dash_package(const fs::path& dir) {
   Bytes all = init_segment();
   write_file(dir / "init.mp4", all);
   for (uint32_t n = 1; n <= kSegments; ++n) {
-    const Bytes seg = media_segment(n, 100 * n);  // different sizes so a wrong offset cannot hide
+    const Bytes seg = media_segment(n, size_t{100} * n);  // different sizes so a wrong offset cannot hide
     write_file(dir / ("seg" + std::to_string(n) + ".m4s"), seg);
     all.insert(all.end(), seg.begin(), seg.end());
   }

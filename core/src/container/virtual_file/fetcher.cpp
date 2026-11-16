@@ -106,7 +106,8 @@ std::string local_path_of(std::string_view url) {
 
 bool offline_requested() noexcept {
   const char* v = std::getenv("OVT_OFFLINE");  // NOLINT(concurrency-mt-unsafe): read-only lookup
-  return v != nullptr && v[0] != '\0' && std::string_view(v) != "0";
+  const std::string_view value = v == nullptr ? std::string_view() : std::string_view(v);
+  return !value.empty() && value != "0";
 }
 
 std::unique_ptr<Fetcher> make_local_fetcher() {

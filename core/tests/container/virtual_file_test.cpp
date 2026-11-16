@@ -145,10 +145,10 @@ TEST_CASE("VirtualFile reports a missing segment as an I/O error", "[container][
 
 TEST_CASE("OVT_OFFLINE=1 refuses http fetches", "[container][virtual_file]") {
 #ifndef _WIN32
-  setenv("OVT_OFFLINE", "1", 1);
+  setenv("OVT_OFFLINE", "1", 1);  // NOLINT(concurrency-mt-unsafe): single-threaded test
   auto fetcher = vf::make_default_fetcher();
   CHECK_THROWS_AS(fetcher->fetch("http://127.0.0.1:9/seg1.m4s", {}), ovt::io::IoError);
-  unsetenv("OVT_OFFLINE");
+  unsetenv("OVT_OFFLINE");  // NOLINT(concurrency-mt-unsafe): single-threaded test
 #endif
   CHECK(vf::is_http_url("HTTPS://example.org/a.mpd"));
   CHECK_FALSE(vf::is_http_url("/tmp/a.mpd"));
@@ -156,7 +156,7 @@ TEST_CASE("OVT_OFFLINE=1 refuses http fetches", "[container][virtual_file]") {
 }
 
 TEST_CASE("the HTTP fetcher serves whole files, byte ranges and sizes", "[container][virtual_file][http]") {
-  unsetenv("OVT_OFFLINE");
+  unsetenv("OVT_OFFLINE");  // NOLINT(concurrency-mt-unsafe): single-threaded test
   const TempDir t("http");
   const Bytes all = write_dash_package(t.path);
   const HttpServer server(t.path);

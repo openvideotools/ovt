@@ -70,7 +70,7 @@ class VirtualFile final : public io::RandomAccessFile {
 
   size_t read(uint64_t offset, size_t len, uint8_t* dst) const override;
   [[nodiscard]] Holder view(uint64_t offset, size_t len) const override;
-  void advise(uint64_t, uint64_t, Access) const noexcept override {}
+  void advise(uint64_t /*offset*/, uint64_t /*len*/, Access /*access*/) const noexcept override {}
   [[nodiscard]] bool is_mapped() const noexcept override { return false; }
 
  private:

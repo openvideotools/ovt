@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <span>
 
 namespace ovt::container::vfile {
 namespace {
@@ -140,7 +141,7 @@ size_t VirtualFile::read(uint64_t offset, size_t len, uint8_t* dst) const {
     const uint64_t in_seg = pos - e->logical_offset;
     const size_t n = static_cast<size_t>(std::min<uint64_t>(len - done, e->length - in_seg));
     const auto seg = open_segment(index);
-    const size_t got = seg->read(in_seg, n, dst + done);
+    const size_t got = seg->read(in_seg, n, std::span<uint8_t>(dst, len).subspan(done).data());
     done += got;
     if (got != n) {
       throw io::IoError(OVT_E_IO, 0, "short read of the cached segment " + e->url);
