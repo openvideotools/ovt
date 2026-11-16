@@ -190,11 +190,36 @@ GridLevel grid_level_of(ovt::fb::BlockKind kind) {
   return k < kGridLevelOfKind.size() ? kGridLevelOfKind.at(k) : GridLevel::None;
 }
 
+// The grid node of block `b`, its rect clipped to the coded picture; false when the clipped rect is empty. Records the
+// block's unclipped side in set.grid_min_side (R-GRID-1).
+bool clipped_node(const ovt::fb::Block& b, OverlaySet& set, GridNode& node) {
+  if (b.rect() == nullptr || b.rect()->w() <= 0 || b.rect()->h() <= 0) {
+    return false;
+  }
+  const ovt::fb::Rect& r = *b.rect();
+  node.x0 = std::max(r.x(), 0);
+  node.y0 = std::max(r.y(), 0);
+  node.x1 = static_cast<int32_t>(std::min<int64_t>(int64_t{r.x()} + r.w(), set.picture_w));
+  node.y1 = static_cast<int32_t>(std::min<int64_t>(int64_t{r.y()} + r.h(), set.picture_h));
+  if (node.x1 <= node.x0 || node.y1 <= node.y0) {
+    return false;
+  }
+  node.level = grid_level_of(b.kind());
+  if (node.level != GridLevel::None) {
+    int32_t& side = set.grid_min_side.at(static_cast<size_t>(node.level));
+    side = std::min({side, r.w(), r.h()});
+  }
+  return true;
+}
+
 // Flattens the block tree breadth-first so that every node's children are contiguous (WI-2.432 step 1). Children are
 // followed only by id, each block at most once (a malformed tree with cycles or shared children cannot loop), and a
 // node whose rect misses the coded picture is dropped with its subtree (FR-BLK-003: children lie inside the parent).
-void build_grid_tree(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
-  const auto* blocks = fa.blocks();
+void build_grid_tree(const ovt::fb::FrameAnalysis* fa, OverlaySet& set) {
+  if (fa == nullptr || (set.config.layers & kGridLayers) == 0) {
+    return;
+  }
+  const auto* blocks = fa->blocks();
   if (blocks == nullptr || blocks->empty() || blocks->Get(0)->rect() == nullptr) {
     set.diagnostics.emplace_back("FrameAnalysis has no block tree; grid lines are empty");
     return;
@@ -221,25 +246,9 @@ void build_grid_tree(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
       if (id >= blocks->size() || taken[id]) {
         continue;
       }
-      const auto* b = blocks->Get(id);
-      if (b->rect() == nullptr || b->rect()->w() <= 0 || b->rect()->h() <= 0) {
-        continue;
-      }
-      const ovt::fb::Rect& r = *b->rect();
-      const int64_t rx1 = int64_t{r.x()} + r.w();
-      const int64_t ry1 = int64_t{r.y()} + r.h();
       GridNode node;
-      node.x0 = std::max(r.x(), 0);
-      node.y0 = std::max(r.y(), 0);
-      node.x1 = static_cast<int32_t>(std::min<int64_t>(rx1, set.picture_w));
-      node.y1 = static_cast<int32_t>(std::min<int64_t>(ry1, set.picture_h));
-      if (node.x1 <= node.x0 || node.y1 <= node.y0) {
+      if (!clipped_node(*blocks->Get(id), set, node)) {
         continue;
-      }
-      node.level = grid_level_of(b->kind());
-      if (node.level != GridLevel::None) {
-        int32_t& side = set.grid_min_side.at(static_cast<size_t>(node.level));
-        side = std::min({side, r.w(), r.h()});
       }
       taken[id] = true;
       source.push_back(id);
@@ -257,9 +266,7 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
                                               const uint16_t* custom_cells) {
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
-  if (fa != nullptr && (cfg.layers & kGridLayers) != 0) {
-    build_grid_tree(*fa, *set);  // the grid lines need the block tree only, not the CellGrid
-  }
+  build_grid_tree(fa, *set);  // the grid lines need the block tree only, not the CellGrid
   if (fa == nullptr || fa->grid() == nullptr) {
     set->diagnostics.emplace_back("FrameAnalysis has no CellGrid; overlay data is empty");
     return set;
