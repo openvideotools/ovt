@@ -220,7 +220,10 @@ TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][
   CHECK(ovt_container_expand(c, 0) == OVT_OK);             // the `ftyp` box: nothing to expand
   CHECK(ovt_container_expand(c, 8) == OVT_E_INVALID_ARG);  // no box starts there
   ovt_Buffer out{nullptr, 0};
-  CHECK(ovt_container_bytes(c, 0, 16, &out) == OVT_E_UNSUPPORTED);
+  CHECK(ovt_container_bytes(c, 0, 16, &out) == OVT_OK);  // the byte service (WI-1.234)
+  CHECK(out.size == 16);
+  delete[] out
+      .data;  // NOLINT(cppcoreguidelines-owning-memory): rule 3a buffers are new[]; ovt_buffer_free is not linked
   ovt_container_close(c);
   ovt_container_close(nullptr);  // no-op
 }

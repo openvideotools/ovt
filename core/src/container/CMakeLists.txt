@@ -8,6 +8,7 @@
 target_sources(
   ovt_core_objects
   PRIVATE annexb.cpp
+          byte_service.cpp
           container.cpp
           isobmff/box_registry.cpp
           isobmff/box_registry.gen.cpp
@@ -29,6 +30,7 @@ target_sources(
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp
+          page_cache.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp
           virtual_file/m3u8.cpp

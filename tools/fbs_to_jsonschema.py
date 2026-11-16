@@ -6,15 +6,20 @@
     fbs_to_jsonschema.py --flatc FLATC [--schema-dir core/schema] [--out docs/spec/schemas] [--check]
 
 Runs `flatc --jsonschema` on every core/schema/*.fbs, merges the definitions and rewrites them into
-JSON Schema draft 2020-12 following the JSON rules of chapter 12 §12.1.4:
+JSON Schema draft 2020-12 following the JSON rules of chapter 12 §12.1.4 and chapter 6 §6.8.1, that is, what
+ovt::model::to_json (core/src/model/json_export.cpp, WI-0.088) writes:
 
   * enums are their value names (an unknown value prints as its integer, §6.8.1);
   * long / ulong (and every integer beyond ±(2^53 - 1), which the writer quotes) are
     oneOf[integer, decimal string];
   * float / double also accept the strings "nan", "inf" and "-inf";
-  * [ubyte] is a base64 string, except in CellGrid (an array of integers);
+  * bool is true / false (a stored byte above 1 prints as its integer, §6.8.1);
+  * [ubyte] is an array of integers, except the hash-like fields (HASH_FIELDS), which are lowercase hex
+    strings;
   * the nested FlatBuffers (Block.ext, FrameAnalysis.filter_params, FrameInfo.ref_state, HevcCu.palette,
-    Av1Block.palette) gain a `<field>_decoded` object, chosen by the sibling `<field>_type` string.
+    Av1Block.palette) are the object of the nested table under the same key, chosen by the sibling
+    `<field>_type` string where there is one; there are no `<field>_decoded` keys. An empty vector is `[]`,
+    and bytes whose `<field>_type` is empty or names no table stay an array of integers.
 
 It writes one self-contained `<Table>.schema.json` per root table and per command result table, and
 `ovt-cli-1.schema.json` for the envelope, whose `result` is checked against the table of its `command`
@@ -66,12 +71,29 @@ TABLE_FILES = (
     "VerifyReport",
 )
 
-# Tables whose [ubyte] vectors are per-cell values, written as arrays of integers (§12.1.4).
-BYTE_ARRAY_TABLES = frozenset({"CellGrid"})
+# The [ubyte] fields that are hashes or ids, written as lowercase hex strings (§6.8.1, §12.1.4). The rule is
+# by field name in every table; it must equal kHashFields in core/src/model/json_rules.hpp
+# (cli/tests/test_schema_validate.py compares the two).
+HASH_FIELDS = (
+    "source_hash",
+    "reference_source_hash",
+    "distorted_source_hash",
+    "default_kid",
+    "system_id",
+    "uuid",
+    "iv",
+    "kid",
+    "kids",
+    "default_constant_iv",
+    "bytes",
+)
 
 # Nested FlatBuffers: table -> [(field, type field or None, candidate tables)] (fbs comments, §12.1.4).
 NESTED: dict[str, list[tuple[str, str | None, tuple[str, ...]]]] = {
-    "Block": [("ext", "ext_type", ("AvcMb", "HevcCu", "HevcPu", "HevcTu", "Av1Block", "Av1Txb"))],
+    # Block.ext: the tables §6.3.3 allows per BlockKind (rule V-021).
+    "Block": [
+        ("ext", "ext_type", ("AvcMb", "AvcSubMb", "HevcCtu", "HevcCu", "HevcPu", "HevcTu", "Av1Block", "Av1Txb"))
+    ],
     "FrameAnalysis": [
         ("filter_params", "filter_params_type", ("HevcFilterParams", "Av1FilterParams", "AvcFilterParams"))
     ],
@@ -116,8 +138,10 @@ MAX_EXACT = 2**53 - 1  # the JSON writer quotes integers beyond ±MAX_EXACT
 U64 = "_UInt64"
 I64 = "_Int64"
 FLOAT = "_Float"
-BYTES = "_Bytes"
+HEX = "_Hex"
+BOOL = "_Bool"
 BYTE_ARRAY = {"type": "array", "items": {"type": "integer", "minimum": 0, "maximum": 255}}
+EMPTY_ARRAY = {"type": "array", "maxItems": 0}
 HELPERS: dict[str, dict[str, Any]] = {
     U64: {
         "$comment": "ulong: a JSON integer, or a decimal string when the value exceeds 2^53 - 1 (§12.1.4).",
@@ -137,15 +161,14 @@ HELPERS: dict[str, dict[str, Any]] = {
         "$comment": "float / double: a JSON number, or one of the strings nan, inf, -inf (§12.1.4).",
         "oneOf": [{"type": "number"}, {"enum": ["nan", "inf", "-inf"]}],
     },
-    BYTES: {
-        # SPEC-ASSUMPTION(#285): §12.1.4 writes [ubyte] as base64, §6.8.1 as an array of numbers
-        # (lowercase hex for hash-like fields). Both forms validate until the issue is answered.
-        "$comment": "[ubyte]: a base64 string (§12.1.4; lowercase hex is also a valid base64 alphabet string) "
-        "or an array of integers (§6.8.1). SPEC-ASSUMPTION(#285).",
-        "anyOf": [
-            {"type": "string", "contentEncoding": "base64", "pattern": "^[A-Za-z0-9+/]*={0,2}$"},
-            BYTE_ARRAY,
-        ],
+    HEX: {
+        "$comment": "A hash-like [ubyte] field: a lowercase hex string, two digits per byte (§6.8.1, §12.1.4).",
+        "type": "string",
+        "pattern": "^([0-9a-f]{2})*$",
+    },
+    BOOL: {
+        "$comment": "bool: true or false; a stored byte that is neither 0 nor 1 prints as its integer (§6.8.1).",
+        "anyOf": [{"type": "boolean"}, {"type": "integer", "minimum": 2, "maximum": 255}],
     },
 }
 
@@ -203,20 +226,18 @@ def convert_scalar(prop: dict[str, Any], table: str, field: str, known: set[str]
         return {"type": "integer", "minimum": lo, "maximum": hi}
     if kind == "number":
         return ref(FLOAT)
-    if kind in ("boolean", "string"):
+    if kind == "boolean":
+        return ref(BOOL)
+    if kind == "string":
         return {"type": kind}
     if kind == "array":
         items = prop.get("items")
         if not isinstance(items, dict):
             raise SchemaError(f"{table}.{field}: array without items")
         if items.get("type") == "integer" and items.get("minimum") == 0 and items.get("maximum") == 255:
-            return BYTE_ARRAY if table in BYTE_ARRAY_TABLES else ref(BYTES)
+            return ref(HEX) if field in HASH_FIELDS else BYTE_ARRAY
         return {"type": "array", "items": convert_scalar(items, table, field, known)}
     raise SchemaError(f"{table}.{field}: unsupported flatc property {json.dumps(prop, sort_keys=True)}")
-
-
-def candidates_schema(cands: tuple[str, ...]) -> dict[str, Any]:
-    return ref(cands[0]) if len(cands) == 1 else {"anyOf": [ref(c) for c in cands]}
 
 
 def convert_table(name: str, body: dict[str, Any], known: set[str]) -> dict[str, Any]:
@@ -230,17 +251,18 @@ def convert_table(name: str, body: dict[str, Any], known: set[str]) -> dict[str,
             for c in cands:
                 if c not in known:
                     raise SchemaError(f"{name}.{field}: nested type {c} is not in the schema")
-            # SPEC-ASSUMPTION(#285): §12.1.4 adds `<field>_decoded` next to the raw bytes; §6.8.1
-            # replaces the raw field in place (its example writes `"ext": null`). Both validate.
-            props[field] = {"anyOf": [ref(BYTES), {"type": "null"}, candidates_schema(cands)]}
-            props[field + "_decoded"] = {"anyOf": [candidates_schema(cands), {"type": "null"}]}
+            # The nested table replaces the bytes under the same key (§6.8.1, §12.1.4; #285, #493). A field
+            # with a `_type` sibling stays an array of integers when the sibling names no table; a palette
+            # (fixed table, no sibling) is an array only when it is empty.
+            plain = EMPTY_ARRAY if tfield is None else BYTE_ARRAY
+            props[field] = {"anyOf": [*(ref(c) for c in cands), plain]}
             continue
         props[field] = convert_scalar(prop, name, field, known)
     out: dict[str, Any] = {"type": "object", "properties": props, "additionalProperties": False}
     for field, (tfield, cands) in nested.items():
         if field not in props:
             raise SchemaError(f"{name}: nested field {field} not found")
-        if tfield is None or len(cands) == 1:
+        if tfield is None:
             continue
         if tfield not in props:
             raise SchemaError(f"{name}: type field {tfield} not found")
@@ -249,14 +271,15 @@ def convert_table(name: str, body: dict[str, Any], known: set[str]) -> dict[str,
             rules.append(
                 {
                     "if": {"properties": {tfield: {"const": c}}, "required": [tfield]},
-                    "then": {
-                        "properties": {
-                            field: {"anyOf": [ref(BYTES), {"type": "null"}, ref(c)]},
-                            field + "_decoded": {"anyOf": [ref(c), {"type": "null"}]},
-                        }
-                    },
+                    "then": {"properties": {field: {"anyOf": [ref(c), EMPTY_ARRAY]}}},
                 }
             )
+        rules.append(
+            {
+                "if": {"properties": {tfield: {"enum": list(cands)}}, "required": [tfield]},
+                "else": {"properties": {field: BYTE_ARRAY}},
+            }
+        )
     return out
 
 
