@@ -684,7 +684,8 @@ std::vector<std::vector<uint8_t>> nal_units(const std::filesystem::path& stream)
 
 // AT2: per slice segment, the CTU bits (1/8 bits) add up to 8 × the slice data bits: from the end of the slice
 // segment header's byte_alignment() to the rbsp_stop_one_bit. The CU bits are at most that (V-019 on the CTUs).
-// SPEC-ASSUMPTION(#605): AT2 sums the CTU bits; CU bits leave out split_cu_flag, SAO and end_of_slice_segment_flag.
+// AT2 sums the CTU bits (§7.6.2 since 1.0-rc37, #605); CU bits leave out split_cu_flag, SAO and
+// end_of_slice_segment_flag.
 void check_slice_bits(std::string_view id) {
   const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
   const json trace = golden(id, "trace_headers");
