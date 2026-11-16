@@ -16,3 +16,9 @@ add_executable(ovt_tests_index_h265 test_index_h265_rps.cpp)
 target_link_libraries(ovt_tests_index_h265 PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
 ovt_set_license(ovt_tests_index_h265 "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_index_h265)
+
+# WI-1.111: H.264 ActiveSets (part a); the frame boundary and POC tests join this executable in part b.
+add_executable(ovt_tests_index_h264 test_index_h264_active_sets.cpp)
+target_link_libraries(ovt_tests_index_h264 PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_tests_index_h264 "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_index_h264)
