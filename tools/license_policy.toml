@@ -56,6 +56,8 @@ ovt_cli_lib = "GPL-3.0-or-later"
 ovt_studio = "GPL-3.0-or-later"
 # The JNI glue of the Android app (WI-0.050, android/app/src/main/cpp); Android builds only.
 ovt_jni = "GPL-3.0-or-later"
+# Host unit test of the Android HDR pattern (WI-0.052, android/app/src/test/cpp).
+ovt_tests_android_hdr = "GPL-3.0-or-later"
 ovt_py = "GPL-3.0-or-later"
 ovt_plugin_aom = "BSD-2-Clause"
 ovt_plugin_de265 = "LGPL-3.0-or-later"
