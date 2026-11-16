@@ -4,7 +4,7 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc36 — 2026-11-16
 
-MINOR-level (FlatBuffers schema, additive): WI-4.106a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
+MINOR-level (FlatBuffers schema, additive): WI-4.106 part a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
 
 - 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
 - 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
