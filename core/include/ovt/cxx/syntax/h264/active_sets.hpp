@@ -11,6 +11,7 @@
 #define OVT_CXX_SYNTAX_H264_ACTIVE_SETS_HPP
 
 #include <array>
+#include <bitset>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -74,8 +75,8 @@ class ActiveSets {
   static constexpr unsigned kMaxPps = 256;
 
   /// A repeat with identical RBSP bytes only updates the entry's Unit.index (its generation stays). A PPS received
-  /// while an open picture uses the same id must repeat that picture's content (§7.4.1.2.1): a copy with different
-  /// bytes is kept aside, replaces the entry at end_picture() and appends Error SYN-H264-0021 to `diags`.
+  /// while any slice of the open picture uses the same id must repeat that picture's content (§7.4.1.2.1): a copy with
+  /// different bytes is kept aside, replaces the entry at end_picture() and appends Error SYN-H264-0021 to `diags`.
   void put_sps(Sps sps, std::span<const uint8_t> rbsp, uint64_t unit_index, std::vector<SetDiagnostic>& diags);
   /// `sps` is the seq_parameter_set_data() of a subset_seq_parameter_set_rbsp() (nal_unit_type 15).
   void put_subset_sps(Sps sps, std::span<const uint8_t> rbsp, uint64_t unit_index, std::vector<SetDiagnostic>& diags);
@@ -134,7 +135,7 @@ class ActiveSets {
   ParameterSets tables_{};
   bool tables_dirty_ = true;
   bool picture_open_ = false;
-  int active_pps_ = -1;
+  std::bitset<kMaxPps> picture_pps_{};  // every PPS id a slice of the open picture used
   int active_sps_ = -1;
   int active_subset_sps_ = -1;
   uint64_t next_generation_ = 1;
