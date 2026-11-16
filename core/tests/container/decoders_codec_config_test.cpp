@@ -495,16 +495,31 @@ void check_records(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, size_t& 
   }
 }
 
+iso::WalkResult walk_corpus(std::string_view id, std::unique_ptr<ovt::io::RandomAccessFile>& file) {
+  // corpus_or_skip() returns the entry's primary file. For the recipes with an "mp4" key (recipe 15), generate.py
+  // wraps the elementary stream with ffmpeg and lists the .mp4 first, so the primary file is the MP4.
+  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  INFO(path.string());
+  REQUIRE(path.extension() == ".mp4");
+  file = ovt::io::RandomAccessFile::open(path.string());
+  return iso::walk(*file);
+}
+
 void check_corpus_file(std::string_view id) {
   INFO(id);
-  std::filesystem::path path = ovt::test::corpus_or_skip(id);
-  path.replace_extension(".mp4");  // syn_av1_filmgrain_10bit has an .ivf and an .mp4
-  REQUIRE(std::filesystem::exists(path));
-  const auto file = ovt::io::RandomAccessFile::open(path.string());
-  const iso::WalkResult walked = iso::walk(*file);
+  std::unique_ptr<ovt::io::RandomAccessFile> file;
+  const iso::WalkResult walked = walk_corpus(id, file);
   size_t seen = 0;
   check_records(walked.top_level, seen);
   CHECK(seen > 0);
+}
+
+const BoxNodeT& corpus_record(const iso::WalkResult& walked, std::string_view type) {
+  const BoxNodeT* rec = find_box(walked.top_level, type);
+  REQUIRE(rec != nullptr);
+  size_t seen = 0;
+  check_records(walked.top_level, seen);
+  return *rec;
 }
 
 TEST_CASE("the configuration records of the container-smoke corpus decode without errors",
@@ -514,12 +529,53 @@ TEST_CASE("the configuration records of the container-smoke corpus decode withou
   }
 }
 
-TEST_CASE("the configuration records of the acceptance-test corpus files decode without errors",
+// AT1 on the corpus file, as adapted by #675 (SPEC-ASSUMPTION(#675)).
+TEST_CASE("AT1 on syn_h264_multislice_cavlc_mp4: avcC profile, 4-byte lengths, one SPS, no extension",
           "[container][decoders][codec_config][needs-corpus]") {
-  for (const std::string_view id :
-       {"syn_h264_multislice_cavlc_mp4", "syn_h265_main10_hev1", "syn_av1_filmgrain_10bit"}) {
-    check_corpus_file(id);
+  std::unique_ptr<ovt::io::RandomAccessFile> file;
+  const iso::WalkResult walked = walk_corpus("syn_h264_multislice_cavlc_mp4", file);
+  const BoxNodeT& avcc = corpus_record(walked, "avcC");
+  const FieldT& sps = field(avcc, "sequenceParameterSets/sequenceParameterSet[0]/sequenceParameterSetNALUnit");
+  REQUIRE(find(sps, "profile_idc") != nullptr);
+  CHECK(field(avcc, "AVCProfileIndication").uvalue == find(sps, "profile_idc")->uvalue);
+  CHECK(field(avcc, "AVCProfileIndication").uvalue == 66);  // x264 --profile baseline (recipe 4)
+  CHECK(field(avcc, "lengthSizeMinusOne").uvalue == 3);
+  CHECK(field(avcc, "numOfSequenceParameterSets").uvalue == 1);
+  CHECK_FALSE(has_field(avcc, "chroma_format"));
+}
+
+// AT2 on the corpus file.
+TEST_CASE("AT2 on syn_h265_main10_hev1: hvcC Main 10, bitDepthLumaMinus8 2, arrays 32 / 33 / 34",
+          "[container][decoders][codec_config][needs-corpus]") {
+  std::unique_ptr<ovt::io::RandomAccessFile> file;
+  const iso::WalkResult walked = walk_corpus("syn_h265_main10_hev1", file);
+  const BoxNodeT& hvcc = corpus_record(walked, "hvcC");
+  CHECK(field(hvcc, "general_profile_idc").uvalue == 2);
+  CHECK(field(hvcc, "bitDepthLumaMinus8").uvalue == 2);
+  std::vector<uint64_t> types;
+  const FieldT& arrays = field(hvcc, "arrays");
+  for (const auto& a : arrays.children) {
+    types.push_back(child(a->children, "NAL_unit_type")->uvalue);
   }
+  for (const uint64_t t : {32U, 33U, 34U}) {
+    INFO(t);
+    CHECK(std::ranges::find(types, t) != types.end());
+  }
+}
+
+// AT3 on the corpus file. SPEC-ASSUMPTION(#689): a 1080p30 aomenc encode carries seq_level_idx_0 8 ("4.0"), not
+// 5.1; the expected value is the one mp4box.js reports for the file (recorded in the PR).
+TEST_CASE("AT3 on syn_av1_filmgrain_10bit: av1C high_bitdepth, level and one sequence header",
+          "[container][decoders][codec_config][needs-corpus]") {
+  std::unique_ptr<ovt::io::RandomAccessFile> file;
+  const iso::WalkResult walked = walk_corpus("syn_av1_filmgrain_10bit", file);
+  const BoxNodeT& av1c = corpus_record(walked, "av1C");
+  CHECK(field(av1c, "high_bitdepth").uvalue == 1);
+  CHECK(field(av1c, "seq_level_idx_0").uvalue == 8);
+  CHECK(field(av1c, "seq_level_idx_0").svalue == "4.0");
+  const FieldT& obus = field(av1c, "configOBUs");
+  REQUIRE(obus.children.size() == 1);
+  CHECK(find(*obus.children[0], "obu_type")->uvalue == 1);
 }
 
 }  // namespace
