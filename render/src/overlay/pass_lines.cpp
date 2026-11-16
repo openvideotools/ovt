@@ -261,6 +261,10 @@ bool LinePass::upload(pl_gpu gpu, const GridLines& lines, std::string& err) {
   if (count == 0) {
     return true;
   }
+  if (count / 2 > static_cast<size_t>(std::numeric_limits<int>::max() / kCornersPerLine)) {
+    err = "grid line list of " + std::to_string(count) + " vertices exceeds the draw call vertex count";
+    return false;
+  }
   const auto max_dim = static_cast<size_t>(gpu->limits.max_tex_2d_dim);
   const size_t w = std::min<size_t>(static_cast<size_t>(kMaxEndpointTexW), max_dim);
   const size_t h = (count + w - 1) / w;
