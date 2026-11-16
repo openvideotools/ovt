@@ -23,7 +23,7 @@
 namespace ovt::render::detail {
 namespace {
 
-// SPEC-ASSUMPTION(#645): §10.5.1 counts 7 vertices per arrow; a triangle list needs 6 for the shaft quad + 3 head.
+// §10.5.1: K = 9 vertices per arrow as a triangle list, 6 for the shaft quad + 3 for the head (issue #645).
 constexpr uint32_t kVerticesPerInstance = 9;  // gl_VertexIndex / 9 -> instance, % 9 -> corner
 constexpr uint32_t kModeBiDraw = 1;
 constexpr uint32_t kModeSkipBi = 2;
