@@ -138,6 +138,30 @@ void copy_plane(const TComPicYuv& rec, ComponentID comp, int bit_depth, Plane* o
   }
 }
 
+// SPEC-ASSUMPTION(#450): Coefficients planes report bit_depth 16, the CoeffMinY/C .. CoeffMaxY/C range without
+// extended_precision_processing (H.265 §7.4.3.3.2), as the de265 plugin does.
+constexpr uint8_t kCoefficientBits = 16;
+
+// One component of the Coefficients planes as S32LE bytes (chapter 06 §6.6.2).
+void coefficient_plane(const CoeffPlanes& in, std::size_t c, Plane* out) {
+  const std::vector<int32_t>& levels = in.level.at(c);
+  if (levels.empty()) {
+    return;
+  }
+  out->width = in.width.at(c);
+  out->height = in.height.at(c);
+  out->bit_depth = kCoefficientBits;
+  out->sample_bytes = 4;
+  out->is_signed = true;
+  out->data.resize(levels.size() * 4);
+  for (std::size_t i = 0; i < levels.size(); ++i) {
+    const auto v = static_cast<uint32_t>(levels[i]);
+    for (std::size_t k = 0; k < 4; ++k) {
+      out->data[(i * 4) + k] = static_cast<uint8_t>(v >> (8 * k));
+    }
+  }
+}
+
 // One picture of the output-order DPB model of H.265 C.5.2 (decode index, POC, "needed for output", "used for
 // reference", PicLatencyCount). It runs next to HM's own buffers, whose pictures the plugin releases once copied.
 struct DpbEntry {
@@ -242,6 +266,7 @@ struct Decoder::Impl {
   int32_t next_index = 0;           // decode index when the host gave none
   PicIndex pic_index;               // decode index of every exported picture HM still holds
   std::vector<DpbEntry> dpb_model;  // HevcRps.dpb_fullness_after (C.5.2)
+  bool want_coefficients = false;   // Decoder::request_stages
   std::deque<Frame> frames;
   std::vector<Diag> pending_diags;  // attached to the next frame that comes out
 
@@ -366,7 +391,11 @@ void Decoder::Impl::export_picture(TComPic* pic) {
     const auto comp = static_cast<ComponentID>(c);
     copy_plane(*rec, comp, sps->getBitDepth(toChannelType(comp)), &f.planes[c]);
   }
-  map_cu(*pic, pic_index, dpb_fullness(pic, f.decode_index), &f.analysis);
+  map_cu(*pic, pic_index, dpb_fullness(pic, f.decode_index), want_coefficients, &f.analysis);
+  for (std::size_t c = 0; c < f.analysis.coeff.level.size(); ++c) {
+    coefficient_plane(f.analysis.coeff, c, &f.coeff.at(c));
+  }
+  f.analysis.coeff = CoeffPlanes();
   pic_index[pic] = f.decode_index;
   if (f.analysis.mv_clamped_cells > 0) {
     add_diag(kWarning, "MDL-GEN-0003",
@@ -568,6 +597,12 @@ ovt_status Decoder::flush() {
     d.frames.push_back(std::move(f));
   }
   return OVT_OK;
+}
+
+// SPEC-ASSUMPTION(#449): as in the de265 plugin, the mask of any pull() is a standing request for the pictures that
+// finish afterwards; the host primes a decoder with one pull before the first push.
+void Decoder::request_stages(uint32_t plane_stage_mask) {
+  impl_->want_coefficients = impl_->want_coefficients || (plane_stage_mask & (1U << kStageCoefficients)) != 0;
 }
 
 bool Decoder::pop(Frame* out) {

@@ -1,14 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Fuzz target of the H.264 slice-level parsers (chapter 7 §7.3.4 rows 19, 20, 24–28, chapter 14 §14.7.1, WI-1.109a/b).
+// Fuzz target of the H.264 slice-level parsers (chapter 7 §7.3.4 rows 19–28, chapter 14 §14.7.1, WI-1.109a–c).
 // Input: byte 0 = SPS length, byte 1 = PPS length, then the SPS NAL unit, the PPS NAL unit and one more NAL unit
 // (headers included, emulation prevention bytes present). When the SPS and PPS parse they seed a fresh
 // ParameterSets (the SPS in both the SPS and the subset SPS table, so NAL 20 / 21 reach the slice header too); the
 // third unit is dispatched on its nal_unit_type: slices and partition A through the slice header, partitions B / C,
-// AUD, end of sequence / stream and filler data. Invariants, each an abort when violated: only ovt::ParseError
-// escapes; two parses of the same bytes give the same JSON (determinism, §0.7.5); a parse with recording off leaves
-// the reader at the same position and returns the same header length.
+// AUD, end of sequence / stream, SPS extension, prefix NAL, subset SPS and filler data. Invariants, each an abort when
+// violated: only ovt::ParseError escapes; two parses of the same bytes give the same JSON (determinism, §0.7.5); a
+// parse with recording off leaves the reader at the same position and returns the same header length.
 
 #include <algorithm>
 #include <cstddef>
@@ -24,8 +24,11 @@
 #include "ovt/cxx/syntax/h264/data_partition.hpp"
 #include "ovt/cxx/syntax/h264/nal_header.hpp"
 #include "ovt/cxx/syntax/h264/pps.hpp"
+#include "ovt/cxx/syntax/h264/prefix_nal.hpp"
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
+#include "ovt/cxx/syntax/h264/sps_ext.hpp"
+#include "ovt/cxx/syntax/h264/subset_sps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "syntax/common/syntax_node_buffer.h"
 
@@ -80,6 +83,15 @@ Result parse_unit(const ovt::Rbsp& rbsp, const h264::ParameterSets& sets, const 
         break;
       case 11:
         (void)h264::parse_end_of_stream(br, b);
+        break;
+      case 13:
+        (void)h264::parse_sps_extension(br, b);
+        break;
+      case 14:
+        (void)h264::parse_prefix_nal_unit(br, b, h);
+        break;
+      case 15:
+        (void)h264::parse_subset_sps(br, b);
         break;
       default:
         (void)h264::parse_filler_data(br, b);

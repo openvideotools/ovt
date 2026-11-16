@@ -34,11 +34,19 @@ constexpr uint8_t kPredPcm = 5;
 /// CellGrid.intra_mode_y for a PCM CU (chapter 06 §6.3.1).
 constexpr int16_t kIntraModePcm = 64;
 
-/// Quarter-sample vector -> 1/16 luma sample units (chapter 0 §0.1.9), saturated to int16: H.265 allows
-/// -2^15..2^15-1 quarter samples.
+/// Largest neutral MV component (chapter 06 §6.2.3): -32768 is the MVD sentinel, so the clamp is symmetric.
+constexpr int32_t kMvNeutralMax = 32767;
+
+/// Quarter-sample vector -> 1/16 luma sample units (chapter 0 §0.1.9), clamped to ±32767 (chapter 06 §6.2.3):
+/// H.265 allows -2^15..2^15-1 quarter samples, so ×4 can overflow `short`.
 inline int16_t mv16(int16_t quarter) {
-  return static_cast<int16_t>(std::clamp<int32_t>(int32_t{quarter} * 4, std::numeric_limits<int16_t>::min(),
-                                                  std::numeric_limits<int16_t>::max()));
+  return static_cast<int16_t>(std::clamp<int32_t>(int32_t{quarter} * 4, -kMvNeutralMax, kMvNeutralMax));
+}
+
+/// True when mv16(@p quarter) clamps (Diagnostic MDL-GEN-0003).
+inline bool mv16_clamps(int16_t quarter) {
+  const int32_t neutral = int32_t{quarter} * 4;
+  return neutral > kMvNeutralMax || neutral < -kMvNeutralMax;
 }
 
 /// The CellGrid vectors before serialisation, one value per cell.
@@ -62,6 +70,7 @@ struct GridCells {
   std::vector<uint8_t> deblock_bs_v;
   std::vector<uint8_t> deblock_bs_h;
   std::vector<uint8_t> filter_idx;
+  uint32_t mv_clamped_cells = 0;  // cells with a vector component clamped by mv16 (MDL-GEN-0003)
 };
 
 /// FrameAnalysis.refs of a picture (chapter 06 §6.3.1 "RefSlot.name"): "L0[i]" / "L1[i]" for the lists of the first
