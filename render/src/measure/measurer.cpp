@@ -38,7 +38,7 @@ void Measurer::report(const std::string& err) {
   error_ = err;
 }
 
-bool Measurer::init(pl_log log, pl_gpu gpu) {
+bool Measurer::init(pl_log log, pl_gpu gpu, OffscreenGpu* host) {
   destroy();
   error_.clear();
   gpu_ = gpu;
@@ -74,12 +74,14 @@ bool Measurer::init(pl_log log, pl_gpu gpu) {
       return fail("cannot create the readback buffers");
     }
   }
+  scopes_.init(gpu, host);
   available_ = true;
   return true;
 }
 
 void Measurer::destroy() {
   available_ = false;
+  scopes_.destroy();
   if (gpu_ != nullptr) {
     for (Readback& rb : readbacks_) {
       pl_buf_destroy(gpu_, &rb.buf);
@@ -95,6 +97,7 @@ void Measurer::destroy() {
   next_seq_ = 1;
   shown_seq_ = 0;
   renders_since_request_ = 2;
+  shown_set_ = -1;
   last_ = Measurements{};
 }
 
@@ -143,6 +146,15 @@ void Measurer::run(const FrameSlot& slot) {
     report(err);
     return;
   }
+  // §10.7.6-§10.7.7 (WI-4.454): the scopes of the same samples into the texture set of this readback slot. A failure
+  // leaves the numbers alone; the scope textures of this result are then not valid.
+  // The set that measure() currently hands out (shown_set_) is never written: when frames render back to back while
+  // the other slot's readback is in flight, the only free slot can be the shown one. This frame is then measured
+  // without scopes (§10.7.9 allows an unmeasured frame), so the textures always belong to measured_frame.
+  const int set = static_cast<int>(rb - readbacks_.data());
+  std::string scope_err;
+  const bool scopes =
+      set != shown_set_ && scopes_.run(dispatch_, m_, slot.frame.color.primaries, s, set, scope_config_, scope_err);
   struct pl_tex_transfer_params tp = {};
   tp.tex = levels_.back();
   tp.buf = rb->buf;
@@ -156,11 +168,16 @@ void Measurer::run(const FrameSlot& slot) {
   rb->frame = slot.id;
   rb->pixels = pixels;
   rb->sampled = sampled_extent(width, s) * sampled_extent(height, s);
-  error_.clear();
+  rb->scopes = scopes;
+  if (scope_err.empty()) {
+    error_.clear();
+  } else {
+    report(scope_err);
+  }
 }
 
 void Measurer::collect(Readback& rb) {
-  if (!rb.pending || pl_buf_poll(gpu_, rb.buf, 0)) {
+  if (!rb.pending || hold_readbacks_ || pl_buf_poll(gpu_, rb.buf, 0)) {
     return;  // nothing queued, or still in use by the GPU
   }
   rb.pending = false;
@@ -185,6 +202,41 @@ void Measurer::collect(Readback& rb) {
   m.gpu_time_ms = 0;  // no GPU timers: libovt-render hides timestamp queries (vk_no_timestamps.cpp)
   last_ = m;
   shown_seq_ = rb.seq;
+  shown_set_ = rb.scopes ? static_cast<int>(&rb - readbacks_.data()) : -1;
+}
+
+void Measurer::fill_scopes(Measurements& m) const {
+  if (shown_set_ < 0) {
+    return;
+  }
+  // Described now rather than at collect(): the host-side layout of a Vulkan image changes once it is held.
+  m.waveform = scopes_.texture(shown_set_, ScopeKind::Waveform);
+  m.vectorscope = scopes_.texture(shown_set_, ScopeKind::Vectorscope);
+  m.cie_xy = scopes_.texture(shown_set_, ScopeKind::CieXy);
+}
+
+pl_tex Measurer::scope_tex(ScopeKind kind) const {
+  return shown_set_ >= 0 ? scopes_.tex(shown_set_, kind) : nullptr;
+}
+
+bool Measurer::measure_now(const FrameSlot& slot) {
+  if (!available_ || !slot.valid) {
+    return false;
+  }
+  pl_gpu_finish(gpu_);  // every readback in flight completes, so run() finds a free slot
+  for (Readback& rb : readbacks_) {
+    collect(rb);
+  }
+  const uint64_t before = next_seq_;
+  run(slot);
+  if (next_seq_ == before) {
+    return false;  // the passes failed; error() says why
+  }
+  pl_gpu_finish(gpu_);
+  for (Readback& rb : readbacks_) {
+    collect(rb);
+  }
+  return shown_seq_ == before && shown_set_ >= 0;
 }
 
 Measurements Measurer::poll() {
@@ -193,7 +245,9 @@ Measurements Measurer::poll() {
       collect(rb);
     }
   }
-  return last_;
+  Measurements m = last_;
+  fill_scopes(m);
+  return m;
 }
 
 }  // namespace ovt::render::detail

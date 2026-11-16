@@ -21,11 +21,26 @@ target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
 # constants in a generated header (cmake/OvtEmbedShaders.cmake).
 target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
                                   src/measure/measurer.cpp)
+# WI-4.454: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
+target_sources(ovt_render PRIVATE src/measure/scopes.cpp src/measure/gamut_tables.cpp)
 include(OvtEmbedShaders)
 ovt_embed_shaders(
   "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h" kShaderMeasurePrep src/shaders/measure_prep.frag
   kShaderReduce8 src/shaders/reduce8.frag kShaderAccumulate src/shaders/accumulate.glsl)
+ovt_embed_shaders("${CMAKE_CURRENT_BINARY_DIR}/generated/scope_shaders.h" kShaderScopes src/shaders/scopes.glsl
+                  kShaderScopeClear src/shaders/scope_clear.glsl kShaderScopeResolve src/shaders/scope_resolve.frag)
 target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
+
+# WI-1.406: NATIVE targets (§10.4.1). The portable rules build everywhere; the macOS CAMetalLayer target is
+# Objective-C++ with ARC and links the frameworks it calls (system frameworks, no licence entry).
+target_sources(ovt_render PRIVATE src/platform/native_target.cpp)
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(ovt_render PRIVATE src/platform/macos_metal.mm)
+  set_source_files_properties(src/platform/macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
+endif()
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

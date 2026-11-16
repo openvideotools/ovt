@@ -60,6 +60,15 @@ X(CNT_TS_1007, "CNT-TS-1007", Warning, "PID_error: PID `pid` referenced by PMT b
 X(CNT_TS_2001, "CNT-TS-2001", Warning,
   "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
 X(CNT_TS_2002, "CNT-TS-2002", Error, "CRC_error in `table` section on PID `pid`", "TR 101 290 §5.2.2 (2.2)")
+X(CNT_TS_2003, "CNT-TS-2003", Warning, "PCR_repetition_error: `D` ms between PCRs on PID `pid` (> 40 ms)",
+  "TR 101 290 §5.2.2 (2.3a)")
+X(CNT_TS_2004, "CNT-TS-2004", Warning,
+  "PCR_discontinuity_indicator_error: PCR jump `D` ms without `discontinuity_indicator` on PID `pid`",
+  "TR 101 290 §5.2.2 (2.3b)")
+X(CNT_TS_2005, "CNT-TS-2005", Info, "PCR_accuracy_error: `D` ns deviation on PID `pid` (> ±500 ns)",
+  "TR 101 290 §5.2.2 (2.4)")
+X(CNT_TS_2006, "CNT-TS-2006", Warning, "PTS_error: `D` ms between PTS on PID `pid` (> 700 ms)",
+  "TR 101 290 §5.2.2 (2.5)")
 X(CNT_TS_2007, "CNT-TS-2007", Warning, "CAT_error: scrambled packets present but no CAT (PID 1)",
   "TR 101 290 §5.2.2 (2.6)")
 
@@ -76,6 +85,10 @@ X(CNT_0109, "CNT-0109", Warning, "non-printable box type", "")
 X(CNT_0110, "CNT-0110", Error, "FullBox shorter than 4 bytes", "14496-12 §4.2")
 X(CNT_0111, "CNT-0111", Error, "more than 1000000 boxes; remaining bytes not walked", "")
 X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "QTFF")
+
+// WI-1.202 (FieldBuilder, §8.2.8 / §8.2.9).
+X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
+X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")

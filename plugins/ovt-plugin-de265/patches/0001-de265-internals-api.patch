@@ -73,10 +73,10 @@ index 79fc81f..7b80a2e 100644
  check_c_source_compiles(
 diff --git a/libde265/de265_internals.cc b/libde265/de265_internals.cc
 new file mode 100644
-index 0000000..0ce19fa
+index 0000000..bf14e73
 --- /dev/null
 +++ b/libde265/de265_internals.cc
-@@ -0,0 +1,345 @@
+@@ -0,0 +1,364 @@
 +/*
 + * H.265 video codec.
 + * Copyright (c) 2026 The Open Video Tools contributors
@@ -103,6 +103,7 @@ index 0000000..0ce19fa
 +
 +#include "de265_internals.h"
 +#include "image.h"
++#include "pps.h"
 +#include "slice.h"
 +#include "sps.h"
 +
@@ -189,6 +190,24 @@ index 0000000..0ce19fa
 +{
 +  if (!inside(de265_internals_get_CTB_info_layout(img), ctb_x, ctb_y)) return 0;
 +  return img->get_SliceAddrRS(ctb_x, ctb_y);
++}
++
++int de265_internals_get_CTB_addr_ts(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  const de265_internals_layout l = de265_internals_get_CTB_info_layout(img);
++  if (!inside(l, ctb_x, ctb_y)) return 0;
++  const int rs = ctb_x + ctb_y * l.width_in_units;
++  if (!img->has_pps() || rs >= (int)img->get_pps().CtbAddrRStoTS.size()) return rs;
++  return img->get_pps().CtbAddrRStoTS[rs];
++}
++
++int de265_internals_get_CTB_tile_id(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  const de265_internals_layout l = de265_internals_get_CTB_info_layout(img);
++  if (!inside(l, ctb_x, ctb_y)) return 0;
++  const int rs = ctb_x + ctb_y * l.width_in_units;
++  if (!img->has_pps() || rs >= (int)img->get_pps().TileIdRS.size()) return 0;
++  return img->get_pps().TileIdRS[rs];
 +}
 +
 +void de265_internals_get_CTB_sao(const struct de265_image* img, int ctb_x, int ctb_y, de265_internals_sao* out)
@@ -424,10 +443,10 @@ index 0000000..0ce19fa
 +}
 diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
 new file mode 100644
-index 0000000..a38fd8a
+index 0000000..073dbc2
 --- /dev/null
 +++ b/libde265/de265_internals.h
-@@ -0,0 +1,174 @@
+@@ -0,0 +1,179 @@
 +/*
 + * H.265 video codec.
 + * Copyright (c) 2026 The Open Video Tools contributors
@@ -482,6 +501,11 @@ index 0000000..a38fd8a
 +LIBDE265_API uint16_t de265_internals_get_CTB_slice_header_index(const struct de265_image*, int ctb_x, int ctb_y);
 +/* SliceAddrRs: address of the first CTB of the independent slice */
 +LIBDE265_API int      de265_internals_get_CTB_slice_addr_rs(const struct de265_image*, int ctb_x, int ctb_y);
++/* CtbAddrInTs (H.265 6.5.1): the CTB's address in tile scan; the CTB's own raster address when the
++   picture has no PPS */
++LIBDE265_API int      de265_internals_get_CTB_addr_ts(const struct de265_image*, int ctb_x, int ctb_y);
++/* TileId (H.265 6.5.1): the index, in tile scan, of the tile that contains the CTB; 0 without tiles */
++LIBDE265_API int      de265_internals_get_CTB_tile_id(const struct de265_image*, int ctb_x, int ctb_y);
 +
 +typedef struct de265_internals_sao {
 +  uint8_t SaoTypeIdx[3];        /* per component: 0 not applied, 1 band offset, 2 edge offset */

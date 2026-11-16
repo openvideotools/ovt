@@ -14,3 +14,8 @@ downloads. HM's `libmd5` is public domain.
 
 Limitations: HM handles malformed input with `exit()` and `assert()` and prints a line per picture to stdout; the
 plugin checks only the NAL unit header, so analyse untrusted streams with `de265` (issue #442).
+
+Analysis data: the CellGrid (all fields but `partition_id`, `bits_x8` and `deblock_bs`), the CTU/CU/PU/TU block tree
+with HevcCtu/HevcCu/HevcPu/HevcTu extensions, motion vectors and reference slots. MotionVector.predictor is
+`merge[i]` or `amvp[i]` without the `:<source>` suffix, because HM does not keep which candidate was chosen
+(issue #495).

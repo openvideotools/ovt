@@ -14,9 +14,7 @@ namespace ovt::syntax::h265 {
 
 namespace {
 
-// SPEC-ASSUMPTION(#418): chapter 7 §7.3.8 states the "identical within a picture" rule for H.265 (§7.4.2.4.2) but
-// registers no H.265 diagnostic for it (H.264 has SYN-H264-0021) and none for a missing VPS (which it calls a
-// Warning). These two codes are the proposed ones.
+// Registered in chapter 7 §7.9 (spec 1.0-rc30, #418).
 constexpr const char* kChangedInPicture = "SYN-H265-0021";
 constexpr const char* kMissingVps = "SYN-H265-0022";
 constexpr const char* kMissingPps = "SYN-H265-0011";

@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "map_blocks.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 
 struct de265_image;
@@ -69,6 +70,7 @@ struct Frame {
   std::array<Plane, 3> planes;  // Reconstruction; planes 1 and 2 are empty for 4:0:0
   // The patch-0003 stages (planes.hpp), keyed by ovt.fb.PlaneStage value; only stages the host has asked for.
   std::map<uint32_t, StagePlanes> snapshots;
+  BlockData blocks;  // patch-0001 metadata for the block mapping (WI-2.164)
   std::vector<Diag> diagnostics;
 };
 

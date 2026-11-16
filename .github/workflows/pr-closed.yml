@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# When a pull request is closed or merged, cancel its queued and running ci, fuzz-smoke and static-analysis runs so
+# they stop holding runners. Each job joins one of those workflows' concurrency groups (`<workflow>-<github.ref>`,
+# where github.ref is refs/pull/<n>/merge for every pull_request event) with cancel-in-progress, which cancels the
+# run in that group, then does nothing. Groups of main, scheduled and manual runs have other names and are never
+# touched. The job names below must match the `name:` of those workflows.
+name: pr-closed
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+jobs:
+  cancel:
+    if: vars.OVT_HOSTED_RUNNERS != 'off' # the owner's switch (ci.yml header)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 2
+    strategy:
+      matrix:
+        workflow: [ci, fuzz-smoke, static-analysis]
+    concurrency:
+      group: ${{ matrix.workflow }}-${{ github.ref }}
+      cancel-in-progress: true
+    steps:
+      - run: echo "Cancelled the ${{ matrix.workflow }} runs of ${{ github.ref }}"
