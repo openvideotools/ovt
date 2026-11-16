@@ -165,6 +165,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/bookmarks_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
     "${app_dir}/src/dock/dock_model.cpp"
+    "${app_dir}/src/picture_controller.h"
+    "${app_dir}/src/picture_controller.cpp"
     ${picture_sources}
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
