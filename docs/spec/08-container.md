@@ -411,7 +411,7 @@ Decoder contract: a decoder reads **only** through `fb`/`br`; it MUST NOT touch 
 
 ### 8.2.10 Generated registry: `tools/gen_box_registry.py`
 
-**Inputs** (pinned copies committed under `tools/registry_inputs/`, refreshed by the update procedure; licences: the FileFormatConformance data is BSD-3-Clause-Clear (row in `tools/license_policy.toml`, test-input use only, never linked), the MP4RA CSVs state no licence and are committed as pinned registry data on the owner's acceptance of 2026-11-16 (#574 point 1); both are recorded in `INPUTS.sha256` with the upstream commit):
+**Inputs** (pinned copies committed under `tools/registry_inputs/`, refreshed by the update procedure; licences: the FileFormatConformance data is BSD-3-Clause-Clear (row in `tools/license_policy.toml`, test-input use only, never linked; owner's acceptance of 2026-11-16, #574 point 1) and is committed; the MP4RA CSVs state no licence, so until the owner rules on them they are **not** committed and the generator takes no MP4RA descriptions (MP4RA-only fourccs are shells without description; `REGISTRY_DIFF.md` lists them); pinned upstream commits and SHA-256 are recorded in `INPUTS.sha256`):
 
 | Input | Source URL | What is taken |
 |---|---|---|
