@@ -16,20 +16,24 @@ tree (AMP_A) and the SAO parameters (SAO_A) compare against the two `hm-cutree` 
 Found on CI's first run and handled in the test (each is a plugin or libde265 behaviour, listed in #589): with no worker
 threads a conformance window makes the plugin report the cropped picture, so `CONFWIN_A` runs with one thread; RPS_C and
 CONFWIN_A raise mapping warnings with an empty Diagnostic code (V-029, SPEC-ASSUMPTION #261), which the plugin runs now
-allow as the one validator finding. Not compared, issue #589: `cbf` Cb/Cr (patch 0002), `partition_id` and the block tree on the other streams (no HM data).
+allow as the one validator finding. Not compared, issue #589: `cbf` Cb/Cr (patch 0002), `partition_id` and the block
+tree on the other streams (no HM data).
 Local run: skipped (no corpus); compiled and linked clean under `-Werror`.
 
 ## Test 2: reconstruction equals the FFmpeg hevc software decode
 
 `ctest -R de265_recon_vs_ffmpeg` (`ovt_plugin_de265_recon_tests`, `test_de265_recon_vs_ffmpeg.cpp`): the plugin's
 `PlaneStage::Reconstruction` planes against libavcodec's `hevc` decoder (one thread, `apply_cropping = 0`), picture by
-picture in output order, one MD5 per plane, plus 1 thread against 4 threads. Same stream list as test 1 plus AMP_A. `NoOutPrior_A` and `RAP_B` are compared as a subsequence: libde265 outputs 10
-pictures there that FFmpeg drops (no_output_of_prior_pics, RASL after an end of sequence); every FFmpeg picture must still
+picture in output order, one MD5 per plane, plus 1 thread against 4 threads. Same stream list as test 1 plus AMP_A.
+`NoOutPrior_A` and `RAP_B` are compared as a subsequence: libde265 outputs 10
+pictures there that FFmpeg drops (no_output_of_prior_pics, RASL after an end of sequence); every FFmpeg picture must
+still
 equal a plugin picture in order. All other streams must give the same sequence.
 
 ```text
 OVT_CORPORA_DIR=<stand-ins> ovt_plugin_de265_recon_tests
-test cases: 2 | 0 passed | 2 skipped (MVCLIP_A, no stand-in)  -- the generator case passed: assertions: 3620 | 3620 passed
+test cases: 2 | 0 passed | 2 skipped (MVCLIP_A, no stand-in)  -- the generator case passed: assertions: 3620 | 3620
+passed
 ```
 
 (4 stand-in streams: 208x120, 416x240 B-pyramid, 10-bit WPP 192x144, 200x110 with a conformance window.)
