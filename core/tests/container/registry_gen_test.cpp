@@ -236,21 +236,24 @@ TEST_CASE("acceptance 3: an unknown fourcc has no row and the walk reports CNT-1
 }
 
 TEST_CASE("the walk reads FullBox version/flags from the registry", "[container][registry][fast]") {
-  Bytes mvhd_payload{1, 0, 0, 5};
-  mvhd_payload.resize(112, 0);
-  const auto r = walk_bytes(
-      cat({box("ftyp", Bytes(8, 'a')), box("moov", cat({box("mvhd", mvhd_payload), box("mvhd", Bytes(2, 0))}))}));
-  const BoxNodeT& moov = *r.top_level[1];
-  REQUIRE(moov.children.size() == 2);
-  const BoxNodeT& mvhd = *moov.children[0];
-  CHECK(mvhd.version == 1);
-  CHECK(mvhd.flags == 5);
-  REQUIRE(mvhd.fields.size() == 2);
-  CHECK(mvhd.fields[0]->name == "version");
-  CHECK(mvhd.fields[1]->name == "flags");
-  CHECK(mvhd.fields[1]->span->bit_offset() == 72);
-  CHECK(mvhd.payload_span->offset() == mvhd.file_span->offset() + 12);
-  CHECK(has_code(*moov.children[1], "CNT-0110"));  // a FullBox of 2 payload bytes
+  // `mehd` (§8.8.2) is a FullBox with no hand decoder, so the walker's own fields are all it gets.
+  Bytes mehd_payload{1, 0, 0, 5};
+  mehd_payload.resize(12, 0);
+  const auto r =
+      walk_bytes(cat({box("ftyp", Bytes(8, 'a')),
+                      box("moov", box("mvex", cat({box("mehd", mehd_payload), box("mehd", Bytes(2, 0))})))}));
+  const BoxNodeT& mvex = *r.top_level[1]->children.at(0);
+  REQUIRE(mvex.children.size() == 2);
+  const BoxNodeT& mehd = *mvex.children[0];
+  CHECK(mehd.version == 1);
+  CHECK(mehd.flags == 5);
+  REQUIRE(mehd.fields.size() == 2);
+  CHECK(mehd.fields[0]->name == "version");
+  CHECK(mehd.fields[1]->name == "flags");
+  CHECK(mehd.fields[1]->span->bit_offset() == 72);
+  REQUIRE(mehd.payload_span != nullptr);
+  CHECK(mehd.payload_span->offset() == mehd.file_span->offset() + 12);
+  CHECK(has_code(*mvex.children[1], "CNT-0110"));  // a FullBox of 2 payload bytes
 }
 
 TEST_CASE("the walk runs hand decoders and carries their context to later siblings", "[container][registry][fast]") {

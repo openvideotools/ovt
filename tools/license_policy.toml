@@ -17,8 +17,9 @@ patterns = [
 # Most-permissive-first ordering used to resolve SPDX `OR` expressions (algorithm step 1).
 # An `OR` alternative whose id is not in this list cannot be chosen; if no alternative is listed -> E-UNKNOWN.
 permissiveness = [
-  "0BSD", "Unlicense", "CC0-1.0", "WTFPL", "MIT-0", "MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent",
-  "Zlib", "libpng-2.0", "BSL-1.0", "NCSA", "Beerware", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MPL-2.0",
+  "0BSD", "Unlicense", "CC0-1.0", "WTFPL", "MIT-0", "MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear",
+  "BSD-2-Clause-Patent", "Zlib", "libpng-2.0", "BSL-1.0", "NCSA", "Beerware", "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception", "MPL-2.0",
   "LGPL-2.1-or-later", "LGPL-2.1-only", "LGPL-3.0-or-later", "LGPL-3.0-only",
   "GPL-2.0-or-later", "GPL-3.0-or-later", "GPL-3.0-only", "GPL-2.0-only",
   # SPEC-ASSUMPTION(#31): ids below are allowed in `any` but were missing from the §15.4.2 ordering, so an OR
@@ -39,6 +40,9 @@ ids = [
   "GPL-3.0-only WITH Bison-exception-2.2",
   "GPL-3.0-or-later WITH Autoconf-exception-3.0",
   "NCSA", "OFL-1.1", "CC-BY-4.0", "CC-BY-SA-4.0",
+  # MPEG FileFormatConformance data (box facts behind core/src/container/isobmff/box_registry.gen.cpp, WI-1.203).
+  # Owner approval 2026-11-16 (#574).
+  "BSD-3-Clause-Clear",
 ]
 
 [allow.gpl_targets]         # additionally permitted for targets whose own licence is GPL-3.0-or-later (cli, app, android, python)
