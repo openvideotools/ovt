@@ -50,6 +50,7 @@ void put_ptl(ParsedUnit& u, const h265::ProfileTierLevel& ptl, unsigned max_sub_
   const size_t n = std::min<size_t>(max_sub_layers_minus1, kSubLayers);
   const auto per_layer = [&](const std::string& key, auto value) {
     std::vector<int64_t> v;
+    v.reserve(n);
     for (size_t i = 0; i < n; ++i) {
       v.push_back(value(i));
     }
@@ -231,6 +232,7 @@ void put_scaling(ParsedUnit& u, const h265::ScalingListData& s) {
   lists("scaling_lists_16x16", 2, 64, {0, 1, 2, 3, 4, 5});
   lists("scaling_lists_32x32", 3, 64, {0, 3});
   std::vector<int64_t> dc16;
+  dc16.reserve(6);
   for (size_t m = 0; m < 6; ++m) {
     dc16.push_back(s.scaling_list_dc_coef_minus8.at(0).at(m));
   }
