@@ -496,11 +496,11 @@ void check_records(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, size_t& 
 }
 
 iso::WalkResult walk_corpus(std::string_view id, std::unique_ptr<ovt::io::RandomAccessFile>& file) {
-  // corpus_or_skip() returns the entry's primary file. For the recipes with an "mp4" key (recipe 15), generate.py
-  // wraps the elementary stream with ffmpeg and lists the .mp4 first, so the primary file is the MP4.
-  const std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  // corpus_or_skip() returns the entry's primary file; recipe 15a lists its .ivf and its .mp4 side by side.
+  std::filesystem::path path = ovt::test::corpus_or_skip(id);
+  path.replace_extension(".mp4");
   INFO(path.string());
-  REQUIRE(path.extension() == ".mp4");
+  REQUIRE(std::filesystem::exists(path));
   file = ovt::io::RandomAccessFile::open(path.string());
   return iso::walk(*file);
 }
@@ -554,6 +554,7 @@ TEST_CASE("AT2 on syn_h265_main10_hev1: hvcC Main 10, bitDepthLumaMinus8 2, arra
   CHECK(field(hvcc, "bitDepthLumaMinus8").uvalue == 2);
   std::vector<uint64_t> types;
   const FieldT& arrays = field(hvcc, "arrays");
+  types.reserve(arrays.children.size());
   for (const auto& a : arrays.children) {
     types.push_back(child(a->children, "NAL_unit_type")->uvalue);
   }
@@ -563,12 +564,13 @@ TEST_CASE("AT2 on syn_h265_main10_hev1: hvcC Main 10, bitDepthLumaMinus8 2, arra
   }
 }
 
-// AT3 on the corpus file. SPEC-ASSUMPTION(#689): a 1080p30 aomenc encode carries seq_level_idx_0 8 ("4.0"), not
-// 5.1; the expected value is the one mp4box.js reports for the file (recorded in the PR).
-TEST_CASE("AT3 on syn_av1_filmgrain_10bit: av1C high_bitdepth, level and one sequence header",
+// AT3 on the corpus file the #675 ruling names (recipe 15a: the recipe-15 encode with HDR metadata OBUs, muxed by
+// MP4Box). SPEC-ASSUMPTION(#689): a 1080p30 aomenc encode carries seq_level_idx_0 8 ("4.0"), not 5.1; the expected
+// value is the one mp4box.js reports for the file (recorded in the PR).
+TEST_CASE("AT3 on syn_av1_pq_hdr_obu: av1C high_bitdepth, level and one sequence header",
           "[container][decoders][codec_config][needs-corpus]") {
   std::unique_ptr<ovt::io::RandomAccessFile> file;
-  const iso::WalkResult walked = walk_corpus("syn_av1_filmgrain_10bit", file);
+  const iso::WalkResult walked = walk_corpus("syn_av1_pq_hdr_obu", file);
   const BoxNodeT& av1c = corpus_record(walked, "av1C");
   CHECK(field(av1c, "high_bitdepth").uvalue == 1);
   CHECK(field(av1c, "seq_level_idx_0").uvalue == 8);
