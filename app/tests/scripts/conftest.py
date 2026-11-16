@@ -171,6 +171,11 @@ def ovt_studio_exe(request: pytest.FixtureRequest) -> str:
         path = str(found[0]) if found else shutil.which("ovt-studio")
     if not path or not Path(path).exists():
         pytest.skip("ovt-studio not found (pass --ovt-studio or set OVT_STUDIO)")
+    # The test IPC is compiled in only with -DOVT_ENABLE_TEST_IPC=ON (WI-1.465); other builds lack the option.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    help_text = subprocess.run([path, "--help"], env=env, capture_output=True, text=True, timeout=60, check=False)
+    if "--test-ipc" not in help_text.stdout + help_text.stderr:
+        pytest.skip("ovt-studio was built without OVT_ENABLE_TEST_IPC")
     return path
 
 

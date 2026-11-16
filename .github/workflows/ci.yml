@@ -402,8 +402,9 @@ jobs:
           triplet: x64-linux-ovt
           qt: "true"
 
+      # OVT_ENABLE_TEST_IPC is OFF in every preset (the release bundles never contain the test IPC); this job turns it on.
       - name: Configure
-        run: cmake --preset linux-x64-release
+        run: cmake --preset linux-x64-release -DOVT_ENABLE_TEST_IPC=ON
 
       - name: Build the GUI targets
         run: >-

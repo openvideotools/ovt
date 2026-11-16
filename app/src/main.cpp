@@ -99,7 +99,7 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
                                      QStringLiteral("Open the main window, exit 0 after the first rendered frame."));
   parser.addOption(self_test);
 #ifdef OVT_ENABLE_TEST_IPC
-  // Test builds only (OVT_BUILD_TESTS; chapter 14 §14.10.3): without this flag no socket exists, and a build without
+  // Builds with -DOVT_ENABLE_TEST_IPC=ON only (chapter 14 §14.10.3): without this flag no socket exists, and a build without
   // OVT_ENABLE_TEST_IPC does not know the option at all.
   const QCommandLineOption test_ipc(QStringLiteral("test-ipc"),
                                     QStringLiteral("Serve the test IPC (JSON lines) on the Unix socket <path>."),

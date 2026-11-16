@@ -215,10 +215,16 @@ add_dependencies(ovt_studio ovt_version_header)
 target_compile_definitions(ovt_studio PRIVATE "OVT_PRODUCT_NAME_VALUE=\"${OVT_PRODUCT_NAME}\"" QT_NO_KEYWORDS)
 ovt_set_license(ovt_studio "GPL-3.0-or-later")
 
-# The test IPC (chapter 14 §14.10.3, WI-1.465) is GPL app code for test builds only: with OVT_BUILD_TESTS=OFF (the
-# release and packaging builds) it is not compiled and `--test-ipc` is not a known option. In test builds main.cpp
-# starts the socket server only when the flag is given. Mouse and key events go through QTest, so Qt6::Test is linked.
-if(OVT_BUILD_TESTS AND NOT ANDROID)
+# The test IPC (chapter 14 §14.10.3, WI-1.465) is GPL app code for test lanes only: OVT_ENABLE_TEST_IPC is OFF by
+# default, so no preset and no packaging build (the macOS bundle, dist archives) contains it, and `--test-ipc` is not a
+# known option there. The `gui` CI job and local GUI test runs turn it on with -DOVT_ENABLE_TEST_IPC=ON. Even then
+# main.cpp starts the socket server only when the flag is given. Mouse and key events go through QTest, so Qt6::Test is
+# linked.
+option(OVT_ENABLE_TEST_IPC "Compile the test IPC server into ovt_studio (tests only, never for release)" OFF)
+if(OVT_ENABLE_TEST_IPC AND NOT OVT_BUILD_TESTS)
+  message(WARNING "OVT_ENABLE_TEST_IPC=ON needs OVT_BUILD_TESTS=ON: the test IPC is not built.")
+endif()
+if(OVT_ENABLE_TEST_IPC AND OVT_BUILD_TESTS AND NOT ANDROID)
   find_package(Qt6 6.4 REQUIRED COMPONENTS Test)
   target_sources(ovt_studio PRIVATE src/testipc/command_dispatch.h src/testipc/command_dispatch.cpp
                                     src/testipc/test_ipc_server.h src/testipc/test_ipc_server.cpp)

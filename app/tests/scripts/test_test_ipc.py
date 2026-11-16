@@ -5,6 +5,10 @@
 test_ipc_client.py tests the client against a fake server; this file starts the application with
 ``--test-ipc <socket>`` and runs every command of 14.10.3 against it. The command semantics are also covered without
 the application by app/tests/testipc (Catch2).
+
+SPEC-ASSUMPTION(#690): WI-1.465 acceptance test 1 names the five scripts of 14.10.3 and the 11.9 scripts, which the
+Overlap line of the WI assigns to WI-1.576 (they need panels this WI does not build). Until the issue is answered,
+this file and app/tests/testipc stand in for AT1 of WI-1.465.
 """
 
 from __future__ import annotations

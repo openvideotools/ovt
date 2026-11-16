@@ -3,7 +3,7 @@
 //
 // The socket side of the test IPC (chapter 14 §14.10.3, WI-1.465): a QLocalServer on the path given with
 // `--test-ipc <socket>`, JSON lines in both directions, one response per request in request order. The server is
-// compiled only into builds with OVT_BUILD_TESTS (app/CMakeLists.txt defines OVT_ENABLE_TEST_IPC for them), and
+// compiled only into builds configured with -DOVT_ENABLE_TEST_IPC=ON (default OFF; app/CMakeLists.txt), and
 // main.cpp creates it only when the flag is on the command line, so a release build has no such socket and a debug
 // build has one only on request. The socket is private to the user (QLocalServer::UserAccessOption).
 
@@ -41,7 +41,7 @@ class TestIpcServer : public QObject {
   // Starts listening on `socket_path`, replacing a stale socket file of an earlier run. False with errorString().
   bool listen(const QString& socket_path);
   [[nodiscard]] QString socketPath() const { return server_.fullServerName(); }
-  [[nodiscard]] QString errorString() const { return server_.errorString(); }
+  [[nodiscard]] QString errorString() const { return error_.isEmpty() ? server_.errorString() : error_; }
 
  private:
   struct Connection {
@@ -56,6 +56,7 @@ class TestIpcServer : public QObject {
   static void write(QLocalSocket* socket, const QJsonObject& response);
 
   QLocalServer server_;
+  QString error_;
   CommandDispatch dispatch_;
   QHash<QLocalSocket*, Connection> connections_;
 };

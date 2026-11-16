@@ -3,6 +3,7 @@
 
 #include "testipc/test_ipc_server.h"
 
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonParseError>
 #include <QLocalSocket>
@@ -26,6 +27,13 @@ TestIpcServer::~TestIpcServer() {
 }
 
 bool TestIpcServer::listen(const QString& socket_path) {
+  // removeServer() unlinks whatever is at the path: only a stale socket of an earlier run may go.
+  const QFileInfo existing(socket_path);
+  if (existing.isSymLink() || existing.isFile() || existing.isDir()) {
+    error_ = QStringLiteral("%1 exists and is not a socket").arg(socket_path);
+    return false;
+  }
+  error_.clear();
   QLocalServer::removeServer(socket_path);
   return server_.listen(socket_path);
 }

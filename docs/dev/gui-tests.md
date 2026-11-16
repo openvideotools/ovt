@@ -56,8 +56,9 @@ every command against the real application.
 
 `ovt-studio --test-ipc <socket>` listens on the Unix socket `<socket>` (`QLocalServer`, user-only permissions) and
 answers one JSON line per request, in request order. Without the flag no socket exists. The server
-(`app/src/testipc/`) is GPL app code compiled only into builds with `OVT_BUILD_TESTS=ON`; with it `OFF` (release and
-packaging builds) the option does not exist. Commands:
+(`app/src/testipc/`) is GPL app code compiled only with `-DOVT_ENABLE_TEST_IPC=ON` (default `OFF`, in every preset, so release bundles never
+contain it; it also needs `OVT_BUILD_TESTS=ON`). Without it the `--test-ipc` option does not exist and the pytest
+lane skips. The `gui` CI job turns it on. Commands:
 
 | Command | Meaning |
 |---|---|
