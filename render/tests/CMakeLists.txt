@@ -117,6 +117,9 @@ target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/rende
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
 
+# WI-2.439: colour tables, legend data, contrast/halo rule and colour-blind simulation (§10.5.2). CPU only.
+target_sources(ovt_tests_render PRIVATE test_overlay_legend.cpp test_overlay_contrast.cpp)
+
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
 

@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# WI-0.095 declares the runtime dependencies of the pure-Python model reader (python/ovt/model.py). The wheel
+# build itself (scikit-build-core, ovt_py, version from /VERSION) arrives with chapter 12 WI-4.540; no publishing
+# step exists here. The generated ovt/fb/ package is installed by python/CMakeLists.txt, never committed.
+[project]
+name = "ovt"
+dynamic = ["version"]
+description = "Open Video Tools: Python access to analysis records"
+requires-python = ">=3.9"
+license = "GPL-3.0-or-later"
+dependencies = ["flatbuffers==25.12.19", "numpy", "zstandard"]
+
+[project.optional-dependencies]
+pandas = ["pandas"]
+test = ["pytest", "pandas"]

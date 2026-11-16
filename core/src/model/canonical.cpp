@@ -306,12 +306,12 @@ class AlignedCopy {
 // verifiers do, and it enforces `required`. Unions and 64-bit vectors, which the OVT schemas do not use, fail.
 // Limits are those of WI-0.094 (verifier_options(): max_depth 64, max_tables 10 000 000), as in the validator.
 // The depth is bounded by max_depth (VerifyTableStart / EndTable), hence the recursion is too.
-// NOLINTBEGIN(misc-no-recursion)
 class SafeVerifier {
  public:
   SafeVerifier(const reflection::Schema& schema, ByteView buffer)
       : schema_(schema), verifier_(buffer.data(), buffer.size(), detail::verifier_options()) {}
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   bool table(const reflection::Object& object, const flatbuffers::Table* table) {
     if (table == nullptr || !table->VerifyTableStart(verifier_)) {
       return false;
@@ -334,6 +334,7 @@ class SafeVerifier {
     return ok;
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   bool vector(const flatbuffers::Table& table, const reflection::Field& field, const reflection::Type& type) {
     const auto* raw = table.GetPointer<const std::uint8_t*>(field.offset());
     if (raw == nullptr) {
@@ -361,6 +362,7 @@ class SafeVerifier {
     return verifier_.VerifyVectorOrString(raw, element_size(schema_, type));
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   bool field(const flatbuffers::Table& table, const reflection::Field& field) {
     const auto& type = type_of(field);
     const auto offset = field.offset();
@@ -394,7 +396,6 @@ class SafeVerifier {
     }
   }
 };
-// NOLINTEND(misc-no-recursion)
 
 /// @p bytes must be 8-byte aligned (an AlignedCopy).
 bool verifies(const reflection::Schema& schema, const reflection::Object& object, ByteView bytes) {
@@ -438,13 +439,13 @@ std::size_t element_size(const reflection::Schema& schema, const reflection::Typ
 // The walkers below recurse along the object tree. The depth is bounded: every buffer passes SafeVerifier
 // (max_depth 64) before it is walked, nested buffers are verified the same way and at most kMaxNesting deep.
 // The width is bounded by the Budget.
-// NOLINTBEGIN(misc-no-recursion)
 
 class Canonicalizer {
  public:
   Canonicalizer(const reflection::Schema& schema, Budget& budget) : schema_(schema), budget_(budget) {}
 
   /// Canonical bytes of a finished buffer of @p object; @p identifier is written when non-null.
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   std::vector<std::uint8_t> finish(const reflection::Object& object, const AlignedCopy& buffer, const char* identifier,
                                    const std::string& path) {
     budget_.charge(buffer.size());
@@ -492,6 +493,7 @@ class Canonicalizer {
   }
 
   /// Copies one struct value field by field into zeroed storage (canonical padding).
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void copy_struct(const reflection::Object& object, ByteView src, MutableBytes dst) const {
     std::ranges::fill(dst, std::uint8_t{0});
     for (const auto* field : fields_of(object)) {
@@ -508,6 +510,7 @@ class Canonicalizer {
     }
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   flatbuffers::uoffset_t copy_table_vector(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& element,
                                            const reflection::Field& field, const flatbuffers::Table& table,
                                            const std::string& path) {
@@ -530,6 +533,7 @@ class Canonicalizer {
     return builder.CreateVector(offsets).o;
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   flatbuffers::uoffset_t copy_vector(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& object,
                                      const reflection::Field& field, const flatbuffers::Table& table,
                                      const std::string& path) {
@@ -578,6 +582,7 @@ class Canonicalizer {
   }
 
   /// Pass 1 of copy_table: the string, vector or sub-table of @p field (0 when none is written).
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   flatbuffers::uoffset_t copy_child(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& object,
                                     const reflection::Field& field, const flatbuffers::Table& table,
                                     const std::string& path) {
@@ -598,6 +603,7 @@ class Canonicalizer {
     }
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   flatbuffers::uoffset_t copy_table(flatbuffers::FlatBufferBuilder& builder, const reflection::Object& object,
                                     const flatbuffers::Table& table, const std::string& path) {
     const auto& fields = field_order_(object);
@@ -791,6 +797,7 @@ class Differ {
   Differ(const reflection::Schema& schema, Budget& budget, std::vector<std::string>& out)
       : schema_(schema), budget_(budget), out_(out) {}
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void tables(const reflection::Object& object, const flatbuffers::Table& a, const flatbuffers::Table& b,
               const std::string& path) {
     budget_.charge(kTableCost);
@@ -887,6 +894,7 @@ class Differ {
   }
 
   /// A struct or sub-table field present in both, or reported as present in one only.
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void objects(const reflection::Object& sub, const reflection::Field& field, const flatbuffers::Table& a,
                const flatbuffers::Table& b, const std::string& path) {
     if (sub.is_struct()) {
@@ -908,6 +916,7 @@ class Differ {
     }
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void structs(const reflection::Object& object, ByteView a, ByteView b, const std::string& path) {
     for (const auto* field : field_order_(object)) {
       const auto& type = type_of(*field);
@@ -927,6 +936,7 @@ class Differ {
   }
 
   /// The first @p count inline elements (structs or scalars) of an array or vector of type @p type.
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void elements(const reflection::Type& type, ByteView a, ByteView b, std::size_t count, const std::string& path) {
     const std::size_t size = element_size(schema_, type);
     budget_.charge(2 * count * size);
@@ -942,6 +952,7 @@ class Differ {
   }
 
   /// Nested buffers of the same named table that both verify: diffed as tables. Returns false otherwise.
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   bool nested(const reflection::Object& object, const reflection::Field& field, const flatbuffers::Table& a,
               const flatbuffers::Table& b, const std::string& path) {
     const auto* type_field = nested_type_field(object, field);
@@ -967,6 +978,7 @@ class Differ {
     return true;
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void vectors(const reflection::Object& object, const reflection::Field& field, const flatbuffers::Table& a,
                const flatbuffers::Table& b, const std::string& path) {
     if (nested(object, field, a, b, path)) {
@@ -1002,8 +1014,6 @@ class Differ {
     }
   }
 };
-
-// NOLINTEND(misc-no-recursion)
 
 }  // namespace
 

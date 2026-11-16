@@ -122,8 +122,26 @@ if(OVT_BUILD_PLUGIN_AOM AND NOT OVT_SYSTEM_LIBAOM)
   endforeach()
 endif()
 
+# Issue #649 (WI-2.434 follow-up): the overlay builder's CPU side over untrusted FrameAnalysis bytes. The libovt-render
+# builder files are compiled in directly (they need FlatBuffers only, no libplacebo), so the target exists in the
+# linux-x64-fuzz preset, which sets OVT_BUILD_RENDER=OFF.
+set(_render_dir "${PROJECT_SOURCE_DIR}/render")
+ovt_add_fuzz_target(overlay_builder fuzz_overlay_builder.cpp)
+foreach(_target ovt_fuzz_overlay_builder_regress ovt_fuzz_overlay_builder)
+  if(TARGET ${_target})
+    target_sources(
+      ${_target} PRIVATE "${_render_dir}/src/overlay/builder.cpp" "${_render_dir}/src/overlay/heatmap_source.cpp"
+                         "${_render_dir}/src/overlay/arrow_instances.cpp")
+    target_include_directories(${_target} PRIVATE "${_render_dir}/src" "${_render_dir}/include")
+  endif()
+endforeach()
+unset(_render_dir)
+
 # WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
 ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
+
+# WI-1.121: the StreamIndex builder end to end (unit scan -> add_unit -> finish -> validate_stream_index).
+ovt_add_fuzz_target(index_builder fuzz_index_builder.cpp)
 
 # The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
 # only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
