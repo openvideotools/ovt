@@ -366,6 +366,13 @@ void defer_moof(WalkState& st, BoxNodeT& n, uint64_t children_begin, uint64_t en
   st.deferred->push_back(DeferredBox{pos, ctx});
 }
 
+// Checks that need a node's children: CNT-1010 on a decoded `stsd` (§8.3.2, SPEC-ASSUMPTION(#592)).
+void check_after_children(BoxNodeT& n, const FourCC& type, bool decoded) {
+  if (decoded && sv(type) == "stsd") {
+    check_stsd_entry_count(n);
+  }
+}
+
 // Steps 2.10-2.13 for one box: registry metadata, FullBox header, the top-level bookkeeping, then the hand decoder,
 // children (containers) or the payload span. `ctx` is the sibling context a decoder may update for later siblings.
 // Recursion is bounded by kMaxBoxDepth (step 2.1).
@@ -406,9 +413,7 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
     defer_moof(st, n, children_begin, end, ctx);
   } else if (walk) {
     n.children = walk_children(st, pos, children_begin, end, depth + 1, child_context(ctx, type, n), n.diagnostics);
-    if (dec != nullptr && sv(type) == "stsd") {
-      check_stsd_entry_count(n);  // CNT-1010 needs the children (§8.3.2, #592)
-    }
+    check_after_children(n, type, dec != nullptr);
   } else if (dec == nullptr) {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
   }
