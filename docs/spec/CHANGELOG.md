@@ -2,12 +2,26 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc39 — 2026-11-16
+## 1.0.0-rc40 — 2026-11-16
 
 MINOR-level (FlatBuffers schema, additive): WI-4.106 part a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
 
 - 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
 - 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
+
+## 1.0.0-rc39 — 2026-11-16
+
+PATCH-level: spec-amendment pass 19 folds in the accepted answers of `spec-question` issues #637 and #638 from WI-1.412 (PR #643), #644 and #645 from WI-2.434 (PR #647), #650 from WI-1.456 (PR #651), #624 from WI-2.432 (PR #652), #648 from WI-2.433 (PR #653), and #641 and #642 from WI-1.121. No new diagnostic code; no FlatBuffers schema, plugin ABI or CLI grammar change. `core/include/ovt/index.h` (#642) declares the §12.3.8 block verbatim, so no declaration changes; the header itself lands with the WI-1.121 part c PR under the Fable reviewer's approval.
+
+- 10 §10.8, WI-1.412 steps 2–4, AT2 and notes — `HdrPng16` of a PQ/HLG source also writes `mDCV` and `cLLi` when the source carries mastering metadata / MaxCLL, through lodepng's native `LodePNGInfo` fields (lodepng 20261102); `view_or_null == nullptr` = the last `render()`'s `ViewState`; `HdrPng16` forces 1:1, no dither, no tone mapping, `SdrPng8` keeps the view's tone/gamut mapping; `ViewPng8` is RGBA when any texel is translucent (`hide_picture` stays a later public-header change); AT2 is checked by the WI-1.575 parity suite, this WI ships the `SdrPng8` == on-screen and reproducibility tests — WI-1.412 (#637)
+- 13 §13.3.1 decision table, 10 WI-1.412 notes — lodepng stays vendored under `third_party/lodepng/` (pinned, unmodified, zlib), the vcpkg port is not used; the PR-size question of #638 stays with the owner — WI-1.412 (#638)
+- 10 §10.5.1 Intra directions row, WI-2.434 step 5 — one stroke per leaf block with a uniform `intra_mode_y`, else per 4×4 cell; 1-px line through the centre, 80 % of the shorter side, row 20 colour, no head, R-MV-1 visibility; H.264 Table 8-2 / H.265 Table 8-5 / AV1 `Mode_To_Angle` + `AngleDeltaY` angle mapping; non-directional modes draw nothing; drawn as the head-collapsed shaft quad — WI-2.434 (#644)
+- 10 §10.5.1 MV arrows row and budget table, WI-2.434 AT1 — 9 vertices per arrow (`PL_PRIM_TRIANGLE_LIST`, 6 shaft + 3 head), 4.67 M vertices / 4.7 MB corner buffer at 4K; AT1 compares the central 1920×1080 of the 4K render with the §10.9.2 1080p golden and reports `arrow_pass_ms` as wall time (21-run median, with minus without arrows) until #304 lets `pl_timer` return values — WI-2.434 (#645)
+- 11 WI-1.456 step 1 and notes, 10 WI-2.436 step 3, 16 §16.3 — until WI-2.436 lands the Picture panel draws the probe crosshair and selection rectangle as thin Qt Quick items (a temporary, narrow exception to FR-GUI-030; WI-2.436 removes them); `PictureController` emits `frameWanted(decode_index, display_index)` and WI-2.171 connects its decoder job to it, so WI-1.456 no longer depends on WI-2.171; read-out from the CPU copy until WI-2.435 — WI-1.456 (#650)
+- 10 WI-2.432 AT1 — the CTU level emits `2 × (2·N + C + R)` vertices under the §10.5.3 left/top edge rule (8 348 for the 4K grid fixture's 2 040 CTUs), not 8160 × 8; the 8-vertices-per-rect figure of §10.5.1 is the pre-rule upper bound — WI-2.432 (#624)
+- 10 §10.5.1 Labels row, §10.5.5, §10.6.2 R-ZOOM-3, WI-2.433 step 1 and AT2 — labels go on the leaf blocks until a later WI adds the cycle level to `OverlayConfig`; sample values are decimal until a public-header WI adds `OverlayConfig.hex_values`; the SDF atlas is 1024 px wide and as tall as the glyphs need (1024×368) — WI-2.433 (#648)
+- 7 WI-1.121 and WI-1.130 Produces, 16 §16.3 — WI-1.121 part c creates `core/include/ovt/index.h` with the §12.3.8 `ovt_Stream` block verbatim and implements `ovt_stream_open` (`annexb`, `obu`, `ivf`), `ovt_stream_close`, `ovt_stream_codec`, `ovt_stream_build_index` (no cache access, job ignored until WI-1.125) and `ovt_stream_index`; the rest returns `OVT_E_UNSUPPORTED` / −1 until its owner lands; WI-1.130 extends the header — WI-1.121 (#642)
+- 7 WI-1.121 Produces and notes, §7.9 `SYN-GEN-0102`, 6 §6.2.6 — split into parts a (builder, AV1, display order, fuzz; AT2), b (H.26x classification, `index_vs_ffprobe`; AT1) and c (`source_hash`, RAP map, C API; AT3); a never-output frame takes the next output frame's `pts` and `dts = decode_index × ticks_per_frame`; AV1 frame OBUs before the first sequence header raise `SYN-GEN-0102` once and belong to no frame; an unparsable unit keeps `frame.decode_index = −1`; `SYN-AV1-0101` is index-level with a `frame <n>: ` prefix — WI-1.121 (#641)
 
 ## 1.0.0-rc38 — 2026-11-16
 
