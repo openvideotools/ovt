@@ -494,7 +494,7 @@ TEST_CASE("group E fields match the MP4Box goldens of the container-smoke corpus
   }
 }
 
-TEST_CASE("the first moof of cta_cmaf_video_cmfv", "[container][decoders][moof][needs-corpus]") {
+TEST_CASE("the first moof of cta_cmaf_video_cmfv", "[container][decoders][moof][slow][needs-corpus]") {
   // Acceptance test 1. SPEC-ASSUMPTION(#671): the repository has no mp4box.js golden for this slow-tagged file, so
   // the values are checked against what the file itself implies: with default-base-is-moof the first sample starts
   // where the following mdat payload does.
