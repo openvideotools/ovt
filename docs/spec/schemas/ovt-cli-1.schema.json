@@ -718,21 +718,21 @@
         }
       ]
     },
-    "_Bytes": {
-      "$comment": "[ubyte]: a base64 string (§12.1.4; lowercase hex is also a valid base64 alphabet string) or an array of integers (§6.8.1). SPEC-ASSUMPTION(#285).",
+    "_Hex": {
+      "$comment": "A hash-like [ubyte] field: a lowercase hex string, two digits per byte (§6.8.1, §12.1.4).",
+      "type": "string",
+      "pattern": "^([0-9a-f]{2})*$"
+    },
+    "_Bool": {
+      "$comment": "bool: true or false; a stored byte that is neither 0 nor 1 prints as its integer (§6.8.1).",
       "anyOf": [
         {
-          "type": "string",
-          "contentEncoding": "base64",
-          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
+          "type": "boolean"
         },
         {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 255
-          }
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 255
         }
       ]
     },
@@ -898,23 +898,11 @@
         "palette": {
           "anyOf": [
             {
-              "$ref": "#/$defs/_Bytes"
-            },
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/Av1Palette"
-            }
-          ]
-        },
-        "palette_decoded": {
-          "anyOf": [
-            {
               "$ref": "#/$defs/Av1Palette"
             },
             {
-              "type": "null"
+              "type": "array",
+              "maxItems": 0
             }
           ]
         },
@@ -971,7 +959,12 @@
           }
         },
         "mv_joint": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "interintra": {
           "type": "integer",
@@ -1060,7 +1053,12 @@
           "maximum": 255
         },
         "txfm_split_tree": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "TxType": {
           "$ref": "#/$defs/Av1TxType"
@@ -1140,16 +1138,36 @@
           "maximum": 255
         },
         "cdef_y_pri_strength": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cdef_y_sec_strength": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cdef_uv_pri_strength": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cdef_uv_sec_strength": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cdef_idx": {
           "type": "array",
@@ -1160,7 +1178,12 @@
           }
         },
         "cdef_dir": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cdef_var": {
           "type": "array",
@@ -1235,10 +1258,20 @@
           "maximum": 255
         },
         "point_y_value": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "point_y_scaling": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "chroma_scaling_from_luma": {
           "type": "integer",
@@ -1251,10 +1284,20 @@
           "maximum": 255
         },
         "point_cb_value": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "point_cb_scaling": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "num_cr_points": {
           "type": "integer",
@@ -1262,10 +1305,20 @@
           "maximum": 255
         },
         "point_cr_value": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "point_cr_scaling": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "grain_scaling_minus_8": {
           "type": "integer",
@@ -1278,13 +1331,28 @@
           "maximum": 255
         },
         "ar_coeffs_y_plus_128": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "ar_coeffs_cb_plus_128": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "ar_coeffs_cr_plus_128": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "ar_coeff_shift_minus_6": {
           "type": "integer",
@@ -1361,7 +1429,12 @@
       "type": "object",
       "properties": {
         "loop_filter_level": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "loop_filter_sharpness": {
           "type": "integer",
@@ -1410,7 +1483,12 @@
           "maximum": 255
         },
         "lvl_per_cell": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "enable_cdef": {
           "type": "integer",
@@ -1546,7 +1624,12 @@
           "maximum": 255
         },
         "FeatureEnabled": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "FeatureData": {
           "type": "array",
@@ -1783,10 +1866,20 @@
           }
         },
         "ColorMapY": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "ColorMapUV": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         }
       },
       "additionalProperties": false
@@ -1910,13 +2003,13 @@
           "maximum": 255
         },
         "saved_gm_valid": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "saved_segmentation": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "saved_film_grain": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         }
       },
       "additionalProperties": false
@@ -1981,7 +2074,12 @@
           }
         },
         "ref_frame_idx": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "OrderHints": {
           "type": "array",
@@ -1992,7 +2090,12 @@
           }
         },
         "RefFrameSignBias": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "use_ref_frame_mvs": {
           "type": "integer",
@@ -2237,7 +2340,12 @@
           "maximum": 255
         },
         "disable_deblocking_filter_idc": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "slice_alpha_c0_offset_div2": {
           "type": "array",
@@ -2423,10 +2531,20 @@
           }
         },
         "prev_intra_pred_mode_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "rem_intra_pred_mode": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "Intra16x16PredMode": {
           "$ref": "#/$defs/AvcIntra16x16PredMode"
@@ -2515,10 +2633,20 @@
           }
         },
         "pred_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "direct_8x8": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "direct_spatial_mv_pred_flag": {
           "type": "integer",
@@ -2526,7 +2654,12 @@
           "maximum": 255
         },
         "total_coeff": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "i16_dc_nonzero": {
           "type": "integer",
@@ -2550,10 +2683,20 @@
           }
         },
         "bs_vertical": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "bs_horizontal": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "filterLeftMbEdgeFlag": {
           "type": "integer",
@@ -2748,7 +2891,7 @@
           "maximum": 255
         },
         "gaps_in_frame_num_detected": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         }
       },
       "additionalProperties": false
@@ -2780,13 +2923,13 @@
           "maximum": 2147483647
         },
         "is_long_term": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "is_reference": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "is_output_needed": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "structure": {
           "$ref": "#/$defs/PictureStructure"
@@ -2800,6 +2943,45 @@
           "type": "integer",
           "minimum": -2147483648,
           "maximum": 2147483647
+        }
+      },
+      "additionalProperties": false
+    },
+    "AvcSubMb": {
+      "type": "object",
+      "properties": {
+        "mbPartIdx": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "sub_mb_type": {
+          "$ref": "#/$defs/AvcSubMbType"
+        },
+        "ref_idx_l0": {
+          "type": "integer",
+          "minimum": -128,
+          "maximum": 127
+        },
+        "ref_idx_l1": {
+          "type": "integer",
+          "minimum": -128,
+          "maximum": 127
+        },
+        "NumSubMbPart": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "SubMbPartWidth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "SubMbPartHeight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
         }
       },
       "additionalProperties": false
@@ -2879,7 +3061,7 @@
           "$ref": "#/$defs/_Float"
         },
         "log_base_bitrate": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "diagnostics": {
           "type": "array",
@@ -2970,10 +3152,10 @@
           "$ref": "#/$defs/PredKind"
         },
         "skip": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "merge_or_direct": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "qp": {
           "type": "integer",
@@ -2991,61 +3173,36 @@
         "ext": {
           "anyOf": [
             {
-              "$ref": "#/$defs/_Bytes"
+              "$ref": "#/$defs/AvcMb"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/AvcSubMb"
             },
             {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/AvcMb"
-                },
-                {
-                  "$ref": "#/$defs/HevcCu"
-                },
-                {
-                  "$ref": "#/$defs/HevcPu"
-                },
-                {
-                  "$ref": "#/$defs/HevcTu"
-                },
-                {
-                  "$ref": "#/$defs/Av1Block"
-                },
-                {
-                  "$ref": "#/$defs/Av1Txb"
-                }
-              ]
-            }
-          ]
-        },
-        "ext_decoded": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/AvcMb"
-                },
-                {
-                  "$ref": "#/$defs/HevcCu"
-                },
-                {
-                  "$ref": "#/$defs/HevcPu"
-                },
-                {
-                  "$ref": "#/$defs/HevcTu"
-                },
-                {
-                  "$ref": "#/$defs/Av1Block"
-                },
-                {
-                  "$ref": "#/$defs/Av1Txb"
-                }
-              ]
+              "$ref": "#/$defs/HevcCtu"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/HevcCu"
+            },
+            {
+              "$ref": "#/$defs/HevcPu"
+            },
+            {
+              "$ref": "#/$defs/HevcTu"
+            },
+            {
+              "$ref": "#/$defs/Av1Block"
+            },
+            {
+              "$ref": "#/$defs/Av1Txb"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
             }
           ]
         }
@@ -3068,23 +3225,65 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
                     "$ref": "#/$defs/AvcMb"
+                  },
+                  {
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
-              },
-              "ext_decoded": {
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ext_type": {
+                "const": "AvcSubMb"
+              }
+            },
+            "required": [
+              "ext_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/AvcMb"
+                    "$ref": "#/$defs/AvcSubMb"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ext_type": {
+                "const": "HevcCtu"
+              }
+            },
+            "required": [
+              "ext_type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ext": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/HevcCtu"
+                  },
+                  {
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -3107,23 +3306,11 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/HevcCu"
-                  }
-                ]
-              },
-              "ext_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/HevcCu"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -3146,23 +3333,11 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/HevcPu"
-                  }
-                ]
-              },
-              "ext_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/HevcPu"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -3185,23 +3360,11 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/HevcTu"
-                  }
-                ]
-              },
-              "ext_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/HevcTu"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -3224,23 +3387,11 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/Av1Block"
-                  }
-                ]
-              },
-              "ext_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/Av1Block"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -3263,25 +3414,46 @@
               "ext": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/Av1Txb"
-                  }
-                ]
-              },
-              "ext_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/Av1Txb"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ext_type": {
+                "enum": [
+                  "AvcMb",
+                  "AvcSubMb",
+                  "HevcCtu",
+                  "HevcCu",
+                  "HevcPu",
+                  "HevcTu",
+                  "Av1Block",
+                  "Av1Txb"
+                ]
+              }
+            },
+            "required": [
+              "ext_type"
+            ]
+          },
+          "else": {
+            "properties": {
+              "ext": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
               }
             }
           }
@@ -3317,7 +3489,7 @@
           "type": "string"
         },
         "uuid": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "file_span": {
           "$ref": "#/$defs/ByteSpan"
@@ -3632,7 +3804,7 @@
           "type": "string"
         },
         "bytes": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "box_offset": {
           "$ref": "#/$defs/_UInt64"
@@ -3746,7 +3918,7 @@
           "type": "string"
         },
         "crop": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         }
       },
       "additionalProperties": false
@@ -3853,7 +4025,7 @@
           "type": "string"
         },
         "bytes": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "span": {
           "$ref": "#/$defs/BitSpan"
@@ -3917,43 +4089,21 @@
         "filter_params": {
           "anyOf": [
             {
-              "$ref": "#/$defs/_Bytes"
+              "$ref": "#/$defs/HevcFilterParams"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/Av1FilterParams"
             },
             {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/HevcFilterParams"
-                },
-                {
-                  "$ref": "#/$defs/Av1FilterParams"
-                },
-                {
-                  "$ref": "#/$defs/AvcFilterParams"
-                }
-              ]
-            }
-          ]
-        },
-        "filter_params_decoded": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/HevcFilterParams"
-                },
-                {
-                  "$ref": "#/$defs/Av1FilterParams"
-                },
-                {
-                  "$ref": "#/$defs/AvcFilterParams"
-                }
-              ]
+              "$ref": "#/$defs/AvcFilterParams"
             },
             {
-              "type": "null"
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
             }
           ]
         },
@@ -4011,23 +4161,11 @@
               "filter_params": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/HevcFilterParams"
-                  }
-                ]
-              },
-              "filter_params_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/HevcFilterParams"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -4050,23 +4188,11 @@
               "filter_params": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/Av1FilterParams"
-                  }
-                ]
-              },
-              "filter_params_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/Av1FilterParams"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -4089,25 +4215,41 @@
               "filter_params": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/AvcFilterParams"
-                  }
-                ]
-              },
-              "filter_params_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/AvcFilterParams"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "filter_params_type": {
+                "enum": [
+                  "HevcFilterParams",
+                  "Av1FilterParams",
+                  "AvcFilterParams"
+                ]
+              }
+            },
+            "required": [
+              "filter_params_type"
+            ]
+          },
+          "else": {
+            "properties": {
+              "filter_params": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
               }
             }
           }
@@ -4152,7 +4294,7 @@
           "$ref": "#/$defs/FrameType"
         },
         "shown": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "show_existing_of": {
           "type": "integer",
@@ -4173,7 +4315,7 @@
           "maximum": 255
         },
         "is_rap": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "poc": {
           "$ref": "#/$defs/_Int64"
@@ -4250,43 +4392,21 @@
         "ref_state": {
           "anyOf": [
             {
-              "$ref": "#/$defs/_Bytes"
+              "$ref": "#/$defs/HevcRps"
             },
             {
-              "type": "null"
+              "$ref": "#/$defs/Av1RefState"
             },
             {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/HevcRps"
-                },
-                {
-                  "$ref": "#/$defs/Av1RefState"
-                },
-                {
-                  "$ref": "#/$defs/AvcRefMarking"
-                }
-              ]
-            }
-          ]
-        },
-        "ref_state_decoded": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/HevcRps"
-                },
-                {
-                  "$ref": "#/$defs/Av1RefState"
-                },
-                {
-                  "$ref": "#/$defs/AvcRefMarking"
-                }
-              ]
+              "$ref": "#/$defs/AvcRefMarking"
             },
             {
-              "type": "null"
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              }
             }
           ]
         },
@@ -4322,23 +4442,11 @@
               "ref_state": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/HevcRps"
-                  }
-                ]
-              },
-              "ref_state_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/HevcRps"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -4361,23 +4469,11 @@
               "ref_state": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/Av1RefState"
-                  }
-                ]
-              },
-              "ref_state_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/Av1RefState"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
               }
@@ -4400,25 +4496,41 @@
               "ref_state": {
                 "anyOf": [
                   {
-                    "$ref": "#/$defs/_Bytes"
-                  },
-                  {
-                    "type": "null"
-                  },
-                  {
-                    "$ref": "#/$defs/AvcRefMarking"
-                  }
-                ]
-              },
-              "ref_state_decoded": {
-                "anyOf": [
-                  {
                     "$ref": "#/$defs/AvcRefMarking"
                   },
                   {
-                    "type": "null"
+                    "type": "array",
+                    "maxItems": 0
                   }
                 ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ref_state_type": {
+                "enum": [
+                  "HevcRps",
+                  "Av1RefState",
+                  "AvcRefMarking"
+                ]
+              }
+            },
+            "required": [
+              "ref_state_type"
+            ]
+          },
+          "else": {
+            "properties": {
+              "ref_state": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
               }
             }
           }
@@ -4499,7 +4611,7 @@
           "type": "string"
         },
         "present": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "profile": {
           "type": "integer",
@@ -4555,7 +4667,12 @@
       "type": "object",
       "properties": {
         "declared": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "declared_json": {
           "type": "string"
@@ -4592,6 +4709,98 @@
         },
         "threshold_nits": {
           "$ref": "#/$defs/_Float"
+        }
+      },
+      "additionalProperties": false
+    },
+    "HevcCtu": {
+      "type": "object",
+      "properties": {
+        "CtbAddrInRs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "CtbAddrInTs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "slice_segment_idx": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "tile_idx": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "end_of_slice_segment_flag": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "sao_merge_left_flag": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "sao_merge_up_flag": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "SaoTypeIdx": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HevcSaoType"
+          }
+        },
+        "sao_offset_abs": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "sao_offset_sign": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "SaoOffsetVal": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767
+          }
+        },
+        "sao_band_position": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "sao_eo_class": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
+        },
+        "bit_count_x8": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
         }
       },
       "additionalProperties": false
@@ -4737,31 +4946,29 @@
           "maximum": 65535
         },
         "intra_chroma_pred_mode": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "IntraPredModeC": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "palette": {
           "anyOf": [
             {
-              "$ref": "#/$defs/_Bytes"
-            },
-            {
-              "type": "null"
-            },
-            {
-              "$ref": "#/$defs/HevcPalette"
-            }
-          ]
-        },
-        "palette_decoded": {
-          "anyOf": [
-            {
               "$ref": "#/$defs/HevcPalette"
             },
             {
-              "type": "null"
+              "type": "array",
+              "maxItems": 0
             }
           ]
         },
@@ -4797,7 +5004,12 @@
           "maximum": 255
         },
         "slice_deblocking_filter_disabled_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "slice_beta_offset_div2": {
           "type": "array",
@@ -4836,16 +5048,36 @@
           "maximum": 255
         },
         "slice_sao_luma_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "slice_sao_chroma_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "edge_flags_v": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "edge_flags_h": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "film_grain_characteristics": {
           "$ref": "#/$defs/SyntaxNode"
@@ -4929,7 +5161,12 @@
           "maximum": 4294967295
         },
         "palette_index_idc": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "copy_above_indices_for_final_run_flag": {
           "type": "integer",
@@ -4950,7 +5187,12 @@
           }
         },
         "PaletteIndexMap": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         }
       },
       "additionalProperties": false
@@ -5021,7 +5263,12 @@
           "maximum": 255
         },
         "candModeList": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "merge_flag": {
           "type": "integer",
@@ -5312,10 +5559,10 @@
           "maximum": 2147483647
         },
         "used_by_curr_pic": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "is_long_term": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "delta_poc_msb_present_flag": {
           "type": "integer",
@@ -5324,6 +5571,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "HevcSaoType": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "SAO_NOT_APPLIED",
+            "SAO_BAND",
+            "SAO_EDGE",
+            "HevcSaoType_Unknown"
+          ]
+        },
+        {
+          "type": "integer"
+        }
+      ]
     },
     "HevcTu": {
       "type": "object",
@@ -5359,25 +5622,60 @@
           "maximum": 255
         },
         "cbf_cb": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "cbf_cr": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "transform_skip_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "explicit_rdpcm_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "explicit_rdpcm_dir_flag": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "last_sig_coeff_x": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "last_sig_coeff_y": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "num_nonzero": {
           "type": "array",
@@ -5396,7 +5694,12 @@
           }
         },
         "sign_data_hiding_used": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "dst_used": {
           "type": "integer",
@@ -5528,10 +5831,10 @@
           "$ref": "#/$defs/WorkingDomain"
         },
         "per_plane": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "higher_is_better": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "range_min": {
           "$ref": "#/$defs/_Float"
@@ -5718,10 +6021,10 @@
           "maximum": 4294967295
         },
         "distorted_source_hash": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "reference_source_hash": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "diagnostics": {
           "type": "array",
@@ -5853,10 +6156,20 @@
           "maximum": 255
         },
         "reference_color": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "distorted_color": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "peak_luminance_nits": {
           "$ref": "#/$defs/_Float"
@@ -5902,7 +6215,7 @@
           "maximum": 65535
         },
         "dither": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "zimg_version": {
           "type": "string"
@@ -6032,7 +6345,12 @@
           "maximum": 255
         },
         "num_ref_idx_active": {
-          "$ref": "#/$defs/_Bytes"
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          }
         },
         "diagnostics": {
           "type": "array",
@@ -6113,7 +6431,7 @@
           "maximum": 255
         },
         "is_signed": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "blob_id": {
           "type": "string"
@@ -6182,10 +6500,10 @@
           }
         },
         "bit_exact": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "has_symbol_accounting": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "notes": {
           "type": "string"
@@ -6348,7 +6666,7 @@
           "type": "string"
         },
         "source_hash": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "metrics_result_index": {
           "type": "integer",
@@ -6399,7 +6717,7 @@
           "type": "string"
         },
         "is_long_term": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "usage_cells": {
           "type": "integer",
@@ -6486,7 +6804,7 @@
           "maximum": 4294967295
         },
         "source_hash": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "units": {
           "type": "array",
@@ -6579,10 +6897,10 @@
           "$ref": "#/$defs/_Int64"
         },
         "bvalue": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "bytes": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "svalue": {
           "type": "string"
@@ -6698,13 +7016,13 @@
           "type": "string"
         },
         "enabled": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "in_movie": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "in_preview": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "width": {
           "$ref": "#/$defs/_Float"
@@ -6778,13 +7096,13 @@
           "maximum": 4294967295
         },
         "is_fragmented": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "is_encrypted": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "edit_list_present": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "codec_private": {
           "type": "array",
@@ -6914,7 +7232,7 @@
           "$ref": "#/$defs/FrameId"
         },
         "ok": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "plane_mismatch_mask": {
           "type": "integer",

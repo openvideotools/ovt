@@ -19,6 +19,19 @@
         }
       ]
     },
+    "_Bool": {
+      "$comment": "bool: true or false; a stored byte that is neither 0 nor 1 prints as its integer (§6.8.1).",
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 255
+        }
+      ]
+    },
     "BitSpan": {
       "type": "object",
       "properties": {
@@ -108,7 +121,7 @@
           "$ref": "#/$defs/FrameId"
         },
         "ok": {
-          "type": "boolean"
+          "$ref": "#/$defs/_Bool"
         },
         "plane_mismatch_mask": {
           "type": "integer",

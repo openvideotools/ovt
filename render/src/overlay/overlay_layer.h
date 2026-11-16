@@ -17,16 +17,13 @@
 #include <libplacebo/renderer.h>
 
 #include "overlay/overlay_set_impl.h"
+#include "overlay/pass_arrows.h"
 #include "overlay/pass_fill.h"
 #include "ovt/render/overlay_set.h"
 #include "ovt/render/render_api.h"
 #include "ovt/render/video_surface.h"
 
 namespace ovt::render::detail {
-
-// The fill palette (§10.5.2), RGBA (straight alpha) per row with the fill alpha where a row has one. Rows 0-29 are
-// the overlay rows; frame-type rows 30-32 are opaque. WI-2.439 replaces it with kOverlayColors / kOverlayColorsCvd.
-OVT_RENDER_API extern const std::array<uint32_t, 33> kFillPalette;
 
 class OverlayLayerGpu {
  public:
@@ -41,8 +38,11 @@ class OverlayLayerGpu {
   // texture cannot be created; nothing is drawn then.
   bool upload(const OverlaySet* set, std::string& err);
 
-  // Draws passes 2-4 into a w x h layer for `view`, limited to `picture` (device-px rect of the drawn picture), and
-  // fills `out` for pl_frame.overlays. Returns false when there is nothing to draw (no set, no enabled layer with
+  // The arrow/stroke pass state (WI-2.434), for tests and the overlay benchmarks.
+  [[nodiscard]] const ArrowPass& arrows() const { return arrows_; }
+
+  // Draws passes 2-4 and 8-9 into a w x h layer for `view`, limited to `picture` (device-px rect of the drawn picture),
+  // and fills `out` for pl_frame.overlays. Returns false when there is nothing to draw (no set, no enabled layer with
   // data) or on error (`err` set).
   bool draw(const ViewState& view, int w, int h, float dpr, const pl_rect2df& picture, struct pl_overlay& out,
             std::string& err);
@@ -63,6 +63,7 @@ class OverlayLayerGpu {
   uint32_t cells_w_ = 0;
   uint32_t cells_h_ = 0;
   CellPasses passes_;
+  ArrowPass arrows_;
   struct pl_overlay_part part_ = {};
 };
 

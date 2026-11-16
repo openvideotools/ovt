@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -20,18 +21,9 @@
 #include "luts/jet.h"
 #include "luts/turbo.h"
 #include "luts/viridis.h"
+#include "ovt/render/overlay_colors.h"
 
 namespace ovt::render::detail {
-
-// clang-format off
-const std::array<uint32_t, 33> kFillPalette = {
-    0x2ECC4066U, 0xFF851B4DU, 0xB10DC94DU, 0x00E5FF4DU, 0xAAAAAA99U, 0x20C99766U, 0xFFDC0066U, 0xF012BE66U,  //  0- 7
-    0xFFFFFFE6U, 0xFFFF00CCU, 0x00FFFFB3U, 0xFF00FF99U, 0xFF4136FFU, 0x7FDBFFCCU, 0x0074D9FFU, 0xFFFFFFFFU,  //  8-15
-    0xFFD700FFU, 0xFF4136FFU, 0x39CCCC33U, 0xFFFFFFFFU, 0x2ECC40FFU, 0xFFDC00FFU,                            // 16-21
-    0xE6194B66U, 0x3CB44B66U, 0xFFE11966U, 0x4363D866U, 0xF5823166U, 0x911EB466U, 0x46F0F066U, 0xF032E666U,  // 22-29
-    0xE53935FFU, 0x1E88E5FFU, 0x43A047FFU,                                                                   // 30-32
-};
-// clang-format on
 
 namespace {
 
@@ -75,6 +67,7 @@ pl_tex make_texture(pl_gpu gpu, const char* fmt_name, int w, int h, const void* 
 
 OverlayLayerGpu::~OverlayLayerGpu() {
   drop_set();
+  arrows_.destroy(gpu_);
   passes_.destroy(gpu_);
   pl_tex_destroy(gpu_, &layer_);
   pl_tex_destroy(gpu_, &palette_);
@@ -87,6 +80,8 @@ void OverlayLayerGpu::drop_set() {
   pl_tex_destroy(gpu_, &attr_);
   pl_tex_destroy(gpu_, &heat_);
   pl_tex_destroy(gpu_, &heat_valid_);
+  std::string ignored;
+  arrows_.set(gpu_, nullptr, 0, ignored);
   cells_w_ = 0;
   cells_h_ = 0;
   cfg_ = OverlayConfig{};
@@ -94,13 +89,16 @@ void OverlayLayerGpu::drop_set() {
 
 bool OverlayLayerGpu::ensure_static(std::string& err) {
   if (palette_ == nullptr) {
-    std::array<uint8_t, kFillPalette.size() * 4> bytes{};
-    for (size_t i = 0; i < kFillPalette.size(); ++i) {
+    // The fill colours of §10.5.2 (WI-2.439). The palette is always the standard one: OverlayConfig has no
+    // colour-blind switch yet; the GUI work item for the K toggle adds it.
+    std::array<uint8_t, kOverlayColors.size() * 4> bytes{};
+    for (size_t i = 0; i < kOverlayColors.size(); ++i) {
+      const uint32_t rgba = overlay_fill_rgba(i, false);
       for (size_t c = 0; c < 4; ++c) {
-        bytes.at((i * 4) + c) = static_cast<uint8_t>(kFillPalette.at(i) >> (24U - (8U * c)));
+        bytes.at((i * 4) + c) = static_cast<uint8_t>(rgba >> (24U - (8U * c)));
       }
     }
-    palette_ = make_texture(gpu_, "rgba8", static_cast<int>(kFillPalette.size()), 1, bytes.data(), bytes.size(), err);
+    palette_ = make_texture(gpu_, "rgba8", static_cast<int>(kOverlayColors.size()), 1, bytes.data(), bytes.size(), err);
     if (palette_ == nullptr) {
       return false;
     }
@@ -149,6 +147,12 @@ bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
       return false;
     }
   }
+  // WI-2.434: arrow and stroke instances; above the R-8K-1 cell count only the viewport's share is uploaded (draw()).
+  const bool culled = cells > kCulledBuildCells;
+  if (!arrows_.set(gpu_, &set->arrows, culled ? 0 : std::numeric_limits<uint64_t>::max(), err)) {
+    drop_set();
+    return false;
+  }
   cfg_ = set->config;
   cells_w_ = set->cells_w;
   cells_h_ = set->cells_h;
@@ -183,7 +187,8 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
   const bool heatmap = (layers & bit(OverlayLayer::Heatmap)) != 0 && heat_ != nullptr;
   const bool fill = (layers & kFillLayers) != 0 && attr_ != nullptr;
   const bool hatch = (layers & bit(OverlayLayer::SkipHatch)) != 0 && attr_ != nullptr;
-  if (!heatmap && !fill && !hatch) {
+  const bool arrows = arrows_.has_work(layers);
+  if (!heatmap && !fill && !hatch && !arrows) {
     return false;
   }
   if (!ensure_layer(w, h, err)) {
@@ -215,6 +220,20 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
   }
   if (hatch && !passes_.run(gpu_, CellPass::Hatch, layer_, pc, {attr_, palette_}, err)) {
     return false;
+  }
+  // 8 intra direction strokes, 9 MV arrows (L1, L0, bi).
+  if (arrows) {
+    ArrowPassConstants apc;
+    apc.viewport_half = pc.viewport_half;
+    apc.pan = pc.pan;
+    apc.clip = pc.clip;
+    apc.zoom = pc.zoom;
+    apc.dpr = pc.dpr;
+    apc.min_px = cfg_.mv_min_px;
+    if (!arrows_.draw_intra(gpu_, layer_, palette_, layers, apc, err) ||
+        !arrows_.draw_mvs(gpu_, layer_, palette_, layers, apc, err)) {
+      return false;
+    }
   }
 
   // §10.5: sRGB BT.709, full range, premultiplied (the passes blend "over"), one full-size part in target pixels.

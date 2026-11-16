@@ -10,8 +10,10 @@ add_executable(
   box_walk_test.cpp
   c_api_test.cpp
   decoders_movie_test.cpp
+  decoders_sample_entries_test.cpp
   field_builder_test.cpp
   ivf_test.cpp
+  lazy_test.cpp
   m3u8_test.cpp
   mpd_test.cpp
   mxf_placeholder_test.cpp
