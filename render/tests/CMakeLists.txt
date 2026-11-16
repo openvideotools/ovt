@@ -120,5 +120,7 @@ target_compile_definitions(ovt_tests_render
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
 
-# WI-2.434a: MV arrow and intra stroke instance builder (§10.5.4); the GPU pass tests follow in WI-2.434b.
+# WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
+# render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
 target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
+target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
