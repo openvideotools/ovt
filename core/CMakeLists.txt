@@ -114,6 +114,9 @@ else()
 endif()
 ovt_find_package(pugixml SPDX "MIT" TARGETS ${_ovt_pugixml_targets})
 unset(_ovt_pugixml_targets)
+# HTTP(S) fetches of the DASH/HLS virtual file (WI-4.210, chapter 8 §8.6.7): libcurl on every platform. The vcpkg
+# port exports CURL::libcurl; a distribution without a CMake config is found through pkg-config.
+ovt_find_package(CURL SPDX "curl" TARGETS CURL::libcurl PKG_CONFIG libcurl)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
 foreach(
@@ -126,7 +129,8 @@ foreach(
   ${hwy_TARGET}
   ${xxHash_TARGET}
   ${nlohmann_json_schema_validator_TARGET}
-  ${pugixml_TARGET})
+  ${pugixml_TARGET}
+  ${CURL_TARGET})
   target_link_libraries(ovt_core PRIVATE "$<BUILD_INTERFACE:${_dep}>")
 endforeach()
 unset(_dep)
