@@ -92,6 +92,16 @@ uint64_t span_sum(const iso::BoxNodes& nodes) {
   return s;
 }
 
+// Where a node's children start: after the header and any prefix fields (FullBox version/flags, the `meta` prefix,
+// a ContainerWithPrefix decoder's fields such as `dref` entry_count). Field spans count bits from the box start.
+uint64_t children_begin(const BoxNodeT& n) {
+  uint64_t rel = n.header_length;
+  for (const auto& f : n.fields) {
+    rel = std::max(rel, (f->span->bit_offset() + f->span->bit_length() + 7U) / 8U);
+  }
+  return n.file_span->offset() + rel;
+}
+
 // Children of every node tile their parent's payload without gaps or overlap.
 void check_tiling(const iso::BoxNodes& nodes, uint64_t begin, uint64_t end) {
   uint64_t pos = begin;
@@ -100,7 +110,7 @@ void check_tiling(const iso::BoxNodes& nodes, uint64_t begin, uint64_t end) {
     REQUIRE(n->file_span->length() >= 1);
     pos += n->file_span->length();
     if (!n->children.empty()) {
-      check_tiling(n->children, n->file_span->offset() + n->header_length, pos);
+      check_tiling(n->children, children_begin(*n), pos);
     }
   }
   REQUIRE(pos == end);
