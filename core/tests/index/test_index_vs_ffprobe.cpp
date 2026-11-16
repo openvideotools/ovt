@@ -325,21 +325,49 @@ TEST_CASE("index_vs_ffprobe: FFmpeg-encoded H.264 and H.265 streams", "[index][h
   }
 }
 
+namespace {
+
+struct CorpusCase {
+  const char* id;
+  fb::Codec codec;
+  const char* format;
+  Compare how;
+};
+
+// Compares every available stream of `cases` with ffprobe; skips when none could be compared.
+void compare_corpus_streams(std::span<const CorpusCase> cases) {
+  size_t compared = 0;
+  for (const CorpusCase& c : cases) {
+    CAPTURE(c.id);
+    const std::optional<std::filesystem::path> path = ovt::test::corpus_path(c.id);
+    if (!path) {
+      if (ovt::test::require_corpora()) {
+        FAIL("corpus file missing: " << c.id);
+      }
+      continue;
+    }
+    const auto probe = ffprobe_frames(*path, c.format);
+    if (!probe) {
+      continue;
+    }
+    const Bytes index = index_annexb(read_file(*path), c.codec);
+    compare_with_ffprobe(root(index), *probe, c.how);
+    ++compared;
+  }
+  if (compared == 0) {
+    SKIP("the corpus or ffprobe is not available");
+  }
+}
+
+}  // namespace
+
 // AT1: Given ffprobe -show_frames of each test stream (WI-1.121 step 7), When compared with StreamIndex.frames
 // (shown frames), Then counts, pict_type and the display position match for every frame.
 TEST_CASE("index_vs_ffprobe: conformance streams", "[index][h264][h265][fast][needs-corpus][needs-oracle:ffprobe]") {
-  struct Case {
-    const char* id;
-    fb::Codec codec;
-    const char* format;
-    Compare how;
-  };
-  const std::array<Case, 10> cases = {{
+  const std::array<CorpusCase, 8> cases = {{
       {"jvt_BA1_Sony_D", fb::Codec::H264, "h264", {}},
       {"jvt_CVSE2_Sony_B", fb::Codec::H264, "h264", {}},
       {"jvt_MR1_BT_A", fb::Codec::H264, "h264", {}},
-      {"jvt_CAPAMA3_Sand_F", fb::Codec::H264, "h264", {}},
-      {"jvt_HPCV_BRCM_A", fb::Codec::H264, "h264", {}},
       // WPP_A has one slice of several dependent segments per picture; the others are single-slice streams.
       {"jctvc_WPP_A_ericsson_MAIN_2", fb::Codec::H265, "hevc", {true, true, 1}},
       {"jctvc_AMP_A_Samsung_7", fb::Codec::H265, "hevc", {true, true, 1}},
@@ -349,27 +377,15 @@ TEST_CASE("index_vs_ffprobe: conformance streams", "[index][h264][h265][fast][ne
       {"jctvc_POC_A_Bossen_3", fb::Codec::H265, "hevc", {true, true, 1}},
       {"jctvc_NoOutPrior_A_Qualcomm_1", fb::Codec::H265, "hevc", {true, false, 1}},
   }};
-  size_t compared = 0;
-  for (const Case& c : cases) {
-    {
-      CAPTURE(c.id);
-      const std::optional<std::filesystem::path> path = ovt::test::corpus_path(c.id);
-      if (!path) {
-        if (ovt::test::require_corpora()) {
-          FAIL("corpus file missing: " << c.id);
-        }
-        continue;
-      }
-      const auto probe = ffprobe_frames(*path, c.format);
-      if (!probe) {
-        continue;
-      }
-      const Bytes index = index_annexb(read_file(*path), c.codec);
-      compare_with_ffprobe(root(index), *probe, c.how);
-      ++compared;
-    }
-  }
-  if (compared == 0) {
-    SKIP("the corpus or ffprobe is not available");
-  }
+  compare_corpus_streams(cases);
+}
+
+// The two H.264 streams of step 7 that the corpus manifest tags slow (field and MBAFF coding, high profile): the
+// same comparison in the nightly lane (chapter 14 §14.2.5).
+TEST_CASE("index_vs_ffprobe: slow conformance streams", "[index][h264][slow][needs-corpus][needs-oracle:ffprobe]") {
+  const std::array<CorpusCase, 2> cases = {{
+      {"jvt_CAPAMA3_Sand_F", fb::Codec::H264, "h264", {}},
+      {"jvt_HPCV_BRCM_A", fb::Codec::H264, "h264", {}},
+  }};
+  compare_corpus_streams(cases);
 }
