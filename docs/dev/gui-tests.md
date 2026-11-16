@@ -47,7 +47,35 @@ python -I tools/imgdiff.py --mode hdr-parity a.png b.png [--diff out.png] [--p99
 §14.10.3 commands: `open`, `click`, `select_syntax_node`, `key`, `get`, `screenshot`, `wait_idle`. The binary comes from
 `--ovt-studio <path>`, `$OVT_STUDIO` or `build/*/app/ovt-studio`; scripts skip when there is none.
 
-The wire format is not in the spec yet (spec question #353): JSON lines over a Unix socket, request
+The wire format is in chapter 14 §14.10.3: JSON lines over a Unix socket, request
 `{"id":1,"cmd":"click","args":["timeline",37]}`, response `{"id":1,"ok":true,"value":…}` or
-`{"id":1,"ok":false,"error":"…"}`. `test_ipc_client.py` tests the client against a fake server that follows it; WI-1.465
-implements the real server against the same format.
+`{"id":1,"ok":false,"error":"…"}`. `test_ipc_client.py` tests the client against a fake server; `test_test_ipc.py` runs
+every command against the real application.
+
+## Test IPC server (WI-1.465)
+
+`ovt-studio --test-ipc <socket>` listens on the Unix socket `<socket>` (`QLocalServer`, user-only permissions) and
+answers one JSON line per request, in request order. Without the flag no socket exists. The server
+(`app/src/testipc/`) is GPL app code compiled only into builds with `OVT_BUILD_TESTS=ON`; with it `OFF` (release and
+packaging builds) the option does not exist. Commands:
+
+| Command | Meaning |
+|---|---|
+| `open <path>` | `Project.openFile`; value `{fileCount, activeFile}`; an error if the project raised a diagnostic |
+| `click <name>` / `click <name> <row>` / `click <name> <x> <y>` | click the centre, a row (`ListView.itemAtIndex`, or the timeline's `xOfFrame`), or item-local (x, y). Item-local points are mapped with `mapToScene` and sent through `QTest::mouseClick`, never as item-local coordinates |
+| `select-syntax-node <path>` | calls `selectByPath(path)` of the object named `syntaxTree` (the Syntax panel provides it) |
+| `key <sequence>` | `QKeySequence` portable text (`J`, `Ctrl+G`), sent to the window through `QTest::keyClick`, so shortcuts fire |
+| `get <name>.<property>[.<key>…]` | a property; further segments read keys of maps, indexes of lists and properties of objects. A first segment that starts upper-case names a QML singleton (`get Project.fileCount`) |
+| `screenshot <path>` | the window as PNG (`grabWindow`); value `{path, width, height}` |
+| `wait-idle [timeout_ms]` | no running job (`JobsModel.activeCount == 0`) and no frame swapped for three 20 ms polls; error after the timeout (default 10 s) |
+
+Objects are found by `objectName` (the QObject tree first, then the item tree, so delegates are found). A panel that
+tests will drive needs an `objectName`.
+
+`OVT_RENDER_STUB=1` makes the Picture panel's `PictureHost` create no libovt-render surface (its `interop` is `stub`
+and it draws only its background colour), so chrome scenes and scripts do not depend on a GPU. Renderer scenes leave it
+unset and run on lavapipe.
+
+CI: the `gui` job of `.github/workflows/ci.yml` builds the GUI targets and runs `ctest --preset linux-x64-release -L
+gui` (Catch2, Qt Quick Test, PictureHost under xvfb, the pytest lane). `app/tests/testipc` tests the dispatch and the
+socket server against a small QML scene without the application.

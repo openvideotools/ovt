@@ -167,6 +167,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/dock/dock_model.cpp"
     "${app_dir}/src/picture_controller.h"
     "${app_dir}/src/picture_controller.cpp"
+    "${app_dir}/src/render_stub.h"
+    "${app_dir}/src/render_stub.cpp"
     ${picture_sources}
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
@@ -212,6 +214,17 @@ add_dependencies(ovt_studio ovt_version_header)
 # Every user-visible product name derives from OVT_PRODUCT_NAME (chapter 15 §15.7.4).
 target_compile_definitions(ovt_studio PRIVATE "OVT_PRODUCT_NAME_VALUE=\"${OVT_PRODUCT_NAME}\"" QT_NO_KEYWORDS)
 ovt_set_license(ovt_studio "GPL-3.0-or-later")
+
+# The test IPC (chapter 14 §14.10.3, WI-1.465) is GPL app code for test builds only: with OVT_BUILD_TESTS=OFF (the
+# release and packaging builds) it is not compiled and `--test-ipc` is not a known option. In test builds main.cpp
+# starts the socket server only when the flag is given. Mouse and key events go through QTest, so Qt6::Test is linked.
+if(OVT_BUILD_TESTS AND NOT ANDROID)
+  find_package(Qt6 6.4 REQUIRED COMPONENTS Test)
+  target_sources(ovt_studio PRIVATE src/testipc/command_dispatch.h src/testipc/command_dispatch.cpp
+                                    src/testipc/test_ipc_server.h src/testipc/test_ipc_server.cpp)
+  target_link_libraries(ovt_studio PRIVATE Qt6::Test)
+  target_compile_definitions(ovt_studio PRIVATE OVT_ENABLE_TEST_IPC=1)
+endif()
 
 # Qt comes from tools/install_qt.py (aqtinstall, pinned in third_party/VERSIONS.md) or, for distro and
 # Flatpak builds, from the system; the licence manifest records it either way (chapter 15 §15.4). Walks the

@@ -35,6 +35,9 @@
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
 #include "platform/platform.h"
 #include "project.h"
+#ifdef OVT_ENABLE_TEST_IPC
+#include "testipc/test_ipc_server.h"
+#endif
 
 namespace {
 
@@ -95,6 +98,14 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   const QCommandLineOption self_test(QStringLiteral("self-test"),
                                      QStringLiteral("Open the main window, exit 0 after the first rendered frame."));
   parser.addOption(self_test);
+#ifdef OVT_ENABLE_TEST_IPC
+  // Test builds only (OVT_BUILD_TESTS; chapter 14 §14.10.3): without this flag no socket exists, and a build without
+  // OVT_ENABLE_TEST_IPC does not know the option at all.
+  const QCommandLineOption test_ipc(QStringLiteral("test-ipc"),
+                                    QStringLiteral("Serve the test IPC (JSON lines) on the Unix socket <path>."),
+                                    QStringLiteral("path"));
+  parser.addOption(test_ipc);
+#endif
   parser.addPositionalArgument(QStringLiteral("file"),
                                QStringLiteral("A video, elementary stream or .ovtproj to open."),
                                QStringLiteral("[file]"));
@@ -135,6 +146,14 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
     report(QStringLiteral("the main QML object is not a window"));
     return kExitFailure;
   }
+
+#ifdef OVT_ENABLE_TEST_IPC
+  ovt::app::testipc::TestIpcServer ipc_server(&engine, window);
+  if (parser.isSet(test_ipc) && !ipc_server.listen(parser.value(test_ipc))) {
+    report(QStringLiteral("cannot listen on the test IPC socket: %1").arg(ipc_server.errorString()));
+    return kExitFailure;
+  }
+#endif
 
   QTimer watchdog;
   if (self_testing) {
