@@ -7696,8 +7696,13 @@
         "container-full"
       ],
       "expected": {
-        "format": "isobmff"
-      }
+        "format": "isobmff",
+        "demux": {
+          "packets": 216,
+          "error": "corrupt"
+        }
+      },
+      "note": "Refs #558: fragmented CENC with key rotation (6 moofs, sbgp/sgpd seig, 483 samples by trun). libavformat (6.1, pinned n7.1.1) delivers the first 3 fragments (216 packets), logs 'hit EOF while reading sub-sample encryption info' and then fails with AVERROR_INVALIDDATA; ffprobe stops there with exit 0. expected.demux pins that until FFmpeg reads the whole file (draft bug report: project patches/ffmpeg-cenc-seig-9436R.md)."
     },
     {
       "id": "mpegff_a1_foreman_qcif",

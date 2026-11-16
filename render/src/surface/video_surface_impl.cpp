@@ -26,6 +26,7 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
 #include "measure/measure.h"
 #include "output_download.h"
@@ -117,6 +118,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (renderer_ == nullptr) {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
+    overlay_gpu_ = std::make_unique<detail::OverlayLayerGpu>(gpu_);  // WI-2.431
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
     static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
@@ -279,7 +281,19 @@ class VideoSurfaceImpl final : public VideoSurface {
     error_.clear();
   }
   void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
-  void set_overlays(std::unique_ptr<OverlaySet> overlays) override { overlays_ = std::move(overlays); }
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
+    overlays_ = std::move(overlays);
+    if (overlay_gpu_ == nullptr) {
+      return;
+    }
+    std::string err;
+    if (!overlay_gpu_->upload(overlays_.get(), err)) {
+      error_ = "RND-0002 renderer init failed: overlays: " + err;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), error_.c_str());
+    }
+  }
 
   void render(const ViewState& view) override {
     if (native_ != nullptr) {
@@ -292,6 +306,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     offscreen_.begin_frame();  // the host hands the texture back (§10.2.2 sync rules)
     pl_tex_clear_ex(gpu_, tex, background(view));
+    measurer_.begin_render();
     if (slot_a_.valid) {
       struct pl_frame target = {};
       target.num_planes = 1;
@@ -301,7 +316,7 @@ class VideoSurfaceImpl final : public VideoSurface {
         target.planes[0].component_mapping[c] = c;
       }
       target.color = detail::target_color(target_, active_);
-      draw_slot_a(view, target, true);
+      draw_picture(view, target, true);
     }
     // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
     // being called.
@@ -421,6 +436,52 @@ class VideoSurfaceImpl final : public VideoSurface {
     params_.build(view, active_, offscreen, image.color, target);
     struct pl_render_params params = params_.params();  // still points at params_'s members
     plane_views_.apply(view, image, params, target);
+    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1).
+    struct pl_overlay overlay = {};
+    std::string overlay_err;
+    if (overlay_gpu_ != nullptr && overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio,
+                                                      target.crop, overlay, overlay_err)) {
+      target.overlays = &overlay;
+      target.num_overlays = 1;
+    } else if (!overlay_err.empty()) {
+      error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
+    }
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
+      error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
+    }
+  }
+
+  // Draws picture A, or the analysis view that replaces it (§10.7.5 / §10.7.8), over the cleared target. Without the
+  // measurement passes (measurer_.error() says why) the picture is drawn as usual.
+  void draw_picture(const ViewState& view, struct pl_frame& target, bool offscreen) {
+    const detail::AnalysisView mode = detail::analysis_view(view);
+    pl_tex analysis = mode != detail::AnalysisView::None ? measurer_.analysis_view(slot_a_, mode) : nullptr;
+    if (analysis != nullptr) {
+      draw_analysis(view, analysis, target, offscreen);
+    } else {
+      draw_slot_a(view, target, offscreen);
+    }
+  }
+
+  // Draws an analysis view (§10.7.5, §10.7.8): an RGBA8 texture of the conformance window holding sRGB-encoded BT.709,
+  // presented as an SDR sRGB frame at the window's place in the viewport, with the ViewState filters but no dithering
+  // (the band colours are exact code values). The caller set the target's planes and colour space.
+  void draw_analysis(const ViewState& view, pl_tex analysis, struct pl_frame& target, bool offscreen) {
+    struct pl_frame image = {};
+    image.num_planes = 1;
+    image.planes[0].texture = analysis;
+    image.planes[0].components = 3;
+    for (int c = 0; c < 3; ++c) {
+      image.planes[0].component_mapping[c] = c;
+    }
+    image.repr = pl_color_repr_rgb;
+    image.color = pl_color_space_srgb;
+    image.crop = pl_rect2df{0.0F, 0.0F, static_cast<float>(analysis->params.w), static_cast<float>(analysis->params.h)};
+
+    target.crop = detail::target_rect(detail::source_rect(slot_a_, true), view, target_.width, target_.height);
+    params_.build(view, active_, offscreen, image.color, target);
+    struct pl_render_params params = params_.params();
+    params.dither_params = nullptr;
     if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
@@ -500,8 +561,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (frame.fbo->params.blit_dst) {
       pl_tex_clear_ex(gpu_, frame.fbo, background(view));
     }
+    measurer_.begin_render();
     if (slot_a_.valid) {
-      draw_slot_a(view, target, false);
+      draw_picture(view, target, false);
     }
     if (measurer_.due()) {  // §10.7.9, as in render()
       measurer_.run(slot_a_);
@@ -706,6 +768,7 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   void destroy() {
     overlays_.reset();
+    overlay_gpu_.reset();
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
@@ -738,7 +801,8 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
-  detail::Measurer measurer_;  // §10.7 (WI-4.452)
+  std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
+  detail::Measurer measurer_;                             // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
