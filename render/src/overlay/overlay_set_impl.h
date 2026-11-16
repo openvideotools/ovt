@@ -9,8 +9,10 @@
 #define OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -82,6 +84,18 @@ class OverlaySet {
   // unusable grid). The build never fails on them: the affected data is left empty.
   std::vector<std::string> diagnostics;
 };
+
+namespace detail {
+
+// The CPU side of OverlayBuilder::build (§10.11), which never touches the surface: the fuzz target of
+// core/tests/fuzz/fuzz_overlay_builder.cpp (issue #649) calls it without a VideoSurface. The buffer overload verifies
+// the untrusted FlatBuffer first and returns nullptr when it is rejected.
+std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells);
+std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells);
+
+}  // namespace detail
 
 }  // namespace ovt::render
 

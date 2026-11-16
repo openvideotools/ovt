@@ -123,6 +123,19 @@ void build_attributes(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   });
 }
 
+// True when at least one CellGrid vector has exactly `cells` entries. Every per-cell output costs O(cells) memory and
+// time, so a grid whose size no column backs (a few bytes claiming 30 M cells, issue #649) must not drive that work:
+// a usable column is physically in the buffer, which bounds the build by the input size.
+bool has_cell_column(const ovt::fb::CellGrid& g, size_t cells) {
+  const auto n = [](const auto* v) -> size_t { return v != nullptr ? v->size() : 0; };
+  const std::array<size_t, 20> sizes = {
+      n(g.block_id()),     n(g.partition_id()), n(g.pred()),         n(g.qp()),           n(g.intra_mode_y()),
+      n(g.intra_mode_c()), n(g.mv0_x()),        n(g.mv0_y()),        n(g.mv1_x()),        n(g.mv1_y()),
+      n(g.ref0()),         n(g.ref1()),         n(g.tx_log2_w()),    n(g.tx_log2_h()),    n(g.tx_type()),
+      n(g.cbf()),          n(g.bits_x8()),      n(g.deblock_bs_v()), n(g.deblock_bs_h()), n(g.filter_idx())};
+  return std::ranges::find(sizes, cells) != sizes.end();
+}
+
 void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   const auto* parts = fa.partitions();
   if (parts == nullptr) {
@@ -145,10 +158,17 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
     if (r.w() <= 0 || r.h() <= 0) {
       continue;
     }
+    // A rect whose far edge does not fit int32 is corrupt (no picture is 2^31 samples wide); it is skipped rather
+    // than overflowing (found by fuzz_overlay_builder, issue #649).
+    const int64_t x1_64 = int64_t{r.x()} + r.w();
+    const int64_t y1_64 = int64_t{r.y()} + r.h();
+    if (x1_64 > INT32_MAX || y1_64 > INT32_MAX) {
+      continue;
+    }
     const int32_t x0 = r.x();
     const int32_t y0 = r.y();
-    const int32_t x1 = x0 + r.w();
-    const int32_t y1 = y0 + r.h();
+    const auto x1 = static_cast<int32_t>(x1_64);
+    const auto y1 = static_cast<int32_t>(y1_64);
     const std::array<Key, 4> edges{Key{x0, y0, x1, y0}, Key{x0, y1, x1, y1}, Key{x0, y0, x0, y1}, Key{x1, y0, x1, y1}};
     for (const Key& e : edges) {
       if (seen.insert(e).second) {
@@ -231,12 +251,10 @@ void build_grid_tree(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
 
 }  // namespace
 
-OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+namespace detail {
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
+std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
   if (fa != nullptr && (cfg.layers & kGridLayers) != 0) {
@@ -254,10 +272,21 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   } else {
     set->cells_w = grid.cells_w();
     set->cells_h = grid.cells_h();
-    if ((cfg.layers & kAttrLayers) != 0 && cells64 > 0) {
+    // A grid size alone (an MV-only frame) still sizes the arrow pass; the per-cell outputs need a backing column.
+    const bool backed = cells64 > 0 && has_cell_column(grid, static_cast<size_t>(cells64));
+    const bool host_heat =
+        custom_cells != nullptr && (cfg.heatmap == HeatmapSource::Custom || cfg.heatmap == HeatmapSource::MetricMap);
+    const bool want_attr = (cfg.layers & kAttrLayers) != 0;
+    const bool want_heat = cfg.heatmap != HeatmapSource::None;
+    if (cells64 > 0 && !backed && (want_attr || (want_heat && !host_heat))) {
+      set->diagnostics.emplace_back(
+          "CellGrid of " + std::to_string(grid.cells_w()) + "x" + std::to_string(grid.cells_h()) +
+          " cells has no per-cell vector of that length; cell attributes and heatmap are empty");
+    }
+    if (want_attr && backed) {
       build_attributes(*fa, *set);
     }
-    if (cfg.heatmap != HeatmapSource::None && cells64 > 0) {
+    if (want_heat && (backed || (cells64 > 0 && host_heat))) {
       detail::HeatmapResult h;
       if (detail::build_heatmap(grid, is_av1_frame(*fa), cfg, custom_cells, h, set->diagnostics)) {
         set->heatmap = std::move(h.values);
@@ -275,8 +304,8 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   return set;
 }
 
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
+std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
   if (buf == nullptr) {
     return nullptr;
   }
@@ -288,7 +317,25 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t siz
   if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
     return nullptr;
   }
-  return build(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+  return build_overlay_set(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+}
+
+}  // namespace detail
+
+OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
+std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                                  const uint16_t* custom_cells) {
+  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
+  return detail::build_overlay_set(fa, cfg, custom_cells);
+}
+
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static): as above
+std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                                  const uint16_t* custom_cells) {
+  (void)owner_;
+  return detail::build_overlay_set(buf, size, cfg, custom_cells);
 }
 
 }  // namespace ovt::render
