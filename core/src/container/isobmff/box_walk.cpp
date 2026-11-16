@@ -308,7 +308,9 @@ uint64_t run_hand_decoder(const io::RandomAccessFile& file, BoxNodeT& n, const B
                           uint64_t payload_begin, uint64_t end, bool fullbox) {
   const uint64_t len = std::min(end - payload_begin, kMaxDecodedPayload);
   std::vector<uint8_t> payload(static_cast<size_t>(len));
-  payload.resize(file.read(payload_begin, payload.size(), payload.data()));
+  if (len > 0) {  // an empty vector's data() may be null, which read() must not get
+    payload.resize(file.read(payload_begin, payload.size(), payload.data()));
+  }
   BitReader br(payload);
   const uint64_t base_bits = (static_cast<uint64_t>(n.header_length) + (fullbox ? 4U : 0U)) * 8U;
   FieldBuilder fb(n, n.file_span->offset(), br, base_bits);
