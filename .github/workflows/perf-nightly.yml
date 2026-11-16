@@ -1,0 +1,95 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+#
+# Nightly performance run on the reference machines (chapter 14 §14.9, WI-0.560). Supersedes the perf job of WI-0.037.
+# Each job runs on a self-hosted runner labelled with its hardware id (§14.9.2), builds the Google Benchmark binaries,
+# runs tools/perf_run.py (budgets from tests/perf/budgets.json, baseline tests/perf/baselines/<hardware-id>.json, 20 %
+# regression limit) and uploads the result files as the artefact perf-<hardware-id>.
+#
+# A job runs only when the repository variable OVT_PERF_RUNNERS lists its hardware id (comma separated, for example
+# `m1-air-8gb,linux-x64-ref`), which the owner sets after registering the runner (docs/dev/perf-runners.md). Until
+# then every job is skipped. Scheduled and manual runs only, so no pull request, and no fork code, ever reaches these
+# machines. The android jobs (pixel-tablet, chromebook-hdr) follow with the Android build of WI-0.034; tools/perf_run.py
+# --android already runs the cross-compiled binaries through adb.
+# Third-party actions are pinned by commit SHA, never by tag.
+name: perf-nightly
+
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  m1-air-8gb:
+    if: contains(format(',{0},', vars.OVT_PERF_RUNNERS), ',m1-air-8gb,')
+    runs-on: [self-hosted, m1-air-8gb]
+    timeout-minutes: 180
+    env:
+      OVT_PERF_HARDWARE_ID: m1-air-8gb
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: macos-arm64-release
+          triplet: arm64-osx-ovt
+          corpora: all
+
+      - name: Build the benchmarks
+        run: |
+          cmake --preset macos-arm64-release -DVCPKG_MANIFEST_FEATURES=benchmarks
+          cmake --build --preset macos-arm64-release --target ovt_perf
+
+      # Exit 1 = a budget or the 20 % regression limit failed. The artefact is uploaded either way.
+      - name: Run and compare
+        run: python3 -I tools/perf_run.py --build-dir build/macos-arm64-release --results-dir results --compare
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: perf-m1-air-8gb
+          path: |
+            results/m1-air-8gb/
+            results/m1-air-8gb-failures.json
+          if-no-files-found: warn
+
+  linux-x64-ref:
+    if: contains(format(',{0},', vars.OVT_PERF_RUNNERS), ',linux-x64-ref,')
+    runs-on: [self-hosted, linux-x64-ref]
+    timeout-minutes: 180
+    env:
+      OVT_PERF_HARDWARE_ID: linux-x64-ref
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-release
+          triplet: x64-linux-ovt
+          corpora: all
+
+      - name: Build the benchmarks
+        run: |
+          cmake --preset linux-x64-release -DVCPKG_MANIFEST_FEATURES=benchmarks
+          cmake --build --preset linux-x64-release --target ovt_perf
+
+      - name: Run and compare
+        run: python3 -I tools/perf_run.py --build-dir build/linux-x64-release --results-dir results --compare
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: perf-linux-x64-ref
+          path: |
+            results/linux-x64-ref/
+            results/linux-x64-ref-failures.json
+          if-no-files-found: warn
