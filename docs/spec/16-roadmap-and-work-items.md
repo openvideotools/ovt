@@ -561,7 +561,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.201 | 8 §8.10 | Implement the ISOBMFF box header walk with spans and truncation handling | M | 1 | M1.1 | WI-1.200, WI-0.553 | FR-CNT-001, FR-CNT-101 |
 | WI-1.202 | 8 §8.10 | Implement `FieldBuilder`, `BoxContext` propagation and the decoder registration macro | M | 1 | M1.1 | WI-1.201 | — |
 | WI-1.203 | 8 §8.10 | Write `tools/gen_box_registry.py` and generate `box_registry.gen.cpp` | M | 1 | M1.1 | WI-1.202 | FR-CNT-003 |
-| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
+| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location (landed, PR #639; `PagedSpan` windowed reads moved to WI-1.209, #630) | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
 | WI-1.205 | 8 §8.10 | Hand decoders, group A (file and movie level) | M | 1 | M1.2 | WI-1.202 | FR-CNT-002 |
 | WI-1.206 | 8 §8.10 | Hand decoders, group B (`stsd` and sample entries) | M | 1 | M1.2 | WI-1.205 | FR-CNT-002 |
 | WI-1.207 | 8 §8.10 | Hand decoders, group C part 1 (codec configuration records) | L | 1 | M1.2 | WI-1.206, WI-1.108, WI-1.112, WI-1.116 | FR-CNT-002 |
@@ -612,7 +612,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.412 | 10 §10.11 | PNG export (`HdrPng16`, `SdrPng8`, `ViewPng8`) | M | 1 | M1.3 | WI-1.403, WI-1.410 | FR-PLN-010 |
 | WI-1.413 | 10 §10.11 | Test pattern generator and measurement expectations | S | 1 | M1.1 | none | — |
 | WI-1.414 | 10 §10.11 | libplacebo/mpv parity test harness (superseded by WI-1.575; see chapter 16 §16.3) | S | 1 | M1.4 | WI-1.412, WI-1.413 | — |
-| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
+| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; landed as a partial in PR #625, GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
 | WI-1.450 | 11 §11.10 | Application skeleton, RHI selection, `Platform` singleton, settings (reduced, §16.3) | M | 1 | M1.1 | WI-0.001, WI-0.018, WI-0.019 | FR-GUI-001, FR-GUI-002, FR-GUI-023, FR-GUI-025, NFR-008, NFR-021, NFR-025 |
 | WI-1.451 | 11 §11.10 | Dock manager (`SplitView`-based) with presets and serialisation | L | 1 | M1.2 | WI-1.450 | FR-GUI-001, FR-GUI-002 |
 | WI-1.452 | 11 §11.10 | `SelectionModel` and the derivation rules | M | 1 | M1.2 | WI-1.450, WI-0.083 | FR-GUI-004, FR-GUI-011, FR-GUI-101 |
