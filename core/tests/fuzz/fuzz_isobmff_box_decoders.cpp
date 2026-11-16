@@ -5,10 +5,11 @@
 // one registered decoder directly on a fuzzed payload, the way the walker does after reading version/flags, so the
 // decoders are reached without a valid box tree around them (the whole-file walk is fuzz_isobmff_tree, WI-1.204).
 // Input layout: byte 0 selects the box type and ancestor chain from kCases, byte 1 is the FullBox version, bytes
-// 2-4 the flags, byte 5 the context bits (bit 0 quicktime, bit 1 movie/track timescales known), the rest is the
-// payload. Invariants, each an abort when violated: no exception escapes run_decoder(); every top-level field
-// span lies inside the box; decoding the same input twice gives byte-identical FlatBuffers.
-// Later decoder WIs add their boxes to kCases.
+// 2-4 the flags, byte 5 the context bits (bit 0 quicktime, bit 1 movie/track timescales known, bits 2-3 the track
+// handler: 0 none, 1 vide, 2 soun, 3 text; bit 4 stsd version 1), the rest is the payload. Invariants, each an abort
+// when violated: no exception escapes run_decoder(); every top-level field span lies inside the box; decoding the same
+// input twice gives byte-identical FlatBuffers. Later decoder WIs add their boxes to kCases (append: the corpus seeds
+// are indexed by position).
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -34,14 +35,48 @@ struct Case {
   std::string_view fourcc;
   std::string_view parent;  // innermost ancestor ("" = top level)
   bool fullbox;
+  std::string_view outer = "";  // ancestor of `parent`, "" = none (sample entry children: stsd)
 };
 
 constexpr auto kCases = std::to_array<Case>({
-    {"ftyp", "", false},     {"styp", "", false},    {"mvhd", "moov", true}, {"tkhd", "trak", true},
-    {"hint", "tref", false}, {"msrc", "trgr", true}, {"elst", "edts", true}, {"mdhd", "mdia", true},
-    {"hdlr", "mdia", true},  {"hdlr", "meta", true}, {"elng", "mdia", true}, {"vmhd", "minf", true},
-    {"smhd", "minf", true},  {"hmhd", "minf", true}, {"nmhd", "minf", true}, {"sthd", "minf", true},
-    {"dref", "dinf", true},  {"url ", "dref", true}, {"urn ", "dref", true}, {"pdin", "", true},
+    {"ftyp", "", false},
+    {"styp", "", false},
+    {"mvhd", "moov", true},
+    {"tkhd", "trak", true},
+    {"hint", "tref", false},
+    {"msrc", "trgr", true},
+    {"elst", "edts", true},
+    {"mdhd", "mdia", true},
+    {"hdlr", "mdia", true},
+    {"hdlr", "meta", true},
+    {"elng", "mdia", true},
+    {"vmhd", "minf", true},
+    {"smhd", "minf", true},
+    {"hmhd", "minf", true},
+    {"nmhd", "minf", true},
+    {"sthd", "minf", true},
+    {"dref", "dinf", true},
+    {"url ", "dref", true},
+    {"urn ", "dref", true},
+    {"pdin", "", true},
+    // WI-1.206 group B: stsd and the sample entries (the layout follows the handler bits of the context byte).
+    {"stsd", "stbl", true},
+    {"avc1", "stsd", false},
+    {"mp4a", "stsd", false},
+    {"tx3g", "stsd", false},
+    {"ftab", "tx3g", false, "stsd"},
+    {"wvtt", "stsd", false},
+    {"vttC", "wvtt", false, "stsd"},
+    {"vlab", "wvtt", false, "stsd"},
+    {"stpp", "stsd", false},
+    {"mett", "stsd", false},
+    {"txtC", "mett", true, "stsd"},
+    {"metx", "stsd", false},
+    {"urim", "stsd", false},
+    {"uri ", "urim", true, "stsd"},
+    {"uriI", "urim", true, "stsd"},
+    {"tmcd", "stsd", false},
+    {"name", "tmcd", false, "stsd"},
 });
 
 void require(bool ok) {
@@ -59,6 +94,9 @@ iso::FourCC cc_of(std::string_view s) {
 std::vector<uint8_t> decode_once(const Case& c, uint8_t version, uint32_t flags, uint8_t ctx_bits,
                                  std::span<const uint8_t> payload) {
   iso::BoxContext ctx;
+  if (!c.outer.empty()) {
+    ctx.ancestors.push_back(cc_of(c.outer));
+  }
   if (!c.parent.empty()) {
     ctx.ancestors.push_back(cc_of(c.parent));
   }
@@ -67,6 +105,11 @@ std::vector<uint8_t> decode_once(const Case& c, uint8_t version, uint32_t flags,
     ctx.movie_timescale = 600;
     ctx.track_timescale = 90000;
   }
+  constexpr std::array<std::string_view, 4> kHandlers = {"", "vide", "soun", "text"};
+  if (const std::string_view h = kHandlers.at((ctx_bits >> 2U) & 3U); !h.empty()) {
+    ctx.handler_type = cc_of(h);
+  }
+  ctx.stsd_version = (ctx_bits & 16U) != 0 ? 1 : 0;
   const iso::RegistryEntry* e = iso::lookup(c.fourcc, ctx);
   require(e != nullptr && e->decoder != nullptr);
 

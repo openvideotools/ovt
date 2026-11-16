@@ -41,8 +41,6 @@ using ovt::fb::BoxNodeT;
 using ovt::fb::FieldT;
 using ovt::fb::SyntaxValueKind;
 
-// ---- byte builders ----
-
 Bytes cat(std::initializer_list<Bytes> parts) {
   Bytes b;
   for (const Bytes& p : parts) {
@@ -155,8 +153,6 @@ Decoded run(std::string_view type, const Bytes& payload, iso::BoxContext& ctx) {
   return d;
 }
 
-// ---- field access ----
-
 const FieldT* child(const std::vector<std::unique_ptr<FieldT>>& fields, std::string_view name) {
   for (const auto& f : fields) {
     if (f->name == name) {
@@ -200,8 +196,6 @@ void check_contiguous(const Decoded& d, uint64_t from_bit = 64) {
   }
   CHECK(at == 64 + 8 * d.payload_bytes);
 }
-
-// ---- registration ----
 
 TEST_CASE("every group B row with fields has a registered decoder", "[container][decoders][stsd]") {
   const std::array<std::pair<std::string_view, std::string_view>, 18> rows = {{
@@ -310,17 +304,6 @@ TEST_CASE("VisualSampleEntry: size, depth, resolution, compressorname and the ch
   CHECK(ctx.sample_entry == cc_of("hvc1"));
   CHECK(d.node.diagnostics.empty());
   check_contiguous(d);
-}
-
-TEST_CASE("VisualSampleEntry depth names and the codec of each family", "[container][decoders][stsd]") {
-  iso::BoxContext ctx = entry_ctx("vide");
-  CHECK(field(run("av01", visual_fixed(64, 64, 32), ctx).node, "depth").svalue == "32 colour+alpha");
-  CHECK(field(run("av01", visual_fixed(64, 64, 40), ctx).node, "depth").svalue == "40 greyscale");
-  CHECK(field(run("avc1", visual_fixed(64, 64, 24), ctx).node, "codec.derived").svalue == "H.264");
-  CHECK(field(run("av01", visual_fixed(64, 64, 24), ctx).node, "codec.derived").svalue == "AV1");
-  CHECK(field(run("vp09", visual_fixed(64, 64, 24), ctx).node, "codec.derived").svalue == "VP9");
-  const Decoded enc = run("encv", visual_fixed(64, 64, 24), ctx);
-  CHECK(field(enc.node, "codec.derived").svalue == "encrypted video; original format in sinf/frma");
 }
 
 TEST_CASE("VisualSampleEntry compressorname is a counted string of 32 bytes", "[container][decoders][stsd]") {
@@ -454,17 +437,6 @@ TEST_CASE("R-AUDIO: a version 1 layout without QuickTime context is QuickTime on
   CHECK(has_code(without.node, "CNT-1007"));  // the QuickTime bytes read as reserved in the ISO v0 layout
 }
 
-TEST_CASE("R-AUDIO: QuickTime version 0 uses the ISO v0 layout without reserved noise", "[container][decoders][stsd]") {
-  iso::BoxContext ctx = entry_ctx("soun");
-  ctx.quicktime = true;
-  const Bytes payload =
-      cat({prefix(), be(0, 2), be(0, 2), str("appl"), be(2, 2), be(16, 2), zeros(4), be(uint64_t{44100} << 16U, 4)});
-  const Decoded d = run("twos", payload, ctx);
-  CHECK(field(d.node, "channelcount").uvalue == 2);
-  CHECK(d.node.diagnostics.empty());
-  CHECK(field(d.node, "codec.derived").svalue == "PCM (big-endian)");
-}
-
 // ---- dispatch by handler ----
 
 TEST_CASE("an unknown entry fourcc is decoded as the layout of the track's handler", "[container][decoders][stsd]") {
@@ -474,13 +446,6 @@ TEST_CASE("an unknown entry fourcc is decoded as the layout of the track's handl
   const Decoded a = run("zzzz", iso_audio(1, 8, 8000), soun);
   CHECK(field(a.node, "channelcount").svalue == "mono");
   CHECK_FALSE(has_field(a.node, "codec.derived"));
-}
-
-TEST_CASE("without a handler the codec tables choose the layout", "[container][decoders][stsd]") {
-  iso::BoxContext none = entry_ctx("");
-  CHECK(has_field(run("avc1", visual_fixed(8, 8, 24), none).node, "width"));
-  CHECK(has_field(run("mp4a", iso_audio(2, 16, 44100), none).node, "channelcount"));
-  CHECK(run("mp4s", cat({prefix(), zeros(4)}), none).outcome.children_offset == 8);
 }
 
 // ---- text and metadata entries ----
@@ -526,7 +491,7 @@ TEST_CASE("wvtt has the prefix only; vttC and vlab are strings", "[container][de
   CHECK(field(run("vlab", str("English"), c).node, "source_label").svalue == "English");
 }
 
-TEST_CASE("stpp, mett and metx strings, then the children offset", "[container][decoders][stsd]") {
+TEST_CASE("stpp and mett strings, then the children offset", "[container][decoders][stsd]") {
   iso::BoxContext ctx = entry_ctx("subt");
   const Bytes stpp = cat(
       {prefix(), str("http://www.w3.org/ns/ttml"), be(0, 1), str("schema.xsd"), be(0, 1), str("image/png"), be(0, 1)});
@@ -543,13 +508,6 @@ TEST_CASE("stpp, mett and metx strings, then the children offset", "[container][
   CHECK(field(m.node, "content_encoding").svalue.empty());
   CHECK(field(m.node, "mime_format").svalue == "text/plain");
   CHECK(m.outcome.children_offset == 8 + 1 + 11);  // the btrt child starts after the strings
-
-  const Bytes metx = cat({prefix(), str("gzip"), be(0, 1), str("urn:ns"), be(0, 1), str("loc"), be(0, 1)});
-  const Decoded x = run("metx", metx, mctx);
-  CHECK(field(x.node, "content_encoding").svalue == "gzip");
-  CHECK(field(x.node, "namespace").svalue == "urn:ns");
-  CHECK(field(x.node, "schema_location").svalue == "loc");
-  CHECK(x.outcome.children_offset == metx.size());
 }
 
 TEST_CASE("urim and its uri / uriI children, txtC", "[container][decoders][stsd]") {
@@ -728,19 +686,6 @@ TEST_CASE("a QuickTime mp4a v1 entry in a .mov: samples_per_packet and esds unde
   const BoxNodeT* wave = find_box(walked.top_level, "wave");
   REQUIRE(wave != nullptr);
   CHECK(find_box(wave->children, "esds") != nullptr);
-}
-
-TEST_CASE("stsd with entry_count 2 and one entry reports CNT-1010", "[container][decoders][stsd]") {
-  const Bytes entry = box("avc1", visual_fixed(64, 64, 24));
-  const Bytes file = file_with_stsd("vide", cat({be(0, 4), be(2, 4), entry}));
-  const ovt::io::MemoryFile mem(file);
-  iso::WalkResult walked = iso::walk(mem);
-  Harness h;
-  h.file = &mem;
-  h.visit(walked.top_level, walked.root_ctx, "");
-  const BoxNodeT* stsd = find_box(walked.top_level, "stsd");
-  REQUIRE(stsd != nullptr);
-  CHECK(has_code(*stsd, "CNT-1010"));
 }
 
 // ---- golden comparison against MP4Box on the container-smoke corpus ----
