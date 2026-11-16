@@ -49,6 +49,12 @@ DEFAULT_MANIFEST = REPO_ROOT / "tests" / "corpora" / "manifest.json"
 SCHEMA_NAME = "manifest.schema.json"
 CHUNK = 1 << 20
 OK_NAME = ".ok"
+# HTTP statuses retried with backoff: itu.int answers 503 (and briefly 404) for minutes at a time.
+TRANSIENT_HTTP = frozenset({408, 425, 429, 500, 502, 503, 504})
+# Backoff after a transient failure: BACKOFF_BASE * 2^(attempt-1) seconds, capped at BACKOFF_CAP; with
+# --retries 6 a fetch rides out about two minutes of outage (5 + 10 + 20 + 40 + 60 s).
+BACKOFF_BASE = 5.0
+BACKOFF_CAP = 60.0
 
 
 class FetchError(Exception):
@@ -67,6 +73,17 @@ class HashMismatch(FetchError):
 class NetworkError(FetchError):
     def __init__(self, message: str) -> None:
         super().__init__(EXIT_NETWORK, message)
+
+
+class TransientNetworkError(NetworkError):
+    """A failure the server may recover from (HTTP 429/5xx, a reset or cut-off connection, a timeout).
+
+    ``retry_after`` is the server's Retry-After in seconds, when it sent one.
+    """
+
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class ManifestError(FetchError):
@@ -189,6 +206,28 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def parse_retry_after(headers: Any) -> float | None:
+    """Retry-After in seconds (the delta-seconds form only; an HTTP date is ignored)."""
+    value = headers.get("Retry-After") if headers is not None else None
+    if value is None:
+        return None
+    try:
+        return max(float(value.strip()), 0.0)
+    except ValueError:
+        return None
+
+
+def retry_delay(attempt: int, exc: FetchError) -> float:
+    """Seconds to wait after failed attempt ``attempt`` (1-based) before the next one."""
+    if isinstance(exc, TransientNetworkError):
+        delay = BACKOFF_BASE * 2 ** (attempt - 1)
+        if exc.retry_after is not None:
+            delay = max(delay, exc.retry_after)
+        return min(delay, BACKOFF_CAP)
+    # A 404 or a hash mismatch rarely heals, but itu.int has served short-lived 404s: retry quickly.
+    return min(2 ** (attempt - 1) * 0.5, 8)
+
+
 def download(url: str, dest: Path, max_bytes: int | None = None) -> str:
     """Stream ``url`` into ``dest`` and return its SHA-256. Raises NetworkError.
 
@@ -210,11 +249,13 @@ def download(url: str, dest: Path, max_bytes: int | None = None) -> str:
                 if max_bytes is not None and received > max_bytes:
                     raise NetworkError(f"{url}: more than the manifest size_bytes ({max_bytes}) received")
     except urllib.error.HTTPError as exc:
+        if exc.code in TRANSIENT_HTTP:
+            raise TransientNetworkError(f"{url}: HTTP {exc.code}", parse_retry_after(exc.headers)) from exc
         raise NetworkError(f"{url}: HTTP {exc.code}") from exc
     except (urllib.error.URLError, http.client.HTTPException, OSError) as exc:
-        raise NetworkError(f"{url}: {exc}") from exc
+        raise TransientNetworkError(f"{url}: {exc}") from exc
     if expected is not None and int(expected) != received:
-        raise NetworkError(f"{url}: Content-Length {expected} but received {received} bytes")
+        raise TransientNetworkError(f"{url}: Content-Length {expected} but received {received} bytes")
     return digest.hexdigest()
 
 
@@ -359,7 +400,7 @@ def fetch_entry(entry: dict[str, Any], cache: Path, retries: int, verify_only: b
                 log(f"{entry['id']}: attempt {attempt} failed: {exc}")
                 part.unlink(missing_ok=True)
                 if attempt < retries:
-                    time.sleep(min(2 ** (attempt - 1) * 0.5, 8))
+                    time.sleep(retry_delay(attempt, exc))
         if last is not None:
             shutil.rmtree(entry_dir, ignore_errors=True)
             raise last
