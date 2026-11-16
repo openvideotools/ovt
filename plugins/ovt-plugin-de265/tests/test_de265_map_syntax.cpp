@@ -7,18 +7,31 @@
 //    tx_type, and the V-020 distribution of bits over cells.
 //  - map_blocks() with syntax: the block tree, MotionVectors and CellGrid of a hand-made picture, checked by the
 //    chapter 06 validator (V-019, V-020).
-// The conformance-stream tests against HM (AT1) and the slice data sizes (AT2) are WI-2.165b.
+//  - The plugin on ten HEVC_v1 conformance streams against HM (AT1): merge_flag, merge_idx, inter_pred_idc, ref_idx,
+//    mvd and mvp_lX_flag of every prediction unit, the chroma cbf and transform_skip_flag, from the goldens
+//    tests/golden/h265/<id>.hm-syntax.json.gz (hm_cu_dump through tests/oracles/normalize/hm_grid.py --syntax).
+//  - The bit counts (AT2): the CTU bits of each slice segment add up to its slice data bits, from the stream and the
+//    trace_headers golden of the slice segment header.
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include <flatbuffers/flatbuffers.h>
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <map>
 #include <numeric>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -26,6 +39,7 @@
 #include "map_syntax.hpp"
 #include "ovt_model_generated.h"
 #include "test_de265_map_support.hpp"
+#include "test_support/corpus.h"
 
 namespace {
 
@@ -33,6 +47,7 @@ namespace fb = ovt::fb;
 using de265_test::analyse;
 using de265_test::ext;
 using de265_test::Pic;
+using json = nlohmann::json;
 using Mode = ovt::de265::De265PredMode;
 using ovt::de265::CellIndex;
 using ovt::de265::CuShape;
@@ -463,4 +478,290 @@ TEST_CASE("de265 map_blocks: syntax that does not fit the picture is ignored", "
   de265_test::check_valid(a.bytes());
   CHECK(a.fa().blocks()->Get(1)->bits_x8() == 0);
   CHECK(a.fa().mvs()->Get(0)->predictor()->str() == "?");
+}
+
+TEST_CASE("de265 map_blocks: a CTU of 0 bits keeps the root's sum (V-019)", "[fast]") {
+  // Two 16x16 CTBs; the second is a skipped CU whose bins cost under 1/8 bit, so its share rounds to 0.
+  Pic p(32, 16, 4, 3);
+  p.d.slices[0].slice_type = 1;
+  p.d.slices[0].num_ref_idx_active = {1, 0};
+  p.d.slices[0].RefPicList_POC[0] = {4};
+  p.cu(0, 0, 4, Mode::Intra);
+  p.intra(0, 0, 16, 16, 1, 1);
+  p.cu(16, 0, 4, Mode::Skip);
+  p.motion(16, 0, 16, 16, 0, 0, 1, 1, 4);
+  add_syntax(p);
+  p.each(16, 0, 16, 16, [&](std::size_t i) { p.d.syn.pu[i] = merge_pu(0); });
+  cu_bits(p, 0, 0, 4, 120);
+  p.d.syn.ctb_bits[0] = 120;
+  p.d.syn.ctb_bits[1] = 0;
+  const de265_test::Analysis a = analyse(p);
+  de265_test::check_valid(a.bytes());
+  const auto* blocks = a.fa().blocks();
+  const fb::Block* root = blocks->Get(0);
+  REQUIRE(root->children()->size() == 2);
+  CHECK(blocks->Get(root->children()->Get(1))->bits_x8() == 0);
+  CHECK(root->bits_x8() == 120);
+}
+
+// ---- the plugin on conformance streams ------------------------------------------------------------------------------
+
+namespace {
+
+json golden(std::string_view id, std::string_view kind) {
+  const std::filesystem::path file =
+      std::filesystem::path(OVT_HEVC_GOLDEN_DIR) / (std::string(id) + "." + std::string(kind) + ".json.gz");
+  REQUIRE(std::filesystem::exists(file));
+  return json::parse(de265_test::read_pipe("gzip -dc \"" + file.string() + "\""));
+}
+
+struct Count {
+  std::size_t checked = 0;
+  std::size_t bad = 0;
+  std::string first;
+  void cmp(const std::string& what, uint32_t frame, const fb::Rect& r, int64_t ovt, int64_t hm) {
+    ++checked;
+    if (ovt != hm && bad++ == 0) {
+      first = what + " frame " + std::to_string(frame) + " PU " + std::to_string(r.x()) + "," + std::to_string(r.y()) +
+              " " + std::to_string(r.w()) + "x" + std::to_string(r.h()) + ": OVT " + std::to_string(ovt) + " HM " +
+              std::to_string(hm);
+    }
+  }
+};
+
+using Counts = std::map<std::string, Count>;
+
+// The HM value of golden field @p key at cell @p cell.
+int64_t hm_at(const json& fields, const char* key, std::size_t cell) {
+  return fields.at(key)[cell].get<int64_t>();
+}
+
+// One inter prediction unit against the HM syntax at its origin.
+void compare_pu(Counts& counts, uint32_t index, const fb::Block* b, const json& f, std::size_t w4) {
+  const fb::Rect& r = *b->rect();
+  const std::size_t c = (static_cast<std::size_t>(r.y() / 4) * w4) + static_cast<std::size_t>(r.x() / 4);
+  REQUIRE(hm_at(f, "inter", c) == 1);
+  const auto* pu = ext<fb::HevcPu>(b);
+  counts["merge_flag"].cmp("merge_flag", index, r, pu->merge_flag(), hm_at(f, "merge_flag", c));
+  if (pu->merge_flag() == 1) {
+    counts["merge_idx"].cmp("merge_idx", index, r, pu->merge_idx(), hm_at(f, "merge_idx", c));
+    return;
+  }
+  const auto idc = static_cast<int64_t>(pu->inter_pred_idc());
+  counts["inter_pred_idc"].cmp("inter_pred_idc", index, r, idc + 1, hm_at(f, "inter_dir", c));  // HM: 1 L0, 2 L1, 3
+  struct List {
+    bool used;
+    const char* suffix;
+    int64_t ref, mvd_x, mvd_y, mvp;
+  };
+  const std::array<List, 2> lists = {
+      List{idc != 1, "l0", pu->ref_idx_l0(), pu->mvd_l0_x(), pu->mvd_l0_y(), pu->mvp_l0_flag()},
+      List{idc != 0, "l1", pu->ref_idx_l1(), pu->mvd_l1_x(), pu->mvd_l1_y(), pu->mvp_l1_flag()},
+  };
+  for (const List& l : lists) {
+    if (!l.used) {
+      continue;
+    }
+    const std::string sfx(l.suffix);
+    counts["ref_idx"].cmp("ref_idx_" + sfx, index, r, l.ref, hm_at(f, ("ref_idx_" + sfx).c_str(), c));
+    counts["mvd"].cmp("mvd_" + sfx + "_x", index, r, l.mvd_x, hm_at(f, ("mvd_" + sfx + "_x").c_str(), c));
+    counts["mvd"].cmp("mvd_" + sfx + "_y", index, r, l.mvd_y, hm_at(f, ("mvd_" + sfx + "_y").c_str(), c));
+    counts["mvp"].cmp("mvp_" + sfx + "_flag", index, r, l.mvp, hm_at(f, ("mvp_" + sfx).c_str(), c));
+  }
+}
+
+// Transform cells: cbf of every component where the chroma block is the TU's own (4x4 luma TBs share theirs with
+// blkIdx 3), and the luma transform skip.
+void compare_cells(Counts& counts, uint32_t index, const fb::CellGrid& g, const json& f, std::size_t w4) {
+  for (flatbuffers::uoffset_t i = 0; i < g.cbf()->size(); ++i) {
+    const int tx = g.tx_log2_w()->Get(i);
+    if (tx == 255) {
+      continue;
+    }
+    const fb::Rect cell(static_cast<int32_t>(i % w4) * 4, static_cast<int32_t>(i / w4) * 4, 4, 4);
+    const int64_t mask = tx > 2 ? 7 : 1;
+    counts["cbf"].cmp("cbf", index, cell, g.cbf()->Get(i) & mask, hm_at(f, "cbf", i) & mask);
+    if (g.tx_type()->Get(i) != 3) {  // transquant bypass: no transform_skip_flag
+      counts["transform_skip"].cmp("transform_skip_y", index, cell, g.tx_type()->Get(i) == 2 ? 1 : 0,
+                                   hm_at(f, "transform_skip_y", i));
+    }
+  }
+}
+
+// AT1: every prediction unit of every frame of @p id against HM's syntax, and the cbf / transform skip cells.
+void check_syntax_vs_hm(std::string_view id) {
+  const json doc = golden(id, "hm-syntax");
+  const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
+  const json& frames = doc.at("frames");
+  const auto analyses = de265_test::analyse_stream(stream, static_cast<int32_t>(frames.size()));
+  REQUIRE(analyses.size() == frames.size());
+  Counts counts;
+  for (const json& frame : frames) {
+    const auto index = frame.at("frame").get<uint32_t>();
+    const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(analyses.at(static_cast<int32_t>(index)).data());
+    const auto w4 = frame.at("w4").get<std::size_t>();
+    REQUIRE(fa.grid()->cells_w() == w4);
+    for (const fb::Block* b : *fa.blocks()) {
+      if (b->kind() == fb::BlockKind::PU && (b->pred() == fb::PredKind::Inter || b->pred() == fb::PredKind::Skip)) {
+        compare_pu(counts, index, b, frame.at("fields"), w4);
+      }
+    }
+    compare_cells(counts, index, *fa.grid(), frame.at("fields"), w4);
+  }
+  for (const auto& [what, n] : counts) {
+    INFO(id << " " << what << ": " << n.bad << " of " << n.checked << " differ; first: " << n.first);
+    CHECK(n.bad == 0);
+  }
+  CHECK(counts["merge_flag"].checked > 0);
+}
+
+// The ten HEVC_v1 streams of AT1 (hm_cu_dump traces taken for WI-2.165).
+constexpr std::array<std::string_view, 10> kSyntaxStreams = {
+    "jctvc_AMP_A_Samsung_7",     "jctvc_CAINIT_A_SHARP_4", "jctvc_MERGE_B_TI_3",   "jctvc_MVCLIP_A_qualcomm_3",
+    "jctvc_MVEDGE_A_qualcomm_3", "jctvc_PMERGE_A_TI_3",    "jctvc_POC_A_Bossen_3", "jctvc_RPS_B_qualcomm_5",
+    "jctvc_SAO_A_MediaTek_4",    "jctvc_WP_A_Toshiba_3",
+};
+
+// The RBSP of a NAL unit (emulation prevention bytes removed).
+std::vector<uint8_t> rbsp(const std::vector<uint8_t>& nal) {
+  std::vector<uint8_t> out;
+  out.reserve(nal.size());
+  int zeros = 0;
+  for (const uint8_t b : nal) {
+    if (zeros >= 2 && b == 3) {
+      zeros = 0;
+      continue;
+    }
+    out.push_back(b);
+    zeros = b == 0 ? zeros + 1 : 0;
+  }
+  return out;
+}
+
+// Bit position of the rbsp_stop_one_bit (from the start of the NAL header), after cabac_zero_words.
+int64_t stop_bit(std::vector<uint8_t> r) {
+  while (!r.empty() && r.back() == 0) {
+    r.pop_back();
+  }
+  REQUIRE(!r.empty());
+  int stop = 0;
+  while (((r.back() >> stop) & 1) == 0) {
+    ++stop;
+  }
+  return (static_cast<int64_t>(r.size() - 1) * 8) + (7 - stop);
+}
+
+std::vector<std::vector<uint8_t>> nal_units(const std::filesystem::path& stream) {
+  std::ifstream in(stream, std::ios::binary);
+  const std::vector<uint8_t> s{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+  std::vector<std::size_t> starts;
+  for (std::size_t i = 0; i + 3 <= s.size(); ++i) {
+    if (s[i] == 0 && s[i + 1] == 0 && s[i + 2] == 1) {
+      starts.push_back(i + 3);
+      i += 2;
+    }
+  }
+  std::vector<std::vector<uint8_t>> nals;
+  for (std::size_t k = 0; k < starts.size(); ++k) {
+    std::size_t end = k + 1 < starts.size() ? starts[k + 1] - 3 : s.size();
+    while (end > starts[k] && s[end - 1] == 0) {
+      --end;
+    }
+    nals.emplace_back(s.begin() + static_cast<std::ptrdiff_t>(starts[k]), s.begin() + static_cast<std::ptrdiff_t>(end));
+  }
+  return nals;
+}
+
+// AT2: per slice segment, the CTU bits (1/8 bits) add up to 8 × the slice data bits: from the end of the slice
+// segment header's byte_alignment() to the rbsp_stop_one_bit. The CU bits are at most that (V-019 on the CTUs).
+// SPEC-ASSUMPTION(#605): AT2 sums the CTU bits; CU bits leave out split_cu_flag, SAO and end_of_slice_segment_flag.
+void check_slice_bits(std::string_view id) {
+  const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
+  const json trace = golden(id, "trace_headers");
+  // Header end per unit (NAL index): the last bit the trace shows; byte_alignment() follows and is not traced.
+  std::map<int64_t, int64_t> header_end;
+  std::map<int64_t, bool> is_slice;
+  for (const json& e : trace) {
+    const int64_t unit = e.at("unit").get<int64_t>();
+    const int64_t end = e.at("bit_offset").get<int64_t>() + e.at("bit_length").get<int64_t>();
+    header_end[unit] = std::max(header_end[unit], end);
+    if (e.at("name") == "first_slice_segment_in_pic_flag") {
+      is_slice[unit] = true;
+    }
+  }
+  const std::vector<std::vector<uint8_t>> nals = nal_units(stream);
+  // Expected bits per (decode index, slice segment index), for the slice segments the golden traces (it may stop
+  // before the end of the stream).
+  std::map<std::pair<int32_t, uint32_t>, int64_t> expected;
+  int32_t decode_index = -1;
+  int32_t last_traced = -1;
+  uint32_t segment = 0;
+  for (std::size_t u = 0; u < nals.size(); ++u) {
+    const std::vector<uint8_t>& nal = nals[u];
+    if (nal.size() <= 2 || ((nal[0] >> 1) & 0x3F) > 31) {
+      continue;  // not a VCL NAL unit
+    }
+    if ((nal[2] & 0x80) != 0) {  // first_slice_segment_in_pic_flag
+      ++decode_index;
+      segment = 0;
+    }
+    const auto unit = static_cast<int64_t>(u);
+    if (is_slice[unit]) {
+      const int64_t data_start = ((header_end[unit] / 8) + 1) * 8;
+      expected[{decode_index, segment}] = stop_bit(rbsp(nal)) - data_start;
+      last_traced = decode_index;
+    }
+    ++segment;
+  }
+  REQUIRE(!expected.empty());
+  const auto analyses = de265_test::analyse_stream(stream, last_traced + 1);
+  REQUIRE(static_cast<int32_t>(analyses.size()) == last_traced + 1);
+  std::map<std::pair<int32_t, uint32_t>, uint64_t> ctu_bits;
+  std::map<std::pair<int32_t, uint32_t>, uint64_t> cu_bits;
+  for (const auto& [index, buf] : analyses) {
+    const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(buf.data());
+    REQUIRE(fa.grid()->bits_x8() != nullptr);
+    for (const uint32_t c : *fa.blocks()->Get(0)->children()) {
+      const fb::Block* ctu = fa.blocks()->Get(c);
+      const uint32_t seg = ext<fb::HevcCtu>(ctu)->slice_segment_idx();
+      ctu_bits[{index, seg}] += ctu->bits_x8();
+      for (const uint32_t k : *ctu->children()) {
+        cu_bits[{index, seg}] += fa.blocks()->Get(k)->bits_x8();
+      }
+    }
+  }
+  std::size_t bad = 0;
+  double worst_cu = 1.0;
+  for (const auto& [key, bits] : expected) {
+    INFO(id << " picture " << key.first << " slice segment " << key.second << ": " << bits << " data bits, CTUs "
+            << ctu_bits[key] << "/8");
+    CHECK(ctu_bits[key] == static_cast<uint64_t>(bits) * 8);
+    bad += ctu_bits[key] == static_cast<uint64_t>(bits) * 8 ? 0U : 1U;
+    CHECK(cu_bits[key] <= ctu_bits[key]);
+    if (bits > 0) {
+      worst_cu = std::min(worst_cu, static_cast<double>(cu_bits[key]) / (static_cast<double>(bits) * 8));
+    }
+  }
+  INFO(id << ": " << expected.size() << " slice segments, smallest CU share " << worst_cu);
+  CHECK(bad == 0);
+}
+
+// Streams for AT2: one slice per picture, slices, dependent slice segments, WPP entry points, PCM, SAO.
+constexpr std::array<std::string_view, 7> kBitStreams = {
+    "jctvc_MERGE_B_TI_3", "jctvc_PMERGE_A_TI_3",  "jctvc_SAO_A_MediaTek_4",    "jctvc_WPP_A_ericsson_MAIN_2",
+    "jctvc_ipcm_A_NEC_3", "jctvc_DSLICE_A_HHI_5", "jctvc_MVEDGE_A_qualcomm_3",
+};
+
+}  // namespace
+
+TEST_CASE("de265 plugin: PU syntax vs HM on ten HEVC_v1 streams (AT1)", "[fast][third_party][needs-corpus][golden]") {
+  const std::string_view id = GENERATE(from_range(kSyntaxStreams));
+  INFO(id);
+  check_syntax_vs_hm(id);
+}
+
+TEST_CASE("de265 plugin: CTU bits add up to the slice data bits (AT2)", "[fast][third_party][needs-corpus][golden]") {
+  const std::string_view id = GENERATE(from_range(kBitStreams));
+  INFO(id);
+  check_slice_bits(id);
 }

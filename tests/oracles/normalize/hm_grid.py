@@ -19,6 +19,13 @@ tx_log2_w, tx_log2_h, cbf``:
 * ``cbf`` = ``getCbf_Y | getCbf_Cb << 1 | getCbf_Cr << 2`` (each 0/1 at the TU leaf).
 
 Frames keep the dump's order (decode order); ``frame`` is the 0-based position.
+
+``--syntax`` (WI-2.165) emits instead the prediction-unit syntax as signalled, for the libde265 patch-0002 fields
+(chapter 07 §7.6.2): ``inter`` (1 for inter and skip cells), ``merge_flag``, ``merge_idx``, ``inter_dir``
+(``getInterDir``: 1 L0, 2 L1, 3 both), ``ref_idx_l0/l1``, ``mvp_l0/l1`` (``getMVPIdx``), ``mvd_l0_x`` ...
+``mvd_l1_y`` (``getMvd``, quarter samples as signalled, not ×4), plus ``cbf`` as above and
+``transform_skip_y``. Every PU field is -1 on cells that are not inter, so the file compresses well; the comparer
+reads them at each prediction unit's origin.
 """
 
 from __future__ import annotations
@@ -74,13 +81,50 @@ def convert_frame(index: int, src: dict[str, Any], hm_map: dict[str, Any]) -> di
     return result
 
 
+# --syntax: output field -> hm_cu_dump getter, kept on inter cells only (-1 elsewhere).
+SYNTAX_FIELDS = {
+    "merge_flag": "getMergeFlag",
+    "merge_idx": "getMergeIndex",
+    "inter_dir": "getInterDir",
+    "ref_idx_l0": "getRefIdx_L0",
+    "ref_idx_l1": "getRefIdx_L1",
+    "mvp_l0": "getMVPIdx_L0",
+    "mvp_l1": "getMVPIdx_L1",
+    "mvd_l0_x": "getMvd_L0_x",
+    "mvd_l0_y": "getMvd_L0_y",
+    "mvd_l1_x": "getMvd_L1_x",
+    "mvd_l1_y": "getMvd_L1_y",
+}
+
+
+def convert_syntax(index: int, src: dict[str, Any], hm_map: dict[str, Any]) -> dict[str, Any]:
+    grid = convert_frame(index, src, hm_map)  # validates the getters and the cell counts
+    cells = src["cells"]
+    missing = (set(SYNTAX_FIELDS.values()) | {"getTransformSkip_Y"}) - set(cells)
+    if missing:
+        raise canon.NormalizeError(f"frame {index}: --syntax needs the getters {sorted(missing)}")
+    inter = [1 if p in (2, 3) else 0 for p in grid["fields"]["pred"]]
+    fields: dict[str, list[int]] = {"inter": inter}
+    for out, key in SYNTAX_FIELDS.items():
+        fields[out] = [int(v) if i else -1 for v, i in zip(cells[key], inter)]
+    fields["cbf"] = grid["fields"]["cbf"]
+    fields["transform_skip_y"] = [int(v) for v in cells["getTransformSkip_Y"]]
+    grid["fields"] = fields
+    return grid
+
+
+def add_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--syntax", action="store_true", help="emit the prediction-unit syntax (WI-2.165)")
+
+
 def convert(args: argparse.Namespace) -> dict[str, Any]:
     doc = canon.read_json(args.input)
     if not isinstance(doc, dict) or not isinstance(doc.get("frames"), list):
         raise canon.NormalizeError('expected {"frames": [...]} from hm_cu_dump')
     hm_map = canon.load_map("hm_grid_map")
-    return {"frames": [convert_frame(i, f, hm_map) for i, f in enumerate(doc["frames"])]}
+    one = convert_syntax if getattr(args, "syntax", False) else convert_frame
+    return {"frames": [one(i, f, hm_map) for i, f in enumerate(doc["frames"])]}
 
 
 if __name__ == "__main__":
-    sys.exit(canon.run("block-grid", __doc__.splitlines()[0], convert))
+    sys.exit(canon.run("block-grid", __doc__.splitlines()[0], convert, add_args))
