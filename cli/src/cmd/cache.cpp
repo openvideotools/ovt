@@ -504,8 +504,8 @@ ExitCode load_records(const fs::path& p, const RecordIo& io, std::vector<Record>
   if (bytes->size() >= 8) {
     const std::string id(bytes->begin() + 4, bytes->begin() + 8);
     if (id == "OVTA" || id == "OVTI") {
-      out.push_back(
-          Record{id == "OVTA" ? RecordKind::FrameAnalysis : RecordKind::StreamIndex, std::move(*bytes), p.string()});
+      out.push_back(Record{id == "OVTA" ? RecordKind::FrameAnalysis : RecordKind::StreamIndex, std::move(*bytes),
+                           p.string(), std::nullopt});
       return ExitCode::Ok;
     }
   }
