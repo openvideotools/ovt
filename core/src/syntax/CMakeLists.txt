@@ -68,6 +68,10 @@ target_sources(ovt_core_objects PRIVATE h264/aud.cpp h264/data_partition.cpp)
 # WI-1.109c: H.264 SPS extension, subset SPS (MVC extension) and prefix NAL (chapter 7 §7.3.4 rows 21–23).
 target_sources(ovt_core_objects PRIVATE h264/sps_ext.cpp h264/subset_sps.cpp h264/prefix_nal.cpp)
 # WI-1.110: SEI framing shared by H.264 and H.265, and the H.264 SEI payload parsers (chapter 7 §7.3.4 rows 7–18).
-target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp)
+target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp h264/sei_picture.cpp
+                                        h264/sei_user_data.cpp)
+# WI-1.114: the H.265 SEI payload parsers over the shared framing (chapter 7 §7.3.5 rows 13–14).
+target_sources(ovt_core_objects PRIVATE h265/sei.cpp h265/sei_timing.cpp h265/sei_parameter_sets.cpp
+                                        h265/sei_picture.cpp h265/sei_user_data.cpp)
 # WI-1.111: H.264 parameter-set activation (chapter 7 §7.3.8).
 target_sources(ovt_core_objects PRIVATE h264/active_sets.cpp)

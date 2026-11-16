@@ -9,6 +9,7 @@
 
 #include <flatbuffers/flatbuffers.h>
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <unordered_map>
@@ -99,6 +100,14 @@ struct Grid {
   void resize(uint32_t w, uint32_t h);
 };
 
+/// PlaneStage.Coefficients (chapter 06 §6.6.1): per component, the TransCoeffLevel values HM keeps (levels, not
+/// dequantised) at their transform blocks' sample positions, zero elsewhere. Empty unless map_cu was asked for them.
+struct CoeffPlanes {
+  std::array<std::vector<int32_t>, 3> level;
+  std::array<uint32_t, 3> width{};
+  std::array<uint32_t, 3> height{};
+};
+
 struct Analysis {
   bool valid = false;
   Grid grid;
@@ -109,14 +118,15 @@ struct Analysis {
   std::vector<uint8_t> filter_params;  // nested HevcFilterParams
   std::vector<uint8_t> ref_state;      // nested HevcRps
   uint32_t mv_clamped_cells = 0;       // cells with an MV component clamped to ±32767 (chapter 06 §6.2.3)
+  CoeffPlanes coeff;
 };
 
 /// Decode indices of the pictures the plugin exported, for RefSlot.frame (cleared when HM destroys its pictures).
 using PicIndex = std::unordered_map<const TComPic*, int32_t>;
 
 /// Fills @p out from the CTUs of @p pic (reconstructed and loop-filtered) and its slices, before HM releases or
-/// reuses it. @p dpb_fullness is the number of pictures in HM's buffer after this one (HevcRps.dpb_fullness_after).
-void map_cu(TComPic& pic, const PicIndex& index, int dpb_fullness, Analysis* out);
+/// reuses it. @p dpb_fullness is HevcRps.dpb_fullness_after; @p coefficients asks for the Coefficients planes.
+void map_cu(TComPic& pic, const PicIndex& index, int dpb_fullness, bool coefficients, Analysis* out);
 
 /// The FlatBuffers parts of an Analysis.
 struct MappedAnalysis {

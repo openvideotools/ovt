@@ -45,6 +45,7 @@ ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / structural_diff
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
+ovt_add_fuzz_target(isobmff_box_decoders fuzz_isobmff_box_decoders.cpp) # WI-1.205: ISOBMFF hand box decoders
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
 ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
@@ -60,6 +61,7 @@ ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
+ovt_add_fuzz_target(json_export fuzz_json_export.cpp) # WI-0.088: the JSON exporter (untrusted stored records)
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
@@ -71,6 +73,8 @@ ovt_add_fuzz_target(syntax_av1_frame_header2 fuzz_syntax_av1_frame_header2.cpp)
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
 # WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry points.
 ovt_add_fuzz_target(h265_slice fuzz_h265_slice.cpp)
+# WI-1.114: the H.265 SEI framing and payload parsers.
+ovt_add_fuzz_target(h265_sei fuzz_h265_sei.cpp)
 # WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
 ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
