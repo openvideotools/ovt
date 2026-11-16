@@ -8,25 +8,46 @@
 //  - map_blocks(): the CTU/CU/PU/TU tree (AMP and NxN rectangles, transform tree) with its extension tables, the
 //    transform grid fields, MotionVectors, tile scan, slice segments and HevcFilterParams, and the chapter 06
 //    validator on every result.
+//  - The plugin on the `h265-cu-golden` conformance streams and the MV streams of AT2, compared cell by cell with the
+//    HM grid goldens tests/golden/h265/<id>.hm-grid.json.gz (hm_cu_dump, chapter 14 §14.4.4): pred, qp, intra modes,
+//    MVs (AT2 `h265_mv_vs_hm`), reference indices, transform sizes and cbf_luma; and with the hm-cutree goldens
+//    (tests/oracles/hm_cutree_dump.cpp): the CU tree of AMP_A (AT1 `h265_cu_tree_vs_hm`) and the SAO parameters per
+//    CTB of SAO_A (AT3).
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 
 #include <flatbuffers/flatbuffers.h>
 
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <map>
 #include <memory>
+#include <optional>
 #include <regex>
+#include <set>
 #include <span>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "map_blocks.hpp"
 #include "map_grid.hpp"
+#include "ovt/abi/analysis_decoder_v1.h"
+#include "ovt/cxx/analysis/decoder_plugin_registry.hpp"
 #include "ovt/cxx/model/validator.hpp"
 #include "ovt_model_generated.h"
+#include "test_support/corpus.h"
 
 namespace {
 
@@ -37,6 +58,7 @@ using ovt::de265::PbInfo;
 using ovt::de265::PictureFormat;
 using ovt::de265::SliceHeader;
 using Mode = ovt::de265::De265PredMode;
+using json = nlohmann::json;
 
 // ---- hand-made libde265 metadata -----------------------------------------------------------------------------------
 
@@ -162,6 +184,7 @@ struct Grid {
   std::unique_ptr<flatbuffers::FlatBufferBuilder> fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(4096);
   std::vector<ovt::de265::RefTable::Slot> slots;
   std::vector<uint32_t> qp_hist;
+  uint32_t mv_clamped_cells = 0;
   [[nodiscard]] const fb::CellGrid& grid() const {
     return *flatbuffers::GetRoot<fb::CellGrid>(fbb->GetBufferPointer());
   }
@@ -173,6 +196,7 @@ Grid map(const Pic& p) {
   ovt::de265::RefTable refs(p.d.slices);
   ovt::de265::fill_cells(g, p.d, p.fmt, refs);
   out.slots = refs.slots();
+  out.mv_clamped_cells = g.mv_clamped_cells;
   {
     flatbuffers::FlatBufferBuilder h;
     h.Finish(ovt::de265::build_qp_hist(h, g));
@@ -470,11 +494,28 @@ TEST_CASE("de265 map_grid: RefSlots shared between slice segments and the slot l
   CHECK(big.slot(4, 1, 14) == -1);
 }
 
-TEST_CASE("de265 map_grid: quarter-sample vectors saturate at the int16 range", "[fast]") {
+TEST_CASE("de265 map_grid: quarter-sample vectors clamp to ±32767", "[fast]") {
   CHECK(ovt::de265::mv16(3) == 12);
   CHECK(ovt::de265::mv16(-5) == -20);
   CHECK(ovt::de265::mv16(10000) == 32767);
-  CHECK(ovt::de265::mv16(-10000) == -32768);
+  CHECK(ovt::de265::mv16(-10000) == -32767);  // -32768 is the MVD sentinel (chapter 06 §6.2.3)
+  CHECK(ovt::de265::mv16_clamps(8192));
+  CHECK_FALSE(ovt::de265::mv16_clamps(8191));
+  CHECK(ovt::de265::mv16_clamps(-8192));
+  CHECK_FALSE(ovt::de265::mv16_clamps(-8191));
+
+  // A 32x32 PB with an L0 vector of 9000 quarter samples: 64 clamped cells (MDL-GEN-0003), stored as 32767.
+  Pic p(64, 32, 5, 3);
+  p.d.slices[0] = b_slice();
+  p.cu(0, 0, 5, Mode::Inter);
+  p.motion(0, 0, 32, 32, 0, 0, 9000, -9000, 0);
+  p.cu(32, 0, 5, Mode::Inter);
+  p.motion(32, 0, 32, 32, 0, 0, 8191, 4, 0);
+  const Grid m = map(p);
+  CHECK(m.mv_clamped_cells == 64);
+  CHECK(m.grid().mv0_x()->Get(0) == 32767);
+  CHECK(m.grid().mv0_y()->Get(0) == -32767);
+  CHECK(m.grid().mv0_x()->Get(static_cast<flatbuffers::uoffset_t>(p.cell(32, 0))) == 32764);
 }
 
 TEST_CASE("de265 map_blocks: block tree of a hand-made picture", "[fast]") {
@@ -694,4 +735,399 @@ TEST_CASE("de265 map_blocks: undecoded CTBs and unusable metadata", "[fast]") {
   const Analysis c = analyse(none);
   CHECK(c.warnings.empty());
   CHECK(c.fa().grid()->block_id() == nullptr);
+}
+
+// ---- the plugin on conformance streams vs the HM goldens ------------------------------------------------------------
+
+namespace {
+
+const ovt_AnalysisDecoderApi& plugin_api() {
+  static ovt::analysis::PluginRegistry registry(
+      ovt::analysis::PluginRegistry::Options{std::string(OVT_DE265_PLUGIN_DIR), std::vector<std::string>{}});
+  const ovt::analysis::LoadedPlugin* plugin = registry.find("de265");
+  REQUIRE(plugin != nullptr);
+  return *plugin->api;
+}
+
+std::vector<std::vector<uint8_t>> split_annexb(const std::vector<uint8_t>& s) {
+  std::vector<std::vector<uint8_t>> nals;
+  std::size_t start = SIZE_MAX;
+  const auto close = [&](std::size_t end) {
+    while (end > start && s[end - 1] == 0) {
+      --end;
+    }
+    if (end > start) {
+      nals.emplace_back(s.begin() + static_cast<std::ptrdiff_t>(start), s.begin() + static_cast<std::ptrdiff_t>(end));
+    }
+  };
+  for (std::size_t i = 0; i + 3 <= s.size();) {
+    if (s[i] == 0 && s[i + 1] == 0 && s[i + 2] == 1) {
+      if (start != SIZE_MAX) {
+        close(i);
+      }
+      i += 3;
+      start = i;
+    } else {
+      ++i;
+    }
+  }
+  if (start != SIZE_MAX) {
+    close(s.size());
+  }
+  return nals;
+}
+
+// Every FrameAnalysis of the first @p max_frames pictures (decode order) of @p stream, keyed by decode index, each
+// checked by the validator.
+std::map<int32_t, std::vector<uint8_t>> analyse_stream(const std::filesystem::path& stream, int32_t max_frames) {
+  const ovt_AnalysisDecoderApi& api = plugin_api();
+  ovt_AnalysisDecoder* dec = nullptr;
+  REQUIRE(api.create(nullptr, 0, 0, &dec) == OVT_OK);
+  std::ifstream in(stream, std::ios::binary);
+  const std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+  std::map<int32_t, std::vector<uint8_t>> out;
+  const auto pull = [&] {
+    ovt_Buffer buf{nullptr, 0};
+    while (api.pull(dec, 0, &buf) == OVT_OK && buf.data != nullptr) {
+      const std::span<const uint8_t> fa(buf.data, buf.size);
+      const fb::FrameAnalysis& f = *fb::GetFrameAnalysis(buf.data);
+      const int32_t index = f.frame()->id()->decode_index();
+      if (index < max_frames && f.grid() != nullptr) {
+        check_valid(fa);
+        out.emplace(index, std::vector<uint8_t>(fa.begin(), fa.end()));
+      }
+      api.release(dec, buf);
+    }
+  };
+  int32_t decode_index = -1;
+  for (const std::vector<uint8_t>& nal : split_annexb(bytes)) {
+    const int type = (nal[0] >> 1) & 0x3F;
+    const bool first_slice = type <= 31 && nal.size() > 2 && (nal[2] & 0x80) != 0;
+    decode_index += first_slice ? 1 : 0;
+    (void)api.push(dec, nal.data(), nal.size(), type <= 31 ? decode_index : -1, decode_index);
+    pull();
+  }
+  (void)api.flush(dec);
+  pull();
+  api.destroy(dec);
+  return out;
+}
+
+std::string read_pipe(const std::string& cmd) {
+  FILE* p = popen(cmd.c_str(), "r");  // NOLINT(cert-env33-c): gzip
+  REQUIRE(p != nullptr);
+  std::string text;
+  std::array<char, 65536> buf{};
+  std::size_t n = 0;
+  while ((n = std::fread(buf.data(), 1, buf.size(), p)) > 0) {
+    text.append(buf.data(), n);
+  }
+  REQUIRE(pclose(p) == 0);
+  return text;
+}
+
+std::optional<json> hm_golden(std::string_view id) {
+  const std::filesystem::path file =
+      std::filesystem::path(OVT_HEVC_GOLDEN_DIR) / (std::string(id) + ".hm-grid.json.gz");
+  if (!std::filesystem::exists(file)) {
+    return std::nullopt;
+  }
+  return std::optional<json>(std::in_place, json::parse(read_pipe("gzip -dc \"" + file.string() + "\"")));
+}
+
+// refIdx of a refs[] entry: "L0[i]", "L1[i]" or "S<s>:L0[i]".
+int ref_idx_of(const fb::FrameAnalysis& fa, int8_t slot) {
+  if (slot < 0) {
+    return -1;
+  }
+  const std::string name = fa.refs()->Get(static_cast<flatbuffers::uoffset_t>(slot))->name()->str();
+  const auto open = name.rfind('[');
+  return std::stoi(name.substr(open + 1));
+}
+
+/// HM's DM_CHROMA_IDX: getIntraDir(CHANNEL_TYPE_CHROMA) for a CU whose chroma mode follows luma.
+constexpr int kHmDmChroma = 36;
+
+/// A golden vector (1/16 luma samples, unclamped) as CellGrid stores it (chapter 06 §6.2.3).
+int clamp_mv(int hm) {
+  return std::clamp(hm, -ovt::de265::kMvNeutralMax, ovt::de265::kMvNeutralMax);
+}
+
+/// Grid cells of a golden frame with a vector component outside ±32767: the MDL-GEN-0003 count.
+std::size_t clamped_cells(const json& fields) {
+  std::size_t n = 0;
+  const std::size_t cells = fields.at("mv0_x").size();
+  for (std::size_t i = 0; i < cells; ++i) {
+    for (const char* key : {"mv0_x", "mv0_y", "mv1_x", "mv1_y"}) {
+      const int v = fields.at(key)[i].get<int>();
+      if (v != clamp_mv(v)) {
+        ++n;
+        break;
+      }
+    }
+  }
+  return n;
+}
+
+/// The MDL-GEN-0003 Diagnostics of a frame (at most one, chapter 06 §6.2.3).
+std::vector<std::string> clamp_diagnostics(const fb::FrameAnalysis& fa) {
+  std::vector<std::string> out;
+  if (fa.diagnostics() != nullptr) {
+    for (const fb::Diagnostic* d : *fa.diagnostics()) {
+      if (d->code() != nullptr && d->code()->str() == "MDL-GEN-0003") {
+        out.push_back(d->message() != nullptr ? d->message()->str() : std::string());
+      }
+    }
+  }
+  return out;
+}
+
+struct Mismatch {
+  std::size_t count = 0;
+  std::string first;
+  void add(std::string_view field, uint32_t frame, std::size_t cell, int64_t ovt, int64_t hm) {
+    if (count++ == 0) {
+      first = std::string(field) + " frame " + std::to_string(frame) + " cell " + std::to_string(cell) + ": OVT " +
+              std::to_string(ovt) + " HM " + std::to_string(hm);
+    }
+  }
+};
+
+// Compares one FrameAnalysis with one golden frame; returns per-field mismatch counts.
+std::map<std::string, Mismatch> compare_frame(const fb::FrameAnalysis& fa, const json& frame, uint32_t index) {
+  std::map<std::string, Mismatch> m;
+  const fb::CellGrid& g = *fa.grid();
+  const json& f = frame.at("fields");
+  REQUIRE(frame.at("w4").get<uint32_t>() == g.cells_w());
+  REQUIRE(frame.at("h4").get<uint32_t>() == g.cells_h());
+  const std::size_t n = std::size_t{g.cells_w()} * g.cells_h();
+  for (std::size_t i = 0; i < n; ++i) {
+    const auto u = static_cast<flatbuffers::uoffset_t>(i);
+    const int pred = g.pred()->Get(u);
+    const int hm_pred = f.at("pred")[i].get<int>();
+    const auto cmp = [&](std::string_view field, int64_t ovt, int64_t hm) {
+      if (ovt != hm) {
+        m[std::string(field)].add(field, index, i, ovt, hm);
+      }
+    };
+    cmp("pred", pred, hm_pred);
+    cmp("qp", g.qp()->Get(u), f.at("qp")[i].get<int>());
+    if (hm_pred == 1) {  // OVT gives PCM cells mode 64; HM's golden has -1 for every non-intra kind
+      cmp("intra_mode_y", g.intra_mode_y()->Get(u), f.at("intra_mode_y")[i].get<int>());
+      // The golden holds HM's raw chroma direction: DM_CHROMA_IDX (36) for intra_chroma_pred_mode 4, which derives
+      // IntraPredModeC from the luma mode at the CU origin (H.265 8.4.3, 4:2:0). CellGrid holds the derived mode.
+      int hm_c = f.at("intra_mode_c")[i].get<int>();
+      if (hm_c == kHmDmChroma) {
+        const fb::Rect& r = *fa.blocks()->Get(g.block_id()->Get(u))->rect();
+        const std::size_t origin = std::size_t(r.y() / 4) * g.cells_w() + std::size_t(r.x() / 4);
+        hm_c = f.at("intra_mode_y")[origin].get<int>();
+      }
+      cmp("intra_mode_c", g.intra_mode_c()->Get(u), hm_c);
+    }
+    // The golden holds HM's vectors unclamped (×4); CellGrid clamps them to ±32767 (chapter 06 §6.2.3).
+    cmp("mv0_x", g.mv0_x()->Get(u), clamp_mv(f.at("mv0_x")[i].get<int>()));
+    cmp("mv0_y", g.mv0_y()->Get(u), clamp_mv(f.at("mv0_y")[i].get<int>()));
+    cmp("mv1_x", g.mv1_x()->Get(u), clamp_mv(f.at("mv1_x")[i].get<int>()));
+    cmp("mv1_y", g.mv1_y()->Get(u), clamp_mv(f.at("mv1_y")[i].get<int>()));
+    cmp("ref0", ref_idx_of(fa, g.ref0()->Get(u)), f.at("ref0")[i].get<int>());
+    cmp("ref1", ref_idx_of(fa, g.ref1()->Get(u)), f.at("ref1")[i].get<int>());
+    // Transform fields exist only where a transform tree was read: not for skipped or PCM CUs, nor for a 64x64 CU
+    // with rqt_root_cbf = 0, where HM reports the CU size.
+    const int tx = g.tx_log2_w()->Get(u);
+    const int hm_tx = f.at("tx_log2_w")[i].get<int>();
+    if (tx != 255) {
+      cmp("tx_log2", tx, hm_tx);
+      cmp("cbf_luma", g.cbf()->Get(u) & 1, f.at("cbf")[i].get<int>() & 1);
+    } else if (pred != 3 && pred != 5) {
+      cmp("tx_log2 (no transform tree)", 6, hm_tx);
+    }
+  }
+  return m;
+}
+
+// The `h265-cu-golden` streams (chapter 14 §14.2.4) that have an HM grid golden, and the MV stream of AT2. AMP_A,
+// DBLK_A, TILES_B and TSKIP_A have none (tests/golden/h26x-index.json); AT1 uses AMP_A's hm-cutree golden instead.
+constexpr std::array<std::string_view, 7> kGoldenStreams = {
+    "jctvc_CAINIT_A_SHARP_4",      "jctvc_MERGE_B_TI_3", "jctvc_PMERGE_A_TI_3",       "jctvc_SAO_A_MediaTek_4",
+    "jctvc_WPP_A_ericsson_MAIN_2", "jctvc_ipcm_A_NEC_3", "jctvc_MVEDGE_A_qualcomm_3",
+};
+
+void check_against_hm(std::string_view id) {
+  const std::optional<json> golden = hm_golden(id);
+  REQUIRE(golden.has_value());
+  const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
+  const json& frames = golden->at("frames");
+  const auto analyses = analyse_stream(stream, static_cast<int32_t>(frames.size()));
+  REQUIRE(analyses.size() == frames.size());
+  for (const json& frame : frames) {
+    const auto index = frame.at("frame").get<uint32_t>();
+    const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(analyses.at(static_cast<int32_t>(index)).data());
+    if (frame.contains("poc")) {
+      CHECK(fa.frame()->poc() == frame.at("poc").get<int64_t>());
+    }
+    for (const auto& [field, mismatch] : compare_frame(fa, frame, index)) {
+      INFO(id << " " << mismatch.count << " cells differ; first: " << mismatch.first);
+      CHECK(mismatch.count == 0);
+    }
+    // MDL-GEN-0003 once per frame with a clamp, naming the clamped cells.
+    const std::size_t clamped = clamped_cells(frame.at("fields"));
+    const std::vector<std::string> diags = clamp_diagnostics(fa);
+    INFO(id << " frame " << index << ": " << clamped << " clamped cells");
+    if (clamped == 0) {
+      CHECK(diags.empty());
+    } else {
+      REQUIRE(diags.size() == 1);
+      CHECK(diags.front().find("(" + std::to_string(clamped) + " cells)") != std::string::npos);
+    }
+  }
+}
+
+// The hm-cutree/1 golden of @p id (one record per CU and the resolved SAO parameters per CTB, after HM's loop
+// filters; tests/oracles/hm_cutree_dump.cpp).
+json hm_cutree(std::string_view id) {
+  const std::filesystem::path file =
+      std::filesystem::path(OVT_HEVC_GOLDEN_DIR) / (std::string(id) + ".hm-cutree.json.gz");
+  REQUIRE(std::filesystem::exists(file));
+  json doc = json::parse(read_pipe("gzip -dc \"" + file.string() + "\""));
+  REQUIRE(doc.at("format") == "hm-cutree/1");
+  REQUIRE(doc.at("stream") == id);
+  return doc;
+}
+
+// The CU blocks of @p fa by luma position.
+std::map<std::pair<int32_t, int32_t>, const fb::Block*> cus_by_position(const fb::FrameAnalysis& fa) {
+  std::map<std::pair<int32_t, int32_t>, const fb::Block*> out;
+  for (const fb::Block* ctu : children(fa, fa.blocks()->Get(0))) {
+    for (const fb::Block* cu : children(fa, ctu)) {
+      REQUIRE(cu->kind() == fb::BlockKind::CU);
+      out.emplace(std::pair{cu->rect()->x(), cu->rect()->y()}, cu);
+    }
+  }
+  return out;
+}
+
+// AT1: the OVT CU partition of every frame equals HM's CU by CU: position, size, ctDepth, part_mode, prediction
+// mode, skip, PCM and transquant bypass.
+void check_cu_tree(std::string_view id) {
+  const json golden = hm_cutree(id);
+  const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
+  const json& frames = golden.at("frames");
+  const auto analyses = analyse_stream(stream, static_cast<int32_t>(frames.size()));
+  REQUIRE(analyses.size() == frames.size());
+  std::set<int> part_modes;
+  for (const json& frame : frames) {
+    const auto index = frame.at("frame").get<int32_t>();
+    const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(analyses.at(index).data());
+    INFO(id << " frame " << index);
+    CHECK(fa.frame()->poc() == frame.at("poc").get<int64_t>());
+    const auto cus = cus_by_position(fa);
+    std::size_t hm_cus = 0;
+    for (const json& ctu : frame.at("ctus")) {
+      for (const json& h : ctu.at("cus")) {
+        ++hm_cus;
+        const int32_t x = h.at("x").get<int32_t>();
+        const int32_t y = h.at("y").get<int32_t>();
+        INFO("CU at " << x << "," << y);
+        const auto it = cus.find({x, y});
+        REQUIRE(it != cus.end());
+        const fb::Block* cu = it->second;
+        const auto* e = ext<fb::HevcCu>(cu);
+        CHECK(cu->rect()->w() == 1 << h.at("log2_size").get<int>());
+        CHECK(e->log2CbSize() == h.at("log2_size").get<int>());
+        CHECK(e->CtDepth() == h.at("depth").get<int>());
+        CHECK(cu->partition_type() == h.at("part_mode").get<int>());
+        const bool intra = cu->pred() == fb::PredKind::Intra || cu->pred() == fb::PredKind::PCM;
+        CHECK(intra == (h.at("pred_mode").get<int>() == 1));
+        CHECK((cu->pred() == fb::PredKind::Skip) == (h.at("skip").get<int>() == 1));
+        CHECK((cu->pred() == fb::PredKind::PCM) == (h.at("pcm").get<int>() == 1));
+        CHECK(e->cu_transquant_bypass_flag() == h.at("bypass").get<int>());
+        part_modes.insert(h.at("part_mode").get<int>());
+      }
+    }
+    CHECK(cus.size() == hm_cus);
+  }
+  INFO("part modes seen: " << part_modes.size());
+  CHECK(part_modes.size() > 1);
+}
+
+// The SAO parameters of one CTB against HM's three components.
+void check_ctb_sao(const fb::HevcCtu& e, const json& sao) {
+  for (flatbuffers::uoffset_t c = 0; c < 3; ++c) {
+    const json& h = sao.at(c);
+    const int type = h.at("type_idx").get<int>();
+    const int ovt_type = e.SaoTypeIdx() != nullptr ? static_cast<int>(e.SaoTypeIdx()->Get(c)) : 0;
+    CHECK(ovt_type == type);
+    if (type == 0 || e.SaoTypeIdx() == nullptr) {
+      continue;
+    }
+    if (type == 2) {
+      CHECK(e.sao_eo_class()->Get(c) == h.at("eo_class").get<int>());
+    } else {
+      CHECK(e.sao_band_position()->Get(c) == h.at("band_position").get<int>());
+    }
+    for (flatbuffers::uoffset_t k = 0; k < 4; ++k) {
+      CHECK(e.SaoOffsetVal()->Get(c * 4 + k) == h.at("offsets").at(k).get<int>());
+    }
+  }
+}
+
+// AT3: per CTB, filter_idx equals HM's SaoTypeIdx of luma, and HevcCtu carries HM's resolved SAO parameters of the
+// three components (type; edge class or band position; SaoOffsetVal).
+void check_sao(std::string_view id) {
+  const json golden = hm_cutree(id);
+  const std::filesystem::path stream = ovt::test::corpus_or_skip(id);
+  const json& frames = golden.at("frames");
+  const auto analyses = analyse_stream(stream, static_cast<int32_t>(frames.size()));
+  REQUIRE(analyses.size() == frames.size());
+  std::array<std::size_t, 3> seen{};
+  for (const json& frame : frames) {
+    const auto index = frame.at("frame").get<int32_t>();
+    const fb::FrameAnalysis& fa = *fb::GetFrameAnalysis(analyses.at(index).data());
+    const fb::CellGrid& g = *fa.grid();
+    std::map<uint32_t, const fb::Block*> ctus;
+    for (const fb::Block* ctu : children(fa, fa.blocks()->Get(0))) {
+      ctus.emplace(ext<fb::HevcCtu>(ctu)->CtbAddrInRs(), ctu);
+    }
+    REQUIRE(ctus.size() == frame.at("ctus").size());
+    for (const json& hc : frame.at("ctus")) {
+      const auto rs = hc.at("rs").get<uint32_t>();
+      INFO(id << " frame " << index << " CTB " << rs);
+      REQUIRE(ctus.count(rs) == 1);
+      const fb::Block* ctu = ctus.at(rs);
+      const json& sao = hc.at("sao");
+      check_ctb_sao(*ext<fb::HevcCtu>(ctu), sao);
+      const int luma_type = sao.at(0).at("type_idx").get<int>();
+      ++seen.at(static_cast<std::size_t>(luma_type));
+      const fb::Rect& r = *ctu->rect();
+      for (int32_t y = r.y(); y < r.y() + r.h(); y += 4) {
+        for (int32_t x = r.x(); x < r.x() + r.w(); x += 4) {
+          const auto i = static_cast<flatbuffers::uoffset_t>((y / 4) * static_cast<int32_t>(g.cells_w()) + x / 4);
+          REQUIRE(g.filter_idx()->Get(i) == luma_type);
+        }
+      }
+    }
+  }
+  CHECK(seen[1] > 0);  // band offset
+  CHECK(seen[2] > 0);  // edge offset
+}
+
+}  // namespace
+
+TEST_CASE("de265 plugin: h265_mv_vs_hm and the grid vectors on the h265-cu-golden streams",
+          "[fast][third_party][needs-corpus][golden]") {
+  const std::string_view id = GENERATE(from_range(kGoldenStreams));
+  INFO(id);
+  check_against_hm(id);
+}
+
+TEST_CASE("de265 plugin: h265_mv_vs_hm on MVCLIP_A_qualcomm_3", "[nightly][third_party][needs-corpus][golden]") {
+  check_against_hm("jctvc_MVCLIP_A_qualcomm_3");
+}
+
+TEST_CASE("de265 plugin: h265_cu_tree_vs_hm on AMP_A_Samsung_7", "[fast][third_party][needs-corpus][golden]") {
+  check_cu_tree("jctvc_AMP_A_Samsung_7");
+}
+
+TEST_CASE("de265 plugin: SAO per CTB vs HM on SAO_A_MediaTek_4", "[fast][third_party][needs-corpus][golden]") {
+  check_sao("jctvc_SAO_A_MediaTek_4");
 }

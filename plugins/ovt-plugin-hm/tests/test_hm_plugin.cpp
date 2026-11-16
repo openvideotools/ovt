@@ -52,6 +52,7 @@
 namespace {
 
 constexpr uint32_t kReconMask = 1U << 0;  // ovt.fb.PlaneStage.Reconstruction
+constexpr uint32_t kCoeffMask = 1U << 6;  // ovt.fb.PlaneStage.Coefficients
 
 const ovt_AnalysisDecoderApi& plugin_api() {
   static ovt::analysis::PluginRegistry registry(
@@ -413,6 +414,11 @@ struct StreamResult {
   int push_errors = 0;
   std::vector<std::string> violations;  // chapter 06 §6.9 validator findings (first few)
   bool keep_grids = false;
+  bool coefficients = false;              // pull Coefficients planes too and check them (check_coefficients)
+  int coeff_pictures = 0;                 // pictures whose Coefficients planes were checked
+  std::size_t coeff_nodes = 0;            // transform-tree nodes with num_nonzero / coeff_abs_sum
+  std::size_t coeff_nonzero_nodes = 0;    // ... of which with a non-zero level
+  std::vector<std::string> coeff_errors;  // first few mismatches
   // 4:2:2 HevcTu.cbf_cb / cbf_cr (ovt_model.fbs: two entries per chroma-coding node, one per vertical half).
   int tu422_two_entry_nodes = 0;   // nodes that carry two entries per component
   int tu422_halves_differ = 0;     // ... of which the two halves of a component differ (so they are not the OR twice)
@@ -498,6 +504,184 @@ void check_tu_cbf_422(const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
   }
 }
 
+// ---- Coefficients planes ------------------------------------------------------------------------------------------
+
+// One Coefficients plane: S32LE levels, width x height.
+struct CoeffView {
+  const uint8_t* data = nullptr;
+  uint32_t w = 0;
+  uint32_t h = 0;
+  [[nodiscard]] int32_t at(uint32_t x, uint32_t y) const {
+    const uint8_t* q = data + ((static_cast<std::size_t>(y) * w + x) * 4);
+    return static_cast<int32_t>(static_cast<uint32_t>(q[0]) | (static_cast<uint32_t>(q[1]) << 8) |
+                                (static_cast<uint32_t>(q[2]) << 16) | (static_cast<uint32_t>(q[3]) << 24));
+  }
+};
+
+// Non-zero count and absolute sum of a plane rectangle.
+std::pair<uint64_t, uint64_t> region_stats(const CoeffView& v, uint32_t x0, uint32_t y0, uint32_t w, uint32_t h) {
+  uint64_t nonzero = 0;
+  uint64_t sum = 0;
+  for (uint32_t y = y0; y < std::min(y0 + h, v.h); ++y) {
+    for (uint32_t x = x0; x < std::min(x0 + w, v.w); ++x) {
+      const int64_t level = v.at(x, y);
+      nonzero += level != 0 ? 1U : 0U;
+      sum += static_cast<uint64_t>(level < 0 ? -level : level);
+    }
+  }
+  return {nonzero, sum};
+}
+
+// The Coefficients planes of a picture, checked against the PlaneRef contract (chapter 06 §6.6.1).
+std::array<CoeffView, 3> coeff_views(Instance& in, const ovt::fb::FrameAnalysis& fa, int sx, int sy, StreamResult* r) {
+  std::array<CoeffView, 3> views;
+  const auto coded_w = static_cast<uint32_t>(fa.frame()->coded_size()->w());
+  const auto coded_h = static_cast<uint32_t>(fa.frame()->coded_size()->h());
+  for (const ovt::fb::PlaneRef* p : *fa.planes()) {
+    if (p->stage() != ovt::fb::PlaneStage::Coefficients) {
+      continue;
+    }
+    CHECK(p->is_signed());
+    CHECK(p->sample_bytes() == 4);
+    CHECK(p->bit_depth() == 16);
+    CHECK(p->blob_id()->str() == std::to_string(fa.frame()->id()->decode_index()) + "/coeff/" + "yuv"[p->plane()]);
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+    REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
+    REQUIRE(size == static_cast<size_t>(p->width()) * p->height() * 4);
+    const int shift_x = p->plane() == 0 ? 0 : sx;
+    const int shift_y = p->plane() == 0 ? 0 : sy;
+    CHECK(p->width() == coded_w >> shift_x);
+    CHECK(p->height() == coded_h >> shift_y);
+    views.at(p->plane()) = {data, p->width(), p->height()};
+  }
+  const std::size_t want = fa.frame()->chroma_format() == 0 ? 1 : 3;
+  for (std::size_t c = 0; c < 3; ++c) {
+    if ((views.at(c).data != nullptr) != (c < want) && r->coeff_errors.size() < 8) {
+      r->coeff_errors.push_back("decode index " + std::to_string(fa.frame()->id()->decode_index()) +
+                                ": Coefficients plane " + std::to_string(c) + " missing or unexpected");
+    }
+  }
+  return views;
+}
+
+// The cbf of component c for the blocks a HevcTu node codes: cbf_luma, or the OR of the node's cbf_cb / cbf_cr entries.
+int node_cbf(const ovt::fb::HevcTu& tu, std::size_t c, bool coded) {
+  if (!coded) {
+    return 0;
+  }
+  if (c == 0) {
+    return tu.cbf_luma();
+  }
+  const auto* f = c == 1 ? tu.cbf_cb() : tu.cbf_cr();
+  return f != nullptr && std::any_of(f->begin(), f->end(), [](uint8_t e) { return e != 0; }) ? 1 : 0;
+}
+
+// Where a TU node's coefficients are: its luma rectangle and the chroma subsampling shifts.
+struct TuRegion {
+  uint32_t x = 0;
+  uint32_t y = 0;
+  uint32_t s = 0;
+  int sx = 0;
+  int sy = 0;
+};
+
+// One component of a HevcTu node: its num_nonzero / coeff_abs_sum entries against the plane, and its cbf against
+// the count. Returns an error or "".
+std::string check_tu_component(const ovt::fb::HevcTu& tu, std::size_t c, bool coded, const CoeffView& v,
+                               const TuRegion& at) {
+  const auto i = static_cast<uint32_t>(c);
+  const uint64_t nonzero = tu.num_nonzero()->Get(i);
+  const uint64_t sum = tu.coeff_abs_sum()->Get(i);
+  std::pair<uint64_t, uint64_t> got{0, 0};
+  if (coded && v.data != nullptr) {
+    const int shift_x = c == 0 ? 0 : at.sx;
+    const int shift_y = c == 0 ? 0 : at.sy;
+    got = region_stats(v, at.x >> shift_x, at.y >> shift_y, at.s >> shift_x, at.s >> shift_y);
+  }
+  const std::string comp = "component " + std::to_string(c);
+  if (got.first != nonzero || got.second != sum) {
+    return comp + " num_nonzero " + std::to_string(nonzero) + " coeff_abs_sum " + std::to_string(sum) + ", plane has " +
+           std::to_string(got.first) + " / " + std::to_string(got.second);
+  }
+  const int cbf = node_cbf(tu, c, coded);
+  if ((cbf != 0) != (nonzero > 0)) {
+    return comp + " cbf " + std::to_string(cbf) + " but " + std::to_string(nonzero) + " non-zero levels";
+  }
+  return "";
+}
+
+// One HevcTu node against the planes: its num_nonzero / coeff_abs_sum equal the plane's over the transform blocks
+// the node codes (luma at a leaf; chroma at a leaf with chroma TBs of its own or at the 8x8 node of four 4x4 luma
+// TUs), and a component has a non-zero level exactly when its cbf is set.
+void check_tu_coefficients(const ovt::fb::Block& b, const ovt::fb::HevcTu& tu, const std::array<CoeffView, 3>& v,
+                           int chroma_format, const TuRegion& shifts, std::array<uint64_t, 3>* node_totals,
+                           std::vector<std::string>* errors) {
+  const int l2 = tu.log2TrafoSize();
+  const bool split = tu.split_transform_flag() == 1;
+  const bool luma = !split;
+  const bool chroma = chroma_format != 0 && (chroma_format == 3 ? !split : ((!split && l2 > 2) || (split && l2 == 3)));
+  const auto* nz = tu.num_nonzero();
+  const auto* sums = tu.coeff_abs_sum();
+  const std::string where = "TU at " + std::to_string(b.rect()->x()) + "," + std::to_string(b.rect()->y()) + " log2 " +
+                            std::to_string(l2) + ": ";
+  const bool present = nz != nullptr && nz->size() == 3 && sums != nullptr && sums->size() == 3;
+  if ((nz != nullptr) != (luma || chroma) || (nz != nullptr && !present)) {
+    errors->push_back(where + "num_nonzero / coeff_abs_sum present where the node codes no block, or not 3 entries");
+    return;
+  }
+  if (!present) {
+    return;
+  }
+  TuRegion at = shifts;
+  at.x = static_cast<uint32_t>(b.rect()->x());
+  at.y = static_cast<uint32_t>(b.rect()->y());
+  at.s = static_cast<uint32_t>(b.rect()->w());
+  for (std::size_t c = 0; c < 3; ++c) {
+    node_totals->at(c) += nz->Get(static_cast<uint32_t>(c));
+    if (const std::string e = check_tu_component(tu, c, c == 0 ? luma : chroma, v.at(c), at); !e.empty()) {
+      errors->push_back(where + e);
+    }
+  }
+}
+
+// The Coefficients planes of a picture and the num_nonzero / coeff_abs_sum of its HevcTu nodes: every non-zero
+// level of a plane lies in a block some node codes, and the nodes' counts match the planes.
+void check_coefficients(Instance& in, const ovt::fb::FrameAnalysis& fa, StreamResult* r) {
+  const int chroma_format = fa.frame()->chroma_format();
+  const int sx = chroma_format == 1 || chroma_format == 2 ? 1 : 0;
+  const int sy = chroma_format == 1 ? 1 : 0;
+  const std::array<CoeffView, 3> views = coeff_views(in, fa, sx, sy, r);
+  std::array<uint64_t, 3> node_totals{};
+  std::vector<std::string> errors;
+  for (const ovt::fb::Block* b : *fa.blocks()) {
+    if (const auto* tu = ovt::model::ext_as<ovt::fb::HevcTu>(*b)) {
+      check_tu_coefficients(*b, *tu, views, chroma_format, TuRegion{0, 0, 0, sx, sy}, &node_totals, &errors);
+      if (tu->num_nonzero() != nullptr) {
+        ++r->coeff_nodes;
+        const auto* nz = tu->num_nonzero();
+        r->coeff_nonzero_nodes += std::any_of(nz->begin(), nz->end(), [](uint16_t n) { return n > 0; }) ? 1U : 0U;
+      }
+    }
+  }
+  for (std::size_t c = 0; c < 3; ++c) {
+    if (views.at(c).data == nullptr) {
+      continue;
+    }
+    const uint64_t plane_total = region_stats(views.at(c), 0, 0, views.at(c).w, views.at(c).h).first;
+    if (plane_total != node_totals.at(c)) {
+      errors.push_back("component " + std::to_string(c) + ": " + std::to_string(plane_total) +
+                       " non-zero levels in the plane, " + std::to_string(node_totals.at(c)) + " in the TUs");
+    }
+  }
+  for (const std::string& e : errors) {
+    if (r->coeff_errors.size() < 8) {
+      r->coeff_errors.push_back("decode index " + std::to_string(fa.frame()->id()->decode_index()) + " " + e);
+    }
+  }
+  ++r->coeff_pictures;
+}
+
 // Validator findings on what the host completes (A6): the timebase, PartitionInfo.unit_index and the source-hash
 // prefix of blob ids.
 bool host_fills(const ovt::model::Violation& v) {
@@ -507,11 +691,40 @@ bool host_fills(const ovt::model::Violation& v) {
          (v.rule == "V-023" && v.path.ends_with(".blob_id") && v.message.find("source-hash") != std::string::npos);
 }
 
+// The Reconstruction planes of a pulled picture: PlaneRef contract and the three SEI hash types of each plane. The
+// Coefficients planes, when asked for, are left to check_coefficients; any other stage fails.
+void reconstruction_planes(Instance& in, const ovt::fb::FrameAnalysis& fa, bool coefficients, PictureOut* out) {
+  const auto* coded = fa.frame()->coded_size();
+  for (const ovt::fb::PlaneRef* p : *fa.planes()) {
+    if (coefficients && p->stage() == ovt::fb::PlaneStage::Coefficients) {
+      continue;
+    }
+    CHECK(p->stage() == ovt::fb::PlaneStage::Reconstruction);
+    // V-023: one byte per sample exactly for unsigned 8-bit planes.
+    CHECK((p->sample_bytes() == 1) == (p->bit_depth() == 8 && !p->is_signed()));
+    const uint8_t* data = nullptr;
+    size_t size = 0;
+    REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
+    REQUIRE(size == static_cast<size_t>(p->stride_bytes()) * p->height());
+    REQUIRE(p->stride_bytes() == p->width() * p->sample_bytes());
+    if (p->plane() == 0) {
+      CHECK(static_cast<int>(p->width()) == coded->w());
+      CHECK(static_cast<int>(p->height()) == coded->h());
+    }
+    out->plane_bit_depths.push_back(p->bit_depth());
+    out->plane_sample_bytes.push_back(p->sample_bytes());
+    for (int type = 0; type < 3; ++type) {
+      out->hashes[static_cast<size_t>(type)].planes.push_back(
+          plane_hash(type, data, p->width(), p->height(), p->sample_bytes()));
+    }
+  }
+}
+
 // Pulls every ready frame; hashes its Reconstruction planes the way the stream's SEI for that picture does.
 void drain(Instance& in, StreamResult* r) {
   for (;;) {
     ovt_Buffer fb{};
-    REQUIRE(in.api.pull(in.dec, kReconMask, &fb) == OVT_OK);
+    REQUIRE(in.api.pull(in.dec, kReconMask | (r->coefficients ? kCoeffMask : 0U), &fb) == OVT_OK);
     if (fb.data == nullptr) {
       return;
     }
@@ -541,30 +754,14 @@ void drain(Instance& in, StreamResult* r) {
     REQUIRE(fa->grid() != nullptr);
     CHECK(static_cast<int>(fa->grid()->cells_w()) == (coded->w() + 3) / 4);
     CHECK(static_cast<int>(fa->grid()->cells_h()) == (coded->h() + 3) / 4);
-    for (const ovt::fb::PlaneRef* p : *fa->planes()) {
-      CHECK(p->stage() == ovt::fb::PlaneStage::Reconstruction);
-      // V-023: one byte per sample exactly for unsigned 8-bit planes.
-      CHECK((p->sample_bytes() == 1) == (p->bit_depth() == 8 && !p->is_signed()));
-      const uint8_t* data = nullptr;
-      size_t size = 0;
-      REQUIRE(in.api.plane(in.dec, p->blob_id()->c_str(), &data, &size) == OVT_OK);
-      REQUIRE(size == static_cast<size_t>(p->stride_bytes()) * p->height());
-      REQUIRE(p->stride_bytes() == p->width() * p->sample_bytes());
-      if (p->plane() == 0) {
-        CHECK(static_cast<int>(p->width()) == coded->w());
-        CHECK(static_cast<int>(p->height()) == coded->h());
-      }
-      out.plane_bit_depths.push_back(p->bit_depth());
-      out.plane_sample_bytes.push_back(p->sample_bytes());
-      for (int type = 0; type < 3; ++type) {
-        out.hashes[static_cast<size_t>(type)].planes.push_back(
-            plane_hash(type, data, p->width(), p->height(), p->sample_bytes()));
-      }
-    }
+    reconstruction_planes(in, *fa, r->coefficients, &out);
     if (r->keep_grids) {
       out.grid = grid_of(*fa);
     }
     out.pic = pic_of(*fa);
+    if (r->coefficients) {
+      check_coefficients(in, *fa, r);
+    }
     if (out.chroma_format == 2) {
       check_tu_cbf_422(*fa, r);
     }
@@ -582,6 +779,11 @@ class StreamFeeder {
 
   [[nodiscard]] bool done() const { return next_ >= nals_.size(); }
   void keep_grids(bool keep) { r_.keep_grids = keep; }
+  // Asks for the Coefficients planes with a pull before the first push, as the host primes a decoder.
+  void coefficients() {
+    r_.coefficients = true;
+    drain(in_, &r_);
+  }
 
   // Pushes the next NAL unit and pulls what is ready.
   void step() {
@@ -642,11 +844,14 @@ class StreamFeeder {
   StreamResult r_;
 };
 
-StreamResult run_stream(const std::vector<uint8_t>& bytes, bool keep_grids = false) {
+StreamResult run_stream(const std::vector<uint8_t>& bytes, bool keep_grids = false, bool coefficients = false) {
   Instance in(plugin_api());
   REQUIRE(in.status == OVT_OK);
   StreamFeeder feeder(in, bytes);
   feeder.keep_grids(keep_grids);
+  if (coefficients) {
+    feeder.coefficients();
+  }
   while (!feeder.done()) {
     feeder.step();
   }
@@ -1103,6 +1308,48 @@ TEST_CASE("hm plugin: partitions, filter parameters and RPS match the slice head
   CHECK(m.count == 0);
 }
 
+// Coefficients: 4:2:0 conformance streams with transform skip, PCM, sign data hiding, AMP and tiles, plus the RExt
+// 4:2:2 10-bit and 4:4:4 12-bit streams.
+struct CoeffStream {
+  std::string_view id;
+  std::string_view file;  // a second file next to the entry's primary one, or empty
+};
+constexpr std::array<CoeffStream, 7> kCoeffStreams = {{
+    {"jctvc_TSKIP_A_MS_3", ""},
+    {"jctvc_ipcm_A_NEC_3", ""},
+    {"jctvc_SDH_A_Orange_4", ""},
+    {"jctvc_AMP_A_Samsung_7", ""},
+    {"jctvc_TILES_B_Cisco_1", ""},
+    {"syn_h265_422_444_rext", ""},
+    {"syn_h265_422_444_rext", "syn_h265_422_10bit.265"},
+}};
+
+TEST_CASE("hm plugin: Coefficients planes match the TUs' levels", "[fast][third_party][needs-corpus]") {
+  const CoeffStream s = GENERATE(from_range(kCoeffStreams));
+  CAPTURE(s.id, s.file);
+  std::filesystem::path path = ovt::test::corpus_or_skip(s.id);
+  if (!s.file.empty()) {
+    path = path.parent_path() / s.file;
+  }
+  const StreamResult r = run_stream(read_file(path), false, true);
+  check_stream(r, false);
+  for (const std::string& e : r.coeff_errors) {
+    UNSCOPED_INFO(e);
+  }
+  INFO(r.coeff_pictures << " pictures, " << r.coeff_nodes << " TU nodes with levels, " << r.coeff_nonzero_nodes
+                        << " of them non-zero");
+  CHECK(r.coeff_errors.empty());
+  CHECK(r.coeff_pictures == static_cast<int>(r.actual.size()));
+  CHECK(r.coeff_nonzero_nodes > 0);
+}
+
+TEST_CASE("hm plugin: Coefficients planes only on request", "[fast][third_party][needs-corpus]") {
+  const std::vector<uint8_t> bytes = read_file(ovt::test::corpus_or_skip("jctvc_AMP_A_Samsung_7"));
+  const StreamResult r = run_stream(bytes);  // Reconstruction only: drain() fails on any other stage
+  check_stream(r, false);
+  CHECK(r.coeff_pictures == 0);
+}
+
 TEST_CASE("hm plugin: RExt 4:4:4 12-bit yields a FrameAnalysis per picture", "[fast][third_party][needs-corpus]") {
   // AT3. The primary file of syn_h265_422_444_rext (chapter 14 §14.2, recipe 11) is the x265 main444-12 stream.
   const std::filesystem::path path = ovt::test::corpus_or_skip("syn_h265_422_444_rext");
@@ -1299,7 +1546,7 @@ TEST_CASE("hm plugin: caps and ABI table", "[fast][third_party]") {
   CHECK(caps->codec == 2);  // ovt.fb.Codec.H265
   CHECK(std::string_view(caps->id) == "hm");
   CHECK(std::string_view(caps->license) == "BSD-3-Clause");
-  CHECK(caps->plane_stages == kReconMask);
+  CHECK(caps->plane_stages == (kReconMask | kCoeffMask));
   // Chapter 07 §7.6.4: every grid vector but bits_x8 and deblock bS; partition_id waits for PartitionInfo.
   CHECK(caps->grid_fields == (0xFFFFU & ~(OVT_GRID_BITS_X8 | OVT_GRID_DEBLOCK_BS)));
   CHECK(caps->has_symbol_accounting == 0);

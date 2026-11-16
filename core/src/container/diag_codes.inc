@@ -60,6 +60,15 @@ X(CNT_TS_1007, "CNT-TS-1007", Warning, "PID_error: PID `pid` referenced by PMT b
 X(CNT_TS_2001, "CNT-TS-2001", Warning,
   "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
 X(CNT_TS_2002, "CNT-TS-2002", Error, "CRC_error in `table` section on PID `pid`", "TR 101 290 §5.2.2 (2.2)")
+X(CNT_TS_2003, "CNT-TS-2003", Warning, "PCR_repetition_error: `D` ms between PCRs on PID `pid` (> 40 ms)",
+  "TR 101 290 §5.2.2 (2.3a)")
+X(CNT_TS_2004, "CNT-TS-2004", Warning,
+  "PCR_discontinuity_indicator_error: PCR jump `D` ms without `discontinuity_indicator` on PID `pid`",
+  "TR 101 290 §5.2.2 (2.3b)")
+X(CNT_TS_2005, "CNT-TS-2005", Info, "PCR_accuracy_error: `D` ns deviation on PID `pid` (> ±500 ns)",
+  "TR 101 290 §5.2.2 (2.4)")
+X(CNT_TS_2006, "CNT-TS-2006", Warning, "PTS_error: `D` ms between PTS on PID `pid` (> 700 ms)",
+  "TR 101 290 §5.2.2 (2.5)")
 X(CNT_TS_2007, "CNT-TS-2007", Warning, "CAT_error: scrambled packets present but no CAT (PID 1)",
   "TR 101 290 §5.2.2 (2.6)")
 

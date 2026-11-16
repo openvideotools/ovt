@@ -12,12 +12,15 @@ target_sources(
           isobmff/box_registry.cpp
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
+          isobmff/decoders/movie.cpp
           isobmff/field_builder.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
           mpegts/descriptors.cpp
+          mpegts/pes.cpp
           mpegts/psi.cpp
+          mpegts/timing.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp
