@@ -10,6 +10,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -177,6 +178,17 @@ TEST_CASE("ovt_validate_frame_analysis reports violations as MDL-VAL diagnostics
     REQUIRE(ovt_validate_frame_analysis(fa.data(), fa.size(), nullptr, static_cast<int>(fb::Codec::H265),
                                         &with_codec.buf) == OVT_OK);
     CHECK(count(with_codec.buf) == 0);
+  }
+
+  SECTION("a buffer at an odd address (a slice of a packed record) is read the same way") {
+    Bytes shifted(fa.size() + 1);
+    std::copy(fa.begin(), fa.end(), shifted.begin() + 1);
+    Owned diag;
+    REQUIRE(ovt_validate_frame_analysis(shifted.data() + 1, fa.size(), nullptr, -1, &diag.buf) == OVT_OK);
+    CHECK(count(diag.buf) == 0);
+    Owned text;
+    REQUIRE(ovt_fb_to_json(shifted.data() + 1, fa.size(), "FrameAnalysis", 1, &text.buf) == OVT_OK);
+    CHECK(text.text() == read_golden("tiny16_hevc.json"));
   }
 
   SECTION("a truncated buffer is V-001 as MDL-VAL-0001, not a status code") {

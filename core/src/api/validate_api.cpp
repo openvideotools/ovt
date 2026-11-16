@@ -92,6 +92,23 @@ ovt_status guarded(const char* what, Fn&& fn) noexcept {
   }
 }
 
+// The validator reads the buffer through FlatBuffers accessors, whose alignment checks are relative to the buffer
+// start; a C caller may hand over bytes at any address (a slice of a file, a packed record), so a start that is not
+// 8-byte aligned is copied into aligned storage first (operator new aligns to alignof(std::max_align_t)).
+struct AlignedInput {
+  std::vector<std::uint8_t> copy;
+  std::span<const std::uint8_t> view;
+
+  AlignedInput(const std::uint8_t* data, std::size_t len) {
+    if (reinterpret_cast<std::uintptr_t>(data) % 8 == 0) {
+      view = std::span<const std::uint8_t>(data, len);
+    } else {
+      copy.assign(data, data + len);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+      view = copy;
+    }
+  }
+};
+
 void zero(ovt_Buffer* out) noexcept {
   if (out != nullptr) {
     out->data = nullptr;
@@ -113,7 +130,8 @@ OVT_API ovt_status ovt_validate_frame_analysis(const uint8_t* fb_bytes, size_t l
     return OVT_E_INVALID_ARG;
   }
   return guarded("ovt_validate_frame_analysis", [&]() -> ovt_status {
-    const std::span<const std::uint8_t> buffer(fb_bytes, len);
+    const AlignedInput input(fb_bytes, len);
+    const std::span<const std::uint8_t> buffer = input.view;
     const std::optional<fb::Codec> codec =
         codec_override < 0 ? std::nullopt : std::optional<fb::Codec>(static_cast<fb::Codec>(codec_override));
     const std::vector<Violation> violations =
@@ -131,8 +149,8 @@ OVT_API ovt_status ovt_validate_stream_index(const uint8_t* fb_bytes, size_t len
     return OVT_E_INVALID_ARG;
   }
   return guarded("ovt_validate_stream_index", [&]() -> ovt_status {
-    const std::span<const std::uint8_t> buffer(fb_bytes, len);
-    return give_list(ovt::model::validate_stream_index(buffer), out);
+    const AlignedInput input(fb_bytes, len);
+    return give_list(ovt::model::validate_stream_index(input.view), out);
   });
 }
 
