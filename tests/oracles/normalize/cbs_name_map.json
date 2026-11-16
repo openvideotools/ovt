@@ -1127,7 +1127,11 @@
    "delta_q_y_dc.delta_coded": "delta_coded",
    "delta_q_y_dc.delta_q": "delta_q"
   },
-  "h264": {},
+  "h264": {
+   "bit_equal_to_one": "payload_bit_equal_to_one",
+   "bit_equal_to_zero": "payload_bit_equal_to_zero",
+   "gaps_in_frame_num_allowed_flag": "gaps_in_frame_num_value_allowed_flag"
+  },
   "h265": {}
  }
 }
