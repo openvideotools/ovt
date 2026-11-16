@@ -51,10 +51,15 @@ real provider:
 
 ```console
 $ adb push mini.mp4 /sdcard/Download/
-$ adb shell am start -a android.intent.action.VIEW -t video/mp4 \
-    -d content://com.android.externalstorage.documents/document/primary%3ADownload%2Fmini.mp4
+$ adb shell content query --uri content://media/external/video/media --projection _id:_display_name  # mini.mp4's id
+$ adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity \
+    -a android.intent.action.VIEW -t video/mp4 --grant-read-uri-permission -d content://media/external/video/media/<id>
 $ adb logcat -d -s OVT | grep 'opened fd size='
 ```
+
+A MediaStore URI with `-n` and `--grant-read-uri-permission`: without `-n` another app that handles `video/mp4` can
+take the intent (a chooser opens), and `adb shell` cannot grant read access to an ExternalStorageProvider document URI
+(Permission Denial).
 
 Output: NOT YET RECORDED (`./gradlew -p android :app:connectedFossDebugAndroidTest`).
 
@@ -72,7 +77,7 @@ Manual cross-check:
 
 ```sh
 adb shell settings put global always_finish_activities 1
-adb shell am start -a android.intent.action.VIEW -t video/mp4 -d <content URI as in test 2>
+adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity -a android.intent.action.VIEW -t video/mp4 --grant-read-uri-permission -d <MediaStore URI as in test 2>
 adb shell input keyevent KEYCODE_HOME && adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity
 adb logcat -d -s OVT | grep -c 'opened fd size='   # prints 1: the file was opened once
 adb shell settings put global always_finish_activities 0

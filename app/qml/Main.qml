@@ -45,6 +45,7 @@ ApplicationWindow {
     font.pixelSize: OvtStyle.fontSize
 
     Component.onCompleted: {
+        Bookmarks.attach(Project, Selection)
         if (initialFile !== "")
             Project.openFile(initialFile)
     }

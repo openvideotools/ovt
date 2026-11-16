@@ -7,6 +7,9 @@
 // by hosting the same pieces Main.qml hosts (OvtMenuBar, MainToolBar, AppShell, StatusBar) in a Page, an Item that
 // carries the window palette and font as ApplicationWindow does on the desktop. The Welcome page (WI-1.464) is
 // therefore what a fresh launch shows (WI-A.450 acceptance test 1). The breakpoint layouts of §11.5.2 are WI-A.451.
+// Qt 6.8 does not expose the Qt Quick accessibility tree through QtQuickView (issue #547), so MainActivity reads
+// `productName` once the root is ready and puts it on the Qt view's own accessibility node, which UI Automator finds
+// (WI-0.050 acceptance test 2).
 
 import QtQuick
 import QtQuick.Controls
@@ -18,6 +21,8 @@ Page {
 
     // The shell, for tests.
     readonly property alias shellItem: shell
+    // The product name of the application, read by MainActivity through QtQuickView.getProperty() (issue #547).
+    readonly property string productName: Qt.application.displayName
 
     // Main.qml's window palette, less placeholderText, which a Control's palette does not offer on Qt 6.4 (the
     // oldest Qt the desktop tests build with); the controls' own default applies there.
@@ -65,4 +70,7 @@ Page {
     }
 
     footer: StatusBar {}
+
+    // As Main.qml does on the desktop: bookmarks follow the open project (WI-2.487).
+    Component.onCompleted: Bookmarks.attach(Project, Selection)
 }

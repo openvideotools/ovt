@@ -124,6 +124,16 @@ if(_ovt_aom_patch_files)
   externalproject_add_stepdependencies(tp_libaom download ${_ovt_aom_patch_files})
 endif()
 
+# NASM 3.x drops "-Ox" from `nasm -hf`, which libaom's test_nasm() requires (third_party/libaom/
+# nasm3_check.cmake). The step re-runs whenever the source tree is re-extracted.
+externalproject_add_step(
+  tp_libaom nasm3_check
+  COMMAND ${CMAKE_COMMAND} -DSRC=<SOURCE_DIR> -P ${CMAKE_CURRENT_LIST_DIR}/libaom/nasm3_check.cmake
+  DEPENDEES patch
+  DEPENDERS configure
+  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/libaom/nasm3_check.cmake
+  COMMENT "Letting libaom's test_nasm() accept NASM 3.x")
+
 if(OVT_BUILD_AOM_INSPECT)
   # libaom installs aomdec with its examples but not inspect, which it builds in the top of its binary tree.
   set(_ovt_aom_inspect "inspect${CMAKE_EXECUTABLE_SUFFIX}")
@@ -158,6 +168,21 @@ set_target_properties(
   tp::aom_inspection PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${LIBAOM_SOURCE_DIR};${LIBAOM_BINARY_DIR}"
                                 INTERFACE_LINK_LIBRARIES tp::aom)
 add_dependencies(tp::aom_inspection tp_libaom)
+# libaom's own headers, so libaom's licence (the licence manifest lists every imported target it walks through).
+get_property(_ovt_aom_spdx GLOBAL PROPERTY OVT_TP_LICENSE_tp_libaom)
+get_property(_ovt_aom_version GLOBAL PROPERTY OVT_TP_VERSION_tp_libaom)
+ovt_set_dependency_license(
+  tp::aom_inspection
+  SOURCE
+  third_party
+  SPDX
+  "${_ovt_aom_spdx}"
+  VERSION
+  "${_ovt_aom_version}"
+  LINKAGE
+  header-only)
+unset(_ovt_aom_spdx)
+unset(_ovt_aom_version)
 unset(SOURCE_DIR)
 unset(BINARY_DIR)
 

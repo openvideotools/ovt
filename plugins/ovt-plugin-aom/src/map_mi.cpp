@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 // insp_mi_data -> CellGrid / Block tree / MotionVector / RefSlot / tiles (chapter 07 §7.6.1 mapping table rows
-// except accounting and the extension-patch fields; WI-2.156 steps 3 to 6).
+// except the extension-patch fields; WI-2.156 steps 3 to 6), with the accounting of map_accounting.cpp (WI-2.157).
 
 #include "map_mi.hpp"
 
@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "enums.h"
+#include "map_accounting.hpp"
 #include "partition_reconstruct.hpp"
 
 namespace ovt::aom {
@@ -594,7 +595,8 @@ struct Cells {
   }
 };
 
-flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, const Cells& c) {
+flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, const Cells& c,
+                                             const std::vector<uint32_t>& cell_bits) {
   const auto block_id_v = vec(fbb, mp.block_id);
   const auto partition_id_v = vec(fbb, mp.partition_id);
   const auto pred_v = vec(fbb, c.pred);
@@ -611,6 +613,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   const auto tx_h_v = vec(fbb, c.tx_h);
   const auto cbf_v = vec(fbb, c.cbf);
   const auto filter_v = vec(fbb, c.filter_idx);
+  const auto bits_v = cell_bits.empty() ? flatbuffers::Offset<flatbuffers::Vector<uint32_t>>() : vec(fbb, cell_bits);
   fb::CellGridBuilder g(fbb);
   g.add_cells_w(mp.cells_w);
   g.add_cells_h(mp.cells_h);
@@ -629,19 +632,21 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   g.add_tx_log2_w(tx_w_v);
   g.add_tx_log2_h(tx_h_v);
   g.add_cbf(cbf_v);
+  g.add_bits_x8(bits_v);
   g.add_filter_idx(filter_v);
   return g.Finish();
 }
 
 // Blocks and MotionVectors of the mapper into @p out.
-void serialise_blocks(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, MappedBlocks* out) {
+void serialise_blocks(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, const std::vector<uint32_t>& bits,
+                      MappedBlocks* out) {
   std::vector<flatbuffers::Offset<fb::Block>> blocks;
   blocks.reserve(mp.blocks.size());
   for (size_t id = 0; id < mp.blocks.size(); ++id) {
     const OutBlock& b = mp.blocks[id];
     blocks.push_back(fb::CreateBlockDirect(fbb, static_cast<uint32_t>(id), b.parent, &b.children, b.kind, &b.rect,
                                            b.level, b.partition_type, static_cast<fb::PredKind>(b.pred), b.skip,
-                                           b.merge, b.qp, /*bits_x8=*/0, b.ext_type, b.ext.empty() ? nullptr : &b.ext));
+                                           b.merge, b.qp, bits[id], b.ext_type, b.ext.empty() ? nullptr : &b.ext));
   }
   out->blocks = fbb.CreateVector(blocks);
   std::vector<flatbuffers::Offset<fb::MotionVector>> mvs;
@@ -716,10 +721,26 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
                            mp.first_ambiguous + "; resolved as PARTITION_SPLIT");
   }
 
-  serialise_blocks(fbb, mp, &out);
+  std::vector<int32_t> parents(mp.blocks.size());
+  std::transform(mp.blocks.begin(), mp.blocks.end(), parents.begin(), [](const OutBlock& b) { return b.parent; });
+  const MappedAccounting acct = map_accounting(d.accounting, parents, mp.block_id, cells_w, cells_h);
+  if (acct.last_tile_group_only) {
+    // §7.6.1's derived note is the Info Diagnostic DEC-AV1-0002 (chapter 07 §7.9 registry, issue #389).
+    out.notes.push_back({"DEC-AV1-0002", "accounting covers last tile group only"});
+  }
+  serialise_blocks(fbb, mp, acct.block_bits, &out);
+  if (d.accounting.valid) {
+    std::vector<flatbuffers::Offset<fb::SymbolCost>> symbols;
+    symbols.reserve(acct.symbols.size());
+    for (const SymbolTotal& s : acct.symbols) {
+      symbols.push_back(fb::CreateSymbolCost(fbb, s.x4, s.y4, s.symbol_id, s.bits_x8, s.count));
+    }
+    out.symbols = fbb.CreateVector(symbols);
+    out.symbol_names = fbb.CreateVectorOfStrings(acct.names);
+  }
   out.refs = ref_slots(fbb, d, cells.usage);
   out.filter_params = filter_params(fbb, d, enable_cdef);
-  out.grid = build_grid(fbb, mp, cells);
+  out.grid = build_grid(fbb, mp, cells, acct.cell_bits);
   return out;
 }
 

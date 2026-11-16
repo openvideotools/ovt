@@ -81,6 +81,15 @@ Item {
         function onActivated(id) {
             if (id === "view.jobs")
                 shell.toggleJobs()
+            else if (id === "navigate.addBookmark")
+                Bookmarks.addBookmark()
+            else if (id === "navigate.addComment") {
+                DockModel.openPanel("bookmarks")
+                Bookmarks.requestComment()
+            } else if (id === "navigate.nextBookmark")
+                Bookmarks.nextBookmark()
+            else if (id === "navigate.previousBookmark")
+                Bookmarks.previousBookmark()
         }
     }
 
@@ -118,7 +127,7 @@ Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
             actions: actions
-            panelComponents: ({"diagnostics": diagnosticsComponent})
+            panelComponents: ({"diagnostics": diagnosticsComponent, "bookmarks": bookmarksComponent})
         }
     }
 
@@ -127,5 +136,12 @@ Item {
         id: diagnosticsComponent
 
         DiagnosticsPanel {}
+    }
+
+    // The Bookmarks & Comments panel (§11.3.17, WI-2.487) stores in the project and navigates through Selection.
+    Component {
+        id: bookmarksComponent
+
+        BookmarksPanel {}
     }
 }

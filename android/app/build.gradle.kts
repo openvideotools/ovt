@@ -142,8 +142,12 @@ android {
 
     packaging {
         jniLibs {
-            // Uncompressed, page-aligned .so files that load straight from the APK (extractNativeLibs=false).
-            useLegacyPackaging = false
+            // Compressed .so files that the installer extracts to ApplicationInfo.nativeLibraryDir
+            // (extractNativeLibs=true). Qt 6.8's QtLoader looks for its libraries only in that directory and stops
+            // with "The native libraries directory is null or empty" when they stay inside the APK; loading straight
+            // from the APK needs Qt >= 6.9 (QtLoader.isUncompressedNativeLibs). SPEC-ASSUMPTION(#547): §13.4.2 says
+            // useLegacyPackaging = false.
+            useLegacyPackaging = true
             keepDebugSymbols += "**/libovt_plugin_*.so"
         }
     }

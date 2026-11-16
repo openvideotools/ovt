@@ -13,6 +13,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 
 /**
  * Debug-only overlay of WI-0.051: an "Open file…" button (the Qt shell has no file UI until WI-A.450) and the JSON
@@ -46,6 +49,18 @@ internal class DebugInfoOverlay(
             ScrollView(context).apply { addView(info) },
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, MAX_INFO_HEIGHT),
         )
+        // Edge-to-edge (the default from API 35): keep the overlay clear of the status bar and display cutout, or the
+        // button sits under the status bar and taps on it (pick_file.py, AT1 on API 36) never reach it.
+        ViewCompat.setOnApplyWindowInsetsListener(this) { view, insets ->
+            val bars =
+                insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            view.updateLayoutParams<MarginLayoutParams> {
+                topMargin = bars.top
+                leftMargin = bars.left
+                rightMargin = bars.right
+            }
+            insets
+        }
     }
 
     /** Shows the JSON for the file just opened. */

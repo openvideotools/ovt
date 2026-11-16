@@ -1,0 +1,109 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// Helpers shared by the H.264 header parsers (chapter 7 §7.3.4): range checks, reserved-value warnings and
+// rbsp_trailing_bits(). Module-internal.
+
+#ifndef OVT_SRC_SYNTAX_H264_H264_INTERNAL_H
+#define OVT_SRC_SYNTAX_H264_H264_INTERNAL_H
+
+#include <fmt/format.h>
+
+#include <cstdint>
+#include <string_view>
+
+#include "ovt/cxx/bitreader.hpp"
+#include "ovt/cxx/syntax/syntax_builder.hpp"
+
+namespace ovt::syntax::h264::detail {
+
+// Generic H.264 range-violation ParseError code, mirroring SYN-H265-0007 (§7.9.3).
+inline constexpr std::string_view kRangeCode = "SYN-H264-0002";
+// Warning for an unknown or reserved value that a decoder may ignore (§7.3.1 rule 3, §7.9.3).
+inline constexpr std::string_view kReservedCode = "SYN-H264-0003";
+
+/// Throws ParseError SYN-H264-0002 unless lo <= value <= hi (§7.3.1 rule 3: checked before any loop is entered).
+template <class T>
+void require_range(const BitReader& br, std::string_view name, T value, int64_t lo, int64_t hi) {
+  const auto v = static_cast<int64_t>(value);
+  if (v < lo || v > hi) {
+    throw ParseError{std::string(kRangeCode),
+                     fmt::format("{} out of range ({} = {}, allowed [{},{}])", name, name, v, lo, hi), br.bit_pos()};
+  }
+}
+
+// SPEC-ASSUMPTION(#552): Info for a payload recorded as opaque bytes until its syntax is parsed (WI-1.109d).
+inline constexpr std::string_view kKeptAsBytesCode = "SYN-H264-0071";
+
+/// Records the rest of the RBSP as the opaque node `name` with Info SYN-H264-0071 "<name> kept as bytes".
+inline void keep_as_bytes(SyntaxBuilder& b, std::string_view name, std::string_view spec_ref) {
+  b.opaque_rest(name);
+  b.diag(Severity::Info, kKeptAsBytesCode, fmt::format("{} kept as bytes", name), spec_ref, true);
+}
+
+/// Diagnostic Warning SYN-H264-0003 on the last emitted node.
+template <class T>
+void warn_reserved(SyntaxBuilder& b, std::string_view name, T value, std::string_view spec_ref = {}) {
+  b.diag(Severity::Warning, kReservedCode,
+         fmt::format("{}: unknown or reserved value {}", name, static_cast<int64_t>(value)), spec_ref, true);
+}
+
+/// rbsp_trailing_bits() (§7.3.2.11) recorded as a struct with rbsp_stop_one_bit f(1) and the
+/// rbsp_alignment_zero_bit f(1) run, as trace_headers prints them. Mismatches are SYN-GEN-0001 Diagnostics.
+inline void read_rbsp_trailing_bits(BitReader& br, SyntaxBuilder& b) {
+  auto s = b.scoped("rbsp_trailing_bits", "H.264 7.3.2.11");
+  b.read_f("rbsp_stop_one_bit", 1, 1);
+  while (!br.byte_aligned()) {
+    b.read_f("rbsp_alignment_zero_bit", 1, 0);
+  }
+}
+
+/// Diagnostic Error SYN-H264-0002 on the last emitted node unless lo <= value <= hi; parsing continues (for limits
+/// whose violation does not endanger the parse, e.g. a count the spec bounds but no loop depends on). Returns
+/// whether the value was in range.
+inline bool check_range(SyntaxBuilder& b, std::string_view name, int64_t value, int64_t lo, int64_t hi,
+                        std::string_view spec_ref = {}) {
+  if (value >= lo && value <= hi) {
+    return true;
+  }
+  b.diag(Severity::Error, kRangeCode,
+         fmt::format("{} out of range ({} = {}, allowed [{},{}])", name, name, value, lo, hi), spec_ref, true);
+  return false;
+}
+
+/// Reads one u(1) element `name[idx]`.
+inline bool read_flag_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const bool v = b.read_flag(name);
+  b.end_array_element();
+  return v;
+}
+
+/// Reads one se(v) element `name[idx]`.
+inline int32_t read_se_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const int32_t v = b.read_se(name);
+  b.end_array_element();
+  return v;
+}
+
+/// Reads one ue(v) element `name[idx]`.
+inline uint32_t read_ue_at(SyntaxBuilder& b, std::string_view name, int idx) {
+  b.begin_array_element(name, idx);
+  const uint32_t v = b.read_ue(name);
+  b.end_array_element();
+  return v;
+}
+
+/// Ceil(Log2(n)) for n >= 1.
+constexpr uint32_t ceil_log2(uint32_t n) noexcept {
+  uint32_t bits = 0;
+  while ((uint64_t{1} << bits) < n) {
+    ++bits;
+  }
+  return bits;
+}
+
+}  // namespace ovt::syntax::h264::detail
+
+#endif  // OVT_SRC_SYNTAX_H264_H264_INTERNAL_H

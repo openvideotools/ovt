@@ -3,11 +3,11 @@
   SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
   SPDX-License-Identifier: GPL-3.0-or-later
 
-  Manifest of OVT Studio for Android and ChromeOS (chapter 13 §13.4.5; WI-0.050). extractNativeLibs=false is
-  not written here: AGP 8 sets it in the merged manifest from packaging.jniLibs.useLegacyPackaging = false
-  (app/build.gradle.kts) and warns when the source manifest carries it. WI-A.450 added the chapter 11 §11.5.1 entries
-  (ACTION_SEND, the file extensions, the ChromeOS free-form window preferences); WI-0.053 adds the codec-pack
-  declarations.
+  Manifest of OVT Studio for Android and ChromeOS (chapter 13 §13.4.5; WI-0.050). extractNativeLibs is
+  not written here: it follows packaging.jniLibs.useLegacyPackaging in app/build.gradle.kts (true, so the libraries
+  are extracted at install, which Qt 6.8's loader needs; SPEC-ASSUMPTION(#547)), and AGP 8 warns when the source
+  manifest carries it. WI-A.450 added the §11.5.1 entries (ACTION_SEND, file extensions,
+  free-form window preferences), WI-0.053 the codec-pack declarations.
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
