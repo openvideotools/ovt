@@ -20,6 +20,7 @@
 #include "luts/turbo.h"
 #include "luts/viridis.h"
 #include "overlay/overlay_layer.h"
+#include "ovt/render/overlay_colors.h"
 #include "ovt/render/overlay_set.h"
 #include "ovt/render/video_surface.h"
 #include "png_io.h"
@@ -198,12 +199,12 @@ TEST_CASE("render_test_overlay_luts: generated tables and fill palette (§10.5.1
   CHECK(kTurbo[(size_t{128} * 4) + 1] == 250);
   CHECK(kTurbo[(size_t{128} * 4) + 2] == 79);
 
-  const auto& pal = ovt::render::detail::kFillPalette;
-  CHECK(pal[0] == 0x2ECC4066U);   // intra fill, 40 %
-  CHECK(pal[1] == 0xFF851B4DU);   // L0 fill alpha 0x4D
-  CHECK(pal[4] == 0xAAAAAA99U);   // skip hatch
-  CHECK(pal[22] == 0xE6194B66U);  // ref slot 0
-  CHECK(pal[29] == 0xF032E666U);  // ref slot 7
+  const auto pal = [](size_t i) { return ovt::render::overlay_fill_rgba(i, false); };
+  CHECK(pal(0) == 0x2ECC4066U);   // intra fill, 40 %
+  CHECK(pal(1) == 0xFF851B4DU);   // L0 fill alpha 0x4D
+  CHECK(pal(4) == 0xAAAAAA99U);   // skip hatch
+  CHECK(pal(22) == 0xE6194B66U);  // ref slot 0
+  CHECK(pal(29) == 0xF032E666U);  // ref slot 7
 }
 
 // Acceptance test 1, plus determinism (§10.9.2 item 5).

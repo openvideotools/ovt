@@ -49,6 +49,17 @@ TestCase {
         verify(window.header.contentItem.implicitWidth <= window.minimumWidth)
     }
 
+    // The Picture panel lives in AppShell (WI-A.450); its plane and zoom shortcuts (WI-1.456) reach it through the
+    // shell's Actions, the object the menu bar and ShortcutLayer trigger.
+    function test_picturePanelUsesShellActions() {
+        const window = createMain()
+        const panel = findChild(window, "picturePanel")
+        verify(panel !== null)
+        verify(window.menuBar.actions !== null)
+        compare(panel.shellActions, window.menuBar.actions)
+        verify(window.menuBar.actions.enabledIds.indexOf("view.plane.y") >= 0)
+    }
+
     // Features that do not exist yet are visible but disabled; Quit and the themes work.
     function test_disabledActions() {
         const window = createMain()
