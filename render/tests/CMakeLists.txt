@@ -75,10 +75,18 @@ target_sources(ovt_tests_render PRIVATE test_measure.cpp)
 # WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
 target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
 
+# WI-4.453: false-colour view, gamut-clip overlay, band fractions and gamut counts (§10.7.5, §10.7.8). The image goldens
+# live in tests/golden/render/ (§10.9.2 item 6; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
+target_sources(ovt_tests_render PRIVATE test_false_color.cpp)
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
 # WI-1.406: NATIVE targets (§10.4.1): encoding choice, CAMetalLayer table, headroom rule, and the swapchain path on a
 # headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
 # CAMetalLayer through MoltenVK.
 target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+# WI-1.411: the swapchain hint carries the content's static HDR metadata (§10.3.6).
+target_sources(ovt_tests_render PRIVATE test_hint.cpp)
 if(APPLE)
   target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
   set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
@@ -86,6 +94,9 @@ if(APPLE)
   target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
                                                  "-framework CoreFoundation")
 endif()
+
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
 
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
 if(APPLE)
@@ -98,3 +109,13 @@ if(APPLE)
                              PRIVATE "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
   ovt_set_license(ovt_manual_edr_pattern "LGPL-2.1-or-later")
 endif()
+
+# WI-2.431: overlay layer, heatmap LUTs and the heatmap/fill/hatch passes (§10.5). The tests read render/luts/ and the
+# image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
+# WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
+target_sources(ovt_tests_render PRIVATE test_compare.cpp)

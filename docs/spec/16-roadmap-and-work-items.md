@@ -612,7 +612,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.412 | 10 §10.11 | PNG export (`HdrPng16`, `SdrPng8`, `ViewPng8`) | M | 1 | M1.3 | WI-1.403, WI-1.410 | FR-PLN-010 |
 | WI-1.413 | 10 §10.11 | Test pattern generator and measurement expectations | S | 1 | M1.1 | none | — |
 | WI-1.414 | 10 §10.11 | libplacebo/mpv parity test harness (superseded by WI-1.575; see chapter 16 §16.3) | S | 1 | M1.4 | WI-1.412, WI-1.413 | — |
-| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
+| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
 | WI-1.450 | 11 §11.10 | Application skeleton, RHI selection, `Platform` singleton, settings (reduced, §16.3) | M | 1 | M1.1 | WI-0.001, WI-0.018, WI-0.019 | FR-GUI-001, FR-GUI-002, FR-GUI-023, FR-GUI-025, NFR-008, NFR-021, NFR-025 |
 | WI-1.451 | 11 §11.10 | Dock manager (`SplitView`-based) with presets and serialisation | L | 1 | M1.2 | WI-1.450 | FR-GUI-001, FR-GUI-002 |
 | WI-1.452 | 11 §11.10 | `SelectionModel` and the derivation rules | M | 1 | M1.2 | WI-1.450, WI-0.083 | FR-GUI-004, FR-GUI-011, FR-GUI-101 |

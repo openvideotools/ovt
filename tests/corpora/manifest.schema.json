@@ -89,7 +89,17 @@
             "format": { "enum": ["isobmff", "ivf", "annexb", "obu", "y4m", "matroska", "mpegts"] },
             "codec": { "type": "string" },
             "hdr_kind": { "enum": ["Unknown", "SDR", "HDR10", "HDR10Plus", "HLG", "DolbyVision", "PQ_NoStatic"] },
-            "diagnostics": { "type": "array", "items": { "type": "string", "pattern": "^CNT-[0-9]{4}$" } }
+            "diagnostics": { "type": "array", "items": { "type": "string", "pattern": "^CNT-[0-9]{4}$" } },
+            "demux": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["packets", "error"],
+              "description": "#558: the pinned libavformat cannot read this file to the end. The Demuxer (08-container.md section 8.7, WI-1.230 acceptance test 1) delivers exactly `packets` packets, whose positions equal ffprobe's, then fails with this error class",
+              "properties": {
+                "packets": { "type": "integer", "minimum": 0 },
+                "error": { "enum": ["corrupt", "io", "unsupported"] }
+              }
+            }
           }
         },
         "upstream_path": { "type": "string", "description": "path of the file inside the origin repository or bucket (informational)" },

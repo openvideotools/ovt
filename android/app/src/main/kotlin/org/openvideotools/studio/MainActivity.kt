@@ -3,8 +3,14 @@
 
 package org.openvideotools.studio
 
+import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.view.Display
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
@@ -15,28 +21,66 @@ import androidx.lifecycle.Lifecycle
 import org.qtproject.qt.android.OvtQtResume
 import org.qtproject.qt.android.QtQmlStatus
 import org.qtproject.qt.android.QtQuickView
+import java.util.function.Consumer
 
 /**
  * The single Activity of OVT Studio (chapter 13 §13.4.4; WI-0.050). A plain Android Activity that embeds Qt Quick
  * through [QtQuickView] (ADR-004), not Qt's own QtActivity, so that it can own the HDR SurfaceView sibling
- * (ADR-014). WI-0.050 sets up the layout of item 1 and the JNI library; the later items arrive with WI-0.051
- * (files), WI-0.052 (HDR output), WI-0.053 (plugins) and WI-0.054 (ChromeOS configuration changes).
+ * (ADR-014). WI-0.050 sets up the layout of item 1 and the JNI library, WI-0.052 the HDR output of item 2; the later
+ * items arrive with WI-0.051 (files), WI-0.053 (plugins) and WI-0.054 (ChromeOS configuration changes).
  */
 class MainActivity : AppCompatActivity() {
     private lateinit var hdrSurface: HdrSurfaceView
     private lateinit var qtView: QtQuickView
+    private lateinit var filePicker: FilePicker
+    private var overlay: DebugInfoOverlay? = null
+
+    /** The `ovt_jni_open_fd` session of the file on screen, 0 for none. Touched on the main thread only. */
+    private var session = 0L
+    private val headroomListener =
+        Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
+    private var headroomDisplay: Display? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         val host = findViewById<FrameLayout>(R.id.ovt_host)
 
-        // Bottom child: the HDR picture surface, positioned by the Picture panel's geometry from WI-0.052 on.
+        // Item 2: what the display can show decides the encoding. COLOR_MODE_HDR before the surface exists (§10.4.3).
+        val caps = DisplayCaps.query(currentDisplay())
+        Log.i(TAG, "OVT: $caps")
+        if (caps.hdrCapable) {
+            window.colorMode = ActivityInfo.COLOR_MODE_HDR
+        }
+
+        // Bottom child: the HDR picture surface with the PQ test pattern of WI-0.052. Until WI-A.400 follows the
+        // Picture panel's geometry it fills the area below the header band of AndroidShell.qml.
         hdrSurface = HdrSurfaceView(this)
-        host.addView(hdrSurface, FrameLayout.LayoutParams(0, 0))
+        hdrSurface.configure(caps, PATTERN_HEADROOM)
+        val surfaceParams =
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        host.addView(hdrSurface, surfaceParams)
+        host.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+            val top = (view.height * SHELL_HEADER_FRACTION).toInt()
+            if (surfaceParams.topMargin != top) {
+                surfaceParams.topMargin = top
+                view.post { hdrSurface.layoutParams = surfaceParams } // not inside the layout pass
+            }
+        }
 
         // Top child: the Qt Quick UI, created once the window's decor view is attached (see addQtView).
         window.decorView.doOnAttach { addQtView(host) }
+
+        // File opening (WI-0.051): picker, VIEW/SEND intents, drag-and-drop; the debug overlay on debuggable builds
+        // (addQtView brings it back in front of the Qt view, which is added later).
+        filePicker = FilePicker(this, ::onFileOpened)
+        filePicker.attachDropTarget(host)
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            val debugOverlay = DebugInfoOverlay(this, filePicker::pick)
+            overlay = debugOverlay
+            host.addView(debugOverlay, debugOverlay.topStartParams())
+        }
+        filePicker.handleIntent(intent)
 
         Log.i(TAG, "OVT: native ${OvtNative.version()}")
     }
@@ -63,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         )
         // Otherwise Qt's ActivityLifecycleCallbacks set the state at the next onResume.
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
+        overlay?.bringToFront() // the WI-0.051 debug overlay stays above the Qt view
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
@@ -105,8 +150,77 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG, "OVT: QML root ready, title '$title'")
     }
 
+    override fun onStart() {
+        super.onStart()
+        // §10.4.3: the live headroom (API 34+) for DisplayTarget.headroom.
+        val current = currentDisplay()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && current.isHdrSdrRatioAvailable) {
+            current.registerHdrSdrRatioChangedListener(mainExecutor, headroomListener)
+            headroomDisplay = current
+            OvtNative.setHeadroom(hdrSurface.session, current.hdrSdrRatio)
+        }
+    }
+
+    override fun onStop() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            headroomDisplay?.unregisterHdrSdrRatioChangedListener(headroomListener)
+        }
+        headroomDisplay = null
+        super.onStop()
+    }
+
+    /** The display the Activity is on (Context.getDisplay needs API 30; minSdk is 28). */
+    @Suppress("DEPRECATION")
+    private fun currentDisplay(): Display =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display ?: windowManager.defaultDisplay
+        } else {
+            windowManager.defaultDisplay
+        }
+
+    // launchMode singleTask: a second VIEW/SEND reaches the running Activity here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        filePicker.handleIntent(intent)
+    }
+
+    // Ctrl+O opens the picker (ChromeOS and hardware keyboards) until the Qt shell has its own File menu.
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_O && event.isCtrlPressed) {
+            filePicker.pick()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onDestroy() {
+        filePicker.shutdown()
+        OvtNative.close(session)
+        session = 0L
+        super.onDestroy()
+    }
+
+    private fun onFileOpened(opened: FilePicker.OpenedFile) {
+        OvtNative.close(session) // the previous file, if any
+        session = opened.session
+        overlay?.show(OvtNative.infoJson(session))
+    }
+
     private companion object {
         const val TAG = "OVT"
+
+        /** Share of the window height that AndroidShell.qml's header band covers (keep both in step). */
+        const val SHELL_HEADER_FRACTION = 0.25f
+
+        /**
+         * Headroom asked of the compositor for the test pattern (API 35+): the full-screen picture value of §10.4.3,
+         * so that the 1000-nit patch can reach its level. WI-A.404 switches between 2.0 and 8.0 with the layout.
+         */
+        const val PATTERN_HEADROOM = 8.0f
 
         /** The Qt application library: Qt appends `_<abi>` (libovt_studio_x86_64.so, §13.2.1). */
         const val QT_APP_LIBRARY = "ovt_studio"

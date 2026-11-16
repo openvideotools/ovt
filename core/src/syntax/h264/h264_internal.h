@@ -32,7 +32,7 @@ void require_range(const BitReader& br, std::string_view name, T value, int64_t 
   }
 }
 
-// SPEC-ASSUMPTION(#552): Info for a payload recorded as opaque bytes until its syntax is parsed (WI-1.109d).
+// Info for a payload recorded as opaque bytes until its syntax is parsed (#552: the 3D-AVC subset SPS extension).
 inline constexpr std::string_view kKeptAsBytesCode = "SYN-H264-0071";
 
 /// Records the rest of the RBSP as the opaque node `name` with Info SYN-H264-0071 "<name> kept as bytes".

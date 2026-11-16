@@ -70,6 +70,7 @@ struct GridCells {
   std::vector<uint8_t> deblock_bs_v;
   std::vector<uint8_t> deblock_bs_h;
   std::vector<uint8_t> filter_idx;
+  std::vector<uint32_t> bits_x8;  // leaf CU bits spread per rule V-020 (patch 0002); 0 = unknown
   uint32_t mv_clamped_cells = 0;  // cells with a vector component clamped by mv16 (MDL-GEN-0003)
 };
 

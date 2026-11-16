@@ -217,6 +217,14 @@ TEST_CASE("every group A row with fields has a registered decoder", "[container]
     REQUIRE(e != nullptr);
     CHECK(e->decoder != nullptr);
   }
+  // hdlr: the one "*" registration reaches every parent the registry lists (mdia, meta, minf).
+  for (const auto& chain : {ctx_of({"moov", "trak", "mdia"}), ctx_of({"moov", "udta", "meta"}), ctx_of({"meta"}),
+                            ctx_of({"moov", "trak", "mdia", "minf"})}) {
+    const iso::RegistryEntry* h = iso::lookup("hdlr", chain);
+    REQUIRE(h != nullptr);
+    CHECK(h->decoder != nullptr);
+    CHECK(h->is_fullbox);
+  }
   const iso::RegistryEntry* g = iso::lookup("msrc", ctx_of({"moov", "trak", "trgr"}));
   REQUIRE(g != nullptr);
   CHECK(g->decoder != nullptr);
@@ -444,6 +452,8 @@ TEST_CASE("elst: segment durations in the movie timescale, media_time in the tra
     CHECK(has_code(d.node, "CNT-1014"));
     CHECK_FALSE(d.outcome.truncated);
     CHECK(field(d.node, "entries").children.size() == 1);
+    CHECK(field(d.node, "entries").uvalue == 1);  // the readable count, not the declared one
+    CHECK(field(d.node, "entry_count").uvalue == 5);
   }
 }
 
@@ -595,56 +605,25 @@ nlohmann::json json_of(const FieldT& f) {
   }
 }
 
+// Collects the fields the walker decoded (§8.2.3 step 2.12), keyed by the MP4Box golden path ("moov/trak[2]/tkhd").
 struct Harness {
-  const ovt::io::RandomAccessFile* file = nullptr;
   std::map<std::string, nlohmann::json> by_path;  // decoded boxes only
 
-  void decode(BoxNodeT& n, iso::BoxContext& ctx, uint64_t payload_begin, uint64_t end) const {
-    const iso::RegistryEntry* e = iso::lookup(n.fourcc, ctx);
-    if (e == nullptr || e->decoder == nullptr || !n.fields.empty() || end <= payload_begin) {
-      return;  // no decoder, or the walker already decoded the box
-    }
-    Bytes payload(end - payload_begin);
-    REQUIRE(file->read(payload_begin, payload.size(), payload.data()) == payload.size());
-    size_t skip = 0;
-    if (is_fullbox(n.fourcc) && payload.size() >= 4) {
-      n.version = payload[0];
-      n.flags = static_cast<int32_t>((uint32_t{payload[1]} << 16U) | (uint32_t{payload[2]} << 8U) | payload[3]);
-      add_uint(n, "version", payload[0], 64, 8);
-      add_uint(n, "flags", static_cast<uint32_t>(n.flags), 72, 24);
-      skip = 4;
-    }
-    ovt::BitReader br(std::span<const uint8_t>(payload).subspan(skip));
-    iso::FieldBuilder fb(n, n.file_span->offset(), br, static_cast<uint64_t>(n.header_length) * 8U + 8U * skip);
-    const iso::DecodeOutcome out = iso::run_decoder(*e->decoder, ctx, br, fb);
-    if (n.fourcc == "dref" && n.children.empty()) {  // ContainerWithPrefix: the walker treats dref as a leaf today
-      iso::WalkState st;
-      st.file = file;
-      iso::BoxNodes kids = iso::walk_children(st, n.file_span->offset(), payload_begin + skip + out.children_offset,
-                                              end, 1, ctx.push(iso::FourCC{'d', 'r', 'e', 'f'}, &n), n.diagnostics);
-      n.children = std::move(kids);
-    }
-  }
-
-  // One mutable context per child list, copied on push (§8.2.9: a decoder's context changes reach later siblings).
-  void visit(std::vector<std::unique_ptr<BoxNodeT>>& boxes, iso::BoxContext ctx, const std::string& parent) {
+  void visit(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, const std::string& parent) {
     std::map<std::string, int> total;
     for (const auto& b : boxes) {
       ++total[b->fourcc];
     }
     std::map<std::string, int> seen;
-    for (auto& b : boxes) {
+    for (const auto& b : boxes) {
       std::string path = parent.empty() ? b->fourcc : parent + "/" + b->fourcc;
       if (total[b->fourcc] > 1) {
         path += "[" + std::to_string(++seen[b->fourcc]) + "]";
       }
-      const uint64_t begin = b->file_span->offset() + b->header_length;
-      const uint64_t end = b->file_span->offset() + b->file_span->length();
-      decode(*b, ctx, begin, end);
       if (!b->fields.empty()) {
         by_path[path] = json_of_children(b->fields);
       }
-      visit(b->children, ctx.push(cc_of(b->fourcc), b.get()), path);
+      visit(b->children, path);
     }
   }
 };
@@ -661,10 +640,9 @@ std::string last_type(const std::string& path) {
 size_t compare_with_golden(std::string_view id) {
   const auto path = ovt::test::corpus_or_skip(id);
   const auto file = ovt::io::RandomAccessFile::open(path.string());
-  iso::WalkResult walked = iso::walk(*file);
+  const iso::WalkResult walked = iso::walk(*file);
   Harness h;
-  h.file = file.get();
-  h.visit(walked.top_level, walked.root_ctx, "");
+  h.visit(walked.top_level, "");
   std::ifstream gf(std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/golden/isobmff" /
                    (std::string(id) + ".mp4box-diso.json"));
   REQUIRE(gf.good());

@@ -46,6 +46,8 @@ class Reader {
   }
   // TsTiming FlatBuffer (MPEG-TS reader); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> ts_timing() const { return {}; }
+  // TsReport FlatBuffer (TR 101 290 priority 1 and 2 checks, MPEG-TS reader); empty otherwise.
+  [[nodiscard]] virtual std::vector<uint8_t> ts_report() const { return {}; }
 };
 
 // True when a reader exists for `f` in this build (phase 1 formats, MPEG-TS and the MXF placeholder).

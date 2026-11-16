@@ -779,6 +779,7 @@ the licence gate fails when this file is stale.
 | syn_h265_bpyramid | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h265_crop_1080_in_1088 | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h265_gop60_1080p | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
+| syn_h265_gop60_1080p_nowpp | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h265_hdr10plus | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h265_hrd_cbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
 | syn_h265_hrd_vbr | syn | OVT synthetic stream generated from lavfi sources (CC0) | CC0-1.0 | yes |
