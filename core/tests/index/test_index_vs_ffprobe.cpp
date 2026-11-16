@@ -95,6 +95,30 @@ uint64_t frame_start(const fb::StreamIndex& si, const fb::FrameInfo& f) {
   return u->file_span()->offset() - u->prefix_span()->length();
 }
 
+// Bytes of the end of sequence / end of bitstream NAL units (H.265 types 36, 37) that close a frame. FFmpeg's hevc
+// parser starts its next packet at such a unit, while the index keeps it in the access unit it ends (§7.3.9).
+uint64_t trailing_eos_bytes(const fb::StreamIndex& si, const fb::FrameInfo& f) {
+  uint64_t bytes = 0;
+  if (si.codec() != fb::Codec::H265) {
+    return bytes;
+  }
+  for (uint32_t i = f.units()->size(); i > 0; --i) {
+    const fb::Unit* u = si.units()->Get(f.units()->Get(i - 1));
+    if (u->type() != 36 && u->type() != 37) {
+      break;
+    }
+    bytes += u->file_span()->length() + u->prefix_span()->length();
+  }
+  return bytes;
+}
+
+// Where FFmpeg starts the packet of a frame: at the frame, or at the EOS / EOB units that end the frame before it.
+uint64_t packet_start(const fb::StreamIndex& si, const fb::FrameInfo& f) {
+  const int32_t d = f.id()->decode_index();
+  const uint64_t moved = d > 0 ? trailing_eos_bytes(si, *si.frames()->Get(static_cast<uint32_t>(d - 1))) : 0;
+  return frame_start(si, f) - moved;
+}
+
 struct ProbeFrame {
   uint64_t pos = 0;
   uint64_t size = 0;
@@ -153,7 +177,7 @@ void compare_with_ffprobe(const fb::StreamIndex& si, const std::vector<ProbeFram
   size_t next = 0;
   for (size_t k = 0; k < probe.size(); ++k) {
     CAPTURE(k, probe[k].pos);
-    while (next < shown.size() && !near(frame_start(si, *shown[next]), probe[k].pos, how.slack)) {
+    while (next < shown.size() && !near(packet_start(si, *shown[next]), probe[k].pos, how.slack)) {
       REQUIRE_FALSE(how.all_output);  // the index's display order has a frame here that ffprobe did not output
       ++next;
     }
@@ -164,13 +188,15 @@ void compare_with_ffprobe(const fb::StreamIndex& si, const std::vector<ProbeFram
     }
     // A complementary field pair is one FFmpeg packet and two FrameInfo that share the display index.
     uint64_t size = f.size_bytes();
+    const fb::FrameInfo* last = &f;
     const auto next_decode = static_cast<uint32_t>(f.id()->decode_index()) + 1;
     if (f.structure() != fb::PictureStructure::Frame && f.structure() != fb::PictureStructure::Mbaff &&
         next_decode < si.frames()->size() &&
         si.frames()->Get(next_decode)->id()->display_index() == f.id()->display_index()) {
-      size += si.frames()->Get(next_decode)->size_bytes();
+      last = si.frames()->Get(next_decode);
+      size += last->size_bytes();
     }
-    CHECK(near(frame_start(si, f) + size, probe[k].pos + probe[k].size, how.slack));
+    CHECK(near(frame_start(si, f) + size - trailing_eos_bytes(si, *last), probe[k].pos + probe[k].size, how.slack));
   }
 }
 
@@ -283,6 +309,40 @@ TEST_CASE("index_builder_h26x: slices without parameter sets become frames of ty
   }
 }
 
+namespace {
+
+// The stream again with an end of sequence NAL unit after the first coded video sequence. FFmpeg then starts the
+// next packet at that unit and drops the pictures it had not output yet, and the leading pictures after it.
+void compare_with_end_of_sequence(const Bytes& stream, const std::filesystem::path& original) {
+  const Bytes plain_index = index_annexb(stream, fb::Codec::H265);
+  const fb::StreamIndex& plain = root(plain_index);
+  uint64_t cut = 0;  // start of the second random access picture's access unit
+  for (const fb::FrameInfo* f : *plain.frames()) {
+    if (f->is_rap() && f->id()->decode_index() > 0) {
+      cut = frame_start(plain, *f);
+      break;
+    }
+  }
+  REQUIRE(cut > 0);
+  Bytes with_eos(stream.begin(), stream.begin() + static_cast<std::ptrdiff_t>(cut));
+  with_eos.insert(with_eos.end(), {0x00, 0x00, 0x01, 0x4A, 0x01});  // EOS_NUT, nuh_temporal_id_plus1 = 1
+  with_eos.insert(with_eos.end(), stream.begin() + static_cast<std::ptrdiff_t>(cut), stream.end());
+  std::filesystem::path path = original;
+  path += ".eos.265";
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): std::ostream::write takes char*
+    out.write(reinterpret_cast<const char*>(with_eos.data()), static_cast<std::streamsize>(with_eos.size()));
+  }
+  const auto probe = ffprobe_frames(path, "hevc");
+  REQUIRE(probe);
+  const Bytes index = index_annexb(with_eos, fb::Codec::H265);
+  CHECK(root(index).frames()->size() == plain.frames()->size());
+  compare_with_ffprobe(root(index), *probe, Compare{true, false, 1});
+}
+
+}  // namespace
+
 // AT1 on streams FFmpeg encodes at test time (skipped without ffmpeg / ffprobe).
 TEST_CASE("index_vs_ffprobe: FFmpeg-encoded H.264 and H.265 streams", "[index][h264][h265][ffprobe][fast]") {
   using ovt::test::units::MadeStream;
@@ -315,9 +375,13 @@ TEST_CASE("index_vs_ffprobe: FFmpeg-encoded H.264 and H.265 streams", "[index][h
       if (!probe) {
         continue;
       }
-      const Bytes index = index_annexb(read_file(stream.path()), c.codec);
+      const Bytes bytes = read_file(stream.path());
+      const Bytes index = index_annexb(bytes, c.codec);
       compare_with_ffprobe(root(index), *probe, Compare{true, true, c.codec == fb::Codec::H265 ? 1U : 0U});
       ++compared;
+      if (c.codec == fb::Codec::H265) {
+        compare_with_end_of_sequence(bytes, stream.path());
+      }
     }
   }
   if (compared == 0) {
