@@ -33,6 +33,18 @@ std::string_view as_view(const FourCC& cc) {
   return {cc.data(), cc.size()};
 }
 
+// Is `parent` one of the comma-separated fourccs of a row's allowed_parents?
+bool lists_parent(std::string_view allowed, std::string_view parent) {
+  while (!allowed.empty()) {
+    const size_t comma = allowed.find(',');
+    if (allowed.substr(0, comma) == parent) {
+      return true;
+    }
+    allowed = comma == std::string_view::npos ? std::string_view{} : allowed.substr(comma + 1);
+  }
+  return false;
+}
+
 // Segments p[pi..) against ancestors a[ai..). A "*" segment takes zero or more ancestors. Depth <= 32 ancestors.
 // NOLINTNEXTLINE(misc-no-recursion)
 bool match_from(const std::vector<std::string_view>& p, size_t pi, const std::vector<FourCC>& a, size_t ai) {
@@ -217,15 +229,46 @@ const RegistryEntry* BoxRegistry::lookup(std::string_view fourcc, const BoxConte
       }
     }
   };
+  const RegistryEntry* listed = nullptr;  // the most specific table row of this fourcc that names the parent
   if (auto it = by_fourcc_.find(fourcc); it != by_fourcc_.end()) {
     consider(it->second, true);
+    if (!ctx.ancestors.empty()) {
+      const std::string_view parent = as_view(ctx.ancestors.back());
+      for (const RegistryEntry* e : it->second) {
+        if (e->decoder == nullptr && lists_parent(e->allowed_parents, parent) &&
+            context_matches(e->context_pattern, ctx.ancestors) &&
+            (listed == nullptr ||
+             pattern_specificity(e->context_pattern) > pattern_specificity(listed->context_pattern))) {
+          listed = e;
+        }
+      }
+    }
   }
   if (!ctx.ancestors.empty()) {
     if (auto it = by_parent_.find(as_view(ctx.ancestors.back())); it != by_parent_.end()) {
+      const RegistryEntry* before = best;
       consider(it->second, false);
+      // SPEC-ASSUMPTION(#592): a "<parent>/*" decoder that wins over a table row listing that parent keeps the row's
+      // kind and metadata (an `hvc1` under `stsd` stays a ContainerWithPrefix FullBox-less sample entry).
+      if (best != before && best->decoder != nullptr && listed != nullptr) {
+        best = merged(*listed, *best);
+      }
     }
   }
   return best;
+}
+
+const RegistryEntry* BoxRegistry::merged(const RegistryEntry& row, const RegistryEntry& wildcard) const {
+  const auto key = std::make_pair(&row, wildcard.decoder);
+  if (const auto it = merged_.find(key); it != merged_.end()) {
+    return it->second;
+  }
+  RegistryEntry e = row;
+  e.context_pattern = wildcard.context_pattern;
+  e.decoder = wildcard.decoder;
+  entries_.push_back(e);
+  merged_.emplace(key, &entries_.back());
+  return &entries_.back();
 }
 
 const RegistryEntry* BoxRegistry::lookup_uuid(const std::array<uint8_t, 16>& usertype) const {

@@ -545,60 +545,25 @@ TEST_CASE("tmcd: flags, frame rate and the name child", "[container][decoders][s
   check_contiguous(name);
 }
 
-// The walker still treats `stsd` as a leaf until WI-1.203 wires the registry in: walk the children here.
-
+// Collects the fields the walker decoded (§8.2.3 step 2.12), keyed by the MP4Box golden path.
 struct Harness {
-  const ovt::io::RandomAccessFile* file = nullptr;
   std::map<std::string, nlohmann::json> by_path;  // decoded boxes only
 
-  void decode(BoxNodeT& n, iso::BoxContext& ctx, uint64_t payload_begin, uint64_t end) const {
-    const iso::RegistryEntry* e = iso::lookup(n.fourcc, ctx);
-    if (e == nullptr || e->decoder == nullptr || !n.fields.empty() || end <= payload_begin) {
-      return;
-    }
-    Bytes payload(end - payload_begin);
-    REQUIRE(file->read(payload_begin, payload.size(), payload.data()) == payload.size());
-    size_t skip = 0;
-    if (is_fullbox(n.fourcc) && payload.size() >= 4) {
-      n.version = payload[0];
-      n.flags = static_cast<int32_t>((uint32_t{payload[1]} << 16U) | (uint32_t{payload[2]} << 8U) | payload[3]);
-      add_uint(n, "version", payload[0], 64, 8);
-      add_uint(n, "flags", static_cast<uint32_t>(n.flags), 72, 24);
-      skip = 4;
-    }
-    ovt::BitReader br(std::span<const uint8_t>(payload).subspan(skip));
-    iso::FieldBuilder fb(n, n.file_span->offset(), br, static_cast<uint64_t>(n.header_length) * 8U + 8U * skip);
-    const iso::DecodeOutcome out = iso::run_decoder(*e->decoder, ctx, br, fb);
-    const bool prefixed = n.fourcc == "stsd" || ctx.parent_is("stsd");
-    if (prefixed && n.children.empty() && out.children_offset > 0 && !out.truncated) {
-      iso::WalkState st;
-      st.file = file;
-      n.children = iso::walk_children(st, n.file_span->offset(), payload_begin + skip + out.children_offset, end, 1,
-                                      ctx.push(cc_of(n.fourcc), &n), n.diagnostics);
-    }
-    if (n.fourcc == "stsd") {
-      iso::check_stsd_entry_count(n);
-    }
-  }
-
-  void visit(std::vector<std::unique_ptr<BoxNodeT>>& boxes, iso::BoxContext ctx, const std::string& parent) {
+  void visit(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, const std::string& parent) {
     std::map<std::string, int> total;
     for (const auto& b : boxes) {
       ++total[b->fourcc];
     }
     std::map<std::string, int> seen;
-    for (auto& b : boxes) {
+    for (const auto& b : boxes) {
       std::string path = parent.empty() ? b->fourcc : parent + "/" + b->fourcc;
       if (total[b->fourcc] > 1) {
         path += "[" + std::to_string(++seen[b->fourcc]) + "]";
       }
-      const uint64_t begin = b->file_span->offset() + b->header_length;
-      const uint64_t end = b->file_span->offset() + b->file_span->length();
-      decode(*b, ctx, begin, end);
       if (!b->fields.empty()) {
         by_path[path] = json_of_children(b->fields);
       }
-      visit(b->children, ctx.push(cc_of(b->fourcc), b.get()), path);
+      visit(b->children, path);
     }
   }
 
@@ -656,10 +621,9 @@ TEST_CASE("a hvc1 entry is walked: size, depth and the hvcC, colr, pasp and btrt
                        box("pasp", zeros(8)), box("btrt", zeros(12))}));
   const Bytes file = file_with_stsd("vide", cat({be(0, 4), be(1, 4), entry}));
   const ovt::io::MemoryFile mem(file);
-  iso::WalkResult walked = iso::walk(mem);
+  const iso::WalkResult walked = iso::walk(mem);
   Harness h;
-  h.file = &mem;
-  h.visit(walked.top_level, walked.root_ctx, "");
+  h.visit(walked.top_level, "");
   const BoxNodeT* hvc1 = find_box(walked.top_level, "hvc1");
   REQUIRE(hvc1 != nullptr);
   CHECK(child_types(*hvc1) == std::vector<std::string>{"hvcC", "colr", "pasp", "btrt"});
@@ -675,16 +639,36 @@ TEST_CASE("a QuickTime mp4a v1 entry in a .mov: samples_per_packet and esds unde
   const Bytes entry = box("mp4a", cat({qt_audio_v1(), wave_with_esds()}));
   const Bytes file = file_with_stsd("soun", cat({be(0, 4), be(1, 4), entry}), "qt  ");
   const ovt::io::MemoryFile mem(file);
-  iso::WalkResult walked = iso::walk(mem);
+  const iso::WalkResult walked = iso::walk(mem);
   Harness h;
-  h.file = &mem;
-  h.visit(walked.top_level, walked.root_ctx, "");
+  h.visit(walked.top_level, "");
   const auto& f = h.by_path.at("moov/trak/mdia/minf/stbl/stsd/mp4a");
   CHECK(f.at("samples_per_packet") == 1024);
   CHECK(f.at("bytes_per_frame") == 4);
   const BoxNodeT* wave = find_box(walked.top_level, "wave");
   REQUIRE(wave != nullptr);
   CHECK(find_box(wave->children, "esds") != nullptr);
+}
+
+TEST_CASE("the walker raises CNT-1010 when stsd.entry_count differs from the entries it walked",
+          "[container][decoders][stsd]") {
+  const Bytes entry = box("hvc1", cat({visual_fixed(64, 64, 24), box("hvcC", zeros(23))}));
+  SECTION("two declared, one present") {
+    const ovt::io::MemoryFile mem(file_with_stsd("vide", cat({be(0, 4), be(2, 4), entry})));
+    const iso::WalkResult walked = iso::walk(mem);
+    const BoxNodeT* stsd = find_box(walked.top_level, "stsd");
+    REQUIRE(stsd != nullptr);
+    CHECK(child_types(*stsd) == std::vector<std::string>{"hvc1"});
+    REQUIRE(stsd->diagnostics.size() == 1);
+    CHECK(stsd->diagnostics[0]->code == "CNT-1010");
+  }
+  SECTION("one declared, one present") {
+    const ovt::io::MemoryFile mem(file_with_stsd("vide", cat({be(0, 4), be(1, 4), entry})));
+    const iso::WalkResult walked = iso::walk(mem);
+    const BoxNodeT* stsd = find_box(walked.top_level, "stsd");
+    REQUIRE(stsd != nullptr);
+    CHECK(stsd->diagnostics.empty());
+  }
 }
 
 // ---- golden comparison against MP4Box on the container-smoke corpus ----
@@ -700,10 +684,9 @@ std::string last_type(const std::string& path) {
 size_t compare_with_golden(std::string_view id) {
   const auto path = ovt::test::corpus_or_skip(id);
   const auto file = ovt::io::RandomAccessFile::open(path.string());
-  iso::WalkResult walked = iso::walk(*file);
+  const iso::WalkResult walked = iso::walk(*file);
   Harness h;
-  h.file = file.get();
-  h.visit(walked.top_level, walked.root_ctx, "");
+  h.visit(walked.top_level, "");
   std::ifstream gf(std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/golden/isobmff" /
                    (std::string(id) + ".mp4box-diso.json"));
   REQUIRE(gf.good());

@@ -15,6 +15,7 @@
 
 #include "container/diagnostics.h"
 #include "container/isobmff/box_registry.h"
+#include "container/isobmff/decoders/sample_entries.h"
 #include "container/isobmff/field_builder.h"
 
 namespace ovt::container::isobmff {
@@ -362,10 +363,17 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
     children_begin += run_hand_decoder(*st.file, n, *dec, ctx, payload_begin, end, entry->is_fullbox);
   }
   // 2.12. SPEC-ASSUMPTION(#574): a ContainerWithPrefix without a decoder cannot know where its children start, so it
-  // stays a leaf; a decoder's children offset counts from the reader start (after FullBox version/flags).
-  const bool walk = decode && (kind == BoxKind::Container || (kind == BoxKind::ContainerWithPrefix && dec != nullptr));
+  // stays a leaf; a decoder's children offset counts from the reader start (after FullBox version/flags). A decoder
+  // that returns a children offset inside the payload is walked whatever the row's kind: a "<parent>/*" decoder
+  // (the `stsd/*` sample entries) reaches unlisted fourccs through a row that has no kind of its own.
+  const bool prefix_children = dec != nullptr && children_begin > payload_begin && children_begin < end;
+  const bool walk = decode && (kind == BoxKind::Container || (kind == BoxKind::ContainerWithPrefix && dec != nullptr) ||
+                               prefix_children);
   if (walk) {
     n.children = walk_children(st, pos, children_begin, end, depth + 1, ctx.push(type, &n), n.diagnostics);
+    if (dec != nullptr && sv(type) == "stsd") {
+      check_stsd_entry_count(n);  // CNT-1010 needs the children (§8.3.2, #592)
+    }
   } else if (dec == nullptr) {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
   }

@@ -29,6 +29,8 @@
     {"fourcc": "tmcd", "type": "SampleEntry", "description": "QuickTime timecode sample entry", "containers": ["stsd"], "spec_ref": "QTFF", "kind": "ContainerWithPrefix"},
     {"fourcc": "tmcd", "type": "TrackReferenceTypeBox", "description": "QuickTime timecode track reference", "containers": ["tref"], "spec_ref": "QTFF", "kind": "Leaf"},
     {"fourcc": "tmcd", "type": "Box", "description": "QuickTime timecode media information", "containers": ["gmhd"], "spec_ref": "QTFF", "kind": "Container"},
+    {"fourcc": "tx3g", "type": "SampleEntry", "description": "3GPP timed text sample entry", "containers": ["stsd"], "spec_ref": "3GPP TS 26.245 §5.16", "kind": "ContainerWithPrefix"},
+    {"fourcc": "ftab", "type": "Box", "description": "3GPP timed text font table", "containers": ["tx3g"], "spec_ref": "3GPP TS 26.245 §5.16", "kind": "Leaf"},
     {"fourcc": "tcmi", "type": "FullBox", "description": "QuickTime timecode media information", "containers": ["tmcd"], "spec_ref": "QTFF", "versions": [0]},
     {"fourcc": "(c)xyz", "type": "Box", "description": "QuickTime location (ISO 6709 string)", "containers": ["udta"], "spec_ref": "QTFF"},
     {"fourcc": "(c)nam", "type": "Box", "description": "QuickTime user data / iTunes item: title", "containers": ["udta"], "spec_ref": "QTFF", "kind": "Leaf"},
