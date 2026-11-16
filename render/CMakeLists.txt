@@ -55,6 +55,8 @@ endif()
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
+# WI-2.439: overlay colour tables (kOverlayColors, kOverlayColorsCvd), halo rule and legend data (§10.5.2).
+target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
 foreach(shader IN ITEMS diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
