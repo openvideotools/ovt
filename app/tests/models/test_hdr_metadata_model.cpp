@@ -180,6 +180,30 @@ TEST_CASE("SDR content reads SDR (BT.709) and Dolby Vision gets its label", "[fa
   CHECK_FALSE(model.has_metadata());
 }
 
+TEST_CASE("only DEC-HDR-0001 marks the colour rows; an Info DEC-HDR-0002 does not", "[fast][gui][hdr]") {
+  ovt::app::testing::qt_app();
+  HdrMetadataModel model;
+  REQUIRE(model.setFromJson(
+      {{QStringLiteral("kind"), QStringLiteral("DolbyVision")},
+       {QStringLiteral("dv_profile"), 5},
+       {QStringLiteral("color"),
+        QVariantMap{{QStringLiteral("primaries"), 9}, {QStringLiteral("transfer"), 16}, {QStringLiteral("matrix"), 9}}},
+       {QStringLiteral("diagnostics"),
+        QVariantList{QVariantMap{{QStringLiteral("severity"), QStringLiteral("Info")},
+                                 {QStringLiteral("code"), QStringLiteral("DEC-HDR-0002")},
+                                 {QStringLiteral("message"), QStringLiteral("Dolby Vision RPU not applied")}}}}}));
+  for (int i = 0; i < model.rowCount(); ++i) {
+    CHECK_FALSE(model.row(i).value(QStringLiteral("warning")).toBool());
+  }
+  CHECK(model.warning_count() == 0);
+  CHECK(model.findCode(QStringLiteral("DEC-HDR-0002")) == -1);  // shown, but not as a warning row
+  bool shown = false;
+  for (int i = 0; i < model.rowCount(); ++i) {
+    shown = shown || model.row(i).value(QStringLiteral("item")).toString() == QStringLiteral("DEC-HDR-0002");
+  }
+  CHECK(shown);
+}
+
 TEST_CASE("an SDR display: not capable, the reason, SDR status and unknown rows", "[fast][gui][hdr]") {
   ovt::app::testing::qt_app();
   DisplayCapsModel caps;

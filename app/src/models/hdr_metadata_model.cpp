@@ -292,7 +292,7 @@ void HdrMetadataModel::rebuild() {
   // The code of the core's consistency diagnostic, which marks the colour rows (§11.3.14 consistency ⚠).
   QString mismatch_code;
   for (const HdrDiagnostic& d : input_.diagnostics) {
-    if (d.code.startsWith(QLatin1String("DEC-HDR-"))) {
+    if (d.code == QLatin1String("DEC-HDR-0001")) {
       mismatch_code = d.code;
       break;
     }

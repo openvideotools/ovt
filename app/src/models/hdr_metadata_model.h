@@ -51,7 +51,7 @@ struct HdrColor {
   int transfer = 2;
   int matrix = 2;
   int full_range = 0;
-  std::array<std::array<int, 2>, 3> mdcv_primaries{};  // (x, y) in 0.00002 units, as signalled (G, B, R in HEVC)
+  std::array<std::array<int, 2>, 3> mdcv_primaries{};  // (x, y) in 0.00002 units, R, G, B (struct order)
   std::array<int, 2> mdcv_white_point{};
   std::uint32_t mdcv_max_luminance = 0;  // 0.0001 cd/m²
   std::uint32_t mdcv_min_luminance = 0;
