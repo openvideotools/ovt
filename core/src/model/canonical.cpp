@@ -44,6 +44,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "reflect_access.hpp"
 #include "verifier_options.hpp"
 
 namespace ovt::model {
@@ -58,7 +59,7 @@ constexpr std::size_t kFileIdentifierOffset = sizeof(flatbuffers::uoffset_t);
 /// Nested buffers inside nested buffers. The OVT schemas nest one level (Block.ext, FrameInfo.ref_state,
 /// FrameAnalysis.filter_params); a `_type` string may name any table, including the root, so untrusted input
 /// could chain levels without bound (each with its own verifier and copy). Deeper input is rejected.
-constexpr int kMaxNesting = 4;
+constexpr int kMaxNesting = detail::kMaxNestedBuffers;
 
 [[noreturn]] void too_deep(const char* caller, const std::string& path) {
   throw std::invalid_argument(std::string(caller) + ": nested buffers deeper than " + std::to_string(kMaxNesting) +
@@ -380,13 +381,17 @@ class SafeVerifier {
 };
 // NOLINTEND(misc-no-recursion)
 
-bool verifies(const reflection::Schema& schema, const reflection::Object& object, const AlignedCopy& copy) {
-  const auto bytes = copy.bytes();
+/// @p bytes must be 8-byte aligned (an AlignedCopy).
+bool verifies(const reflection::Schema& schema, const reflection::Object& object, ByteView bytes) {
   if (bytes.size() < 2 * sizeof(flatbuffers::uoffset_t) ||
-      flatbuffers::ReadScalar<flatbuffers::uoffset_t>(copy.data()) > bytes.size() - sizeof(flatbuffers::soffset_t)) {
+      flatbuffers::ReadScalar<flatbuffers::uoffset_t>(bytes.data()) > bytes.size() - sizeof(flatbuffers::soffset_t)) {
     return false;
   }
-  return SafeVerifier(schema, bytes).table(object, flatbuffers::GetAnyRoot(copy.data()));
+  return SafeVerifier(schema, bytes).table(object, flatbuffers::GetAnyRoot(bytes.data()));
+}
+
+bool verifies(const reflection::Schema& schema, const reflection::Object& object, const AlignedCopy& copy) {
+  return verifies(schema, object, copy.bytes());
 }
 
 struct Resolved {
@@ -988,6 +993,30 @@ class Differ {
 // NOLINTEND(misc-no-recursion)
 
 }  // namespace
+
+// The helpers shared with the JSON exporter and importer (WI-0.088), declared in reflect_access.hpp.
+namespace detail {
+
+ReflectedRoot resolve_root(SchemaId id, std::string_view root_table, const char* caller) {
+  const auto resolved = resolve(id, root_table, caller);
+  return {resolved.schema, resolved.root};
+}
+
+bool verify_aligned(const reflection::Schema& schema, const reflection::Object& object,
+                    std::span<const std::uint8_t> aligned) {
+  return verifies(schema, object, aligned);
+}
+
+const reflection::Object* find_table(const reflection::Schema& schema, const reflection::Object& context,
+                                     std::string_view name) {
+  return lookup_table(schema, context, name);
+}
+
+const reflection::Field* nested_type_sibling(const reflection::Object& object, const reflection::Field& field) {
+  return nested_type_field(object, field);
+}
+
+}  // namespace detail
 
 std::vector<std::uint8_t> canonicalize(std::span<const std::uint8_t> buffer, SchemaId schema,
                                        std::string_view root_table) {
