@@ -15,6 +15,7 @@
 
 #include "container/diagnostics.h"
 #include "container/isobmff/box_registry.h"
+#include "container/isobmff/decoders/sample_entries.h"
 #include "container/isobmff/field_builder.h"
 
 namespace ovt::container::isobmff {
@@ -370,6 +371,9 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
                                prefix_children);
   if (walk) {
     n.children = walk_children(st, pos, children_begin, end, depth + 1, ctx.push(type, &n), n.diagnostics);
+    if (dec != nullptr && sv(type) == "stsd") {
+      check_stsd_entry_count(n);  // CNT-1010 needs the children (§8.3.2, #592)
+    }
   } else if (dec == nullptr) {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
   }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the group B hand decoders (chapter 08 §8.3.2, WI-1.206): `stsd`, the visual / audio / text / metadata /
-// timecode sample entries, rule R-AUDIO, the children offset a ContainerWithPrefix decoder returns (§8.2.9),
+// timecode sample entries, rule R-AUDIO, the children offset a ContainerWithPrefix decoder returns (§8.2.9), CNT-1010,
 // and the comparison with the MP4Box goldens of the container-smoke corpus.
 
 #include <catch2/catch_test_macros.hpp>
@@ -26,6 +26,7 @@
 
 #include "container/isobmff/box_registry.h"
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/decoders/sample_entries.h"
 #include "container/isobmff/field_builder.h"
 #include "io/memory_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -250,6 +251,34 @@ TEST_CASE("stsd of an unknown version is not decoded and has no children", "[con
   CHECK(has_code(d.node, "CNT-1003"));
   CHECK_FALSE(has_field(d.node, "entry_count"));
   CHECK(d.outcome.children_offset == 16);  // the whole payload after version/flags: nothing left to walk
+}
+
+TEST_CASE("check_stsd_entry_count: CNT-1010 when entry_count differs from the entries found",
+          "[container][decoders][stsd]") {
+  const auto stsd_with = [](uint64_t count, size_t entries) {
+    BoxNodeT n;
+    n.fourcc = "stsd";
+    add_uint(n, "entry_count", count, 96, 32);
+    for (size_t i = 0; i < entries; ++i) {
+      auto c = std::make_unique<BoxNodeT>();
+      c->fourcc = "avc1";
+      n.children.push_back(std::move(c));
+    }
+    auto trailing = std::make_unique<BoxNodeT>();  // the walker's "trailing bytes" node is not an entry
+    n.children.push_back(std::move(trailing));
+    return n;
+  };
+  BoxNodeT ok = stsd_with(2, 2);
+  iso::check_stsd_entry_count(ok);
+  CHECK(ok.diagnostics.empty());
+  BoxNodeT bad = stsd_with(3, 1);
+  iso::check_stsd_entry_count(bad);
+  REQUIRE(bad.diagnostics.size() == 1);
+  CHECK(bad.diagnostics[0]->code == "CNT-1010");
+  BoxNodeT undecoded;
+  undecoded.fourcc = "stsd";
+  iso::check_stsd_entry_count(undecoded);
+  CHECK(undecoded.diagnostics.empty());
 }
 
 TEST_CASE("VisualSampleEntry: size, depth, resolution, compressorname and the children offset",
@@ -619,6 +648,27 @@ TEST_CASE("a QuickTime mp4a v1 entry in a .mov: samples_per_packet and esds unde
   const BoxNodeT* wave = find_box(walked.top_level, "wave");
   REQUIRE(wave != nullptr);
   CHECK(find_box(wave->children, "esds") != nullptr);
+}
+
+TEST_CASE("the walker raises CNT-1010 when stsd.entry_count differs from the entries it walked",
+          "[container][decoders][stsd]") {
+  const Bytes entry = box("hvc1", cat({visual_fixed(64, 64, 24), box("hvcC", zeros(23))}));
+  SECTION("two declared, one present") {
+    const ovt::io::MemoryFile mem(file_with_stsd("vide", cat({be(0, 4), be(2, 4), entry})));
+    const iso::WalkResult walked = iso::walk(mem);
+    const BoxNodeT* stsd = find_box(walked.top_level, "stsd");
+    REQUIRE(stsd != nullptr);
+    CHECK(child_types(*stsd) == std::vector<std::string>{"hvc1"});
+    REQUIRE(stsd->diagnostics.size() == 1);
+    CHECK(stsd->diagnostics[0]->code == "CNT-1010");
+  }
+  SECTION("one declared, one present") {
+    const ovt::io::MemoryFile mem(file_with_stsd("vide", cat({be(0, 4), be(1, 4), entry})));
+    const iso::WalkResult walked = iso::walk(mem);
+    const BoxNodeT* stsd = find_box(walked.top_level, "stsd");
+    REQUIRE(stsd != nullptr);
+    CHECK(stsd->diagnostics.empty());
+  }
 }
 
 // ---- golden comparison against MP4Box on the container-smoke corpus ----
