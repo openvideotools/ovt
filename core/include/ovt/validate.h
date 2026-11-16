@@ -15,8 +15,8 @@
 #ifndef OVT_VALIDATE_H
 #define OVT_VALIDATE_H
 
-#include <stddef.h>
-#include <stdint.h>
+#include <stddef.h> /* NOLINT(modernize-deprecated-headers): a C11 header */
+#include <stdint.h> /* NOLINT(modernize-deprecated-headers): a C11 header */
 
 #include "ovt/status.h"
 
