@@ -11,7 +11,8 @@
 // and compares OVT's trees with the golden: trace_headers element by element (§14.4.1), gstparse member values
 // (§14.4.2). --dump writes OVT's syntax elements as JSON for debugging.
 // SPEC-ASSUMPTION(#603): this driver stands in for `ovt syntax` (WI-1.504) until it exists.
-// Exit: 0 equal, 1 different (or a unit OVT could not parse), 2 usage or input error, 77 skipped (corpus not fetched and OVT_REQUIRE_CORPORA unset).
+// Exit: 0 equal, 1 different (or a unit OVT could not parse), 2 usage or input error, 77 skipped (corpus not fetched
+// and OVT_REQUIRE_CORPORA unset).
 
 #include <fmt/format.h>
 
