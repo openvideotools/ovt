@@ -29,14 +29,12 @@ namespace ovt::container::isobmff {
 
 namespace {
 
-constexpr std::string_view kSpecRef = "ISO/IEC 14496-12:2022 ";
 constexpr uint64_t kMaxDecodedPayload = 1U << 20;  // the walker's window (box_walk.cpp)
 
 // Stamps `spec_ref` on every top-level field a decoder adds, also when the decoder throws (CNT-1002).
 class SpecRefScope {
  public:
-  SpecRefScope(FieldBuilder& fb, std::string_view section)
-      : fb_(fb), first_(fb.node().fields.size()), ref_(std::string(kSpecRef) + std::string(section)) {}
+  SpecRefScope(FieldBuilder& fb, std::string_view ref) : fb_(fb), first_(fb.node().fields.size()), ref_(ref) {}
   SpecRefScope(const SpecRefScope&) = delete;
   SpecRefScope& operator=(const SpecRefScope&) = delete;
   SpecRefScope(SpecRefScope&&) = delete;
@@ -53,7 +51,7 @@ class SpecRefScope {
  private:
   FieldBuilder& fb_;
   size_t first_;
-  std::string ref_;
+  std::string_view ref_;
 };
 
 uint8_t version_of(FieldBuilder& fb) {
@@ -182,7 +180,7 @@ TrackFragmentInfo* track_info(BoxContext& ctx, uint32_t track_id) {
 // ---- mehd (§8.8.2) -------------------------------------------------------------------------------------------
 
 uint64_t decode_mehd(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.2");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.2");
   if (!known_version(fb, 1)) {
     return 0;
   }
@@ -194,7 +192,7 @@ uint64_t decode_mehd(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
 // ---- trex (§8.8.3) -------------------------------------------------------------------------------------------
 
 uint64_t decode_trex(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.3");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.3");
   const uint32_t track_id = fb.u32("track_ID");
   TrackFragmentInfo t;
   t.has_trex = true;
@@ -234,7 +232,7 @@ std::string_view assignment_name(uint64_t type) {
 }
 
 uint64_t decode_leva(BoxContext& /*ctx*/, BitReader& br, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.13");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.13");
   const uint8_t count = fb.u8("level_count");
   fb.array("levels", count);
   for (uint32_t i = 0; i < count; ++i) {
@@ -266,7 +264,7 @@ uint64_t decode_leva(BoxContext& /*ctx*/, BitReader& br, FieldBuilder& fb) {
 // ---- mfhd (§8.8.5) -------------------------------------------------------------------------------------------
 
 uint64_t decode_mfhd(BoxContext& /*ctx*/, BitReader& /*br*/, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.5");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.5");
   fb.u32("sequence_number");
   check_fixed_size_end(fb);
   return 0;
@@ -283,7 +281,7 @@ constexpr uint32_t kDurationIsEmpty = 0x10000;
 constexpr uint32_t kDefaultBaseIsMoof = 0x20000;
 
 uint64_t decode_tfhd(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.7");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.7");
   if (!known_version(fb, 0)) {
     return 0;
   }
@@ -357,7 +355,7 @@ uint64_t decode_tfhd(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
 // ---- tfdt (§8.8.12) ------------------------------------------------------------------------------------------
 
 uint64_t decode_tfdt(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.12");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.12");
   if (!known_version(fb, 1)) {
     return 0;
   }
@@ -432,7 +430,7 @@ void read_run_entry(FieldBuilder& fb, uint32_t flags, bool wide_cts_signed, bool
 }
 
 uint64_t decode_trun(BoxContext& /*ctx*/, BitReader& br, FieldBuilder& fb) {
-  const SpecRefScope scope(fb, "§8.8.8");
+  const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.8.8");
   if (!known_version(fb, 1)) {
     return 0;
   }
