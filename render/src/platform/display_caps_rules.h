@@ -61,7 +61,9 @@ ScreenQuery screen_query_override();
 // Re-probe triggers (§10.4.5 step 4): while the object lives, `on_change` is called (on the platform's UI thread) when
 // the screen changes, or its potential or current EDR headroom changes by more than 5 % (headroom_changed()), seen by
 // screen-parameter notifications and a 500 ms timer. The host then calls display_probe() again. nullptr where the
-// platform has no such trigger (Linux: WI-4.451, Android: WI-4.458). Destruction never blocks on the UI thread.
+// platform has no such trigger (Linux: WI-4.451, Android: WI-4.458). Destruction never blocks on the UI thread, so a
+// destruction on another thread can still see one `on_change` already in flight on the UI thread; destroy it on the UI
+// thread when the callback captures state that dies with the watcher.
 class DisplayWatcher {
  public:
   DisplayWatcher() = default;

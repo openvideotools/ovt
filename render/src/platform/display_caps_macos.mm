@@ -10,6 +10,7 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -178,7 +179,7 @@ class MacDisplayWatcher final : public DisplayWatcher {
       state->have_last = true;
       state->last_potential = pot;
       state->last_current = cur;
-      if (changed && !first) {
+      if (changed && !first && !state->stopped) {  // re-checked: the destructor may have run since the top
         state->on_change();
       }
     };
@@ -211,7 +212,7 @@ class MacDisplayWatcher final : public DisplayWatcher {
   MacDisplayWatcher& operator=(MacDisplayWatcher&&) = delete;
   ~MacDisplayWatcher() override {
     auto state = state_;
-    state->stopped = true;
+    state->stopped = true;                        // atomic: read on the main thread by the check block
     dispatch_async(dispatch_get_main_queue(), ^{  // never wait for the main thread here
       [state->timer invalidate];
       state->timer = nil;
@@ -228,7 +229,7 @@ class MacDisplayWatcher final : public DisplayWatcher {
     std::function<void()> on_change;
     NSTimer* timer = nil;
     NSMutableArray<id>* tokens = nil;
-    bool stopped = false;
+    std::atomic<bool> stopped{false};
     bool have_last = false;
     float last_potential = 0.0F;
     float last_current = 0.0F;
