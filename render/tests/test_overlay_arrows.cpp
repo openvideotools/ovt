@@ -562,7 +562,8 @@ TEST_CASE("render_test_arrows: list coding, MvBi, strokes and R-MV-1 (§10.5.4)"
   }
 }
 
-// SPEC-ASSUMPTION(#645): the golden is §10.9.2's 1080p viewport; the 4K AT1 test compares its centre with it.
+// Per the WI-2.434 AT1 wording (issue #645): the golden is §10.9.2's 1080p viewport; the 4K AT1 test compares its
+// centre with it.
 // The overlay golden (§10.9.2 item 4: 1920x1080 viewport, dpr 1): the centre of synthetic_4k_mv at zoom 1, so most of
 // the frame's 518,400 instances are culled in the vertex shader and the rest are drawn. Determinism: two renders
 // are byte-identical (§10.9.2 item 5).
@@ -583,7 +584,7 @@ TEST_CASE("render_test_arrows: synthetic_4k_mv golden (§10.9.2)", "[fast][rende
 // Acceptance test 1: all 518,400 arrows at zoom 1 in a 3840x2160 viewport, on the GPU runners only (chapter 14
 // §14.9.2). The central 1920x1080 of the render must match the same golden (the view is the 1080p golden's, moved
 // by whole pixels), and the arrow passes' time is reported as the bench_overlay_4k_mv_arrows counter.
-// SPEC-ASSUMPTION(#645): libovt-render disables libplacebo's timestamp queries (vk_no_timestamps.cpp, a
+// Issue #645 (WI-2.434 AT1): libovt-render disables libplacebo's timestamp queries (vk_no_timestamps.cpp, a
 // MoltenVK use-after-free), so the counter is the median wall time of render() + readback with arrows minus without.
 TEST_CASE("render_test_arrows: 518,400 arrows at 4K (AT1)", "[.gpu][render][overlay]") {
   const std::vector<uint8_t> fa = synthetic_4k_mv();

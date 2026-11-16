@@ -188,6 +188,10 @@ jobs:
       - name: Tests that cite slow streams carry [slow] (WI-0.552c)
         run: python -I tools/check_slow_labels.py
 
+      # FR-CNT-104 (chapter 08 §8.8, WI-1.234): the GUI and the Python package read file bytes only through the core.
+      - name: no_direct_file_access
+        run: python -I tools/lint_no_direct_file_access.py
+
       - name: Tool tests
         run: python -m pytest -q tools/tests
 

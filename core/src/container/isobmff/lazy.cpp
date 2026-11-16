@@ -59,6 +59,7 @@ ovt_status IsobmffReader::expand(uint64_t box_offset) {
   expand_node(file_, **node, it->ctx);
   index((*node)->children);
   deferred_.erase(it);
+  ++revision_;
   return OVT_OK;
 }
 

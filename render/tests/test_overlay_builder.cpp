@@ -259,6 +259,22 @@ TEST_CASE("render_test_overlay_malformed_input", "[render][overlay]") {
   const auto empty = builder.build(static_cast<const ovt::fb::FrameAnalysis*>(nullptr), cfg);
   REQUIRE(empty != nullptr);
   CHECK_FALSE(empty->diagnostics.empty());
+
+  // A grid size that no per-cell vector backs (a 50-byte buffer claiming 30 M cells, issue #649) keeps its size for
+  // the arrow pass but builds no attributes or heatmap, so the work stays bounded by the input.
+  flatbuffers::FlatBufferBuilder fbb;
+  const auto grid = ovt::fb::CreateCellGrid(fbb, 2490384, 12);
+  ovt::fb::FrameAnalysisBuilder fab(fbb);
+  fab.add_grid(grid);
+  ovt::fb::FinishFrameAnalysisBuffer(fbb, fab.Finish());
+  OverlayConfig all = cfg;
+  all.layers = layer(OverlayLayer::PredFill) | layer(OverlayLayer::SkipHatch);
+  const auto bare = builder.build(fbb.GetBufferPointer(), fbb.GetSize(), all);
+  REQUIRE(bare != nullptr);
+  CHECK(bare->cells_w == 2490384);
+  CHECK(bare->cell_attributes.empty());
+  CHECK(bare->heatmap.empty());
+  CHECK(bare->diagnostics.size() == 1);
 }
 
 TEST_CASE("render_test_overlay_deterministic", "[render][overlay]") {
