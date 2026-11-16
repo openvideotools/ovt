@@ -25,6 +25,6 @@ Result: 1.40 s ≤ 1.5 s on a busy M4. Still to do: a quiet-machine rerun, then 
 
 ## Test 2: Pixel Tablet time recorded and the GUI progress requirement confirmed
 
-Deferred to #610 (WI-2.168b): needs the `pixel-tablet` device (`needs-hardware:pixel-tablet`) and the Android build of the plugin. The
-README's estimate is 2–3 s against the 5 s budget. When the device is available, run the same binary through
-`tools/perf_run.py --android` and add the time and the GUI progress/cancel check here.
+Deferred to #610 (WI-2.168b): needs the `pixel-tablet` device (`needs-hardware:pixel-tablet`) and the Android
+build of the plugin. The README's estimate is 2–3 s against the 5 s budget. When the device is available, run the same
+binary through `tools/perf_run.py --android` and add the time and the GUI progress/cancel check here.
