@@ -14,6 +14,7 @@ target_sources(
           isobmff/box_walk.cpp
           isobmff/decoders/movie.cpp
           isobmff/field_builder.cpp
+          isobmff/lazy.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp

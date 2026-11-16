@@ -1,0 +1,55 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: LGPL-2.1-or-later
+//
+// The ISOBMFF container reader (chapter 08 §8.2.4, WI-1.204): the eager box walk with header-only `moof`s, the
+// `mfro`/`mfra` index location and `ovt_container_expand`.
+
+#ifndef OVT_CONTAINER_ISOBMFF_LAZY_H
+#define OVT_CONTAINER_ISOBMFF_LAZY_H
+
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <unordered_set>
+#include <vector>
+
+#include "container/container.hpp"
+#include "container/isobmff/box_walk.h"
+#include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt_container_generated.h"
+
+namespace ovt::container::isobmff {
+
+class IsobmffReader final : public Reader {
+ public:
+  explicit IsobmffReader(const io::RandomAccessFile& file) : file_(file) {}
+
+  // False when the file is not ISOBMFF at all (CNT-0006). Walks the top level (§8.2.4 rules 1-5).
+  [[nodiscard]] bool open();
+
+  [[nodiscard]] std::vector<uint8_t> tree() const override;
+  // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
+  ovt_status expand(uint64_t box_offset) override;
+
+  // The `mfra` located through `mfro` (§8.2.4 rule 4) and confirmed by the walk; nullopt otherwise.
+  [[nodiscard]] std::optional<uint64_t> mfra_offset() const noexcept { return mfra_offset_; }
+  // Number of boxes still waiting for expand().
+  [[nodiscard]] size_t unexpanded() const noexcept { return deferred_.size(); }
+
+ private:
+  void index(const BoxNodes& nodes);
+
+  const io::RandomAccessFile& file_;
+  fb::ContainerTreeT tree_;
+  std::vector<DeferredBox> deferred_;
+  std::unordered_set<uint64_t> offsets_;  // file offset of every box in the tree
+  std::optional<uint64_t> mfra_offset_;
+};
+
+// nullptr with *why = OVT_E_CORRUPT when the first bytes are not a box header (CNT-0006). Throws io::IoError on an I/O
+// failure. `file` must outlive the reader.
+[[nodiscard]] std::unique_ptr<Reader> make_reader(const io::RandomAccessFile& file, ovt_status* why);
+
+}  // namespace ovt::container::isobmff
+
+#endif  // OVT_CONTAINER_ISOBMFF_LAZY_H
