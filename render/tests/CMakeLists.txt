@@ -119,3 +119,8 @@ target_compile_definitions(ovt_tests_render
 
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-1.412: PNG export (§10.8): HdrPng16 / SdrPng8 / ViewPng8 and their cICP, mDCV and cLLi chunks. The test decodes the
+# exports with the vendored lodepng (third_party/lodepng), linked statically into the test as well.
+target_sources(ovt_tests_render PRIVATE test_export.cpp)
+target_link_libraries(ovt_tests_render PRIVATE lodepng::lodepng)

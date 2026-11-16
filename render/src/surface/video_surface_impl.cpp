@@ -8,9 +8,10 @@
 // dithering (WI-1.403), the compare modes of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp),
 // overlays, measurements
 // (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are
-// inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
-// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the
-// swapchain with the content's static HDR metadata on init and on source change (§10.3.6).
+// inert. WI-1.412 adds the picture and view PNG exports of §10.8 (render/src/export/). WI-1.406 adds NATIVE targets: a
+// libplacebo swapchain on the surface of a platform NativeOutput (src/platform/native_target.h), retarget() EMBEDDED
+// <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the swapchain with the content's static HDR metadata on
+// init and on source change (§10.3.6).
 
 #include <algorithm>
 #include <array>
@@ -33,6 +34,7 @@
 
 #include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
+#include "export/png_export.h"
 #include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
@@ -354,6 +356,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   void render(const ViewState& view) override {
+    last_view_ = view;  // export_png(..., nullptr) exports with the view of the last render (§10.8)
     if (native_ != nullptr) {
       render_native(view);
       return;
@@ -407,7 +410,10 @@ class VideoSurfaceImpl final : public VideoSurface {
     return m;
   }
 
-  bool export_png(const char* path, ExportKind kind, const ViewState* /*view_or_null*/) override {
+  // §10.8. SPEC-ASSUMPTION(#637): a null view stands for the ViewState of the last render() (the default ViewState
+  // before the first one).
+  bool export_png(const char* path, ExportKind kind, const ViewState* view_or_null) override {
+    const ViewState& view = view_or_null != nullptr ? *view_or_null : last_view_;
     switch (kind) {
       case ExportKind::ScopeWaveformPng:
         return export_scope(path, detail::ScopeKind::Waveform);
@@ -417,10 +423,11 @@ class VideoSurfaceImpl final : public VideoSurface {
         return export_scope(path, detail::ScopeKind::CieXy);
       case ExportKind::HdrPng16:
       case ExportKind::SdrPng8:
+        return export_picture(path, kind, view);
       case ExportKind::ViewPng8:
-        break;
+        return export_view(path, view);
     }
-    error_ = "export_png is not implemented yet for this kind (chapter 10 §10.8, WI-1.412)";
+    error_ = "export_png: unknown ExportKind";
     return false;
   }
 
@@ -704,6 +711,163 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     const std::vector<uint8_t> rgb = detail::scope_png_rgb(texels, width, height);
     if (!detail::write_png_rgb8(path, rgb, width, height)) {
+      error_ = std::string("export_png: cannot write ") + (path != nullptr ? path : "(null)");
+      return false;
+    }
+    error_.clear();
+    return true;
+  }
+
+  // ExportKind::HdrPng16 and SdrPng8 (§10.8, WI-1.412): picture A alone (no overlays, no compare view) at its native
+  // resolution with the crop applied, rendered offscreen into a texture of its own (the output texture and the host's
+  // view are untouched) and written with lodepng. HdrPng16 of a PQ/HLG source keeps the source's transfer and HDR
+  // metadata (no tone mapping, no dither; cICP 9,16|18,0,1 plus mDCV/cLLi from the source); SdrPng8 tone- and
+  // gamut-maps with `view` (peak detection off, as for every offscreen render, so the bytes are reproducible).
+  bool export_picture(const char* path, ExportKind kind, const ViewState& view) {
+    if (!slot_a_.valid) {
+      error_ = "export_png: no picture in slot A";
+      return false;
+    }
+    const pl_rect2df src = detail::source_rect(slot_a_, true);
+    const auto w = static_cast<int>(std::lround(src.x1 - src.x0));
+    const auto h = static_cast<int>(std::lround(src.y1 - src.y0));
+    if (w <= 0 || h <= 0) {
+      error_ = "export_png: the picture's crop window is empty";
+      return false;
+    }
+    const detail::ExportTarget et = detail::export_target(kind, slot_a_.frame.color);
+    pl_tex tex = export_texture(w, h, et.bit_depth == 16 ? "rgba16" : "rgba8");
+    if (tex == nullptr) {
+      return false;
+    }
+    union pl_clear_color black = {};
+    black.f[3] = 1.0F;
+    pl_tex_clear_ex(gpu_, tex, black);
+
+    struct pl_frame image = slot_a_.frame;
+    image.crop = src;
+    struct pl_frame target = texture_frame(tex);
+    target.color = et.color;
+    target.crop = pl_rect2df{0.0F, 0.0F, static_cast<float>(w), static_cast<float>(h)};
+    ViewState v = view;
+    v.zoom = 1.0;  // native resolution: 1:1, so neither the upscaler nor the downscaler runs
+    if (kind == ExportKind::HdrPng16) {
+      v.dither = false;
+      v.target_peak_override = 0.0F;
+      if (et.hdr_pass) {
+        v.tone_map = ToneMap::None;
+      }
+    }
+    // The encoding only selects the colour depth and the dither rule here; 16-bit exports set their depth below.
+    params_.build(v, et.bit_depth == 16 ? DisplayTarget::OutputEncoding::Pq10 : DisplayTarget::OutputEncoding::Srgb8,
+                  true, image.color, target);
+    target.repr.bits.color_depth = et.bit_depth;
+    if (et.hdr_pass) {
+      target.color.hdr = et.color.hdr;  // the source's own metadata: an identity mapping, not a tone curve
+    }
+    bool ok = pl_render_image(renderer_, &image, &target, &params_.params());
+    std::vector<uint8_t> texels;
+    ok = ok && download_texture(tex, texels);
+    pl_tex_destroy(gpu_, &tex);
+    if (!ok) {
+      error_ = "export_png: the offscreen render or its readback failed";
+      return false;
+    }
+    detail::PngImage png;
+    static_cast<void>(detail::pack_samples(texels, et.bit_depth == 16 ? 8 : 4, w, h, 3, png));
+    png.has_cicp = true;
+    png.cicp = et.cicp;
+    if (et.hdr_pass) {
+      png.hdr = detail::hdr_chunks(slot_a_.frame.color.hdr);
+    }
+    return write_png(path, png);
+  }
+
+  // ExportKind::ViewPng8 (§10.8, WI-1.412): the viewport as displayed (zoom, pan, overlays, compare view, analysis
+  // views) rendered once more in the EMBEDDED Srgb8 encoding into an RGBA8 texture of the target's size. The PNG keeps
+  // the alpha channel when the background (or anything drawn) is not opaque, so an overlay-only export over
+  // background_rgba = 0x00000000 is transparent. SPEC-ASSUMPTION(#637): colour type 6 only then, otherwise 2.
+  bool export_view(const char* path, const ViewState& view) {
+    pl_tex tex = export_texture(target_.width, target_.height, "rgba8");
+    if (tex == nullptr) {
+      return false;
+    }
+    const DisplayTarget::OutputEncoding displayed = active_;
+    active_ = DisplayTarget::OutputEncoding::Srgb8;  // texture_frame() and draw_*() read it
+    offscreen_.begin_frame();  // analysis-view and scope textures held by the host come back for the passes
+    pl_tex_clear_ex(gpu_, tex, background(view));
+    if (slot_a_.valid) {
+      struct pl_frame target = texture_frame(tex);
+      draw_picture(view, target, true);
+    }
+    std::vector<uint8_t> texels;
+    const bool ok = download_texture(tex, texels);
+    offscreen_.end_frame();
+    active_ = displayed;
+    pl_tex_destroy(gpu_, &tex);
+    if (!ok) {
+      error_ = "export_png: the offscreen render or its readback failed";
+      return false;
+    }
+    detail::PngImage png;
+    static_cast<void>(
+        detail::pack_samples(texels, 4, target_.width, target_.height, detail::has_transparency(texels) ? 4 : 3, png));
+    return write_png(path, png);
+  }
+
+  // A renderable, host-readable export texture of w x h (§10.8); nullptr with error_ set when the GPU has no such
+  // format.
+  pl_tex export_texture(int w, int h, const char* format) {
+    pl_fmt fmt = pl_find_named_fmt(gpu_, format);
+    const auto needed =
+        static_cast<enum pl_fmt_caps>(PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_HOST_READABLE | PL_FMT_CAP_BLITTABLE);
+    if (fmt == nullptr || (fmt->caps & needed) != needed) {
+      error_ = std::string("export_png: no renderable, host-readable ") + format + " texture on this GPU";
+      return nullptr;
+    }
+    struct pl_tex_params tp = {};
+    tp.w = w;
+    tp.h = h;
+    tp.format = fmt;
+    tp.renderable = true;
+    tp.host_readable = true;
+    tp.blit_dst = true;
+    pl_tex tex = pl_tex_create(gpu_, &tp);
+    if (tex == nullptr) {
+      error_ = std::string("export_png: cannot create a ") + std::to_string(w) + "x" + std::to_string(h) + " " +
+               format + " texture";
+    }
+    return tex;
+  }
+
+  // Downloads a whole texture (tightly packed rows) through an explicit host-readable buffer, as read_scope() does.
+  bool download_texture(pl_tex tex, std::vector<uint8_t>& bytes) {
+    const size_t row = static_cast<size_t>(tex->params.w) * tex->params.format->texel_size;
+    bytes.assign(row * static_cast<size_t>(tex->params.h), 0);
+    struct pl_buf_params bp = {};
+    bp.size = bytes.size();
+    bp.host_readable = true;
+    pl_buf buf = pl_buf_create(gpu_, &bp);
+    if (buf == nullptr) {
+      return false;
+    }
+    struct pl_tex_transfer_params tp = {};
+    tp.tex = tex;
+    tp.row_pitch = row;
+    tp.buf = buf;
+    const bool ok = pl_tex_download(gpu_, &tp) && pl_buf_read(gpu_, buf, 0, bytes.data(), bp.size);
+    pl_buf_destroy(gpu_, &buf);
+    return ok;
+  }
+
+  bool write_png(const char* path, const detail::PngImage& image) {
+    std::vector<uint8_t> bytes;
+    std::string why;
+    if (!detail::encode_png(image, bytes, why)) {
+      error_ = "export_png: PNG encode failed: " + why;
+      return false;
+    }
+    if (!detail::write_file(path, bytes)) {
       error_ = std::string("export_png: cannot write ") + (path != nullptr ? path : "(null)");
       return false;
     }
@@ -1029,6 +1193,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
+  ViewState last_view_;  // of the last render(): the view of export_png(..., nullptr)
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)

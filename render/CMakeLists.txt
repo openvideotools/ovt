@@ -26,6 +26,11 @@ target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce
                                   src/measure/measurer.cpp src/measure/false_color.cpp)
 # WI-4.454: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
 target_sources(ovt_render PRIVATE src/measure/scopes.cpp src/measure/gamut_tables.cpp)
+# WI-1.412: PNG export of the picture and the view (§10.8) with the vendored lodepng (third_party/lodepng, Zlib), linked
+# statically and hidden inside libovt_render.
+add_subdirectory("${PROJECT_SOURCE_DIR}/third_party/lodepng" "${CMAKE_BINARY_DIR}/third_party/lodepng")
+target_sources(ovt_render PRIVATE src/export/png_export.cpp)
+target_link_libraries(ovt_render PRIVATE lodepng::lodepng)
 include(OvtEmbedShaders)
 ovt_embed_shaders(
   "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h"

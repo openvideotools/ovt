@@ -22,6 +22,7 @@ Columns: Name | Version / commit | Licence (SPDX) | URL | Patches (relative path
 | Gradle / AGP | 8.10 / 8.6.0 | Apache-2.0 | gradle-wrapper (distributionSha256Sum set) | – | `<sha>` | android/gradle/wrapper | versions Qt 6.8 tests against |
 | Qt Gradle Plugin | 1.2 | LGPL-3.0-only | Maven Central `org.qtproject.qt.gradleplugin` | – | – (Gradle verifies) | android/build.gradle.kts | versioned independently of Qt |
 | KDDockWidgets | 2.2.x | GPL-2.0-only OR GPL-3.0-only (open-source) | <https://github.com/KDAB/KDDockWidgets> | – | `<sha>` | third_party/kddockwidgets.cmake | GUI docking (chapter 11) — GPL-3 chosen |
+| lodepng | 20261102 (`7b2893e35891c0c85bee5595caafaf3c2044b409`) | Zlib | <https://github.com/lvandeve/lodepng> | – | – (vendored; pinned by the commit) | third_party/lodepng (vendored) | PNG export of chapter 10 §10.8 (WI-1.412); upstream files plus a four-line SPDX marker (third_party/lodepng/README.md) |
 | QHexView | `<commit>` | MIT | <https://github.com/Dax89/QHexView> | – | – | app/third_party (vendored) | |
 | UVQ models | google/uvq `c204ecc04f093e90c941cb126c7ac3d5beca0414` (`UVQ_COMMIT`) | Apache-2.0 | <https://github.com/google/uvq> | – | – (git); checkpoint hashes in tools/uvq_export/weights.sha256, exported .onnx hashes in core/share/models/uvq/manifest.json | tools/uvq_export/export_uvq.py | PyTorch revision (#47), same pin as the oracle image; models downloaded on first use (§9.6.3), not committed |
 | VMAF models | in libvmaf | BSD-2-Clause-Patent | – | – | – | built-in | |
