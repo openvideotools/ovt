@@ -21,7 +21,9 @@
 #include <QtQml/qqmlregistration.h>
 #include <QColor>
 #include <QQuickRhiItem>
+#include <QRect>
 #include <QString>
+#include <QVariantList>
 
 #include <cstdint>
 #include <memory>
@@ -55,6 +57,8 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(bool hasPicture READ has_picture NOTIFY pictureChanged)
   Q_PROPERTY(int pictureWidth READ picture_width NOTIFY pictureChanged)
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
+  // Picture::crop (conformance window / render_size, luma samples); a null rect when the picture has none.
+  Q_PROPERTY(QRect crop READ crop NOTIFY pictureChanged)
   // Renderer state for the status strip and the tests.
   Q_PROPERTY(QString interop READ interop NOTIFY statsChanged)
   Q_PROPERTY(QString lastError READ last_error NOTIFY statsChanged)
@@ -89,6 +93,11 @@ class PictureHost : public QQuickRhiItem {
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
   [[nodiscard]] int picture_width() const noexcept;
   [[nodiscard]] int picture_height() const noexcept;
+  [[nodiscard]] QRect crop() const;
+  // The [Y, U, V] code values of the picture at luma sample (x, y) (chroma: the sample covering it), for the Picture
+  // panel's read-out (WI-1.456); [] outside the picture or without one. Read from the CPU copy of the frame, so it
+  // works before VideoSurface::pick() exists (WI-2.435).
+  Q_INVOKABLE [[nodiscard]] QVariantList codeValues(int x, int y) const;
 
   [[nodiscard]] QString interop() const { return stats_.interop; }
   [[nodiscard]] QString last_error() const { return stats_.error; }
