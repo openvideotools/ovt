@@ -6,9 +6,8 @@
 
 add_subdirectory(mock_plugin)
 
-add_executable(ovt_tests_analysis test_analysis_plugin_registry.cpp test_analysis_session.cpp test_analysis_hash_check.cpp
-                                  abi_header_c_first.c
-                                  abi_header_c_second.c)
+add_executable(ovt_tests_analysis test_analysis_plugin_registry.cpp test_analysis_session.cpp
+                                  test_analysis_hash_check.cpp abi_header_c_first.c abi_header_c_second.c)
 target_include_directories(ovt_tests_analysis PRIVATE "${PROJECT_SOURCE_DIR}/core/src/analysis")
 target_link_libraries(ovt_tests_analysis PRIVATE ovt_core_objects ovt::flags ${Catch2_TARGET})
 target_compile_definitions(ovt_tests_analysis PRIVATE "OVT_MOCK_PLUGIN_ROOT=\"${OVT_MOCK_PLUGIN_ROOT}\"")
