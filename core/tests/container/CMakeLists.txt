@@ -8,6 +8,7 @@ add_executable(
   ovt_tests_container
   annexb_test.cpp
   box_walk_test.cpp
+  byte_service_test.cpp
   c_api_test.cpp
   decoders_codec_config_test.cpp
   decoders_movie_test.cpp
