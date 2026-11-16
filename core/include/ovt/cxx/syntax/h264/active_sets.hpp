@@ -135,7 +135,7 @@ class ActiveSets {
   ParameterSets tables_{};
   bool tables_dirty_ = true;
   bool picture_open_ = false;
-  std::bitset<kMaxPps> picture_pps_{};  // every PPS id a slice of the open picture used
+  std::bitset<kMaxPps> picture_pps_;  // every PPS id a slice of the open picture used
   int active_sps_ = -1;
   int active_subset_sps_ = -1;
   uint64_t next_generation_ = 1;
