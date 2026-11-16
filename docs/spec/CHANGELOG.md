@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc36 — 2026-11-16
+
+PATCH-level: spec-amendment pass 16 folds in the accepted answers of `spec-question` issue #574 points 2–7 from WI-1.203 (PR #579); point 1 (licence of the committed MP4RA / FileFormatConformance snapshots) awaits the owner and the issue stays open. No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 8 §8.2.10 steps 2–4 and snippet — one `"*"` row per fourcc plus `*/<container>` rows for differing definitions (~600 rows); class containers expand to fourccs, `file` is the top-level token, bare classes leave `allowed_parents` empty; sample entries are `ContainerWithPrefix`; strict child-box heuristic; `0xFF` / `0xFFFFFF` unknown masks; `has_trailing_data_ok` list; `spec_ref` sources; extras with `spec_ref`, `kind` override and several entries per fourcc — WI-1.203 (#574 points 2–6)
+- 8 §8.2.3 step 12 — a `ContainerWithPrefix` without a hand decoder stays a leaf; the children offset is relative to the reader start after version/flags; one mutable `BoxContext` per child list; a `"*"` decoder decorates every more specific row of its fourcc — WI-1.203, WI-1.204 (#574 point 7)
+
 ## 1.0.0-rc35 — 2026-11-15
 
 PATCH-level: spec-amendment pass 15 folds in the accepted answers of `spec-question` issues #558 from WI-1.230 (PR #518), #567 from WI-1.205 (PR #571), #568 from WI-1.111 (PR #573), #569 from WI-4.206 (PR #572), #570 from WI-1.114 (PR #575) and #566 from WI-3.590 (PR #576). New diagnostic codes are registered (D2: `SYN-H265-0051`, `SYN-H265-0052`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
