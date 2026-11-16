@@ -1,0 +1,1061 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: 2026-11-16
+Subject: [PATCH] Keep PU/TU syntax and CU/CTB bit positions
+
+Extends the DE265_INTERNALS build (patch 0001) with an opt-in store of the syntax elements
+that the decoder reads and then drops. A decoder context with
+de265_internals_set_parameter_bool(ctx, DE265_INTERNALS_PARAM_KEEP_SYNTAX, 1) keeps, for
+every picture it starts afterwards:
+
+  - per 4x4, the prediction-unit syntax as signalled (merge_flag, merge_idx, inter_pred_idc,
+    ref_idx_lX, mvp_lX_flag, MvdLX; prev_intra_luma_pred_flag, mpm_idx,
+    rem_intra_luma_pred_mode, intra_chroma_pred_mode), written in read_prediction_unit(),
+    read_prediction_unit_SKIP() and the intra branch of read_coding_unit(),
+  - per 4x4, the transform-unit syntax (cbf_luma/cb/cr, transform_skip_flag,
+    explicit_rdpcm_flag/dir, LastSignificantCoeffX/Y, the number of non-zero coefficients,
+    cu_qp_delta_abs/sign, cu_chroma_qp_offset_flag/idx), gathered in residual_coding() and
+    written at the end of read_transform_unit(),
+  - the entropy-coded size of every coding unit (start to end of coding_unit()) and of every
+    CTB (end of the previous CTB to the end of coding_tree_unit() and
+    end_of_slice_segment_flag), in 1/8 bits from the CABAC decoder position. The last CTB of
+    a substream or slice segment also takes the end_of_subset_one_bit, the byte alignment and
+    the bits up to rbsp_slice_segment_trailing_bits, so that the CTBs of a slice segment add
+    up to its slice_segment_data() size exactly, with and without worker threads.
+
+They are read with de265_internals_get_PU_syntax(), _get_TU_syntax(), _get_CU_bits_x8() and
+_get_CTB_bits_x8(). With KEEP_SYNTAX off nothing is allocated and each write point is one
+pointer test; decoded pictures are identical with it on and off.
+
+All new functions have C linkage and the de265_internals_ prefix (the internal ones are
+declared in de265_internals_syntax.h, not installed), so the ON library still adds only
+de265_internals_* symbols; every change is compiled only when DE265_INTERNALS is defined, so
+the OFF library stays identical to upstream. Every modified upstream file carries a dated
+modification notice (GPL-3.0 section 5(a), through LGPL-3.0); the new header is
+LGPL-3.0-or-later like libde265.
+
+Upstream-Status: Pending [to be offered to strukturag/libde265 after patch 0001, WI-2.167]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-3.0-or-later
+Rationale: merge/AMVP choices, motion vector differences, per-component cbf, transform skip,
+  coefficient counts and bit positions exist only transiently inside slice.cc (chapter 07
+  section 7.6.2, patch 0002).
+---
+ libde265/de265_internals.cc       | 255 +++++++++++++++++++++++++++++++++++++-
+ libde265/de265_internals.h        |  93 +++++++++++++-
+ libde265/de265_internals_syntax.h |  74 +++++++++++
+ libde265/decctx.cc                |  13 ++
+ libde265/decctx.h                 |  19 +++
+ libde265/image.cc                 |  14 +++
+ libde265/image.h                  |   9 ++
+ libde265/slice.cc                 | 188 ++++++++++++++++++++++++++++
+ 8 files changed, 663 insertions(+), 2 deletions(-)
+
+diff --git a/libde265/de265_internals.cc b/libde265/de265_internals.cc
+index bf14e73..7c7d617 100644
+--- a/libde265/de265_internals.cc
++++ b/libde265/de265_internals.cc
+@@ -20,9 +20,14 @@
+ 
+ /* Read-only internals API (OVT patch 0001). Reads the metadata arrays of a decoded
+    de265_image; changes nothing. The public functions take unit coordinates; the
+-   de265_image accessors take luma sample coordinates, so every function converts. */
++   de265_image accessors take luma sample coordinates, so every function converts.
++   PU/TU syntax and bit positions (OVT patch 0002): the de265_internals_store_* functions that
++   slice.cc calls while a picture is decoded, and the getters of what they keep (after the
++   patch 0001 getters). */
+ 
+ #include "de265_internals.h"
++#include "de265_internals_syntax.h"
++#include "decctx.h"
+ #include "image.h"
+ #include "pps.h"
+ #include "slice.h"
+@@ -30,6 +35,8 @@
+ 
+ #include <string.h>
+ 
++#include <new>
++
+ 
+ struct de265_internals_access
+ {
+@@ -362,3 +369,249 @@ void de265_internals_get_sps_sizes(const struct de265_image* img, int* CtbLog2Si
+   if (PicWidthInCtbsY)  *PicWidthInCtbsY  = ok ? sps->PicWidthInCtbsY  : 0;
+   if (PicHeightInCtbsY) *PicHeightInCtbsY = ok ? sps->PicHeightInCtbsY : 0;
+ }
++
++
++/* --- PU/TU syntax and bit positions (OVT patch 0002) ---
++   Plain arrays and free functions only, so that the library's external symbols stay the
++   upstream ones plus de265_internals_* (no template instantiations, no member functions). */
++
++/* What one picture keeps; de265_image::internals_syntax points here. Each array has the
++   layout of the patch 0001 array of the same unit: pu = pb_info, tu = the 4x4 view of
++   tu_info, cu_bits = cb_info, ctb_bits = ctb_info. */
++struct de265_internals_syntax
++{
++  de265_internals_layout pu_l, tu_l, cb_l, ctb_l;
++  de265_internals_pu_syntax* pu;
++  de265_internals_tu_syntax* tu;
++  uint32_t* cu_bits;
++  uint32_t* ctb_bits;
++};
++
++namespace {
++
++size_t units(const de265_internals_layout& l) { return (size_t)l.width_in_units * l.height_in_units; }
++
++bool same_layout(const de265_internals_layout& a, const de265_internals_layout& b)
++{
++  return a.log2_unit_size == b.log2_unit_size && a.width_in_units == b.width_in_units &&
++         a.height_in_units == b.height_in_units;
++}
++
++void delete_syntax(de265_internals_syntax* syn)
++{
++  delete[] syn->pu;
++  delete[] syn->tu;
++  delete[] syn->cu_bits;
++  delete[] syn->ctb_bits;
++  delete syn;
++}
++
++/* The units of layout l covered by the luma rectangle (x,y,w,h), clipped to the layout. */
++struct unit_span { int x0, y0, x1, y1; };
++
++unit_span span_of(const de265_internals_layout& l, int x, int y, int w, int h)
++{
++  unit_span s;
++  const int last_x = x + w - 1, last_y = y + h - 1;
++  s.x0 = x < 0 ? 0 : x >> l.log2_unit_size;
++  s.y0 = y < 0 ? 0 : y >> l.log2_unit_size;
++  s.x1 = last_x < 0 ? -1 : last_x >> l.log2_unit_size;
++  s.y1 = last_y < 0 ? -1 : last_y >> l.log2_unit_size;
++  if (s.x1 >= l.width_in_units)  s.x1 = l.width_in_units - 1;
++  if (s.y1 >= l.height_in_units) s.y1 = l.height_in_units - 1;
++  return s;
++}
++
++/* round(8 * log2(range / 256)) for range = 256 + i: the fractional bits that the 9-bit range
++   register of the arithmetic decoder still holds (cf. libaom od_ec_dec_tell_frac()). */
++const uint8_t range_frac_x8[256] = {
++  0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
++  1,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,
++  3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,4,4,4,4,4,
++  4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5,5,5,5,5,
++  5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,6,6,6,
++  6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,6,
++  6,6,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,7,
++  7,7,7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,
++};
++
++}  // namespace
++
++
++void de265_internals_set_parameter_bool(de265_decoder_context* ctx, enum de265_internals_param param, int value)
++{
++  if (ctx == NULL) return;
++  switch (param) {
++  case DE265_INTERNALS_PARAM_KEEP_SYNTAX:
++    ((decoder_context*)ctx)->internals_keep_syntax = (value != 0);
++    break;
++  default:
++    break;
++  }
++}
++
++int de265_internals_has_syntax(const struct de265_image* img)
++{
++  return img != NULL && img->internals_syntax != NULL;
++}
++
++void de265_internals_get_PU_syntax(const struct de265_image* img, int x4, int y4, de265_internals_pu_syntax* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  if (!de265_internals_has_syntax(img)) return;
++  const de265_internals_syntax* syn = img->internals_syntax;
++  if (!inside(syn->pu_l, x4, y4)) return;
++  *out = syn->pu[x4 + y4 * syn->pu_l.width_in_units];
++}
++
++void de265_internals_get_TU_syntax(const struct de265_image* img, int x4, int y4, de265_internals_tu_syntax* out)
++{
++  if (out == NULL) return;
++  memset(out, 0, sizeof(*out));
++  if (!de265_internals_has_syntax(img)) return;
++  const de265_internals_syntax* syn = img->internals_syntax;
++  if (!inside(syn->tu_l, x4, y4)) return;
++  *out = syn->tu[x4 + y4 * syn->tu_l.width_in_units];
++}
++
++uint32_t de265_internals_get_CU_bits_x8(const struct de265_image* img, int unit_x, int unit_y)
++{
++  if (!de265_internals_has_syntax(img)) return 0;
++  const de265_internals_syntax* syn = img->internals_syntax;
++  if (!inside(syn->cb_l, unit_x, unit_y)) return 0;
++  return syn->cu_bits[unit_x + unit_y * syn->cb_l.width_in_units];
++}
++
++uint32_t de265_internals_get_CTB_bits_x8(const struct de265_image* img, int ctb_x, int ctb_y)
++{
++  if (!de265_internals_has_syntax(img)) return 0;
++  const de265_internals_syntax* syn = img->internals_syntax;
++  if (!inside(syn->ctb_l, ctb_x, ctb_y)) return 0;
++  return syn->ctb_bits[ctb_x + ctb_y * syn->ctb_l.width_in_units];
++}
++
++
++void de265_internals_syntax_picture_start(struct de265_image* img)
++{
++  decoder_context* ctx = img->decctx;
++  if (ctx == NULL || !ctx->internals_keep_syntax || !has_metadata(img)) {
++    de265_internals_syntax_free(img);
++    return;
++  }
++
++  const de265_internals_layout pu_l  = layout_of(ia::pb(img));
++  const de265_internals_layout tu_l  = layout_4x4(ia::tu(img));
++  const de265_internals_layout cb_l  = layout_of(ia::cb(img));
++  const de265_internals_layout ctb_l = layout_of(ia::ctb(img));
++
++  de265_internals_syntax* syn = img->internals_syntax;
++  if (syn != NULL && !(same_layout(syn->pu_l, pu_l) && same_layout(syn->tu_l, tu_l) &&
++                       same_layout(syn->cb_l, cb_l) && same_layout(syn->ctb_l, ctb_l))) {
++    de265_internals_syntax_free(img);
++    syn = NULL;
++  }
++  if (syn == NULL) {
++    syn = new (std::nothrow) de265_internals_syntax;
++    if (syn == NULL) return;   /* no syntax for this picture; decoding goes on */
++    syn->pu_l = pu_l;
++    syn->tu_l = tu_l;
++    syn->cb_l = cb_l;
++    syn->ctb_l = ctb_l;
++    syn->pu       = new (std::nothrow) de265_internals_pu_syntax[units(pu_l)];
++    syn->tu       = new (std::nothrow) de265_internals_tu_syntax[units(tu_l)];
++    syn->cu_bits  = new (std::nothrow) uint32_t[units(cb_l)];
++    syn->ctb_bits = new (std::nothrow) uint32_t[units(ctb_l)];
++    if (!syn->pu || !syn->tu || !syn->cu_bits || !syn->ctb_bits) {
++      delete_syntax(syn);
++      return;
++    }
++    img->internals_syntax = syn;
++  }
++  memset(syn->pu,       0, units(pu_l)  * sizeof(*syn->pu));
++  memset(syn->tu,       0, units(tu_l)  * sizeof(*syn->tu));
++  memset(syn->cu_bits,  0, units(cb_l)  * sizeof(*syn->cu_bits));
++  memset(syn->ctb_bits, 0, units(ctb_l) * sizeof(*syn->ctb_bits));
++}
++
++void de265_internals_syntax_free(struct de265_image* img)
++{
++  if (img->internals_syntax == NULL) return;
++  delete_syntax(img->internals_syntax);
++  img->internals_syntax = NULL;
++}
++
++int de265_internals_syntax_on(const struct de265_image* img)
++{
++  return img->internals_syntax != NULL;
++}
++
++void de265_internals_store_pu(struct de265_image* img, int x, int y, int w, int h,
++                              const de265_internals_pu_syntax* pu)
++{
++  de265_internals_syntax* syn = img->internals_syntax;
++  if (syn == NULL) return;
++  const unit_span s = span_of(syn->pu_l, x, y, w, h);
++  for (int uy = s.y0; uy <= s.y1; uy++)
++    for (int ux = s.x0; ux <= s.x1; ux++)
++      syn->pu[ux + uy * syn->pu_l.width_in_units] = *pu;
++}
++
++void de265_internals_store_tu(struct de265_image* img, int x, int y, int log2TrafoSize,
++                              const de265_internals_tu_syntax* tu)
++{
++  de265_internals_syntax* syn = img->internals_syntax;
++  if (syn == NULL) return;
++  const unit_span s = span_of(syn->tu_l, x, y, 1 << log2TrafoSize, 1 << log2TrafoSize);
++  for (int uy = s.y0; uy <= s.y1; uy++)
++    for (int ux = s.x0; ux <= s.x1; ux++)
++      syn->tu[ux + uy * syn->tu_l.width_in_units] = *tu;
++}
++
++void de265_internals_store_cu_bits(struct de265_image* img, int x, int y, int log2CbSize, uint32_t bits_x8)
++{
++  de265_internals_syntax* syn = img->internals_syntax;
++  if (syn == NULL) return;
++  const unit_span s = span_of(syn->cb_l, x, y, 1 << log2CbSize, 1 << log2CbSize);
++  for (int uy = s.y0; uy <= s.y1; uy++)
++    for (int ux = s.x0; ux <= s.x1; ux++)
++      syn->cu_bits[ux + uy * syn->cb_l.width_in_units] = bits_x8;
++}
++
++void de265_internals_store_ctb_bits(struct de265_image* img, int x, int y, uint32_t bits_x8)
++{
++  de265_internals_syntax* syn = img->internals_syntax;
++  if (syn == NULL || x < 0 || y < 0) return;
++  const int cx = x >> syn->ctb_l.log2_unit_size;
++  const int cy = y >> syn->ctb_l.log2_unit_size;
++  if (!inside(syn->ctb_l, cx, cy)) return;
++  syn->ctb_bits[cx + cy * syn->ctb_l.width_in_units] = bits_x8;
++}
++
++int64_t de265_internals_cabac_tell_x8(const CABAC_decoder* d)
++{
++  /* Bits the arithmetic decoder has read in the sense of H.265 9.3.4.3 (9 at initialisation,
++     one per renormalisation shift): bytes fetched, less the bits buffered beyond the 9-bit
++     offset register (libde265 keeps -bits_needed-1 of them). */
++  const int64_t bits_read = (int64_t)(d->bitstream_curr - d->bitstream_start) * 8 + d->bits_needed + 1;
++  const int r = (int)d->range - 256;
++  const int frac = range_frac_x8[r < 0 ? 0 : (r > 255 ? 255 : r)];
++  /* The information decoded so far is bits_read - log2(range) up to a constant; the constant
++     makes the value 64 x p right after initialisation at byte p (9 bits read, range 510). */
++  return bits_read * 8 - frac - 64;
++}
++
++int64_t de265_internals_cabac_byte_pos_x8(const CABAC_decoder* d)
++{
++  return (int64_t)(d->bitstream_curr - d->bitstream_start) * 64;
++}
++
++int64_t de265_internals_cabac_data_end_x8(const CABAC_decoder* d)
++{
++  const uint8_t* p = d->bitstream_end;
++  while (p > d->bitstream_start && p[-1] == 0) p--;   /* cabac_zero_words */
++  if (p == d->bitstream_start) return 0;
++  int stop = 0;                                        /* bit index of rbsp_stop_one_bit, LSB = 0 */
++  while (stop < 7 && !((p[-1] >> stop) & 1)) stop++;
++  return ((int64_t)(p - 1 - d->bitstream_start) * 8 + (7 - stop)) * 8;
++}
+diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
+index 073dbc2..46a5d93 100644
+--- a/libde265/de265_internals.h
++++ b/libde265/de265_internals.h
+@@ -18,7 +18,8 @@
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-/* de265_internals.h -- read-only access to per-picture metadata (OVT patch 0001).
++/* de265_internals.h -- read-only access to per-picture metadata (OVT patch 0001) and to
++ * the PU/TU syntax and bit positions it can keep (OVT patch 0002).
+  *
+  * Built only with the CMake option DE265_INTERNALS=ON. Every function reads the metadata
+  * that the decoder already keeps for a decoded picture (the image returned by
+@@ -172,6 +173,96 @@ LIBDE265_API int      de265_internals_get_picture_poc(const struct de265_image*)
+ LIBDE265_API void     de265_internals_get_sps_sizes(const struct de265_image*, int* CtbLog2SizeY, int* MinCbLog2SizeY,
+                                                     int* MinTbLog2SizeY, int* PicWidthInCtbsY, int* PicHeightInCtbsY);
+ 
++/* --- PU/TU syntax and bit positions (OVT patch 0002) ---
++ *
++ * With DE265_INTERNALS_PARAM_KEEP_SYNTAX set on a decoder context, every picture that starts
++ * decoding afterwards keeps the prediction-unit and transform-unit syntax elements that the
++ * decoder otherwise drops after use, and the entropy-coded size of every coding unit and CTB.
++ * Off by default: then nothing is allocated, de265_internals_has_syntax() returns 0 and the
++ * getters below return zero-filled values.
++ */
++enum de265_internals_param {
++  DE265_INTERNALS_PARAM_KEEP_SYNTAX = 0   /* keep PU/TU syntax and bit positions (default 0) */
++};
++
++/* Sets a boolean internals parameter (enum de265_internals_param) for the pictures that start
++   decoding afterwards. */
++LIBDE265_API void     de265_internals_set_parameter_bool(de265_decoder_context*, enum de265_internals_param, int value);
++/* 1 when the picture was decoded with KEEP_SYNTAX, 0 otherwise. */
++LIBDE265_API int      de265_internals_has_syntax(const struct de265_image*);
++
++#define DE265_INTERNALS_PU_NONE  0     /* no prediction syntax at this 4x4 (not decoded, or PCM) */
++#define DE265_INTERNALS_PU_INTER 1     /* prediction_unit() of an inter or skipped CU (H.265 7.3.8.6) */
++#define DE265_INTERNALS_PU_INTRA 2     /* intra prediction block of coding_unit() (H.265 7.3.8.5) */
++
++/* The syntax of the prediction block covering a 4x4 unit, as signalled. Fields that do not
++   apply to the block's kind, or that were not signalled, hold 255 (unsigned) or -1 (ref_idx);
++   mvd_x/mvd_y hold 0 then. */
++typedef struct de265_internals_pu_syntax {
++  uint8_t kind;                       /* DE265_INTERNALS_PU_* */
++  /* inter */
++  uint8_t merge_flag;                 /* 1 also when inferred from cu_skip_flag */
++  uint8_t merge_idx;                  /* when merge_flag is 1 */
++  uint8_t inter_pred_idc;             /* when merge_flag is 0: 0 PRED_L0, 1 PRED_L1, 2 PRED_BI (PRED_L0 is
++                                         inferred in P slices) */
++  int8_t  ref_idx[2];                 /* ref_idx_l0/l1 for the lists inter_pred_idc uses (0 when inferred
++                                         because the list has one active entry) */
++  uint8_t mvp_lX_flag[2];             /* mvp_l0_flag / mvp_l1_flag for those lists */
++  int16_t mvd_x[2];                   /* MvdLX of mvd_coding() in quarter samples, for those lists */
++  int16_t mvd_y[2];
++  uint8_t mvd_l1_zero;                /* 1: PRED_BI with mvd_l1_zero_flag, MvdL1 = 0 was not coded */
++  /* intra */
++  uint8_t prev_intra_luma_pred_flag;
++  uint8_t mpm_idx;                    /* when prev_intra_luma_pred_flag is 1 */
++  uint8_t rem_intra_luma_pred_mode;   /* when prev_intra_luma_pred_flag is 0 */
++  uint8_t intra_chroma_pred_mode;     /* 0..4 as signalled; 255 in 4:0:0 */
++} de265_internals_pu_syntax;
++
++/* unit = 4x4, the layout of de265_internals_get_PB_info_layout() */
++LIBDE265_API void     de265_internals_get_PU_syntax(const struct de265_image*, int x4, int y4, de265_internals_pu_syntax* out);
++
++/* The syntax of the transform unit (leaf of transform_tree(), H.265 7.3.8.8 and 7.3.8.10)
++   covering a 4x4 unit. Per-component arrays are indexed Y, Cb, Cr. In 4:2:0 the chroma
++   blocks of four 4x4 luma TUs are coded in the fourth one (blkIdx 3), so their chroma fields
++   are filled there only. Elements not signalled in this TU hold 255. */
++typedef struct de265_internals_tu_syntax {
++  uint8_t  coded;                     /* 1 when transform_unit() was read for the TU covering this 4x4 */
++  uint8_t  trafoDepth;                /* depth in the transform tree (rqt depth) */
++  uint8_t  log2TrafoSize;             /* luma transform size */
++  uint8_t  cbf[3];                    /* cbf_luma, cbf_cb, cbf_cr of this TU, inferred values included;
++                                         4:2:2 chroma: bit 0 first, bit 1 second chroma block */
++  uint8_t  transform_skip_flag[3];
++  uint8_t  explicit_rdpcm_flag[3];
++  uint8_t  explicit_rdpcm_dir_flag[3];
++  uint8_t  last_sig_coeff_x[3];       /* LastSignificantCoeffX/Y (H.265 7.4.9.11, after the swap for
++                                         vertical scan) of the component's first block coded here */
++  uint8_t  last_sig_coeff_y[3];
++  uint16_t nnz[3];                    /* non-zero coefficients coded in this TU per component; 0 when none */
++  uint8_t  cu_qp_delta_abs;           /* when coded in this TU (the first TU with a cbf of its
++                                         quantization group) */
++  uint8_t  cu_qp_delta_sign_flag;     /* 0 when cu_qp_delta_abs is 0 */
++  uint8_t  cu_chroma_qp_offset_flag;
++  uint8_t  cu_chroma_qp_offset_idx;   /* 0 when cu_chroma_qp_offset_flag is 0 or the list has one entry */
++} de265_internals_tu_syntax;
++
++/* unit = 4x4, the layout of de265_internals_get_TU_info_layout() */
++LIBDE265_API void     de265_internals_get_TU_syntax(const struct de265_image*, int x4, int y4, de265_internals_tu_syntax* out);
++
++/* Entropy-coded size estimates in 1/8 bits, from the CABAC decoder position (bytes consumed,
++   bits buffered but unread, and the fractional bits of the arithmetic decoder's range):
++   - CU (unit = MinCb, the layout of de265_internals_get_CB_info_layout(), value of the whole
++     CU at every unit it covers): from the start to the end of coding_unit(), its prediction
++     and transform units included;
++   - CTB (unit = CTB): from the end of the previous CTB of the substream (or the substream
++     start) to the end of coding_tree_unit() and end_of_slice_segment_flag. The last CTB of a
++     substream also takes end_of_subset_one_bit and the byte alignment, the last CTB of a slice
++     segment everything up to rbsp_slice_segment_trailing_bits, so that the CTBs of a slice
++     segment add up to its slice_segment_data() size exactly (x8). The CTB value also holds
++     coding_quadtree() and sao() syntax, which no CU holds.
++   0 where nothing was decoded or the picture has no syntax. */
++LIBDE265_API uint32_t de265_internals_get_CU_bits_x8(const struct de265_image*, int unit_x, int unit_y);
++LIBDE265_API uint32_t de265_internals_get_CTB_bits_x8(const struct de265_image*, int ctb_x, int ctb_y);
++
+ #ifdef __cplusplus
+ }
+ #endif
+diff --git a/libde265/de265_internals_syntax.h b/libde265/de265_internals_syntax.h
+new file mode 100644
+index 0000000..6d38ebf
+--- /dev/null
++++ b/libde265/de265_internals_syntax.h
+@@ -0,0 +1,74 @@
++/*
++ * H.265 video codec.
++ * Copyright (c) 2026 The Open Video Tools contributors
++ *
++ * This file is part of libde265.
++ *
++ * libde265 is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as
++ * published by the Free Software Foundation, either version 3 of
++ * the License, or (at your option) any later version.
++ *
++ * libde265 is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++/* de265_internals_syntax.h -- the decoder's calls into the syntax store of OVT patch 0002.
++ * Internal (not installed); every caller is under #ifdef DE265_INTERNALS. Each store call
++ * returns at once when the picture keeps no syntax (KEEP_SYNTAX off), so pictures decoded
++ * without it pay one pointer test per call site. C linkage keeps the library's symbols to
++ * de265_internals_*. Coordinates are luma samples. */
++
++#ifndef DE265_INTERNALS_SYNTAX_H
++#define DE265_INTERNALS_SYNTAX_H
++
++#include <stdint.h>
++
++#include "cabac.h"
++#include "de265_internals.h"
++
++struct de265_image;
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* A new picture starts decoding (after clear_metadata()): allocate or clear its syntax store
++   when the decoder context keeps syntax, free it otherwise. */
++void de265_internals_syntax_picture_start(struct de265_image* img);
++/* The picture's buffers are released (de265_image::release()). */
++void de265_internals_syntax_free(struct de265_image* img);
++/* 1 when img keeps syntax. */
++int  de265_internals_syntax_on(const struct de265_image* img);
++
++/* Store the syntax of the prediction block (x,y,w,h) / the transform unit at (x,y). */
++void de265_internals_store_pu(struct de265_image* img, int x, int y, int w, int h,
++                              const de265_internals_pu_syntax* pu);
++void de265_internals_store_tu(struct de265_image* img, int x, int y, int log2TrafoSize,
++                              const de265_internals_tu_syntax* tu);
++/* Store the size of the CU (x,y,log2CbSize) / of the CTB containing luma sample (x,y). */
++void de265_internals_store_cu_bits(struct de265_image* img, int x, int y, int log2CbSize, uint32_t bits_x8);
++void de265_internals_store_ctb_bits(struct de265_image* img, int x, int y, uint32_t bits_x8);
++
++/* Position of the CABAC decoder in 1/8 bits from its bitstream_start: 64 x the bytes read,
++   less 8 x the bits buffered but not yet used, less the fractional bits still held in the
++   9-bit range register (8 x log2(range/256), from a table). Just after init_CABAC_decoder_2()
++   at byte p it is exactly 64 x p, so differences across a re-initialisation stay exact. */
++int64_t de265_internals_cabac_tell_x8(const CABAC_decoder* decoder);
++/* 64 x the byte offset of bitstream_curr from bitstream_start: the end of a substream once its
++   end_of_subset_one_bit has been decoded. */
++int64_t de265_internals_cabac_byte_pos_x8(const CABAC_decoder* decoder);
++/* 8 x the bit offset, from bitstream_start, of the rbsp_stop_one_bit before bitstream_end (the
++   last non-zero byte; cabac_zero_words are skipped): the end of slice_segment_data(). */
++int64_t de265_internals_cabac_data_end_x8(const CABAC_decoder* decoder);
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
+diff --git a/libde265/decctx.cc b/libde265/decctx.cc
+index 2e5fca5..6f9cfe8 100644
+--- a/libde265/decctx.cc
++++ b/libde265/decctx.cc
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-16 by The Open Video Tools contributors (OVT patch 0002,
++ * PU/TU syntax): initialises internals_keep_syntax and sets up the syntax
++ * store of each picture when DE265_INTERNALS is defined.
+  */
+ 
+ #include "decctx.h"
+@@ -23,6 +27,9 @@
+ #include "sao.h"
+ #include "sei.h"
+ #include "deblock.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_syntax.h"
++#endif
+ 
+ #include <string.h>
+ #include <assert.h>
+@@ -214,6 +221,9 @@ decoder_context::decoder_context()
+ 
+   param_disable_deblocking = false;
+   param_disable_sao = false;
++#ifdef DE265_INTERNALS
++  internals_keep_syntax = false;
++#endif
+   //param_disable_mc_residual_idct = false;
+   //param_disable_intra_residual_idct = false;
+ 
+@@ -2052,6 +2062,9 @@ bool decoder_context::process_slice_segment_header(slice_segment_header* hdr,
+     img->decctx = this;
+ 
+     img->clear_metadata();
++#ifdef DE265_INTERNALS
++    de265_internals_syntax_picture_start(img);
++#endif
+ 
+ 
+     if (isIRAP(nal_unit_type)) {
+diff --git a/libde265/decctx.h b/libde265/decctx.h
+index 8170b60..9ce9143 100644
+--- a/libde265/decctx.h
++++ b/libde265/decctx.h
+@@ -16,6 +16,10 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-16 by The Open Video Tools contributors (OVT patch 0002,
++ * PU/TU syntax): adds the internals_keep_syntax flag and the per-thread syntax
++ * state, only when DE265_INTERNALS is defined.
+  */
+ 
+ #ifndef DE265_DECCTX_H
+@@ -31,6 +35,9 @@
+ #include "libde265/de265.h"
+ #include "libde265/dpb.h"
+ #include "libde265/sei.h"
++#ifdef DE265_INTERNALS
++#include "libde265/de265_internals.h"
++#endif
+ #include "libde265/threads.h"
+ #include "libde265/acceleration.h"
+ #include "libde265/nal-parser.h"
+@@ -106,6 +113,13 @@ public:
+ 
+   CABAC_decoder cabac_decoder;
+ 
++#ifdef DE265_INTERNALS
++  // PU/TU syntax (OVT patch 0002): the transform unit being read, and the CABAC position
++  // (de265_internals_cabac_tell_x8) where the current CTB started.
++  de265_internals_tu_syntax internals_tu;
++  int64_t internals_ctb_start_x8;
++#endif
++
+   context_model_table ctx_model;
+   uint8_t StatCoeff[4];
+ 
+@@ -352,6 +366,11 @@ class decoder_context : public base_context {
+ 
+   bool param_disable_deblocking;
+   bool param_disable_sao;
++#ifdef DE265_INTERNALS
++  // PU/TU syntax (OVT patch 0002): pictures started while this is set keep their PU/TU syntax
++  // and bit positions (de265_internals.h, DE265_INTERNALS_PARAM_KEEP_SYNTAX).
++  bool internals_keep_syntax;
++#endif
+   //bool param_disable_mc_residual_idct;  // not implemented yet
+   //bool param_disable_intra_residual_idct;  // not implemented yet
+ 
+diff --git a/libde265/image.cc b/libde265/image.cc
+index fe45010..d3fe464 100644
+--- a/libde265/image.cc
++++ b/libde265/image.cc
+@@ -20,9 +20,16 @@
+  * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
+  * internals API): allocates and clears deblk_bS_v when DE265_INTERNALS is
+  * defined.
++ *
++ * Modified 2026-11-16 by The Open Video Tools contributors (OVT patch 0002,
++ * PU/TU syntax): initialises internals_syntax and frees it in release() when
++ * DE265_INTERNALS is defined.
+  */
+ 
+ #include "image.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_syntax.h"
++#endif
+ #include "decctx.h"
+ #include "en265.h"
+ 
+@@ -232,6 +239,9 @@ de265_image::de265_image()
+ 
+   de265_mutex_init(&mutex);
+   de265_cond_init(&finished_cond);
++#ifdef DE265_INTERNALS
++  internals_syntax = NULL;
++#endif
+ }
+ 
+ 
+@@ -501,6 +511,10 @@ de265_image::~de265_image()
+ 
+ void de265_image::release()
+ {
++#ifdef DE265_INTERNALS
++  de265_internals_syntax_free(this);
++#endif
++
+   // free image memory
+ 
+   if (pixels[0])
+diff --git a/libde265/image.h b/libde265/image.h
+index de401ae..039f4ee 100644
+--- a/libde265/image.h
++++ b/libde265/image.h
+@@ -20,6 +20,10 @@
+  * Modified 2026-11-07 by The Open Video Tools contributors (OVT patch 0001,
+  * internals API): adds the deblk_bS_v array and the de265_internals_access
+  * friend, both only when DE265_INTERNALS is defined.
++ *
++ * Modified 2026-11-16 by The Open Video Tools contributors (OVT patch 0002,
++ * PU/TU syntax): adds the internals_syntax pointer, only when DE265_INTERNALS
++ * is defined.
+  */
+ 
+ #ifndef DE265_IMAGE_H
+@@ -85,6 +89,7 @@ enum PictureState {
+ class decoder_context;
+ #ifdef DE265_INTERNALS
+ struct de265_internals_access;  // de265_internals.cc reads the metadata arrays
++struct de265_internals_syntax;  // de265_internals.cc: PU/TU syntax and bit positions of one picture
+ #endif
+ 
+ template <class DataUnit> class MetaDataArray
+@@ -428,6 +433,10 @@ public:
+   // Boundary strength of the vertical edge left of each 4x4 block. deblk_info keeps only one bS,
+   // which the horizontal-edge pass overwrites; deblock.cc copies the vertical value here.
+   MetaDataArray<uint8_t>     deblk_bS_v;
++
++  // PU/TU syntax and bit positions of this picture (OVT patch 0002), NULL unless the decoder
++  // context keeps syntax. Owned here; freed by release().
++  de265_internals_syntax*    internals_syntax;
+ #endif
+ 
+ public:
+diff --git a/libde265/slice.cc b/libde265/slice.cc
+index 3a8a8de..01e7a11 100644
+--- a/libde265/slice.cc
++++ b/libde265/slice.cc
+@@ -19,6 +19,11 @@
+  *
+  * You should have received a copy of the GNU Lesser General Public License
+  * along with libde265.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * Modified 2026-11-16 by The Open Video Tools contributors (OVT patch 0002,
++ * PU/TU syntax): hands the prediction-unit and transform-unit syntax and the
++ * CABAC positions of each coding unit and CTB to the syntax store when
++ * DE265_INTERNALS is defined.
+  */
+ 
+ #include "slice.h"
+@@ -29,6 +34,9 @@
+ #include "transform.h"
+ #include "threads.h"
+ #include "image.h"
++#ifdef DE265_INTERNALS
++#include "de265_internals_syntax.h"
++#endif
+ 
+ #include <assert.h>
+ #include <string.h>
+@@ -48,6 +56,46 @@ extern bool read_short_term_ref_pic_set(error_queue* errqueue,
+ 
+ 
+ void read_coding_tree_unit(thread_context* tctx);
++
++
++#ifdef DE265_INTERNALS
++/* OVT patch 0002: bit positions. A substream starts at a CABAC (re)initialisation; each CTB
++   runs from the end of the previous one to its end, the last CTB of a substream or slice
++   segment to the end of that substream or of the slice data. */
++static void internals_substream_start(thread_context* tctx)
++{
++  tctx->internals_ctb_start_x8 = de265_internals_cabac_tell_x8(&tctx->cabac_decoder);
++}
++
++static void internals_ctb_end(thread_context* tctx, int ctbx, int ctby, int64_t end_x8)
++{
++  if (!de265_internals_syntax_on(tctx->img)) return;
++  const int64_t bits = end_x8 - tctx->internals_ctb_start_x8;
++  const int log2Ctb = tctx->img->get_sps().Log2CtbSizeY;
++  de265_internals_store_ctb_bits(tctx->img, ctbx << log2Ctb, ctby << log2Ctb, bits > 0 ? (uint32_t)bits : 0);
++  tctx->internals_ctb_start_x8 = end_x8;
++}
++
++static void internals_reset_tu(thread_context* tctx, int log2TrafoSize, int trafoDepth)
++{
++  de265_internals_tu_syntax& tu = tctx->internals_tu;
++  memset(&tu, 255, sizeof(tu));
++  tu.coded = 1;
++  tu.trafoDepth = (uint8_t)trafoDepth;
++  tu.log2TrafoSize = (uint8_t)log2TrafoSize;
++  for (int c = 0; c < 3; c++) tu.nnz[c] = 0;
++}
++
++static de265_internals_pu_syntax internals_empty_pu(uint8_t kind)
++{
++  de265_internals_pu_syntax pu;
++  memset(&pu, 255, sizeof(pu));
++  pu.kind = kind;
++  pu.ref_idx[0] = pu.ref_idx[1] = -1;
++  pu.mvd_x[0] = pu.mvd_x[1] = pu.mvd_y[0] = pu.mvd_y[1] = 0;
++  return pu;
++}
++#endif
+ void read_coding_quadtree(thread_context* tctx,
+                           int xCtb, int yCtb,
+                           int Log2CtbSizeY,
+@@ -2941,6 +2989,9 @@ int residual_coding(thread_context* tctx,
+       (log2TrafoSize <= pps.Log2MaxTransformSkipSize))
+     {
+       tctx->transform_skip_flag[cIdx] = decode_transform_skip_flag(tctx,cIdx);
++#ifdef DE265_INTERNALS
++      tctx->internals_tu.transform_skip_flag[cIdx] = tctx->transform_skip_flag[cIdx];
++#endif
+     }
+   else
+     {
+@@ -2957,6 +3008,12 @@ int residual_coding(thread_context* tctx,
+       if (tctx->explicit_rdpcm_flag) {
+         tctx->explicit_rdpcm_dir = decode_explicit_rdpcm_dir(tctx,cIdx);
+       }
++#ifdef DE265_INTERNALS
++      tctx->internals_tu.explicit_rdpcm_flag[cIdx] = tctx->explicit_rdpcm_flag;
++      if (tctx->explicit_rdpcm_flag) {
++        tctx->internals_tu.explicit_rdpcm_dir_flag[cIdx] = tctx->explicit_rdpcm_dir;
++      }
++#endif
+ 
+       //printf("EXPLICIT RDPCM %d;%d\n",x0,y0);
+     }
+@@ -3037,6 +3094,13 @@ int residual_coding(thread_context* tctx,
+     std::swap(LastSignificantCoeffX, LastSignificantCoeffY);
+   }
+ 
++#ifdef DE265_INTERNALS
++  if (tctx->internals_tu.last_sig_coeff_x[cIdx] == 255) {  // first block of the component in this TU
++    tctx->internals_tu.last_sig_coeff_x[cIdx] = (uint8_t)LastSignificantCoeffX;
++    tctx->internals_tu.last_sig_coeff_y[cIdx] = (uint8_t)LastSignificantCoeffY;
++  }
++#endif
++
+   logtrace(LogSlice,"LastSignificantCoeff: x=%d;y=%d\n",LastSignificantCoeffX,LastSignificantCoeffY);
+ 
+   const position* ScanOrderSub = get_scan_order(log2TrafoSize-2, scanIdx);
+@@ -3431,6 +3495,10 @@ int residual_coding(thread_context* tctx,
+     }  // if nonZero
+   }  // next sub-block
+ 
++#ifdef DE265_INTERNALS
++  tctx->internals_tu.nnz[cIdx] += tctx->nCoeff[cIdx];
++#endif
++
+   return DE265_OK;
+ }
+ 
+@@ -3592,6 +3660,13 @@ int read_transform_unit(thread_context* tctx,
+ 
+   tctx->explicit_rdpcm_flag = false;
+ 
++#ifdef DE265_INTERNALS
++  internals_reset_tu(tctx, log2TrafoSize, trafoDepth);
++  tctx->internals_tu.cbf[0] = (uint8_t)cbf_luma;
++  tctx->internals_tu.cbf[1] = (uint8_t)cbf_cb;
++  tctx->internals_tu.cbf[2] = (uint8_t)cbf_cr;
++#endif
++
+ 
+   enum PredMode cuPredMode = tctx->img->get_pred_mode(x0,y0);
+ 
+@@ -3610,6 +3685,10 @@ int read_transform_unit(thread_context* tctx,
+ 
+         tctx->IsCuQpDeltaCoded = 1;
+         tctx->CuQpDelta = cu_qp_delta_abs*(1-2*cu_qp_delta_sign);
++#ifdef DE265_INTERNALS
++        tctx->internals_tu.cu_qp_delta_abs = (uint8_t)(cu_qp_delta_abs > 255 ? 255 : cu_qp_delta_abs);
++        tctx->internals_tu.cu_qp_delta_sign_flag = (uint8_t)cu_qp_delta_sign;
++#endif
+ 
+         //printf("read cu_qp_delta (%d;%d) = %d\n",x0,y0,tctx->CuQpDelta);
+ 
+@@ -3638,6 +3717,10 @@ int read_transform_unit(thread_context* tctx,
+         }
+ 
+         tctx->IsCuChromaQpOffsetCoded = 1;
++#ifdef DE265_INTERNALS
++        tctx->internals_tu.cu_chroma_qp_offset_flag = (uint8_t)cu_chroma_qp_offset_flag;
++        tctx->internals_tu.cu_chroma_qp_offset_idx  = (uint8_t)cu_chroma_qp_offset_idx;
++#endif
+ 
+         if (cu_chroma_qp_offset_flag) {
+           tctx->CuQpOffsetCb = pps.range_extension.cb_qp_offset_list[ cu_chroma_qp_offset_idx ];
+@@ -3813,6 +3896,9 @@ int read_transform_unit(thread_context* tctx,
+     }
+   }
+ 
++#ifdef DE265_INTERNALS
++  de265_internals_store_tu(tctx->img, x0,y0, log2TrafoSize, &tctx->internals_tu);
++#endif
+ 
+   return DE265_OK;
+ }
+@@ -4064,6 +4150,15 @@ void read_prediction_unit_SKIP(thread_context* tctx,
+   tctx->motion.merge_idx = merge_idx;
+   tctx->motion.merge_flag = true;
+ 
++#ifdef DE265_INTERNALS
++  if (de265_internals_syntax_on(tctx->img)) {
++    de265_internals_pu_syntax pu = internals_empty_pu(DE265_INTERNALS_PU_INTER);
++    pu.merge_flag = 1;
++    pu.merge_idx = (uint8_t)merge_idx;
++    de265_internals_store_pu(tctx->img, x0,y0, nPbW,nPbH, &pu);
++  }
++#endif
++
+   logtrace(LogSlice,"prediction skip 2Nx2N, merge_idx: %d\n",merge_idx);
+ }
+ 
+@@ -4147,6 +4242,29 @@ void read_prediction_unit(thread_context* tctx,
+ 
+ 
+ 
++#ifdef DE265_INTERNALS
++  if (de265_internals_syntax_on(tctx->img)) {
++    const PBMotionCoding& m = tctx->motion;
++    de265_internals_pu_syntax pu = internals_empty_pu(DE265_INTERNALS_PU_INTER);
++    pu.merge_flag = (uint8_t)merge_flag;
++    if (merge_flag) {
++      pu.merge_idx = (uint8_t)m.merge_idx;
++    }
++    else {
++      pu.inter_pred_idc = (uint8_t)(m.inter_pred_idc - PRED_L0);  // H.265 Table 7-11 numbering 0..2
++      for (int l = 0; l < 2; l++) {
++        if (m.inter_pred_idc == (l == 0 ? PRED_L1 : PRED_L0)) continue;  // list not used
++        pu.ref_idx[l]     = (int8_t)m.refIdx[l];
++        pu.mvp_lX_flag[l] = (uint8_t)(l == 0 ? m.mvp_l0_flag : m.mvp_l1_flag);
++        pu.mvd_x[l]       = m.mvd[l][0];
++        pu.mvd_y[l]       = m.mvd[l][1];
++      }
++      pu.mvd_l1_zero = (uint8_t)(shdr->mvd_l1_zero_flag && m.inter_pred_idc == PRED_BI);
++    }
++    de265_internals_store_pu(tctx->img, x0,y0, nPbW,nPbH, &pu);
++  }
++#endif
++
+   decode_prediction_unit(tctx->decctx, tctx->shdr, tctx->img, tctx->motion,
+                          xC,yC,xB,yB, nCS, nPbW,nPbH, partIdx);
+ }
+@@ -4381,6 +4499,10 @@ void read_coding_unit(thread_context* tctx,
+         logtrace(LogSlice,"nCbS:%d pbOffset:%d\n",nCbS,pbOffset);
+ 
+         int prev_intra_luma_pred_flag[4];
++#ifdef DE265_INTERNALS
++        int internals_mpm_idx[4], internals_rem_mode[4];
++        int internals_chroma_mode[4] = { 255,255,255,255 };
++#endif
+ 
+         int idx=0;
+         for (int j=0;j<nCbS;j+=pbOffset)
+@@ -4404,6 +4526,10 @@ void read_coding_unit(thread_context* tctx,
+               else {
+                 rem_intra_luma_pred_mode[idx] = decode_rem_intra_luma_pred_mode(tctx);
+               }
++#ifdef DE265_INTERNALS
++              internals_mpm_idx[idx]  = prev_intra_luma_pred_flag[idx] ? mpm_idx[idx] : 255;
++              internals_rem_mode[idx] = prev_intra_luma_pred_flag[idx] ? 255 : rem_intra_luma_pred_mode[idx];
++#endif
+ 
+ 
+               int x = x0+i;
+@@ -4474,6 +4600,9 @@ void read_coding_unit(thread_context* tctx,
+ 
+               int intra_chroma_pred_mode = decode_intra_chroma_pred_mode(tctx);
+               int IntraPredMode = img->get_IntraPredMode(x,y);
++#ifdef DE265_INTERNALS
++              internals_chroma_mode[idx] = intra_chroma_pred_mode;
++#endif
+ 
+               int IntraPredModeC = map_chroma_pred_mode(intra_chroma_pred_mode, IntraPredMode);
+ 
+@@ -4492,6 +4621,9 @@ void read_coding_unit(thread_context* tctx,
+           int intra_chroma_pred_mode = decode_intra_chroma_pred_mode(tctx);
+           int IntraPredMode = img->get_IntraPredMode(x0,y0);
+           logtrace(LogSlice,"IntraPredMode: %d\n",IntraPredMode);
++#ifdef DE265_INTERNALS
++          for (int k = 0; k < 4; k++) internals_chroma_mode[k] = intra_chroma_pred_mode;
++#endif
+           int IntraPredModeC = map_chroma_pred_mode(intra_chroma_pred_mode, IntraPredMode);
+ 
+           if (sps.ChromaArrayType == CHROMA_422) {
+@@ -4502,6 +4634,22 @@ void read_coding_unit(thread_context* tctx,
+                                   (enum IntraPredMode)IntraPredModeC,
+                                   intra_chroma_pred_mode == 4);
+         }
++
++#ifdef DE265_INTERNALS
++        if (de265_internals_syntax_on(img)) {
++          idx = 0;
++          for (int j=0;j<nCbS;j+=pbOffset)
++            for (int i=0;i<nCbS;i+=pbOffset) {
++              de265_internals_pu_syntax pu = internals_empty_pu(DE265_INTERNALS_PU_INTRA);
++              pu.prev_intra_luma_pred_flag = (uint8_t)prev_intra_luma_pred_flag[idx];
++              pu.mpm_idx                   = (uint8_t)internals_mpm_idx[idx];
++              pu.rem_intra_luma_pred_mode  = (uint8_t)internals_rem_mode[idx];
++              pu.intra_chroma_pred_mode    = (uint8_t)internals_chroma_mode[idx];
++              de265_internals_store_pu(img, x0+i,y0+j, pbOffset,pbOffset, &pu);
++              idx++;
++            }
++        }
++#endif
+       }
+     }
+     else { // INTER
+@@ -4663,7 +4811,19 @@ void read_coding_quadtree(thread_context* tctx,
+ 
+     img->set_ctDepth(x0,y0, log2CbSize, ctDepth);
+ 
++#ifdef DE265_INTERNALS
++    const bool internals_on = de265_internals_syntax_on(img);
++    const int64_t internals_cu_start = internals_on ? de265_internals_cabac_tell_x8(&tctx->cabac_decoder) : 0;
++#endif
++
+     read_coding_unit(tctx, x0,y0, log2CbSize, ctDepth);
++
++#ifdef DE265_INTERNALS
++    if (internals_on) {
++      const int64_t bits = de265_internals_cabac_tell_x8(&tctx->cabac_decoder) - internals_cu_start;
++      de265_internals_store_cu_bits(img, x0,y0, log2CbSize, bits > 0 ? (uint32_t)bits : 0);
++    }
++#endif
+   }
+ 
+   logtrace(LogSlice,"-\n");
+@@ -4776,6 +4936,13 @@ enum DecodeResult decode_substream(thread_context* tctx,
+     int end_of_slice_segment_flag = decode_CABAC_term_bit(&tctx->cabac_decoder);
+     //printf("end-of-slice flag: %d\n", end_of_slice_segment_flag);
+ 
++#ifdef DE265_INTERNALS
++    if (end_of_slice_segment_flag) {
++      // the last CTB of the slice segment takes everything up to the trailing bits
++      internals_ctb_end(tctx, ctbx,ctby, de265_internals_cabac_data_end_x8(&tctx->cabac_decoder));
++    }
++#endif
++
+     if (end_of_slice_segment_flag) {
+       // at the end of the slice segment, we store the CABAC model if we need it
+       // because a dependent slice may follow
+@@ -4840,11 +5007,23 @@ enum DecodeResult decode_substream(thread_context* tctx,
+           return Decode_Error;
+         }
+ 
++#ifdef DE265_INTERNALS
++        // the last CTB of the substream takes end_of_subset_one_bit and the byte alignment
++        internals_ctb_end(tctx, ctbx,ctby, de265_internals_cabac_byte_pos_x8(&tctx->cabac_decoder));
++#endif
++
+         init_CABAC_decoder_2(&tctx->cabac_decoder); // byte alignment
++#ifdef DE265_INTERNALS
++        internals_substream_start(tctx);
++#endif
+         return Decode_EndOfSubstream;
+       }
+     }
+ 
++#ifdef DE265_INTERNALS
++    internals_ctb_end(tctx, ctbx,ctby, de265_internals_cabac_tell_x8(&tctx->cabac_decoder));
++#endif
++
+   } while (true);
+ }
+ 
+@@ -4950,6 +5129,9 @@ void thread_task_slice_segment::work()
+   }
+ 
+   init_CABAC_decoder_2(&tctx->cabac_decoder);
++#ifdef DE265_INTERNALS
++  internals_substream_start(tctx);
++#endif
+ 
+   /*enum DecodeResult result =*/ decode_substream(tctx, false, data->firstSliceSubstream);
+ 
+@@ -4997,6 +5179,9 @@ void thread_task_ctb_row::work()
+   }
+ 
+   init_CABAC_decoder_2(&tctx->cabac_decoder);
++#ifdef DE265_INTERNALS
++  internals_substream_start(tctx);
++#endif
+ 
+   bool firstIndependentSubstream =
+     data->firstSliceSubstream && !tctx->shdr->dependent_slice_segment_flag;
+@@ -5040,6 +5225,9 @@ de265_error read_slice_segment_data(thread_context* tctx)
+   }
+ 
+   init_CABAC_decoder_2(&tctx->cabac_decoder);
++#ifdef DE265_INTERNALS
++  internals_substream_start(tctx);
++#endif
+ 
+   //printf("-----\n");
+ 
