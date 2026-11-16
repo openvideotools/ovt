@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "map_syntax.hpp"
 #include "ovt_model_generated.h"
 
 namespace ovt::de265 {
@@ -99,6 +100,7 @@ struct BlockData {
   std::vector<int32_t> ctb_tile;     // TileId (tile scan)
   std::vector<SaoInfo> sao;
   std::vector<SliceHeader> slices;
+  SyntaxData syn;  // patch 0002 (WI-2.165); has_syntax false without it
 };
 
 /// Picture-level facts map_blocks() needs besides the block metadata.
@@ -122,9 +124,9 @@ struct MappedBlocks {
   uint32_t mv_clamped_cells = 0;      // grid cells whose vector was clamped to ±32767 (MDL-GEN-0003)
 };
 
-/// Grid fields map_blocks() fills (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.2 Caps row): all but bits_x8,
-/// which needs patch 0002 (WI-2.165).
-constexpr uint32_t kGridFields = 0xFFFFU & ~(1U << 13U);
+/// Grid fields map_blocks() fills (ovt_AnalysisCaps.grid_fields, chapter 07 §7.6.2 Caps row): all 16; bits_x8
+/// (bit 13) and the chroma bits of cbf come from patch 0002 (WI-2.165).
+constexpr uint32_t kGridFields = 0xFFFFU;
 
 /// Maps @p d into @p fbb. Must not be called while another table is being built in @p fbb. With `d.valid == false`
 /// (or metadata that does not fit @p fmt) only the empty grid is made.

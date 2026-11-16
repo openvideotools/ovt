@@ -12,6 +12,25 @@
 Until every M0.1 work item is merged, a `lint` step whose tool is not on the branch yet prints a notice and
 skips (#27).
 
+## Fuzzing
+
+`fuzz-smoke.yml` runs every `ovt_fuzz_*` target for 60 s on each pull request, in four shards (`fuzz-smoke-shard`).
+The job `fuzz-smoke` gates on them and is the name for the required-check list. A crash, timeout or out-of-memory
+fails the shard and uploads `fuzz-crashes-shard-<n>` with the `crash-*` reproducer.
+
+`nightly.yml` job `fuzz-nightly` runs 20 minutes per target in the same shards, keeps the corpus cache small with
+`-merge=1`, minimises any crash (`minimized-*` in the artefact) and stages the inputs the committed seeds lack.
+`fuzz-corpus-pr` then opens a pull request with them through `tools/fuzz_corpus_pr.py` (at most 64 KiB per file,
+2 MiB per target, 100 new files per target and run). It needs the repository setting "Allow GitHub Actions to
+create and approve pull requests", and CI does not start on a pull request opened that way: close and reopen it.
+
+To check that the lanes really fail on a crash, run `fuzz-smoke` by hand with the `canary` input ticked
+(Actions, `fuzz-smoke`, Run workflow): `ovt_fuzz_canary` aborts on its seed when `OVT_FUZZ_CANARY` is set, so the run
+must fail and attach `crash-*`. Locally: `ctest --test-dir build/<preset> -L canary` (the replay must fail).
+
+A reproducer found by either lane is minimised and committed to `core/tests/fuzz/regressions/<target>/` as
+described in chapter 14 §14.7.5.
+
 ## Getting a macOS build
 
 Every push to `main` uploads `ovt-macos-arm64`: a zip with the `ovt` CLI and, once the GUI exists,

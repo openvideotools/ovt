@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "descriptor": {
+        "id": "psnr",
+        "kind": "FullReference",
+        "domain": "CodeValue",
+        "per_plane": true,
+        "higher_is_better": true,
+        "range_min": 0,
+        "range_max": 100,
+        "temporal_unit_frames": 0
+      },
+      "frames": [
+        {
+          "frame": {
+            "decode_index": 0,
+            "display_index": 0
+          },
+          "values": [
+            41.25,
+            0.1,
+            1e-7
+          ],
+          "map_block_size": 0
+        },
+        {
+          "frame": {
+            "decode_index": 1,
+            "display_index": 1
+          },
+          "values": [
+            38.5,
+            0.1,
+            1e-7
+          ],
+          "map_block_size": 0
+        }
+      ],
+      "pooled_mean": [
+        0.30000000000000004,
+        1e+21,
+        -0
+      ],
+      "alignment_offset_frames": 0,
+      "alignment_confidence": 0.5,
+      "engine": "ovt-kernels 1.0",
+      "schema_version": 1,
+      "frames_total": 2,
+      "frames_scored": 2,
+      "distorted_source_hash": "000fa0ff"
+    }
+  ],
+  "reference_name": "ref.y4m",
+  "distorted_name": "dist.mp4"
+}

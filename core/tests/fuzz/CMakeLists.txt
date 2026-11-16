@@ -47,6 +47,7 @@ ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / str
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(isobmff_box_decoders fuzz_isobmff_box_decoders.cpp) # WI-1.205: ISOBMFF hand box decoders
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
+ovt_add_fuzz_target(m3u8 fuzz_m3u8.cpp) # WI-4.209: the HLS M3U8 parser
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
 ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
@@ -61,6 +62,7 @@ ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
+ovt_add_fuzz_target(json_export fuzz_json_export.cpp) # WI-0.088: the JSON exporter (untrusted stored records)
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
@@ -88,6 +90,8 @@ ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
 ovt_add_fuzz_target(h264_slice fuzz_h264_slice.cpp)
 # WI-1.110: the H.264 SEI framing and payload parsers.
 ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
+# WI-1.111: the H.264 index chain (ActiveSets with the PPS re-parse, frame boundary, POC) over Annex B bytes.
+ovt_add_fuzz_target(h264_index fuzz_h264_index.cpp)
 
 # WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
 # plugin module from its output directory, so it follows the plugin's own option.
@@ -117,3 +121,11 @@ endif()
 
 # WI-1.119: AV1 frame-header peek, frame / temporal-unit grouping and the slot model over a Section 5 OBU stream.
 ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
+
+# The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
+# only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
+ovt_add_fuzz_target(canary fuzz_canary.cpp)
+add_test(NAME fuzz_canary_trips
+         COMMAND "${CMAKE_COMMAND}" "-DEXE=$<TARGET_FILE:ovt_fuzz_canary_regress>"
+                 "-DDIR=${CMAKE_CURRENT_SOURCE_DIR}/corpus/canary" -P "${CMAKE_CURRENT_SOURCE_DIR}/expect_crash.cmake")
+set_tests_properties(fuzz_canary_trips PROPERTIES LABELS "canary")

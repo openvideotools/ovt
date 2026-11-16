@@ -646,7 +646,7 @@ ovt hdr clip.mp4 --dynamic -f json | jq '.result.dynamic[0]'
 | `--stop-on-first` | flag | off | Exit at the first mismatching frame. |
 | `--report-planes` | flag | off | Write the first mismatching frame's planes from both decoders to `--planes-dir`. |
 
-**Output.** `result` = `VerifyReport` (chapter 06 §6.3, index in §12.2.17): `checks` (`hash`, `levels`, `against`: `pass|fail|skipped`) and per frame `ok`, `plane_mismatch_mask`, `max_abs_diff`, `first_mismatch_xy`, `declared_hash`, `computed_hash`. Exit 0 only when every requested check passes; 8 if any frame mismatches or a level limit is violated; exit 4 if the stream has no hash SEI and neither `--against` nor `--levels` was given.
+**Output.** `result` = `VerifyReport` (chapter 06 §6.3, index in §12.2.17): `checks` (`hash`, `levels`, `against`: `pass|fail|skipped`) and per frame `ok`, `plane_mismatch_mask`, `max_abs_diff`, `first_mismatch_xy`, `declared_hash`, `computed_hash`, `diagnostics` (the frame's `VER-*` Diagnostics), `mismatch_map_blob` with `mismatch_cells_w`/`mismatch_cells_h` (chapter 7 §7.6.4), plus the run-level `diagnostics` (issue #606). Exit 0 only when every requested check passes; 8 if any frame mismatches or a level limit is violated; exit 4 if the stream has no hash SEI and neither `--against` nor `--levels` was given.
 
 **Examples.**
 

@@ -8,26 +8,43 @@
 // chapter 15 §15.7.4), on the window colour. Qt 6.8 does not expose this accessibility tree through QtQuickView
 // (issue #547), so MainActivity reads `productName` once the root is ready and puts it on the Qt view's own
 // accessibility node, which UI Automator finds (WI-0.050 acceptance test 2).
+//
+// WI-0.052: only the header band is painted; the rest of the window is transparent, so the HDR test pattern of
+// HdrSurfaceView (below QtQuickView, chapter 13 §13.4.4 item 1) shows through. MainActivity.SHELL_HEADER_FRACTION
+// places the surface under the band; WI-A.400 replaces both with the Picture panel's geometry.
 
 import QtQuick
 import OvtStudio
 
-Rectangle {
+Item {
     id: root
 
+    // Keep in step with MainActivity.SHELL_HEADER_FRACTION.
+    readonly property real headerFraction: 0.25
     // The product name this root displays, read by MainActivity through QtQuickView.getProperty().
     readonly property string productName: productLabel.text
 
-    color: OvtStyle.window
+    Component.onCompleted: {
+        if (root.Window.window)
+            root.Window.window.color = "transparent";
+    }
 
-    Text {
-        id: productLabel
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: parent.height * root.headerFraction
+        color: OvtStyle.window
 
-        anchors.centerIn: parent
-        text: Qt.application.displayName
-        color: OvtStyle.text
-        font.pixelSize: OvtStyle.fontSize * 2
-        Accessible.role: Accessible.StaticText
-        Accessible.name: text
+        Text {
+            id: productLabel
+
+            anchors.centerIn: parent
+            text: Qt.application.displayName
+            color: OvtStyle.text
+            font.pixelSize: OvtStyle.fontSize * 2
+            Accessible.role: Accessible.StaticText
+            Accessible.name: text
+        }
     }
 }
