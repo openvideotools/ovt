@@ -496,9 +496,9 @@ std::vector<ParsedUnit> parse_h264(std::span<const std::span<const uint8_t>> uni
         case 19: {
           const auto sh = h264::parse_slice_layer(br, b, h, sets);
           if (sh) {
-            add_h264_slice_derived(*sh, unit);
             const h264::Pps* p = sets.pps.find(sh->pic_parameter_set_id);
             sei_ctx.active_sps = p != nullptr ? sets.sps.find(p->seq_parameter_set_id) : nullptr;
+            add_h264_slice_derived(*sh, sei_ctx.active_sps, unit);
           }
           sei_ctx.buffering_period_sps_id.reset();
           break;

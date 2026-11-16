@@ -1,11 +1,8 @@
 # WI-1.572 acceptance record
 
-Part a (PR #604): the 10 `syn_h264_*` golden tests use generated corpora (tests/corpora/synthetic/recipes.json).
-Hosted CI does not generate them, so those tests exit 77 (skipped) there. The record below is the Mac Mini run of
-the container-path stream, the first time `h264_container_to_annexb` ran against the real file. The run of the full
-10-test set is added when the PAFF stream's generation finishes.
-
-## syn_h264_multislice_cavlc_mp4 (trace_headers and gstparse)
+The 10 `syn_h264_*` golden tests of part a use generated corpora (tests/corpora/synthetic/recipes.json). Hosted CI
+does not generate them, so they exit 77 (skipped) there. Below is the Mac Mini run of PR #604 (00a6009): first the
+container-path stream alone (the first time `h264_container_to_annexb` ran on the real file), then all 10 tests.
 
 ```console
 WI-1.572a (PR #604 @ 00a6009) — syn_h264_multislice_cavlc_mp4 golden test on the Mac Mini, 2026-11-16 13:17 UTC
@@ -30,5 +27,41 @@ needs_corpus     =   0.44 sec*proc (2 tests)
 syntax_golden    =   0.44 sec*proc (2 tests)
 
 Total Test time (real) =   0.34 sec
+rc=0
+
+==================================================================
+Full set, 2026-11-16 13:41 UTC — all 11 syn_h264 corpora generated in the ovt-oracles image with generate.py (each .ok sha256 matches tests/corpora/manifest.json; syn_h264_gop60_1080p with --check)
+$ OVT_CORPORA_DIR=<dir> OVT_REQUIRE_CORPORA=1 ctest --preset macos-arm64-debug -R 'syntax_golden_h264_.*syn_h264' --output-on-failure
+Test project /Users/ovt-build/mxf-main/build/macos-arm64-debug
+      Start 111: syntax_golden_h264_trace_headers_syn_h264_multislice_cavlc_mp4
+      Start 137: syntax_golden_h264_gstparse_syn_h264_multislice_cavlc_mp4
+      Start 107: syntax_golden_h264_trace_headers_syn_h264_epb_dense
+      Start 108: syntax_golden_h264_trace_headers_syn_h264_gop60_1080p
+ 1/10 Test #107: syntax_golden_h264_trace_headers_syn_h264_epb_dense ..............   Passed    0.06 sec
+      Start 109: syntax_golden_h264_trace_headers_syn_h264_hrd_cbr
+ 2/10 Test #111: syntax_golden_h264_trace_headers_syn_h264_multislice_cavlc_mp4 ...   Passed    0.09 sec
+      Start 110: syntax_golden_h264_trace_headers_syn_h264_hrd_vbr
+ 3/10 Test #137: syntax_golden_h264_gstparse_syn_h264_multislice_cavlc_mp4 ........   Passed    0.09 sec
+      Start 133: syntax_golden_h264_gstparse_syn_h264_epb_dense
+ 4/10 Test #109: syntax_golden_h264_trace_headers_syn_h264_hrd_cbr ................   Passed    0.07 sec
+      Start 134: syntax_golden_h264_gstparse_syn_h264_gop60_1080p
+ 5/10 Test #133: syntax_golden_h264_gstparse_syn_h264_epb_dense ...................   Passed    0.04 sec
+      Start 135: syntax_golden_h264_gstparse_syn_h264_hrd_cbr
+ 6/10 Test #108: syntax_golden_h264_trace_headers_syn_h264_gop60_1080p ............   Passed    0.15 sec
+      Start 136: syntax_golden_h264_gstparse_syn_h264_hrd_vbr
+ 7/10 Test #110: syntax_golden_h264_trace_headers_syn_h264_hrd_vbr ................   Passed    0.12 sec
+ 8/10 Test #135: syntax_golden_h264_gstparse_syn_h264_hrd_cbr .....................   Passed    0.08 sec
+ 9/10 Test #134: syntax_golden_h264_gstparse_syn_h264_gop60_1080p .................   Passed    0.15 sec
+10/10 Test #136: syntax_golden_h264_gstparse_syn_h264_hrd_vbr .....................   Passed    0.12 sec
+
+100% tests passed out of 10
+
+Label Time Summary:
+fast             =   0.97 sec*proc (10 tests)
+golden           =   0.97 sec*proc (10 tests)
+needs_corpus     =   0.97 sec*proc (10 tests)
+syntax_golden    =   0.97 sec*proc (10 tests)
+
+Total Test time (real) =   0.37 sec
 rc=0
 ```

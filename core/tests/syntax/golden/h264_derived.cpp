@@ -133,7 +133,7 @@ void add_h264_pps_derived(const h264::Pps& pps, const h264::Sps* sps, ParsedUnit
   }
 }
 
-void add_h264_slice_derived(const h264::SliceHeader& sh, ParsedUnit& u) {
+void add_h264_slice_derived(const h264::SliceHeader& sh, const h264::Sps* sps, ParsedUnit& u) {
   // GStreamer infers the active reference counts only for the lists the slice type uses (zero otherwise).
   const bool uses_l0 = sh.slice_type_mod5 == h264::kSliceP || sh.slice_type_mod5 == h264::kSliceSP ||
                        sh.slice_type_mod5 == h264::kSliceB;
@@ -167,6 +167,9 @@ void add_h264_slice_derived(const h264::SliceHeader& sh, ParsedUnit& u) {
 
   if (sh.has_pred_weight_table) {
     const auto& pwt = sh.pred_weight_table;
+    // With ChromaArrayType 0 no chroma weights are coded and GStreamer leaves them at 0, while OVT's struct holds the
+    // §7.4.3.2 inferred 2^chroma_log2_weight_denom: the chroma keys are left out, so the golden must hold zeros.
+    const bool chroma = sps == nullptr || sps->ChromaArrayType != 0;
     const auto list = [&](const h264::PredWeightTable::List& l, uint32_t active_minus1, const std::string& n) {
       std::vector<int64_t> lw;
       std::vector<int64_t> lo;
@@ -182,8 +185,10 @@ void add_h264_slice_derived(const h264::SliceHeader& sh, ParsedUnit& u) {
       }
       put(u, "luma_weight_" + n, std::move(lw));
       put(u, "luma_offset_" + n, std::move(lo));
-      put(u, "chroma_weight_" + n, std::move(cw));
-      put(u, "chroma_offset_" + n, std::move(co));
+      if (chroma) {
+        put(u, "chroma_weight_" + n, std::move(cw));
+        put(u, "chroma_offset_" + n, std::move(co));
+      }
     };
     list(pwt.l0, sh.num_ref_idx_l0_active_minus1, "l0");
     if (sh.slice_type_mod5 == h264::kSliceB) {
