@@ -783,7 +783,7 @@ std::vector<std::vector<uint8_t>> split_annexb(const std::vector<uint8_t>& s) {
 // Every FrameAnalysis of the first @p max_frames pictures (decode order) of @p stream, keyed by decode index, each
 // checked by the validator.
 std::map<int32_t, std::vector<uint8_t>> analyse_stream(const std::filesystem::path& stream, int32_t max_frames,
-                                                       int threads = 0) {
+                                                       int threads = 0, bool empty_codes = false) {
   const ovt_AnalysisDecoderApi& api = plugin_api();
   ovt_AnalysisDecoder* dec = nullptr;
   REQUIRE(api.create(nullptr, 0, threads, &dec) == OVT_OK);
