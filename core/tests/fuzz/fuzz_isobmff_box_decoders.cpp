@@ -78,6 +78,14 @@ constexpr auto kCases = std::to_array<Case>({
     {"uriI", "urim", true, "stsd"},
     {"tmcd", "stsd", false},
     {"name", "tmcd", false, "stsd"},
+    // WI-1.211 group E part 1: movie extends and movie fragments.
+    {"mehd", "mvex", true},
+    {"trex", "mvex", true},
+    {"leva", "mvex", true},
+    {"mfhd", "moof", true},
+    {"tfhd", "traf", true},
+    {"tfdt", "traf", true},
+    {"trun", "traf", true},
 });
 
 void require(bool ok) {

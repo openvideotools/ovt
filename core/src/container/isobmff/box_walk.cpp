@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -15,6 +17,7 @@
 
 #include "container/diagnostics.h"
 #include "container/isobmff/box_registry.h"
+#include "container/isobmff/decoders/fragment_boxes.h"
 #include "container/isobmff/field_builder.h"
 
 namespace ovt::container::isobmff {
@@ -360,6 +363,7 @@ void defer_moof(WalkState& st, BoxNodeT& n, uint64_t children_begin, uint64_t en
                                  child_context(ctx, FourCC{'m', 'o', 'o', 'f'}, n), n.diagnostics);
     }
   }
+  check_fragment_children(n);  // SPEC-ASSUMPTION(#671)
   add_diag(n, DiagCode::CNT_0007,
            "box at offset " + std::to_string(pos) + " not yet expanded (lazy; call ovt_container_expand)", pos);
   st.deferred->push_back(DeferredBox{pos, ctx});
@@ -405,6 +409,7 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
     defer_moof(st, n, children_begin, end, ctx);
   } else if (walk) {
     n.children = walk_children(st, pos, children_begin, end, depth + 1, child_context(ctx, type, n), n.diagnostics);
+    check_fragment_children(n);  // SPEC-ASSUMPTION(#671)
   } else if (dec == nullptr) {
     n.payload_span = std::make_unique<fb::ByteSpan>(payload_begin, end > payload_begin ? end - payload_begin : 0);
   }
@@ -493,6 +498,7 @@ WalkResult walk(const io::RandomAccessFile& file, std::vector<DeferredBox>* defe
     return r;
   }
 
+  r.root_ctx.trex_for_track = std::make_shared<std::map<uint32_t, TrackFragmentInfo>>();  // SPEC-ASSUMPTION(#670)
   WalkState st;
   st.file = &file;
   st.deferred = deferred;
@@ -539,6 +545,7 @@ void expand_node(const io::RandomAccessFile& file, fb::BoxNodeT& node, const Box
   st.file = &file;
   node.children = walk_children(st, pos, pos + node.header_length, end, 1,
                                 child_context(ctx, FourCC{'m', 'o', 'o', 'f'}, node), node.diagnostics);
+  check_fragment_children(node);  // SPEC-ASSUMPTION(#671)
 }
 
 // SPEC-ASSUMPTION(#631): the located offset is a hint the container reader keeps only if the top-level walk finds an

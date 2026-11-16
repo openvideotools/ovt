@@ -11,6 +11,8 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <map>
+#include <memory>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -22,6 +24,18 @@ struct BoxNodeT;
 namespace ovt::container::isobmff {
 
 using FourCC = std::array<char, 4>;
+
+// Per-track state of the fragment decoders (WI-1.211): the `trex` defaults of `moov/mvex` and the `mdhd` timescale of
+// the track, both keyed by track_ID. SPEC-ASSUMPTION(#670): one map shared by every copy of the context, because a
+// `trex` is decoded in the child context of `mvex` and its values must reach the `moof`s that follow.
+struct TrackFragmentInfo {
+  bool has_trex = false;
+  uint32_t default_sample_description_index = 0;
+  uint32_t default_sample_duration = 0;
+  uint32_t default_sample_size = 0;
+  uint32_t default_sample_flags = 0;
+  uint32_t timescale = 0;  // mdhd.timescale of the track, 0 = unknown
+};
 
 struct BoxContext {
   std::vector<FourCC> ancestors;  // ["moov","trak","mdia"] innermost last
@@ -37,7 +51,8 @@ struct BoxContext {
   uint8_t stsd_version = 0;
   uint8_t per_sample_iv_size = 0xFF;  // 0xFF = unknown
   uint64_t moof_offset = 0;           // enclosing moof start (trun data_offset base)
-  const fb::BoxNodeT* trex_for_track = nullptr;
+  // null until the walk creates it (a test context without one simply keeps no track state)
+  std::shared_ptr<std::map<uint32_t, TrackFragmentInfo>> trex_for_track;
   const fb::BoxNodeT* parent = nullptr;
 
   [[nodiscard]] bool in(std::string_view fourcc) const noexcept {
