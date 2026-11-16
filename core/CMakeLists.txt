@@ -117,6 +117,17 @@ unset(_ovt_pugixml_targets)
 # HTTP(S) fetches of the DASH/HLS virtual file (WI-4.210, chapter 8 §8.6.7): libcurl on every platform. The vcpkg
 # port exports CURL::libcurl; a distribution without a CMake config is found through pkg-config.
 ovt_find_package(CURL SPDX "curl" TARGETS CURL::libcurl PKG_CONFIG libcurl)
+# libcurl's own dependencies reach the licence manifest as imported targets of their own (vcpkg's curl[ssl] links
+# OpenSSL and zlib on Linux; the Android build has neither).
+if(OVT_USE_VCPKG)
+  set(_ovt_curl_dep_source vcpkg)
+else()
+  set(_ovt_curl_dep_source system)
+endif()
+ovt_set_dependency_license(OpenSSL::SSL SOURCE ${_ovt_curl_dep_source} SPDX "Apache-2.0")
+ovt_set_dependency_license(OpenSSL::Crypto SOURCE ${_ovt_curl_dep_source} SPDX "Apache-2.0")
+ovt_set_dependency_license(ZLIB::ZLIB SOURCE ${_ovt_curl_dep_source} SPDX "Zlib")
+unset(_ovt_curl_dep_source)
 # $<BUILD_INTERFACE:...> keeps them out of the exported ovt-targets.cmake even when a system build
 # (OVT_USE_VCPKG=OFF) links them as shared libraries (WI-0.008).
 foreach(
