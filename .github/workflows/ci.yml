@@ -59,7 +59,7 @@ jobs:
           cat "$RUNNER_TEMP/changed.txt"
           # A file outside the list below (or an empty diff) means Android must build.
           if [ -s "$RUNNER_TEMP/changed.txt" ] && ! grep -qvE \
-              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image)\.yml$' \
+              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image|corpora-cache)\.yml$' \
               "$RUNNER_TEMP/changed.txt"; then
             echo "android=false" >> "$GITHUB_OUTPUT"
           else
