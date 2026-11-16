@@ -111,6 +111,7 @@ TEST_CASE("H.264 Table A-1 MaxFS and the DPB limit", "[index][levels][fast]") {
   CHECK(h264_max_fs("3.0") == 1620);
   CHECK(h264_max_fs("4.1") == 8192);
   CHECK(h264_max_fs("1b") == 99);
+  CHECK(h264_max_fs("6.2") == 139264);
   CHECK(h264_max_fs("9.9") == 0);
   CHECK(h264_max_fs("") == 0);
 
@@ -154,8 +155,9 @@ TEST_CASE("AV1 Annex A MaxPicSize, MaxHSize and MaxVSize per operating point", "
   CHECK(two[0].message == "picture size exceeds level 2.0 MaxLumaPs");
   // Level 31 (no limits) and reserved indices are not checked.
   CHECK(check_levels(seq(65536, 65536, {31})).empty());
-  CHECK(check_levels(seq(65536, 65536, {2, 3, 6, 7, 10, 11, 24})).empty());
-  CHECK(av1_level_limits(23).max_pic_size == 35651584);
+  CHECK(check_levels(seq(65536, 65536, {2, 3, 6, 7, 10, 11, 20, 21, 22, 23, 24})).empty());
+  CHECK(av1_level_limits(19).max_pic_size == 35651584);
+  CHECK_FALSE(av1_level_limits(20).valid);  // 7.x: no limits in Annex A, never checked
   CHECK(av1_level_limits(9).valid);
   CHECK_FALSE(av1_level_limits(31).valid);
 }

@@ -26,10 +26,10 @@ struct H264Level {
 };
 
 // H.264 Table A-1, MaxFS column.
-constexpr std::array<H264Level, 19> kH264Levels{{
-    {"1b", 99},     {"1.0", 99},    {"1.1", 396},   {"1.2", 396},    {"1.3", 396},    {"2.0", 396},  {"2.1", 792},
-    {"2.2", 1620},  {"3.0", 1620},  {"3.1", 3600},  {"3.2", 5120},   {"4.0", 8192},   {"4.1", 8192}, {"4.2", 8704},
-    {"5.0", 22080}, {"5.1", 36864}, {"5.2", 36864}, {"6.0", 139264}, {"6.1", 139264},
+constexpr std::array<H264Level, 20> kH264Levels{{
+    {"1b", 99},     {"1.0", 99},    {"1.1", 396},   {"1.2", 396},    {"1.3", 396},    {"2.0", 396},    {"2.1", 792},
+    {"2.2", 1620},  {"3.0", 1620},  {"3.1", 3600},  {"3.2", 5120},   {"4.0", 8192},   {"4.1", 8192},   {"4.2", 8704},
+    {"5.0", 22080}, {"5.1", 36864}, {"5.2", 36864}, {"6.0", 139264}, {"6.1", 139264}, {"6.2", 139264},
 }};
 
 struct H265Level {
@@ -54,7 +54,8 @@ constexpr std::array<H265Level, 13> kH265Levels{{
     {186, 35651584},
 }};
 
-// AV1 Annex A.3 Table A.3 (seq_level_idx 0..23); indices 2, 3, 6, 7, 10, 11 are reserved. Levels 7.x repeat 6.x.
+// AV1 Annex A.3 (seq_level_idx 0..19); indices 2, 3, 6, 7, 10, 11 are reserved. Indices 20..23 (levels 7.x) have no
+// limits in the Annex and are not checked, like the reserved ones.
 constexpr Av1LevelLimits kAv1Level20{true, 147456, 2048, 1152};
 constexpr Av1LevelLimits kAv1Level21{true, 278784, 2816, 1584};
 constexpr Av1LevelLimits kAv1Level30{true, 665856, 4352, 2448};
@@ -117,10 +118,6 @@ Av1LevelLimits av1_level_limits(uint32_t seq_level_idx) noexcept {
     case 17:
     case 18:
     case 19:
-    case 20:
-    case 21:
-    case 22:
-    case 23:
       return kAv1Level60;
     default:
       return {};
