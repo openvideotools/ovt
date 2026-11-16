@@ -15,6 +15,7 @@
 
 namespace ovt::render::fonts {
 
+// clang-format off
 inline constexpr int kSdfFontPx = 48;       // source raster size (px per em)
 inline constexpr int kSdfSpread = 8;         // distance range on each side of the outline, source px
 inline constexpr int kSdfAdvance = 29;       // monospaced advance, source px
@@ -28,7 +29,6 @@ inline constexpr int kSdfAtlasHeight = 368;
 inline constexpr int kSdfGlyphCount = 101;    // U+0020..U+007E, then kSdfExtraGlyphs
 inline constexpr std::array<char32_t, 6> kSdfExtraGlyphs = {0x2192, 0x2191, 0x2193, 0x2190, 0x2212, 0x00B7};
 
-// clang-format off
 inline constexpr std::array<uint8_t, 376832> kSdfAtlas = {
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
