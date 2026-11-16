@@ -1,0 +1,1 @@
+<MPD><Period duration="PT1000000S"><AdaptationSet><Representation id="v" bandwidth="100"><SegmentTemplate timescale="1" duration="1" startNumber="1" initialization="i/$RepresentationID$.mp4" media="$RepresentationID$/s$Number%05d$_$Bandwidth$.m4s"/></Representation></AdaptationSet></Period></MPD>

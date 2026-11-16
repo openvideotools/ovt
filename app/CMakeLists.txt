@@ -75,6 +75,7 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/panels/DiagnosticsPanel.qml"
       "${app_dir}/qml/panels/UnitListPanel.qml"
       "${app_dir}/qml/panels/TimelinePanel.qml"
+      "${app_dir}/qml/panels/RefGraphPanel.qml"
       "${app_dir}/qml/panels/BookmarksPanel.qml"
       "${app_dir}/qml/panels/PicturePanel.qml")
   # PictureView.qml instantiates PictureHost, so it exists only where the type does (PicturePanel loads it by URL).
@@ -154,6 +155,10 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/timeline_geometry.cpp"
     "${app_dir}/src/items/timeline_chart.h"
     "${app_dir}/src/items/timeline_chart.cpp"
+    "${app_dir}/src/models/ref_graph_layout.h"
+    "${app_dir}/src/models/ref_graph_layout.cpp"
+    "${app_dir}/src/items/ref_graph.h"
+    "${app_dir}/src/items/ref_graph.cpp"
     "${app_dir}/src/models/unit_list_model.h"
     "${app_dir}/src/models/unit_list_model.cpp"
     "${app_dir}/src/models/bookmarks_model.h"

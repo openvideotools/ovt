@@ -24,6 +24,16 @@ target_sources(ovt_core_objects PRIVATE av1/obu_header.cpp av1/sequence_header.c
                                         av1/metadata.cpp av1/tile_list.cpp)
 # WI-1.119: the AV1 reference slot model (DecoderState, §7.20 update, §7.21 loading, §7.8 set_frame_refs).
 target_sources(ovt_core_objects PRIVATE av1/decoder_state.cpp)
+# WI-1.117: AV1 uncompressed_header() part 1 (chapter 7 §7.3.6 rows 11–19): frame_size / superres / render_size /
+# frame_size_with_refs (rows 12–14), tile_info (row 15), quantization / segmentation / delta params (rows 16–19)
+# and uncompressed_header() itself (row 11).
+target_sources(ovt_core_objects PRIVATE av1/frame_size.cpp av1/tile_info.cpp av1/quantization.cpp av1/segmentation.cpp
+                                        av1/delta_params.cpp av1/frame_header.cpp)
+# WI-1.118: uncompressed_header() rows 20–29 (loop filter, CDEF, LR, tx mode, reference / skip mode, global motion,
+# film grain, frame OBU, tile group).
+target_sources(ovt_core_objects PRIVATE av1/loop_filter.cpp av1/cdef.cpp av1/lr.cpp av1/tx_mode.cpp av1/skip_mode.cpp
+                                        av1/global_motion.cpp av1/film_grain.cpp)
+target_sources(ovt_core_objects PRIVATE av1/frame_obu.cpp av1/tile_group.cpp)
 # WI-1.112: H.265 NAL header, profile_tier_level, hrd_parameters, vui_parameters, scaling_list_data,
 # st_ref_pic_set (shared with WI-1.113), VPS, SPS and PPS parsers with the ActivePps tile tables (chapter 7 §7.3.5
 # rows 1–9). Typed structs live in core/include/ovt/cxx/syntax/h265/ (§7.3.7).
@@ -44,3 +54,22 @@ target_sources(ovt_core_objects PRIVATE h265/slice_segment_header.cpp h265/ref_p
                                         h265/pred_weight_table.cpp)
 # WI-1.115: H.265 parameter-set activation tracking (chapter 7 §7.3.8).
 target_sources(ovt_core_objects PRIVATE h265/active_sets.cpp)
+# WI-1.108: H.264 NAL header, SPS (VUI, HRD, scaling lists) and PPS parsers; H.273 code-point names shared with
+# the H.265 and AV1 parsers.
+target_sources(ovt_core_objects PRIVATE common/h273_names.cpp h264/nal_header.cpp h264/scaling_list.cpp h264/vui.cpp
+                                        h264/sps.cpp h264/pps.cpp)
+# WI-1.109a: H.264 slice header with ref list modification, pred weight table and dec ref pic marking (chapter 7
+# §7.3.4 rows 24–27).
+target_sources(ovt_core_objects PRIVATE h264/slice_header.cpp h264/ref_pic_list_modification.cpp
+                                        h264/pred_weight_table.cpp h264/dec_ref_pic_marking.cpp)
+# WI-1.109b: H.264 AUD, end of sequence / stream, filler data and slice data partitions (chapter 7 §7.3.4 rows 19, 20
+# and 28).
+target_sources(ovt_core_objects PRIVATE h264/aud.cpp h264/data_partition.cpp)
+# WI-1.109c: H.264 SPS extension, subset SPS (MVC extension) and prefix NAL (chapter 7 §7.3.4 rows 21–23).
+target_sources(ovt_core_objects PRIVATE h264/sps_ext.cpp h264/subset_sps.cpp h264/prefix_nal.cpp)
+# WI-1.110: SEI framing shared by H.264 and H.265, and the H.264 SEI payload parsers (chapter 7 §7.3.4 rows 7–18).
+target_sources(ovt_core_objects PRIVATE common/sei_framing.cpp h264/sei.cpp h264/sei_timing.cpp h264/sei_picture.cpp
+                                        h264/sei_user_data.cpp)
+# WI-1.114: the H.265 SEI payload parsers over the shared framing (chapter 7 §7.3.5 rows 13–14).
+target_sources(ovt_core_objects PRIVATE h265/sei.cpp h265/sei_timing.cpp h265/sei_parameter_sets.cpp
+                                        h265/sei_picture.cpp h265/sei_user_data.cpp)

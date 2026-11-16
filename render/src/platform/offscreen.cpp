@@ -10,6 +10,8 @@
 #include "offscreen.h"
 
 #include <algorithm>
+#include <array>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -204,46 +206,82 @@ bool OffscreenGpu::create_gl(std::string& stage, std::string& reason) {
 }
 
 bool OffscreenGpu::create_texture(const DisplayTarget& target, std::string& reason) {
-  const char* name = offscreen_format_name(target.offscreen_format);
-  pl_fmt fmt = pl_find_named_fmt(gpu_, name);
   // The CPU download (Interop::None: tests, CLI) needs a host-readable format; the interop rows hand the texture to
   // the host and read it back only when the format allows (GLES drivers may not offer host reads of rgba8).
+  return create_host_texture(out_, target.width, target.height, target.offscreen_format,
+                             interop_ == DisplayTarget::Interop::None, reason);
+}
+
+bool OffscreenGpu::create_extra(HostTexture& t, int width, int height, DisplayTarget::OffscreenFormat format,
+                                std::string& reason) {
+  if (gpu_ == nullptr) {
+    reason = "no GPU";
+    return false;
+  }
+  if (!create_host_texture(t, width, height, format, false, reason)) {
+    return false;
+  }
+  if (std::find(extras_.begin(), extras_.end(), &t) == extras_.end()) {
+    extras_.push_back(&t);
+  }
+  pl_tex_clear(gpu_, t.tex, std::array<float, 4>{}.data());  // the host sees zeros until the first write
+  return true;
+}
+
+void OffscreenGpu::destroy_extra(HostTexture& t) {
+  const auto it = std::find(extras_.begin(), extras_.end(), &t);
+  if (it != extras_.end()) {
+    extras_.erase(it);
+  }
+  destroy_host_texture(t);
+}
+
+bool OffscreenGpu::create_host_texture(HostTexture& t, int width, int height, DisplayTarget::OffscreenFormat format,
+                                       bool need_readable, std::string& reason) {
+  const char* name = offscreen_format_name(format);
+  pl_fmt fmt = pl_find_named_fmt(gpu_, name);
   auto needed = static_cast<enum pl_fmt_caps>(PL_FMT_CAP_RENDERABLE | PL_FMT_CAP_SAMPLEABLE | PL_FMT_CAP_BLITTABLE);
-  if (interop_ == DisplayTarget::Interop::None) {
+  if (need_readable) {
     needed = static_cast<enum pl_fmt_caps>(needed | PL_FMT_CAP_HOST_READABLE);
   }
   if (fmt == nullptr || (fmt->caps & needed) != needed) {
-    destroy_texture();
+    destroy_host_texture(t);
     reason = std::string("texture format ") + name + " is not renderable/blittable/readable";
     return false;
   }
   if (interop_ == DisplayTarget::Interop::MetalTexture) {
-    destroy_texture();
-    return create_metal_texture(fmt, target, reason);
+    destroy_host_texture(t);
+    t.width = width;
+    t.height = height;
+    t.format = format;
+    return create_metal_texture(t, fmt, reason);
   }
-  begin_frame();  // a held image goes back to libplacebo before pl_tex_recreate replaces or keeps it
+  release(t);  // a held image goes back to libplacebo before pl_tex_recreate replaces or keeps it
   struct pl_tex_params params = {};
-  params.w = target.width;
-  params.h = target.height;
+  params.w = width;
+  params.h = height;
   params.format = fmt;
   params.sampleable = true;
   params.renderable = true;
   params.blit_dst = true;
   params.host_readable = (fmt->caps & PL_FMT_CAP_HOST_READABLE) != 0;
-  if (!pl_tex_recreate(gpu_, &tex_, &params)) {
+  if (!pl_tex_recreate(gpu_, &t.tex, &params)) {
     reason = std::string("pl_tex_recreate failed for ") + name;
     return false;
   }
+  t.width = width;
+  t.height = height;
+  t.format = format;
   return true;
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static): uses the members where VK_EXT_metal_objects exists
-bool OffscreenGpu::create_metal_texture(pl_fmt fmt, const DisplayTarget& target, std::string& reason) {
+bool OffscreenGpu::create_metal_texture(HostTexture& t, pl_fmt fmt, std::string& reason) {
 #if defined(VK_EXT_metal_objects)
   VkFormat vk_format = VK_FORMAT_R8G8B8A8_UNORM;  // libplacebo "rgba8"
-  if (target.offscreen_format == DisplayTarget::OffscreenFormat::Rgba16F) {
+  if (t.format == DisplayTarget::OffscreenFormat::Rgba16F) {
     vk_format = VK_FORMAT_R16G16B16A16_SFLOAT;  // "rgba16hf"
-  } else if (target.offscreen_format == DisplayTarget::OffscreenFormat::Rgb10A2) {
+  } else if (t.format == DisplayTarget::OffscreenFormat::Rgb10A2) {
     vk_format = VK_FORMAT_A2B10G10R10_UNORM_PACK32;  // "rgb10a2"
   }
   const auto create_image = device_fn<PFN_vkCreateImage>(vk_, "vkCreateImage");
@@ -274,7 +312,7 @@ bool OffscreenGpu::create_metal_texture(pl_fmt fmt, const DisplayTarget& target,
   info.pNext = &export_info;
   info.imageType = VK_IMAGE_TYPE_2D;
   info.format = vk_format;
-  info.extent = {static_cast<uint32_t>(target.width), static_cast<uint32_t>(target.height), 1};
+  info.extent = {static_cast<uint32_t>(t.width), static_cast<uint32_t>(t.height), 1};
   info.mipLevels = 1;
   info.arrayLayers = 1;
   info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -286,12 +324,12 @@ bool OffscreenGpu::create_metal_texture(pl_fmt fmt, const DisplayTarget& target,
   info.queueFamilyIndexCount = static_cast<uint32_t>(families.size());
   info.pQueueFamilyIndices = families.data();
   info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-  if (create_image(vk_->device, &info, nullptr, &mtl_image_) != VK_SUCCESS) {
+  if (create_image(vk_->device, &info, nullptr, &t.mtl_image) != VK_SUCCESS) {
     reason = "vkCreateImage failed for the exportable Metal texture";
     return false;
   }
   VkMemoryRequirements reqs = {};
-  get_reqs(vk_->device, mtl_image_, &reqs);
+  get_reqs(vk_->device, t.mtl_image, &reqs);
   VkPhysicalDeviceMemoryProperties props = {};
   mem_props(vk_->phys_device, &props);
   uint32_t type = UINT32_MAX;
@@ -306,69 +344,123 @@ bool OffscreenGpu::create_metal_texture(pl_fmt fmt, const DisplayTarget& target,
   alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   alloc.allocationSize = reqs.size;
   alloc.memoryTypeIndex = type;
-  if (type == UINT32_MAX || allocate(vk_->device, &alloc, nullptr, &mtl_memory_) != VK_SUCCESS ||
-      bind(vk_->device, mtl_image_, mtl_memory_, 0) != VK_SUCCESS) {
+  if (type == UINT32_MAX || allocate(vk_->device, &alloc, nullptr, &t.mtl_memory) != VK_SUCCESS ||
+      bind(vk_->device, t.mtl_image, t.mtl_memory, 0) != VK_SUCCESS) {
     reason = "no device-local memory for the exportable Metal texture";
-    destroy_texture();
+    destroy_host_texture(t);
     return false;
   }
 
   VkExportMetalTextureInfoEXT tex_info = {};
   tex_info.sType = VK_STRUCTURE_TYPE_EXPORT_METAL_TEXTURE_INFO_EXT;
-  tex_info.image = mtl_image_;
+  tex_info.image = t.mtl_image;
   tex_info.plane = VK_IMAGE_ASPECT_PLANE_0_BIT;  // single-plane image
   VkExportMetalObjectsInfoEXT objects = {};
   objects.sType = VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECTS_INFO_EXT;
   objects.pNext = &tex_info;
   export_objects(vk_->device, &objects);
-  mtl_texture_ = tex_info.mtlTexture;  // MTLTexture_id is void* outside Objective-C
-  if (mtl_texture_ == nullptr) {
+  t.mtl_texture = tex_info.mtlTexture;  // MTLTexture_id is void* outside Objective-C
+  if (t.mtl_texture == nullptr) {
     reason = "vkExportMetalObjectsEXT returned no MTLTexture";
-    destroy_texture();
+    destroy_host_texture(t);
     return false;
   }
 
   struct pl_vulkan_wrap_params wrap = {};
-  wrap.image = mtl_image_;
-  wrap.width = target.width;
-  wrap.height = target.height;
+  wrap.image = t.mtl_image;
+  wrap.width = t.width;
+  wrap.height = t.height;
   wrap.format = vk_format;
   wrap.usage = info.usage;
-  tex_ = pl_vulkan_wrap(gpu_, &wrap);
-  if (tex_ == nullptr || tex_->params.format != fmt) {
+  t.tex = pl_vulkan_wrap(gpu_, &wrap);
+  if (t.tex == nullptr || t.tex->params.format != fmt) {
     reason = "pl_vulkan_wrap failed for the exportable Metal texture";
-    destroy_texture();
+    destroy_host_texture(t);
     return false;
   }
   // A wrapped image starts out held by the user; libplacebo owns it from here on. Metal has no image layouts, so the
   // host never hands it back (end_frame() waits for the GPU instead).
   struct pl_vulkan_release_params release = {};
-  release.tex = tex_;
+  release.tex = t.tex;
   release.layout = VK_IMAGE_LAYOUT_UNDEFINED;
   release.qf = VK_QUEUE_FAMILY_IGNORED;
   pl_vulkan_release_ex(gpu_, &release);
   return true;
 #else
   static_cast<void>(fmt);
-  static_cast<void>(target);
+  static_cast<void>(t);
   reason = "Interop::MetalTexture needs VK_EXT_metal_objects";
   return false;
 #endif
 }
 
+void OffscreenGpu::release(HostTexture& t) {
+  if (interop_ != DisplayTarget::Interop::VulkanSharedDevice || !t.held || t.tex == nullptr) {
+    return;
+  }
+  // The host has finished sampling: its commands precede ours on the same queue (§10.2.2), and it returned the image
+  // in the layout it got it in.
+  struct pl_vulkan_release_params release = {};
+  release.tex = t.tex;
+  release.layout = kHostLayout;
+  release.qf = VK_QUEUE_FAMILY_IGNORED;
+  pl_vulkan_release_ex(gpu_, &release);
+  t.held = false;
+}
+
+void OffscreenGpu::hold(HostTexture& t) {
+  if (interop_ != DisplayTarget::Interop::VulkanSharedDevice || t.held || t.tex == nullptr) {
+    return;
+  }
+  // Transition to the host's layout and mark the image held.
+  struct pl_vulkan_hold_params params = {};
+  params.tex = t.tex;
+  params.layout = kHostLayout;
+  params.qf = VK_QUEUE_FAMILY_IGNORED;
+  params.semaphore.sem = hold_sem_;
+  params.semaphore.value = ++hold_value_;
+  t.held = pl_vulkan_hold_ex(gpu_, &params);
+  if (t.held) {
+    hold_signalled_ = params.semaphore.value;
+  }
+}
+
+void OffscreenGpu::wait_hold_sem() {
+  // pl_gpu_finish() waits on libplacebo's own per-command timeline semaphore, which vk_cmd_begin() puts first in the
+  // submission's signal list, ahead of hold_sem_. Mesa's common queue code (lavapipe, threaded submit, emulated
+  // timelines) publishes the signal points one after another after the driver submit, so that wait can return
+  // while hold_sem_'s point is still being installed; destroying hold_sem_ in that window links the point into a
+  // freed timeline and LeakSanitizer reports it (160 bytes + 112 for its fence inside libvulkan_lvp.so; seen on
+  // render_test_interop). Waiting on hold_sem_'s own last value closes the window: the wait returns only once its
+  // point is installed and signalled. Bounded, because a hold whose submission failed never signals.
+  if (hold_signalled_ == 0) {
+    return;
+  }
+  const auto wait_semaphores = device_fn<PFN_vkWaitSemaphores>(vk_, "vkWaitSemaphores");
+  if (wait_semaphores == nullptr) {
+    return;
+  }
+  VkSemaphoreWaitInfo wait = {};
+  wait.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+  wait.semaphoreCount = 1;
+  wait.pSemaphores = &hold_sem_;
+  wait.pValues = &hold_signalled_;
+  constexpr uint64_t kTimeoutNs = 1'000'000'000;  // the GPU work is already done (pl_gpu_finish); this is a backstop
+  if (wait_semaphores(vk_->device, &wait, kTimeoutNs) != VK_SUCCESS) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    (void)std::fprintf(stderr, "[render] offscreen: the hold semaphore did not reach its last value before destroy\n");
+  }
+}
+
 bool OffscreenGpu::begin_frame() {
-  if (tex_ == nullptr) {
+  for (HostTexture* t : extras_) {
+    release(*t);
+  }
+  if (out_.tex == nullptr) {
     return false;
   }
-  if (interop_ == DisplayTarget::Interop::VulkanSharedDevice && held_) {
-    // The host has finished sampling: its commands precede ours on the same queue (§10.2.2), and it returned the
-    // image in the layout it got it in.
-    struct pl_vulkan_release_params release = {};
-    release.tex = tex_;
-    release.layout = kHostLayout;
-    release.qf = VK_QUEUE_FAMILY_IGNORED;
-    pl_vulkan_release_ex(gpu_, &release);
-    held_ = false;
+  if (interop_ == DisplayTarget::Interop::VulkanSharedDevice && out_.held) {
+    release(out_);
     return true;
   }
 #if OVT_RENDER_GL_INTEROP
@@ -383,7 +475,7 @@ bool OffscreenGpu::begin_frame() {
 }
 
 void OffscreenGpu::end_frame() {
-  if (tex_ == nullptr) {
+  if (out_.tex == nullptr) {
     return;
   }
   switch (interop_) {
@@ -396,18 +488,14 @@ void OffscreenGpu::end_frame() {
       pl_gpu_flush(gpu_);
       pl_gpu_finish(gpu_);
       break;
-    case DisplayTarget::Interop::VulkanSharedDevice: {
-      // Transition to the host's layout and mark the image held; the hold submits (pl_gpu_flush).
-      struct pl_vulkan_hold_params hold = {};
-      hold.tex = tex_;
-      hold.layout = kHostLayout;
-      hold.qf = VK_QUEUE_FAMILY_IGNORED;
-      hold.semaphore.sem = hold_sem_;
-      hold.semaphore.value = ++hold_value_;
-      held_ = pl_vulkan_hold_ex(gpu_, &hold);
+    case DisplayTarget::Interop::VulkanSharedDevice:
+      // Every image goes to the host's layout and is marked held; the holds submit (pl_gpu_flush).
+      hold(out_);
+      for (HostTexture* t : extras_) {
+        hold(*t);
+      }
       pl_gpu_flush(gpu_);
       break;
-    }
     case DisplayTarget::Interop::GlTexture:
       pl_gpu_flush(gpu_);
 #if OVT_RENDER_GL_INTEROP
@@ -415,6 +503,7 @@ void OffscreenGpu::end_frame() {
         glFinish();  // last-resort fallback (§10.2.2 Android row)
       } else {
         // GLES 3.0 fence on the surface's context; the host glWaitSync()s it on its own context of the share group.
+        // One fence covers the output and the scope textures: they are written in the same submission.
         gl_sync_ = static_cast<void*>(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
         glFlush();  // the fence must reach the GPU before another context waits on it
       }
@@ -424,29 +513,35 @@ void OffscreenGpu::end_frame() {
 }
 
 ExternalTexture OffscreenGpu::describe(const DisplayTarget& target) const {
+  ExternalTexture t = describe(out_);
+  t.format = target.offscreen_format;
+  return t;
+}
+
+ExternalTexture OffscreenGpu::describe(const HostTexture& h) const {
   ExternalTexture t{};
   t.interop = interop_;
   t.handle = nullptr;
   t.handle2 = nullptr;
-  t.width = tex_ != nullptr ? target.width : 0;
-  t.height = tex_ != nullptr ? target.height : 0;
-  t.format = target.offscreen_format;
+  t.width = h.tex != nullptr ? h.width : 0;
+  t.height = h.tex != nullptr ? h.height : 0;
+  t.format = h.format;
   t.layout = 0;
-  if (tex_ == nullptr) {
+  if (h.tex == nullptr) {
     return t;
   }
   switch (interop_) {
     case DisplayTarget::Interop::None:
       // The handle is the pl_tex itself (only libovt-render dereferences it).
-      t.handle = const_cast<void*>(static_cast<const void*>(tex_));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+      t.handle = const_cast<void*>(static_cast<const void*>(h.tex));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
       break;
     case DisplayTarget::Interop::MetalTexture:
-      t.handle = mtl_texture_;  // id<MTLTexture>, owned by the surface (MoltenVK keeps it alive with the VkImage)
+      t.handle = h.mtl_texture;  // id<MTLTexture>, owned by the surface (MoltenVK keeps it alive with the VkImage)
       break;
     case DisplayTarget::Interop::VulkanSharedDevice:
-      t.handle = static_cast<void*>(pl_vulkan_unwrap(gpu_, tex_, nullptr, nullptr));
+      t.handle = static_cast<void*>(pl_vulkan_unwrap(gpu_, h.tex, nullptr, nullptr));
       // The layout the host finds the image in after render(); UNDEFINED (0) before the first render.
-      t.layout = held_ ? static_cast<uint32_t>(kHostLayout) : 0U;
+      t.layout = h.held ? static_cast<uint32_t>(kHostLayout) : 0U;
       break;
     case DisplayTarget::Interop::GlTexture:
 #if OVT_RENDER_GL_INTEROP
@@ -454,7 +549,7 @@ ExternalTexture OffscreenGpu::describe(const DisplayTarget& target) const {
       // (nullptr with OVT_RENDER_GL_FINISH=1), which the host glWaitSync()s before sampling.
       t.handle =
           reinterpret_cast<void*>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast,performance-no-int-to-ptr)
-              static_cast<uintptr_t>(pl_opengl_unwrap(gpu_, tex_, nullptr, nullptr, nullptr)));
+              static_cast<uintptr_t>(pl_opengl_unwrap(gpu_, h.tex, nullptr, nullptr, nullptr)));
       t.handle2 = gl_sync_;
 #endif
       break;
@@ -462,42 +557,50 @@ ExternalTexture OffscreenGpu::describe(const DisplayTarget& target) const {
   return t;
 }
 
-void OffscreenGpu::destroy_texture() {
+void OffscreenGpu::destroy_host_texture(HostTexture& t) {
   if (gpu_ == nullptr) {
     return;
   }
-  begin_frame();
-  if (interop_ == DisplayTarget::Interop::MetalTexture) {
+  release(t);
+  if (interop_ == DisplayTarget::Interop::MetalTexture && t.tex != nullptr) {
     // The wrapper does not own the VkImage; the GPU must be done with it before the image and memory go.
     pl_gpu_finish(gpu_);
   }
-  pl_tex_destroy(gpu_, &tex_);
+  pl_tex_destroy(gpu_, &t.tex);
 #if defined(VK_EXT_metal_objects)
-  if (mtl_image_ != VK_NULL_HANDLE || mtl_memory_ != VK_NULL_HANDLE) {
+  if (t.mtl_image != VK_NULL_HANDLE || t.mtl_memory != VK_NULL_HANDLE) {
     const auto destroy_image = device_fn<PFN_vkDestroyImage>(vk_, "vkDestroyImage");
     const auto free_memory = device_fn<PFN_vkFreeMemory>(vk_, "vkFreeMemory");
-    if (destroy_image != nullptr && mtl_image_ != VK_NULL_HANDLE) {
-      destroy_image(vk_->device, mtl_image_, nullptr);
+    if (destroy_image != nullptr && t.mtl_image != VK_NULL_HANDLE) {
+      destroy_image(vk_->device, t.mtl_image, nullptr);
     }
-    if (free_memory != nullptr && mtl_memory_ != VK_NULL_HANDLE) {
-      free_memory(vk_->device, mtl_memory_, nullptr);
+    if (free_memory != nullptr && t.mtl_memory != VK_NULL_HANDLE) {
+      free_memory(vk_->device, t.mtl_memory, nullptr);
     }
   }
 #endif
-  mtl_image_ = VK_NULL_HANDLE;
-  mtl_memory_ = VK_NULL_HANDLE;
-  mtl_texture_ = nullptr;
+  t.mtl_image = VK_NULL_HANDLE;
+  t.mtl_memory = VK_NULL_HANDLE;
+  t.mtl_texture = nullptr;
+  t.held = false;
 }
 
 void OffscreenGpu::destroy() {
-  destroy_texture();
+  // Scope textures first (their owner keeps the HostTexture objects; only the GPU side goes here), then the output.
+  for (HostTexture* t : extras_) {
+    destroy_host_texture(*t);
+  }
+  extras_.clear();
+  begin_frame();  // drops the GL fence of the last frame
+  destroy_host_texture(out_);
   if (vk_ != nullptr && hold_sem_ != VK_NULL_HANDLE) {
     pl_gpu_finish(gpu_);  // nothing may still signal the semaphore
+    wait_hold_sem();      // ... including Mesa's bookkeeping of the signal (see wait_hold_sem)
     pl_vulkan_sem_destroy(gpu_, &hold_sem_);
   }
   hold_sem_ = VK_NULL_HANDLE;
   hold_value_ = 0;
-  held_ = false;
+  hold_signalled_ = 0;
   if (imported_) {
     // libplacebo's state on the host's device; the VkDevice stays the host's. The host may be using its queue, so a
     // pl_gpu_finish() (not the own-device teardown wait of video_surface_impl.cpp) is all that is needed.

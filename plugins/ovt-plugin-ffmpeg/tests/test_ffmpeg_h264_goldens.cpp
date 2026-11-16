@@ -272,7 +272,9 @@ QpCounts qp_vs_jm(const std::string& id, const std::vector<PluginFrame>& frames)
 void qp_vs_golden(const std::string& id) {
   CAPTURE(id);
   const std::filesystem::path path = ovt::test::corpus_or_skip(id);
-  const std::vector<uint8_t> stream = prefix_of_pictures(read_file(path), golden_pictures(id, "jm"));
+  // One picture past the golden: when the JM golden ends on a first field (PAFF), FFmpeg outputs that frame only
+  // once the second field is decoded. qp_vs_jm compares the golden's pictures only, so the extra one is not checked.
+  const std::vector<uint8_t> stream = prefix_of_pictures(read_file(path), golden_pictures(id, "jm") + 1);
   std::vector<PluginFrame> frames = analyse(stream, 2);
   std::stable_sort(frames.begin(), frames.end(),
                    [](const PluginFrame& a, const PluginFrame& b) { return a.decode_index < b.decode_index; });

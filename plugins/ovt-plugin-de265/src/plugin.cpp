@@ -3,9 +3,8 @@
 //
 // libovt_plugin_de265: the ABI glue of the HEVC analysis plugin (chapter 0 §0.6.2, chapter 07 §7.6.2, WI-2.163).
 // It exports only ovt_analysis_decoder_v1(); every entry point is noexcept and turns an exception into an error
-// status. This skeleton produces frame-level FrameAnalysis buffers (FrameInfo, the empty 4x4 cell grid size,
-// diagnostics) and the planes (planes.hpp: Reconstruction, and the patch-0003 stages of WI-2.166); the block data
-// of the mapping table arrives with WI-2.164.
+// status. It produces FrameAnalysis buffers with FrameInfo, the block data of the §7.6.2 mapping table (WI-2.164,
+// map_blocks.cpp), diagnostics and the planes (planes.hpp: Reconstruction, and the patch-0003 stages of WI-2.166).
 
 #include <flatbuffers/flatbuffers.h>
 #include <libde265/de265-version.h>
@@ -21,13 +20,15 @@
 #include <vector>
 
 #include "decoder.hpp"
+#include "map_blocks.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
 #include "ovt_model_generated.h"
 #include "planes.hpp"
 
 namespace {
 
-constexpr uint8_t kCodecH265 = 2;  // ovt.fb.Codec.H265
+constexpr uint8_t kCodecH265 = 2;        // ovt.fb.Codec.H265
+constexpr uint8_t kSeverityWarning = 1;  // ovt.fb.Severity.Warning
 
 }  // namespace
 
@@ -48,10 +49,14 @@ const ovt_AnalysisCaps kCaps = {
     sizeof(ovt_AnalysisCaps),
     kCodecH265,
     ovt::de265::kSupportedStageMask,  // plane_stages: Reconstruction, + the patch-0003 stages (WI-2.166)
-    0U,                               // grid_fields: none yet; WI-2.164 fills the CellGrid vectors and announces them
-    0,                                // has_symbol_accounting
-    1,                                // bit_exact: conformance-exact for Main / Main 10
-    1,                                // supports_threads: libde265 worker threads
+#ifdef OVT_DE265_INTERNALS
+    ovt::de265::kGridFields,  // grid_fields: every CellGrid vector but bits_x8 (patch 0002, WI-2.165)
+#else
+    0U,  // grid_fields: a system libde265 has no internals API, so no block data (OVT_SYSTEM_DE265)
+#endif
+    0,  // has_symbol_accounting
+    1,  // bit_exact: conformance-exact for Main / Main 10
+    1,  // supports_threads: libde265 worker threads
     "de265",
     "0.1.0+libde265." LIBDE265_VERSION,
     "LGPL-3.0-or-later",
@@ -66,16 +71,29 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   const ovt::de265::Frame& f = out->frame;
   auto fbb = std::make_unique<flatbuffers::FlatBufferBuilder>(1024);
 
+  // Block tree, grid, MVs, refs, partitions and filter parameters first: the mapping may add warnings.
+  ovt::de265::MappedBlocks mapped;
+  if (f.picture) {
+    mapped = ovt::de265::map_blocks(*fbb, f.blocks,
+                                    ovt::de265::PictureFormat{f.coded_w, f.coded_h, f.chroma_format, f.bit_depth_luma});
+  }
+
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size());
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + 1);
   for (const ovt::de265::Diag& d : f.diagnostics) {
-    const auto code = fbb->CreateString(d.code);
-    const auto message = fbb->CreateString(d.message);
-    ovt::fb::DiagnosticBuilder db(*fbb);
-    db.add_severity(static_cast<ovt::fb::Severity>(d.severity));
-    db.add_code(code);
-    db.add_message(message);
-    diags.push_back(db.Finish());
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
+                                                    d.message.c_str()));
+  }
+  // SPEC-ASSUMPTION(#261): no Diagnostic code is registered for mapping warnings yet; the code stays empty.
+  for (const std::string& w : mapped.warnings) {
+    diags.push_back(
+        ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
+  }
+  if (mapped.mv_clamped_cells > 0) {  // chapter 06 §6.2.3: once per frame
+    const std::string msg =
+        "motion vector clamped to \u00b132767 (" + std::to_string(mapped.mv_clamped_cells) + " cells)";
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning),
+                                                    "MDL-GEN-0003", msg.c_str()));
   }
   const auto diags_v = fbb->CreateVector(diags);
 
@@ -83,13 +101,8 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   ovt::de265::add_plane_refs(*fbb, f, plane_stage_mask, &planes, &out->blobs);
   const auto planes_v = fbb->CreateVector(planes);
 
-  flatbuffers::Offset<ovt::fb::CellGrid> grid_off;
-  if (f.picture) {
-    ovt::fb::CellGridBuilder grid(*fbb);
-    grid.add_cells_w(static_cast<uint32_t>((f.coded_w + 3) / 4));
-    grid.add_cells_h(static_cast<uint32_t>((f.coded_h + 3) / 4));
-    grid_off = grid.Finish();
-  }
+  const auto filter_type = mapped.filter_params.IsNull() ? flatbuffers::Offset<flatbuffers::String>()
+                                                         : fbb->CreateString("HevcFilterParams");
 
   const ovt::fb::FrameId id(f.decode_index, -1);  // the host assigns display_index from its index
   const ovt::fb::Rect coded(0, 0, f.coded_w, f.coded_h);
@@ -122,7 +135,14 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   fa.add_plugin_version(plugin_version);
   fa.add_frame(info_off);
   if (f.picture) {
-    fa.add_grid(grid_off);
+    fa.add_grid(mapped.grid);
+    fa.add_blocks(mapped.blocks);
+    fa.add_mvs(mapped.mvs);
+    fa.add_refs(mapped.refs);
+    fa.add_partitions(mapped.partitions);
+    fa.add_filter_params(mapped.filter_params);
+    fa.add_filter_params_type(filter_type);
+    fa.add_qp_hist(mapped.qp_hist);
   }
   fa.add_planes(planes_v);
   fa.add_diagnostics(diags_v);

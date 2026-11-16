@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.265 index models (chapter 7 §7.3.9, §7.3.10.2, §7.4.4, WI-1.115): frame-boundary detection and POC derivation
-// with prevTid0Pic (the RPS / reference-marking / RefPicList model follows in WI-1.115b). They are plain state machines
-// over the parsed headers of WI-1.112/1.113 so that WI-1.121/1.123 can wire them into the StreamIndex builder. Only
-// base-layer pictures (nuh_layer_id == 0) go into PocState; FrameBoundary tracks every layer.
+// H.265 index models (chapter 7 §7.3.9, §7.3.10.2, §7.4.4, WI-1.115): frame-boundary detection, POC derivation
+// with prevTid0Pic, and the RPS / reference-marking / RefPicList model. They are plain state machines over the
+// parsed headers of WI-1.112/1.113 so that WI-1.121/1.123 can wire them into the StreamIndex builder. Only
+// base-layer pictures (nuh_layer_id == 0) go into PocState and Dpb; FrameBoundary tracks every layer.
 // Module-internal, not installed.
 
 #pragma once
@@ -94,6 +94,53 @@ class PocState {
   bool handle_cra_as_bla_ = false;
   bool irap_no_rasl_output_ = false;  // NoRaslOutputFlag of the last IRAP
   int32_t prev_tid0_poc_ = 0;
+};
+
+// ---- RPS, marking and RefPicList (§7.4.4, H.265 §8.3.2 and §8.3.4) --------------------------------------------
+
+inline constexpr int32_t kNoRef = -1;
+
+struct DpbPicture {
+  int32_t decode_index = 0;
+  int32_t poc = 0;
+  bool is_long_term = false;
+};
+
+/// The five RPS lists of the current picture as decode indices (kNoRef for "no reference picture") and their POCs.
+struct RefPicSets {
+  struct Entry {
+    int32_t poc = 0;
+    int32_t decode_index = kNoRef;
+  };
+  std::vector<Entry> st_curr_before, st_curr_after, st_foll, lt_curr, lt_foll;
+};
+
+struct DpbStepResult {
+  RefPicSets sets;
+  std::array<std::vector<int32_t>, 2> ref_pic_list;  // decode indices; kNoRef entries are "no reference picture"
+  std::array<std::vector<int32_t>, 2> ref_pic_list_poc;
+  std::vector<int32_t> declared_refs;  // unique decode indices of RefPicList0 then RefPicList1, kNoRef dropped
+  std::vector<int32_t> dpb_after;      // ascending decode indices
+  std::vector<IndexDiagnostic> diagnostics;
+};
+
+class Dpb {
+ public:
+  /// Runs the §7.4.4 step for the picture `decode_index` whose first slice segment header is `sh`. `poc` comes from
+  /// PocState (its no_rasl_output_flag / rasl_skipped decide the marking and the diagnostic severity).
+  DpbStepResult step(int32_t decode_index, const syntax::h265::NalHeader& nal,
+                     const syntax::h265::SliceSegmentHeader& sh, const syntax::h265::Sps& sps,
+                     const syntax::h265::Pps& pps, const PocResult& poc);
+
+  /// Builds RefPicList0/1 of a later slice of the same picture from the picture's `sets`.
+  [[nodiscard]] static DpbStepResult build_lists(const RefPicSets& sets, int32_t current_decode_index,
+                                                 int32_t current_poc, const syntax::h265::SliceSegmentHeader& sh,
+                                                 const syntax::h265::Pps& pps);
+
+  [[nodiscard]] const std::vector<DpbPicture>& pictures() const noexcept { return dpb_; }
+
+ private:
+  std::vector<DpbPicture> dpb_;  // reference pictures only
 };
 
 }  // namespace ovt::index::h265
