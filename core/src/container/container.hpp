@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 
+#include "container/byte_service.h"
 #include "container/format.hpp"
 #include "ovt/container.h"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -58,13 +59,18 @@ class Reader {
 [[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file,
                                                   ovt_status* why = nullptr);
 
+// Maps the exception being handled to the status a C entry point returns (IoError code, OVT_E_NOMEM, OVT_E_INTERNAL).
+// Call from inside a catch block.
+ovt_status status_of_current_exception() noexcept;
+
 }  // namespace ovt::container
 
 struct ovt_Container {
   ovt_File* file = nullptr;  // not owned; outlives the container
   ovt::container::Format format = ovt::container::Format::Unknown;
   std::unique_ptr<ovt::container::Reader> reader;
-  std::vector<uint8_t> tree;  // serialised ContainerTree, rebuilt after every expand
+  std::vector<uint8_t> tree;          // serialised ContainerTree, rebuilt after every expand
+  ovt::container::ByteService bytes;  // page cache and tree lock of the thread-safe byte service (§8.8)
 };
 
 #endif  // OVT_CONTAINER_CONTAINER_HPP

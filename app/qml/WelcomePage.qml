@@ -25,6 +25,16 @@ Rectangle {
     color: OvtStyle.panel
     Accessible.name: qsTr("Welcome")
 
+    // WI-A.450 acceptance test 1 on Android: QtQuickView exposes no accessibility tree (issue #547), so uiautomator
+    // cannot find this page; the log line is the emulator's probe. Only the shown copy logs (every dock placeholder
+    // carries one, and `visible` is false while an ancestor is hidden).
+    function logShown() {
+        if (visible && Qt.platform.os === "android")
+            console.info("OVT: Welcome page shown")
+    }
+    onVisibleChanged: logShown()
+    Component.onCompleted: logShown()
+
     function actionEnabled(id) {
         return actions !== null && actions.isEnabled(id)
     }
