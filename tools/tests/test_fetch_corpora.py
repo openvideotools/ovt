@@ -367,3 +367,116 @@ def test_serve_corpus_cli_prints_url(files: Path) -> None:
     finally:
         proc.terminate()
         proc.wait(timeout=5)
+
+
+class _Headers(dict):
+    def get(self, key, default=None):  # type: ignore[override]
+        return super().get(key, default)
+
+
+def test_retry_delay_backs_off_on_transient_failures() -> None:
+    """HTTP 429/5xx and cut-off downloads back off 5, 10, 20, 40, 60 s; other failures keep the short delay."""
+    transient = fetch_corpora.TransientNetworkError("x: HTTP 503")
+    assert [fetch_corpora.retry_delay(a, transient) for a in range(1, 7)] == [
+        5.0,
+        10.0,
+        20.0,
+        40.0,
+        60.0,
+        60.0,
+    ]
+    slow_server = fetch_corpora.TransientNetworkError("x: HTTP 429", retry_after=30.0)
+    assert fetch_corpora.retry_delay(1, slow_server) == 30.0
+    assert fetch_corpora.retry_delay(1, fetch_corpora.TransientNetworkError("x", retry_after=3600.0)) == 60.0
+    assert fetch_corpora.retry_delay(1, fetch_corpora.NetworkError("x: HTTP 404")) == 0.5
+    assert fetch_corpora.retry_delay(1, fetch_corpora.HashMismatch("x")) == 0.5
+
+
+def test_parse_retry_after() -> None:
+    assert fetch_corpora.parse_retry_after(_Headers({"Retry-After": " 12 "})) == 12.0
+    assert fetch_corpora.parse_retry_after(_Headers({"Retry-After": "Wed, 21 Oct 2015 07:28:00 GMT"})) is None
+    assert fetch_corpora.parse_retry_after(_Headers()) is None
+    assert fetch_corpora.parse_retry_after(None) is None
+
+
+@pytest.mark.parametrize(
+    "code,transient",
+    [(503, True), (502, True), (429, True), (404, False), (403, False)],
+)
+def test_http_status_classification(
+    code: int, transient: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def refuse(request, timeout=None):  # noqa: ANN001, ARG001
+        raise urllib.error.HTTPError(request.full_url, code, "status", _Headers({"Retry-After": "7"}), None)
+
+    monkeypatch.setattr(fetch_corpora.urllib.request, "urlopen", refuse)
+    with pytest.raises(fetch_corpora.NetworkError) as info:
+        fetch_corpora.download("https://example.invalid/a.zip", tmp_path / "a.part")
+    err = info.value
+    assert isinstance(err, fetch_corpora.TransientNetworkError) is transient
+    assert err.code == fetch_corpora.EXIT_NETWORK
+    if isinstance(err, fetch_corpora.TransientNetworkError):
+        assert err.retry_after == 7.0
+
+
+def test_transient_503_is_retried_until_the_download_succeeds(
+    files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Given a server that answers 503 twice, When fetching with --retries 3, Then the third attempt succeeds."""
+    real_download = fetch_corpora.download
+    calls: list[str] = []
+    sleeps: list[float] = []
+
+    def flaky(url: str, dest: Path, max_bytes: int | None = None) -> str:
+        calls.append(url)
+        if len(calls) <= 2:
+            raise fetch_corpora.TransientNetworkError(f"{url}: HTTP 503")
+        return real_download(url, dest, max_bytes)
+
+    monkeypatch.setattr(fetch_corpora, "download", flaky)
+    monkeypatch.setattr(fetch_corpora.time, "sleep", sleeps.append)
+    with serve(files) as base:
+        manifest = write_manifest(tmp_path / "m.json", [entry("r", files, "plain.bin")], base)
+        cache = tmp_path / "cache"
+        assert (
+            fetch_corpora.main(
+                [
+                    "--manifest",
+                    str(manifest),
+                    "--cache-dir",
+                    str(cache),
+                    "--retries",
+                    "3",
+                ]
+            )
+            == 0
+        )
+    assert len(calls) == 3
+    assert sleeps == [5.0, 10.0]
+    assert (cache / "r" / ".ok").is_file()
+
+
+def test_transient_failures_past_the_retry_budget_exit_3(
+    files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def down(url: str, dest: Path, max_bytes: int | None = None) -> str:  # noqa: ARG001
+        raise fetch_corpora.TransientNetworkError(f"{url}: HTTP 503")
+
+    sleeps: list[float] = []
+    monkeypatch.setattr(fetch_corpora, "download", down)
+    monkeypatch.setattr(fetch_corpora.time, "sleep", sleeps.append)
+    with serve(files) as base:
+        manifest = write_manifest(tmp_path / "m.json", [entry("d", files, "plain.bin")], base)
+        rc = fetch_corpora.main(
+            [
+                "--manifest",
+                str(manifest),
+                "--cache-dir",
+                str(tmp_path / "c"),
+                "--retries",
+                "4",
+            ]
+        )
+    assert rc == 3
+    assert sleeps == [5.0, 10.0, 20.0]
+    assert not (tmp_path / "c" / "d" / ".ok").exists()

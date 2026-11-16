@@ -1,0 +1,48 @@
+{
+  "comment": "Inputs of tools/gen_box_registry.py (chapter 08 §8.2.10). `--fetch` clones each repository into a new, empty directory and copies `files` (upstream path -> name under tools/registry_inputs/). An upstream rename is a one-line change here.",
+  "repositories": [
+    {
+      "name": "mp4ra",
+      "url": "https://github.com/mp4ra/mp4ra.github.io",
+      "files": {
+        "data/boxes.csv": "mp4ra_boxes.csv",
+        "data/boxes-udta.csv": "mp4ra_boxes_udta.csv",
+        "data/boxes-qt.csv": "mp4ra_boxes_qt.csv",
+        "data/brands.csv": "mp4ra_brands.csv",
+        "data/handlers.csv": "mp4ra_handlers.csv",
+        "data/item-types.csv": "mp4ra_item_types.csv",
+        "data/schemes.csv": "mp4ra_schemes.csv",
+        "data/sample-entries.csv": "mp4ra_sample_entries.csv"
+      }
+    },
+    {
+      "name": "ffc",
+      "url": "https://github.com/MPEGGroup/FileFormatConformance",
+      "files": {
+        "LICENSE": "ffc/LICENSE",
+        "data/standard_features/14496-12/spec_info.json": "ffc/14496-12_spec_info.json",
+        "data/standard_features/14496-12/boxes.json": "ffc/14496-12_boxes.json",
+        "data/standard_features/14496-12/codecs.json": "ffc/14496-12_codecs.json",
+        "data/standard_features/14496-12/entity_groups.json": "ffc/14496-12_entity_groups.json",
+        "data/standard_features/14496-12/item_properties.json": "ffc/14496-12_item_properties.json",
+        "data/standard_features/14496-12/item_references.json": "ffc/14496-12_item_references.json",
+        "data/standard_features/14496-12/track_groups.json": "ffc/14496-12_track_groups.json",
+        "data/standard_features/14496-12/track_references.json": "ffc/14496-12_track_references.json",
+        "data/standard_features/14496-14/spec_info.json": "ffc/14496-14_spec_info.json",
+        "data/standard_features/14496-15/spec_info.json": "ffc/14496-15_spec_info.json",
+        "data/standard_features/14496-15/boxes.json": "ffc/14496-15_boxes.json",
+        "data/standard_features/14496-15/codecs.json": "ffc/14496-15_codecs.json",
+        "data/standard_features/14496-15/entity_groups.json": "ffc/14496-15_entity_groups.json",
+        "data/standard_features/14496-15/track_groups.json": "ffc/14496-15_track_groups.json",
+        "data/standard_features/14496-15/track_references.json": "ffc/14496-15_track_references.json",
+        "data/standard_features/14496-30/spec_info.json": "ffc/14496-30_spec_info.json",
+        "data/standard_features/14496-30/boxes.json": "ffc/14496-30_boxes.json",
+        "data/standard_features/23008-12/spec_info.json": "ffc/23008-12_spec_info.json",
+        "data/standard_features/23008-12/boxes.json": "ffc/23008-12_boxes.json",
+        "data/standard_features/23008-12/entity_groups.json": "ffc/23008-12_entity_groups.json",
+        "data/standard_features/23008-12/item_properties.json": "ffc/23008-12_item_properties.json",
+        "data/standard_features/23008-12/item_references.json": "ffc/23008-12_item_references.json"
+      }
+    }
+  ]
+}

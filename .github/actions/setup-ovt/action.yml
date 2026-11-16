@@ -232,8 +232,13 @@ runs:
         echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
 
     - name: Corpora cache
+      id: corpora-cache
       if: inputs.corpora != 'none'
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      # Restore only. A cache saved by a pull_request run is scoped to refs/pull/<n>/merge, which no other PR can
+      # read, so every PR used to save its own ~300 MiB copy; those copies pushed the shared one out of the 10 GB
+      # repository cache and each run then fetched everything from itu.int again. Only refs/heads/main saves
+      # (the step after "Fetch corpora", and .github/workflows/corpora-cache.yml), and every branch can read that.
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: build/corpora
         # The manifest hash names the exact set of files; a stale prefix is still useful because the fetcher keeps
@@ -255,11 +260,24 @@ runs:
           *) echo "::error::corpora must be none, fast or all (got $CORPORA_SET)"; exit 1 ;;
         esac
         mkdir -p build/corpora
+        # --retries 6: transient failures (HTTP 429/5xx, cut-off downloads) back off 5, 10, 20, 40, 60 s, so a
+        # short itu.int outage no longer fails the job.
         # shellcheck disable=SC2086
-        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter
+        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --retries 6
         # shellcheck disable=SC2086
         python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --verify-only
         echo "OVT_CORPORA_DIR=${GITHUB_WORKSPACE}/build/corpora" >> "$GITHUB_ENV"
+
+    - name: Save corpora cache (main only)
+      # Saved right after the verified fetch, not at job end, so a later build or test failure still keeps the
+      # corpora. Skipped on an exact hit: a cache key cannot be overwritten.
+      if: >-
+        inputs.corpora != 'none' && github.ref == 'refs/heads/main' &&
+        steps.corpora-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: build/corpora
+        key: ${{ steps.corpora-cache.outputs.cache-primary-key }}
 
     - name: ffmpeg 6.1 in a container (tools_pytest)
       if: inputs.ffmpeg-container == 'true' && runner.os == 'Linux'

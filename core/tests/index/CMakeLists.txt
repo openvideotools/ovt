@@ -26,6 +26,13 @@ ovt_catch_discover_tests(ovt_tests_index_levels)
 
 # WI-1.111: H.264 ActiveSets (part a); the frame boundary and POC tests join this executable in part b.
 add_executable(ovt_tests_index_h264 test_index_h264_active_sets.cpp)
+
+# WI-1.111: H.264 ActiveSets (part a), frame boundary and POC (part b).
+add_executable(ovt_tests_index_h264 test_index_h264_active_sets.cpp test_index_h264_poc.cpp)
 target_link_libraries(ovt_tests_index_h264 PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
+target_include_directories(ovt_tests_index_h264 PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
+# The hand-made Annex B streams of the h264_index fuzz seeds double as a corpus-free end-to-end test.
+target_compile_definitions(ovt_tests_index_h264
+                           PRIVATE OVT_H264_INDEX_SEEDS="${PROJECT_SOURCE_DIR}/core/tests/fuzz/corpus/h264_index")
 ovt_set_license(ovt_tests_index_h264 "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_index_h264)

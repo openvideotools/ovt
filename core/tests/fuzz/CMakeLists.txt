@@ -96,6 +96,8 @@ ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
 ovt_add_fuzz_target(h264_slice fuzz_h264_slice.cpp)
 # WI-1.110: the H.264 SEI framing and payload parsers.
 ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
+# WI-1.111: the H.264 index chain (ActiveSets with the PPS re-parse, frame boundary, POC) over Annex B bytes.
+ovt_add_fuzz_target(h264_index fuzz_h264_index.cpp)
 
 # WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
 # plugin module from its output directory, so it follows the plugin's own option.

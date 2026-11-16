@@ -281,6 +281,39 @@ jobs:
           path: fuzz-artifacts/
           if-no-files-found: warn
 
+  # Deletes the pack of this commit once the shards are done with it, and sweeps packs older than a day that no run
+  # cleaned up (a cancelled or superseded run never reaches this job). The pack is 100s of MB and the repository's
+  # Actions cache has a 10 GB cap shared by every branch; left to LRU eviction it pushes the ccache and vcpkg
+  # entries out. The only job in this workflow with `actions: write` (needed to delete caches); it checks out
+  # nothing and runs no repository code. A pull request from a fork gets a read-only token, so the deletes fail
+  # there and only warn; a shard that restores after the delete falls back to building the fuzzers itself.
+  fuzz-cache-cleanup:
+    needs: [fuzz-build, fuzz-smoke-shard]
+    if: always() && needs.fuzz-build.result == 'success'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Delete this commit's fuzz binaries
+        run: |
+          gh api -X DELETE "repos/$GH_REPO/actions/caches?key=fuzz-binaries-${{ github.sha }}&ref=${{ github.ref }}" \
+            || echo "::warning::could not delete fuzz-binaries-${{ github.sha }} (read-only token or already evicted)"
+
+      - name: Delete stale fuzz binaries
+        run: |
+          cutoff=$(date -u -d '1 day ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api --paginate "repos/$GH_REPO/actions/caches?key=fuzz-binaries-&per_page=100" \
+            --jq ".actions_caches[] | select(.created_at < \"$cutoff\") | .id" > stale.txt \
+            || { echo "::warning::could not list caches"; exit 0; }
+          echo "$(wc -l < stale.txt) stale fuzz-binaries caches"
+          while read -r id; do
+            gh api -X DELETE "repos/$GH_REPO/actions/caches/$id" || echo "::warning::could not delete cache $id"
+          done < stale.txt
+
   # The stable name for the required-check list (chapter 13 §13.7.3): one result for the build and the whole matrix.
   # A failed fuzz-build skips the shards, so its own result is checked too.
   fuzz-smoke:

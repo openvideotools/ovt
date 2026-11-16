@@ -41,3 +41,6 @@ aqtinstall.log
 
 # tools/perf_run.py writes results/<hardware-id>/ here (chapter 14 §14.9.1)
 /results/
+
+# Upstream registry snapshots fetched by tools/gen_box_registry.py at the commits pinned in INPUTS.sha256 (WI-1.203).
+tools/registry_inputs/upstream/
