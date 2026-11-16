@@ -710,7 +710,7 @@ LUT generation (`tools/gen_luts.py`, run at build time, output checked in): `vir
 | 31 | Frame type P | `#1E88E5` |
 | 32 | Frame type B | `#43A047` |
 
-These values are also the single source for the GUI legend and timeline (Chapter 11 §11.4.5 imports them via `ovt::render::kOverlayColors`). Colour-blind-safe variant (`kOverlayColorsCvd[]`): L0 `#E69F00`, L1 `#56B4E9`, bi `#CC79A7`, intra `#009E73` (Okabe-Ito); heatmaps default to viridis.
+These values are also the single source for the GUI legend and timeline (Chapter 11 §11.4.5 imports them via `ovt::render::kOverlayColors`). Colour-blind-safe variant (`kOverlayColorsCvd[]`): L0 `#E69F00`, L1 `#56B4E9`, bi `#0072B2`, intra `#009E73` (Okabe-Ito; bi is Okabe-Ito blue rather than `#CC79A7`, whose protanopia distance to L1 is ΔE2000 14.0 and fails WI-2.439 acceptance test 3 — with `#0072B2` the smallest pairwise distance over normal, protan and deutan vision is 17.9 and the colour holds ≥ 3:1 against both black and white, issue #632); row 20 (intra direction stroke) takes the intra role colour `#009E73` at alpha `0xFF` in the CVD table; heatmaps default to viridis. The 1-px halo of each row is a fixed property of the palette, not a per-frame setting: `kOverlayHalo[]` / `kOverlayHaloCvd[]` hold its RGBA (0 = no halo); the overlay passes read it and the contrast test checks it (issue #633).
 
 The colour tables and the legend helper are render-library symbols (WI-2.439), **not** part of the core C API of chapter 12 §12.3 (`core/include/ovt/*.h`); the GUI links `libovt-render` and includes this header directly:
 
@@ -719,15 +719,21 @@ The colour tables and the legend helper are render-library symbols (WI-2.439), *
 namespace ovt::render {
 extern const std::array<uint32_t, 33> kOverlayColors;     // RGBA (straight alpha), index = row of the table above
 extern const std::array<uint32_t, 33> kOverlayColorsCvd;  // colour-blind-safe variant; same indices
+extern const std::array<uint32_t, 33> kOverlayHalo;       // RGBA of the row's 1-px halo, 0 = none (issue #633)
+extern const std::array<uint32_t, 33> kOverlayHaloCvd;    // same for the colour-blind-safe palette
+enum class LegendShape : uint8_t { Fill, Line, Arrow, Hatch, Gradient, Text };  // swatch kind (chapter 11 §11.4.5)
+constexpr uint8_t kLegendNoColor = 0xFF;                  // color_index of a Gradient entry (bar drawn from cfg.lut)
 struct LegendEntry {
-  uint8_t      color_index;   // row of the table above
+  uint8_t      color_index;   // row of the table above, or kLegendNoColor
   uint32_t     rgba;          // from the active palette
   OverlayLayer layer;         // the layer bit this entry explains
   const char*  label_key;     // translation key, e.g. "legend.inter_l0"; the GUI runs it through qsTr
+  LegendShape  shape;         // issue #633
 };
 }  // namespace ovt::render
 
-/// Legend data for the GUI (chapter 11 §11.4.5). Fills `out` (capacity `cap`) with one entry per layer enabled in `cfg.layers`,
+/// Legend data for the GUI (chapter 11 §11.4.5). Fills `out` (capacity `cap`) with one entry per colour of each layer enabled in `cfg.layers`
+/// (a multi-colour layer such as PredFill, RefIdxFill, DeblockEdges or Selection gets one entry per colour, all carrying its layer bit; issue #633),
 /// in draw order (§10.5.6), from `kOverlayColorsCvd` when `cvd` is true; returns the number of entries needed (may exceed `cap`;
 /// call again with a larger buffer). `noexcept`; never allocates.
 size_t ovt_render_legend(const ovt::render::OverlayConfig& cfg, bool cvd, ovt::render::LegendEntry* out, size_t cap) noexcept;
@@ -965,7 +971,7 @@ Overlay-only export (`ViewPng8` with `background_rgba = 0x00000000` and the pict
 
 ### 10.9.3 Performance tests
 
-Render benchmarks live in `tests/perf/render/` on the shared Google Benchmark harness of chapter 14 §14.9 (`bench_render_video_4k`, `bench_overlay_4k_mv_arrows`, `bench_overlay_build`, `bench_render_first_frame`; run by `tools/perf_run.py` on the self-hosted M1 and Android runners of chapter 14 §14.9.2, budgets in `tests/perf/budgets.json`). Fixtures: `synthetic_4k_mv.fb` (518,400 MVs), `synthetic_8k_mv.fb`, `real_4k_hevc_frame.fb` and `real_1080p_hevc_frame.fb` (from `ovt analyze` of corpus streams; chapter 14 §14.3.3), 300 frames each with a scripted pan/zoom path; each benchmark reports p50/p95/p99 CPU and GPU times per step of §10.5.8. Inputs and budgets of all four benchmarks (M1 and `pixel-tablet` rows) are defined only in chapter 14 §14.9.3 and `tests/perf/budgets.json` (D19); this chapter repeats no numbers. The per-pass GPU times of §10.5.8 are reported as benchmark counters, not gated.
+Render benchmarks live in `tests/perf/render/` on the shared Google Benchmark harness of chapter 14 §14.9 (`bench_render_video_4k`, `bench_overlay_4k_mv_arrows`, `bench_overlay_build`, `bench_render_first_frame`; run by `tools/perf_run.py` on the self-hosted M1 and Android runners of chapter 14 §14.9.2, budgets in `tests/perf/budgets.json`). Fixtures: `synthetic_4k_mv.fb` (518,400 MVs), `synthetic_8k_mv.fb`, `real_4k_hevc_frame.fb` and `real_1080p_hevc_frame.fb` (from `ovt analyze` of corpus streams; chapter 14 §14.3.3; they supply the coded size only, the rendered picture is a deterministic synthetic 10-bit PQ BT.2020 4:2:0 frame, issue #627), 300 frames each with a scripted pan/zoom path; each benchmark reports p50/p95/p99 CPU and GPU times per step of §10.5.8. Inputs and budgets of all four benchmarks (M1 and `pixel-tablet` rows) are defined only in chapter 14 §14.9.3 and `tests/perf/budgets.json` (D19); this chapter repeats no numbers. The per-pass GPU times of §10.5.8 are reported as benchmark counters, not gated.
 
 ### 10.9.4 Manual HDR checklist (release gate, `docs/dev/hdr-checklist.md`)
 
@@ -1157,10 +1163,10 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-1.403, WI-0.560.
 **Produces:** `tests/perf/render/bench_render_video.cpp` (`bench_render_video_4k`, `bench_render_first_frame`), budget rows in `tests/perf/budgets.json`.
 **Interface:** Google Benchmark flags of chapter 14 §14.9.1 plus `--fixture <fb> --frames N --viewport WxH`.
-**Steps:** 1. Synthetic 4K picture generator. 2. Scripted zoom/pan path. 3. `pl_timer` per step; p50/p95/p99 in the result JSON. 4. Budget rows.
+**Steps:** 1. Synthetic 4K picture generator (sized from `--fixture`'s `FrameInfo.coded_size`, issue #627). 2. Scripted zoom/pan path. 3. CPU wall-clock p50/p95/p99 per step in the result JSON; `pl_timer` per-pass GPU times deferred to issue #628 (`gpu_time: null` on every device while the Vulkan timestamp queries stay hidden, #304). 4. Budget rows.
 **Acceptance tests:** 1. Given the `m1-air-8gb` runner and the chapter 14 §14.9.3 input, When `bench_render_video_4k` runs, Then p95 meets its §14.9.3 budget. 2. Given the same runner, When `bench_render_first_frame` runs, Then `set_frame` → presented meets its §14.9.3 budget (warm and cold cache rows).
 **Size:** S.
-**Notes / pitfalls:** GPU timers (`pl_timer`) are unavailable on lavapipe — record CPU times only and mark the row `gpu_time: null`; never gate on a software device.
+**Notes / pitfalls:** GPU timers (`pl_timer`) are unavailable on lavapipe and, until issue #628, hidden on every device (#304) — record CPU times only and mark the row `gpu_time: null`; never gate on a software device. `bench_render_first_frame`: libovt-render has no on-disk shader cache, so `cold_ms` is the first `VideoSurface` creation in the process and `warm_ms` the median of later creations in the same process (PR #625).
 
 ### Phase 2 — Overlays, picking, labels
 
@@ -1260,10 +1266,10 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-2.431.
 **Produces:** `render/include/ovt/render/overlay_colors.h` (`kOverlayColors`, `kOverlayColorsCvd`, `ovt_render_legend(OverlayConfig, out entries[])`), test.
 **Interface:** §10.5.2.
-**Steps:** 1. Tables. 2. Legend entries (name, RGBA, shape: fill/line/arrow/hatch) per enabled layer. 3. Contrast test (`render/tests/test_overlay_contrast.cpp`, criterion below). 4. CVD simulation check (deuteranopia/protanopia via the Machado 2009 matrices) that the CVD palette's L0/L1/bi/intra colours stay pairwise distinguishable (ΔE2000 ≥ 15 after simulation).
-**Acceptance tests:** 1. Given `layers = MvL0|MvL1|GridCU`, When legend requested, Then 3 entries in draw order with the table colours. 2. **Contrast:** Given the 12 golden frames of §10.9.2 rendered to `SdrPng8` without overlays, When for each frame the 10 % darkest and 10 % lightest luma pixels are averaged, Then every line/arrow/label colour of `kOverlayColors[]` and `kOverlayColorsCvd[]` (indices 1, 2, 3, 8–21) composited at its table alpha has WCAG 2.x contrast ≥ 3:1 against **at least one** of the two averages, and every colour that fails against either average is drawn with its 1-px `#000000`/`#FFFFFF` halo (indices 15 and 19 already do; the test asserts the halo rule is set for the others in `OverlayConfig` defaults). 3. Given the CVD simulation of step 4, When applied to `kOverlayColorsCvd[]`, Then all pairwise ΔE2000 ≥ 15.
+**Steps:** 1. Tables (colours and halos). 2. Legend entries (name, RGBA, `LegendShape`: Fill/Line/Arrow/Hatch, Gradient for the heatmap bar, Text for labels) per colour of each enabled layer. 3. Contrast test (`render/tests/test_overlay_contrast.cpp`, criterion below). 4. CVD simulation check (deuteranopia/protanopia via the Machado 2009 matrices) that the CVD palette's L0/L1/bi/intra colours stay pairwise distinguishable (ΔE2000 ≥ 15 after simulation).
+**Acceptance tests:** 1. Given `layers = MvL0|MvL1|GridCU`, When legend requested, Then 3 entries in draw order with the table colours. 2. **Contrast:** Given the `render-ref` frames of §10.9.2 (WI-1.575) rendered to `SdrPng8` without overlays — until they exist, the interim backgrounds are full-range black/white (0/255) and video-range black/white (16/235), the extremes any `SdrPng8` frame can reach (issue #634) — When for each frame the 10 % darkest and 10 % lightest luma pixels are averaged (compositing straight-alpha over in linear light, as libplacebo blends `pl_overlay`), Then every line/arrow/label colour of `kOverlayColors[]` and `kOverlayColorsCvd[]` (indices 1, 2, 3, 8–21) composited at its table alpha has WCAG 2.x contrast ≥ 3:1 against **at least one** of the two averages, and every colour that fails against either average has a non-zero 1-px `#000000`/`#FFFFFF` halo in `kOverlayHalo[]` / `kOverlayHaloCvd[]` (indices 15 and 19 already do; derived from the stricter 16/235 pair; issue #633). When WI-1.575 lands, the test adds the real frame averages and re-checks the "at least one" side (row 11 reaches only 4.0:1 on dark backgrounds). 3. Given the CVD simulation of step 4, When applied to `kOverlayColorsCvd[]`, Then all pairwise ΔE2000 ≥ 15.
 **Size:** S.
-**Notes / pitfalls:** no single colour can hold 3:1 against both black and white video content — the halo rule is what guarantees legibility; the CVD palette is colour-blind-*safe* only for the four coded roles (L0, L1, bi, intra); heatmaps rely on `viridis`/`cividis`, and the frame-type palette on the shape coding of FR-GUI-020 (chapter 11 §11.4.5).
+**Notes / pitfalls:** no single colour can hold 3:1 against both black and white video content — the halo rule is what guarantees legibility; the CVD palette is colour-blind-*safe* only for the four coded roles (L0, L1, bi, intra); heatmaps rely on `viridis`/`cividis`, and the frame-type palette on the shape coding of FR-GUI-020 (chapter 11 §11.4.5). `OverlayConfig` (§10.2.5) carries no palette switch in this WI: the fill passes use the standard palette, and a `bool cvd_palette` member is added by the overlay-pass WIs or the GUI WI that wires the `K` toggle (chapter 11 §11.4.5), so `ovt_render_legend` takes `cvd` explicitly (issue #633).
 
 ### Phase 4 — Linux Wayland HDR, HDR scopes, HDR10+/DV, exports
 

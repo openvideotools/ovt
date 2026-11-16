@@ -2,12 +2,26 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc38 — 2026-11-16
+## 1.0.0-rc39 — 2026-11-16
 
 MINOR-level (FlatBuffers schema, additive): WI-4.106 part a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
 
 - 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
 - 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
+
+## 1.0.0-rc38 — 2026-11-16
+
+PATCH-level: spec-amendment pass 18 folds in the accepted answers of `spec-question` issues #627 from WI-1.415 (PR #625) and #632, #633, #634 from WI-2.439 (PR #635), #629 from WI-4.210 and #630, #631 from WI-1.204 (PR #639), and records the WI-1.415 GPU-time partial and the WI-1.204 Produces line. No new diagnostic code; no public C header under `core/include/`, FlatBuffers schema, plugin ABI or CLI grammar change. The public render header `render/include/ovt/render/overlay_colors.h` gains one `LegendEntry` member and two arrays (#633), reviewed on the WI-2.439 PR.
+
+- 14 §14.9.3 `bench_render_video_4k` / `bench_render_first_frame` rows, §14.3.3 fixture row, 10 §10.9.3 — the `real_*_hevc_frame.fb` fixtures are `FrameAnalysis` files without samples, so they supply the coded size only (`--fixture`) and the benchmarks render a deterministic synthetic 10-bit PQ BT.2020 4:2:0 picture — WI-1.415 (#627)
+- 10 WI-1.415 steps 3 and notes, 16 §16.4 row — per-pass `pl_timer` GPU times are deferred to issue #628 (`gpu_time: null` on every device while #304 hides the Vulkan timestamp queries); CPU wall-clock p50/p95/p99 reported; cold/warm first-frame definition — WI-1.415 (#628)
+- 10 §10.5.2 — colour-blind-safe bi colour is Okabe-Ito blue `#0072B2` (`#CC79A7` fails the protanopia ΔE2000 ≥ 15 check at 14.0); CVD row 20 takes the intra role colour — WI-2.439 (#632)
+- 10 §10.5.2 header mirror, WI-2.439 steps and notes — `LegendEntry.shape` (`LegendShape`: Fill, Line, Arrow, Hatch, Gradient, Text; `kLegendNoColor`), `kOverlayHalo[]` / `kOverlayHaloCvd[]` as fixed palette properties instead of `OverlayConfig` defaults, one legend entry per colour of a multi-colour layer, no CVD switch in `OverlayConfig` until the overlay-pass or `K`-toggle GUI WI — WI-2.439 (#633)
+- 10 WI-2.439 AT2 — until the WI-1.575 `render-ref` frames exist, the contrast test uses full-range and video-range black/white as the interim backgrounds, halos derived from the 16/235 pair; real frame averages are added when WI-1.575 lands — WI-2.439 (#634)
+- 8 §8.6.7, WI-4.210 Interface and AT1, 12 §12.3.7 — `segment_index` 0 = init, 1… = media segments; `variant_selector` NULL/empty = first video Representation (HLS: highest-bandwidth non-I-frame variant), else a DASH Representation `id` or a zero-based index, otherwise `OVT_E_INVALID_ARG`; byte-range segments cache under `sha256(url + "\n" + offset + "-" + length)`; `ovt_container_segment_for_offset` returns the `"segment"` object (fields listed), `OVT_E_INVALID_ARG` past the end, `OVT_E_UNSUPPORTED` for other containers; ` [seg N]` on top-level nodes only — WI-4.210 (#629)
+- 8 §8.2.2, §8.2.3 reading strategy, WI-1.204 steps 4–5 and AT1, WI-1.209 step 6 — `RandomAccessFile` has no `bytes_read()` (chapter 7 owns the class; tests count through a subclass, the user statistic is `ovt_container_stats_json`); `PagedSpan` windowed reads move to WI-1.209, decoders see at most the 1 MiB window until then — WI-1.204 (#630)
+- 8 §8.2.4 rules 3–4 — an unexpanded top-level `moof` holds only its `mfhd` (none if the first child is not `mfhd`) plus `CNT-0007`, the sum-of-spans invariant applies to expanded boxes only, `expand` replaces the children and clears `CNT-0007`; `locate_mfra()` reads 24 bytes and returns a hint kept only when the top-level walk finds `mfra` there, no diagnostic — WI-1.204 (#631)
+- 8 WI-1.204 Produces — `lazy.{h,cpp}` (`IsobmffReader`), `bench_container_open_moov_1h`, `fuzz_isobmff_tree` with seeds (PR #639) — WI-1.204
 
 ## 1.0.0-rc37 — 2026-11-16
 

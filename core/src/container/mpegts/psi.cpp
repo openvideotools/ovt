@@ -378,6 +378,7 @@ bool PsiParser::wants(uint16_t pid) const noexcept {
 }
 
 void PsiParser::diag(DiagCode code, std::string message, uint64_t offset) {
+  ++tables_.diag_counts[code];
   if (tables_.diagnostics.size() < 10000) {
     tables_.diagnostics.push_back({code, std::move(message), offset});
   }
@@ -496,6 +497,7 @@ bool PsiParser::repeated(const Section& s) {
 void PsiParser::take(uint16_t pid, std::span<const uint8_t> section, uint64_t packet_index, uint64_t file_offset,
                      uint32_t first_chunk) {
   ++tables_.section_count;
+  current_packet_ = packet_index;
   Section s = make_section(pid, section, packet_index, file_offset, first_chunk);
   const bool wrong = wrong_table(s);
   if (wrong) {
@@ -504,6 +506,12 @@ void PsiParser::take(uint16_t pid, std::span<const uint8_t> section, uint64_t pa
   if (s.bytes.size() < min_section_size(s)) {
     table_error(s, "section shorter than its header");
     return;
+  }
+  if (!wrong && (pid == kPatPid || pid == kCatPid || pmt_mask_[pid] != 0)) {
+    std::vector<uint64_t>& a = tables_.arrivals[pid];
+    if (a.size() < kMaxArrivals) {
+      a.push_back(packet_index);
+    }
   }
   read_long_header(s);
   if (s.has_crc && crc32_mpeg2(s.bytes) != 0) {
@@ -566,6 +574,7 @@ void PsiParser::rebuild_programs() {
         continue;
       }
       pmt_mask_[e.pid] = 1;
+      tables_.pmt_named_at.emplace(e.pid, current_packet_);
       const auto same = std::find_if(tables_.programs.begin(), tables_.programs.end(), [&e](const Program& p) {
         return p.number == e.program_number && p.pmt_pid == e.pid;
       });
