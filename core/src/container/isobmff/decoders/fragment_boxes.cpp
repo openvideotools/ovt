@@ -39,6 +39,8 @@ class SpecRefScope {
   SpecRefScope& operator=(const SpecRefScope&) = delete;
   SpecRefScope(SpecRefScope&&) = delete;
   SpecRefScope& operator=(SpecRefScope&&) = delete;
+  // The string assignment can only fail with bad_alloc, which terminates the process anyway.
+  // NOLINTNEXTLINE(bugprone-exception-escape)
   ~SpecRefScope() {
     auto& fields = fb_.node().fields;
     for (size_t i = first_; i < fields.size(); ++i) {
