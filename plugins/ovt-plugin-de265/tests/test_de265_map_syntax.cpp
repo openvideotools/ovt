@@ -588,6 +588,9 @@ void compare_cells(Counts& counts, uint32_t index, const fb::CellGrid& g, const 
   }
 }
 
+// The AT1 stream that is coded intra only (every picture of POC_A_Bossen_3 is intra).
+constexpr std::string_view kIntraOnlyStream = "jctvc_POC_A_Bossen_3";
+
 // AT1: every prediction unit of every frame of @p id against HM's syntax, and the cbf / transform skip cells.
 void check_syntax_vs_hm(std::string_view id) {
   const json doc = golden(id, "hm-syntax");
@@ -612,7 +615,14 @@ void check_syntax_vs_hm(std::string_view id) {
     INFO(id << " " << what << ": " << n.bad << " of " << n.checked << " differ; first: " << n.first);
     CHECK(n.bad == 0);
   }
-  CHECK(counts["merge_flag"].checked > 0);
+  CHECK(counts["cbf"].checked > 0);
+  if (id == kIntraOnlyStream) {
+    // HM's trace has no inter cell here: the stream checks the cbf / transform skip cells, and that the plugin
+    // finds no inter PU either. The other nine streams carry the PU syntax.
+    CHECK(counts["merge_flag"].checked == 0);
+  } else {
+    CHECK(counts["merge_flag"].checked > 0);
+  }
 }
 
 // The ten HEVC_v1 streams of AT1 (hm_cu_dump traces taken for WI-2.165).
