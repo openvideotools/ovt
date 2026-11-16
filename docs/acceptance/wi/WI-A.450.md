@@ -2,7 +2,7 @@
 
 Machine: cloud container, Linux x86_64 (Ubuntu 24.04), Qt 6.4.2 from apt, no Android SDK/NDK, no emulator, no
 Kotlin compiler (Google's Maven and the SDK downloads are blocked by the container's proxy).
-Date: 2026-11-14 (desktop), 2026-11-16 (emulator). Spec version: 1.0-rc24.
+Date: 2026-11-14 (desktop), 2026-11-16 (emulator, and a re-run at 77a63a1 below). Spec version: 1.0-rc24.
 
 **Status: all three tests pass.** The QML half of test 1 runs on the desktop (below). The emulator runs were done on
 the Mac Mini (Mac16,10, Apple M4, macOS 15.8.2), AVD `ovt-api36-arm64` (android-36 google_apis arm64-v8a,
@@ -131,3 +131,30 @@ grep -c 'opened fd size=': 1
 
 PASS. Also checked at 565b1a8: Back from the loaded UI destroys the Activity without an ANR, and a warm relaunch
 in the same process (same pid) shows the Welcome page again (`wa450-teardown-final-565b1a8-D.png`).
+
+## Re-run after merging main (77a63a1)
+
+The merge of main (#615, WI-1.405) changed `MainActivity.onDestroy` and `AppShell.qml` after the runs above, so
+the emulator checks were repeated at 77a63a1 with no patch (Mac Mini, same AVD, 2026-11-16; project files
+`wa450-final-77a63a1-results.txt`):
+
+```console
+recreationKeepsTheOpenHandles: OK (1 test)
+finishingClosesTheSession: OK (1 test)
+viewIntentOpensFileInRunningActivity: OK (1 test)
+SessionTest, whole class in one process: OK (3 tests)
+relaunch: OVT: Welcome page shown
+```
+
+In that run, the Back checks failed once. Back was sent the moment `OVT: QML root ready` appeared on the first launch
+after a fresh install, and the Activity was not destroyed, so the warm relaunch had nothing to do. This did not
+reproduce in 26 later trials at 77a63a1 (project files `wa450-back-bisect-results.txt` and
+`wa450-back-race-results.txt`):
+- The first 4 trials sent Back 3 s after root-ready.
+- The other 22 used a timing sweep: fresh install, cold and warm starts, with Back sent 0, 0.5, 1 and 2 s after
+  root-ready, three times at 0 s on a fresh install.
+
+A diagnostic build logged every `KEYCODE_BACK` the Activity received. Each one arrived with window focus while the
+Activity was RESUMED, and `onDestroy` followed. The one failure is recorded as an emulator artefact, not a lost Back.
+From now on, the Back checks send Back only once `dumpsys window` reports `mCurrentFocus` on `MainActivity`, never
+after a fixed sleep.
