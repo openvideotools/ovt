@@ -3,8 +3,9 @@
 # isobmff-broken
 
 Small ISOBMFF files (about 20 KiB each, 260 KiB in all) with one deliberate defect in the box headers, used by
-`core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209). Each is the base file of
-`tools/make_broken.py` with one change; regenerate a file with the command in the table (the output is
+`core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
+in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209). Each is the base
+file of `tools/make_broken.py` with one change; regenerate a file with the command in the table (the output is
 byte-for-byte reproducible).
 
 | File | `tools/make_broken.py` arguments | Expected code |
