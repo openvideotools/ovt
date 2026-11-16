@@ -13,7 +13,6 @@
 // `stpp`, `mett`, `metx`, `urim`, `tmcd`) have rows of their own. Derived text goes into `Field.svalue`
 // (SPEC-ASSUMPTION(#415), field_builder.h).
 
-#include "container/isobmff/decoders/sample_entries.h"
 
 #include <algorithm>
 #include <array>
@@ -625,30 +624,6 @@ uint64_t decode_tmcd_name(BoxContext& /*ctx*/, BitReader& /*br*/, FieldBuilder& 
 }
 
 }  // namespace
-
-void check_stsd_entry_count(fb::BoxNodeT& stsd) {
-  const auto count = std::ranges::find_if(stsd.fields, [](const auto& f) { return f && f->name == "entry_count"; });
-  if (count == stsd.fields.end()) {
-    return;
-  }
-  const auto found = static_cast<uint64_t>(
-      std::ranges::count_if(stsd.children, [](const auto& c) { return c && !c->fourcc.empty(); }));
-  if (found == (*count)->uvalue) {
-    return;
-  }
-  auto d = std::make_unique<fb::DiagnosticT>();
-  d->severity = static_cast<fb::Severity>(Severity::Error);
-  d->code = "CNT-1010";
-  d->message = "stsd.entry_count is " + std::to_string((*count)->uvalue) + " but " + std::to_string(found) +
-               " sample entries were found";
-  if ((*count)->span) {
-    d->span = std::make_unique<fb::BitSpan>((*count)->span->bit_offset(), (*count)->span->bit_length());
-  }
-  if (const DiagInfo* info = container::diag(d->code); info != nullptr) {
-    d->spec_ref = std::string(info->spec_ref);
-  }
-  stsd.diagnostics.push_back(std::move(d));
-}
 
 // One registration per §8.3.2 row with fields.
 OVT_BOX_DECODER("stsd", "*", &decode_stsd)
