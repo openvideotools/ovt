@@ -114,6 +114,9 @@ endif()
 # image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
 target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
 target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1). The image goldens are tests/golden/render/plane_*.png
+# (png_io.h; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
+target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
 
