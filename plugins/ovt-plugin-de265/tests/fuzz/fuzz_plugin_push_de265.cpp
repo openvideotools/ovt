@@ -1,5 +1,5 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
-// SPDX-License-Identifier: LGPL-2.1-or-later
+// SPDX-License-Identifier: LGPL-3.0-or-later
 //
 // fuzz_plugin_push_de265 (WI-2.582, chapter 14 §14.7.1): push() of ovt-plugin-de265. Input byte 0 picks the thread
 // count (0..3; 0 lets libde265 choose) and whether pull() asks for the reconstruction planes; the rest is an Annex B
