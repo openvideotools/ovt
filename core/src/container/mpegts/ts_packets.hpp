@@ -14,6 +14,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <optional>
 #include <span>
@@ -26,6 +27,7 @@
 #include "container/mpegts/pes.hpp"
 #include "container/mpegts/psi.hpp"
 #include "container/mpegts/timing.hpp"
+#include "container/mpegts/tr101290.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
 
 namespace ovt::container::mpegts {
@@ -130,7 +132,12 @@ struct File {
   // PES packets of the elementary-stream PIDs that some PMT named, ascending PID; each is a track
   // (TrackInfo.track_id = PID) and each PES one sample (WI-4.206).
   std::vector<PesStream> pes;
-  Timing timing;                // PCR points, PCR/PTS check counts and the PID of every packet (WI-4.206)
+  Timing timing;  // PCR points, PCR/PTS check counts and the PID of every packet (WI-4.206)
+  // First and last packet index of a scrambled packet on a PID other than 0 and 1 (CAT_error timer, WI-4.207);
+  // first > last when there is none.
+  uint64_t first_scrambled = UINT64_MAX;
+  uint64_t last_scrambled = 0;
+  std::map<DiagCode, uint64_t> first_offsets;  // file offset of the first diagnostic of each code, cap or not
   uint16_t pcr_pid = kNullPid;  // the timing table's PCR PID: of the first program whose PCR PID carries one,
                                 // else the lowest PID that carries a PCR
 
@@ -159,6 +166,9 @@ AnnexBSummary pes_units(const io::RandomAccessFile& file, const File& f, const P
 // TsTiming FlatBuffer (chapter 06 §6.4): PCR points of `pcr_pid`, one TsPtsPoint per PES in packet order and the
 // bitrate of every PID in the windows of kBitrateWindowsMs.
 [[nodiscard]] std::vector<uint8_t> build_ts_timing(const File& f);
+
+// TsReport FlatBuffer (chapter 06 §6.4) of the TR 101 290 priority 1 and 2 checks of `f`, see tr101290.hpp.
+[[nodiscard]] std::vector<uint8_t> build_ts_report(const File& f, const Tr101290Options& options = {});
 
 // nullptr when `file` is not a transport stream.
 [[nodiscard]] std::unique_ptr<Reader> make_reader(const io::RandomAccessFile& file);
