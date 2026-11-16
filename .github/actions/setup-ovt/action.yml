@@ -56,7 +56,15 @@ runs:
     - name: Host tools (macOS)
       if: runner.os == 'macOS'
       shell: bash
+      env:
+        HOSTED: ${{ runner.environment == 'github-hosted' }}
       run: |
+        # GitHub's macOS images (static-analysis clang-tidy) lack some of tools/brew-packages.txt: install it there.
+        # Not python@3.12: setup-python below provides Python, and Homebrew's would clash with the image's links.
+        if [ "$HOSTED" = true ]; then
+          grep -v -e '^\s*#' -e '^\s*$' -e '^python@' tools/brew-packages.txt |
+            HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 xargs brew install --quiet
+        fi
         # The self-hosted Mac runner has no write access to Homebrew; check what tools/brew-packages.txt
         # lists instead of installing it.
         missing=""
@@ -135,8 +143,9 @@ runs:
         path: build/third_party/${{ inputs.preset }}
         # Exact key only: a prefix restored from other pins or patches would not be reproducible. Per runner: the
         # prefix holds CMake build trees (CMakeCache.txt names the checkout directory), which CMake refuses to
-        # reuse from another runner's workspace (the Mini's runners are actions-runner, -runner-2, ...).
-        key: tp-${{ runner.os }}-${{ runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
+        # reuse from another runner's workspace (the Mini's runners are actions-runner, -runner-2, ...). Hosted runners
+        # all use the same workspace path but a different runner.name per job, so they share one `hosted` entry.
+        key: tp-${{ runner.os }}-${{ runner.environment == 'github-hosted' && 'hosted' || runner.name }}-${{ inputs.preset }}-${{ hashFiles('third_party/VERSIONS.md', 'third_party/*.cmake', 'third_party/patches/**', 'plugins/*/patches/**') }}
 
     - name: third_party downloads cache
       id: tpdl
@@ -178,12 +187,23 @@ runs:
         path: build/third_party/downloads
         key: tpdl-${{ runner.os }}-${{ hashFiles('third_party/VERSIONS.md') }}
 
+    # ccache entries are the biggest caches (up to 2 GB each) and the repository has a 10 GB cap shared by every branch,
+    # so they must not pile up: no timestamp suffix and a per-day key, so that the first main build of the day saves one
+    # entry per preset and every later run of that day hits it exactly and saves nothing. Pull requests only restore
+    # (the newest main entry through the prefix); their own entries were duplicates that no other branch can read.
+    - name: ccache day
+      id: ccacheday
+      shell: bash
+      run: echo "day=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
     - name: ccache
       uses: hendrikmuhs/ccache-action@63069e3931dedbf3b63792097479563182fe70d1 # v1.2.18
       with:
-        key: ccache-${{ runner.os }}-${{ inputs.preset }}-${{ github.sha }}
+        key: ccache-${{ runner.os }}-${{ inputs.preset }}-${{ steps.ccacheday.outputs.day }}
         restore-keys: ccache-${{ runner.os }}-${{ inputs.preset }}-
-        max-size: 2G
+        append-timestamp: false
+        save: ${{ github.event_name != 'pull_request' }}
+        max-size: 1G
 
     - name: ccache settings
       shell: bash

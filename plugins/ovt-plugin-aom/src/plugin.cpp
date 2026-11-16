@@ -19,6 +19,7 @@
 
 #include "decoder.hpp"
 #include "fb_builder.hpp"
+#include "map_accounting.hpp"
 #include "map_mi.hpp"
 #include "map_mi_ext.hpp"
 #include "ovt/abi/analysis_decoder_v1.h"
@@ -52,20 +53,22 @@ struct Info {
   std::string version = std::string("0.1.0+libaom.") + aom_codec_version_str();
   std::string notes =
       std::string("AV1 analysis via libaom ") + aom_codec_version_str() +
-      " inspection (blocks, motion vectors, reference slots, tiles and reconstruction; no symbol accounting yet)";
+      " inspection (blocks, motion vectors, reference slots, tiles, reconstruction and symbol accounting)";
   ovt_AnalysisCaps caps{};
   Info() {
     caps.struct_size = sizeof(ovt_AnalysisCaps);
     caps.codec = kCodecAv1;
-    caps.plane_stages = 1U << kStageRecon;     // stock libaom: Reconstruction only (§7.6.1 Caps row)
-    caps.grid_fields = ovt::aom::kGridFields;  // §7.6.1 Caps row with stock libaom, before accounting (WI-2.157)
+    caps.plane_stages = 1U << kStageRecon;  // stock libaom: Reconstruction only (§7.6.1 Caps row)
+    // §7.6.1 Caps row with stock libaom; bits_x8 and symbols come from CONFIG_ACCOUNTING (WI-2.157).
+    const bool accounting = ovt::aom::Decoder::has_accounting();
+    caps.grid_fields = ovt::aom::kGridFields | (accounting ? ovt::aom::kGridFieldBits : 0U);
     if (ovt::aom::Decoder::has_mi_extension()) {
       caps.grid_fields |= ovt::aom::kGridFieldsExt;  // tx_type, with extension patch 0001 (WI-2.159)
     }
     if (ovt::aom::Decoder::has_snapshots()) {  // extension patch 0002: the three pre-filter stages
       caps.plane_stages |= (1U << kStagePreDeblock) | (1U << kStagePreCdef) | (1U << kStagePreLr);
     }
-    caps.has_symbol_accounting = 0;  // WI-2.157
+    caps.has_symbol_accounting = accounting ? 1 : 0;
     caps.bit_exact = 1;
     caps.supports_threads = 1;  // safe; libaom runs on one thread while accounting is on (decoder.cpp)
     caps.id = "aom";

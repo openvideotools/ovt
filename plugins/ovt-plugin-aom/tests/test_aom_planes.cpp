@@ -319,7 +319,9 @@ TEST_CASE("aom planes: Reconstruction equals aomdec --skip-film-grain output", "
   const auto [id, want] = GENERATE(Case{"aom_av1_1_b10_00_quantizer_10", "2387e415ebed841a1a6a3c3c070ebdcb"},
                                    Case{"aom_av1_1_b8_01_size_196x196", "e88e97f333e4c9fa38e18c0b9a63a90d"});
   INFO(id);
-  CHECK(stream_md5(analyse(ovt::test::corpus_or_skip(id), kReconMask)) == want);
+  // Outside CHECK(): a SKIP() thrown inside an assertion expression is reported as a failure.
+  const auto path = ovt::test::corpus_or_skip(id);
+  CHECK(stream_md5(analyse(path, kReconMask)) == want);
 }
 
 TEST_CASE("aom planes: Reconstruction of film grain streams is the picture before grain synthesis",

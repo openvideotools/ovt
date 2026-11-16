@@ -7,12 +7,14 @@
 # WI-0.083 acceptance test 2: the embedded .bfbs resources and the schema identity accessors.
 # WI-0.084: the model helpers (grid, tree, units, labels); test_labels compares labels_golden.txt.
 # WI-0.087: the PictureStore and the ovt/decode.h view types.
-add_executable(ovt_tests_model test_bfbs_resources.cpp test_grid.cpp test_labels.cpp test_picture_c_api.cpp
-                               test_picture_store.cpp test_tree.cpp test_units.cpp)
+# WI-0.085: canonicalize() and structural_diff() on the WI-0.093 fixture (ovt_golden_fixtures: sha256_hex).
+add_executable(ovt_tests_model test_bfbs_resources.cpp test_canonical.cpp test_grid.cpp test_labels.cpp
+                               test_picture_c_api.cpp test_picture_store.cpp test_tree.cpp test_units.cpp)
 target_link_libraries(ovt_tests_model PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ovt_test_support
-                                              ${flatbuffers_TARGET} ${Catch2_TARGET})
-target_compile_definitions(ovt_tests_model
-                           PRIVATE "OVT_MODEL_LABELS_GOLDEN=\"${CMAKE_CURRENT_SOURCE_DIR}/labels_golden.txt\"")
+                                              ovt_golden_fixtures ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(
+  ovt_tests_model PRIVATE "OVT_MODEL_LABELS_GOLDEN=\"${CMAKE_CURRENT_SOURCE_DIR}/labels_golden.txt\""
+                          "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
 # ovt_metrics.fbs arrives with WI-0.082. Until then bfbs(Metrics) is empty and its check is skipped; once the
 # file exists the check is required (a schema that is present but not embedded fails).
 if(EXISTS "${PROJECT_SOURCE_DIR}/core/schema/ovt_metrics.fbs")
@@ -99,4 +101,25 @@ if(OVT_NODE_EXECUTABLE)
                    "${PROJECT_SOURCE_DIR}/core/tests/golden/aom_inspect_keys.txt")
   set_tests_properties(test_aom_json_smoke_rejects_grid test_aom_json_smoke_rejects_text PROPERTIES LABELS "fast;unit"
                                                                                                     WILL_FAIL TRUE)
+endif()
+
+# WI-0.088: to_json() / from_json() (§6.8.1). Acceptance tests 1 and 2 compare with
+# core/tests/golden/tiny16_hevc.json (a mismatch writes <name>.actual.json here). Acceptance tests 3 and 4 ask
+# for Python's json.loads: the [json-files] cases write the two exports, check_json_loads.py reads them.
+add_executable(test_json test_json.cpp)
+target_link_libraries(test_json PRIVATE "$<BUILD_INTERFACE:ovt_core_objects>" ovt::flags ${flatbuffers_TARGET}
+                                        ${nlohmann_json_TARGET} ${Catch2_TARGET})
+target_compile_definitions(test_json PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\""
+                                             "OVT_TEST_OUTPUT_DIR=\"${CMAKE_CURRENT_BINARY_DIR}\"")
+ovt_set_license(test_json "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_json EXTRA_LABELS golden)
+if(Python3_Interpreter_FOUND)
+  add_test(NAME test_json_write_exports COMMAND test_json "[json-files]")
+  add_test(
+    NAME test_json_python_loads
+    COMMAND
+      "${Python3_EXECUTABLE}" -I "${CMAKE_CURRENT_SOURCE_DIR}/check_json_loads.py"
+      "${CMAKE_CURRENT_BINARY_DIR}/tiny16_hevc.compact.json" "${CMAKE_CURRENT_BINARY_DIR}/tiny_metrics_nan.strict.json")
+  set_tests_properties(test_json_write_exports PROPERTIES LABELS "fast;unit" FIXTURES_SETUP ovt_json_exports)
+  set_tests_properties(test_json_python_loads PROPERTIES LABELS "fast;unit" FIXTURES_REQUIRED ovt_json_exports)
 endif()

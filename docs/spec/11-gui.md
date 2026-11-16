@@ -182,7 +182,7 @@ Common rules for every panel: (a) title bar with name, context menu (Detach / Cl
 ```
 
 **Interactions.** Click bar → `Selection.frame`; drag → range selection (a first..last inclusive *position* in the current x order; shown as a translucent band `#39CCCC` 25 %; status line computes count = last − first + 1, bytes = Σ `size_bytes`, mean `qp_base`, and duration Δpts = (max pts − min pts of the range's frames) + d, where d is the pts distance from the max-pts frame to the next frame in presentation order of the whole stream (for the stream's final frame: the distance from the previous frame), converted with the first frame's time base; bitrate = bytes×8/duration; a one-frame range in a one-frame stream has Δpts = 0 and no bitrate); wheel → zoom about cursor (1.25× per notch), Shift+wheel → pan; double-click → fit; right-click → context menu {Analyse range, Metrics on range, Bookmark frame, Export range CSV, Copy stats}; hover → tooltip (`#disp/#dec · type · bytes · QP · Tid · POC · pts`); keyboard ←/→ when focused. Series combo switches bar heights: **bits** (`size_bytes`, default), **QP** (`qp_base`), **PSNR/VMAF/…** (any `MetricsResult` present, per plane selectable), **temporal id** (stepped). Secondary series may be drawn as a line (checkbox per series). Bars coloured by `FrameType` (§11.4.5); hidden frames (AV1 `shown == false`) hatched (part c of WI-1.455, split per §16.2.6; until then part b draws them at 55 % opacity of the type colour); `show_existing_of` frames drawn as outline-only bars pointing to their source. GOP markers: tick + "I"/"K" label at every `is_rap` (part c of WI-1.455, shared marker layer with the filmstrip). Order toggle switches the x axis between decode and display order (bars re-sort; the selection stays on the same frame).
-**Filmstrip.** Thumbnails in the current order under the bars at zoom levels where a frame ≥ 48 px wide; reference arrows (toggle) drawn as arcs from each frame to its `declared_refs` in the current order (L0 orange, L1 purple as §11.4.5; long-term refs dashed); hover highlights a frame's arrows.
+**Filmstrip.** Thumbnails in the current order under the bars at zoom levels where a frame ≥ 48 px wide; reference arrows (toggle) drawn as arcs from each frame to its `declared_refs` in the current order (L0 orange, L1 purple as §11.4.5; long-term refs dashed); hover highlights a frame's arrows. Until the index carries list membership (`StreamIndex.declared_refs` is a plain list of decode indices with no L0/L1 or long-term information; an additive schema field is a separate, owner-approved WI), timeline arrows from `declared_refs` are drawn as L0, solid (#402); the Reference graph (§11.3.11) colours by list from `FrameAnalysis.refs` slot names when an analysis is loaded.
 **States.** Empty (no file); loading (index building: bars appear progressively from the left as the job reports progress, with a grey "indexing…" region); partial (metrics series missing for some frames → gaps); error (index failed → red badge, message, "Open Diagnostics").
 **Performance.** Custom `QQuickItem` `TimelineChart` with `QSGGeometryNode` (one node for bars, one for lines, one for markers); LOD: when more than one frame per device pixel, each pixel column shows max (bar) and mean (line) of its frames computed in C++ (`O(n)` prefix tables built once per series); handles 10⁶ frames at 60 fps. Thumbnails decode on a low-priority job; never block the chart.
 
@@ -438,9 +438,9 @@ Row modes: temporal layers (default), decode-vs-display (two rows with crossing 
 ### 11.3.17 Bookmarks & Comments
 
 **Purpose.** Named frame bookmarks and anchored comments, stored in the project.
-**Data source.** `.ovtproj` `bookmarks[]`, `comments[]` (§11.2.6).
-**Layout.** Two lists: Bookmarks (colour dot, name, `disp#/dec#`, type, time; shown as markers on the Timeline) and Comments (anchor kind icon, excerpt, author, date). Buttons Add bookmark (`B`), Add comment (`Shift+B` → inline editor anchored to the current selection: frame, block, byte range, field or box), Export JSON/CSV, Import.
-**Interactions.** Click → navigate to anchor (frame/block/bytes/field/box via `SelectionModel`); `N`/`Shift+N` next/previous bookmark; rename inline; drag to reorder; right-click → Delete, Change colour.
+**Data source.** `.ovtproj` `bookmarks[]`, `comments[]` (§11.2.6); `comments[].anchor.field` may carry `bit_offset`/`bit_length` (optional keys of `docs/spec/schemas/ovtproj.schema.json`) so that Hex can mark the field's bytes (#421).
+**Layout.** Two lists: Bookmarks (colour dot, name, `disp#/dec#`, type, time — `decode_index` alone until the index lookups of WI-2.480 exist, #421; shown as markers on the Timeline) and Comments (anchor kind icon, excerpt, author, date). Buttons Add bookmark (`B`), Add comment (`Shift+B` → inline editor anchored to the current selection: frame, block, byte range, field or box), Export JSON/CSV, Import.
+**Interactions.** Click → navigate to anchor (frame/block/bytes/field via `SelectionModel`; a box anchor is emitted as `boxRequested(path)` and the Container panel follows, since `SelectionModel` has no box selection, #421); `N`/`Shift+N` next/previous bookmark in ascending `decode_index` of the active file's bookmarks, wrapping at the ends (#421); rename inline; drag to reorder; right-click → Delete, Change colour.
 **States.** Empty hints.
 
 ### 11.3.18 Jobs (popover, not a dock panel)
@@ -950,7 +950,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Produces:** `app/src/items/ref_graph.{h,cpp}`, `app/qml/panels/RefGraphPanel.qml`, `app/tests/models/test_ref_graph_layout.cpp`.
 **Interface:** §11.3.11; `StreamIndex.frames[].declared_refs`, `temporal_id`.
 **Steps:** 1. Layout by temporal id. 2. Arrows. 3. DPB view. 4. Click navigation.
-**Acceptance tests:** 1. Given `syn_h265_bpyramid` (chapter 14 §14.3.3 recipe 43), When the Reference graph panel opens, Then rows by temporal id match `temporal_id` and arrows equal `declared_refs`. 2. Given the same fixture, When a node is clicked, Then `Selection.frame` changes to that node's frame.
+**Acceptance tests:** 1. Given `syn_h265_bpyramid` (chapter 14 §14.3.3 recipe 43) — until the H.265 indexer (WI-1.115, WI-1.121) produces its `StreamIndex` and the GUI tests have a corpus loader, an in-memory `StreamIndex` of the same shape (GOP 8, decode-order POC 0 8 4 2 1 3 6 5 7, temporal ids 0..3, HEVC-style references); the WI that completes the indexer or adds the loader swaps in the real fixture and `tests/corpora/bpyramid_edges.json` (#457, owner OK 2026-11-14) —, When the Reference graph panel opens, Then rows by temporal id match `temporal_id` and arrows equal `declared_refs`. 2. Given the same fixture, When a node is clicked, Then `Selection.frame` changes to that node's frame.
 **Size:** M.
 **Notes / pitfalls:** `declared_refs` come from the index (headers), not from decoded data; mark frames whose refs are unknown.
 
@@ -1054,10 +1054,10 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Goal:** The desktop QML runs inside the Kotlin Activity of WI-0.050 with a process-lifetime `OvtSession` and the §11.5.1 manifest entries.
 **Overlap:** this WI delivers only `OvtSession.kt` and the §11.5.1 manifest entries on top of the Gradle project and `MainActivity.kt` of WI-0.050 (primary); the ChromeOS free-form launch test is WI-0.054. See chapter 16 §16.3.
 **Depends on:** WI-1.450, WI-0.050 (Android Gradle project and `MainActivity.kt`).
-**Produces:** `android/app/src/main/kotlin/org/ovt/OvtSession.kt`, manifest additions in `android/app/src/main/AndroidManifest.xml` per §11.5.1 (intent filters, `configChanges`, free-form metadata, `colorMode`), `android/app/src/androidTest/java/org/ovt/SessionTest.kt`.
+**Produces:** `android/app/src/main/kotlin/org/openvideotools/studio/OvtSession.kt`, manifest additions in `android/app/src/main/AndroidManifest.xml` per §11.5.1 (intent filters, `configChanges`, free-form metadata, `colorMode`), `android/app/src/androidTest/java/org/openvideotools/studio/SessionTest.kt`.
 **Interface:** `OvtSession` (singleton holding `ovt_File/ovt_Container/ovt_Stream` handles and caches across Activity recreation, §11.5.7); manifest keys of §11.5.1.
 **Steps:** 1. `OvtSession` with JNI binding to the core handles. 2. Manifest entries. 3. Re-bind on `onCreate`. 4. Instrumentation test.
-**Acceptance tests:** 1. Given the APK from `./gradlew -p android :app:assembleFossDebug`, When it is installed with `:app:installFossDebug` on the x86_64 API 36 emulator and launched, Then the welcome page shows. 2. Given the app running, When an `ACTION_VIEW` intent with a `video/mp4` URI arrives, Then the file opens in the running Activity without recreation. 3. Given a file open and "Don't keep activities" enabled, When the Activity is recreated, Then `OvtSession` keeps the open handles (same `source_hash`, no re-index).
+**Acceptance tests:** 1. Given the APK from `./gradlew -p android :app:assembleFossDebug`, When it is installed with `:app:installFossDebug` on the x86_64 API 36 emulator and launched, Then the welcome page shows. 2. Given the app running, When an `ACTION_VIEW` intent with a `video/mp4` URI arrives, Then the file opens in the running Activity without recreation. 3. Given a file open and "Don't keep activities" enabled, When the Activity is recreated, Then `OvtSession` keeps the open handles: the same native session handle, still live (`ovt_file_size` through it returns the file size), and `OvtSession.openCount` unchanged (nothing re-opened, so nothing re-indexed); the literal `source_hash` comparison is added by the WI that first puts an `ovt_Stream`/index into `OvtSession` (#444, narrowing approved by the owner 2026-11-14).
 **Size:** M.
 **Notes / pitfalls:** `targetSdk 36`, `minSdk 28` are pinned in chapter 13; do not duplicate Gradle files owned by WI-0.050.
 
@@ -1075,7 +1075,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Goal:** §11.5.6.
 **Overlap:** this WI delivers only the GUI flows (recent list, export, `GUI-AND-0001` copy action, Espresso tests) over `FilePicker.kt` and `ovt_jni_open_fd` of WI-0.051; no `Files.kt` and no `file_fd_bridge.cpp`. See chapter 16 §16.3.
 **Depends on:** WI-A.450, WI-1.454, WI-0.051 (`FilePicker.kt`, `ovt_jni_open_fd`).
-**Produces:** `android/app/src/main/kotlin/org/ovt/RecentFiles.kt`, `android/app/src/main/kotlin/org/ovt/ExportDocument.kt`, `android/app/src/main/kotlin/org/ovt/CopyToAppStorage.kt`, `android/app/src/androidTest/java/org/ovt/SafFlowsTest.kt` (with a test `DocumentsProvider`).
+**Produces:** `android/app/src/main/kotlin/org/openvideotools/studio/RecentFiles.kt`, `android/app/src/main/kotlin/org/openvideotools/studio/ExportDocument.kt`, `android/app/src/main/kotlin/org/openvideotools/studio/CopyToAppStorage.kt`, `android/app/src/androidTest/java/org/openvideotools/studio/SafFlowsTest.kt` (with a test `DocumentsProvider`).
 **Interface:** §11.5.6 flows; `GUI-AND-0001`; `ACTION_CREATE_DOCUMENT` export; recent list entries {uri, display name, codec}.
 **Steps:** 1. Recent list over persisted URIs. 2. Non-seekable detection (`fstat` on the fd) → `GUI-AND-0001` + copy action streaming to `getExternalFilesDir`. 3. Export via `ACTION_CREATE_DOCUMENT`. 4. Instrumentation tests.
 **Acceptance tests:** 1. Given a document URI, When opened, Then `ovt_file_open_fd` succeeds and the recent list shows its display name; after process restart the URI reopens. 2. Given a non-seekable provider, When a document is opened, Then `GUI-AND-0001` is raised with the copy action, and after the copy the file opens.
@@ -1095,7 +1095,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 ### WI-A.454 — HDR `SurfaceView` sibling integration in the Picture panel
 **Goal:** §11.5.5 rules incl. the popup rule.
 **Depends on:** WI-A.400, WI-A.401, WI-1.456.
-**Produces:** `app/src/platform/android_native_host.cpp`, `android/app/src/main/kotlin/org/ovt/HdrSurfacePositioner.kt`, `android/app/src/androidTest/java/org/ovt/SiblingSurfaceTest.kt`.
+**Produces:** `app/src/platform/android_native_host.cpp`, `android/app/src/main/kotlin/org/openvideotools/studio/HdrSurfacePositioner.kt`, `android/app/src/androidTest/java/org/openvideotools/studio/SiblingSurfaceTest.kt`.
 **Interface:** `NativeSurfaceHost` (WI-1.463) Android backend; `pictureRectChanged(x, y, w, h)`; `nativeSetVisible(bool)`.
 **Steps:** 1. Geometry relay (coalesced per frame). 2. Popup watcher. 3. Lifecycle (`surfaceCreated/Destroyed` → `retarget`). 4. Tests.
 **Acceptance tests:** 1. Given NATIVE HDR mode, When a popup opens over the picture, Then the sibling is `GONE` and the embedded texture is visible, and When it closes, Then the sibling returns. 2. Given NATIVE HDR mode, When the device rotates, Then `Selection.frame` and zoom persist and the sibling re-attaches.
@@ -1105,7 +1105,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 ### WI-A.455 — State preservation and lifecycle
 **Goal:** §11.5.7.
 **Depends on:** WI-A.450, WI-1.454.
-**Produces:** `app/src/platform/android_state.cpp` (state ↔ JSON), `onSaveInstanceState` glue in `MainActivity.kt` (owned by WI-0.050, extended in place), `android/app/src/androidTest/java/org/ovt/StateRestoreTest.kt`.
+**Produces:** `app/src/platform/android_state.cpp` (state ↔ JSON), `onSaveInstanceState` glue in `MainActivity.kt` (owned by WI-0.050, extended in place), `android/app/src/androidTest/java/org/openvideotools/studio/StateRestoreTest.kt`.
 **Interface:** §11.5.7 saved-state keys (project path/URI, `SelectionState`, `ViewState`, layout preset, panel state ≤ 100 KB).
 **Steps:** 1. State serialiser. 2. Save/restore hooks. 3. Job continuity across configuration changes. 4. Test.
 **Acceptance tests:** 1. Given "Don't keep activities" enabled, When backgrounded and resumed, Then the same frame/selection show within 2 s.

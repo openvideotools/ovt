@@ -6,6 +6,8 @@
 
 #include "decoder.hpp"
 
+#include "planes.hpp"
+
 #include <libde265/de265.h>
 #ifdef OVT_DE265_INTERNALS
 #include <libde265/de265_internals.h>
@@ -313,6 +315,23 @@ ovt_status Decoder::flush() {
   return decode_loop();
 }
 
+// SPEC-ASSUMPTION(#449): the mask of any pull(), even one that returns no frame, is a standing request for the
+// pictures that start decoding afterwards; the host primes a new decoder with one pull before the first push.
+void Decoder::request_stages(uint32_t plane_stage_mask) {
+#ifdef OVT_DE265_INTERNALS
+  const uint32_t wanted = plane_stage_mask & kSnapshotStageMask;
+  if ((wanted & ~snapshot_stages_) == 0) {
+    return;
+  }
+  if (snapshot_stages_ == 0) {
+    de265_internals_set_plane_snapshots(as_ctx(ctx_), 1);
+  }
+  snapshot_stages_ |= wanted;
+#else
+  (void)plane_stage_mask;  // a system libde265 has no snapshots; caps announce Reconstruction only
+#endif
+}
+
 bool Decoder::pop(Frame* out) {
   if (frames_.empty()) {
     return false;
@@ -453,6 +472,126 @@ void read_internals(const de265_image* img, Frame* frame) {
     frame->frame_type = (b >= p && b >= i) ? 2 : (p >= i ? 1 : 0);
   }
 }
+
+// Slice header table entry @p index in the plain form map_blocks() reads.
+SliceHeader slice_header(const de265_image* img, int index) {
+  de265_internals_slice_header in{};
+  de265_internals_get_slice_header(img, index, &in);
+  SliceHeader sh;
+  sh.slice_type = in.slice_type;
+  sh.SliceAddrRs = in.SliceAddrRs;
+  sh.slice_qp_delta = in.slice_qp_delta;
+  sh.SliceQPY = in.SliceQPY;
+  sh.num_ref_idx_active = {in.num_ref_idx_l0_active, in.num_ref_idx_l1_active};
+  for (std::size_t l = 0; l < 2; ++l) {
+    for (std::size_t k = 0; k < 16; ++k) {
+      sh.RefPicList_POC.at(l).at(k) = in.RefPicList_POC[l][k];            // NOLINT(*-constant-array-index)
+      sh.RefPicList_LongTerm.at(l).at(k) = in.RefPicList_LongTerm[l][k];  // NOLINT(*-constant-array-index)
+    }
+  }
+  sh.MaxNumMergeCand = in.MaxNumMergeCand;
+  sh.slice_deblocking_filter_disabled_flag = in.slice_deblocking_filter_disabled_flag;
+  sh.slice_beta_offset_div2 = in.slice_beta_offset_div2;
+  sh.slice_tc_offset_div2 = in.slice_tc_offset_div2;
+  sh.slice_sao_luma_flag = in.slice_sao_luma_flag;
+  sh.slice_sao_chroma_flag = in.slice_sao_chroma_flag;
+  return sh;
+}
+
+// Per-CTB metadata: slice segment, tile-scan address, tile and SAO parameters.
+void copy_ctbs(const de265_image* img, BlockData* d) {
+  const auto n = static_cast<std::size_t>(d->ctbs_w) * static_cast<std::size_t>(d->ctbs_h);
+  d->ctb_slice.resize(n);
+  d->ctb_addr_ts.resize(n);
+  d->ctb_tile.resize(n);
+  d->sao.resize(n);
+  for (int y = 0; y < d->ctbs_h; ++y) {
+    for (int x = 0; x < d->ctbs_w; ++x) {
+      const auto i = (static_cast<std::size_t>(y) * static_cast<std::size_t>(d->ctbs_w)) + static_cast<std::size_t>(x);
+      d->ctb_slice[i] = de265_internals_get_CTB_slice_header_index(img, x, y);
+      // SPEC-ASSUMPTION(#461): tile scan and tile id come from the two patch-0001 getters added for WI-2.164.
+      d->ctb_addr_ts[i] = de265_internals_get_CTB_addr_ts(img, x, y);
+      d->ctb_tile[i] = de265_internals_get_CTB_tile_id(img, x, y);
+      de265_internals_sao sao{};
+      de265_internals_get_CTB_sao(img, x, y, &sao);
+      SaoInfo& s = d->sao[i];
+      for (std::size_t c = 0; c < 3; ++c) {
+        s.SaoTypeIdx.at(c) = sao.SaoTypeIdx[c];            // NOLINT(*-constant-array-index)
+        s.SaoBandPosition.at(c) = sao.SaoBandPosition[c];  // NOLINT(*-constant-array-index)
+        s.SaoEoClass.at(c) = sao.SaoEoClass[c];            // NOLINT(*-constant-array-index)
+        for (std::size_t k = 0; k < 4; ++k) {
+          s.SaoOffsetVal.at((c * 4) + k) = sao.SaoOffsetVal[c][k];  // NOLINT(*-constant-array-index)
+        }
+      }
+    }
+  }
+}
+
+// Per-4x4 metadata over the CellGrid of the coded picture; the accessors return zeros outside their layouts.
+void copy_cells(const de265_image* img, BlockData* d) {
+  const std::size_t n = std::size_t{d->cells_w} * d->cells_h;
+  d->pb.resize(n);
+  d->intra_y.resize(n);
+  d->intra_c.resize(n);
+  d->tu.resize(n);
+  d->deblk.resize(n);
+  d->bs_v.resize(n);
+  for (uint32_t y = 0; y < d->cells_h; ++y) {
+    for (uint32_t x = 0; x < d->cells_w; ++x) {
+      const std::size_t i = (std::size_t{y} * d->cells_w) + x;
+      const auto xi = static_cast<int>(x);
+      const auto yi = static_cast<int>(y);
+      de265_internals_pb pb{};
+      de265_internals_get_PB_info(img, xi, yi, &pb);
+      PbInfo& p = d->pb[i];
+      p.predFlag = {pb.predFlag[0], pb.predFlag[1]};
+      p.refIdx = {pb.refIdx[0], pb.refIdx[1]};
+      p.mv_x = {pb.mv_x[0], pb.mv_x[1]};
+      p.mv_y = {pb.mv_y[0], pb.mv_y[1]};
+      p.refPOC = {pb.refPOC[0], pb.refPOC[1]};
+      de265_internals_get_intra_modes(img, xi, yi, &d->intra_y[i], &d->intra_c[i]);
+      d->tu[i] = de265_internals_get_TU_info(img, xi, yi);
+      d->deblk[i] = de265_internals_get_deblk_flags(img, xi, yi);
+      d->bs_v[i] = de265_internals_get_deblk_bS_v(img, xi, yi);
+    }
+  }
+}
+
+// Copies the block metadata map_blocks() needs (WI-2.164) before the picture goes back to libde265.
+void copy_blocks(const de265_image* img, const Frame& frame, BlockData* d) {
+  int ctb_log2 = 0;
+  int min_cb_log2 = 0;
+  int min_tb_log2 = 0;
+  de265_internals_get_sps_sizes(img, &ctb_log2, &min_cb_log2, &min_tb_log2, &d->ctbs_w, &d->ctbs_h);
+  const de265_internals_layout cb = de265_internals_get_CB_info_layout(img);
+  const int slices = de265_internals_get_num_slice_headers(img);
+  if (ctb_log2 == 0 || cb.width_in_units <= 0 || cb.height_in_units <= 0 || slices <= 0 || frame.coded_w <= 0 ||
+      frame.coded_h <= 0) {
+    return;  // no metadata: d->valid stays false
+  }
+  d->ctb_log2 = ctb_log2;
+  d->min_cb_log2 = min_cb_log2;
+  d->cbs_w = cb.width_in_units;
+  d->cbs_h = cb.height_in_units;
+  d->cells_w = static_cast<uint32_t>((frame.coded_w + 3) / 4);
+  d->cells_h = static_cast<uint32_t>((frame.coded_h + 3) / 4);
+  d->cb.resize(static_cast<std::size_t>(d->cbs_w) * static_cast<std::size_t>(d->cbs_h));
+  for (int y = 0; y < d->cbs_h; ++y) {
+    for (int x = 0; x < d->cbs_w; ++x) {
+      de265_internals_cb in{};
+      de265_internals_get_CB_info(img, x, y, &in);
+      d->cb[(static_cast<std::size_t>(y) * static_cast<std::size_t>(d->cbs_w)) + static_cast<std::size_t>(x)] =
+          CbInfo{in.log2CbSize, in.PartMode, in.ctDepth, in.PredMode, in.pcm_flag, in.cu_transquant_bypass, in.QP_Y};
+    }
+  }
+  copy_ctbs(img, d);
+  copy_cells(img, d);
+  d->slices.reserve(static_cast<std::size_t>(slices));
+  for (int s = 0; s < slices; ++s) {
+    d->slices.push_back(slice_header(img, s));
+  }
+  d->valid = true;
+}
 #endif
 
 }  // namespace
@@ -490,6 +629,11 @@ void Decoder::copy_picture(const de265_image* img, Frame* frame) {
   }
 #ifdef OVT_DE265_INTERNALS
   read_internals(img, frame);
+  if (!copy_snapshots(img, snapshot_stages_, frame)) {  // also frees libde265's snapshots of the picture
+    add_diag(kInfo, "",
+             "libde265: plane snapshots left out: only the cropped picture is available without worker threads");
+  }
+  copy_blocks(img, *frame, &frame->blocks);
 #endif
   frame->diagnostics = std::move(pending_diags_);
   pending_diags_.clear();
