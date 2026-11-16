@@ -322,9 +322,10 @@ TEST_CASE("lazy: expand of an unknown offset is OVT_E_INVALID_ARG, of any other 
   CHECK(ovt_container_expand(o.container, 3) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_expand(o.container, data.size()) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_expand(o.container, 0) == OVT_OK);  // ftyp
-  const auto* moov = tree_of(o.container)->root()->Get(1);
-  CHECK(ovt_container_expand(o.container, moov->file_span()->offset()) == OVT_OK);
-  CHECK(ovt_container_expand(o.container, moov->file_span()->offset() + 8) == OVT_OK);  // mvhd inside moov
+  // Every expand republishes the tree, so read the offset before the first call (the buffer is freed then).
+  const uint64_t moov_at = tree_of(o.container)->root()->Get(1)->file_span()->offset();
+  CHECK(ovt_container_expand(o.container, moov_at) == OVT_OK);
+  CHECK(ovt_container_expand(o.container, moov_at + 8) == OVT_OK);  // mvhd inside moov
 }
 
 TEST_CASE("lazy: a moof whose first child is not mfhd keeps no children until expanded",
