@@ -575,9 +575,19 @@ TEST_CASE("AT3 on syn_av1_pq_hdr_obu: av1C high_bitdepth, level and one sequence
   CHECK(field(av1c, "high_bitdepth").uvalue == 1);
   CHECK(field(av1c, "seq_level_idx_0").uvalue == 8);
   CHECK(field(av1c, "seq_level_idx_0").svalue == "4.0");
+  // MP4Box (recipe 15a) also copies the MDCV and CLLI metadata OBUs into configOBUs (allowed, AV1-ISOBMFF §2.3.4):
+  // exactly one sequence header, first, and metadata OBUs otherwise. MP4Box 2.4 reports av01.0.08M.10 for the file.
   const FieldT& obus = field(av1c, "configOBUs");
-  REQUIRE(obus.children.size() == 1);
+  REQUIRE_FALSE(obus.children.empty());
   CHECK(find(*obus.children[0], "obu_type")->uvalue == 1);
+  size_t sequence_headers = 0;
+  for (const auto& obu : obus.children) {
+    const uint64_t type = find(*obu, "obu_type")->uvalue;
+    CHECK((type == 1 || type == 5));
+    sequence_headers += type == 1 ? 1U : 0U;
+  }
+  CHECK(sequence_headers == 1);
+  CHECK_FALSE(has_code(av1c, "CNT-1021"));
 }
 
 }  // namespace
