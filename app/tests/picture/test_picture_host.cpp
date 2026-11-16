@@ -369,6 +369,8 @@ TEST_CASE("picture_host_resize_once_per_size_without_flicker", "[fast][gui]") {
 }
 
 // WI-1.456: the Picture panel's read-out and crop come from the frame the host shows, without the GPU.
+// Catch2's REQUIRE/CHECK expand to branches; the test itself is straight-line.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST_CASE("picture_host_code_values_and_crop", "[fast][gui]") {
   if (app_or_null() == nullptr) {
     SKIP("no X display (run under xvfb-run)");
