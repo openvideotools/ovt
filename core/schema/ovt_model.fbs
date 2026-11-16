@@ -741,10 +741,14 @@ table HdrReport     { declared:[ubyte] /* ovt_ColorDescription as little-endian 
                       conflicts:[Diagnostic]; measures:[HdrFrameMeasure]; max_cll_measured:float; max_fall_measured:float;
                       dynamic:[HdrDynamicRecord]; threshold_nits:float; }              // used by chapter 12 §12.2.11 (`ovt hdr`)
 table VerifyFrame   { frame:FrameId; ok:bool; plane_mismatch_mask:ubyte; max_abs_diff:uint; first_mismatch_x:int; first_mismatch_y:int;
-                      declared_hash:string; computed_hash:string; }                    // used by chapter 12 §12.2.12
+                      declared_hash:string; computed_hash:string;                      // used by chapter 12 §12.2.12
+                      diagnostics:[Diagnostic];        // WI-4.106 (SPEC-ASSUMPTION(#606)): the VER-0001..VER-0004 Diagnostics of this frame (chapter 7 §7.6.4)
+                      mismatch_map_blob:string;        // Picture-store key of the mismatch heat map: U8, one byte per 4x4 luma cell, row-major, bit p set when plane p differs in that cell; empty when the frame matches
+                      mismatch_cells_w:uint; mismatch_cells_h:uint; }   // dimensions of that map (ceil(coded_w/4), ceil(coded_h/4)); 0 when there is no map
 table VerifyCheck   { name:string /* "hash", "levels", "against" */; status:string /* "pass" | "fail" | "skipped" */; detail:string; }   // used by chapter 12 §12.2.12
 table VerifyReport  { mode:string /* "hash_sei","against" */; plugin:string; oracle:string; tolerance:uint; frames:[VerifyFrame];
-                      frames_ok:uint; frames_failed:uint; checks:[VerifyCheck]; }       // used by chapter 12 §12.2.12 (`ovt verify`); one VerifyCheck per requested check
+                      frames_ok:uint; frames_failed:uint; checks:[VerifyCheck];        // used by chapter 12 §12.2.12 (`ovt verify`); one VerifyCheck per requested check
+                      diagnostics:[Diagnostic]; }      // WI-4.106 (SPEC-ASSUMPTION(#606)): Diagnostics of the run that belong to no single frame (e.g. a plane stage one plugin cannot export)
 table CacheEntry    { key:string; kind:string; source_basename:string; size_bytes:ulong; created:string; last_used:string; }   // used by chapter 12 §12.2.13
 table CacheReport   { dir:string; entries:[CacheEntry]; total_bytes:ulong; max_bytes:ulong; hits:ulong; misses:ulong; }        // used by chapter 12 §12.2.13 (`ovt cache`)
 table HrdPoint      { decode_index:uint; init_arrival_time_90k:ulong; final_arrival_time_90k:ulong; removal_time_90k:ulong;
