@@ -104,7 +104,7 @@ constexpr std::string_view kHex = "0123456789abcdef";
 
 void append_hex(std::string& out, std::uint64_t value, int digits) {
   for (int i = digits - 1; i >= 0; --i) {
-    out.push_back(kHex[static_cast<std::size_t>((value >> (4 * static_cast<unsigned>(i))) & 0xFU)]);
+    out.push_back(kHex[(value >> (4 * static_cast<unsigned>(i))) & 0xFU]);
   }
 }
 
