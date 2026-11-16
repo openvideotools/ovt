@@ -52,7 +52,7 @@ if(OVT_TP_SANITIZER_C_FLAGS MATCHES "-fsanitize=[^ ]*undefined")
   unset(_ovt_de265_cflags)
 endif()
 
-# Optimisation (chapter 07 §7.6.2 mitigation 4, WI-2.168). libde265 1.0.15 has no arm64 kernels (its NEON code is
+# Optimisation (chapter 07 §7.6.2 mitigation 4, WI-2.168). the pinned libde265 has no arm64 kernels (its NEON code is
 # 32-bit ARM assembly that only the autotools build uses), so on Apple silicon and Android it runs its scalar C++
 # fallbacks and the compiler flags are the only lever. The release presets are RelWithDebInfo, which CMake builds at
 # -O2, and debug presets build third-party code as RelWithDebInfo too (OvtThirdPartyCommon); libde265 is always built
