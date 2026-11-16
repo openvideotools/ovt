@@ -19,23 +19,10 @@
         }
       ]
     },
-    "_Bytes": {
-      "$comment": "[ubyte]: a base64 string (§12.1.4; lowercase hex is also a valid base64 alphabet string) or an array of integers (§6.8.1). SPEC-ASSUMPTION(#285).",
-      "anyOf": [
-        {
-          "type": "string",
-          "contentEncoding": "base64",
-          "pattern": "^[A-Za-z0-9+/]*={0,2}$"
-        },
-        {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "minimum": 0,
-            "maximum": 255
-          }
-        }
-      ]
+    "_Hex": {
+      "$comment": "A hash-like [ubyte] field: a lowercase hex string, two digits per byte (§6.8.1, §12.1.4).",
+      "type": "string",
+      "pattern": "^([0-9a-f]{2})*$"
     },
     "BitSpan": {
       "type": "object",
@@ -72,7 +59,7 @@
           "$ref": "#/$defs/_UInt64"
         },
         "source_hash": {
-          "$ref": "#/$defs/_Bytes"
+          "$ref": "#/$defs/_Hex"
         },
         "record_count": {
           "type": "integer",

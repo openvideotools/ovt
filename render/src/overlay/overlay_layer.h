@@ -26,10 +26,6 @@
 
 namespace ovt::render::detail {
 
-// The fill palette (§10.5.2), RGBA (straight alpha) per row with the fill alpha where a row has one. Rows 0-29 are
-// the overlay rows; frame-type rows 30-32 are opaque. WI-2.439 replaces it with kOverlayColors / kOverlayColorsCvd.
-OVT_RENDER_API extern const std::array<uint32_t, 33> kFillPalette;
-
 class OverlayLayerGpu {
  public:
   explicit OverlayLayerGpu(pl_gpu gpu) : gpu_(gpu) {}

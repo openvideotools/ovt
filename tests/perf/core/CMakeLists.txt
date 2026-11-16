@@ -5,3 +5,4 @@
 # benchmark that validates the harness).
 
 ovt_add_benchmark(core bench_smoke LIBRARIES ovt_core_objects)
+ovt_add_benchmark(core bench_container_open_moov_1h LIBRARIES ovt_core_objects)
