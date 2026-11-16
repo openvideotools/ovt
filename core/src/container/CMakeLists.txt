@@ -15,6 +15,7 @@ target_sources(
           isobmff/decoders/movie.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/field_builder.cpp
+          isobmff/lazy.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp

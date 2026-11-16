@@ -46,6 +46,7 @@ ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / structural_diff
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(isobmff_box_decoders fuzz_isobmff_box_decoders.cpp) # WI-1.205: ISOBMFF hand box decoders
+ovt_add_fuzz_target(isobmff_tree fuzz_isobmff_tree.cpp) # WI-1.204: ISOBMFF open + tree + expand of every box
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(m3u8 fuzz_m3u8.cpp) # WI-4.209: the HLS M3U8 parser
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
@@ -62,7 +63,9 @@ ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
-ovt_add_fuzz_target(json_export fuzz_json_export.cpp) # WI-0.088: the JSON exporter (untrusted stored records)
+# WI-0.088: the JSON importer (untrusted text) and the JSON exporter (untrusted stored records).
+ovt_add_fuzz_target(json_import fuzz_json_import.cpp)
+ovt_add_fuzz_target(json_export fuzz_json_export.cpp)
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
