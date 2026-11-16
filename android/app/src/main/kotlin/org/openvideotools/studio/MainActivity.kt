@@ -46,6 +46,9 @@ class MainActivity : AppCompatActivity() {
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
 
+    /** True only inside a finishing onDestroy (issue #614). */
+    private var keepQtAlive = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -216,8 +219,24 @@ class MainActivity : AppCompatActivity() {
         filePicker.shutdown()
         OvtSession.unbind(sessionListener)
         if (isFinishing) OvtSession.close()
-        super.onDestroy()
+        // Issue #614: keep Qt running when the Activity finishes (see isChangingConfigurations).
+        keepQtAlive = isFinishing
+        try {
+            super.onDestroy()
+        } finally {
+            keepQtAlive = false
+        }
     }
+
+    /**
+     * Issue #614. Qt 6.8's QtEmbeddedDelegate quits Qt from Application.ActivityLifecycleCallbacks.onActivityDestroyed
+     * unless isChangingConfigurations() is true. In embedded mode that quit waits on the UI thread for Qt's main() to
+     * return, which nothing asks it to do, so a finishing Activity hangs (and if main() did return, Qt would call
+     * exit()). Qt is kept for the life of the process instead: during a finishing onDestroy this reports a
+     * configuration change, so Qt treats the finish as it treats a recreation, and the next MainActivity's QtQuickView
+     * attaches to the running Qt. No ViewModel or retained Fragment state depends on this value here.
+     */
+    override fun isChangingConfigurations(): Boolean = keepQtAlive || super.isChangingConfigurations()
 
     private companion object {
         const val TAG = "OVT"
