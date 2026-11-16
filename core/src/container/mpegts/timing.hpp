@@ -45,6 +45,7 @@ struct PcrStream {
   uint64_t repetition_errors = 0;     // CNT-TS-2003
   uint64_t discontinuity_errors = 0;  // CNT-TS-2004
   uint64_t accuracy_errors = 0;       // CNT-TS-2005
+  uint64_t pcr_errors = 0;            // PCR intervals with CNT-TS-2003 or CNT-TS-2004 (TR 101 290 2.3, counted once)
 };
 
 struct Timing {
@@ -57,6 +58,29 @@ struct PidBitrate {
   uint16_t pid = 0;
   uint32_t window_ms = 0;
   std::vector<uint32_t> bps;  // bits per second of each window, from the time of packet 0
+};
+
+// The PCR points of one PID as a strictly increasing time axis over packet index: wraps are unwrapped, and a
+// step back or a step of more than 10 s continues at the rate of the previous segment. Used by the bitrate
+// windows and the timer checks of the TR 101 290 report (tr101290.hpp).
+struct TimePoint {
+  uint64_t packet_index = 0;
+  double t = 0;  // 27 MHz ticks from the first point
+};
+
+class TimeAxis {
+ public:
+  explicit TimeAxis(const std::vector<PcrPoint>& pcr);
+
+  // False when fewer than two usable PCRs exist: there is no time to measure.
+  [[nodiscard]] bool valid() const noexcept { return axis_.size() >= 2; }
+
+  // Time of packet `k` in 27 MHz ticks from the first PCR: linear inside a segment, extrapolated before the
+  // first and after the last. Requires valid().
+  [[nodiscard]] double ticks_at(uint64_t k) const;
+
+ private:
+  std::vector<TimePoint> axis_;
 };
 
 using TimingSink = std::function<void(DiagCode code, std::string message, uint64_t offset)>;

@@ -95,6 +95,9 @@ if(APPLE)
                                                  "-framework CoreFoundation")
 endif()
 
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
+
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
 if(APPLE)
   add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
