@@ -22,6 +22,7 @@ Local run (2026-11-16, cloud container, Ubuntu 24.04, lavapipe, system libplaceb
 item, so no reference exists yet. WI-1.575's parity suite exports through `SdrPng8` and runs this comparison.
 
 What this work item checks automatically instead:
+
 - `render_test_export: SdrPng8 equals the Srgb8 render at 1:1`: the export's RGB codes match the on-screen offscreen
   render of the same picture within 1 code;
 - `render_test_export: SdrPng8 of pq_patches_1000 with BT.2390 is reproducible and tone-mapped (AT2 precondition)`:
