@@ -140,7 +140,7 @@ void Md5::block(const uint8_t* p) noexcept {
 }
 
 void Md5::update(std::span<const uint8_t> data) noexcept {
-  std::size_t fill = static_cast<std::size_t>(total_ % 64U);
+  std::size_t fill = total_ % 64U;
   total_ += data.size();
   std::size_t pos = 0;
   if (fill != 0U) {
@@ -163,7 +163,7 @@ void Md5::update(std::span<const uint8_t> data) noexcept {
 
 Md5Digest Md5::finish() noexcept {
   const uint64_t bits = total_ * 8U;
-  const std::size_t fill = static_cast<std::size_t>(total_ % 64U);
+  const std::size_t fill = total_ % 64U;
   std::array<uint8_t, 72> pad{};
   pad[0] = 0x80U;
   const std::size_t pad_len = (fill < 56U ? 56U : 120U) - fill;
