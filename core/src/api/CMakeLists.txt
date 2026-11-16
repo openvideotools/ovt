@@ -3,6 +3,8 @@
 #
 # The `api` module of libovt-core (chapter 0 §0.3): the noexcept C entry points of chapter 12 §12.3
 # (§12.3.1 rule 8). WI-1.512 adds ovt/jobs.h and ovt/log.h; WI-1.101 adds ovt/io.h. Sources go into
-# ovt_core_objects. WI-3.300 adds buffer.cpp, the allocator of caller-owned ovt_Buffers (rule 3a).
+# ovt_core_objects. WI-3.300 adds buffer.cpp, the allocator of caller-owned ovt_Buffers (rule 3a). json_api.cpp
+# (ovt/syntax.h) and validate_api.cpp (ovt/validate.h) wrap the WI-0.088 / WI-0.086 helpers (#673, #674).
 
-target_sources(ovt_core_objects PRIVATE buffer.cpp cache_api.cpp file_api.cpp jobs_api.cpp log_api.cpp)
+target_sources(ovt_core_objects PRIVATE buffer.cpp cache_api.cpp file_api.cpp jobs_api.cpp json_api.cpp log_api.cpp
+                                        validate_api.cpp)

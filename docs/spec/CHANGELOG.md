@@ -2,6 +2,14 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc40 — 2026-11-16
+
+MINOR-level: the accepted answer of `spec-question` issue #674 (found while adding the C entry points of #673 point 1). One additive FlatBuffers table in `ovt_model.fbs`; no field renumbering, no plugin ABI or CLI grammar change. Two new public C headers under `core/include/ovt/` (`validate.h`, `syntax.h`), reviewed on the implementing PR under the Fable reviewer's approval.
+
+- 6 §6.1.1, §6.3 — `table DiagnosticList { diagnostics:[Diagnostic]; }` appended to the CLI/API report tables, a secondary root table with identifier `"OVTD"`, the out-buffer of `ovt_validate_*`, `ovt_container_validate` and `ovt_BdResult.diagnostics` (not size-prefixed across the C ABI) — WI-0.086, WI-1.509 (#674)
+- 12 §12.3.8 `ovt/validate.h` comment — a violation is `Diagnostic{code "MDL-VAL-0nnn", severity per rule, message "V-nnn: …" + " (at <path>)", spec_ref "chapter 06 §6.9"}`; `ovt_validate_*` return `OVT_OK` whenever the call could run (an empty list = valid, a verifier failure is V-001 in the list), `OVT_E_INVALID_ARG` for NULL pointers or a `codec_override` outside `-1..ovt.fb.Codec` — WI-0.086 (#674)
+- 12 §12.3.8 `ovt_fb_to_json` / `ovt_json_to_fb`, §12.3.1 `ovt/syntax.h` row — `root_type` with or without the `ovt.fb.` prefix, looked up in the model, container and metrics schemas in that order; unknown = `OVT_E_INVALID_ARG`, rejected text or buffer = `OVT_E_CORRUPT`; the text is RFC 8259 (strict numbers) and NUL-terminated past `size`; the buffer is the canonical `from_json` form with the identifier only for the schema's own root type; `ovt/syntax.h` is created with the two JSON functions first — WI-1.509 (#674)
+
 ## 1.0.0-rc39 — 2026-11-16
 
 PATCH-level: spec-amendment pass 19 folds in the accepted answers of `spec-question` issues #637 and #638 from WI-1.412 (PR #643), #644 and #645 from WI-2.434 (PR #647), #650 from WI-1.456 (PR #651), #624 from WI-2.432 (PR #652), #648 from WI-2.433 (PR #653), and #641 and #642 from WI-1.121. No new diagnostic code; no FlatBuffers schema, plugin ABI or CLI grammar change. `core/include/ovt/index.h` (#642) declares the §12.3.8 block verbatim, so no declaration changes; the header itself lands with the WI-1.121 part c PR under the Fable reviewer's approval.

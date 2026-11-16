@@ -66,6 +66,14 @@ ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV i
 # WI-0.088: the JSON importer (untrusted text) and the JSON exporter (untrusted stored records).
 ovt_add_fuzz_target(json_import fuzz_json_import.cpp)
 ovt_add_fuzz_target(json_export fuzz_json_export.cpp)
+# #673 / #674: the C wrappers of the importer, exporter and validator (ovt/syntax.h, ovt/validate.h; byte 0 selects).
+ovt_add_fuzz_target(c_api_model fuzz_c_api_model.cpp)
+# ovt_buffer_free is defined in ovt_core itself (core/src/status.cpp), not in the module objects, so this one target
+# also links the shared library; the module code it calls still resolves to the objects linked above.
+target_link_libraries(ovt_fuzz_c_api_model_regress PRIVATE ovt::core)
+if(TARGET ovt_fuzz_c_api_model)
+  target_link_libraries(ovt_fuzz_c_api_model PRIVATE ovt::core)
+endif()
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
 # WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte

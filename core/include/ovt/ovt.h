@@ -19,6 +19,8 @@
 #include "ovt/log.h"
 #include "ovt/metrics.h"
 #include "ovt/status.h"
+#include "ovt/syntax.h"    // IWYU pragma: export
+#include "ovt/validate.h"  // IWYU pragma: export
 #include "ovt/version.h"
 
 #endif /* OVT_OVT_H */

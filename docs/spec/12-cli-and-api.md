@@ -842,7 +842,7 @@ ovt render clip.hevc --frame 0 --overlays F4 --plane y --out mv_overlay.png
 | `ovt/jobs.h` | `ovt_Job` | |
 | `ovt/io.h` | `ovt_File` | |
 | `ovt/container.h` | `ovt_Container` | |
-| `ovt/syntax.h` | `ovt_syntax_*` stateless parsing / trace | |
+| `ovt/syntax.h` | `ovt_syntax_*` stateless parsing / trace; `ovt_fb_to_json`, `ovt_json_to_fb` (§12.3.8; the two JSON functions landed first, #674) | |
 | `ovt/index.h` | `ovt_Stream` | |
 | `ovt/validate.h` | `ovt_validate_frame_analysis`, `ovt_validate_stream_index` (chapter 06 §6.9 rules) | |
 | `ovt/hrd.h` | `ovt_HrdOptions`, `ovt_index_hrd_trace` (chapter 07 §7.4.8) | |
@@ -993,8 +993,10 @@ ovt_status ovt_syntax_parse_unit(uint8_t codec /*ovt.fb.Codec*/, const uint8_t* 
                                  ovt_Buffer* out /* SyntaxNode */);
 ovt_status ovt_syntax_trace(const uint8_t* syntax_node_fb, size_t len, ovt_Buffer* out_text);   /* §12.2.3.1 text */
 ovt_status ovt_syntax_to_json(const uint8_t* fb, size_t len, const char* root_type /*"SyntaxNode","StreamIndex",...*/, int pretty, ovt_Buffer* out_text);
-ovt_status ovt_fb_to_json(const uint8_t* fb, size_t len, const char* root_type, int pretty, ovt_Buffer* out_text);        /* generic: any root table */
-ovt_status ovt_json_to_fb(const char* json, const char* root_type, ovt_Buffer* out_fb);
+ovt_status ovt_fb_to_json(const uint8_t* fb, size_t len, const char* root_type, int pretty, ovt_Buffer* out_text);        /* generic: any root table; RFC 8259 text (strict numbers), NUL past out_text.size */
+ovt_status ovt_json_to_fb(const char* json, const char* root_type, ovt_Buffer* out_fb);                                     /* canonical buffer of chapter 06 §6.8.1 from_json; identifier only for the schema's own root type */
+/* root_type of the two JSON functions is a table of ovt_model.fbs, ovt_container.fbs or ovt_metrics.fbs (looked up in that order), with or
+   without the "ovt.fb." prefix; unknown = OVT_E_INVALID_ARG, a buffer or text the helper rejects = OVT_E_CORRUPT (#674). */
 
 typedef struct ovt_Stream ovt_Stream;
 ovt_status ovt_stream_open(ovt_Container*, int track_index, ovt_Stream** out);
@@ -1015,7 +1017,11 @@ ovt_status ovt_stream_min_cvs_units(ovt_Stream*, int decode_index, int with_sei,
 void       ovt_stream_close(ovt_Stream*);
 
 /* ovt/validate.h — chapter 06 §6.9 rules (WI-0.086 implements; this is the exported signature). Violations come back as a
-   DiagnosticList with code "MDL-VAL-0nnn" (message begins with "V-nnn"; severity per rule), path in FlatBuffers locator syntax ("grid.qp[1234]"). */
+   DiagnosticList (ovt_model.fbs, identifier "OVTD", chapter 06 §6.1.1; not size-prefixed) with code "MDL-VAL-0nnn" (message
+   begins with "V-nnn: " and ends with " (at <path>)" when the rule names a location, path in FlatBuffers locator syntax
+   ("grid.qp[1234]"); severity per rule; spec_ref "chapter 06 §6.9"). The status says whether the call could run: OVT_OK also
+   when violations were found (an empty list = valid; a buffer the verifier rejects is V-001 in the list), OVT_E_INVALID_ARG for
+   a NULL fb or out or a codec_override outside -1..ovt.fb.Codec (#674). */
 ovt_status ovt_validate_frame_analysis(const uint8_t* fb, size_t len, const uint8_t* expected_source_hash /*nullable, 32 bytes*/, int codec_override /*-1 none, else ovt.fb.Codec*/, ovt_Buffer* out /* DiagnosticList */);
 ovt_status ovt_validate_stream_index(const uint8_t* fb, size_t len, ovt_Buffer* out /* DiagnosticList */);
 
