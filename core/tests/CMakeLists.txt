@@ -53,6 +53,19 @@ target_link_libraries(ovt_tests_result PRIVATE ovt_core_objects ovt::flags ${Cat
 ovt_set_license(ovt_tests_result "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_result)
 
+# Test discovery itself: names with ";" or an unbalanced "[" or "]" must reach ctest (cmake/OvtCatchAddTests.cmake).
+add_executable(ovt_tests_catch_discovery test_catch_discovery.cpp)
+target_link_libraries(ovt_tests_catch_discovery PRIVATE ovt::flags ${Catch2_TARGET})
+ovt_set_license(ovt_tests_catch_discovery "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_catch_discovery)
+add_test(
+  NAME catch_discovery_registers_every_test_case
+  COMMAND
+    "${CMAKE_COMMAND}" -D "TEST_EXECUTABLE=$<TARGET_FILE:ovt_tests_catch_discovery>" -D
+    "SCRIPT=${PROJECT_SOURCE_DIR}/cmake/OvtCatchAddTests.cmake" -D "WORK=${CMAKE_CURRENT_BINARY_DIR}" -P
+    "${CMAKE_CURRENT_SOURCE_DIR}/check_catch_discovery.cmake")
+set_tests_properties(catch_discovery_registers_every_test_case PROPERTIES LABELS "fast;unit")
+
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
 add_subdirectory(analysis)
@@ -62,6 +75,7 @@ add_subdirectory(container)
 add_subdirectory(demux) # WI-1.230: the libavformat Demuxer; WI-1.231: the unit splitter
 add_subdirectory(fuzz) # WI-0.557: libFuzzer targets and their replay tests
 add_subdirectory(golden) # WI-0.093: hand-built FrameAnalysis fixtures and their generator
+add_subdirectory(index) # WI-1.119: AV1 reference slot model and frame boundaries
 add_subdirectory(jobs)
 add_subdirectory(log)
 add_subdirectory(metrics)
