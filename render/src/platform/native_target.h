@@ -35,6 +35,10 @@ class NativeOutput {
   // Applies the properties of `encoding` that must be in place before the first present of a swapchain (§10.4.1:
   // EDR flag, pixel format, colour space, EDR metadata) and the drawable size in device pixels.
   virtual void configure(DisplayTarget::OutputEncoding encoding, int width, int height) = 0;
+  // The static HDR metadata handed to the swapchain with its colour space hint (§10.3.6; swapchain_hint() below:
+  // empty unless the encoding is Pq10 or Hlg10). Called after every hint, on init and when the source changes;
+  // macOS keeps it for CAEDRMetadata.hdr10 of the "System PQ pass-through" mode (§10.4.1).
+  virtual void set_content_metadata(const struct pl_hdr_metadata& hdr) = 0;
   // The display's current EDR headroom from the platform's latest poll (§10.4.1), or 0 when it reports none.
   [[nodiscard]] virtual float polled_headroom() const = 0;
 };
@@ -80,6 +84,28 @@ OVT_RENDER_API NativeChoice choose_native_encoding(const DisplayTarget& target,
 // pair (BT.2020 for the ScRgbLinear16F pair above).
 OVT_RENDER_API struct pl_color_space native_target_color(const DisplayTarget& target,
                                                          DisplayTarget::OutputEncoding encoding);
+
+// §10.3.6 (WI-1.411): the pl_swapchain_colorspace_hint() of a NATIVE swapchain. `base` is the hint of the chosen
+// encoding (NativeChoice::hint: primaries and transfer of its pair). For Pq10 and Hlg10 its hdr block becomes the
+// content's static metadata from `content` (the uploaded picture's pl_color_space.hdr: MDCV primaries, white point
+// and min/max luminance, MaxCLL, MaxFALL); dynamic HDR10+ fields are not copied (a swapchain carries static metadata
+// only). For Srgb8 and ScRgbLinear16F (libplacebo tone-maps to the display itself) the hdr block stays empty.
+OVT_RENDER_API struct pl_color_space swapchain_hint(const struct pl_color_space& base,
+                                                    DisplayTarget::OutputEncoding encoding,
+                                                    const struct pl_hdr_metadata& content);
+
+// The hint is advisory: a description of how the swapchain's colour space after the next pl_swapchain_start_frame()
+// differs from `hinted` in primaries or transfer, or "" when it does not. A field the swapchain reports as unknown
+// does not differ (an SRGB_NONLINEAR swapchain reports BT.709 with an unknown SDR transfer).
+OVT_RENDER_API std::string hint_mismatch(const struct pl_color_space& hinted, const struct pl_color_space& actual);
+
+// The mastering luminance range of CAEDRMetadata.hdr10 (§10.4.1) for the hinted metadata: the MDCV range when the
+// content signals one (max_luma > 0), else 0.005 to 1000 nits, the HDR10 mastering range assumed without MDCV.
+struct Hdr10Range {
+  float min_nits = 0.005F;
+  float max_nits = 1000.0F;
+};
+OVT_RENDER_API Hdr10Range edr_hdr10_range(const struct pl_hdr_metadata& hdr);
 
 // §10.4.1: a polled headroom differing from the current one by more than 5 % triggers retarget().
 OVT_RENDER_API bool headroom_changed(float current, float polled);

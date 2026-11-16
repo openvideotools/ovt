@@ -90,6 +90,9 @@ X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "Q
 X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
 X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
+// WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
+X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
+
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
@@ -98,6 +101,8 @@ X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (fra
 
 // WI-1.229 (raw YUV opening, §8.6.6).
 X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole frame (ignored)", "")
+X(CNT_RAW_0002, "CNT-RAW-0002", Error,
+  "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
@@ -117,6 +122,29 @@ X(CNT_DASH_0007, "CNT-DASH-0007", Warning, "invalid attribute value `v` ignored"
 X(CNT_DASH_0008, "CNT-DASH-0008", Warning, "SegmentList `SegmentURL` count differs from its SegmentTimeline",
   "23009-1 §5.3.9.3")
 X(CNT_DASH_0009, "CNT-DASH-0009", Fatal, "not a well-formed MPD (XML error or no `MPD` root element)", "23009-1 §5.3.1")
+
+// WI-4.209 (HLS M3U8 parser, §8.10). SPEC-ASSUMPTION(#416): §8.5 has no HLS family (OI-16 defers the manifest-level
+// cross-checks); CNT-HLS-0001..0010 are the proposed parse-level rows.
+X(CNT_HLS_0001, "CNT-HLS-0001", Fatal, "not an HLS playlist (first line is not `#EXTM3U`)", "RFC 8216 §4.3.1.1")
+X(CNT_HLS_0002, "CNT-HLS-0002", Warning, "malformed attribute list in `tag`; the bad items are ignored",
+  "RFC 8216 §4.2")
+X(CNT_HLS_0003, "CNT-HLS-0003", Warning, "invalid attribute or tag value `v` ignored", "RFC 8216 §4.2")
+X(CNT_HLS_0004, "CNT-HLS-0004", Warning,
+  "`#EXT-X-BYTERANGE` without `@offset` does not follow a sub-range of the same resource; offset 0 assumed",
+  "RFC 8216 §4.3.2.2")
+X(CNT_HLS_0005, "CNT-HLS-0005", Warning, "oversized playlist cannot be fully expanded (segment cap)",
+  "RFC 8216 §4.3.2")
+X(CNT_HLS_0006, "CNT-HLS-0006", Warning,
+  "URI line without its `#EXTINF` / `#EXT-X-STREAM-INF`, or a tag without its URI line",
+  "RFC 8216 §4.3.2.1, §4.3.4.2")
+X(CNT_HLS_0007, "CNT-HLS-0007", Info, "no `#EXT-X-ENDLIST`: live playlist snapshotted as written",
+  "RFC 8216 §4.3.3.4")
+X(CNT_HLS_0008, "CNT-HLS-0008", Info, "encrypted segments (`METHOD`) are listed, never decrypted",
+  "RFC 8216 §4.3.2.4")
+X(CNT_HLS_0009, "CNT-HLS-0009", Warning, "playlist mixes master and media tags; treated as a master playlist",
+  "RFC 8216 §4.3.4")
+X(CNT_HLS_0010, "CNT-HLS-0010", Warning, "`#EXTINF` duration rounds above `#EXT-X-TARGETDURATION`",
+  "RFC 8216 §4.3.3.1")
 
 // WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
 X(CNT_9001, "CNT-9001", Error,
