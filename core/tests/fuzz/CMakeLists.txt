@@ -76,6 +76,8 @@ ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
 ovt_add_fuzz_target(h265_slice fuzz_h265_slice.cpp)
 # WI-1.114: the H.265 SEI framing and payload parsers.
 ovt_add_fuzz_target(h265_sei fuzz_h265_sei.cpp)
+# WI-1.112 follow-up: the H.265 AUD, end of sequence / bitstream and filler data parsers (byte 0 selects the parser).
+ovt_add_fuzz_target(h265_aud fuzz_h265_aud.cpp)
 # WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
 ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
