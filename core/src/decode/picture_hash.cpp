@@ -246,7 +246,7 @@ std::uint32_t plane_checksum(const ovt::model::PlaneView& plane) {
   std::uint32_t sum = 0;
   for_each_picture_byte(plane, [&sum](std::uint8_t b, std::uint32_t x, std::uint32_t y) {
     const std::uint32_t xor_mask = (x & 0xFFU) ^ (y & 0xFFU) ^ (x >> 8U) ^ (y >> 8U);
-    sum += (static_cast<std::uint32_t>(b) ^ xor_mask) & 0xFFU;
+    sum += static_cast<std::uint32_t>(b) ^ xor_mask;  // D.3.19: no masking of the sum term
   });
   return sum;
 }
