@@ -47,7 +47,7 @@ if(Python3_Interpreter_FOUND)
                                            --check)
   set_tests_properties(registry_gen_check PROPERTIES LABELS "registry;tools")
   # WI-4.200: the committed EBML table matches a fresh generator run. The inputs are committed, so it needs no network.
-  add_test(NAME ebml_schema_gen_check COMMAND "${Python3_EXECUTABLE}" -I "${PROJECT_SOURCE_DIR}/tools/gen_ebml_schema.py"
-                                              --check)
+  add_test(NAME ebml_schema_gen_check COMMAND "${Python3_EXECUTABLE}" -I
+                                              "${PROJECT_SOURCE_DIR}/tools/gen_ebml_schema.py" --check)
   set_tests_properties(ebml_schema_gen_check PROPERTIES LABELS "registry;tools;fast")
 endif()

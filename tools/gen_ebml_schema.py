@@ -133,7 +133,7 @@ def build_table(inputs: Path) -> list[Element]:
                     raise InputError(f"id 0x{e.id:X} is {by_id[e.id].name} in one file and {e.name} in another")
                 continue  # the same element restated as a constraint: the first (header) definition stays
             by_id[e.id] = e
-    names = {}
+    names: dict[str, int] = {}
     for e in by_id.values():
         if e.path in names:
             raise InputError(f"path {e.path} is defined by 0x{names[e.path]:X} and 0x{e.id:X}")
