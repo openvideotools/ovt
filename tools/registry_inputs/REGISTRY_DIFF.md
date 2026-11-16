@@ -5,7 +5,7 @@
 Chapter 08 §8.2.10 step 6. Regenerated with the registry; CI fails when the error list is not empty.
 A space in a fourcc is written `$20`.
 
-Registry rows: 612; fourccs: 584.
+Registry rows: 614; fourccs: 586.
 
 ## In MP4RA but in no conformance JSON or extra entry (generic shell only)
 

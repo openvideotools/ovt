@@ -46,6 +46,11 @@ if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/de265/CMakeLists.txt")
   add_subdirectory(de265)
 endif()
 
+# WI-1.415: bench_render_video needs libovt_render (OVT_BUILD_RENDER).
+if(TARGET ovt_render)
+  add_subdirectory(render)
+endif()
+
 # The harness itself, end to end: run the smoke benchmark through tools/perf_run.py with short timings and read the
 # result back with tools/perf_compare.py (hardware id `harness-test`: no budget column, no baseline). Needs
 # Python only, so it also runs where no reference hardware exists.

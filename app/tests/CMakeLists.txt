@@ -29,6 +29,8 @@ add_executable(
   models/test_dock_model.cpp
   models/test_bookmarks_model.cpp
   models/test_sample_streams.cpp
+  models/test_picture_controller.cpp
+  ../src/picture_controller.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
   ../src/goto_parser.cpp

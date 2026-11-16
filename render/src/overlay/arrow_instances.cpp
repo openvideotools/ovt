@@ -147,46 +147,62 @@ Cls class_of(const ovt::fb::MotionVector& mv) {
   return bi ? kL0Bi : kL0Uni;
 }
 
-// Segment sizes and, per chunk, where the chunk's instances of each segment start (stable: chunk order = mvs order).
-using ChunkCounts = std::array<std::array<size_t, 4>, kChunks>;
-ChunkCounts chunk_starts(const ChunkCounts& counts, std::array<size_t, 4>& total) {
-  total = {};
-  for (const auto& c : counts) {
+// Where the instances of [begin, end) go: the segment starts plus the instances of each class before `begin`. Chunk
+// boundaries (multiples of `step`) have their prefix precomputed; any other `begin` counts from the boundary below,
+// so a callback is idempotent whatever ranges parallel_ranges hands out (including its inline redo after a throw).
+class ScatterPlan {
+ public:
+  ScatterPlan(const std::vector<uint8_t>& cls, size_t step) : cls_(&cls), step_(step) {
+    std::array<size_t, 4> run{};
+    for (size_t i = 0; i < cls.size(); ++i) {
+      if (i % step == 0) {
+        boundary_.push_back(run);
+      }
+      if (cls[i] != kSkip) {
+        ++run.at(cls[i]);
+      }
+    }
+    total_ = run;
+    size_t at = 0;
     for (size_t k = 0; k < 4; ++k) {
-      total.at(k) += c.at(k);
+      seg_start_.at(k) = at;
+      at += run.at(k);
     }
   }
-  ChunkCounts start{};
-  size_t seg_begin = 0;
-  for (size_t k = 0; k < 4; ++k) {
-    size_t at = seg_begin;
-    for (size_t ch = 0; ch < kChunks; ++ch) {
-      start.at(ch).at(k) = at;
-      at += counts.at(ch).at(k);
+  [[nodiscard]] const std::array<size_t, 4>& total() const { return total_; }
+  [[nodiscard]] std::array<size_t, 4> start_of(size_t begin) const {
+    const size_t b = begin / step_;
+    std::array<size_t, 4> pos = boundary_.at(b);
+    for (size_t i = b * step_; i < begin; ++i) {
+      if ((*cls_)[i] != kSkip) {
+        ++pos.at((*cls_)[i]);
+      }
     }
-    seg_begin += total.at(k);
+    for (size_t k = 0; k < 4; ++k) {
+      pos.at(k) += seg_start_.at(k);
+    }
+    return pos;
   }
-  return start;
-}
+
+ private:
+  const std::vector<uint8_t>* cls_;
+  size_t step_;
+  std::vector<std::array<size_t, 4>> boundary_;
+  std::array<size_t, 4> total_{};
+  std::array<size_t, 4> seg_start_{};
+};
 
 void build_mvs(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::MotionVector>>& mvs, float scale,
                ArrowInstances& out, std::vector<std::string>& diag) {
   const size_t n = mvs.size();
   std::vector<uint8_t> cls(n);
-  const size_t step = std::max<size_t>(1, (n + kChunks - 1) / kChunks);
-  // counts[chunk][class]; parallel_ranges runs chunk k on [k * step, (k + 1) * step) or everything as chunk 0.
-  ChunkCounts counts{};
   parallel_ranges(n, kChunks, [&](size_t begin, size_t end) {
-    auto& cnt = counts.at(std::min<size_t>(begin / step, kChunks - 1));
     for (size_t i = begin; i < end; ++i) {
       cls[i] = class_of(*mvs.Get(static_cast<flatbuffers::uoffset_t>(i)));
-      if (cls[i] != kSkip) {
-        ++cnt.at(cls[i]);
-      }
     }
   });
-  std::array<size_t, 4> total{};
-  const ChunkCounts start = chunk_starts(counts, total);
+  const ScatterPlan plan(cls, std::max<size_t>(1, (n + kChunks - 1) / kChunks));
+  const std::array<size_t, 4>& total = plan.total();
   const size_t drawn = total[0] + total[1] + total[2] + total[3];
   if (drawn < n) {
     diag.push_back(std::to_string(n - drawn) + " MotionVector(s) without rect or with list > 1 not drawn");
@@ -198,7 +214,7 @@ void build_mvs(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::MotionVect
   out.geom.resize(drawn * 4);
   out.attr.resize(drawn * 4);
   parallel_ranges(n, kChunks, [&](size_t begin, size_t end) {
-    auto pos = start.at(std::min<size_t>(begin / step, kChunks - 1));
+    auto pos = plan.start_of(begin);
     for (size_t i = begin; i < end; ++i) {
       if (cls[i] == kSkip) {
         continue;
@@ -206,6 +222,13 @@ void build_mvs(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::MotionVect
       put_mv(out, pos.at(cls[i])++, *mvs.Get(static_cast<flatbuffers::uoffset_t>(i)), scale, static_cast<uint32_t>(i));
     }
   });
+  // §10.5.4 / §10.10: field MVs are drawn unchanged, with one RND-0060 note per build.
+  for (size_t i = 0; i < drawn; ++i) {
+    if (((out.attr[i * 4] >> 8U) & kInstField) != 0) {
+      diag.emplace_back("RND-0060 field motion vectors drawn in field units (vertical component approximate)");
+      break;
+    }
+  }
 }
 
 struct Region {

@@ -795,10 +795,10 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Depends on:** WI-1.405 (`PictureHost`), WI-1.452.
 **Produces:** `app/qml/panels/PicturePanel.qml`, `app/src/picture_controller.{h,cpp}` (ViewState ownership, input → ViewState/Selection), tests `tst_picture.qml`.
 **Interface:** `ViewState`; gesture table §11.4.4.
-**Steps:** 1. Playback decoder job per frame change (HW first). 2. Zoom/pan math and clamping. 3. Plane selector + stage combo. 4. Probe hover/pin. 5. Selection rect. 6. Status bar read-out.
+**Steps:** 1. Frame-change hook: `PictureController` emits `frameWanted(decode_index, display_index)` when `Selection`'s frame changes and `PictureController::setPicture()` / `PictureHost::set_picture()` take the result; WI-2.171 connects its playback decoder job (HW first) to that signal (issue #650). 2. Zoom/pan math and clamping. 3. Plane selector + stage combo. 4. Probe hover/pin. 5. Selection rect. 6. Status bar read-out.
 **Acceptance tests:** 1. Given a frame at zoom 1, When the wheel turns at device (400,300) so zoom becomes 2, Then the image point under the cursor is unchanged (`pick()` before/after equal). 2. Given a frame shown, When the picture is `Ctrl+click`ed, Then `Selection.probe` is set and the crosshair drawn (screenshot). 3. Given the Picture focused, When keys `1`–`5` are pressed, Then `ViewState.plane_mode` reads 0–4.
 **Size:** L.
-**Notes / pitfalls:** one `render()` per vsync — coalesce wheel events; the wheel notch is `angleDelta == 120` (§11.4.4).
+**Notes / pitfalls:** one `render()` per vsync — coalesce wheel events; the wheel notch is `angleDelta == 120` (§11.4.4). Interim until WI-2.436 lands (issue #650): the panel draws the probe crosshair (1 px `#FF4136`) and the selection rectangle (1 px `#39CCCC`, fill alpha `0x33`; the §10.5.2 row 17–18 colours) as thin Qt Quick items over the `PictureHost`, marked `SPEC-ASSUMPTION(#650)`; WI-2.436 removes them and passes `OverlayConfig.probe_x/y` / `selection_rect` instead. This is a temporary, narrow exception to FR-GUI-030 for two interaction markers; video and block overlays stay in the renderer. Until `VideoSurface::pick()` exists (WI-2.435) the status-bar read-out uses the CPU copy of the shown frame (`PictureHost::codeValues`). Acceptance tests 1–3 run with picture geometry given directly, without decoded frames.
 
 ### WI-1.457 — Syntax tree panel
 **Goal:** §11.3.4.

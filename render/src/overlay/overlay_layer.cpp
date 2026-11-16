@@ -9,6 +9,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -77,6 +78,7 @@ pl_tex make_texture(pl_gpu gpu, const char* fmt_name, int w, int h, const void* 
 
 OverlayLayerGpu::~OverlayLayerGpu() {
   drop_set();
+  arrows_.destroy(gpu_);
   passes_.destroy(gpu_);
   lines_.destroy(gpu_);
   pl_tex_destroy(gpu_, &layer_);
@@ -90,6 +92,8 @@ void OverlayLayerGpu::drop_set() {
   pl_tex_destroy(gpu_, &attr_);
   pl_tex_destroy(gpu_, &heat_);
   pl_tex_destroy(gpu_, &heat_valid_);
+  std::string ignored;
+  arrows_.set(gpu_, nullptr, 0, ignored);
   cells_w_ = 0;
   cells_h_ = 0;
   cfg_ = OverlayConfig{};
@@ -160,6 +164,12 @@ bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
       return false;
     }
   }
+  // WI-2.434: arrow and stroke instances; above the R-8K-1 cell count only the viewport's share is uploaded (draw()).
+  const bool culled = cells > kCulledBuildCells;
+  if (!arrows_.set(gpu_, &set->arrows, culled ? 0 : std::numeric_limits<uint64_t>::max(), err)) {
+    drop_set();
+    return false;
+  }
   cells_w_ = set->cells_w;
   cells_h_ = set->cells_h;
   return true;
@@ -203,7 +213,8 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
     }
     lines = !grid_cache_.lines().vertices.empty();
   }
-  if (!heatmap && !fill && !hatch && !lines) {
+  const bool arrows = arrows_.has_work(layers);
+  if (!heatmap && !fill && !hatch && !lines && !arrows) {
     return false;
   }
   if (!ensure_layer(w, h, err)) {
@@ -246,6 +257,20 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
     lc.zoom = pc.zoom;
     lc.line_scale = std::max(cfg_.line_px, 0.0F) * pc.dpr;
     if (!lines_.run(gpu_, layer_, palette_, lc, err)) {
+      return false;
+    }
+  }
+  // 8 intra direction strokes, 9 MV arrows (L1, L0, bi).
+  if (arrows) {
+    ArrowPassConstants apc;
+    apc.viewport_half = pc.viewport_half;
+    apc.pan = pc.pan;
+    apc.clip = pc.clip;
+    apc.zoom = pc.zoom;
+    apc.dpr = pc.dpr;
+    apc.min_px = cfg_.mv_min_px;
+    if (!arrows_.draw_intra(gpu_, layer_, palette_, layers, apc, err) ||
+        !arrows_.draw_mvs(gpu_, layer_, palette_, layers, apc, err)) {
       return false;
     }
   }
