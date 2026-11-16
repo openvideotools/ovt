@@ -580,7 +580,8 @@ QString DisplayCapsModel::status_text() const {
     return QStringLiteral("PQ pass-through");
   }
   if (info_.hdr_capable) {
-    return QStringLiteral("HDR headroom %1×").arg(std::max(info_.headroom, info_.potential_headroom), 0, 'f', 1);
+    return QStringLiteral("HDR headroom %1×")
+        .arg(static_cast<double>(std::max(info_.headroom, info_.potential_headroom)), 0, 'f', 1);
   }
   return QStringLiteral("SDR");
 }
