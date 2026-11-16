@@ -16,6 +16,7 @@
 #include <fmt/format.h>
 
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
@@ -184,15 +185,19 @@ int run(const Args& a) {
 
 }  // namespace
 
+// Nothing may escape main (bugprone-exception-escape): a bad --pictures value, a malformed golden or a stream error
+// ends the run with exit status 2 instead of std::terminate.
 int main(int argc, char** argv) {
-  const auto args = parse_args(std::span<char*>(argv, static_cast<size_t>(argc)));
-  if (!args) {
-    return usage("bad arguments");
-  }
   try {
+    const auto args = parse_args(std::span<char*>(argv, static_cast<size_t>(argc)));
+    if (!args) {
+      return usage("bad arguments");
+    }
     return run(*args);
   } catch (const std::exception& e) {
-    std::cerr << "ovt_syntax_golden_run: " << e.what() << "\n";
-    return 2;
+    (void)std::fprintf(stderr, "ovt_syntax_golden_run: %s\n", e.what());
+  } catch (...) {
+    (void)std::fputs("ovt_syntax_golden_run: unknown exception\n", stderr);
   }
+  return 2;
 }
