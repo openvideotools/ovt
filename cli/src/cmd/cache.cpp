@@ -4,8 +4,9 @@
 // `ovt cache` (chapter 12 §12.2.13, WI-1.509) over the cache C API of ovt/cache.h (§12.3.14).
 //
 // SPEC-ASSUMPTION(#673): (1) import goes through the RecordIo seam until the C API wrappers exist; (2) a
-// FrameAnalysis names its entry through --source-hash or its PlaneRef blob ids; (3) every `clear` needs --yes or
-// a TTY answer. (4) Library failures are reported as CLI-0009 diagnostics (no cache code is registered for the CLI).
+// FrameAnalysis names its entry through the envelope's input.source_hash or its PlaneRef blob ids (else exit 2); (3)
+// every `clear` needs --yes or a TTY answer. (4) Library failures are reported as CLI-0009 diagnostics (no cache code
+// is registered for the CLI).
 
 #include "cmd/cache.h"
 
@@ -393,10 +394,14 @@ CacheOutcome run_path(const Globals& g, std::FILE* out) {
 
 // ---- import ------------------------------------------------------------------------------------------------
 
+using Hash = std::array<std::uint8_t, 32>;
+std::optional<Hash> parse_hash(std::string_view hex);
+
 struct Record {
   RecordKind kind = RecordKind::FrameAnalysis;
   std::vector<std::uint8_t> fb;
   std::string origin;
+  std::optional<Hash> hint;  // input.source_hash of the CLI envelope the record came from
 };
 
 std::optional<std::vector<std::uint8_t>> read_file(const fs::path& p) {
@@ -465,7 +470,12 @@ ExitCode load_records(const fs::path& p, const RecordIo& io, std::vector<Record>
       return bad(ExitCode::Corrupt, "not valid JSON");
     }
     bool rewrite = false;
+    std::optional<Hash> hint;
     if (j.is_object() && j.contains("result") && j.contains("command") && j.contains("schema_version")) {
+      if (j.contains("input") && j["input"].is_object() && j["input"].contains("source_hash") &&
+          j["input"]["source_hash"].is_string()) {
+        hint = parse_hash(j["input"]["source_hash"].get<std::string>());
+      }
       j = j["result"];  // a CLI envelope: the result holds the record(s)
       rewrite = true;
     }
@@ -481,7 +491,7 @@ ExitCode load_records(const fs::path& p, const RecordIo& io, std::vector<Record>
       if (!kind) {
         return bad(ExitCode::Unsupported, "JSON is neither a FrameAnalysis nor a StreamIndex");
       }
-      Record r{*kind, {}, p.string()};
+      Record r{*kind, {}, p.string(), hint};
       std::string error;
       const ovt_status st = io.json_to_fb(rewrite ? item.dump() : text, *kind, r.fb, error);
       if (st != OVT_OK) {
@@ -501,8 +511,6 @@ ExitCode load_records(const fs::path& p, const RecordIo& io, std::vector<Record>
   }
   return bad(ExitCode::Unsupported, "not a recognised record (.json, .fa, .fa.zst, .index.fb)");
 }
-
-using Hash = std::array<std::uint8_t, 32>;
 
 std::optional<Hash> parse_hash(std::string_view hex) {
   if (hex.size() != 64) {
@@ -540,8 +548,10 @@ std::string to_hex_string(const Hash& h) {
   return s;
 }
 
-// The hash a record belongs to: StreamIndex.source_hash, else --source-hash, else the prefix of a PlaneRef blob id.
-std::optional<Hash> record_hash(const Record& r, const std::optional<Hash>& given, bool& conflict) {
+// The hash a record belongs to: StreamIndex.source_hash, else the envelope's input.source_hash, else the prefix
+// of a PlaneRef blob id.
+std::optional<Hash> record_hash(const Record& r, bool& conflict) {
+  const std::optional<Hash>& given = r.hint;
   conflict = false;
   if (r.kind == RecordKind::StreamIndex) {
     const auto* si = flatbuffers::GetRoot<ovt::fb::StreamIndex>(r.fb.data());
@@ -605,13 +615,6 @@ CacheOutcome run_import(const CacheArgs& a, const Globals& g, const CacheEnv& en
     o.usage = check_format(g, "import", false);
     return o;
   }
-  std::optional<Hash> given;
-  if (!a.source_hash.empty()) {
-    given = parse_hash(a.source_hash);
-    if (!given) {
-      return usage("CLI-0001", "--source-hash must be 64 hexadecimal digits", "ovt cache import");
-    }
-  }
   CacheOutcome o;
   if (env.io == nullptr || !env.io->available()) {
     o.code = ExitCode::Unsupported;
@@ -653,13 +656,17 @@ CacheOutcome run_import(const CacheArgs& a, const Globals& g, const CacheEnv& en
         continue;
       }
       bool conflict = false;
-      const auto hash = record_hash(r, given, conflict);
+      const auto hash = record_hash(r, conflict);
       if (conflict) {
-        return usage("CLI-0001", "--source-hash differs from the StreamIndex's source_hash", "ovt cache import");
+        return usage("CLI-0001", "the envelope's input.source_hash differs from the StreamIndex's source_hash",
+                     "ovt cache import");
       }
       if (!hash) {
-        return usage("CLI-0001", fmt::format("'{}' names no source; pass --source-hash <64 hex>", r.origin),
-                     "ovt cache import");
+        return usage(
+            "CLI-0001",
+            fmt::format("'{}' names no source (use the JSON of `ovt analyze -f json`, which carries input.source_hash)",
+                        r.origin),
+            "ovt cache import");
       }
       const std::size_t first = o.diagnostics.size();
       const ovt_status vs =
@@ -732,7 +739,6 @@ void add_cache_command(Cli& cli, CacheArgs& a) {
       "import",
       "Import .json exports, .fa/.fa.zst FrameAnalysis, .index.fb StreamIndex records or a directory of them");
   a.import->add_option("path", a.import_path, "File or directory to import")->required();
-  a.import->add_option("--source-hash", a.source_hash, "Source hash (64 hex) of a FrameAnalysis that names none");
   for (CLI::App* sub : {a.list, a.stats, a.clear, a.path, a.import}) {
     sub->fallthrough();
   }

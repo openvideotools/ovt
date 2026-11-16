@@ -39,7 +39,6 @@ struct CacheArgs {
   bool yes = false;
   double max_size_gib = 0;
   std::string import_path;
-  std::string source_hash;  // import: 64 hex
 };
 
 // Adds `cache` and its subcommands to cli.app().

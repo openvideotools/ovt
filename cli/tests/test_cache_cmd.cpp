@@ -151,6 +151,12 @@ std::string hash_hex(std::uint8_t b) {
   return s;
 }
 
+std::string envelope_json(int decode_index) {
+  return R"({"schema_version":1,"command":"analyze","input":{"path":"a.mp4","size_bytes":1,"source_hash":")" +
+         hash_hex(kHashByte) + R"("},"result":[{"frame":{"id":{"decode_index":)" + std::to_string(decode_index) +
+         R"(}}}],"diagnostics":[],"status":"OK"})";
+}
+
 }  // namespace
 
 TEST_CASE("cache list -f csv has one index row per indexed file (AT1)", "[fast][cli][cache]") {
@@ -240,10 +246,9 @@ TEST_CASE("cache import writes a validated FrameAnalysis (AT3 shape)", "[fast][c
   const TempDir d;
   const fs::path cache = d.path / "cache";
   const fs::path in = d.path / "tiny.json";
-  std::ofstream(in) << R"({"frame":{"id":{"decode_index":7}}})";
+  std::ofstream(in) << envelope_json(7);
   const auto io = fake_io(true);
-  const std::string hex = hash_hex(kHashByte);
-  const Result r = invoke({"cache", "import", in.string(), "--source-hash", hex, "--json"}, cache, &io);
+  const Result r = invoke({"cache", "import", in.string(), "--json"}, cache, &io);
   REQUIRE(r.code == 0);
   const auto j = nlohmann::json::parse(r.out);
   CHECK(j["command"] == "cache import");
@@ -268,30 +273,32 @@ TEST_CASE("cache import never writes a record that fails validation (exit 5)", "
   const TempDir d;
   const fs::path cache = d.path / "cache";
   const fs::path in = d.path / "tiny.json";
-  std::ofstream(in) << R"({"frame":{"id":{"decode_index":1}}})";
+  std::ofstream(in) << envelope_json(1);
   const auto io = fake_io(false);
-  const Result r = invoke({"cache", "import", in.string(), "--source-hash", hash_hex(kHashByte), "--json"}, cache, &io);
+  const Result r = invoke({"cache", "import", in.string(), "--json"}, cache, &io);
   CHECK(r.code == 5);
   CHECK(nlohmann::json::parse(r.out)["diagnostics"][0]["code"] == "MDL-VAL-0001");
   CHECK(nlohmann::json::parse(invoke({"cache", "stats", "--json"}, cache).out)["result"]["entries"].empty());
 }
 
-TEST_CASE("cache import needs a source for a FrameAnalysis, and takes a directory", "[fast][cli][cache]") {
+TEST_CASE("cache import takes the hash from the envelope; a bare record names none (exit 2); directories",
+          "[fast][cli][cache]") {
   const TempDir d;
   const fs::path cache = d.path / "cache";
   const fs::path dir = d.path / "records";
   fs::create_directories(dir);
-  std::ofstream(dir / "a.json") << R"({"frame":{"id":{"decode_index":1}}})";
+  std::ofstream(dir / "a.json") << envelope_json(1);
   std::ofstream(dir / "b.txt") << "junk";
   const auto io = fake_io(true);
-  const Result no_hash = invoke({"cache", "import", dir.string()}, cache, &io);
-  CHECK(no_hash.code == 2);
-  const Result ok =
-      invoke({"cache", "import", dir.string(), "--source-hash", hash_hex(kHashByte), "--json"}, cache, &io);
+  const Result ok = invoke({"cache", "import", dir.string(), "--json"}, cache, &io);
   CHECK(ok.code == 0);  // the unrecognised file is skipped with a warning
   CHECK(ok.out.find("Warning") != std::string::npos);
-  const Result bad_hash = invoke({"cache", "import", dir.string(), "--source-hash", "zz"}, cache, &io);
-  CHECK(bad_hash.code == 2);
+  CHECK(nlohmann::json::parse(ok.out)["result"]["entries"][0]["kind"] == "analysis");
+  std::ofstream(dir / "bare.json") << R"({"frame":{"id":{"decode_index":2}}})";
+  const Result bare = invoke({"cache", "import", dir.string()}, cache, &io);
+  CHECK(bare.code == 2);
+  CHECK(bare.err.find("names no source") != std::string::npos);
+  CHECK(invoke({"cache", "import", dir.string(), "--source-hash", "zz"}, cache, &io).code == 2);  // no such flag
 }
 
 TEST_CASE("cache is in the completion scripts", "[fast][cli][cache]") {
