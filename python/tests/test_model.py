@@ -18,10 +18,15 @@ import pytest
 
 zstandard = pytest.importorskip("zstandard")
 
-GOLDEN = Path(os.environ.get("OVT_GOLDEN_DIR", Path(__file__).resolve().parents[2] / "core" / "tests" / "golden"))
+GOLDEN = Path(
+    os.environ.get(
+        "OVT_GOLDEN_DIR",
+        Path(__file__).resolve().parents[2] / "core" / "tests" / "golden",
+    )
+)
 
-import ovt.fb.FrameAnalysis  # noqa: E402,F401  (acceptance test 1: the generated package imports)
-from ovt import model  # noqa: E402
+import ovt.fb.FrameAnalysis  # noqa: F401  (acceptance test 1: the generated package imports)
+from ovt import model
 
 
 def _fa(name: str):
@@ -116,7 +121,10 @@ def test_values_match_cxx_json_export():
         (frame.TimebaseNum(), j["frame"]["timebase_num"]),
         (frame.TimebaseDen(), j["frame"]["timebase_den"]),
         (frame.SizeBytes(), j["frame"]["size_bytes"]),
-        ((cs.X(), cs.Y(), cs.W(), cs.H()), tuple(j["frame"]["coded_size"][k] for k in "xywh")),
+        (
+            (cs.X(), cs.Y(), cs.W(), cs.H()),
+            tuple(j["frame"]["coded_size"][k] for k in "xywh"),
+        ),
         (grid.CellsW(), j["grid"]["cells_w"]),
         (grid.CellsH(), j["grid"]["cells_h"]),
         (fa.BlocksLength(), len(j["blocks"])),
@@ -127,14 +135,30 @@ def test_values_match_cxx_json_export():
     for got, want in checks:
         assert got == want
     g = model.grid_as_numpy(fa)
-    for name in ("block_id", "partition_id", "pred", "qp", "intra_mode_y", "ref0", "tx_type", "cbf", "bits_x8",
-                 "deblock_bs_v", "filter_idx"):
+    for name in (
+        "block_id",
+        "partition_id",
+        "pred",
+        "qp",
+        "intra_mode_y",
+        "ref0",
+        "tx_type",
+        "cbf",
+        "bits_x8",
+        "deblock_bs_v",
+        "filter_idx",
+    ):
         assert g[name].reshape(-1).tolist() == j["grid"][name], name
     for i, jb in enumerate(j["blocks"]):
         b = fa.Blocks(i)
         r = b.Rect()
         assert (b.Id(), b.Parent(), b.Level(), b.Qp(), b.BitsX8()) == (
-            jb["id"], jb["parent"], jb["level"], jb["qp"], jb["bits_x8"])
+            jb["id"],
+            jb["parent"],
+            jb["level"],
+            jb["qp"],
+            jb["bits_x8"],
+        )
         assert (r.X(), r.Y(), r.W(), r.H()) == tuple(jb["rect"][k] for k in "xywh")
         assert b.ChildrenLength() == len(jb.get("children", []))
 

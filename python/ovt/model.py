@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import struct
 from pathlib import Path
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -75,13 +75,15 @@ def _decompress(data: bytes) -> bytes:
     try:
         import zstandard
     except ImportError as exc:  # pragma: no cover - declared dependency
-        raise ImportError("reading .fa.zst files needs the 'zstandard' package") from exc
+        raise ImportError(
+            "reading .fa.zst files needs the 'zstandard' package"
+        ) from exc
     # Frames written by the C++ side carry the content size; fall back to streaming when they do not.
     with zstandard.ZstdDecompressor().stream_reader(data) as reader:
         return reader.read()
 
 
-def parse_frame_analysis(data: Union[bytes, bytearray, memoryview]) -> "FrameAnalysis":
+def parse_frame_analysis(data: bytes | bytearray | memoryview) -> FrameAnalysis:
     """Parse an in-memory FrameAnalysis buffer (plain or size-prefixed, identifier ``OVTA``).
 
     The returned object keeps ``data`` alive; NumPy views from :func:`grid_as_numpy` point into it.
@@ -100,13 +102,13 @@ def parse_frame_analysis(data: Union[bytes, bytearray, memoryview]) -> "FrameAna
     return FrameAnalysis.GetRootAs(buf, offset)
 
 
-def load_frame_analysis(path: Union[str, Path]) -> "FrameAnalysis":
+def load_frame_analysis(path: str | Path) -> FrameAnalysis:
     """Read a stored ``FrameAnalysis`` from ``*.fa`` or ``*.fa.zst`` (size-prefix and zstd are detected)."""
     raw = Path(path).read_bytes()
     return parse_frame_analysis(_decompress(raw))
 
 
-def grid_as_numpy(fa: "FrameAnalysis") -> dict[str, np.ndarray]:
+def grid_as_numpy(fa: FrameAnalysis) -> dict[str, np.ndarray]:
     """Return every ``CellGrid`` vector as an array of shape ``(cells_h, cells_w)``.
 
     Populated vectors are zero-copy, read-only views over the FlatBuffer (``*AsNumpy()`` accessors). A vector
@@ -125,7 +127,9 @@ def grid_as_numpy(fa: "FrameAnalysis") -> dict[str, np.ndarray]:
             continue
         arr = getattr(grid, accessor + "AsNumpy")()
         if arr.size != w * h:
-            raise ValueError(f"grid.{name} has {arr.size} entries, expected {w}x{h}={w * h}")
+            raise ValueError(
+                f"grid.{name} has {arr.size} entries, expected {w}x{h}={w * h}"
+            )
         out[name] = arr.reshape(h, w)
     return out
 
@@ -137,7 +141,7 @@ def mv_to_luma_samples(v):
     return v / MV_UNITS_PER_LUMA_SAMPLE
 
 
-def blocks_as_dataframe(fa: "FrameAnalysis"):
+def blocks_as_dataframe(fa: FrameAnalysis):
     """Return ``FrameAnalysis.blocks`` as a ``pandas.DataFrame`` (index = position in ``blocks[]``).
 
     Columns: ``id, parent, kind, x, y, w, h, level, partition_type, pred, skip, merge_or_direct, qp, bits_x8,
@@ -146,13 +150,19 @@ def blocks_as_dataframe(fa: "FrameAnalysis"):
     try:
         import pandas as pd
     except ImportError as exc:
-        raise ImportError("blocks_as_dataframe needs the optional 'pandas' package") from exc
+        raise ImportError(
+            "blocks_as_dataframe needs the optional 'pandas' package"
+        ) from exc
     from ovt.fb.BlockKind import BlockKind
     from ovt.fb.PredKind import PredKind
 
     def names(enum_cls) -> dict[int, str]:
         # flatc appends "_" to names that are Python keywords (`PredKind.None_`); the schema name has none.
-        return {v: k.rstrip("_") for k, v in vars(enum_cls).items() if isinstance(v, int) and not k.startswith("_")}
+        return {
+            v: k.rstrip("_")
+            for k, v in vars(enum_cls).items()
+            if isinstance(v, int) and not k.startswith("_")
+        }
 
     kinds, preds = names(BlockKind), names(PredKind)
     rows = []
