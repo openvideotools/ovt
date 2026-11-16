@@ -328,6 +328,28 @@ TEST_CASE("lazy: expand of an unknown offset is OVT_E_INVALID_ARG, of any other 
   CHECK(ovt_container_expand(o.container, moov_at + 8) == OVT_OK);  // mvhd inside moov
 }
 
+TEST_CASE("lazy: an expand that changes nothing keeps the tree buffer", "[container][isobmff][lazy][fast]") {
+  // Re-serialising the whole tree on a no-op expand made expanding every box quadratic (fuzz_isobmff_tree timeout).
+  const Bytes data = fragmented_file(70);  // more than 64 moofs: all header-only
+  Opened o(std::make_unique<ovt::io::MemoryFile>(data));
+  const auto offsets = moof_offsets(tree_of(o.container));
+  REQUIRE(offsets.size() == 70);
+  const ovt_Buffer before = ovt_container_tree(o.container);
+  REQUIRE(ovt_container_expand(o.container, 0) == OVT_OK);               // ftyp: complete
+  REQUIRE(ovt_container_expand(o.container, offsets[0] + 8) == OVT_OK);  // mfhd of a header-only moof
+  const ovt_Buffer same = ovt_container_tree(o.container);
+  CHECK(same.data == before.data);
+  CHECK(same.size == before.size);
+  REQUIRE(ovt_container_expand(o.container, offsets[69]) == OVT_OK);  // a deferred moof: a new, larger tree
+  const ovt_Buffer grown = ovt_container_tree(o.container);
+  CHECK(grown.size > before.size);
+  const auto* last = tree_of(o.container)->root()->Get(tree_of(o.container)->root()->size() - 2);  // last moof, mdat
+  REQUIRE(last->file_span()->offset() == offsets[69]);
+  CHECK(child(last, "traf") != nullptr);
+  REQUIRE(ovt_container_expand(o.container, offsets[69]) == OVT_OK);  // expanded already: no-op
+  CHECK(ovt_container_tree(o.container).data == grown.data);
+}
+
 TEST_CASE("lazy: a moof whose first child is not mfhd keeps no children until expanded",
           "[container][isobmff][lazy][fast]") {
   Bytes data = fragmented_file(65);
