@@ -751,7 +751,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
-  detail::Measurer measurer_;  // §10.7 (WI-4.452)
+  detail::Measurer measurer_;                             // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
