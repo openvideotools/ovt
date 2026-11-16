@@ -206,6 +206,16 @@ TEST_CASE("cache clear needs --yes or a terminal answer", "[fast][cli][cache]") 
   CHECK(invoke({"cache", "stats", "--json"}, d.path).out.find(hash_hex(kHashByte)) == std::string::npos);
 }
 
+TEST_CASE("a declined clear leaves the cache and its cap alone, even with --max-size", "[fast][cli][cache]") {
+  const TempDir d;
+  seed_index(d.path, kHashByte);
+  const Result no = invoke({"cache", "clear", "--max-size", "0.000001"}, d.path, nullptr, true, "n\n");
+  CHECK(no.code == 0);
+  const auto j = nlohmann::json::parse(invoke({"cache", "stats", "--json"}, d.path).out);
+  CHECK(j["result"]["entries"].size() == 1);
+  CHECK(j["result"]["max_bytes"] == 20ULL * 1073741824ULL);
+}
+
 TEST_CASE("cache clear --kind and --source", "[fast][cli][cache]") {
   const TempDir d;
   seed_index(d.path, kHashByte);
@@ -302,6 +312,24 @@ TEST_CASE("cache import takes the hash from the envelope; a bare record names no
   CHECK(bare.code == 2);
   CHECK(bare.err.find("names no source") != std::string::npos);
   CHECK(invoke({"cache", "import", dir.string(), "--source-hash", "zz"}, cache, &io).code == 2);  // no such flag
+}
+
+TEST_CASE("cache import rejects a FrameAnalysis without frame or id (exit 5)", "[fast][cli][cache]") {
+  const TempDir d;
+  const fs::path in = d.path / "bare.json";
+  std::ofstream(in) << R"({"schema_version":1,"command":"analyze","input":{"source_hash":")" + hash_hex(kHashByte) +
+                           R"("},"result":[{"frame":{"id":{"decode_index":-1}}}]})";
+  ovt::cli::cmd::RecordIo io = fake_io(true);
+  io.json_to_fb = [](std::string_view, RecordKind, std::vector<std::uint8_t>& fb, std::string&) {
+    flatbuffers::FlatBufferBuilder fbb;
+    fbb.Finish(ovt::fb::CreateFrameAnalysisDirect(fbb, 1, "fake", "1", 0), "OVTA");  // no frame table
+    const std::span<const std::uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+    fb.assign(bytes.begin(), bytes.end());
+    return OVT_OK;
+  };
+  const Result r = invoke({"cache", "import", in.string(), "--json"}, d.path / "c", &io);
+  CHECK(r.code == 5);
+  CHECK(nlohmann::json::parse(invoke({"cache", "stats", "--json"}, d.path / "c").out)["result"]["entries"].empty());
 }
 
 TEST_CASE("cache is in the completion scripts", "[fast][cli][cache]") {

@@ -354,12 +354,13 @@ CacheOutcome run_clear(const CacheArgs& a, const Globals& g, const CacheEnv& env
       static_cast<void>(std::fputs("nothing deleted\n", env.err));
     }
   }
-  if (a.clear->count("--max-size") > 0) {
-    if (const ovt_status st = apply_max_size(a.max_size_gib); st != OVT_OK) {
-      return fail(st, "cannot set the cache limit");
-    }
-  }
   if (go) {
+    // The cap is applied only when the clear goes ahead: opening the cache evicts down to it.
+    if (a.clear->count("--max-size") > 0) {
+      if (const ovt_status st = apply_max_size(a.max_size_gib); st != OVT_OK) {
+        return fail(st, "cannot set the cache limit");
+      }
+    }
     const ovt_status st = ovt_cache_clear(a.kind.empty() ? nullptr : a.kind.c_str(),
                                           a.source.empty() ? nullptr : a.source.c_str(), a.older_than_days);
     if (st != OVT_OK) {
@@ -591,8 +592,15 @@ std::optional<Hash> record_hash(const Record& r, bool& conflict) {
 
 bool verifies(const Record& r) {
   flatbuffers::Verifier v(r.fb.data(), r.fb.size());
-  return r.kind == RecordKind::FrameAnalysis ? ovt::fb::VerifyFrameAnalysisBuffer(v)
-                                             : v.VerifyBuffer<ovt::fb::StreamIndex>("OVTI");
+  if (r.kind == RecordKind::StreamIndex) {
+    return v.VerifyBuffer<ovt::fb::StreamIndex>("OVTI");
+  }
+  if (!ovt::fb::VerifyFrameAnalysisBuffer(v)) {
+    return false;
+  }
+  // store() keys the frame by frame.id.decode_index; both tables are optional in the schema.
+  const auto* fa = flatbuffers::GetRoot<ovt::fb::FrameAnalysis>(r.fb.data());
+  return fa->frame() != nullptr && fa->frame()->id() != nullptr && fa->frame()->id()->decode_index() >= 0;
 }
 
 ovt_status store(const Record& r, const Hash& h) {
