@@ -54,4 +54,6 @@ def test_repository_app_and_python_are_clean() -> None:
 
 
 def test_flag_is_a_usage_error() -> None:
-    assert subprocess.run([sys.executable, "-I", str(TOOL), "--bogus"], capture_output=True, check=False).returncode == 2
+    assert (
+        subprocess.run([sys.executable, "-I", str(TOOL), "--bogus"], capture_output=True, check=False).returncode == 2
+    )
