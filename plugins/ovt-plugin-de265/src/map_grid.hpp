@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 // The CellGrid half of the chapter 07 §7.6.2 mapping (WI-2.164): per-cell vectors read straight from libde265's
-// per-4x4 metadata, the reference slot table, and serialisation. The block-tree mapping (the next part of WI-2.164)
-// adds the fields that need the tree (block_id and the transform fields). Internal to the plugin.
+// per-4x4 metadata, the reference slot table, and serialisation. map_blocks.cpp adds the fields that need the block
+// tree (block_id and the transform fields). Internal to the plugin.
 #ifndef OVT_PLUGIN_DE265_MAP_GRID_HPP
 #define OVT_PLUGIN_DE265_MAP_GRID_HPP
 
@@ -34,11 +34,19 @@ constexpr uint8_t kPredPcm = 5;
 /// CellGrid.intra_mode_y for a PCM CU (chapter 06 §6.3.1).
 constexpr int16_t kIntraModePcm = 64;
 
-/// Quarter-sample vector -> 1/16 luma sample units (chapter 0 §0.1.9), saturated to int16: H.265 allows
-/// -2^15..2^15-1 quarter samples.
+/// Largest neutral MV component (chapter 06 §6.2.3): -32768 is the MVD sentinel, so the clamp is symmetric.
+constexpr int32_t kMvNeutralMax = 32767;
+
+/// Quarter-sample vector -> 1/16 luma sample units (chapter 0 §0.1.9), clamped to ±32767 (chapter 06 §6.2.3):
+/// H.265 allows -2^15..2^15-1 quarter samples, so ×4 can overflow `short`.
 inline int16_t mv16(int16_t quarter) {
-  return static_cast<int16_t>(std::clamp<int32_t>(int32_t{quarter} * 4, std::numeric_limits<int16_t>::min(),
-                                                  std::numeric_limits<int16_t>::max()));
+  return static_cast<int16_t>(std::clamp<int32_t>(int32_t{quarter} * 4, -kMvNeutralMax, kMvNeutralMax));
+}
+
+/// True when mv16(@p quarter) clamps (Diagnostic MDL-GEN-0003).
+inline bool mv16_clamps(int16_t quarter) {
+  const int32_t neutral = int32_t{quarter} * 4;
+  return neutral > kMvNeutralMax || neutral < -kMvNeutralMax;
 }
 
 /// The CellGrid vectors before serialisation, one value per cell.
@@ -62,6 +70,7 @@ struct GridCells {
   std::vector<uint8_t> deblock_bs_v;
   std::vector<uint8_t> deblock_bs_h;
   std::vector<uint8_t> filter_idx;
+  uint32_t mv_clamped_cells = 0;  // cells with a vector component clamped by mv16 (MDL-GEN-0003)
 };
 
 /// FrameAnalysis.refs of a picture (chapter 06 §6.3.1 "RefSlot.name"): "L0[i]" / "L1[i]" for the lists of the first
@@ -101,7 +110,7 @@ class RefTable {
 /// transform fields) and counts the reference usage in @p refs. @p d must have passed the size checks.
 void fill_cells(GridCells& g, const BlockData& d, const PictureFormat& fmt, RefTable& refs);
 
-/// Serialises @p g with every vector present.
+/// Serialises @p g; every vector of kGridFields is present.
 flatbuffers::Offset<ovt::fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb, uint32_t cells_w,
                                                   uint32_t cells_h, const GridCells& g);
 

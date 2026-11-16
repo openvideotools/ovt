@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8 ?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IFo n-demand-style static package (SegmentTemplate with
+     $RepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, two periods). Not ca copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.i’‰ž“–›Ðžash/.kg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT80S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="03">
+   B@ContentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                  ="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="85´" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentationID$/init.mp4"
+                         mecale="1000" startNumber="0" duration="0004"
+                         initialization="init-$Ba(ndwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

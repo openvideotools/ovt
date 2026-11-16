@@ -336,14 +336,17 @@ std::string recompose(const UriParts& p) {
 void append_padded(std::string& out, int64_t value, size_t width) {
   const bool negative = value < 0;
   const uint64_t magnitude = negative ? (~static_cast<uint64_t>(value) + 1U) : static_cast<uint64_t>(value);
-  const std::string digits = std::to_string(magnitude);
+  std::array<char, 24> digits{};
+  char* const first = digits.data();
+  char* const last = std::to_chars(first, std::next(first, static_cast<std::ptrdiff_t>(digits.size())), magnitude).ptr;
+  const auto count = static_cast<size_t>(std::distance(first, last));
   if (negative) {
     out += '-';
   }
-  if (digits.size() < width) {
-    out.append(width - digits.size(), '0');
+  if (count < width) {
+    out.append(width - count, '0');
   }
-  out += digits;
+  out.append(first, count);
 }
 
 // Width of a `%0Nd` format tag; nullopt when `fmt` is not one. An empty tag means width 1.
@@ -702,6 +705,102 @@ std::string resolve_segment(const SplitBase& base, std::string_view ref) {
   return resolve_against(base.parts, base.empty, ref);
 }
 
+// A media template parsed once per representation: literal text, each followed by at most one numeric field. The
+// segment loop then appends text and formats numbers without re-scanning the template (a million segments would
+// otherwise scan and tokenise it a million times). Built with the same grammar as expand_template_into.
+struct TemplatePiece {
+  enum class Field : uint8_t { None, Number, Bandwidth, Time };
+  std::string text;
+  Field field = Field::None;
+  size_t width = 1;
+};
+
+std::optional<std::vector<TemplatePiece>> compile_template(std::string_view tmpl, std::string_view representation_id) {
+  std::vector<TemplatePiece> pieces(1);
+  size_t i = 0;
+  while (i < tmpl.size()) {
+    const size_t dollar = tmpl.find('$', i);
+    if (dollar == std::string_view::npos) {
+      pieces.back().text.append(tmpl.substr(i));
+      break;
+    }
+    pieces.back().text.append(tmpl.substr(i, dollar - i));
+    const size_t close = tmpl.find('$', dollar + 1);
+    if (close == std::string_view::npos) {
+      return std::nullopt;
+    }
+    const std::string_view token = tmpl.substr(dollar + 1, close - dollar - 1);
+    i = close + 1;
+    if (token.empty()) {
+      pieces.back().text += '$';
+      continue;
+    }
+    const size_t pct = token.find('%');
+    const std::string_view name = token.substr(0, pct);
+    const std::string_view fmt = pct == std::string_view::npos ? std::string_view() : token.substr(pct);
+    if (name == "RepresentationID") {
+      if (!fmt.empty()) {
+        return std::nullopt;
+      }
+      pieces.back().text.append(representation_id);
+      continue;
+    }
+    TemplatePiece::Field field = TemplatePiece::Field::None;
+    if (name == "Number") {
+      field = TemplatePiece::Field::Number;
+    } else if (name == "Bandwidth") {
+      field = TemplatePiece::Field::Bandwidth;
+    } else if (name == "Time") {
+      field = TemplatePiece::Field::Time;
+    } else {
+      return std::nullopt;
+    }
+    const auto width = parse_format_tag(fmt);
+    if (!width) {
+      return std::nullopt;
+    }
+    pieces.back().field = field;
+    pieces.back().width = *width;
+    pieces.emplace_back();
+  }
+  return pieces;
+}
+
+void append_compiled(std::string& out, const std::vector<TemplatePiece>& pieces, const TemplateValues& values) {
+  for (const TemplatePiece& p : pieces) {
+    out.append(p.text);
+    switch (p.field) {
+      case TemplatePiece::Field::Number:
+        append_padded(out, values.number, p.width);
+        break;
+      case TemplatePiece::Field::Bandwidth:
+        append_padded(out, values.bandwidth, p.width);
+        break;
+      case TemplatePiece::Field::Time:
+        append_padded(out, values.time, p.width);
+        break;
+      case TemplatePiece::Field::None:
+        break;
+    }
+  }
+}
+
+// The compiled form of a valid media template whose expansion is a plain relative reference (see below), or nullopt
+// when the segments must go through segment_url(). The numeric fields only ever add digits and a minus sign, none of
+// which plain_relative() looks at, so one probe expansion decides it for every segment.
+std::optional<std::vector<TemplatePiece>> compile_plain_template(std::string_view tmpl,
+                                                                 std::string_view representation_id) {
+  auto compiled = compile_template(tmpl, representation_id);
+  if (compiled) {
+    std::string probe;
+    append_compiled(probe, *compiled, TemplateValues{representation_id, 0, 0, 0});
+    if (!plain_relative(probe)) {
+      return std::nullopt;
+    }
+  }
+  return compiled;
+}
+
 // Whether a template expands at all. Validity depends only on the identifiers and format tags, never on the values,
 // so a media template is checked (and an invalid one reported) once per representation, not once per segment.
 bool template_valid(std::string_view tmpl) {
@@ -756,12 +855,46 @@ Segment init_from_element(Context& ctx, const pugi::xml_node& init, const std::s
   return seg;
 }
 
+// Spends the budget for `entries` and appends one media segment per entry, expanding `media` for each.
+void append_template_segments(Context& ctx, Representation& rep, const std::vector<TimelineEntry>& entries,
+                              const SplitBase& base, std::string_view media, TemplateValues values,
+                              const pugi::xml_node& at) {
+  spend(ctx, entries.size());
+  rep.segments.reserve(rep.segments.size() + entries.size());
+  // An invalid media template is used as written for every segment: report it once and resolve it once.
+  std::optional<std::string> as_written;
+  if (!entries.empty() && !template_valid(media)) {
+    as_written = segment_url(ctx, base, media, values, at);
+  }
+  std::optional<std::vector<TemplatePiece>> compiled;
+  if (!as_written && !entries.empty() && !base.empty) {
+    compiled = compile_plain_template(media, rep.id);
+  }
+  std::string scratch;
+  for (const TimelineEntry& e : entries) {
+    values.number = e.number;
+    values.time = e.time;
+    Segment seg;
+    if (compiled) {
+      scratch.assign(base.dir_prefix);
+      append_compiled(scratch, *compiled, values);
+      seg.url = scratch;  // exact-size copy; the scratch buffer is reused
+    } else {
+      seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, at);
+    }
+    seg.start_time = e.time;
+    seg.duration = e.duration;
+    seg.number = e.number;
+    rep.segments.push_back(std::move(seg));
+  }
+}
+
 void expand_template_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,
                               int64_t period_duration_ms) {
   const Chain& chain = info.template_chain;
   const Timing t = read_timing(ctx, chain, period_duration_ms);
   rep.timescale = t.timescale;
-  TemplateValues values{rep.id, 0, rep.bandwidth, 0};
+  const TemplateValues values{rep.id, 0, rep.bandwidth, 0};
   const SplitBase base(rep_base);
 
   if (const char* init = chain_attr(chain, "initialization")) {
@@ -811,23 +944,7 @@ void expand_template_segments(Context& ctx, Representation& rep, const SegmentIn
     }
   }
 
-  spend(ctx, entries.size());
-  rep.segments.reserve(rep.segments.size() + entries.size());
-  // An invalid media template is used as written for every segment: report it once and resolve it once.
-  std::optional<std::string> as_written;
-  if (!entries.empty() && !template_valid(media)) {
-    as_written = segment_url(ctx, base, media, values, chain.front());
-  }
-  for (const TimelineEntry& e : entries) {
-    values.number = e.number;
-    values.time = e.time;
-    Segment seg;
-    seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, chain.front());
-    seg.start_time = e.time;
-    seg.duration = e.duration;
-    seg.number = e.number;
-    rep.segments.push_back(std::move(seg));
-  }
+  append_template_segments(ctx, rep, entries, base, media, values, chain.front());
 }
 
 void expand_list_segments(Context& ctx, Representation& rep, const SegmentInfo& info, const std::string& rep_base,

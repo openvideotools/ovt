@@ -45,6 +45,7 @@ ovt_add_fuzz_target(annexb_split fuzz_annexb_split.cpp)
 ovt_add_fuzz_target(bitreader fuzz_bitreader.cpp)
 ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / structural_diff
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
+ovt_add_fuzz_target(isobmff_box_decoders fuzz_isobmff_box_decoders.cpp) # WI-1.205: ISOBMFF hand box decoders
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
 ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
@@ -60,12 +61,20 @@ ovt_add_fuzz_target(cache_meta fuzz_cache_meta.cpp)
 # WI-1.230: the libavformat Demuxer over the custom AVIOContext (byte 0 picks the hint_format).
 ovt_add_fuzz_target(demuxer_open fuzz_demuxer_open.cpp)
 ovt_add_fuzz_target(yuview_csv fuzz_yuview_csv.cpp) # WI-0.089: the YUView CSV importer
+ovt_add_fuzz_target(json_export fuzz_json_export.cpp) # WI-0.088: the JSON exporter (untrusted stored records)
 # WI-1.116: the AV1 OBU header, sequence header, metadata, tile list, padding and temporal delimiter parsers.
 ovt_add_fuzz_target(syntax_av1 fuzz_syntax_av1.cpp)
+# WI-1.117: the AV1 uncompressed_header() sub-structure parsers (part a: frame size, tile_info); the selector byte
+# grows with parts b (quantization, segmentation, delta q / lf) and c (the whole header).
+ovt_add_fuzz_target(syntax_av1_frame_header fuzz_syntax_av1_frame_header.cpp)
+# WI-1.118: the uncompressed_header() rows 20–27 parsers (loop filter … film grain) and tile_group_obu(), in order.
+ovt_add_fuzz_target(syntax_av1_frame_header2 fuzz_syntax_av1_frame_header2.cpp)
 # WI-1.112: H.265 header parsers (the selector byte grows with each part of the work item).
 ovt_add_fuzz_target(h265_ps fuzz_h265_ps.cpp)
 # WI-1.113: H.265 slice_segment_header(), ref_pic_lists_modification(), pred_weight_table() and entry points.
 ovt_add_fuzz_target(h265_slice fuzz_h265_slice.cpp)
+# WI-1.114: the H.265 SEI framing and payload parsers.
+ovt_add_fuzz_target(h265_sei fuzz_h265_sei.cpp)
 # WI-3.300: the two JSON option parsers of the metrics module (chapter 14 §14.1.2 item 3).
 ovt_add_fuzz_target(normalization_config fuzz_normalization_config.cpp)
 ovt_add_fuzz_target(metrics_jobspec fuzz_metrics_jobspec.cpp)
@@ -74,6 +83,12 @@ ovt_add_fuzz_target(unit_split fuzz_unit_split.cpp)
 # WI-0.094: the FrameAnalysis and StreamIndex readers (Verifier + validator).
 ovt_add_fuzz_target(frame_analysis fuzz_frame_analysis.cpp)
 ovt_add_fuzz_target(stream_index fuzz_stream_index.cpp)
+# WI-1.108: H.264 NAL header, SPS and PPS parsers (byte 0 selects the mode).
+ovt_add_fuzz_target(h264_ps fuzz_h264_ps.cpp)
+# WI-1.109a/b: H.264 slice header, AUD, end of sequence / stream, filler data and data partitions.
+ovt_add_fuzz_target(h264_slice fuzz_h264_slice.cpp)
+# WI-1.110: the H.264 SEI framing and payload parsers.
+ovt_add_fuzz_target(h264_sei fuzz_h264_sei.cpp)
 
 # WI-2.583: push() of ovt-plugin-ffmpeg (chapter 14 §14.7.1). The source lives with the plugin; the target loads the built
 # plugin module from its output directory, so it follows the plugin's own option.
@@ -84,6 +99,19 @@ if(OVT_BUILD_PLUGIN_FFMPEG)
     if(TARGET ${_target})
       target_compile_definitions(${_target} PRIVATE "OVT_FFMPEG_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_ffmpeg>\"")
       add_dependencies(${_target} ovt_plugin_ffmpeg)
+    endif()
+  endforeach()
+endif()
+
+# WI-2.581: push() of ovt-plugin-aom (chapter 14 §14.7.1). Same shape as plugin_push_ffmpeg above; the plugin exists only
+# with the bundled libaom (OVT_SYSTEM_LIBAOM=OFF), so the target does too.
+if(OVT_BUILD_PLUGIN_AOM AND NOT OVT_SYSTEM_LIBAOM)
+  ovt_add_fuzz_target(plugin_push_aom
+                      "${PROJECT_SOURCE_DIR}/plugins/ovt-plugin-aom/tests/fuzz/fuzz_plugin_push_aom.cpp")
+  foreach(_target ovt_fuzz_plugin_push_aom_regress ovt_fuzz_plugin_push_aom)
+    if(TARGET ${_target})
+      target_compile_definitions(${_target} PRIVATE "OVT_AOM_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_aom>\"")
+      add_dependencies(${_target} ovt_plugin_aom)
     endif()
   endforeach()
 endif()

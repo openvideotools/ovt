@@ -9,6 +9,8 @@
 #ifndef OVT_RENDER_SRC_SURFACE_VK_NO_TIMESTAMPS_H
 #define OVT_RENDER_SRC_SURFACE_VK_NO_TIMESTAMPS_H
 
+#include <vector>
+
 #include <vulkan/vulkan_core.h>
 
 namespace ovt::render::detail {
@@ -16,6 +18,11 @@ namespace ovt::render::detail {
 // Returns the wrapper around `real`, the instance's own vkGetInstanceProcAddr (pl_vk_inst::get_proc_addr). Every
 // pl_vk_inst of the process comes from the same loader (or MoltenVK), so the wrapper keeps the first `real` it gets.
 PFN_vkGetInstanceProcAddr no_timestamps_get_proc_addr(PFN_vkGetInstanceProcAddr real);
+
+// WI-1.406: the wrapper also reports only `pairs` from vkGetPhysicalDeviceSurfaceFormatsKHR for `surface` (an empty
+// list removes the filter). libplacebo 7.349 picks the swapchain's surface format itself and scores 8-bit UNORM above
+// 16-bit float for linear colour spaces, so the filter is how the surface gets the pair of its encoding.
+void set_surface_format_filter(VkSurfaceKHR surface, std::vector<VkSurfaceFormatKHR> pairs);
 
 }  // namespace ovt::render::detail
 

@@ -93,7 +93,11 @@ Av1FrameRecord Av1SlotModel::step(const Av1FrameHeaderValues& h, int64_t decode_
     // §7.3.10.4: OrderHintBits == 0 → poc = decode_index so that poc stays strictly increasing (chapter 6 §6.2.5).
     // SPEC-ASSUMPTION(#426): §7.9 registers no code for this Info; SYN-AV1-0103 is proposed.
     r.poc = decode_index;
-    report(diag, Severity::Info, kDiagNoOrderHints, "order hints disabled; poc = decode_index");
+    if (!no_order_hints_reported_) {
+      // Once per stream (#489 review): every frame of such a stream would repeat the same Info.
+      no_order_hints_reported_ = true;
+      report(diag, Severity::Info, kDiagNoOrderHints, "order hints disabled; poc = decode_index");
+    }
   }
 
   if (cur.frame_type == FrameType::Key && h.show_frame) {
@@ -125,7 +129,10 @@ Av1FrameRecord Av1SlotModel::step(const Av1FrameHeaderValues& h, int64_t decode_
     r.state.OrderHints = r.order_hints.OrderHints;
   }
 
-  syntax::av1::reference_frame_update(state_, r.state, h.refresh_frame_flags, decode_index, state_diag);
+  // AV1 §5.9.2: a shown KEY frame has refresh_frame_flags = allFrames whatever the bits say (the header parser
+  // infers it, a peek may not; #489 review).
+  const uint8_t refresh = r.is_rap ? kAllFrames : h.refresh_frame_flags;
+  syntax::av1::reference_frame_update(state_, r.state, refresh, decode_index, state_diag);
   r.dpb_after = state_.slot_decode_indices();
   return r;
 }

@@ -2,6 +2,81 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc35 — 2026-11-15
+
+PATCH-level: spec-amendment pass 15 folds in the accepted answers of `spec-question` issues #558 from WI-1.230 (PR #518), #567 from WI-1.205 (PR #571), #568 from WI-1.111 (PR #573), #569 from WI-4.206 (PR #572), #570 from WI-1.114 (PR #575) and #566 from WI-3.590 (PR #576). New diagnostic codes are registered (D2: `SYN-H265-0051`, `SYN-H265-0052`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
+
+- 8 §8.7 WI-1.230 AT1 — for a manifest entry carrying `expected.demux = {packets, error}` the parity sweep asserts exactly that packet count, `file_pos` parity for those packets and then a read error of that class (`mpegff_FX_VY_9436R_3_qhd`: 216 of 483 samples, libavformat CENC/seig limitation); an acceptance-test narrowing for one entry, listed for the owner's check-in — WI-1.230 (#558)
+- 8 §8.3 field rules, builder note and §8.3.1 notation — derived text of a `String` (fourcc) field is a sibling `<field>.derived` (`kind = String`, empty `span`), `compatible_brands.derived` for the array; non-`String` kinds keep it in `svalue` (#415); the two sentences no longer disagree — WI-1.205, WI-1.203 (#567 point 2)
+- 8 §8.3.1 `hdlr` — a QuickTime counted `name` is two fields, `name_length u8` then `name str_fixed(name_length)` — WI-1.205 (#567 point 3)
+- 8 §8.10 WI-1.205 AT1 — `mvhd`/`tkhd`/`mdhd` on `mpegff_a1_foreman_qcif`, `elst.entries[0].media_time` on `mpegff_hvc1_only` (the former has no `edts`); an acceptance-test substitution listed for the owner's check-in — WI-1.205 (#567 point 1)
+- 7 §7.3.9 rule 10 — a prefix NAL (14) does not start a picture; it belongs to the base-layer slice that follows — WI-1.111 (#568 point 1)
+- 7 §7.3.9 field pairing — both fields of a complementary pair are reference or both non-reference (H.264 3.29/3.30) — WI-1.111 (#568 point 4)
+- 7 §7.8 WI-1.111 AT2 and notes — AT2 uses `jvt_sp1_bt_a` (`MR9_BT_B` has no mmco 5; an acceptance-test substitution listed for the owner's check-in); JM 19.0 + FFmpeg `-debug pict` per-picture POC oracle in `jm_poc_expected.h`; an SPS changing inside a picture is held to the next picture without a diagnostic; identical repeated parameter sets keep their `generation` — WI-1.111 (#568 points 2, 3, 5, 6)
+- 8 §8.6.7 and WI-4.206 notes — PES reassembly starts at the first `payload_unit_start_indicator` with a `00 00 01` payload on every non-PSI PID (PES before the PMT count, as ffprobe counts them); damaged PES keep their bytes with `complete = false`; file-based TR 101 290 2.3a/2.3b/2.4/2.5 semantics on carried values (`CNT-TS-2003`…`2006`); ffmpeg's 100 ms PCR interval makes `syn_ts_clean.ts` report `CNT-TS-2003` legitimately; `bitrate_per_pid` time axis and memory bound — WI-4.206 (#569)
+- 7 §7.3.5 row 14, §7.9, WI-1.114 ATs — `CpbCnt = cpb_cnt_minus1[0] + 1` from the SPS named by `bp_seq_parameter_set_id` (as HM and `cbs_h265`); new `SYN-H265-0051` (SEI without its SPS/VPS, parsed as bytes) and `SYN-H265-0052` (trailing bytes); AT1 on `jctvc_VPSID_A_VIDYO_2` (+ `HRD_A` checksum), AT2 on `syn_h265_hdr10plus`, AT3 on `jctvc_HRD_A_Fujitsu_3` and `jctvc_CONFWIN_A_Sony_1` — three acceptance-test substitutions listed for the owner's check-in — WI-1.114 (#570)
+- 14 §14.12 WI-3.590 AT3 — the 1e-9 conservation check runs on block SSEs over the map's block grid (plus each map value equal to its block PSNR to float32 precision); the read-back from the float32, `psnr_max`-clipped map values conserves within 1e-6 on content with no clipped block, since the map stores PSNR, not MSE (§9.4.7); an acceptance-test rewording whose read-back tolerance is relaxed, listed for the owner's check-in — WI-3.590 (#566)
+
+## 1.0.0-rc34 — 2026-11-15
+
+PATCH-level: spec-amendment pass 14 folds in the accepted answers of `spec-question` issues #550 from WI-0.035 (Android emulator smoke, PR #548), #551 and #552 from WI-1.109 part c (PR #554) and #553 from WI-4.105 part c1 (PR #543). New diagnostic codes are registered (D2: `SYN-H264-0033`, `SYN-H264-0071`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 13 §13.4.4 item 9 — Qt Quick accessibility is not exposed through `QtQuickView` (Qt ≤ 6.10); `MainActivity` mirrors the QML root's `productName` onto the view's accessibility node so TalkBack and UI Automator see one labelled node — WI-0.035, WI-0.050 (#550, PR #548)
+- 17 §17.1 — new risk R-23: screen readers cannot reach QML controls on Android under the `QtQuickView` embedding; mitigation and trigger listed — (#550)
+- 7 §7.3.4 row 20, §7.9 — bytes after an `end_of_seq` / `end_of_stream` NAL header are kept as `trailing_data` and reported with the new Info `SYN-H264-0033`; `SYN-H264-0003` stays for reserved values — WI-1.109 (#551)
+- 7 §7.3.4 rows 22–23, §7.9, WI-1.109 block — SVC / MVCD / 3D-AVC subset-SPS extensions, VUI extensions and `prefix_nal_unit_svc()` are kept as bytes with the new Info `SYN-H264-0071` until WI-1.109 part d (waits for the H.264 Annex G–J text); the WI block records the four-way split — WI-1.109 (#552)
+- 7 §7.6.4 mapping and verify mode, WI-4.106 notes — the `hm` plugin reports empty `HevcRps` lists for BLA pictures (HM resets the slice-header RPS and no HM patch is allowed; every entry would be "no reference picture"); other plugins keep the signalled lists; verify mode does not compare `HevcRps` of BLA pictures — WI-4.105, WI-4.106 (#553)
+
+## 1.0.0-rc33 — 2026-11-15
+
+PATCH-level: spec-amendment pass 13 folds in the accepted answers of `spec-question` issues #546 from WI-1.118 part c (AV1 tile groups) and #547 from WI-0.035/WI-0.050 (Android native-library packaging, PR #548). No new diagnostic code; no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. Also corrects the rc32 entry's count ("seventeen" → "eighteen").
+
+- 7 §7.3.6 row 29 — a tile group with `tg_end ≥ NumTiles` or `tg_start > tg_end` is ParseError `SYN-GEN-0003`; the read values stay in the partial tree, no tile is visited, and the frame is reported truncated (`SYN-AV1-0101`) as after a `SYN-AV1-0020` overrun — WI-1.118 (#546)
+- 13 §13.4.2, §13.4.5, §13.4.6 W^X paragraph, WI-0.050 notes — the app module uses `useLegacyPackaging = true` (libraries extracted at install) because Qt 6.8.3's `QtLoader` reads only `ApplicationInfo.nativeLibraryDir` (direct-from-APK loading arrives in Qt 6.9.0); no `android:extractNativeLibs` in the source manifest; user-plugin W^X rule unchanged; Play policy check before a `play` release (WI-0.056) — WI-0.050 (#547, PR #548)
+
+## 1.0.0-rc32 — 2026-11-15
+
+MINOR-level: spec-amendment pass 12 folds in the accepted answers of eighteen `spec-question` items on chapters 6, 7, 8, 9, 10, 13 and 14 (#159, #366 ranking wording, #406, #419 accumulation wording, #431, #433, #434, #449, #450, #470, #471, #477, #478, #480, #486, #490, #499, #510). #470, #471, #480, #486 and #499 were accepted by the owner on 2026-11-14 ("OK all"); the rest under the Level-3 spec-question triage. No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; §7.5.3 adds a priming `pull()` to the host/plugin contract text and §10.2.2 pins field semantics of `ExternalTexture`/`VulkanDeviceInfo` without changing a declaration.
+
+- 14 §14.3.3 recipe 45 — `syn_h265_multi_pps` clones differ in `num_extra_slice_header_bits` / `output_flag_present_flag`, not `init_qp_minus26` (decoding unchanged, formally non-conforming) — WI-0.553 (#159)
+- 8 §8.6.6 step 4 — ranking prefers the larger picture (width × height); chroma and bit-depth tie-breaks at equal geometry — WI-1.229 (#366)
+- 13 §13.2.2, §13.3.3 — `OVT_FFMPEG_CORE_STATIC` (fuzz-only static core FFmpeg for OSS-Fuzz) — WI-0.569 (#406)
+- 14 §14.4.3, 7 §7.6.3 — phase-2 QP test rebuilds QP_Y from `trace_headers` + `mb_qp_delta` (the `jm-trace` `qp` key is unreliable, normaliser fix owed); I_PCM macroblocks report `qp = 0` in the public-API FFmpeg mapping, test accepts either — WI-2.583 (#431, #433)
+- 8 §8.6.7, §8.10 rows, WI-4.205 — `PSIT` root for PSI/SI sections; `CNT-TS-1007`/`2007` whole-file forms until WI-4.207; `0x3F` extension descriptor (HEVC timing/HRD) decoded, `0x7F` DVB extension as hex — WI-4.205 (#434)
+- 7 §7.5.3 — priming `pull()` with the stage mask after `create()`; a plugin treats any `pull()` mask as a standing request for later pictures — WI-2.166, WI-2.151 (#449)
+- 6 §6.6.1, 7 §7.6.2 — `Residual = PreDeblock − Prediction` after clipping (so `Prediction + Residual == PreDeblock`), PCM/bypass convention and `bit_depth` recorded there; patch 0003 copy points in `decode_some()` and `run_postprocessing_filters_*` — WI-2.166 (#450)
+- 10 §10.3.3, §10.4.1, §10.10 `RND-0040`, WI-1.406 AT2 — at libplacebo v7.349.0 the NATIVE EDR target uses `{R16G16B16A16_SFLOAT, BT2020_LINEAR_EXT}` via `pl_swapchain_colorspace_hint`; AT2 checks `DisplayTarget.hdr_capable` — WI-1.406 (#470)
+- 10 §10.5.1 — `viridis` CC0; `cividis` from pnnl/cmaputil under `LicenseRef-Battelle-cmaputil` (owner decision), viridis fallback until the licence entry lands — WI-2.431 (#471)
+- 10 §10.2.2, WI-1.404 — Metal export via a self-created `VkImage` + `vkExportMetalObjectsEXT`; host Vulkan device ≥ 1.2 with `timelineSemaphore`/`hostQueryReset`, `queue_index` must be 0, held layout `SHADER_READ_ONLY_OPTIMAL`; `handle2` carries the `GLsync` for `GlTexture` — WI-1.404 (#477)
+- 10 §10.6.4, WI-1.410 AT1 — B converted inside `set_compare()`; RND-0010 behaviour per mode; SideBySide/Split geometry; difference/divider output on non-sRGB targets; overlay blend on linear intermediates; overlays in Single/Flicker-A only; `region_psnr` readback in `measure()`, finite values unclamped — WI-1.410 (#478)
+- 7 §7.6.1, WI-2.159 — `OVT_AOM_SNAPSHOTS` from `INSPECTION_FRAME_SNAPSHOTS`; mvd in `MB_MODE_INFO` under `CONFIG_INSPECTION`; patch 0002 carries the three filter snapshots only (Prediction/Residual and hidden-frame recon to a follow-up part); AT1 every frame, AT2/AT3 on corpus `aom` vectors instead of Argon — WI-2.159 (#480)
+- 13 §13.7.1, WI-0.035 — emulator smoke runs `ovt --version` now and `ovt info` once the CLI has it (`OVT_SMOKE_REQUIRE_INFO`) — WI-0.035 (#486)
+- 10 §10.3.4, §10.7.5, §10.7.8 — out-of-gamut rule (0.2 % relative tolerance, container peak), band fractions counted per pixel, grey = PQ of CIE Y, §10.7.8 wins over §10.3.4, false colour wins over the gamut overlay, conformance window placed in the viewport, no dithering — WI-4.453 (#490)
+- 14 §14.4.5, WI-2.581 — suite driven through `PluginRegistry` until `ovt analyze --plugin aom`; first accounting symbol re-added until the goldens come from the patched oracle; masked layers; IVF/Section 5 only; bench row via WI-0.560 part b — WI-2.581 (#499)
+- 9 §9.4.4 step 3 — `ssim_x264` plane accumulation is `float` in x264's order (`ssim_end4` groups of four, `float` plane total, `double(total) / count`); only the per-window division is `double`; a `double` plane mean is not allowed (≈ 1.5e-6 off the unmodified oracle on the Netflix pair) — WI-3.308 (#419, PR #447)
+- 10 WI-1.405 AT1 — frame 0 built from `sdr709_ramp.expected.json` through `PictureHost::set_picture()`, reference from a 1:1 `Interop::None` surface, until WI-2.171 — WI-1.405 (#510)
+
+## 1.0.0-rc31 — 2026-11-14
+
+PATCH-level: spec-amendment pass 11 folds in the accepted answers of `spec-question` issues #528 from WI-1.110 part a (H.264 SEI, PR #530), #533 from WI-1.118 part a (AV1 film grain, PR #535) and #529 from WI-1.109 part a (H.264 slice header). Three diagnostic codes are registered and two widened (D2, additive); `parse_slice_header()` takes a `ParameterSets` instead of the not-yet-existing `ActiveSets` (D22 semi-public C++ helper header); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.4 rows 7 and 9, §7.9 table, WI-1.110 steps and AT2; `corrupt_conditions.json` — each SEI payload is parsed through a bounded view of the message's own `BitReader` (one reader per `sei_rbsp`, absolute node offsets) instead of a sub-BitReader; `SYN-H264-0031` Warning `"pic_timing SEI without an active SPS; parsed as bytes"` and `SYN-H264-0032` Info `"SEI payload has trailing bytes after its last element"` registered with `not_in_table` reasons; AT2 runs against `CVSE3_Sony_H` (committed golden) instead of `CVSEFDFT3_Sony_E` (`slow`, no golden), clock timestamps from `trace_headers` over crafted NAL units — WI-1.110 (#528)
+- 7 §7.3.6 row 27, §7.9 table, WI-1.118 AT2; `corrupt_conditions.json` — the film grain conformance checks of AV1 §6.8.20 (`film_grain_params_ref_idx` not in `ref_frame_idx[]`, `num_y_points` > 14, `num_cb_points`/`num_cr_points` > 10, point values not increasing, 4:2:0 with exactly one chroma list empty) raise `SYN-AV1-0015` and parsing continues with the values as read (point arrays sized by the f(4) range); `load_grain_params` copies every saved element including `apply_grain` but keeps `update_grain` and `film_grain_params_ref_idx` as read; AT2's slot-copy case runs on hand-assembled frame headers (no public vector) — WI-1.118 (#533)
+- 7 §7.3.7, §7.9 table, WI-1.109 interface and step 4; `corrupt_conditions.json` — `parse_slice_header(BitReader&, SyntaxBuilder&, const NalHeader&, const ParameterSets&)` with `ParameterSets {pps, sps, subset_sps, on_activate}` owned by WI-1.111's `ActiveSets` (mirrors the H.265 resolution of #391); `SYN-H264-0010` also covers a PPS whose SPS or subset SPS is missing; `slice_header_in_scalable_extension()` stays with WI-4.111, until then SVC/3D-AVC enhancement-layer slices are kept as bytes with Info `SYN-H264-0070` and `parse_slice_header()` throws `SYN-H264-0002` for them — WI-1.109 (#529)
+
+## 1.0.0-rc30 — 2026-11-14
+
+PATCH-level: spec-amendment pass 10 folds in the accepted answer of `spec-question` issue #418 from WI-1.115 (H.265 activation). Two diagnostic codes are registered (D2, additive); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.8 H.265 row, §7.9 table; `corrupt_conditions.json` — `SYN-H265-0021` Error `"%s %d changed within a picture"` (VPS/SPS/PPS; new content held back until the next picture, mirrors `SYN-H264-0021`) and `SYN-H265-0022` Warning `"SPS %d refers to missing VPS %d"` (once per SPS generation); `SYN-H265-0022` gets a bit-edit condition (`sps_video_parameter_set_id = 1`), `SYN-H265-0021` a `not_in_table` reason — WI-1.115 (#418)
+
+## 1.0.0-rc29 — 2026-11-14
+
+PATCH-level: spec-amendment pass 9 folds in the accepted answers of `spec-question` issues #495 and #498 from the HM plugin work (WI-4.105 part b, PR #496). No public C header, FlatBuffers schema (`predictor` is already a free string), plugin ABI or CLI grammar change.
+
+- 6 §6.3.1 `MotionVector.predictor` HEVC row; 7 §7.6.4 HM mapping — the `:<source>` suffix is optional: a decoder that does not expose the merge/AMVP candidate's neighbour (HM) writes `merge[<idx>]` / `amvp[<flag>]` and says so in its README; consumers parse the prefix up to `:` — WI-4.105 (#495)
+- 6 §6.2.3 — the ±32767 clamp with `MDL-GEN-0003` is exercised by the conformance stream `MVCLIP_A_qualcomm_3` (the sentence "conformance streams never need this" was wrong); rule unchanged — WI-4.105 (#498)
+
 ## 1.0.0-rc28 — 2026-11-14
 
 MINOR-level: spec-amendment pass 8 folds in the accepted answers of `spec-question` issues #466 (owner OK 2026-11-14), #473 and #512 (internal to libovt-render), #513 (WI-1.117: new code `SYN-AV1-0015` registered, D2; an additive `parse_frame_header` overload in the semi-public C++ helper header, D22; AT2 oracle substitution listed for the owner's check-in) the #509 review nits, and the corpus placeholder answer #517 (follow-up of #507 and #160; ships with `tests/corpora/manifest.json`, `tests/golden/av1-index.json`, the regenerated `tests/corpora/LICENSES.md` and the one-condition demux sweep change, because `tools/check_fast_subset.py` ties the §14.3.2 names to manifest entries). No public C header, FlatBuffers schema, plugin ABI or CLI grammar change; the `MeasureConfig` setter of #512 item 5 is recorded as a later work item that waits for the owner.

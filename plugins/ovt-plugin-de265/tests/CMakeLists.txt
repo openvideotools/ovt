@@ -32,17 +32,29 @@ target_link_libraries(ovt_plugin_de265_smoke_tests PRIVATE ovt_core_objects tp::
                                                            ovt_test_support ovt::flags ${Catch2_TARGET})
 target_compile_definitions(ovt_plugin_de265_smoke_tests
                            PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\"")
+if(NOT OVT_SYSTEM_DE265)
+  target_compile_definitions(ovt_plugin_de265_smoke_tests PRIVATE OVT_DE265_INTERNALS=1)
+endif()
 add_dependencies(ovt_plugin_de265_smoke_tests ovt_plugin_de265)
 ovt_set_license(ovt_plugin_de265_smoke_tests "LGPL-3.0-or-later")
 ovt_catch_discover_tests(ovt_plugin_de265_smoke_tests)
 
 if(NOT OVT_SYSTEM_DE265)
   # ---- WI-2.164: the block mapping ---------------------------------------------------------------------------------
-  # The CellGrid layer (map_grid.cpp) on hand-made libde265 metadata. Built only with the patched libde265, the one
-  # that has the block metadata.
-  add_executable(ovt_plugin_de265_map_tests test_de265_map.cpp ../src/map_grid.cpp)
-  target_include_directories(ovt_plugin_de265_map_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src")
-  target_link_libraries(ovt_plugin_de265_map_tests PRIVATE ovt_schemas ovt::flags ${Catch2_TARGET})
+  # map_grid.cpp and map_blocks.cpp on hand-made libde265 metadata (each result checked by the chapter 06 validator),
+  # and the plugin on the h265-cu-golden streams against the HM grid goldens tests/golden/h265/<id>.hm-grid.json.gz
+  # (chapter 14 §14.4.4). Built only with the patched libde265, the one that has the block metadata.
+  ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+  add_executable(ovt_plugin_de265_map_tests test_de265_map.cpp ../src/map_blocks.cpp ../src/map_grid.cpp)
+  target_include_directories(ovt_plugin_de265_map_tests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../src"
+                                                                "${PROJECT_SOURCE_DIR}/core/include")
+  target_link_libraries(
+    ovt_plugin_de265_map_tests PRIVATE ovt_core_objects tp::ffmpeg_core ovt_schemas ovt_test_support ovt::flags
+                                       ${nlohmann_json_TARGET} ${Catch2_TARGET})
+  target_compile_definitions(
+    ovt_plugin_de265_map_tests PRIVATE "OVT_DE265_PLUGIN_DIR=\"$<TARGET_FILE_DIR:ovt_plugin_de265>\""
+                                       "OVT_HEVC_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/h265\"")
+  add_dependencies(ovt_plugin_de265_map_tests ovt_plugin_de265)
   ovt_set_license(ovt_plugin_de265_map_tests "LGPL-3.0-or-later")
   ovt_catch_discover_tests(ovt_plugin_de265_map_tests)
 

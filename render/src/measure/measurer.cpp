@@ -256,6 +256,27 @@ pl_tex Measurer::scope_tex(ScopeKind kind) const {
   return shown_set_ >= 0 ? scopes_.tex(shown_set_, kind) : nullptr;
 }
 
+bool Measurer::measure_now(const FrameSlot& slot) {
+  if (!available_ || !slot.valid) {
+    return false;
+  }
+  prepared_ = false;    // outside render(): M and Q of an earlier render may be of another picture (WI-4.453)
+  pl_gpu_finish(gpu_);  // every readback in flight completes, so run() finds a free slot
+  for (Readback& rb : readbacks_) {
+    collect(rb);
+  }
+  const uint64_t before = next_seq_;
+  run(slot);
+  if (next_seq_ == before) {
+    return false;  // the passes failed; error() says why
+  }
+  pl_gpu_finish(gpu_);
+  for (Readback& rb : readbacks_) {
+    collect(rb);
+  }
+  return shown_seq_ == before && shown_set_ >= 0;
+}
+
 Measurements Measurer::poll() {
   if (available_) {
     for (Readback& rb : readbacks_) {
