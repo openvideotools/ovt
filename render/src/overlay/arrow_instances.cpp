@@ -296,10 +296,9 @@ Region rect_of(const ovt::fb::Rect& r) {
 
 // One stroke per leaf block whose cells share one intra_mode_y, else one per cell (the rule of the YUView export,
 // chapter 6 §6.8.2 "per leaf block if uniform, else per cell"). Raster order of each block's first cell.
-// SPEC-ASSUMPTION(#644): §10.5 says "short direction stroke per intra block" without a geometry or a
-// mode-to-angle mapping; the stroke is a 1-px line through the block centre, 80 % of the shorter side long, along
-// the prediction angle of the codec (H.264 Table 8-2, H.265 Table 8-5, AV1 Mode_To_Angle + AngleDeltaY);
-// non-directional modes have none.
+// Geometry per §10.5.1 "Intra directions" (issue #644): a 1-px line through the region centre, 80 % of the shorter
+// side long, along the prediction angle of the codec (H.264 Table 8-2, H.265 Table 8-5, AV1 Mode_To_Angle +
+// AngleDeltaY); non-directional modes have none.
 void build_intra(const ovt::fb::FrameAnalysis& fa, ArrowInstances& out, std::vector<std::string>& diag) {
   const ovt::fb::CellGrid& g = *fa.grid();
   const size_t cells = static_cast<size_t>(g.cells_w()) * g.cells_h();
