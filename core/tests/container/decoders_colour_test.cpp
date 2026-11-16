@@ -322,9 +322,28 @@ TEST_CASE("AT1: an HDR10 hvc1 entry with colr, mdcv and clli is walked and decod
   CHECK(mdcv->diagnostics.empty());
 }
 
-// SPEC-ASSUMPTION(#676): recipe 10 is expected to mux mdcv/clli; the corpus is not fetchable yet (synthetic entry).
+// The manifest sha256 of the recipe-10 file as muxed before #676 (ffmpeg -c copy, no mdcv/clli boxes).
+constexpr std::string_view kRecipe10PreSha = "df44b7f63aac0c0f848145d813133f7f866c4055355b88add8a16f6b952f4a16";
+
+std::string manifest_sha256(std::string_view id) {
+  std::ifstream mf(std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/corpora/manifest.json");
+  REQUIRE(mf.good());
+  const nlohmann::json manifest = nlohmann::json::parse(mf);
+  for (const auto& e : manifest.at("entries")) {
+    if (e.value("id", std::string{}) == id) {
+      return e.value("sha256", std::string{});
+    }
+  }
+  return {};
+}
+
+// SPEC-ASSUMPTION(#676): recipe 10 muxes colr/mdcv/clli explicitly; until the corpora job regenerates the file, the
+// manifest still records the pre-#676 sha256 and this test skips. The synthetic-byte AT1 test covers the decoder.
 TEST_CASE("AT1 on the recipe-10 corpus file syn_h265_main10_pq_hdr.mp4",
           "[container][decoders][colour][needs-corpus]") {
+  if (manifest_sha256("syn_h265_main10_pq_hdr") == kRecipe10PreSha) {
+    SKIP("recipe 10 predates #676");
+  }
   const auto path = ovt::test::corpus_or_skip("syn_h265_main10_pq_hdr");
   const auto file = ovt::io::RandomAccessFile::open(path.string());
   const iso::WalkResult w = iso::walk(*file);
@@ -547,7 +566,8 @@ TEST_CASE("colour boxes of the container-smoke corpus: Dolby Vision, HLG and the
                    "tests/golden/isobmff/gpac_dolby_vision_cenc.mp4box-diso.json");
   REQUIRE(gf.good());
   size_t compared = 0;
-  for (const auto& b : nlohmann::json::parse(gf)) {
+  const nlohmann::json golden = nlohmann::json::parse(gf);
+  for (const auto& b : golden) {
     if (b.at("path").get<std::string>().ends_with("/pasp") && b.contains("fields")) {
       const BoxNodeT* pasp = find_box(dv.top_level, "pasp");
       REQUIRE(pasp != nullptr);
