@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "overlay/arrow_instances.h"
 #include "ovt/render/overlay_set.h"
 
 namespace ovt::render {
@@ -72,6 +73,10 @@ class OverlaySet {
   std::array<int32_t, 4> grid_min_side{std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max(),
                                        std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
   int32_t picture_w = 0, picture_h = 0;  // NOLINT(readability-isolate-declaration): coded size, luma samples
+
+  // MV arrow and intra direction stroke instances (§10.5.1, §10.5.4; WI-2.434). Empty unless MvL0, MvL1, MvBi or
+  // IntraDirs is set.
+  detail::ArrowInstances arrows;
 
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.

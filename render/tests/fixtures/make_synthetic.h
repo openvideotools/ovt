@@ -45,6 +45,14 @@ struct GridFixtureOptions {
 // of CTU (cx, cy) is 64 >> ((cx + cy) % 4), and a CU larger than 8 that crosses the picture edge is split further.
 std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
 
+// WI-2.434: the in-memory twin of `tools/gen_fixture_fb.py --kind mv` (render/tests/fixtures/synthetic_4k_mv.fb for
+// w x h = 3840 x 2160): one L0 MotionVector per 4x4 cell, ref 1, in the generator's order (64x64 superblocks in
+// raster order, cells in raster order inside each), forming a rotation about the picture centre:
+//   mv_x = clamp(-(2 y4 - cells_h) * 2, -512, 512), mv_y = clamp((2 x4 - cells_w) * 2, -512, 512)   (1/16 samples)
+// Only the fields the arrow pass reads are written (grid size, pred, mv0, and the MotionVector list); the fixture file
+// is 45 MB and not in the fast corpora, so the tests fall back to this when it is absent.
+std::vector<uint8_t> make_synthetic_mv(uint32_t width, uint32_t height);
+
 }  // namespace ovt::render::test
 
 #endif  // OVT_RENDER_TESTS_FIXTURES_MAKE_SYNTHETIC_H
