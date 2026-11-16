@@ -311,6 +311,34 @@ jobs:
           cmake --preset linux-x64-release
           cmake --build --preset linux-x64-release
 
+      # The parity tests (chapter 08 WI-1.230 acceptance test 1) need ffprobe from the oracle image (n7.1.1, the same
+      # libavformat the core links, chapter 14 §14.2.6), not ubuntu-22.04's ffprobe 4.4: 4.4 has no 'kind' box parser,
+      # so it reads files that FFmpeg ≥ 5.1 rejects (mpegff_16_vtt), and its packet positions are not comparable.
+      # packages: read for the private image comes with the job's permissions (#506).
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ffprobe from the oracle image
+        env:
+          IMAGE: ghcr.io/openvideotools/ovt-oracles:main
+        run: |
+          docker pull -q "${IMAGE}"
+          wrapper="${RUNNER_TEMP}/ffprobe-oracle/ffprobe"
+          mkdir -p "$(dirname "$wrapper")"
+          # Same paths inside and outside: the workspace (corpora), the runner temp dir and /tmp (test scratch files).
+          cat > "$wrapper" <<EOF
+          #!/bin/sh
+          case "\$PWD" in "${GITHUB_WORKSPACE}"*|"${RUNNER_TEMP}"*|/tmp*) wd="\$PWD" ;; *) wd=/tmp ;; esac
+          exec docker run --rm -i --user "\$(id -u):\$(id -g)" -v "${GITHUB_WORKSPACE}:${GITHUB_WORKSPACE}:ro" \\
+            -v "${RUNNER_TEMP}:${RUNNER_TEMP}:ro" -v /tmp:/tmp:ro -w "\$wd" "${IMAGE}" ffprobe "\$@"
+          EOF
+          chmod +x "$wrapper"
+          "$wrapper" -hide_banner -version | grep -E '^(ffprobe version|libavformat)'
+          echo "$(dirname "$wrapper")" >> "$GITHUB_PATH"
+
       # needs_corpus_demo is the deliberate missing-corpus demo of WI-0.550 (fails by design under OVT_REQUIRE_CORPORA).
       - name: Corpus and slow tests
         run: ctest --test-dir build/linux-x64-release -L "needs_corpus|slow" -LE needs_corpus_demo -j 4 --output-on-failure --output-junit junit-corpora.xml
