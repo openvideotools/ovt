@@ -76,7 +76,8 @@ ovt_set_license(ovt_cli "GPL-3.0-or-later")
 
 if(OVT_BUILD_TESTS)
   ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
+  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp
+                               $<TARGET_OBJECTS:ovt_cli_completions>)
   target_link_libraries(ovt_tests_cli PRIVATE ovt_cli_lib ovt::flags ovt_schemas ${nlohmann_json_TARGET}
                                               ${Catch2_TARGET})
   ovt_set_license(ovt_tests_cli "GPL-3.0-or-later")

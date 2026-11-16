@@ -701,7 +701,7 @@ int run(const std::vector<std::string>& args, Context& ctx) {
 }
 
 void install_signal_handlers() {
-  struct sigaction sa {};
+  struct sigaction sa{};
   sa.sa_handler = &ovt_cli_on_signal;
   sigemptyset(&sa.sa_mask);
   static_cast<void>(sigaction(SIGINT, &sa, nullptr));
