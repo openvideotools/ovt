@@ -30,6 +30,8 @@ class IsobmffReader final : public Reader {
   [[nodiscard]] std::vector<uint8_t> tree() const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
   ovt_status expand(uint64_t box_offset) override;
+  // Bumped by each expand() that decodes a deferred box; a no-op expand leaves it, and the tree, unchanged.
+  [[nodiscard]] std::optional<uint64_t> tree_revision() const noexcept override { return revision_; }
 
   // The `mfra` located through `mfro` (§8.2.4 rule 4) and confirmed by the walk; nullopt otherwise.
   [[nodiscard]] std::optional<uint64_t> mfra_offset() const noexcept { return mfra_offset_; }
@@ -44,6 +46,7 @@ class IsobmffReader final : public Reader {
   std::vector<DeferredBox> deferred_;
   std::unordered_set<uint64_t> offsets_;  // file offset of every box in the tree
   std::optional<uint64_t> mfra_offset_;
+  uint64_t revision_ = 0;
 };
 
 // nullptr with *why = OVT_E_CORRUPT when the first bytes are not a box header (CNT-0006). Throws io::IoError on an I/O
