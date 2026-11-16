@@ -261,16 +261,38 @@ void compare_with_ffmpeg(std::string_view id) {
   const std::vector<Picture> got = plugin_pictures(bytes, 1);
   REQUIRE(!ref.empty());
   INFO("FFmpeg output " << ref.size() << " pictures, ovt-plugin-de265 " << got.size());
-  REQUIRE(got.size() == ref.size());
+  // libde265 outputs pictures that H.265 C.5.2.2 / 8.3.1 do not output, which FFmpeg drops: the pictures cut by
+  // no_output_of_prior_pics_flag (NoOutPrior_A) and the RASL pictures of a CRA after an end of sequence (RAP_B). On
+  // those two streams every FFmpeg picture must still equal a plugin picture, in order, and the plugin has the
+  // extra ones (#590); everywhere else the two outputs must be the same sequence.
+  std::vector<size_t> match(ref.size());
+  if (id == "jctvc_NoOutPrior_A_Qualcomm_1" || id == "jctvc_RAP_B_Bossen_2") {
+    REQUIRE(got.size() > ref.size());
+    size_t g = 0;
+    for (size_t i = 0; i < ref.size(); ++i, ++g) {
+      while (g < got.size() && !(got[g] == ref[i])) {
+        ++g;
+      }
+      INFO("FFmpeg picture " << i << " has no equal plugin picture after plugin picture " << (g == got.size() ? 0 : g));
+      REQUIRE(g < got.size());
+      match[i] = g;
+    }
+  } else {
+    REQUIRE(got.size() == ref.size());
+    for (size_t i = 0; i < ref.size(); ++i) {
+      match[i] = i;
+    }
+  }
   for (size_t i = 0; i < ref.size(); ++i) {
+    const Picture& a = got[match[i]];
     INFO("picture " << i << " (output order)");
-    REQUIRE(got[i].width == ref[i].width);
-    REQUIRE(got[i].height == ref[i].height);
-    REQUIRE(got[i].sample_bytes == ref[i].sample_bytes);
-    REQUIRE(got[i].planes.size() == ref[i].planes.size());
+    REQUIRE(a.width == ref[i].width);
+    REQUIRE(a.height == ref[i].height);
+    REQUIRE(a.sample_bytes == ref[i].sample_bytes);
+    REQUIRE(a.planes.size() == ref[i].planes.size());
     for (size_t plane = 0; plane < ref[i].planes.size(); ++plane) {
       INFO("plane " << plane << " of " << describe(ref[i]));
-      CHECK(got[i].planes[plane] == ref[i].planes[plane]);
+      CHECK(a.planes[plane] == ref[i].planes[plane]);
     }
   }
   // Frame threads and slice threads must not change a sample.
