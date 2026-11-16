@@ -10,6 +10,10 @@
 // Qt 6.8 does not expose the Qt Quick accessibility tree through QtQuickView (issue #547), so MainActivity reads
 // `productName` once the root is ready and puts it on the Qt view's own accessibility node, which UI Automator finds
 // (WI-0.050 acceptance test 2).
+//
+// WI-0.052 painted only a header band so that the HDR test pattern of HdrSurfaceView (below QtQuickView, chapter 13
+// §13.4.4 item 1) showed through; the full shell is opaque and covers that surface. WI-A.400 cuts the Picture
+// panel's hole and replaces MainActivity.SHELL_HEADER_FRACTION with the panel's geometry.
 
 import QtQuick
 import QtQuick.Controls
