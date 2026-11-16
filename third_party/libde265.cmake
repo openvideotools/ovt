@@ -52,6 +52,26 @@ if(OVT_TP_SANITIZER_C_FLAGS MATCHES "-fsanitize=[^ ]*undefined")
   unset(_ovt_de265_cflags)
 endif()
 
+# Optimisation (chapter 07 §7.6.2 mitigation 4, WI-2.168). libde265 1.0.15 has no arm64 kernels (its NEON code is
+# 32-bit ARM assembly that only the autotools build uses), so on Apple silicon and Android it runs its scalar C++
+# fallbacks and the compiler's optimisation level is the only lever. The release presets are RelWithDebInfo, which
+# CMake builds at -O2, and debug presets build third-party code as RelWithDebInfo too (OvtThirdPartyCommon); libde265
+# is always built with OVT_DE265_OPT_FLAGS instead (-O3, measured in plugins/ovt-plugin-de265/README.md
+# "Performance"). The flags go into CMAKE_<LANG>_FLAGS_<CONFIG>, never CMAKE_<LANG>_FLAGS, so the sanitizer flags
+# below are untouched. -DNDEBUG stays: libde265's assert()s are debug checks. Override the cache value to sweep flags.
+set(_ovt_de265_opt_default "-O3")
+if(ANDROID AND ANDROID_ABI STREQUAL "arm64-v8a")
+  string(APPEND _ovt_de265_opt_default " -march=armv8-a") # the Android arm64 baseline; no FP16/dot-product
+endif()
+set(OVT_DE265_OPT_FLAGS "${_ovt_de265_opt_default}"
+    CACHE STRING "Optimisation flags of the libde265 build (chapter 07 §7.6.2 mitigation 4, WI-2.168)")
+unset(_ovt_de265_opt_default)
+foreach(_lang C CXX)
+  list(APPEND _ovt_de265_flag_args "-DCMAKE_${_lang}_FLAGS_RELEASE=${OVT_DE265_OPT_FLAGS} -DNDEBUG"
+       "-DCMAKE_${_lang}_FLAGS_RELWITHDEBINFO=${OVT_DE265_OPT_FLAGS} -g -DNDEBUG")
+endforeach()
+unset(_lang)
+
 externalproject_add(
   tp_libde265
   URL ${OVT_TP_libde265_URL}

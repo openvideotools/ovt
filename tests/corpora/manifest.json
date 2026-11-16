@@ -18553,6 +18553,24 @@
       }
     },
     {
+      "id": "syn_h265_gop60_1080p_nowpp",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "26",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "unverified": true,
+      "features": [
+        "gop60",
+        "1080p",
+        "perf"
+      ],
+      "tags": [
+        "fast"
+      ]
+    },
+    {
       "id": "syn_av1_gop60_1080p",
       "source": "syn",
       "kind": "stream",
