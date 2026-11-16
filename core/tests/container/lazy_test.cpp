@@ -238,11 +238,10 @@ TEST_CASE("lazy: 3600 moofs are header-only until expanded", "[container][isobmf
     }
   }
   const ovt_Buffer before = ovt_container_tree(o.container);
-  const std::vector<uint8_t> snapshot(before.data, before.data + before.size);
+  const std::vector<uint8_t> snapshot(before.data, before.data + before.size);  // the handle frees its buffer on expand
   REQUIRE(ovt_container_expand(o.container, offsets[1799]) == OVT_OK);
   const ovt_Buffer after = ovt_container_tree(o.container);
-  CHECK(std::vector<uint8_t>(before.data, before.data + before.size) !=
-        std::vector<uint8_t>(after.data, after.data + after.size));
+  CHECK(snapshot != std::vector<uint8_t>(after.data, after.data + after.size));
   CHECK(snapshot.size() < after.size);  // a new, larger buffer
   const auto* t = tree_of(o.container);
   for (const auto* n : *t->root()) {
