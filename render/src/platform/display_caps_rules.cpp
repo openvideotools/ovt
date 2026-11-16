@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <limits>
 
 #include "platform/native_target.h"
@@ -31,12 +30,6 @@ bool offers(const std::vector<VkSurfaceFormatKHR>& formats, Encoding encoding) {
 }
 }  // namespace
 
-void copy_text(char* dest, std::size_t capacity, const std::string& text) {
-  const std::size_t n = std::min(text.size(), capacity - 1);
-  std::memcpy(dest, text.data(), n);
-  std::memset(dest + n, 0, capacity - n);
-}
-
 EncodingSupport encoding_support(const std::vector<VkSurfaceFormatKHR>& formats) {
   return {offers(formats, Encoding::Pq10), offers(formats, Encoding::Hlg10), offers(formats, Encoding::ScRgbLinear16F)};
 }
@@ -54,10 +47,10 @@ DisplayCaps unimplemented_caps(const std::string& reason, const std::string& pla
   caps.headroom = 1.0F;
   caps.potential_headroom = 1.0F;
   caps.sdr_white_nits = 203.0F;
-  copy_text(caps.primaries_name, sizeof caps.primaries_name, "unknown");
-  copy_text(caps.source, sizeof caps.source, "none");
-  copy_text(caps.reason, sizeof caps.reason, reason);
-  copy_text(caps.platform_detail, sizeof caps.platform_detail, platform_detail);
+  copy_text(caps.primaries_name, "unknown");
+  copy_text(caps.source, "none");
+  copy_text(caps.reason, reason);
+  copy_text(caps.platform_detail, platform_detail);
   return caps;
 }
 
@@ -66,15 +59,15 @@ DisplayCaps caps_from_screen(const ScreenInfo& screen) {
   caps.headroom = 1.0F;
   caps.potential_headroom = 1.0F;
   caps.sdr_white_nits = std::numeric_limits<float>::quiet_NaN();  // macOS reports "relative" (§10.4.5)
-  copy_text(caps.primaries_name, sizeof caps.primaries_name, screen.primaries_name);
+  copy_text(caps.primaries_name, screen.primaries_name);
   caps.wide_gamut = screen.primaries_name == "P3" || screen.primaries_name == "BT.2020";
   if (!screen.have_screen) {
-    copy_text(caps.source, sizeof caps.source, "none");
-    copy_text(caps.reason, sizeof caps.reason, "no screen");
-    copy_text(caps.platform_detail, sizeof caps.platform_detail, screen.os_name);
+    copy_text(caps.source, "none");
+    copy_text(caps.reason, "no screen");
+    copy_text(caps.platform_detail, screen.os_name);
     return caps;
   }
-  copy_text(caps.source, sizeof caps.source, "NSScreen");
+  copy_text(caps.source, "NSScreen");
   const bool finite = std::isfinite(screen.potential_edr) && std::isfinite(screen.current_edr);
   caps.potential_headroom = finite ? std::max(screen.potential_edr, 1.0F) : 1.0F;
   const float current = finite ? std::max(screen.current_edr, 1.0F) : 1.0F;
@@ -99,8 +92,8 @@ DisplayCaps caps_from_screen(const ScreenInfo& screen) {
   caps.hdr_capable = reason.empty();
   caps.headroom = caps.hdr_capable ? current : 1.0F;
   caps.hdr_active = caps.hdr_capable && caps.headroom > kActiveHeadroom;
-  copy_text(caps.reason, sizeof caps.reason, reason);
-  copy_text(caps.platform_detail, sizeof caps.platform_detail, screen.os_name + "; " + tier);
+  copy_text(caps.reason, reason);
+  copy_text(caps.platform_detail, screen.os_name + "; " + tier);
   return caps;
 }
 

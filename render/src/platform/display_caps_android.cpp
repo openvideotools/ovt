@@ -13,7 +13,8 @@
 namespace ovt::render {
 
 namespace detail {
-std::unique_ptr<DisplayWatcher> watch_display(const DisplayTarget& /*where*/, std::function<void()> /*on_change*/) {
+std::unique_ptr<DisplayWatcher> watch_display(const DisplayTarget& /*where*/,
+                                              const std::function<void()>& /*on_change*/) {
   return nullptr;
 }
 }  // namespace detail

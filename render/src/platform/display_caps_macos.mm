@@ -238,8 +238,8 @@ class MacDisplayWatcher final : public DisplayWatcher {
 
 }  // namespace
 
-std::unique_ptr<DisplayWatcher> watch_display(const DisplayTarget& where, std::function<void()> on_change) {
-  return std::make_unique<MacDisplayWatcher>(where, std::move(on_change));
+std::unique_ptr<DisplayWatcher> watch_display(const DisplayTarget& where, const std::function<void()>& on_change) {
+  return std::make_unique<MacDisplayWatcher>(where, on_change);
 }
 
 }  // namespace ovt::render::detail

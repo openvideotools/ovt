@@ -7,8 +7,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -39,6 +42,12 @@ std::vector<VkSurfaceFormatKHR> moltenvk_formats() {
   return out;
 }
 
+// A DisplayCaps char field as a string (no array-to-pointer decay at the call sites).
+template <std::size_t N>
+std::string text(const char (&field)[N]) {  // NOLINT(modernize-avoid-c-arrays)
+  return {std::begin(field), std::find(std::begin(field), std::end(field), '\0')};
+}
+
 ScreenInfo xdr_screen() {
   ScreenInfo s;
   s.have_screen = true;
@@ -66,22 +75,22 @@ TEST_CASE("render_test_display_caps: SDR-only Mac is not HDR capable (acceptance
   const DisplayCaps caps = caps_from_screen(sdr_screen());
   CHECK_FALSE(caps.hdr_capable);
   CHECK_FALSE(caps.hdr_active);
-  CHECK(std::string(caps.reason) == "display has no EDR headroom");
+  CHECK(text(caps.reason) == "display has no EDR headroom");
   CHECK(caps.headroom == 1.0F);
   CHECK(caps.potential_headroom == 1.0F);
-  CHECK(std::string(caps.source) == "NSScreen");
-  CHECK(std::string(caps.primaries_name) == "BT.709");
+  CHECK(text(caps.source) == "NSScreen");
+  CHECK(text(caps.primaries_name) == "BT.709");
   CHECK_FALSE(caps.wide_gamut);
-  CHECK(std::string(caps.platform_detail) == "macOS 15.5; SDR");
+  CHECK(text(caps.platform_detail) == "macOS 15.5; SDR");
 }
 
 TEST_CASE("render_test_display_caps: XDR Mac reports potential headroom (acceptance test 2)", "[fast][render]") {
   const DisplayCaps caps = caps_from_screen(xdr_screen());
   CHECK(caps.potential_headroom >= 1.5F);
   CHECK(caps.hdr_capable);
-  CHECK(std::string(caps.reason).empty());
-  CHECK(std::string(caps.platform_detail) == "macOS 15.5; XDR");
-  CHECK(std::string(caps.primaries_name) == "P3");
+  CHECK(text(caps.reason).empty());
+  CHECK(text(caps.platform_detail) == "macOS 15.5; XDR");
+  CHECK(text(caps.primaries_name) == "P3");
   CHECK(caps.wide_gamut);
   CHECK(caps.supports_pq);
   CHECK(caps.supports_hlg);
@@ -92,7 +101,7 @@ TEST_CASE("render_test_display_caps: XDR Mac reports potential headroom (accepta
 
 TEST_CASE("render_test_display_caps: capability uses the potential value, headroom the current one", "[fast][render]") {
   // maximumExtendedDynamicRangeColorComponentValue is 1.0 until EDR content is on screen (spec pitfall).
-  ScreenInfo idle = xdr_screen();
+  const ScreenInfo idle = xdr_screen();
   DisplayCaps caps = caps_from_screen(idle);
   CHECK(caps.hdr_capable);
   CHECK(caps.headroom == 1.0F);
@@ -110,7 +119,7 @@ TEST_CASE("render_test_display_caps: capability uses the potential value, headro
 
   ScreenInfo mid = xdr_screen();
   mid.potential_edr = 2.0F;
-  CHECK(std::string(caps_from_screen(mid).platform_detail) == "macOS 15.5; EDR");
+  CHECK(text(caps_from_screen(mid).platform_detail) == "macOS 15.5; EDR");
 }
 
 TEST_CASE("render_test_display_caps: the probe surface decides between formats and no format", "[fast][render]") {
@@ -118,7 +127,7 @@ TEST_CASE("render_test_display_caps: the probe surface decides between formats a
   none.surface_formats = {{VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}};  // sRGB only
   DisplayCaps caps = caps_from_screen(none);
   CHECK_FALSE(caps.hdr_capable);
-  CHECK(std::string(caps.reason) == "no HDR surface format");
+  CHECK(text(caps.reason) == "no HDR surface format");
   CHECK(caps.headroom == 1.0F);
   CHECK(caps.potential_headroom == 16.0F);  // the display could, the surface cannot
   CHECK_FALSE(caps.supports_pq);
@@ -136,7 +145,7 @@ TEST_CASE("render_test_display_caps: the probe surface decides between formats a
   failed.surface_error = "vkCreateInstance failed";
   caps = caps_from_screen(failed);
   CHECK_FALSE(caps.hdr_capable);
-  CHECK(std::string(caps.reason) == "HDR surface probe failed: vkCreateInstance failed");
+  CHECK(text(caps.reason) == "HDR surface probe failed: vkCreateInstance failed");
 }
 
 TEST_CASE("render_test_display_caps: no screen, odd values and long strings", "[fast][render]") {
@@ -144,8 +153,8 @@ TEST_CASE("render_test_display_caps: no screen, odd values and long strings", "[
   gone.os_name = "macOS 15.5";
   DisplayCaps caps = caps_from_screen(gone);
   CHECK_FALSE(caps.hdr_capable);
-  CHECK(std::string(caps.reason) == "no screen");
-  CHECK(std::string(caps.source) == "none");
+  CHECK(text(caps.reason) == "no screen");
+  CHECK(text(caps.source) == "none");
 
   ScreenInfo nan = xdr_screen();
   nan.potential_edr = std::nanf("");
@@ -154,7 +163,7 @@ TEST_CASE("render_test_display_caps: no screen, odd values and long strings", "[
   ScreenInfo longer = xdr_screen();
   longer.os_name = std::string(500, 'x');
   caps = caps_from_screen(longer);
-  CHECK(std::string(caps.platform_detail).size() == sizeof caps.platform_detail - 1);  // truncated and terminated
+  CHECK(text(caps.platform_detail).size() == sizeof(DisplayCaps::platform_detail) - 1);  // truncated and terminated
 }
 
 #if defined(__APPLE__)
@@ -176,8 +185,8 @@ TEST_CASE("render_test_display_caps: other platforms return not-implemented reas
   const DisplayCaps caps = ovt::render::display_probe(DisplayTarget{});
   CHECK_FALSE(caps.hdr_capable);
   CHECK_FALSE(caps.hdr_active);
-  CHECK(std::string(caps.reason).rfind("not implemented", 0) == 0);
-  CHECK(std::string(caps.source) == "none");
+  CHECK(text(caps.reason).rfind("not implemented", 0) == 0);
+  CHECK(text(caps.source) == "none");
   CHECK(caps.headroom == 1.0F);
   CHECK(ovt::render::detail::watch_display(DisplayTarget{}, [] {}) == nullptr);
 }

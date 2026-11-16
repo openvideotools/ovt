@@ -9,7 +9,10 @@
 #ifndef OVT_RENDER_SRC_PLATFORM_DISPLAY_CAPS_RULES_H
 #define OVT_RENDER_SRC_PLATFORM_DISPLAY_CAPS_RULES_H
 
+#include <algorithm>
+#include <cstddef>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <vector>
@@ -69,10 +72,14 @@ class DisplayWatcher {
   virtual ~DisplayWatcher() = default;
 };
 OVT_RENDER_API std::unique_ptr<DisplayWatcher> watch_display(const DisplayTarget& where,
-                                                             std::function<void()> on_change);
+                                                             const std::function<void()>& on_change);
 
 // Copies `text` into a fixed char array, truncating (the arrays of DisplayCaps are 16..128 bytes) and terminating.
-void copy_text(char* dest, std::size_t capacity, const std::string& text);
+template <std::size_t N>
+void copy_text(char (&dest)[N], const std::string& text) {  // NOLINT(modernize-avoid-c-arrays): DisplayCaps fields
+  std::fill(std::begin(dest), std::end(dest), '\0');
+  std::copy_n(text.begin(), std::min(text.size(), N - 1), std::begin(dest));
+}
 
 // A "not implemented" caps for a platform whose probe is a stub: not capable, source "none", the given reason.
 DisplayCaps unimplemented_caps(const std::string& reason, const std::string& platform_detail);
