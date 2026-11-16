@@ -197,6 +197,33 @@ bool OverlayLayerGpu::ensure_layer(int w, int h, std::string& err) {
   return true;
 }
 
+bool OverlayLayerGpu::update_lines(const ViewState& view, int w, int h, bool& lines, std::string& err) {
+  lines = false;
+  if ((cfg_.layers & kLineLayers) == 0 || set_ == nullptr) {
+    return true;
+  }
+  // WI-2.432 step 5: rebuild only on a new set, a level threshold crossing or a pan beyond the pre-fetched margin.
+  const ImageRect visible = visible_image_rect(w, h, view.pan_x, view.pan_y, view.zoom);
+  if (grid_cache_.update(*set_, cfg_.layers, view.zoom, visible) && !lines_.upload(gpu_, grid_cache_.lines(), err)) {
+    grid_cache_.reset();
+    return false;
+  }
+  lines = !grid_cache_.lines().vertices.empty();
+  return true;
+}
+
+// 5 grids TU -> PU -> CU -> CTU and 6 slice/tile boundaries, one draw in that order (§10.5.3).
+bool OverlayLayerGpu::run_lines(const CellPassConstants& pc, std::string& err) {
+  LinePassConstants lc;
+  lc.viewport_half = pc.viewport_half;
+  lc.pan = pc.pan;
+  lc.clip = pc.clip;
+  lc.picture = {static_cast<float>(set_->picture_w), static_cast<float>(set_->picture_h)};
+  lc.zoom = pc.zoom;
+  lc.line_scale = std::max(cfg_.line_px, 0.0F) * pc.dpr;
+  return lines_.run(gpu_, layer_, palette_, lc, err);
+}
+
 bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const pl_rect2df& picture,
                            struct pl_overlay& out, std::string& err) {
   const uint32_t layers = cfg_.layers;
@@ -204,14 +231,8 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
   const bool fill = (layers & kFillLayers) != 0 && attr_ != nullptr;
   const bool hatch = (layers & bit(OverlayLayer::SkipHatch)) != 0 && attr_ != nullptr;
   bool lines = false;
-  if ((layers & kLineLayers) != 0 && set_ != nullptr) {
-    // WI-2.432 step 5: rebuild only on a new set, a level threshold crossing or a pan beyond the pre-fetched margin.
-    const ImageRect visible = visible_image_rect(w, h, view.pan_x, view.pan_y, view.zoom);
-    if (grid_cache_.update(*set_, layers, view.zoom, visible) && !lines_.upload(gpu_, grid_cache_.lines(), err)) {
-      grid_cache_.reset();
-      return false;
-    }
-    lines = !grid_cache_.lines().vertices.empty();
+  if (!update_lines(view, w, h, lines, err)) {
+    return false;
   }
   const bool arrows = arrows_.has_work(layers);
   if (!heatmap && !fill && !hatch && !lines && !arrows) {
@@ -247,18 +268,8 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
   if (hatch && !passes_.run(gpu_, CellPass::Hatch, layer_, pc, {attr_, palette_}, err)) {
     return false;
   }
-  // 5 grids TU -> PU -> CU -> CTU and 6 slice/tile boundaries, one draw in that order (§10.5.3).
-  if (lines) {
-    LinePassConstants lc;
-    lc.viewport_half = pc.viewport_half;
-    lc.pan = pc.pan;
-    lc.clip = pc.clip;
-    lc.picture = {static_cast<float>(set_->picture_w), static_cast<float>(set_->picture_h)};
-    lc.zoom = pc.zoom;
-    lc.line_scale = std::max(cfg_.line_px, 0.0F) * pc.dpr;
-    if (!lines_.run(gpu_, layer_, palette_, lc, err)) {
-      return false;
-    }
+  if (lines && !run_lines(pc, err)) {
+    return false;
   }
   // 8 intra direction strokes, 9 MV arrows (L1, L0, bi).
   if (arrows) {

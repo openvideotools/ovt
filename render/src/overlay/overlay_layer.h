@@ -55,6 +55,8 @@ class OverlayLayerGpu {
  private:
   bool ensure_static(std::string& err);
   bool ensure_layer(int w, int h, std::string& err);
+  bool update_lines(const ViewState& view, int w, int h, bool& lines, std::string& err);  // WI-2.432
+  bool run_lines(const CellPassConstants& pc, std::string& err);
   void drop_set();
 
   pl_gpu gpu_;
