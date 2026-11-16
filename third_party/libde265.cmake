@@ -59,6 +59,8 @@ endif()
 # is always built with OVT_DE265_OPT_FLAGS instead (-O3, measured in plugins/ovt-plugin-de265/README.md
 # "Performance"). The flags go into CMAKE_<LANG>_FLAGS_<CONFIG>, never CMAKE_<LANG>_FLAGS, so the sanitizer flags
 # below are untouched. -DNDEBUG stays: libde265's assert()s are debug checks. Override the cache value to sweep flags.
+# SPEC-ASSUMPTION(#597): §7.6.2 mitigation 4 reads "-O3 -ffast-math=off -march=armv8-a"; -ffast-math=off is not a
+# compiler flag (no fast-math is the default), so it is left out.
 set(_ovt_de265_opt_default "-O3")
 if(ANDROID AND ANDROID_ABI STREQUAL "arm64-v8a")
   string(APPEND _ovt_de265_opt_default " -march=armv8-a") # the Android arm64 baseline; no FP16/dot-product

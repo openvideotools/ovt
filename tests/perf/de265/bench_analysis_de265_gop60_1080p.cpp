@@ -12,6 +12,7 @@
 //                                                        `wpp` (syn_h265_gop60_1080p) or `nowpp`
 //                                                        (syn_h265_gop60_1080p_nowpp), <n> libde265 worker threads
 //
+// SPEC-ASSUMPTION(#596): syn_h265_gop60_1080p_nowpp is a recipe-26 entry added for WI-2.168 step 1.
 // Input: the corpus cache ($OVT_CORPORA_DIR, default build/corpora) entries syn_h265_gop60_1080p (recipe 26, x265
 // with its default WPP) and syn_h265_gop60_1080p_nowpp (the same with --no-wpp). Neither stream has tiles. A stream
 // that is not in the cache is not registered, so a partial cache runs the rest; the binary prints which were left out.
@@ -37,6 +38,7 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -118,14 +120,15 @@ std::vector<uint8_t> index_annexb(const ovt::io::RandomAccessFile& file) {
       f.units.push_back(u);
       f.size_bytes += su.bytes.size();
       unit->frame = std::make_unique<ovt::fb::FrameId>(*f.id);
-    } else if (!idx.frames.empty() || !(type >= kVps && type <= kPps)) {
+    } else if (!idx.frames.empty() || type < kVps || type > kPps) {
       pending.push_back(u);  // parameter sets before picture 0 reach the decoder through parameter_sets only
     }
     idx.units.push_back(std::move(unit));
   });
   flatbuffers::FlatBufferBuilder fbb;
   fbb.Finish(ovt::fb::StreamIndex::Pack(fbb, &idx));
-  return {fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize()};
+  const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
 }
 
 std::optional<Stream> load(const std::string& id) {
@@ -167,7 +170,7 @@ void run_gop(benchmark::State& state, const Stream& stream, int threads) {
     ovt::analysis::Session session(*stream.file, stream.index, plugin, options);
     const ovt_status st = session.frame(kTarget, kReconMask, nullptr, out);
     if (st != OVT_OK) {
-      state.SkipWithError(("frame(59) failed with status " + std::to_string(static_cast<int>(st))).c_str());
+      state.SkipWithError("frame(59) failed with status " + std::to_string(static_cast<int>(st)));
       return;
     }
     benchmark::DoNotOptimize(out.data());
@@ -187,15 +190,14 @@ benchmark::internal::Benchmark* configure(benchmark::internal::Benchmark* b) {
       ->ReportAggregatesOnly(true);
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
+int run(int argc, char** argv) {
   std::vector<std::unique_ptr<Stream>> streams;
   for (const char* id : {"syn_h265_gop60_1080p", "syn_h265_gop60_1080p_nowpp"}) {
     std::optional<Stream> s = load(id);
     if (!s) {
-      std::fprintf(stderr, "bench_analysis_de265_gop60_1080p: %s not in the corpus cache %s, its rows are skipped\n",
-                   id, corpora_dir().string().c_str());
+      (void)std::fprintf(stderr,
+                         "bench_analysis_de265_gop60_1080p: %s not in the corpus cache %s, its rows are skipped\n", id,
+                         corpora_dir().string().c_str());
       streams.push_back(nullptr);
       continue;
     }
@@ -213,7 +215,7 @@ int main(int argc, char** argv) {
     }
     for (const int n : kSweepThreads) {
       const std::string name = std::string("bench_de265_gop60_threads/") + names.at(k) + "/" + std::to_string(n);
-      configure(benchmark::RegisterBenchmark(name.c_str(), [s, n](benchmark::State& st) { run_gop(st, *s, n); }));
+      configure(benchmark::RegisterBenchmark(name, [s, n](benchmark::State& st) { run_gop(st, *s, n); }));
     }
   }
   benchmark::Initialize(&argc, argv);
@@ -223,4 +225,14 @@ int main(int argc, char** argv) {
   benchmark::RunSpecifiedBenchmarks();
   benchmark::Shutdown();
   return 0;
+}
+}  // namespace
+
+int main(int argc, char** argv) {
+  try {
+    return run(argc, argv);
+  } catch (const std::exception& e) {
+    (void)std::fprintf(stderr, "bench_analysis_de265_gop60_1080p: %s\n", e.what());
+    return 2;
+  }
 }
