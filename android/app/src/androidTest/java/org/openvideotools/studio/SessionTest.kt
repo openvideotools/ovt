@@ -58,7 +58,11 @@ class SessionTest {
     fun viewIntentOpensFileInRunningActivity() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             var first: MainActivity? = null
-            scenario.onActivity { first = it }
+            var launchIntent: Intent? = null
+            scenario.onActivity {
+                first = it
+                launchIntent = it.intent
+            }
             val opensBefore = onMain { OvtSession.openCount }
 
             val file = writeY4m("view_intent.y4m")
@@ -66,10 +70,14 @@ class SessionTest {
 
             waitUntil("the VIEW intent's file is open") { OvtSession.openCount == opensBefore + 1 }
             scenario.onActivity { assertSame("the Activity was recreated", first, it) }
-            // The file opens off the main thread, so the count can change before the Activity is resumed again after
-            // onNewIntent (it passes through STARTED); the same instance must return to RESUMED.
-            waitForState(scenario, Lifecycle.State.RESUMED)
+            // The same instance must be RESUMED again after onNewIntent. Read from the Activity itself: onNewIntent calls
+            // setIntent(), and ActivityScenario ignores the lifecycle of an Activity whose intent no longer matches the
+            // one it launched, so scenario.state stays at the PAUSED (STARTED) it saw before onNewIntent. The file opens
+            // off the main thread, so the open count can change before onResume.
+            waitUntil("the Activity is resumed again") { first!!.lifecycle.currentState == Lifecycle.State.RESUMED }
             onMain { assertEquals("view_intent.y4m", OvtSession.current?.displayName) }
+            // Give the Activity back the intent ActivityScenario launched, so that close() can follow it to DESTROYED.
+            scenario.onActivity { it.intent = launchIntent }
         }
     }
 
@@ -141,18 +149,6 @@ class SessionTest {
         val deadline = System.nanoTime() + TIMEOUT_NS
         while (!onMain(condition)) {
             check(System.nanoTime() < deadline) { "timed out waiting until $what" }
-            Thread.sleep(POLL_MS)
-        }
-    }
-
-    /** Polls [ActivityScenario.getState] from the test thread (it is not read on the main thread). */
-    private fun waitForState(
-        scenario: ActivityScenario<*>,
-        state: Lifecycle.State,
-    ) {
-        val deadline = System.nanoTime() + TIMEOUT_NS
-        while (scenario.state != state) {
-            check(System.nanoTime() < deadline) { "timed out waiting for $state, last ${scenario.state}" }
             Thread.sleep(POLL_MS)
         }
     }
