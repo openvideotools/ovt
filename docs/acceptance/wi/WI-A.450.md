@@ -35,9 +35,13 @@ Emulator half, owed:
 ```console
 $ ./gradlew -p android :app:assembleFossDebug :app:installFossDebug   # emulator x86_64 API 36 running
 $ adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity
-$ adb shell uiautomator dump /sdcard/ui.xml && adb pull /sdcard/ui.xml && grep -o 'Welcome' ui.xml | head -1
-Welcome                                                # the Welcome page's Accessible.name
+$ adb logcat -d | grep -o 'OVT: Welcome page shown' | head -1
+OVT: Welcome page shown                                # WelcomePage.qml logs when its shown copy becomes visible
 ```
+
+The probe is a log line, not `uiautomator dump`: Qt 6.8's `QtQuickView` registers no accessibility interface
+(issue #547), so the whole QML scene is one `TextureView` without child nodes and uiautomator cannot see the
+Welcome page's `Accessible.name`. The screenshot is the visual check.
 
 Output: NOT YET RECORDED (plus a screenshot, `adb exec-out screencap -p > welcome.png`).
 
