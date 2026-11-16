@@ -19,6 +19,8 @@
 #     ${CMAKE_BINARY_DIR}/notices/licenses/<dep>/ (a step of the ovt_notices target);
 #   * vcpkg ports: <vcpkg installed dir>/<triplet>/share/<port>/copyright;
 #   * Qt: ${QT_ROOT_DIR}/Licenses (CMake or environment variable), else the GNU texts of LICENSES/;
+#   * vendored sources built in-tree (lodepng): the texts the directory names in OVT_VENDORED_LICENSE_FILES_<dep>, staged
+#     like the ExternalProject ones;
 #   * system libraries OVT links but does not build (zlib): third_party/system-licenses/<component>/.
 #
 # Install rules (component `notices`, OPTIONAL so a plain `cmake --install` works without building ovt_notices;
@@ -73,6 +75,19 @@ foreach(_dep IN LISTS OVT_TP_DEPS)
     endforeach()
   endif()
 endforeach()
+# Vendored dependencies (sources compiled in-tree from third_party/<dep>/, e.g. lodepng, WI-1.412): the directory's
+# CMakeLists.txt appends <dep> to the global OVT_VENDORED_DEPS and names its licence texts in
+# OVT_VENDORED_LICENSE_FILES_<dep> (absolute paths).
+get_property(_ovt_vendored GLOBAL PROPERTY OVT_VENDORED_DEPS)
+foreach(_dep IN LISTS _ovt_vendored)
+  get_property(_files GLOBAL PROPERTY OVT_VENDORED_LICENSE_FILES_${_dep})
+  foreach(_f IN LISTS _files)
+    get_filename_component(_name "${_f}" NAME)
+    list(APPEND _ovt_notices_stage_cmds COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_f}"
+         "${_ovt_notices_staging}/${_dep}/${_name}")
+  endforeach()
+endforeach()
+unset(_ovt_vendored)
 unset(_dep)
 unset(_ep)
 unset(_ep_set)

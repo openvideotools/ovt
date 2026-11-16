@@ -8,8 +8,9 @@
 # written before WI-0.007 have not been reformatted yet, so `--all-files` would rewrite them.
 default_install_hook_types: [pre-commit, commit-msg]
 default_stages: [pre-commit]
-# Licence texts stay byte-identical to their sources (SPDX License List, libaom PATENTS): no whitespace fixes.
-exclude: ^(third_party/vcpkg/|docs/spec/|LICENSES/|LICENSE$|plugins/ovt-plugin-aom/PATENTS$)
+# Licence texts stay byte-identical to their sources (SPDX License List, libaom PATENTS): no whitespace fixes. The
+# vendored lodepng (WI-1.412) keeps upstream's bytes and style too.
+exclude: ^(third_party/vcpkg/|docs/spec/|LICENSES/|LICENSE$|plugins/ovt-plugin-aom/PATENTS$|third_party/lodepng/(lodepng\.(cpp|h)|LICENSE)$)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

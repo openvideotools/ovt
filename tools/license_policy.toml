@@ -123,6 +123,10 @@ ovt_asan_canary = "LGPL-2.1-or-later"    # cmake/OvtTesting.cmake, top-level dir
 "tests/oracles/x264_ssim" = "GPL-2.0-or-later"
 "tests" = "LGPL-2.1-or-later"
 "cmake" = "LGPL-2.1-or-later"
+# WI-1.412: lodepng, vendored with its own licence (third_party/lodepng/README.md); the directory's CMakeLists.txt and
+# README are OVT's.
+"third_party/lodepng/lodepng.cpp" = "Zlib"
+"third_party/lodepng/lodepng.h" = "Zlib"
 "third_party" = "LGPL-2.1-or-later"
 "docs" = "CC-BY-SA-4.0"
 # §15.1 lists .github/ and the root build files with tools/ (LGPL-2.1-or-later); "" is the repository root,
