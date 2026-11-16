@@ -395,8 +395,12 @@ void fill_payload(WalkState& st, BoxNodeT& n, const FourCC& type, unsigned depth
     children_begin += run_hand_decoder(*st.file, n, *dec, ctx, payload_begin, end, entry->is_fullbox);
   }
   // 2.12. SPEC-ASSUMPTION(#574): a ContainerWithPrefix without a decoder cannot know where its children start, so it
-  // stays a leaf; a decoder's children offset counts from the reader start (after FullBox version/flags).
-  const bool walk = decode && (kind == BoxKind::Container || (kind == BoxKind::ContainerWithPrefix && dec != nullptr));
+  // stays a leaf; a decoder's children offset counts from the reader start (after FullBox version/flags). A decoder
+  // that returns a children offset inside the payload is walked whatever the row's kind: a "<parent>/*" decoder
+  // (the `stsd/*` sample entries) reaches unlisted fourccs through a row that has no kind of its own.
+  const bool prefix_children = dec != nullptr && children_begin > payload_begin && children_begin < end;
+  const bool walk = decode && (kind == BoxKind::Container || (kind == BoxKind::ContainerWithPrefix && dec != nullptr) ||
+                               prefix_children);
   if (walk && depth == 0 && st.deferred != nullptr && sv(type) == "moof") {
     defer_moof(st, n, children_begin, end, ctx);
   } else if (walk) {

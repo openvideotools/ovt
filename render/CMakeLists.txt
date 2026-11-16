@@ -52,9 +52,22 @@ if(APPLE)
   target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
 endif()
 
+# WI-1.407: display_probe() (§10.4.5). The rules are portable; one platform file queries the screen.
+target_sources(ovt_render PRIVATE src/platform/display_caps_rules.cpp)
+if(APPLE)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_macos.mm)
+  set_source_files_properties(src/platform/display_caps_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(ANDROID)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_android.cpp)
+else()
+  target_sources(ovt_render PRIVATE src/platform/display_caps_linux.cpp)
+endif()
+
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
+# WI-2.434a: MV arrow and intra stroke instances, CPU side (§10.5.1, §10.5.4); the GPU pass follows in WI-2.434b.
+target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp)
 foreach(shader IN ITEMS diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
