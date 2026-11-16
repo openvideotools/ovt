@@ -38,6 +38,9 @@ using ovt::io::OpenMode;
 using ovt::io::RandomAccessFile;
 
 constexpr size_t kMiB = size_t{1} << 20U;
+// 3 GB: above 2^31, the limit of a 32-bit off_t or jint (WI-0.051 acceptance test 2). Namespace scope, because
+// GENERATE captures its arguments in a lambda.
+constexpr uint64_t k3GB = uint64_t{3} * 1000 * 1000 * 1000;
 
 // A file under the test binary directory (tests read no environment, chapter 14 §14.1.3), removed on
 // destruction. The pid keeps parallel ctest runs apart.
@@ -293,6 +296,35 @@ TEST_CASE("capi_file_open_fd_borrowed", "[io][fast]") {
   ovt_file_close(f);
   CHECK(fd_is_open(fd));
   ::close(fd);
+}
+
+// WI-0.051 acceptance test 2 on the host: a 3 GB sparse file (above 2^31, the limit of a 32-bit off_t or jint) opened
+// by descriptor, as MainActivity does with ParcelFileDescriptor.detachFd(), reports its 64-bit size, both when
+// the caller passes getStatSize() and when it passes 0 and the library asks fstat(2). The same call chain runs on
+// the emulator through ovt_jni_open_fd.
+TEST_CASE("capi_file_open_fd_3gb_sparse", "[io][fast]") {
+  const TempPath path("capi_fd_3gb");
+  {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+    const int fd = ::open(path.str().c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    REQUIRE(fd >= 0);
+    REQUIRE(::ftruncate(fd, static_cast<off_t>(k3GB)) == 0);
+    ::close(fd);
+  }
+  const uint64_t reported = GENERATE(k3GB, uint64_t{0});
+
+  ovt_File* f = nullptr;
+  REQUIRE(ovt_file_open_fd(open_fd(path.str()), reported, 1, "big.mp4", &f) == OVT_OK);
+  REQUIRE(f != nullptr);
+  CHECK(ovt_file_size(f) == k3GB);
+
+  std::array<uint8_t, 16> tail{};
+  tail.fill(0xAA);
+  size_t n = 0;
+  CHECK(ovt_file_read(f, k3GB - tail.size(), tail.data(), tail.size(), &n) == OVT_OK);
+  CHECK(n == tail.size());
+  CHECK(tail == std::array<uint8_t, 16>{});  // a hole reads as zeros
+  ovt_file_close(f);
 }
 
 TEST_CASE("capi_file_open_fd_errors", "[io][fast]") {

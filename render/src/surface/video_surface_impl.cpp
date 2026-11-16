@@ -5,18 +5,22 @@
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
 // pl_render_image pass, with the §10.3.3 colour tables of WI-1.402; WI-1.408 adds the plane modes
-// (src/pipeline/plane_views.h). The full render parameters, target frames and dithering (WI-1.403), interop (WI-1.404,
-// render/src/platform/offscreen.cpp), compare modes, overlays, measurements (WI-4.452, render/src/measure/) and export
-// arrive with their own work items; until then those entry points are inert. WI-1.406 adds NATIVE targets: a
-// libplacebo swapchain on the surface of a platform NativeOutput (src/platform/native_target.h), retarget() EMBEDDED
-// <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the swapchain with the content's static HDR metadata on
-// init and on source change (§10.3.6).
+// (src/pipeline/plane_views.h). The full render parameters, target frames and dithering (WI-1.403), the compare modes
+// of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp), overlays, measurements (WI-4.452,
+// render/src/measure/) and export arrive with their own work items; until then those entry points are inert. WI-1.406
+// adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput (src/platform/native_target.h),
+// retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the swapchain with the content's
+// static HDR metadata on init and on source change (§10.3.6).
 
+#include <algorithm>
 #include <array>
+#include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -32,6 +36,7 @@
 #include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
+#include "pipeline/compare.h"
 #include "pipeline/frame_upload.h"
 #include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
@@ -120,6 +125,7 @@ class VideoSurfaceImpl final : public VideoSurface {
       return fail("pl_renderer", "pl_renderer_create failed");
     }
     overlay_gpu_ = std::make_unique<detail::OverlayLayerGpu>(gpu_);  // WI-2.431
+    compare_.init(log_, gpu_);                                       // WI-1.410
 
     // §10.7: measurement passes. A GPU without what they need still renders; measure() then never becomes valid.
     static_cast<void>(measurer_.init(log_, gpu_, &offscreen_));
@@ -288,7 +294,52 @@ class VideoSurfaceImpl final : public VideoSurface {
       }
     }
   }
-  void set_compare(const Picture& /*b*/, const CompareMode& /*mode*/) override {}  // WI-1.410
+
+  // Slot B and the mode (§10.2.4). SPEC-ASSUMPTION(#478): B is converted into A's grid here, so set_frame() comes
+  // first when both change. RND-0010 / RND-0011 stay in last_error() while B is in that state.
+  void set_compare(const Picture& b, const CompareMode& mode) override {
+    if (gpu_ == nullptr) {
+      error_ = "RND-0001 picture rejected: surface is not initialised";
+      return;
+    }
+    const bool restart_flicker =
+        mode.kind == CompareMode::Kind::Flicker &&
+        (mode_.kind != CompareMode::Kind::Flicker || mode.flicker_period_ms != mode_.flicker_period_ms);
+    mode_ = mode;
+    psnr_pending_ = false;
+    psnr_ = {-1.0F, -1.0F, -1.0F};
+    if (mode.kind == CompareMode::Kind::Single) {
+      detail::destroy_slot(gpu_, slot_b_);
+      b_mismatch_ = false;
+      b_converted_ = false;
+      return;
+    }
+    if (restart_flicker) {
+      flicker_start_ms_ = now_ms();
+    }
+    detail::PreparedB prep;
+    std::string err = detail::prepare_b(b, detail::slot_format(slot_a_), mode.allow_scale_b, prep);
+    if (err.empty()) {
+      if (prep.converted || b_converted_) {
+        slot_b_.valid = false;  // the same generation may now need another conversion
+      }
+      std::vector<std::string> notices;
+      err = detail::upload_picture(gpu_, prep.pic, slot_b_, notice_log_, notices);
+      log_lines(notices);
+    }
+    if (!err.empty()) {
+      slot_b_.valid = false;
+      error_ = std::move(err);
+      log_lines({error_});
+      return;
+    }
+    b_mismatch_ = prep.size_mismatch;
+    b_converted_ = prep.converted;
+    error_ = prep.message;
+    if (!error_.empty()) {
+      log_lines({error_});
+    }
+  }
   // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
     overlays_ = std::move(overlays);
@@ -339,9 +390,22 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
-  Measurements measure() override {                                                  // §10.7.9: never blocks
+
+  // §10.7.9: never blocks. SPEC-ASSUMPTION(#478): region_psnr (Difference) reduces the visible region of the last
+  // render() here rather than in render(), so only a host that asks waits for the readback.
+  Measurements measure() override {
     measurer_.request();
-    return measurer_.poll();
+    Measurements m = measurer_.poll();
+    if (psnr_pending_ && slot_a_.valid && slot_b_.valid) {
+      if (!compare_.psnr(slot_a_, slot_b_, psnr_region_, psnr_)) {
+        error_ = "RND-0002 renderer init failed: compare: region PSNR pass failed";
+      }
+      psnr_pending_ = false;
+    }
+    for (size_t i = 0; i < 3; ++i) {
+      m.region_psnr[i] = psnr_.at(i);  // NOLINT(cppcoreguidelines-pro-bounds-constant-array-index)
+    }
+    return m;
   }
 
   bool export_png(const char* path, ExportKind kind, const ViewState* /*view_or_null*/) override {
@@ -415,6 +479,11 @@ class VideoSurfaceImpl final : public VideoSurface {
     return true;
   }
 
+  void set_clock(std::function<int64_t()> clock) {
+    clock_ = std::move(clock);
+    flicker_start_ms_ = now_ms();
+  }
+
  private:
   // background_rgba is 0xRRGGBBAA in the output encoding (straight alpha).
   static union pl_clear_color background(const ViewState& view) {
@@ -427,28 +496,92 @@ class VideoSurfaceImpl final : public VideoSurface {
     return color;
   }
 
-  // Draws slot A over the cleared target (whose planes and colour space the caller set) with a basic parameter set:
-  // nearest upscaling at zoom >= 1, the ViewState chroma upscaler and downscaler, no dithering, no anti-ringing
-  // (§10.3.1 "Scaling filters"). WI-1.403 replaces this with the full pl_render_params of §10.3.4/§10.3.5.
-  void draw_slot_a(const ViewState& view, struct pl_frame& target, bool offscreen) {
+  int64_t now_ms() const {
+    if (clock_) {
+      return clock_();
+    }
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+  }
+
+  void log_lines(const std::vector<std::string>& lines) const {
+    for (const std::string& line : lines) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+      (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), line.c_str());
+    }
+  }
+
+  // A frame over the whole of `tex` (the offscreen output or a compare intermediate) in the target's colour space.
+  [[nodiscard]] struct pl_frame texture_frame(pl_tex tex) const {
+    struct pl_frame frame = {};
+    frame.num_planes = 1;
+    frame.planes[0].texture = tex;
+    frame.planes[0].components = 4;
+    for (int c = 0; c < 4; ++c) {
+      frame.planes[0].component_mapping[c] = c;
+    }
+    frame.color = detail::target_color(target_, active_);
+    return frame;
+  }
+
+  // Draws picture A, or the §10.6.4 compare view of A and B, over the cleared `target` (whose planes and colour space
+  // the caller set: the offscreen texture, or a NATIVE swapchain image).
+  void draw_view(const ViewState& view, const struct pl_frame& target, bool offscreen) {
+    if (mode_.kind == CompareMode::Kind::Single || !slot_b_.valid) {
+      const detail::IRect full{0, 0, target_.width, target_.height};
+      draw_slot(slot_a_, view, full, full, target, false, offscreen, true);
+    } else {
+      render_compare(view, target, offscreen);
+    }
+  }
+
+  // Draws `slot` into `out` with the §10.2.3 mapping of the viewport rectangle `view_rect`, clipped to `clip` (the
+  // scissor of the side-by-side and split views). `linear` renders to an FP16 intermediate in linear light (the
+  // target's primaries and peak, 1.0 = 203 nits) for the overlay blend; otherwise to the target's own encoding with
+  // the full parameters of §10.3.4/§10.3.5.
+  void draw_slot(const detail::FrameSlot& slot, const ViewState& view, const detail::IRect& clip,
+                 const detail::IRect& view_rect, struct pl_frame target, bool linear, bool offscreen,
+                 bool with_overlays = false) {
+    pl_rect2df src = detail::source_rect(slot, view.show_cropped);
+    pl_rect2df dst = detail::map_into(src, view, view_rect);
+    const pl_rect2df unclipped = dst;  // the picture rectangle the overlay layer is laid out on
+    // A scissor narrower than the target clips both rectangles; the whole target is left to libplacebo's own clipping.
+    const bool whole = clip.x0 == 0 && clip.y0 == 0 && clip.x1 == target_.width && clip.y1 == target_.height;
+    if (!whole && !detail::clip_rects(src, dst, clip)) {
+      return;
+    }
     // The view transform works in luma samples; plane modes U/V sample the chroma plane over the same picture area
-    // (WI-1.408, §10.6.1).
-    const pl_rect2df luma_rect = detail::source_rect(slot_a_, view.show_cropped);
+    // (WI-1.408, §10.6.1). They apply to every slot drawn here, so both sides of a compare view show the same plane.
     struct pl_frame image = {};
-    std::string err = plane_views_.build_image(gpu_, slot_a_, view, luma_rect, image);
+    std::string err = plane_views_.build_image(gpu_, slot, view, src, image);
     if (!err.empty()) {
       error_ = std::move(err);
       return;
     }
-    target.crop = detail::target_rect(luma_rect, view, target_.width, target_.height);
-    params_.build(view, active_, offscreen, image.color, target);
+
+    if (linear) {
+      target.color.transfer = PL_COLOR_TRC_LINEAR;
+    }
+    target.crop = dst;
+    params_.build(view, linear ? DisplayTarget::OutputEncoding::ScRgbLinear16F : active_, offscreen, image.color,
+                  target);
+    if (linear) {
+      target.repr.bits = pl_bit_encoding{};  // a float texture holds normalised values; no integer depth scaling
+    }
     struct pl_render_params params = params_.params();  // still points at params_'s members
-    plane_views_.apply(view, image, params, target);
-    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1).
+    // The overlay blend needs linear light, so raw_code_values (a pass-through of the stored codes) applies only to
+    // views drawn in the target's own encoding. SPEC-ASSUMPTION(#623): §10.6.1 does not say how plane modes combine
+    // with the §10.6.4 compare views.
+    ViewState plane_view = view;
+    plane_view.raw_code_values = view.raw_code_values && !linear;
+    plane_views_.apply(plane_view, image, params, target);
+    // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1). It describes
+    // slot A in the full viewport: drawn only where A is (Single, Flicker's A phase; SPEC-ASSUMPTION(#478)).
     struct pl_overlay overlay = {};
     std::string overlay_err;
-    if (overlay_gpu_ != nullptr && overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio,
-                                                      target.crop, overlay, overlay_err)) {
+    if (with_overlays && overlay_gpu_ != nullptr &&
+        overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio, unclipped, overlay,
+                           overlay_err)) {
       target.overlays = &overlay;
       target.num_overlays = 1;
     } else if (!overlay_err.empty()) {
@@ -459,15 +592,84 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
   }
 
-  // Draws picture A, or the analysis view that replaces it (§10.7.5 / §10.7.8), over the cleared target. Without the
-  // measurement passes (measurer_.error() says why) the picture is drawn as usual.
+  // The device-pixel bounding box of `slot` in the viewport (whole pixels, clipped to the target).
+  [[nodiscard]] detail::IRect picture_box(const detail::FrameSlot& slot, const ViewState& view) const {
+    const detail::IRect full{0, 0, target_.width, target_.height};
+    const pl_rect2df d = detail::map_into(detail::source_rect(slot, view.show_cropped), view, full);
+    return detail::intersect(full, detail::IRect{static_cast<int>(std::floor(d.x0)), static_cast<int>(std::floor(d.y0)),
+                                                 static_cast<int>(std::ceil(d.x1)), static_cast<int>(std::ceil(d.y1))});
+  }
+
+  // §10.6.4 compare views of slots A and B.
+  void render_compare(const ViewState& view, const struct pl_frame& out, bool offscreen) {
+    pl_tex tex = out.planes[0].texture;
+    const bool show_b = mode_.kind == CompareMode::Kind::Flicker &&
+                        detail::flicker_shows_b(now_ms() - flicker_start_ms_, mode_.flicker_period_ms);
+    const detail::CompareLayout layout = detail::compare_layout(mode_, target_.width, target_.height, show_b);
+    const detail::IRect full{0, 0, target_.width, target_.height};
+    const int enc = detail::shader_encoding(active_);
+    bool ok = true;
+    switch (mode_.kind) {
+      case CompareMode::Kind::Difference: {
+        detail::DiffParams p;
+        p.gain = mode_.diff_gain;
+        p.plane = mode_.diff_plane >= 0 ? static_cast<int>(static_cast<uint8_t>(mode_.diff_plane)) : -1;  // -1: max
+        p.signed_view = mode_.diff_signed;
+        p.false_color = mode_.diff_false_color;
+        p.hatch = b_mismatch_;
+        p.encoding = enc;
+        const pl_rect2df src = detail::source_rect(slot_a_, view.show_cropped);
+        ok = compare_.difference(tex, picture_box(slot_a_, view), slot_a_, slot_b_, src, view, full, p);
+        psnr_pending_ = !b_mismatch_;
+        psnr_region_ = detail::visible_samples(src, view, full);
+        break;
+      }
+      case CompareMode::Kind::Overlay: {
+        pl_tex ia = nullptr;
+        pl_tex ib = nullptr;
+        ok = compare_.intermediates(target_.width, target_.height, ia, ib);
+        if (ok) {
+          draw_slot(slot_a_, view, full, full, texture_frame(ia), true, offscreen);
+          draw_slot(slot_b_, view, full, full, texture_frame(ib), true, offscreen);
+          const detail::IRect a = picture_box(slot_a_, view);
+          const detail::IRect b = picture_box(slot_b_, view);
+          const detail::IRect box{std::min(a.x0, b.x0), std::min(a.y0, b.y0), std::max(a.x1, b.x1),
+                                  std::max(a.y1, b.y1)};
+          ok = compare_.blend(tex, box, mode_.overlay_alpha, enc);
+        }
+        break;
+      }
+      case CompareMode::Kind::Single:
+      case CompareMode::Kind::SideBySide:
+      case CompareMode::Kind::Split:
+      case CompareMode::Kind::Flicker:
+        if (layout.draw_a) {
+          draw_slot(slot_a_, view, layout.clip_a, layout.view_a, out, false, offscreen,
+                    mode_.kind == CompareMode::Kind::Flicker);
+        }
+        if (layout.draw_b) {
+          draw_slot(slot_b_, view, layout.clip_b, layout.view_b, out, false, offscreen);
+        }
+        if (!layout.divider.empty()) {
+          ok = compare_.fill_white(tex, layout.divider, enc);
+        }
+        break;
+    }
+    if (!ok) {
+      error_ = "RND-0002 renderer init failed: compare: pass failed";
+    }
+  }
+
+  // Draws picture A (or the §10.6.4 compare view of A and B), or the analysis view that replaces it (§10.7.5 /
+  // §10.7.8), over the cleared target. Without the measurement passes (measurer_.error() says why) the picture is
+  // drawn as usual. An analysis view replaces the displayed frame (§10.7.5), so it also replaces a compare view.
   void draw_picture(const ViewState& view, struct pl_frame& target, bool offscreen) {
     const detail::AnalysisView mode = detail::analysis_view(view);
     pl_tex analysis = mode != detail::AnalysisView::None ? measurer_.analysis_view(slot_a_, mode) : nullptr;
     if (analysis != nullptr) {
       draw_analysis(view, analysis, target, offscreen);
     } else {
-      draw_slot_a(view, target, offscreen);
+      draw_view(view, target, offscreen);
     }
   }
 
@@ -805,7 +1007,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
       plane_views_.destroy(gpu_);
+      detail::destroy_slot(gpu_, slot_b_);
     }
+    compare_.destroy();
     pl_renderer_destroy(&renderer_);
     close_native();
     offscreen_.destroy();  // the output texture, and the host's device or GL context wrapper
@@ -827,6 +1031,16 @@ class VideoSurfaceImpl final : public VideoSurface {
   pl_gpu gpu_ = nullptr;  // offscreen_.gpu()
   pl_renderer renderer_ = nullptr;
   detail::FrameSlot slot_a_;
+  detail::FrameSlot slot_b_;  // compare picture, converted into A's grid (WI-1.410)
+  CompareMode mode_;
+  bool b_mismatch_ = false;   // RND-0010: B keeps its own size
+  bool b_converted_ = false;  // slot B holds a converted copy
+  detail::ComparePasses compare_;
+  std::function<int64_t()> clock_;  // ms; steady_clock unless a test sets one (the host drives redraws, §10.6.4)
+  int64_t flicker_start_ms_ = 0;
+  bool psnr_pending_ = false;
+  detail::IRect psnr_region_;
+  std::array<float, 3> psnr_ = {-1.0F, -1.0F, -1.0F};
   detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
   detail::PlaneViews plane_views_;    // plane modes 1-4 (§10.6.1)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
@@ -861,6 +1075,13 @@ bool download_output(const VideoSurface& surface, OutputPixels& out) {
     return false;
   }
   return impl->download(out);
+}
+
+void set_compare_clock(VideoSurface& surface, std::function<int64_t()> clock_ms) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl != nullptr) {
+    impl->set_clock(std::move(clock_ms));
+  }
 }
 
 bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
