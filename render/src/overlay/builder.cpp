@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "overlay/arrow_instances.h"
 #include "overlay/heatmap_source.h"
 #include "overlay/overlay_set_impl.h"
 #include "ovt/render/overlay_set.h"
@@ -193,6 +194,8 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   if ((cfg.layers & static_cast<uint32_t>(OverlayLayer::GridPartition)) != 0) {
     build_partition_lines(*fa, *set);
   }
+  // WI-2.434: MV arrow and intra stroke instances (MotionVector list and CellGrid.intra_mode_y).
+  detail::build_arrow_instances(*fa, cfg, set->arrows, set->diagnostics);
   return set;
 }
 
@@ -201,7 +204,11 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t siz
   if (buf == nullptr) {
     return nullptr;
   }
-  flatbuffers::Verifier verifier(buf, size);
+  // A dense 4K frame has a Block and a MotionVector per 4x4 cell (over a million tables, synthetic_4k_mv.fb); the
+  // default verifier limit of 1 M tables would reject it. kMaxCells bounds what the build uses anyway.
+  flatbuffers::Verifier::Options opts;
+  opts.max_tables = 4 * kMaxCells;
+  flatbuffers::Verifier verifier(buf, size, opts);
   if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
     return nullptr;
   }

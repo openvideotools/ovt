@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Overlay configuration and builder (chapter 10 §10.2.5, verbatim). OverlayBuilder and the colour tables of
-// overlay_colors.h (§10.5.2) are implemented by their own work items (overlay passes; WI-2.439 for the colours, which
-// adds the overlay_colors.h include here); WI-1.400 only declares the interface.
+// Overlay configuration and builder (chapter 10 §10.2.5, verbatim). OverlayBuilder is implemented by the overlay-pass
+// work items; the colour tables and legend data of §10.5.2 are in overlay_colors.h (WI-2.439), included here.
 
 #ifndef OVT_RENDER_OVERLAY_SET_H
 #define OVT_RENDER_OVERLAY_SET_H
@@ -12,6 +11,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "ovt/render/overlay_colors.h"
 #include "ovt/render/render_api.h"
 #include "ovt/render/video_surface.h"  // VideoSurface, OverlaySet (forward declaration)
 #include "ovt_model_generated.h"       // ovt::fb::FrameAnalysis, ovt::fb::Rect

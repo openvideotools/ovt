@@ -95,6 +95,9 @@ if(APPLE)
                                                  "-framework CoreFoundation")
 endif()
 
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
+
 # WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
 if(APPLE)
   add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
@@ -117,5 +120,13 @@ target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
 
+# WI-2.439: colour tables, legend data, contrast/halo rule and colour-blind simulation (§10.5.2). CPU only.
+target_sources(ovt_tests_render PRIVATE test_overlay_legend.cpp test_overlay_contrast.cpp)
+
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
+# render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
+target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
+target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")

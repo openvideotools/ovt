@@ -12,3 +12,6 @@ target_sources(ovt_core_objects PRIVATE av1_frame_boundary.cpp av1_slots.cpp)
 
 # WI-1.111: H.264 frame boundary and POC models (chapter 7 §7.3.9, §7.3.10.1).
 target_sources(ovt_core_objects PRIVATE h264_frame_boundary.cpp h264_poc.cpp)
+
+# WI-1.121: StreamIndex builder (§7.4.2): core state machine, AV1 dispatch, classification and display order.
+target_sources(ovt_core_objects PRIVATE stream_index_builder.cpp av1_units.cpp frame_classify.cpp display_order.cpp)

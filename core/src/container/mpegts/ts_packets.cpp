@@ -197,6 +197,7 @@ bool head_pattern(std::span<const uint8_t> head, uint64_t phase, uint64_t stride
 }
 
 void add_diag(File& f, DiagCode code, std::string message, uint64_t offset) {
+  f.first_offsets.emplace(code, offset);
   if (f.diagnostics.size() < kMaxDiagnostics) {
     f.diagnostics.push_back({code, std::move(message), offset});
   }
@@ -375,6 +376,10 @@ class Walker {
     ++st.packets;
     st.payload_packets += h.has_payload() ? 1U : 0U;
     st.scrambled_packets += h.transport_scrambling_control != 0 ? 1U : 0U;
+    if (h.transport_scrambling_control != 0 && h.pid != kPatPid && h.pid != kCatPid) {
+      f_.first_scrambled = std::min(f_.first_scrambled, k);
+      f_.last_scrambled = k;
+    }
     if (h.transport_error_indicator) {
       ++st.transport_errors;
       add_diag(f_, DiagCode::CNT_TS_2001,
@@ -547,6 +552,7 @@ class MpegtsReader final : public Reader {
   }
 
   [[nodiscard]] std::vector<uint8_t> ts_timing() const override { return build_ts_timing(f_); }
+  [[nodiscard]] std::vector<uint8_t> ts_report() const override { return build_ts_report(f_); }
 
   ovt_status expand(uint64_t box_offset) override {
     if (box_offset == 0) {  // the root: the next window of TSPK children

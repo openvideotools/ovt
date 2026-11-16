@@ -13,7 +13,9 @@ target_sources(
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
           isobmff/decoders/movie.cpp
+          isobmff/decoders/sample_entries.cpp
           isobmff/field_builder.cpp
+          isobmff/lazy.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
@@ -21,6 +23,7 @@ target_sources(
           mpegts/pes.cpp
           mpegts/psi.cpp
           mpegts/timing.cpp
+          mpegts/tr101290.cpp
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp

@@ -55,7 +55,7 @@ void TimingBuilder::packet(uint16_t pid, bool has_pcr, uint64_t pcr, bool discon
   PcrState& s = pcr_state_[pid];
   if (s.stream < 0) {
     s.stream = static_cast<int32_t>(timing_.pcr.size());
-    timing_.pcr.push_back(PcrStream{pid, {}, 0, 0, 0});
+    timing_.pcr.push_back(PcrStream{pid, {}, 0, 0, 0, 0});
   }
   PcrStream& st = timing_.pcr[static_cast<size_t>(s.stream)];
   st.points.push_back({packet_index, pcr});
@@ -98,6 +98,9 @@ void TimingBuilder::check_pcr(PcrState& s, PcrStream& st, uint64_t pcr, uint64_t
   }
   if (ok && s.have_prev) {
     check_accuracy(s, st, delta, offset);
+  }
+  if (!ok) {
+    ++st.pcr_errors;
   }
   s.have_prev = ok;
   s.prev = s.last;
@@ -157,13 +160,7 @@ Timing TimingBuilder::finish() {
 
 namespace {
 
-struct TimePoint {
-  uint64_t packet_index = 0;
-  double t = 0;  // 27 MHz ticks from the first point
-};
-
-// The PCR points as a strictly increasing time axis: wraps are unwrapped, and a step back or a step of more than
-// kTimelineJump continues at the rate of the previous segment.
+// The PCR points as a strictly increasing time axis (see TimeAxis).
 std::vector<TimePoint> timeline(const std::vector<PcrPoint>& pcr) {
   std::vector<TimePoint> out;
   for (size_t i = 0; i < pcr.size(); ++i) {
@@ -191,6 +188,19 @@ std::vector<TimePoint> timeline(const std::vector<PcrPoint>& pcr) {
 }
 
 }  // namespace
+
+TimeAxis::TimeAxis(const std::vector<PcrPoint>& pcr) : axis_(timeline(pcr)) {}
+
+double TimeAxis::ticks_at(uint64_t k) const {
+  const auto after = std::upper_bound(axis_.begin(), axis_.end(), k,
+                                      [](uint64_t v, const TimePoint& p) { return v < p.packet_index; });
+  const size_t seg =
+      std::min(static_cast<size_t>(after - axis_.begin() > 0 ? after - axis_.begin() - 1 : 0), axis_.size() - 2);
+  const TimePoint& a = axis_[seg];
+  const TimePoint& b = axis_[seg + 1];
+  const double rate = (b.t - a.t) / static_cast<double>(b.packet_index - a.packet_index);
+  return a.t + rate * (static_cast<double>(k) - static_cast<double>(a.packet_index));
+}
 
 std::vector<PidBitrate> compute_bitrates(const std::vector<uint16_t>& packet_pid, const std::vector<PcrPoint>& pcr,
                                          uint32_t packet_bytes) {

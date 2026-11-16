@@ -28,6 +28,10 @@ import java.util.function.Consumer
  * through [QtQuickView] (ADR-004), not Qt's own QtActivity, so that it can own the HDR SurfaceView sibling
  * (ADR-014). WI-0.050 sets up the layout of item 1 and the JNI library, WI-0.052 the HDR output of item 2; the later
  * items arrive with WI-0.051 (files), WI-0.053 (plugins) and WI-0.054 (ChromeOS configuration changes).
+ *
+ * The open file is not owned here: [OvtSession] keeps the core handles for the life of the process, and every
+ * instance of this Activity binds to it in [onCreate] (WI-A.450, chapter 11 §11.5.7), so a recreated Activity shows
+ * the same file without opening or indexing it again.
  */
 class MainActivity : AppCompatActivity() {
     private lateinit var hdrSurface: HdrSurfaceView
@@ -35,11 +39,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var filePicker: FilePicker
     private var overlay: DebugInfoOverlay? = null
 
-    /** The `ovt_jni_open_fd` session of the file on screen, 0 for none. Touched on the main thread only. */
-    private var session = 0L
+    /** This instance's binding to [OvtSession]: shows the open file in the debug overlay. */
+    private val sessionListener =
+        OvtSession.Listener { file -> overlay?.show(file?.let { OvtNative.infoJson(it.handle) }) }
     private val headroomListener =
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
+
+    /** True only inside a finishing onDestroy (issue #614). */
+    private var keepQtAlive = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,8 +61,8 @@ class MainActivity : AppCompatActivity() {
             window.colorMode = ActivityInfo.COLOR_MODE_HDR
         }
 
-        // Bottom child: the HDR picture surface with the PQ test pattern of WI-0.052. Until WI-A.400 follows the
-        // Picture panel's geometry it fills the area below the header band of AndroidShell.qml.
+        // Bottom child: the HDR picture surface with the PQ test pattern of WI-0.052, below the top quarter. The opaque
+        // WI-A.450 shell covers it until WI-A.400 gives it the Picture panel's geometry.
         hdrSurface = HdrSurfaceView(this)
         hdrSurface.configure(caps, PATTERN_HEADROOM)
         val surfaceParams =
@@ -72,15 +80,23 @@ class MainActivity : AppCompatActivity() {
         window.decorView.doOnAttach { addQtView(host) }
 
         // File opening (WI-0.051): picker, VIEW/SEND intents, drag-and-drop; the debug overlay on debuggable builds
-        // (addQtView brings it back in front of the Qt view, which is added later).
-        filePicker = FilePicker(this, ::onFileOpened)
+        // (addQtView brings it back in front of the Qt view, which is added later). A newly opened file goes to
+        // OvtSession, which closes the one before it.
+        filePicker = FilePicker(this) { opened -> OvtSession.adopt(opened.session, opened.displayName) }
         filePicker.attachDropTarget(host)
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
             val debugOverlay = DebugInfoOverlay(this, filePicker::pick)
             overlay = debugOverlay
             host.addView(debugOverlay, debugOverlay.topStartParams())
         }
-        filePicker.handleIntent(intent)
+
+        // Re-bind to the handles of the process (WI-A.450). The launch intent is handled on a fresh start only: a
+        // recreated Activity gets the same intent again, and opening it would replace (and re-index) the file that
+        // OvtSession still holds. After process death OvtSession is empty, so the intent's file is opened again.
+        OvtSession.bind(sessionListener)
+        if (savedInstanceState == null || OvtSession.current == null) {
+            filePicker.handleIntent(intent)
+        }
 
         Log.i(TAG, "OVT: native ${OvtNative.version()}")
     }
@@ -178,7 +194,7 @@ class MainActivity : AppCompatActivity() {
             windowManager.defaultDisplay
         }
 
-    // launchMode singleTask: a second VIEW/SEND reaches the running Activity here.
+    // launchMode singleTask: a second VIEW/SEND reaches the running Activity here, without recreating it.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -197,23 +213,35 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
+    // The handles outlive a recreation; they are closed only when the Activity really finishes (§11.5.7: jobs are
+    // cancelled on onDestroy with isFinishing).
     override fun onDestroy() {
         filePicker.shutdown()
-        OvtNative.close(session)
-        session = 0L
-        super.onDestroy()
+        OvtSession.unbind(sessionListener)
+        if (isFinishing) OvtSession.close()
+        // Issue #614: keep Qt running when the Activity finishes (see isChangingConfigurations).
+        keepQtAlive = isFinishing
+        try {
+            super.onDestroy()
+        } finally {
+            keepQtAlive = false
+        }
     }
 
-    private fun onFileOpened(opened: FilePicker.OpenedFile) {
-        OvtNative.close(session) // the previous file, if any
-        session = opened.session
-        overlay?.show(OvtNative.infoJson(session))
-    }
+    /**
+     * Issue #614. Qt 6.8's QtEmbeddedDelegate quits Qt from Application.ActivityLifecycleCallbacks.onActivityDestroyed
+     * unless isChangingConfigurations() is true. In embedded mode that quit waits on the UI thread for Qt's main() to
+     * return, which nothing asks it to do, so a finishing Activity hangs (and if main() did return, Qt would call
+     * exit()). Qt is kept for the life of the process instead: during a finishing onDestroy this reports a
+     * configuration change, so Qt treats the finish as it treats a recreation, and the next MainActivity's QtQuickView
+     * attaches to the running Qt. No ViewModel or retained Fragment state depends on this value here.
+     */
+    override fun isChangingConfigurations(): Boolean = keepQtAlive || super.isChangingConfigurations()
 
     private companion object {
         const val TAG = "OVT"
 
-        /** Share of the window height that AndroidShell.qml's header band covers (keep both in step). */
+        /** Top margin of the HDR surface as a share of the window height, until WI-A.400 follows the Picture panel. */
         const val SHELL_HEADER_FRACTION = 0.25f
 
         /**

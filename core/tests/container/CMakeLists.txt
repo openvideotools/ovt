@@ -10,8 +10,10 @@ add_executable(
   box_walk_test.cpp
   c_api_test.cpp
   decoders_movie_test.cpp
+  decoders_sample_entries_test.cpp
   field_builder_test.cpp
   ivf_test.cpp
+  lazy_test.cpp
   m3u8_test.cpp
   mpd_test.cpp
   mxf_placeholder_test.cpp
@@ -26,6 +28,7 @@ add_executable(
   test_container_obu.cpp
   test_container_y4m.cpp
   mpegts_pes_test.cpp
+  tr101290_test.cpp
   ts_packets_test.cpp
   y4m_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")

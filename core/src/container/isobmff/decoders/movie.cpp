@@ -35,10 +35,10 @@ std::string_view sv(const Fourcc& cc) {
 }
 
 // ---- interim name tables -------------------------------------------------------------------------------------
-// SPEC-ASSUMPTION(#567): §8.3.1 takes brand and handler descriptions from the generated kBrands / kHandlers tables
-// of WI-1.203, which are not on main yet. Until they are, these short tables of the MP4RA entries seen in the
-// container-smoke corpus give the derived text; a code missing here simply has no derived text (no CNT-1031,
-// which needs the full kHandlers table). WI-1.203's tables replace both.
+// SPEC-ASSUMPTION(#567, #574): §8.3.1 takes brand and handler descriptions from the generated kBrands / kHandlers
+// tables of WI-1.203 (brand_description() / handler_description()). Their descriptions stay empty until the owner
+// rules on the MP4RA data licence, so these short tables of the MP4RA entries seen in the container-smoke corpus
+// are the fallback; a code in neither has no derived text (no CNT-1031, which needs the full kHandlers table).
 struct Name {
   std::string_view code;
   std::string_view text;
@@ -117,6 +117,17 @@ template <size_t N>
 std::string_view name_of(const std::array<Name, N>& table, std::string_view code) {
   const auto it = std::ranges::find(table, code, &Name::code);
   return it == table.end() ? std::string_view{} : it->text;
+}
+
+// The registry's description of a brand / handler, else the interim table's.
+std::string_view brand_text(std::string_view code) {
+  const std::string_view d = brand_description(code);
+  return d.empty() ? name_of(kBrandNames, code) : d;
+}
+
+std::string_view handler_text(std::string_view code) {
+  const std::string_view d = handler_description(code);
+  return d.empty() ? name_of(kHandlerNames, code) : d;
 }
 
 // ---- shared helpers ------------------------------------------------------------------------------------------
@@ -256,7 +267,7 @@ void check_trailing(FieldBuilder& fb) {
 uint64_t decode_file_type(BoxContext& ctx, BitReader& br, FieldBuilder& fb, std::string_view ref) {
   const SpecRefScope scope(fb, ref);
   const Fourcc major = fb.fourcc("major_brand");
-  if (const std::string_view d = name_of(kBrandNames, sv(major)); !d.empty()) {
+  if (const std::string_view d = brand_text(sv(major)); !d.empty()) {
     derived_sibling(fb, "major_brand", d);
   }
   fb.u32("minor_version");
@@ -265,7 +276,7 @@ uint64_t decode_file_type(BoxContext& ctx, BitReader& br, FieldBuilder& fb, std:
   fb.array("compatible_brands", count);
   for (uint64_t i = 0; i < count; ++i) {
     const Fourcc cc = fb.fourcc("compatible_brands[" + std::to_string(i) + "]");
-    if (const std::string_view d = name_of(kBrandNames, sv(cc)); !d.empty()) {
+    if (const std::string_view d = brand_text(sv(cc)); !d.empty()) {
       compat += (compat.empty() ? "" : "; ") + std::string(sv(cc)) + ": " + std::string(d);
     }
   }
@@ -392,16 +403,16 @@ uint64_t decode_elst(BoxContext& ctx, BitReader& br, FieldBuilder& fb) {
   const bool wide = version_of(fb) == 1;
   const uint32_t entry_bytes = wide ? 20U : 12U;
   const uint32_t count = fb.u32("entry_count");
-  uint64_t readable = count;
+  uint32_t readable = count;
   if (const uint64_t fit = br.bits_left() / 8U / entry_bytes; fit < count) {
     fb.diag(Severity::Error, "CNT-1014",
             "elst.entry_count " + std::to_string(count) + " needs " + std::to_string(uint64_t{count} * entry_bytes) +
                 " bytes; " + std::to_string(fit) + " entries fit in the box");
-    readable = fit;
+    readable = static_cast<uint32_t>(fit);  // fit < count <= UINT32_MAX
   }
-  fb.array("entries", count);
+  fb.array("entries", readable);  // the entries present; entry_count keeps the declared number
   for (uint32_t i = 0; i < readable; ++i) {
-    if (!FieldBuilder::materialise(i, count)) {
+    if (!FieldBuilder::materialise(i, readable)) {
       br.skip_bytes(entry_bytes);
       continue;
     }
@@ -448,7 +459,7 @@ uint64_t decode_hdlr(BoxContext& ctx, BitReader& br, FieldBuilder& fb) {
   const SpecRefScope scope(fb, "ISO/IEC 14496-12:2022 §8.4.3");
   fb.u32("pre_defined");
   const Fourcc handler = fb.fourcc("handler_type");
-  if (const std::string_view d = name_of(kHandlerNames, sv(handler)); !d.empty()) {
+  if (const std::string_view d = handler_text(sv(handler)); !d.empty()) {
     derived_sibling(fb, "handler_type", d);
   }
   if (ctx.parent_is("mdia")) {
@@ -605,8 +616,6 @@ OVT_BOX_DECODER("tref/*", "*/tref", &decode_track_reference)
 OVT_BOX_DECODER("trgr/*", "*/trgr", &decode_track_group)
 OVT_BOX_DECODER("elst", "*", &decode_elst)
 OVT_BOX_DECODER("mdhd", "*", &decode_mdhd)
-OVT_BOX_DECODER("hdlr", "*/mdia", &decode_hdlr)
-OVT_BOX_DECODER("hdlr", "*/meta", &decode_hdlr)
 OVT_BOX_DECODER("hdlr", "*", &decode_hdlr)
 OVT_BOX_DECODER("elng", "*", &decode_elng)
 OVT_BOX_DECODER("vmhd", "*", &decode_vmhd)

@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "overlay/arrow_instances.h"
 #include "ovt/render/overlay_set.h"
 
 namespace ovt::render {
@@ -49,6 +50,10 @@ class OverlaySet {
 
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
+
+  // MV arrow and intra direction stroke instances (§10.5.1, §10.5.4; WI-2.434). Empty unless MvL0, MvL1, MvBi or
+  // IntraDirs is set.
+  detail::ArrowInstances arrows;
 
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.

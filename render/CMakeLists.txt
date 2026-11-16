@@ -54,10 +54,25 @@ if(APPLE)
   target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
 endif()
 
+# WI-1.407: display_probe() (§10.4.5). The rules are portable; one platform file queries the screen.
+target_sources(ovt_render PRIVATE src/platform/display_caps_rules.cpp)
+if(APPLE)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_macos.mm)
+  set_source_files_properties(src/platform/display_caps_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(ANDROID)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_android.cpp)
+else()
+  target_sources(ovt_render PRIVATE src/platform/display_caps_linux.cpp)
+endif()
+
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
-foreach(shader IN ITEMS diff fill hatch heatmap)
+# WI-2.439: overlay colour tables (kOverlayColors, kOverlayColorsCvd), halo rule and legend data (§10.5.2).
+target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
+# WI-2.434: MV arrow and intra stroke instances (2.434a) and passes 8-9 by vertex pulling (2.434b, §10.5.4).
+target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
+foreach(shader IN ITEMS arrows diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
   file(READ "${shader_src}" OVT_SHADER_TEXT)
