@@ -6,7 +6,7 @@
 // path holds a copy of a larger payload. A decoder walks a large table window by window, building a BitReader over
 // each window.
 //
-// SPEC-ASSUMPTION(#630): BitReader (a public C++ helper header, chapter 7 §7.2) reads a std::span and is not changed
+// BitReader (a public C++ helper header, chapter 7 §7.2) reads a std::span and is not changed
 // here, so "a BitReader over a PagedSpan" is realised as one BitReader per window; BoxContext::payload_pages carries
 // the PagedSpan to the decoders that walk large tables.
 

@@ -26,7 +26,7 @@ namespace {
 using fb::BoxNodeT;
 
 constexpr uint64_t kHeaderProbe = 32;  // 8 + 8 (largesize) + 16 (usertype)
-// SPEC-ASSUMPTION(#630): a decoder's BitReader sees at most 1 MiB (§8.2.3 reading strategy); the decoders of the
+// A decoder's BitReader sees at most 1 MiB (§8.2.3 reading strategy); the decoders of the
 // large tables (stts, ctts, stsz, stz2, stco, co64, stss, stps) read the rest through BoxContext::payload_pages.
 constexpr uint64_t kMaxDecodedPayload = 1 << 20;
 
