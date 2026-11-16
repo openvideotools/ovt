@@ -297,6 +297,30 @@ TEST_CASE("h264_active_sets: replace before a picture, identical within it", "[i
   CHECK(held->pic_init_qp_minus26 == -4);
 }
 
+TEST_CASE("h264_active_sets: every PPS a picture's slices use is fixed until the picture ends", "[index][h264][fast]") {
+  h264::ActiveSets sets;
+  std::vector<h264::SetDiagnostic> diags;
+  const auto sps = sps_bytes(0, 1);
+  sets.put_sps(parse_sps_bytes(sps), sps, 0, diags);
+  const auto pps0 = pps_bytes(0, 0, 0);
+  const auto pps1 = pps_bytes(1, 0, 2);
+  const auto pps1_new = pps_bytes(1, 0, -2);
+  sets.put_pps(parse_pps_bytes(pps0, sets.parameter_sets(diags).sps), pps0, 1, diags);
+  sets.put_pps(parse_pps_bytes(pps1, sets.parameter_sets(diags).sps), pps1, 2, diags);
+  REQUIRE(sets.activate(make_nal(5, 3), slice_with_pps(0), true, diags).has_value());
+  REQUIRE(sets.activate(make_nal(5, 3), slice_with_pps(1), false, diags).has_value());
+  REQUIRE(diags.empty());
+  // PPS 1 was used by the second slice, not the first: a change to it is still within the picture.
+  sets.put_pps(parse_pps_bytes(pps1_new, sets.parameter_sets(diags).sps), pps1_new, 3, diags);
+  REQUIRE(has_set_code(diags, "SYN-H264-0021", Severity::Error));
+  CHECK(diags[0].message == "PPS 1 changed within a picture");
+  CHECK(sets.pps(1)->pic_init_qp_minus26 == 2);
+  const auto a = sets.activate(make_nal(1, 2), slice_with_pps(1), true, diags);
+  REQUIRE(a.has_value());
+  CHECK(a->pps->pic_init_qp_minus26 == -2);
+  CHECK(a->pps_unit == 3);
+}
+
 TEST_CASE("h264_scaling: Table 7-2 fall-back rules A and B", "[index][h264][fast]") {
   h264::Sps sps;
   h264::Pps pps;

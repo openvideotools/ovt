@@ -13,6 +13,8 @@ add_library(ovt::render ALIAS ovt_render)
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 # WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
+# WI-1.410: compare modes (§10.2.4, §10.6.4); src/shaders/diff.glsl is embedded by the WI-2.431 loop below.
+target_sources(ovt_render PRIVATE src/pipeline/compare.cpp src/pipeline/compare_convert.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
 # WI-1.404: offscreen interop export, one pl_gpu per §10.2.2 interop row (Metal texture, shared Vulkan device, GL).
@@ -50,10 +52,21 @@ if(APPLE)
   target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
 endif()
 
+# WI-1.407: display_probe() (§10.4.5). The rules are portable; one platform file queries the screen.
+target_sources(ovt_render PRIVATE src/platform/display_caps_rules.cpp)
+if(APPLE)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_macos.mm)
+  set_source_files_properties(src/platform/display_caps_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(ANDROID)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_android.cpp)
+else()
+  target_sources(ovt_render PRIVATE src/platform/display_caps_linux.cpp)
+endif()
+
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
-foreach(shader IN ITEMS fill hatch heatmap)
+foreach(shader IN ITEMS diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
   file(READ "${shader_src}" OVT_SHADER_TEXT)
