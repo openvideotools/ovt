@@ -2,12 +2,16 @@
 
 Machine: cloud container, Linux x86_64 (Ubuntu 24.04), Qt 6.4.2 from apt, no Android SDK/NDK, no emulator, no
 Kotlin compiler (Google's Maven and the SDK downloads are blocked by the container's proxy).
-Date: 2026-11-14. Spec version: 1.0-rc24.
+Date: 2026-11-14 (desktop), 2026-11-16 (emulator). Spec version: 1.0-rc24.
 
-**Status: the emulator runs have not been done.** The QML half of test 1 runs on the desktop and passes; the APK
-and the instrumentation tests could not be built here. The emulator runs are owed before this work item is Done;
-the commands are below so that the Mac Mini session or a CI emulator job (WI-0.034, WI-1.577) can fill in the
-output.
+**Status: all three tests pass.** The QML half of test 1 runs on the desktop (below). The emulator runs were done on
+the Mac Mini (Mac16,10, Apple M4, macOS 15.8.2), AVD `ovt-api36-arm64` (android-36 google_apis arm64-v8a,
+headless; the Mini has no x86_64 system image, so the arm64-v8a APK was used), on 2026-11-16: the instrumentation
+tests and test 1 at commit 565b1a8, the manual cross-checks of tests 2 and 3 at 301b400. Build:
+`./gradlew -p android :app:QtBuildTask --rerun :app:assembleFossDebug :app:assembleFossDebugAndroidTest`.
+
+Finishing the Activity after the Qt UI loaded deadlocked in Qt 6.8's `QtNative.quitQt()` until the fix of issue #614
+(PR #615, merged into this branch): the instrumentation tests below depend on it.
 
 ## Test 1: the APK launches on the x86_64 API 36 emulator and the Welcome page shows
 
@@ -43,7 +47,15 @@ The probe is a log line, not `uiautomator dump`: Qt 6.8's `QtQuickView` register
 (issue #547), so the whole QML scene is one `TextureView` without child nodes and uiautomator cannot see the
 Welcome page's `Accessible.name`. The screenshot is the visual check.
 
-Output: NOT YET RECORDED (plus a screenshot, `adb exec-out screencap -p > welcome.png`).
+Output (565b1a8; the line comes from the `qml` log tag; screenshot in the project files,
+`wa450-teardown-final-565b1a8-C.png`, not committed):
+
+```console
+11-16 00:03:51.650  4327  4352 I qml     : OVT: Welcome page shown
+11-16 00:03:52.510  4327  4327 I OVT     : OVT: QML root ready, title 'OVT Studio'
+```
+
+PASS.
 
 ## Test 2: an `ACTION_VIEW` intent opens the file in the running Activity without recreation
 
@@ -65,7 +77,23 @@ A MediaStore URI with `-n` and `--grant-read-uri-permission`: without `-n` anoth
 take the intent (a chooser opens), and `adb shell` cannot grant read access to an ExternalStorageProvider document URI
 (Permission Denial).
 
-Output: NOT YET RECORDED (`./gradlew -p android :app:connectedFossDebugAndroidTest`).
+Output. Instrumented, 565b1a8, each case alone and then the whole class in one process
+(`adb shell am instrument -w -r -e class org.openvideotools.studio.SessionTest
+org.openvideotools.studio.debug.test/androidx.test.runner.AndroidJUnitRunner`):
+
+```console
+viewIntentOpensFileInRunningActivity: OK (1 test)
+SessionTest (whole class): OK (3 tests)
+```
+
+Manual cross-check, 301b400 (MediaStore id of `mini.mp4`: 16):
+
+```console
+Warning: Activity not started, intent has been delivered to currently running top-most instance.
+11-15 22:38:36.787  4448  4523 I OVT     : opened fd size=475988
+```
+
+PASS.
 
 ## Test 3: with "Don't keep activities", recreation keeps the open handles
 
@@ -87,4 +115,19 @@ adb logcat -d -s OVT | grep -c 'opened fd size='   # prints 1: the file was open
 adb shell settings put global always_finish_activities 0
 ```
 
-Output: NOT YET RECORDED.
+Output. Instrumented, 565b1a8:
+
+```console
+recreationKeepsTheOpenHandles: OK (1 test)
+finishingClosesTheSession: OK (1 test)
+```
+
+Manual cross-check, 301b400:
+
+```console
+Warning: Activity not started, its current task has been brought to the front
+grep -c 'opened fd size=': 1
+```
+
+PASS. Also checked at 565b1a8: Back from the loaded UI destroys the Activity without an ANR, and a warm relaunch
+in the same process (same pid) shows the Welcome page again (`wa450-teardown-final-565b1a8-D.png`).
