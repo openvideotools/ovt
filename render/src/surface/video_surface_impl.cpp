@@ -304,6 +304,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
     offscreen_.begin_frame();  // the host hands the texture back (§10.2.2 sync rules)
     pl_tex_clear_ex(gpu_, tex, background(view));
+    measurer_.begin_render();
     if (slot_a_.valid) {
       struct pl_frame target = {};
       target.num_planes = 1;
@@ -313,7 +314,7 @@ class VideoSurfaceImpl final : public VideoSurface {
         target.planes[0].component_mapping[c] = c;
       }
       target.color = detail::target_color(target_, active_);
-      draw_slot_a(view, target, true);
+      draw_picture(view, target, true);
     }
     // §10.7.9: the measurement passes follow the display render in the same submission, only while measure() is
     // being called.
@@ -439,6 +440,42 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
   }
 
+  // Draws picture A, or the analysis view that replaces it (§10.7.5 / §10.7.8), over the cleared target. Without the
+  // measurement passes (measurer_.error() says why) the picture is drawn as usual.
+  void draw_picture(const ViewState& view, struct pl_frame& target, bool offscreen) {
+    const detail::AnalysisView mode = detail::analysis_view(view);
+    pl_tex analysis = mode != detail::AnalysisView::None ? measurer_.analysis_view(slot_a_, mode) : nullptr;
+    if (analysis != nullptr) {
+      draw_analysis(view, analysis, target, offscreen);
+    } else {
+      draw_slot_a(view, target, offscreen);
+    }
+  }
+
+  // Draws an analysis view (§10.7.5, §10.7.8): an RGBA8 texture of the conformance window holding sRGB-encoded BT.709,
+  // presented as an SDR sRGB frame at the window's place in the viewport, with the ViewState filters but no dithering
+  // (the band colours are exact code values). The caller set the target's planes and colour space.
+  void draw_analysis(const ViewState& view, pl_tex analysis, struct pl_frame& target, bool offscreen) {
+    struct pl_frame image = {};
+    image.num_planes = 1;
+    image.planes[0].texture = analysis;
+    image.planes[0].components = 3;
+    for (int c = 0; c < 3; ++c) {
+      image.planes[0].component_mapping[c] = c;
+    }
+    image.repr = pl_color_repr_rgb;
+    image.color = pl_color_space_srgb;
+    image.crop = pl_rect2df{0.0F, 0.0F, static_cast<float>(analysis->params.w), static_cast<float>(analysis->params.h)};
+
+    target.crop = detail::target_rect(detail::source_rect(slot_a_, true), view, target_.width, target_.height);
+    params_.build(view, active_, offscreen, image.color, target);
+    struct pl_render_params params = params_.params();
+    params.dither_params = nullptr;
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
+      error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
+    }
+  }
+
   // ExportKind::Scope*Png (§10.8, WI-4.454): measures picture A now (blocking, unlike measure()), then writes the scope
   // texture through the GUI-independent LUT of detail::scope_png_rgb().
   bool export_scope(const char* path, detail::ScopeKind kind) {
@@ -513,8 +550,9 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (frame.fbo->params.blit_dst) {
       pl_tex_clear_ex(gpu_, frame.fbo, background(view));
     }
+    measurer_.begin_render();
     if (slot_a_.valid) {
-      draw_slot_a(view, target, false);
+      draw_picture(view, target, false);
     }
     if (measurer_.due()) {  // §10.7.9, as in render()
       measurer_.run(slot_a_);
