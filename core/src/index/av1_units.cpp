@@ -159,7 +159,7 @@ class Av1Dispatch final : public CodecDispatch {
 
   // S5 for AV1: the grouper decides, the core keeps the books.
   void place(BuilderCore& core, uint32_t unit, const ObuEvent& e, std::optional<FrameHeader> frame_header) {
-    const ObuPlacement p = grouper_.on_obu(e, [&core, unit, this](const IndexDiagnostic& d) { report(core, unit, d); });
+    const ObuPlacement p = grouper_.on_obu(e, [&core, unit](const IndexDiagnostic& d) { report(core, unit, d); });
     if (p.closes_previous_frame) {
       close_frame(core);
     }
@@ -211,7 +211,7 @@ class Av1Dispatch final : public CodecDispatch {
                      ? core.frames[static_cast<size_t>(decode_index)].qp_base
                      : int16_t{0};
         },
-        [&core, unit, this](const IndexDiagnostic& d) { report(core, unit, d); });
+        [&core, unit](const IndexDiagnostic& d) { report(core, unit, d); });
     classify_av1(f, r, *seq_, fh.current_frame_id);
     core.finish_frame();
     open_header_.reset();
