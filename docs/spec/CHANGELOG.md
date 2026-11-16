@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc36 — 2026-11-16
+
+MINOR-level (FlatBuffers schema, additive): WI-4.106a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
+
+- 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
+- 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
+
 ## 1.0.0-rc35 — 2026-11-15
 
 PATCH-level: spec-amendment pass 15 folds in the accepted answers of `spec-question` issues #558 from WI-1.230 (PR #518), #567 from WI-1.205 (PR #571), #568 from WI-1.111 (PR #573), #569 from WI-4.206 (PR #572), #570 from WI-1.114 (PR #575) and #566 from WI-3.590 (PR #576). New diagnostic codes are registered (D2: `SYN-H265-0051`, `SYN-H265-0052`); no public C header, FlatBuffers schema, plugin ABI or CLI grammar change. The test-corpus manifest schema (`tests/corpora/manifest.schema.json`) gains the optional `expected.demux` object in PR #518.
