@@ -1,0 +1,71 @@
+{
+ "end_list": true,
+ "kind": "media",
+ "media_sequence": 100,
+ "segments": [
+  {
+   "duration": -1,
+   "is_init": true,
+   "length": 0,
+   "number": -1,
+   "offset": 0,
+   "start_time": -1,
+   "url": "https://example.invalid/hls/init_a.mp4"
+  },
+  {
+   "duration": 6006000,
+   "is_init": false,
+   "length": 0,
+   "number": 100,
+   "offset": 0,
+   "start_time": 0,
+   "url": "https://example.invalid/hls/seg100.m4s"
+  },
+  {
+   "duration": 6006000,
+   "is_init": false,
+   "length": 0,
+   "number": 101,
+   "offset": 0,
+   "start_time": 6006000,
+   "url": "https://example.invalid/hls/seg101.m4s"
+  },
+  {
+   "duration": 5500000,
+   "is_init": false,
+   "length": 0,
+   "number": 102,
+   "offset": 0,
+   "start_time": 12012000,
+   "url": "https://example.invalid/hls/seg102.m4s"
+  },
+  {
+   "duration": -1,
+   "is_init": true,
+   "length": 720,
+   "number": -1,
+   "offset": 0,
+   "start_time": -1,
+   "url": "https://example.invalid/hls/init_b.mp4"
+  },
+  {
+   "duration": 6000000,
+   "is_init": false,
+   "length": 0,
+   "number": 103,
+   "offset": 0,
+   "start_time": 17512000,
+   "url": "https://example.invalid/hls/seg103.m4s"
+  },
+  {
+   "duration": 3003000,
+   "is_init": false,
+   "length": 0,
+   "number": 104,
+   "offset": 0,
+   "start_time": 23512000,
+   "url": "https://example.invalid/hls/seg104.m4s"
+  }
+ ],
+ "target_duration": 6
+}
