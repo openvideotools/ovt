@@ -96,6 +96,24 @@ std::string_view find_name(std::span<const RegistryName> table, std::string_view
                                                                    : std::string_view{};
 }
 
+// The most specific table row (no decoder) among `rows` whose allowed_parents names the innermost ancestor.
+const RegistryEntry* most_specific_listing(const std::vector<const RegistryEntry*>& rows,
+                                           const std::vector<FourCC>& ancestors) {
+  if (ancestors.empty()) {
+    return nullptr;
+  }
+  const std::string_view parent = as_view(ancestors.back());
+  const RegistryEntry* listed = nullptr;
+  for (const RegistryEntry* e : rows) {
+    if (e->decoder == nullptr && lists_parent(e->allowed_parents, parent) &&
+        context_matches(e->context_pattern, ancestors) &&
+        (listed == nullptr || pattern_specificity(e->context_pattern) > pattern_specificity(listed->context_pattern))) {
+      listed = e;
+    }
+  }
+  return listed;
+}
+
 }  // namespace
 
 bool context_matches(std::string_view pattern, const std::vector<FourCC>& ancestors) {
@@ -232,17 +250,7 @@ const RegistryEntry* BoxRegistry::lookup(std::string_view fourcc, const BoxConte
   const RegistryEntry* listed = nullptr;  // the most specific table row of this fourcc that names the parent
   if (auto it = by_fourcc_.find(fourcc); it != by_fourcc_.end()) {
     consider(it->second, true);
-    if (!ctx.ancestors.empty()) {
-      const std::string_view parent = as_view(ctx.ancestors.back());
-      for (const RegistryEntry* e : it->second) {
-        if (e->decoder == nullptr && lists_parent(e->allowed_parents, parent) &&
-            context_matches(e->context_pattern, ctx.ancestors) &&
-            (listed == nullptr ||
-             pattern_specificity(e->context_pattern) > pattern_specificity(listed->context_pattern))) {
-          listed = e;
-        }
-      }
-    }
+    listed = most_specific_listing(it->second, ctx.ancestors);
   }
   if (!ctx.ancestors.empty()) {
     if (auto it = by_parent_.find(as_view(ctx.ancestors.back())); it != by_parent_.end()) {
