@@ -39,6 +39,8 @@
     "SYN-H265-0011": "needs a PPS NAL removed from the stream, not a bit edit; covered by the WI-1.113 unit tests",
     "SYN-H265-0021": "needs a second, different VPS/SPS/PPS inserted inside a picture, not a bit edit; covered by the WI-1.115 unit tests",
     "SYN-H265-0061": "needs the independent slice segment removed before a dependent one, not a bit edit; covered by the WI-1.113 unit tests",
+    "SYN-H265-0051": "needs an SEI ahead of its SPS or VPS, a NAL reorder rather than a bit edit; covered by the WI-1.114 unit tests",
+    "SYN-H265-0052": "needs an SEI payload longer than its last element, not a header bit edit; covered by the WI-1.114 unit tests",
     "SYN-GEN-0103": "a cancelled or partial index is a run-time condition, not a property of the file",
     "SYN-GEN-0104": "every unedited Annex B / OBU recipe output already lacks timing information",
     "SYN-GEN-0105": "a length-prefixed sample overrun is an MP4 edit: chapter 8 broken corpus (WI-1.201)",
