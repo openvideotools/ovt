@@ -28,6 +28,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string_view>
 #include <utility>
 
@@ -478,6 +479,49 @@ int PictureHost::picture_width() const noexcept {
 
 int PictureHost::picture_height() const noexcept {
   return frame_ != nullptr ? static_cast<int>(frame_->picture.coded_height) : 0;
+}
+
+QRect PictureHost::crop() const {
+  if (frame_ == nullptr) {
+    return {};
+  }
+  const ovt::fb::Rect& c = frame_->picture.crop;
+  if (c.w() <= 0 || c.h() <= 0) {
+    return {};
+  }
+  return {c.x(), c.y(), c.w(), c.h()};  // ovt.fb.Rect fields are int
+}
+
+QVariantList PictureHost::codeValues(int x, int y) const {
+  QVariantList codes;
+  if (frame_ == nullptr || x < 0 || y < 0) {
+    return codes;
+  }
+  const ovt::render::Picture& pic = frame_->picture;
+  if (static_cast<std::uint32_t>(x) >= pic.coded_width || static_cast<std::uint32_t>(y) >= pic.coded_height) {
+    return codes;
+  }
+  for (std::size_t i = 0; i < pic.num_planes && i < 3; ++i) {
+    const ovt::render::PlaneData& p = pic.planes[i];
+    if (p.data == nullptr || p.width == 0 || p.height == 0) {
+      break;
+    }
+    // The plane sample covering luma (x, y): scale by the plane's size relative to the luma plane.
+    const std::span<const std::uint8_t> bytes(static_cast<const std::uint8_t*>(p.data),
+                                              static_cast<std::size_t>(p.stride_bytes) * p.height);
+    const std::size_t px = (static_cast<std::size_t>(x) * p.width) / pic.coded_width;
+    const std::size_t py = (static_cast<std::size_t>(y) * p.height) / pic.coded_height;
+    const std::size_t at = (py * p.stride_bytes) + (px * p.sample_bytes);
+    if (at + p.sample_bytes > bytes.size()) {
+      break;
+    }
+    std::uint32_t v = bytes[at];
+    if (p.sample_bytes == 2) {
+      v |= static_cast<std::uint32_t>(bytes[at + 1]) << 8U;
+    }
+    codes.append(static_cast<int>(v));
+  }
+  return codes;
 }
 
 void PictureHost::set_zoom(double zoom) {

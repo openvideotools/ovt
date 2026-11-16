@@ -13,6 +13,7 @@
 #include <new>
 #include <span>
 
+#include "container/isobmff/lazy.h"
 #include "container/ivf.hpp"
 #include "container/mpegts/ts_packets.hpp"
 #include "container/mxf_placeholder.hpp"
@@ -54,6 +55,7 @@ std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file, 
     case Format::Mxf:
       return mxf::make_reader(file, why);
     case Format::Isobmff:
+      return isobmff::make_reader(file, why);
     case Format::AnnexB:
     case Format::Obu:
       return std::make_unique<Reader>();  // stub until the format's reader lands
