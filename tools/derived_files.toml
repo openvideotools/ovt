@@ -17,3 +17,17 @@ path = "render/src/measure/cie1931_locus.h"
 upstream = "colour-science (https://github.com/colour-science/colour), Copyright 2013 Colour Developers"
 commit = "a3bfe349685f528100672e5c8ca2dfeeef64a273"
 license = "BSD-3-Clause"
+
+# WI-4.200: byte-exact snapshots of the IETF CELLAR EBML and Matroska schemas; tools/gen_ebml_schema.py derives
+# core/src/container/ebml/ebml_schema.gen.cpp from them (CC-BY-4.0: attribution kept here and in that file's header).
+[[files]]
+path = "tools/registry_inputs/ebml/ebml_header.xml"
+upstream = "ietf-wg-cellar/ebml-specification (https://github.com/ietf-wg-cellar/ebml-specification), IETF CELLAR working group contributors"
+commit = "a4b3c4a88fe56ab4066e26f76691ca0c7c9274d7"
+license = "CC-BY-4.0"
+
+[[files]]
+path = "tools/registry_inputs/ebml/ebml_matroska.xml"
+upstream = "ietf-wg-cellar/matroska-specification (https://github.com/ietf-wg-cellar/matroska-specification), IETF CELLAR working group contributors"
+commit = "3366a30a21f5203ea6e34bddd6df018ce21d6aa4"
+license = "CC-BY-4.0"

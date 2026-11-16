@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# ebml https://github.com/ietf-wg-cellar/ebml-specification a4b3c4a88fe56ab4066e26f76691ca0c7c9274d7 2026-05-03
+# matroska https://github.com/ietf-wg-cellar/matroska-specification 3366a30a21f5203ea6e34bddd6df018ce21d6aa4 2026-11-15
+# snapshot 2026-11-16
+e767938ba7eef84ba33856750379eef5fd289776066b5f5f030ce6a1a7174094  ebml_header.xml
+a42a9c6ea47dfd83589ce04a508b6a7f5d038560cee11dee1e4cbe2e746d0939  ebml_matroska.xml
