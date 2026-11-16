@@ -40,7 +40,6 @@ namespace fs = std::filesystem;
 
 constexpr double kGiB = 1073741824.0;
 constexpr std::size_t kMaxRecordBytes = std::size_t{1} << 30U;
-constexpr std::string_view kKinds[] = {"index", "analysis", "metrics"};  // NOLINT(modernize-avoid-c-arrays)
 
 struct BufferGuard {
   ovt_Buffer b{};
@@ -204,6 +203,7 @@ std::optional<UsageIssue> check_format(const Globals& g, std::string_view sub, b
     return std::nullopt;
   }
   std::vector<std::string_view> names;
+  names.reserve(ok.size());
   for (const Format f : ok) {
     names.push_back(format_name(f));
   }
@@ -447,69 +447,78 @@ std::optional<RecordKind> json_kind(const nlohmann::json& j) {
   return std::nullopt;
 }
 
+struct LoadError {
+  ExitCode code = ExitCode::Ok;
+  std::string why;
+};
+
+// The records of a JSON document: one object, an array of them, or a CLI envelope whose result is either.
+std::optional<LoadError> load_json_records(const std::string& text, const RecordIo& io, const std::string& origin,
+                                           std::vector<Record>& out) {
+  nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
+  if (j.is_discarded()) {
+    return LoadError{ExitCode::Corrupt, "not valid JSON"};
+  }
+  bool rewrite = false;
+  std::optional<Hash> hint;
+  if (j.is_object() && j.contains("result") && j.contains("command") && j.contains("schema_version")) {
+    const auto input = j.value("input", nlohmann::json::object());
+    if (input.is_object() && input.contains("source_hash") && input["source_hash"].is_string()) {
+      hint = parse_hash(input["source_hash"].get<std::string>());
+    }
+    j = j["result"];  // a CLI envelope: the result holds the record(s)
+    rewrite = true;
+  }
+  std::vector<nlohmann::json> items;
+  if (j.is_array()) {
+    items.assign(j.begin(), j.end());
+    rewrite = true;
+  } else {
+    items.push_back(j);
+  }
+  for (const auto& item : items) {
+    const auto kind = json_kind(item);
+    if (!kind) {
+      return LoadError{ExitCode::Unsupported, "JSON is neither a FrameAnalysis nor a StreamIndex"};
+    }
+    Record r{*kind, {}, origin, hint};
+    std::string error;
+    const ovt_status st = io.json_to_fb(rewrite ? item.dump() : text, *kind, r.fb, error);
+    if (st != OVT_OK) {
+      return LoadError{from_status(st), error.empty() ? std::string(ovt_status_string(st)) : error};
+    }
+    out.push_back(std::move(r));
+  }
+  return std::nullopt;
+}
+
 // Loads the records of one file; problems become diagnostics (Error: the file is unusable).
 ExitCode load_records(const fs::path& p, const RecordIo& io, std::vector<Record>& out, std::vector<Diagnostic>& diags,
                       bool strict) {
-  const auto bad = [&](ExitCode code, const std::string& why) {
-    diags.push_back(Diagnostic{strict ? "Error" : "Warning", "CLI-0009", fmt::format("input '{}': {}", p.string(), why),
-                               std::nullopt, ""});
-    return code;
+  const auto result = [&](const LoadError& e) {
+    diags.push_back(Diagnostic{strict ? "Error" : "Warning", "CLI-0009",
+                               fmt::format("input '{}': {}", p.string(), e.why), std::nullopt, ""});
+    return e.code;
   };
   auto bytes = read_file(p);
   if (!bytes) {
-    return bad(ExitCode::Io, "cannot be read");
+    return result({ExitCode::Io, "cannot be read"});
   }
   if (!inflate_if_zstd(*bytes)) {
-    return bad(ExitCode::Corrupt, "not a valid zstd frame");
+    return result({ExitCode::Corrupt, "not a valid zstd frame"});
   }
-  const auto first = std::find_if(bytes->begin(), bytes->end(), [](std::uint8_t c) { return !std::isspace(c); });
+  const auto first = std::find_if(bytes->begin(), bytes->end(), [](std::uint8_t c) { return std::isspace(c) == 0; });
   if (first != bytes->end() && (*first == '{' || *first == '[')) {
-    const std::string text(bytes->begin(), bytes->end());
-    nlohmann::json j = nlohmann::json::parse(text, nullptr, false);
-    if (j.is_discarded()) {
-      return bad(ExitCode::Corrupt, "not valid JSON");
-    }
-    bool rewrite = false;
-    std::optional<Hash> hint;
-    if (j.is_object() && j.contains("result") && j.contains("command") && j.contains("schema_version")) {
-      if (j.contains("input") && j["input"].is_object() && j["input"].contains("source_hash") &&
-          j["input"]["source_hash"].is_string()) {
-        hint = parse_hash(j["input"]["source_hash"].get<std::string>());
-      }
-      j = j["result"];  // a CLI envelope: the result holds the record(s)
-      rewrite = true;
-    }
-    std::vector<nlohmann::json> items;
-    if (j.is_array()) {
-      items.assign(j.begin(), j.end());
-      rewrite = true;
-    } else {
-      items.push_back(j);
-    }
-    for (const auto& item : items) {
-      const auto kind = json_kind(item);
-      if (!kind) {
-        return bad(ExitCode::Unsupported, "JSON is neither a FrameAnalysis nor a StreamIndex");
-      }
-      Record r{*kind, {}, p.string(), hint};
-      std::string error;
-      const ovt_status st = io.json_to_fb(rewrite ? item.dump() : text, *kind, r.fb, error);
-      if (st != OVT_OK) {
-        return bad(from_status(st), error.empty() ? std::string(ovt_status_string(st)) : error);
-      }
-      out.push_back(std::move(r));
-    }
+    const auto err = load_json_records(std::string(bytes->begin(), bytes->end()), io, p.string(), out);
+    return err ? result(*err) : ExitCode::Ok;
+  }
+  const std::string id = bytes->size() >= 8 ? std::string(bytes->begin() + 4, bytes->begin() + 8) : std::string();
+  if (id == "OVTA" || id == "OVTI") {
+    out.push_back(Record{id == "OVTA" ? RecordKind::FrameAnalysis : RecordKind::StreamIndex, std::move(*bytes),
+                         p.string(), std::nullopt});
     return ExitCode::Ok;
   }
-  if (bytes->size() >= 8) {
-    const std::string id(bytes->begin() + 4, bytes->begin() + 8);
-    if (id == "OVTA" || id == "OVTI") {
-      out.push_back(Record{id == "OVTA" ? RecordKind::FrameAnalysis : RecordKind::StreamIndex, std::move(*bytes),
-                           p.string(), std::nullopt});
-      return ExitCode::Ok;
-    }
-  }
-  return bad(ExitCode::Unsupported, "not a recognised record (.json, .fa, .fa.zst, .index.fb)");
+  return result({ExitCode::Unsupported, "not a recognised record (.json, .fa, .fa.zst, .index.fb)"});
 }
 
 std::optional<Hash> parse_hash(std::string_view hex) {
@@ -608,107 +617,121 @@ ovt_status store(const Record& r, const Hash& h) {
   return st;
 }
 
+struct ImportState {
+  ExitCode code = ExitCode::Ok;
+  std::set<std::string> touched;
+  std::size_t imported = 0;
+  std::optional<UsageIssue> usage;
+};
+
+// Validates and stores one record; failures go to diags and st.code, a usage problem to st.usage.
+void import_record(const Record& r, const RecordIo& io, std::vector<Diagnostic>& diags, ImportState& st) {
+  if (!verifies(r)) {
+    diags.push_back(error(fmt::format("input '{}': record does not verify", r.origin)));
+    st.code = ExitCode::Corrupt;
+    return;
+  }
+  bool conflict = false;
+  const auto hash = record_hash(r, conflict);
+  if (conflict || !hash) {
+    st.usage =
+        UsageIssue{"CLI-0001",
+                   conflict ? "the envelope's input.source_hash differs from the StreamIndex's source_hash"
+                            : fmt::format("'{}' names no source (use the JSON of `ovt analyze -f json`, which carries "
+                                          "input.source_hash)",
+                                          r.origin),
+                   "ovt cache import"};
+    return;
+  }
+  const std::size_t first = diags.size();
+  const ovt_status vs = io.validate(r.kind, r.fb, r.kind == RecordKind::FrameAnalysis ? hash->data() : nullptr, diags);
+  const bool errors = std::any_of(diags.begin() + static_cast<std::ptrdiff_t>(first), diags.end(),
+                                  [](const Diagnostic& d) { return d.severity == "Error" || d.severity == "Fatal"; });
+  if (vs != OVT_OK || errors) {  // never write a record that fails the §6.9 rules
+    st.code = vs != OVT_OK ? from_status(vs) : ExitCode::Corrupt;
+    return;
+  }
+  if (const ovt_status ss = store(r, *hash); ss != OVT_OK) {
+    diags.push_back(error(fmt::format("input '{}': cannot store: {}", r.origin, ovt_status_string(ss))));
+    st.code = from_status(ss);
+    return;
+  }
+  st.touched.insert(to_hex_string(*hash));
+  ++st.imported;
+}
+
+std::vector<fs::path> import_files(const fs::path& root, bool& is_dir) {
+  std::error_code ec;
+  is_dir = fs::is_directory(root, ec);
+  std::vector<fs::path> files;
+  if (!is_dir) {
+    files.push_back(root);
+    return files;
+  }
+  for (const auto& de : fs::directory_iterator(root, ec)) {
+    if (de.is_regular_file()) {
+      files.push_back(de.path());
+    }
+  }
+  std::sort(files.begin(), files.end());
+  return files;
+}
+
 CacheOutcome run_import(const CacheArgs& a, const Globals& g, const CacheEnv& env, std::FILE* out) {
+  CacheOutcome o;
   if (g.format != Format::Text && g.format != Format::Json && g.format != Format::Fb) {
-    CacheOutcome o;
     o.code = ExitCode::Usage;
     o.usage = check_format(g, "import", false);
     return o;
   }
-  CacheOutcome o;
   if (env.io == nullptr || !env.io->available()) {
     o.code = ExitCode::Unsupported;
     o.diagnostics.push_back(
         error("import needs ovt_json_to_fb and ovt_validate_* (not in this library build yet, #673)"));
     return o;
   }
-  std::error_code ec;
-  std::vector<fs::path> files;
-  const fs::path root(a.import_path);
-  if (fs::is_directory(root, ec)) {
-    for (const auto& de : fs::directory_iterator(root, ec)) {
-      if (de.is_regular_file()) {
-        files.push_back(de.path());
-      }
-    }
-    std::sort(files.begin(), files.end());
-  } else {
-    files.push_back(root);
-  }
-  const bool strict = !fs::is_directory(root, ec);  // an unsniffable file in a directory is skipped with a warning
-  ExitCode code = ExitCode::Ok;
-  std::set<std::string> touched;
-  std::size_t imported = 0;
+  bool is_dir = false;
+  const std::vector<fs::path> files = import_files(fs::path(a.import_path), is_dir);
+  ImportState st;
   ProgressReporter progress(env.err, env.stderr_tty, "import", "files");
   std::size_t done = 0;
   for (const fs::path& f : files) {
     std::vector<Record> records;
-    const std::size_t before = o.diagnostics.size();
-    const ExitCode lc = load_records(f, *env.io, records, o.diagnostics, strict);
-    if (lc != ExitCode::Ok && strict && code == ExitCode::Ok) {
-      code = lc;
+    // A file that is no record is an error for a named file, a skipped warning inside a directory.
+    const ExitCode lc = load_records(f, *env.io, records, o.diagnostics, !is_dir);
+    if (lc != ExitCode::Ok && !is_dir && st.code == ExitCode::Ok) {
+      st.code = lc;
     }
-    static_cast<void>(before);
     for (const Record& r : records) {
-      if (!verifies(r)) {
-        o.diagnostics.push_back(error(fmt::format("input '{}': record does not verify", r.origin)));
-        code = ExitCode::Corrupt;
-        continue;
+      import_record(r, *env.io, o.diagnostics, st);
+      if (st.usage) {
+        o.code = ExitCode::Usage;
+        o.usage = std::move(st.usage);
+        return o;
       }
-      bool conflict = false;
-      const auto hash = record_hash(r, conflict);
-      if (conflict) {
-        return usage("CLI-0001", "the envelope's input.source_hash differs from the StreamIndex's source_hash",
-                     "ovt cache import");
-      }
-      if (!hash) {
-        return usage(
-            "CLI-0001",
-            fmt::format("'{}' names no source (use the JSON of `ovt analyze -f json`, which carries input.source_hash)",
-                        r.origin),
-            "ovt cache import");
-      }
-      const std::size_t first = o.diagnostics.size();
-      const ovt_status vs =
-          env.io->validate(r.kind, r.fb, r.kind == RecordKind::FrameAnalysis ? hash->data() : nullptr, o.diagnostics);
-      const bool invalid = vs != OVT_OK || std::any_of(o.diagnostics.begin() + static_cast<std::ptrdiff_t>(first),
-                                                       o.diagnostics.end(), [](const Diagnostic& d) {
-                                                         return d.severity == "Error" || d.severity == "Fatal";
-                                                       });
-      if (invalid) {
-        code = vs != OVT_OK ? from_status(vs) : ExitCode::Corrupt;
-        continue;  // never write a record that fails the §6.9 rules
-      }
-      if (const ovt_status st = store(r, *hash); st != OVT_OK) {
-        o.diagnostics.push_back(error(fmt::format("input '{}': cannot store: {}", r.origin, ovt_status_string(st))));
-        code = from_status(st);
-        continue;
-      }
-      touched.insert(to_hex_string(*hash));
-      ++imported;
     }
     ++done;
     if (g.progress && files.size() > 1) {
       progress.update(static_cast<double>(done) / static_cast<double>(files.size()), done, files.size());
     }
     if (cancel_requested()) {
-      code = ExitCode::Cancelled;
+      st.code = ExitCode::Cancelled;
       break;
     }
   }
   progress.finish();
   Report rep;
-  if (const ovt_status st = load_report(rep); st != OVT_OK) {
-    return fail(st, "cannot read the cache");
+  if (const ovt_status ls = load_report(rep); ls != OVT_OK) {
+    return fail(ls, "cannot read the cache");
   }
   const auto text = [&]() {
-    return write_all(out, fmt::format("imported {} record(s) into {} cache entr{}\n", imported, touched.size(),
-                                      touched.size() == 1 ? "y" : "ies"));
+    return write_all(out, fmt::format("imported {} record(s) into {} cache entr{}\n", st.imported, st.touched.size(),
+                                      st.touched.size() == 1 ? "y" : "ies"));
   };
   // fb: the CliEnvelope only (§12.2.0 table); JSON: the report restricted to the touched entries.
   const ovt::fb::CacheReport* shown = g.format == Format::Fb ? nullptr : rep.root;
-  o.code = code;
-  o.write_failed = !emit(g, out, "cache import", shown, &touched, o.diagnostics, code, text);
+  o.code = st.code;
+  o.write_failed = !emit(g, out, "cache import", shown, &st.touched, o.diagnostics, st.code, text);
   return o;
 }
 

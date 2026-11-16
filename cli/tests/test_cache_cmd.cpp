@@ -9,6 +9,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <nlohmann/json.hpp>
 
+#include <fmt/format.h>
+
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -94,7 +96,8 @@ std::vector<std::uint8_t> stream_index(std::uint8_t hash_byte) {
   flatbuffers::FlatBufferBuilder fbb;
   const std::vector<std::uint8_t> hash(32, hash_byte);
   fbb.Finish(ovt::fb::CreateStreamIndexDirect(fbb, ovt::fb::Codec::H265, 1, &hash), "OVTI");
-  return {fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize()};
+  const std::span<const std::uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
 }
 
 std::vector<std::uint8_t> frame_analysis(int decode_index) {
@@ -102,7 +105,8 @@ std::vector<std::uint8_t> frame_analysis(int decode_index) {
   const ovt::fb::FrameId id(decode_index, decode_index);
   const auto info = ovt::fb::CreateFrameInfo(fbb, &id);
   fbb.Finish(ovt::fb::CreateFrameAnalysisDirect(fbb, 1, "fake", "1", info), "OVTA");
-  return {fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize()};
+  const std::span<const std::uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
 }
 
 // Seeds one entry holding an index through the C API.
@@ -144,9 +148,7 @@ ovt::cli::cmd::RecordIo fake_io(bool valid) {
 std::string hash_hex(std::uint8_t b) {
   std::string s;
   for (int i = 0; i < 32; ++i) {
-    char buf[3];
-    std::snprintf(buf, sizeof buf, "%02x", b);
-    s += buf;
+    s += fmt::format("{:02x}", b);
   }
   return s;
 }
@@ -263,7 +265,8 @@ TEST_CASE("cache import writes a validated FrameAnalysis (AT3 shape)", "[fast][c
   ovt_Buffer b{};
   REQUIRE(ovt_cache_get_frame(e, 7, &b) == OVT_OK);
   const auto want = frame_analysis(7);
-  CHECK(std::vector<std::uint8_t>(b.data, b.data + b.size) == want);
+  CHECK(std::vector<std::uint8_t>(std::span<const std::uint8_t>(b.data, b.size).begin(),
+                                  std::span<const std::uint8_t>(b.data, b.size).end()) == want);
   ovt_buffer_free(&b);
   ovt_cache_entry_release(e);
   ovt_cache_close(c);
