@@ -11,7 +11,7 @@ the corpus is absent: itu.int is blocked from cloud containers, so this record i
 - Environment: `OVT_CORPORA_DIR` held 38 fetched JVT entries, including `jvt_CVPCMNL1_SVA_C`, `jvt_MR6_BT_B`,
   `jvt_MR9_BT_B`, `jvt_CVFI1_Sony_D` and `jvt_sp1_bt_a`. `OVT_REQUIRE_CORPORA=1` was set.
 
-```
+```text
 $ ovt_tests_index_h264 "*"
 All tests passed (83694 assertions in 23 test cases)
 
