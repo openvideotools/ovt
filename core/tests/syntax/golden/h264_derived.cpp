@@ -81,6 +81,38 @@ void put_scaling(ParsedUnit& u, const ScalingMatrices& m) {
   put_matrices(u, "scaling_lists_8x8", m, 6, 6, std::integral_constant<size_t, 64>{});
 }
 
+// pred_weight_table() of a P, SP or B slice with the §7.4.3.2 inferred weights.
+void put_pwt(const h264::SliceHeader& sh, const h264::Sps* sps, ParsedUnit& u) {
+  const auto& pwt = sh.pred_weight_table;
+  // With ChromaArrayType 0 no chroma weights are coded and GStreamer leaves them at 0, while OVT's struct holds the
+  // §7.4.3.2 inferred 2^chroma_log2_weight_denom: the chroma keys are left out, so the golden must hold zeros.
+  const bool chroma = sps == nullptr || sps->ChromaArrayType != 0;
+  const auto list = [&](const h264::PredWeightTable::List& l, uint32_t active_minus1, const std::string& n) {
+    std::vector<int64_t> lw;
+    std::vector<int64_t> lo;
+    std::vector<int64_t> cw;
+    std::vector<int64_t> co;
+    for (uint32_t i = 0; i <= active_minus1 && i < h264::kMaxRefIdx; ++i) {
+      lw.push_back(l.luma_weight.at(i));
+      lo.push_back(l.luma_offset.at(i));
+      for (size_t j = 0; j < 2; ++j) {
+        cw.push_back(l.chroma_weight.at(i).at(j));
+        co.push_back(l.chroma_offset.at(i).at(j));
+      }
+    }
+    put(u, "luma_weight_" + n, std::move(lw));
+    put(u, "luma_offset_" + n, std::move(lo));
+    if (chroma) {
+      put(u, "chroma_weight_" + n, std::move(cw));
+      put(u, "chroma_offset_" + n, std::move(co));
+    }
+  };
+  list(pwt.l0, sh.num_ref_idx_l0_active_minus1, "l0");
+  if (sh.slice_type_mod5 == h264::kSliceB) {
+    list(pwt.l1, sh.num_ref_idx_l1_active_minus1, "l1");
+  }
+}
+
 }  // namespace
 
 ScalingMatrices h264_sps_scaling(const h264::Sps& sps) {
@@ -166,34 +198,7 @@ void add_h264_slice_derived(const h264::SliceHeader& sh, const h264::Sps* sps, P
   ops(rplm.ref_pic_list_modification_flag_l1, rplm.ops_l1, "l1");
 
   if (sh.has_pred_weight_table) {
-    const auto& pwt = sh.pred_weight_table;
-    // With ChromaArrayType 0 no chroma weights are coded and GStreamer leaves them at 0, while OVT's struct holds the
-    // §7.4.3.2 inferred 2^chroma_log2_weight_denom: the chroma keys are left out, so the golden must hold zeros.
-    const bool chroma = sps == nullptr || sps->ChromaArrayType != 0;
-    const auto list = [&](const h264::PredWeightTable::List& l, uint32_t active_minus1, const std::string& n) {
-      std::vector<int64_t> lw;
-      std::vector<int64_t> lo;
-      std::vector<int64_t> cw;
-      std::vector<int64_t> co;
-      for (uint32_t i = 0; i <= active_minus1 && i < h264::kMaxRefIdx; ++i) {
-        lw.push_back(l.luma_weight.at(i));
-        lo.push_back(l.luma_offset.at(i));
-        for (size_t j = 0; j < 2; ++j) {
-          cw.push_back(l.chroma_weight.at(i).at(j));
-          co.push_back(l.chroma_offset.at(i).at(j));
-        }
-      }
-      put(u, "luma_weight_" + n, std::move(lw));
-      put(u, "luma_offset_" + n, std::move(lo));
-      if (chroma) {
-        put(u, "chroma_weight_" + n, std::move(cw));
-        put(u, "chroma_offset_" + n, std::move(co));
-      }
-    };
-    list(pwt.l0, sh.num_ref_idx_l0_active_minus1, "l0");
-    if (sh.slice_type_mod5 == h264::kSliceB) {
-      list(pwt.l1, sh.num_ref_idx_l1_active_minus1, "l1");
-    }
+    put_pwt(sh, sps, u);
   }
 
   if (sh.has_dec_ref_pic_marking) {

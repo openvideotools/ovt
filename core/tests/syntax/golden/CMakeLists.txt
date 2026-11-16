@@ -7,7 +7,7 @@
 # tests/golden/h26x-index.json (WI-0.567). A test whose corpus file has not been fetched is skipped (exit 77), and
 # fails under OVT_REQUIRE_CORPORA=1.
 
-add_library(ovt_syntax_golden STATIC syntax_golden.cpp h264_derived.cpp)
+add_library(ovt_syntax_golden STATIC syntax_golden.cpp h264_derived.cpp h265_derived.cpp)
 target_link_libraries(ovt_syntax_golden PUBLIC ovt_core_objects ovt_test_support ovt::flags ${nlohmann_json_TARGET})
 ovt_set_license(ovt_syntax_golden "LGPL-2.1-or-later")
 
@@ -66,6 +66,8 @@ function(ovt_add_syntax_golden_tests codec oracle index_file)
   endforeach()
 endfunction()
 
-foreach(oracle trace_headers gstparse)
-  ovt_add_syntax_golden_tests(h264 ${oracle} "${_sg_golden_dir}/h26x-index.json")
+foreach(codec h264 h265)
+  foreach(oracle trace_headers gstparse)
+    ovt_add_syntax_golden_tests(${codec} ${oracle} "${_sg_golden_dir}/h26x-index.json")
+  endforeach()
 endforeach()

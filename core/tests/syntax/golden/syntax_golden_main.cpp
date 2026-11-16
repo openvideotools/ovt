@@ -111,11 +111,11 @@ std::vector<sg::ParsedUnit> parse_input(const std::filesystem::path& input, sg::
   const std::string text = sg::read_text(input);
   std::vector<uint8_t> stream(text.begin(), text.end());
   if (!sg::looks_like_annexb(stream)) {
-    stream = sg::h264_container_to_annexb(input, kContainerPackets);
+    stream = sg::container_to_annexb(input, codec, kContainerPackets);
   }
   const auto all = sg::annexb_units(stream);
   const auto units = sg::cut_to_pictures(all, codec, pictures);
-  return sg::parse_h264(units);
+  return codec == sg::Codec::kH264 ? sg::parse_h264(units) : sg::parse_h265(units);
 }
 
 // Prints the diagnostics of the units whose parser stopped; true when there is any.
@@ -146,7 +146,7 @@ int run(const Args& a) {
       (a.corpus.empty() == a.input.empty())) {
     return usage("missing argument");
   }
-  if (*codec != sg::Codec::kH264) {
+  if (*codec == sg::Codec::kAv1) {
     return usage("codec not supported yet: " + a.codec);
   }
   std::filesystem::path input = a.input;

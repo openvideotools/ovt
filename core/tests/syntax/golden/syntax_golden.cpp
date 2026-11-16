@@ -6,11 +6,13 @@
 #include "syntax_golden.h"
 
 #include "h264_derived.h"
+#include "h265_derived.h"
 
 #include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
+#include <bit>
 #include <cstdio>
 #include <fstream>
 #include <memory>
@@ -30,6 +32,12 @@
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
 #include "ovt/cxx/syntax/h264/sps_ext.hpp"
+#include "ovt/cxx/syntax/h265/nal_header.hpp"
+#include "ovt/cxx/syntax/h265/pps.hpp"
+#include "ovt/cxx/syntax/h265/sei.hpp"
+#include "ovt/cxx/syntax/h265/slice_segment_header.hpp"
+#include "ovt/cxx/syntax/h265/sps.hpp"
+#include "ovt/cxx/syntax/h265/vps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "ovt/cxx/syntax/unit_scan.hpp"
 #include "ovt_model_generated.h"
@@ -44,6 +52,9 @@ using ovt::syntax::SyntaxBuilder;
 using ovt::syntax::SyntaxNodeBuffer;
 using ovt::syntax::SyntaxNodeData;
 namespace h264 = ovt::syntax::h264;
+namespace h265 = ovt::syntax::h265;
+
+constexpr std::string_view kOpaquePrefix = "opaque:";
 
 constexpr std::array<std::string_view, 4> kSeverity = {"Info", "Warning", "Error", "Fatal"};
 
@@ -88,6 +99,12 @@ bool au_prefix(uint32_t t, Codec codec) {
     return t == 6 || t == 7 || t == 8 || t == 9 || t == 14 || t == 15;
   }
   return t == 32 || t == 33 || t == 34 || t == 35 || t == 39 || (t >= 41 && t <= 44) || (t >= 48 && t <= 55);
+}
+
+// The H.265 NAL unit types FFmpeg's CBS decomposes (cbs_h265_read_nal_unit): slice segments, VPS, SPS, PPS, AUD,
+// FD and SEI. The others are not counted in its unit indices.
+bool h265_decomposed(uint32_t t) {
+  return t <= 9 || (t >= 16 && t <= 21) || (t >= 32 && t <= 35) || (t >= 38 && t <= 40);
 }
 
 // Base name of a CBS element: "chroma_weight_l0[3][1]" -> "chroma_weight_l0".
@@ -138,6 +155,61 @@ bool ignored_name(const Collect& c, const std::string& name) {
   return c.ignored.contains(name);
 }
 
+// Parameter-set extensions OVT keeps opaque in phase 1 (chapter 7 §7.3.5 rows 2 and 4) that CBS reads as a run of
+// one-bit `extension_data` elements up to the rbsp_stop_one_bit (H.265 vps/sps/pps_extension_data_flag).
+// SPEC-ASSUMPTION(#603): compared bit by bit, so OVT's opaque span must cover exactly the bits CBS reads.
+const std::set<std::string, std::less<>> kOpaqueExtensions = {"vps_extension", "sps_extension_data_flag",
+                                                              "pps_extension_data_flag"};
+
+void push_extension_bits(const Collect& c, uint64_t begin, uint64_t end) {
+  const auto& rbsp = c.unit.rbsp;
+  // The rbsp_stop_one_bit is the last 1 bit of the RBSP; the extension bits end before it.
+  uint64_t stop = 0;
+  for (size_t i = rbsp.size(); i-- > 0;) {
+    if (rbsp[i] != 0) {
+      stop = (i * 8U) + 7U - static_cast<uint64_t>(std::countr_zero(rbsp[i]));
+      break;
+    }
+  }
+  for (uint64_t bit = begin; bit < std::min(end, stop); ++bit) {
+    const unsigned v = (rbsp.at(bit / 8) >> (7U - (bit % 8))) & 1U;
+    c.out.push_back({c.unit.index, "extension_data", bit, 1, v});
+  }
+}
+
+// Extensions §7.3.5 keeps opaque in phase 1 that CBS parses element by element. SPEC-ASSUMPTION(#663): compared for
+// coverage only; OVT's opaque node must start at the first golden element of the extension and hold every golden
+// element that follows in the unit. The marker element carries kOpaquePrefix + the node name.
+const std::set<std::string, std::less<>> kCoverageOnly = {"pps_multilayer_extension", "pps_3d_extension",
+                                                          "sps_3d_extension"};
+
+// T.35 payload fields OVT reads from the leading itu_t_t35_payload_byte()s (WI-1.120); CBS prints the bytes.
+const std::set<std::string, std::less<>> kT35PayloadFields = {"itu_t_t35_terminal_provider_code",
+                                                              "itu_t_t35_terminal_provider_oriented_code"};
+
+// The node names of SEI payloads OVT keeps as bytes (no parser, or a parameter set missing): the Annex D names.
+// CBS prints the bytes of a payload it does not parse as payload_byte.
+const std::set<std::string, std::less<>>& sei_payload_names() {
+  static const std::set<std::string, std::less<>> names = [] {
+    std::set<std::string, std::less<>> out;
+    for (uint32_t t = 0; t <= 205; ++t) {
+      out.emplace(h265::sei_payload_name(t));
+    }
+    return out;
+  }();
+  return names;
+}
+
+// One u(8) element per RBSP byte of a byte-aligned span, named as CBS names the bytes of a payload it does not parse.
+void push_bytes(const Collect& c, const std::string& name, uint64_t offset, uint64_t length) {
+  if (offset % 8 != 0 || length % 8 != 0 || (offset + length) / 8 > c.unit.rbsp.size()) {
+    return;
+  }
+  for (uint64_t bit = offset; bit < offset + length; bit += 8) {
+    c.out.push_back({c.unit.index, name, bit, 8, c.unit.rbsp.at(bit / 8)});
+  }
+}
+
 void collect_elements(const fb::SyntaxNode& n, const Collect& c) {
   const auto kind = n.kind();
   const std::string name = n.name() != nullptr ? n.name()->str() : std::string();
@@ -146,12 +218,17 @@ void collect_elements(const fb::SyntaxNode& n, const Collect& c) {
   const uint64_t length = span != nullptr ? span->bit_length() : 0U;
   if (kind == fb::SyntaxValueKind::Bytes) {
     // Byte-aligned byte arrays only; the bytes come from the RBSP (the tree keeps a copy only up to 256 bytes).
-    if (c.byte_arrays.contains(name) && offset % 8 == 0 && length % 8 == 0 &&
-        (offset + length) / 8 <= c.unit.rbsp.size()) {
-      for (uint64_t bit = offset; bit < offset + length; bit += 8) {
-        c.out.push_back({c.unit.index, name, bit, 8, c.unit.rbsp.at(bit / 8)});
-      }
+    if (c.byte_arrays.contains(name)) {
+      push_bytes(c, name, offset, length);
+    } else if (kOpaqueExtensions.contains(name)) {
+      push_extension_bits(c, offset, offset + length);
+    } else if (kCoverageOnly.contains(name)) {
+      c.out.push_back({c.unit.index, std::string(kOpaquePrefix) + name, offset, length, nullptr});
+    } else if (sei_payload_names().contains(name)) {
+      push_bytes(c, "payload_byte", offset, length);
     }
+  } else if (kT35PayloadFields.contains(name)) {
+    push_bytes(c, "itu_t_t35_payload_byte", offset, length);
   } else if (kind != fb::SyntaxValueKind::None && !ignored_name(c, name)) {
     c.out.push_back({c.unit.index, name, offset, length, node_value(n)});
   }
@@ -160,6 +237,21 @@ void collect_elements(const fb::SyntaxNode& n, const Collect& c) {
       collect_elements(*child, c);
     }
   }
+}
+
+// CBS reads an element wider than 32 bits in pieces (general_reserved_zero_43bits as 24 + 19 bits) and prints each
+// piece under the element's name. `next` continues `head` when it is the next piece of the same read: same name and
+// unit, adjacent, and the width the name states ("_<N>bits", N > 32) not reached yet.
+bool continues_split_read(const Element& head, const Element& next) {
+  static const std::regex kWidth("_([0-9]+)bits$");
+  std::smatch m;
+  if (head.unit != next.unit || head.name != next.name || head.bit_offset + head.bit_length != next.bit_offset ||
+      !std::regex_search(head.name, m, kWidth)) {
+    return false;
+  }
+  const uint64_t width = std::stoull(m[1].str());
+  return width > 32 && head.bit_length + next.bit_length <= width && head.value.is_number_unsigned() &&
+         next.value.is_number_unsigned();
 }
 
 void sort_elements(std::vector<Element>& v) {
@@ -266,6 +358,66 @@ class H264Mp4ToAnnexB {
   bool pps_seen_ = false;
 };
 
+// hevc_mp4toannexb_filter() of FFmpeg 7.1: the hvcC arrays (all of them, in order) become the extradata, which goes
+// before the first IRAP NAL unit (types 16..23) of every packet.
+class HevcMp4ToAnnexB {
+ public:
+  HevcMp4ToAnnexB(std::span<const uint8_t> hvcc, unsigned length_size) : length_size_(length_size) {
+    // hvcC (ISO/IEC 14496-15 §8.3.3.1): 22 bytes of header, numOfArrays, then per array one byte of type and a
+    // 16-bit numNalus, each NAL unit with a 16-bit length.
+    if (hvcc.size() < 23) {
+      throw std::runtime_error("short hvcC");
+    }
+    size_t pos = 22;
+    const unsigned arrays = hvcc[pos++];
+    for (unsigned a = 0; a < arrays && pos + 3 <= hvcc.size(); ++a) {
+      const unsigned count = (unsigned{hvcc[pos + 1]} << 8U) | hvcc[pos + 2];
+      pos += 3;
+      for (unsigned k = 0; k < count && pos + 2 <= hvcc.size(); ++k) {
+        const size_t len = (size_t{hvcc[pos]} << 8U) | hvcc[pos + 1];
+        pos += 2;
+        if (pos + len > hvcc.size()) {
+          throw std::runtime_error("truncated hvcC");
+        }
+        append(hvcc.subspan(pos, len), extradata_);
+        pos += len;
+      }
+    }
+  }
+
+  void packet(std::span<const uint8_t> data, std::vector<uint8_t>& es) const {
+    bool got_irap = false;
+    size_t p = 0;
+    while (p + length_size_ <= data.size()) {
+      size_t len = 0;
+      for (unsigned k = 0; k < length_size_; ++k) {
+        len = (len << 8U) | data[p + k];
+      }
+      p += length_size_;
+      if (len == 0 || p + len > data.size()) {
+        break;
+      }
+      const unsigned type = (data[p] >> 1U) & 0x3FU;
+      const bool irap = type >= 16 && type <= 23;
+      if (irap && !got_irap) {
+        es.insert(es.end(), extradata_.begin(), extradata_.end());
+      }
+      got_irap = got_irap || irap;
+      append(data.subspan(p, len), es);
+      p += len;
+    }
+  }
+
+ private:
+  static void append(std::span<const uint8_t> nal, std::vector<uint8_t>& out) {
+    out.insert(out.end(), {0, 0, 0, 1});
+    out.insert(out.end(), nal.begin(), nal.end());
+  }
+
+  unsigned length_size_;
+  std::vector<uint8_t> extradata_;
+};
+
 using Values = std::map<std::string, std::vector<int64_t>>;
 
 // "<qualifier>.<name>", or the name alone without a qualifier.
@@ -342,6 +494,14 @@ std::string golden_structure(const nlohmann::json& unit, const GstMap& map) {
   return {};
 }
 
+// True when `golden` is `ovt` followed by zeros only: GStreamer's fixed-size arrays hold the coded entries first and
+// zero-fill the rest (SPEC-ASSUMPTION(#603), the zero-fill rule of gst_compare()).
+bool zero_extended(const std::vector<int64_t>& ovt, const std::vector<int64_t>& golden) {
+  return golden.size() >= ovt.size() && std::equal(ovt.begin(), ovt.end(), golden.begin()) &&
+         std::all_of(golden.begin() + static_cast<std::ptrdiff_t>(ovt.size()), golden.end(),
+                     [](int64_t x) { return x == 0; });
+}
+
 template <class Note>
 void compare_unit(const std::string& unit_key, const std::string& structure, const nlohmann::json& golden,
                   const ParsedUnit& u, const GstMap& map, const Note& note) {
@@ -372,7 +532,7 @@ void compare_unit(const std::string& unit_key, const std::string& structure, con
         note(
             fmt::format("golden unit {} {}: {} = {} | OVT has no {}", unit_key, structure, raw_key, join(values), key));
       }
-    } else if (it->second != values) {
+    } else if (!zero_extended(it->second, values)) {
       note(fmt::format("golden unit {} {}: {} = {} | OVT {} = {}", unit_key, structure, raw_key, join(values), key,
                        join(it->second)));
     }
@@ -409,22 +569,31 @@ bool looks_like_annexb(std::span<const uint8_t> head) {
   return i >= 2 && i < head.size() && head[i] == 1;
 }
 
-std::vector<uint8_t> h264_container_to_annexb(const std::filesystem::path& path, unsigned max_packets) {
+std::vector<uint8_t> container_to_annexb(const std::filesystem::path& path, Codec codec, unsigned max_packets) {
   std::shared_ptr<ovt::io::RandomAccessFile> file = ovt::io::RandomAccessFile::open(path.string());
   auto opened = ovt::demux::Demuxer::open(file, "");
   if (!opened) {
     throw std::runtime_error("cannot open " + path.string() + ": " + opened.message());
   }
   auto& demuxer = *opened.value();
+  const bool avc = codec == Codec::kH264;
+  const auto fb_codec = avc ? ovt::fb::Codec::H264 : ovt::fb::Codec::H265;
   const auto& streams = demuxer.streams();
-  const auto video = std::find_if(streams.begin(), streams.end(), [](const ovt::demux::StreamInfo& s) {
-    return s.codec == ovt::fb::Codec::H264 && s.media_type == AVMEDIA_TYPE_VIDEO;
+  const auto video = std::find_if(streams.begin(), streams.end(), [&](const ovt::demux::StreamInfo& s) {
+    return s.codec == fb_codec && s.media_type == AVMEDIA_TYPE_VIDEO;
   });
-  if (video == streams.end() || !video->length_prefixed || video->codec_private_fourcc != "avcC") {
-    throw std::runtime_error("no length-prefixed H.264 track with an avcC record in " + path.string());
+  const std::string record = avc ? "avcC" : "hvcC";
+  if (video == streams.end() || !video->length_prefixed || video->codec_private_fourcc != record) {
+    throw std::runtime_error("no length-prefixed video track with an " + record + " record in " + path.string());
   }
   const int stream = video->avstream_index;
-  H264Mp4ToAnnexB filter(video->codec_private, video->nal_length_size);
+  std::optional<H264Mp4ToAnnexB> h264_filter;
+  std::optional<HevcMp4ToAnnexB> hevc_filter;
+  if (avc) {
+    h264_filter.emplace(video->codec_private, video->nal_length_size);
+  } else {
+    hevc_filter.emplace(video->codec_private, video->nal_length_size);
+  }
   demuxer.select_streams(std::span<const int>(&stream, 1));
   std::vector<uint8_t> es;
   for (unsigned n = 0; n < max_packets; ++n) {
@@ -435,7 +604,11 @@ std::vector<uint8_t> h264_container_to_annexb(const std::filesystem::path& path,
     if (!r.value()) {
       break;
     }
-    filter.packet(r.value()->data, es);
+    if (avc) {
+      h264_filter->packet(r.value()->data, es);
+    } else {
+      hevc_filter->packet(r.value()->data, es);
+    }
   }
   return es;
 }
@@ -553,6 +726,116 @@ std::vector<ParsedUnit> parse_h264(std::span<const std::span<const uint8_t>> uni
   return out;
 }
 
+// The parameter sets of an H.265 stream as CBS keeps them: the latest one per id replaces the previous one at once.
+// The PPS table parse_slice_segment_header() takes is rebuilt after every put, activating each PPS against the
+// SPS it names.
+class H265Sets {
+ public:
+  void put(std::unique_ptr<h265::Vps> v) {
+    const uint32_t id = v->vps_video_parameter_set_id;
+    vps_.at(id) = std::move(v);
+    vps_by_id_.at(id) = vps_.at(id).get();
+  }
+  void put(std::unique_ptr<h265::Sps> s) {
+    const uint32_t id = s->sps_seq_parameter_set_id;
+    if (id < sps_.size()) {
+      sps_.at(id) = std::move(s);
+      sps_by_id_.at(id) = sps_.at(id).get();
+      rebuild();
+    }
+  }
+  void put(std::unique_ptr<h265::Pps> p) {
+    const uint32_t id = p->pps_pic_parameter_set_id;
+    if (id < pps_.size()) {
+      pps_.at(id) = std::move(p);
+      rebuild();
+    }
+  }
+  [[nodiscard]] const h265::PpsTable& table() const { return table_; }
+  [[nodiscard]] const h265::Sps* sps(uint32_t id) const { return id < sps_.size() ? sps_.at(id).get() : nullptr; }
+  [[nodiscard]] std::span<const h265::Vps* const> vps_by_id() const { return vps_by_id_; }
+  [[nodiscard]] std::span<const h265::Sps* const> sps_by_id() const { return sps_by_id_; }
+
+ private:
+  void rebuild() {
+    for (size_t id = 0; id < pps_.size(); ++id) {
+      const h265::Pps* p = pps_.at(id).get();
+      const h265::Sps* s = p != nullptr && p->pps_seq_parameter_set_id < sps_.size()
+                               ? sps_.at(p->pps_seq_parameter_set_id).get()
+                               : nullptr;
+      active_.at(id) = s != nullptr ? std::make_unique<h265::ActivePps>(h265::activate_pps(*p, *s)) : nullptr;
+      table_.entries.at(id) = active_.at(id).get();
+    }
+  }
+
+  std::array<std::unique_ptr<h265::Vps>, 16> vps_{};
+  std::array<std::unique_ptr<h265::Sps>, 16> sps_{};
+  std::array<std::unique_ptr<h265::Pps>, 64> pps_{};
+  std::array<std::unique_ptr<h265::ActivePps>, 64> active_{};
+  std::array<const h265::Vps*, 16> vps_by_id_{};
+  std::array<const h265::Sps*, 16> sps_by_id_{};
+  h265::PpsTable table_{};
+};
+
+std::vector<ParsedUnit> parse_h265(std::span<const std::span<const uint8_t>> units) {
+  std::vector<ParsedUnit> out;
+  H265Sets sets;
+  h265::SeiContext sei_ctx;
+  sei_ctx.vps_by_id = sets.vps_by_id();
+  sei_ctx.sps_by_id = sets.sps_by_id();
+  std::optional<h265::SliceSegmentHeader> prev_independent;
+  uint32_t index = 0;
+
+  for (const auto nal : units) {
+    const uint32_t type = h26x_type(nal, Codec::kH265);
+    if (!h265_decomposed(type)) {
+      continue;
+    }
+    ParsedUnit unit;
+    unit.index = index++;
+    unit.type = type;
+    unit.rbsp = ovt::rbsp_from_nal(nal).rbsp;
+    unit.bit_length = unit.rbsp.size() * 8U;
+    BitReader br(unit.rbsp);
+    SyntaxBuilder b(br);
+    try {
+      const h265::NalHeader h = h265::parse_nal_header(br, b);
+      if (type <= 21) {
+        auto sh =
+            h265::parse_slice_segment_header(br, b, h, sets.table(), prev_independent ? &*prev_independent : nullptr);
+        const h265::ActivePps* a = sets.table().entries.at(sh.slice_pic_parameter_set_id);
+        sei_ctx.active_sps = a != nullptr ? a->sps : nullptr;
+        sei_ctx.buffering_period_sps_id.reset();
+        add_h265_slice_derived(sh, a, unit);
+        if (!sh.dependent_slice_segment_flag) {
+          prev_independent = std::move(sh);
+        }
+      } else if (type == 32) {
+        auto v = std::make_unique<h265::Vps>(h265::parse_vps(br, b));
+        add_h265_vps_derived(*v, unit);
+        sets.put(std::move(v));
+      } else if (type == 33) {
+        auto s = std::make_unique<h265::Sps>(h265::parse_sps(br, b, h.nuh_layer_id));
+        add_h265_sps_derived(*s, unit);
+        sets.put(std::move(s));
+      } else if (type == 34) {
+        auto p = std::make_unique<h265::Pps>(h265::parse_pps(br, b));
+        add_h265_pps_derived(*p, sets.sps(p->pps_seq_parameter_set_id), unit);
+        sets.put(std::move(p));
+      } else if (type == 39 || type == 40) {
+        (void)h265::parse_sei_rbsp(br, b, h, sei_ctx);
+      }
+      // AUD_NUT and FD_NUT: OVT has no parser for them yet (FR-SYN-005, WI-1.112); only the NAL header is kept.
+    } catch (const ovt::ParseError& e) {
+      unit.parse_error = true;
+      unit.diagnostics.push_back({e.code, "Error", e.bit_offset, 0});
+    }
+    finish_unit(b, unit);
+    out.push_back(std::move(unit));
+  }
+  return out;
+}
+
 std::vector<Element> ovt_elements(std::span<const ParsedUnit> units, const std::set<std::string>& ignored,
                                   const std::set<std::string>& byte_arrays) {
   std::vector<Element> out;
@@ -569,16 +852,43 @@ std::vector<Element> ovt_elements(std::span<const ParsedUnit> units, const std::
 std::vector<Element> golden_elements(const nlohmann::json& golden, const std::map<std::string, std::string>& rename) {
   std::vector<Element> out;
   out.reserve(golden.size());
+  std::string prev_raw;
   for (const auto& e : golden) {
-    std::string name = base_name(e.at("name").get<std::string>());
+    const auto raw = e.at("name").get<std::string>();
+    std::string name = base_name(raw);
     if (const auto it = rename.find(name); it != rename.end()) {
       name = it->second;
     }
-    out.push_back({e.at("unit").get<uint32_t>(), std::move(name), e.at("bit_offset").get<uint64_t>(),
-                   e.at("bit_length").get<uint64_t>(), e.at("value")});
+    Element el{e.at("unit").get<uint32_t>(), std::move(name), e.at("bit_offset").get<uint64_t>(),
+               e.at("bit_length").get<uint64_t>(), e.at("value")};
+    if (!out.empty() && raw == prev_raw && continues_split_read(out.back(), el)) {
+      Element& head = out.back();
+      head.value = (head.value.get<uint64_t>() << el.bit_length) | el.value.get<uint64_t>();
+      head.bit_length += el.bit_length;
+      continue;
+    }
+    prev_raw = raw;
+    out.push_back(std::move(el));
   }
   sort_elements(out);
   return out;
+}
+
+// SPEC-ASSUMPTION(#663): a coverage-only span must start at a golden element, and the golden elements from there to
+// the end of the unit must all lie inside it. Returns the index of the first golden element after the span.
+template <typename Note>
+size_t skip_opaque_span(const std::vector<Element>& golden, size_t i, const Element& o, const Note& note) {
+  const uint64_t end = o.bit_offset + o.bit_length;
+  if (i >= golden.size() || golden[i].unit != o.unit || golden[i].bit_offset != o.bit_offset) {
+    note(fmt::format("unit {}: ovt {} [{}+{}] does not start at a golden element", o.unit, o.name, o.bit_offset,
+                     o.bit_length));
+  }
+  for (; i < golden.size() && golden[i].unit == o.unit && golden[i].bit_offset >= o.bit_offset; ++i) {
+    if (golden[i].bit_offset + golden[i].bit_length > end) {
+      note(fmt::format("unit {}: golden {} lies beyond ovt {}", o.unit, describe(golden[i]), o.name));
+    }
+  }
+  return i;
 }
 
 std::vector<std::string> compare_elements(const std::vector<Element>& golden, const std::vector<Element>& ovt,
@@ -596,7 +906,10 @@ std::vector<std::string> compare_elements(const std::vector<Element>& golden, co
   while (i < golden.size() || j < ovt.size()) {
     const Element* g = i < golden.size() ? &golden[i] : nullptr;
     const Element* o = j < ovt.size() ? &ovt[j] : nullptr;
-    if (g != nullptr && o != nullptr && g->unit == o->unit && g->bit_offset == o->bit_offset) {
+    if (o != nullptr && o->name.starts_with(kOpaquePrefix)) {
+      i = skip_opaque_span(golden, i, *o, note);
+      ++j;
+    } else if (g != nullptr && o != nullptr && g->unit == o->unit && g->bit_offset == o->bit_offset) {
       if (!(*g == *o)) {
         note(fmt::format("unit {}: golden {} | ovt {}", g->unit, describe(*g), describe(*o)));
       }
