@@ -34,7 +34,7 @@ because the script did not complete on that run:
 
 1. A system ANR dialog ("Messages isn't responding") covered the app on the freshly booted image, so the script did
    not find the button. It was dismissed with "Close app".
-2. On API 36 the app is edge-to-edge, and the overlay's button (bounds [16,16][280,142] on 1080x2400) sat mostly
+2. On API 36 the app is edge-to-edge, and the overlay's button (bounds `[16,16][280,142]` on 1080x2400) sat mostly
    under the status bar. The script's tap at its centre hit the status bar. Fixed after this run: `DebugInfoOverlay`
    now applies the system-bar and cutout insets as margins. The uppercase label in the dump ("OPEN FILE…") was
    already matched, because `pick_file.py` compares case-insensitively.
