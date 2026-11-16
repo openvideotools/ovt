@@ -217,7 +217,7 @@ bool run_gzip(const std::string& args) {
 // most 0.1 % may differ. OVT_UPDATE_GOLDEN=1 rewrites the golden (never on CI).
 void check_golden(const RgbImage& actual, const std::string& name) {
   const std::string golden = std::string(OVT_RENDER_GOLDEN_DIR) + "/" + name + ".gz";
-  const std::string plain = name;                         // decompressed copy in the working directory
+  const std::string& plain = name;                        // decompressed copy in the working directory
   const char* update = std::getenv("OVT_UPDATE_GOLDEN");  // NOLINT(concurrency-mt-unsafe): test setup
   const char* ci = std::getenv("CI");                     // NOLINT(concurrency-mt-unsafe)
   if (update != nullptr && std::string(update) == "1" && (ci == nullptr || std::string(ci).empty())) {
