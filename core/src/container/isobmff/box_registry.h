@@ -15,6 +15,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "container/isobmff/box_context.h"
@@ -70,12 +71,15 @@ class BoxRegistry {
  private:
   void join_decoder(const BoxDecoder* d) const;  // adds one decoder to the index; caller holds mutex_
   void join_pending() const;  // folds decoders added since the last call into the entry index; caller holds mutex_
+  // A table row with a "<parent>/*" decoder joined in (built once, kept in entries_); caller holds mutex_.
+  const RegistryEntry* merged(const RegistryEntry& row, const RegistryEntry& wildcard) const;
 
   mutable std::mutex mutex_;
   mutable std::deque<RegistryEntry> entries_;                                                // stable addresses
   mutable std::map<std::string, std::vector<const RegistryEntry*>, std::less<>> by_fourcc_;  // exact fourccs
   mutable std::map<std::string, std::vector<const RegistryEntry*>, std::less<>> by_parent_;  // "<parent>/*" decoders
   mutable std::vector<std::pair<std::array<uint8_t, 16>, const RegistryEntry*>> by_uuid_;
+  mutable std::map<std::pair<const RegistryEntry*, const BoxDecoder*>, const RegistryEntry*> merged_;
   std::vector<const BoxDecoder*> decoders_;
   mutable size_t joined_ = 0;
 };

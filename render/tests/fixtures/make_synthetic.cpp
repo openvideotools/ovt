@@ -5,6 +5,7 @@
 
 #include "fixtures/make_synthetic.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <memory>
 #include <span>
@@ -94,6 +95,56 @@ std::vector<uint8_t> make_synthetic(const SyntheticOptions& opts) {
 
   flatbuffers::FlatBufferBuilder fbb;
   fb::FinishFrameAnalysisBuffer(fbb, fb::FrameAnalysis::Pack(fbb, fa.get()));
+  const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> make_synthetic_mv(uint32_t width, uint32_t height) {
+  const uint32_t cw = (width + 3) / 4;
+  const uint32_t ch = (height + 3) / 4;
+  flatbuffers::FlatBufferBuilder fbb(size_t{64} << 20);
+  auto mv_x = [&](uint32_t y4) {
+    return static_cast<int16_t>(std::clamp(-((static_cast<int>(y4) * 2) - static_cast<int>(ch)) * 2, -512, 512));
+  };
+  auto mv_y = [&](uint32_t x4) {
+    return static_cast<int16_t>(std::clamp(((static_cast<int>(x4) * 2) - static_cast<int>(cw)) * 2, -512, 512));
+  };
+  std::vector<flatbuffers::Offset<fb::MotionVector>> mvs;
+  mvs.reserve(static_cast<size_t>(cw) * ch);
+  const uint32_t sb_rows = (height + 63) / 64;
+  const uint32_t sb_cols = (width + 63) / 64;
+  uint32_t id = 1;
+  for (uint32_t sy = 0; sy < sb_rows; ++sy) {
+    for (uint32_t sx = 0; sx < sb_cols; ++sx) {
+      ++id;  // the superblock's own Block id
+      for (uint32_t y4 = sy * 16; y4 < std::min(ch, (sy * 16) + 16); ++y4) {
+        for (uint32_t x4 = sx * 16; x4 < std::min(cw, (sx * 16) + 16); ++x4) {
+          const fb::Rect rect(static_cast<int32_t>(x4 * 4), static_cast<int32_t>(y4 * 4), 4, 4);
+          mvs.push_back(fb::CreateMotionVector(fbb, id++, 0, 1, &rect, mv_x(y4), mv_y(x4)));
+        }
+      }
+    }
+  }
+  const std::vector<uint8_t> pred(static_cast<size_t>(cw) * ch, static_cast<uint8_t>(fb::PredKind::Inter));
+  std::vector<int16_t> mx;
+  std::vector<int16_t> my;
+  mx.reserve(pred.size());
+  my.reserve(pred.size());
+  for (uint32_t y4 = 0; y4 < ch; ++y4) {
+    for (uint32_t x4 = 0; x4 < cw; ++x4) {
+      mx.push_back(mv_x(y4));
+      my.push_back(mv_y(x4));
+    }
+  }
+  const auto vec_mvs = fbb.CreateVector(mvs);
+  const auto grid = fb::CreateCellGridDirect(fbb, cw, ch, nullptr, nullptr, &pred, nullptr, nullptr, nullptr, &mx, &my);
+  const auto plugin = fbb.CreateString("gen_fixture_fb");
+  fb::FrameAnalysisBuilder b(fbb);
+  b.add_schema_version(1);
+  b.add_plugin_id(plugin);
+  b.add_grid(grid);
+  b.add_mvs(vec_mvs);
+  fb::FinishFrameAnalysisBuffer(fbb, b.Finish());
   const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
   return {bytes.begin(), bytes.end()};
 }
