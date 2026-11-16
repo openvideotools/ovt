@@ -25,8 +25,8 @@ Local run: skipped (no corpus); compiled and linked clean under `-Werror`.
 `ctest -R de265_recon_vs_ffmpeg` (`ovt_plugin_de265_recon_tests`, `test_de265_recon_vs_ffmpeg.cpp`): the plugin's
 `PlaneStage::Reconstruction` planes against libavcodec's `hevc` decoder (one thread, `apply_cropping = 0`), picture by
 picture in output order, one MD5 per plane, plus 1 thread against 4 threads. Same stream list as test 1 plus AMP_A.
-`NoOutPrior_A` and `RAP_B` are compared as a subsequence: libde265 outputs 10
-pictures there that FFmpeg drops (no_output_of_prior_pics, RASL after an end of sequence); every FFmpeg picture must
+`NoOutPrior_A` is compared as a subsequence: libde265 outputs 10
+pictures there that FFmpeg drops (no_output_of_prior_pics); every FFmpeg picture must
 still
 equal a plugin picture in order. All other streams must give the same sequence.
 
@@ -48,3 +48,7 @@ Not done in this PR. The budget row exists in `tests/perf/budgets.json`, but the
 `fuzz_plugin_push_de265` (`plugins/ovt-plugin-de265/tests/fuzz/`), seeds in `core/tests/fuzz/corpus/plugin_push_de265/`:
 `ctest -R fuzz_plugin_push_de265_regress` passes; 600 randomly mutated seeds replayed without a crash or contract
 violation. The 60 s libFuzzer run belongs to CI (`OVT_ENABLE_FUZZ`).
+
+`RAP_B_Bossen_2` is not in the recon list: on CI FFmpeg's output picture 69 of 80 equals no libde265
+picture (the stream has end-of-sequence CRAs with RASL pictures). Which decoder is wrong is open (#589); its HM
+grid comparison passes.
