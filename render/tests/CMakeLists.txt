@@ -79,6 +79,8 @@ target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
 # headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
 # CAMetalLayer through MoltenVK.
 target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+# WI-1.411: the swapchain hint carries the content's static HDR metadata (§10.3.6).
+target_sources(ovt_tests_render PRIVATE test_hint.cpp)
 if(APPLE)
   target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
   set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")

@@ -153,6 +153,7 @@ class MetalLayerOutput final : public NativeOutput {
   // swapchain is created with. Implicit layer animations are off so nothing fades.
   void configure(DisplayTarget::OutputEncoding encoding, int width, int height) override {
     const MetalLayerConfig c = metal_layer_config(encoding);
+    edr_metadata_ = c.edr_metadata;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     layer_.wantsExtendedDynamicRangeContent = c.wants_edr ? YES : NO;
@@ -160,11 +161,37 @@ class MetalLayerOutput final : public NativeOutput {
     CGColorSpaceRef space = CGColorSpaceCreateWithName(cg_color_space_name(c.color_space));
     layer_.colorspace = space;
     CGColorSpaceRelease(space);
-    switch (c.edr_metadata) {
+    apply_edr_metadata();
+    layer_.displaySyncEnabled = YES;
+    layer_.drawableSize = CGSizeMake(width, height);
+    [CATransaction commit];
+  }
+
+  // §10.3.6, §10.4.1: "System PQ pass-through" carries the content's mastering range in CAEDRMetadata.hdr10.
+  void set_content_metadata(const struct pl_hdr_metadata& hdr) override {
+    const Hdr10Range r = edr_hdr10_range(hdr);
+    if (r.min_nits == range_.min_nits && r.max_nits == range_.max_nits) {
+      return;
+    }
+    range_ = r;
+    if (edr_metadata_ == MetalLayerConfig::EdrMetadata::HDR10) {
+      [CATransaction begin];
+      [CATransaction setDisableActions:YES];
+      apply_edr_metadata();
+      [CATransaction commit];
+    }
+  }
+
+  [[nodiscard]] float polled_headroom() const override { return headroom_->load(); }
+
+ private:
+  // Inside a CATransaction.
+  void apply_edr_metadata() {
+    switch (edr_metadata_) {
       case MetalLayerConfig::EdrMetadata::HDR10:
-        // Placeholder mastering range until WI-1.411 passes the content's MDCV (§10.3.6); 10000 = PQ code 1.0 in nits.
-        layer_.EDRMetadata = [CAEDRMetadata HDR10MetadataWithMinLuminance:0.005F
-                                                             maxLuminance:1000.0F
+        // 10000 = PQ code 1.0 in nits.
+        layer_.EDRMetadata = [CAEDRMetadata HDR10MetadataWithMinLuminance:range_.min_nits
+                                                             maxLuminance:range_.max_nits
                                                        opticalOutputScale:10000.0F];
         break;
       case MetalLayerConfig::EdrMetadata::HLG:
@@ -174,17 +201,13 @@ class MetalLayerOutput final : public NativeOutput {
         layer_.EDRMetadata = nil;  // scRGB: libplacebo tone-maps to the headroom itself
         break;
     }
-    layer_.displaySyncEnabled = YES;
-    layer_.drawableSize = CGSizeMake(width, height);
-    [CATransaction commit];
   }
 
-  [[nodiscard]] float polled_headroom() const override { return headroom_->load(); }
-
- private:
   CAMetalLayer* layer_;  // strong (ARC): the layer outlives the surface made from it
   std::shared_ptr<std::atomic<float>> headroom_;
   OVTEdrHeadroomObserver* observer_;
+  MetalLayerConfig::EdrMetadata edr_metadata_ = MetalLayerConfig::EdrMetadata::None;  // of the configured encoding
+  Hdr10Range range_;  // of the last hinted metadata (§10.3.6)
 };
 
 std::unique_ptr<NativeOutput> create_metal_output(const DisplayTarget& target, std::string& error) {
