@@ -9,9 +9,11 @@
 
 #include <flatbuffers/flatbuffers.h>
 
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
+#include <optional>
 #include <span>
 
 #include "container/isobmff/lazy.h"
@@ -206,12 +208,15 @@ OVT_API ovt_status ovt_container_expand(ovt_Container* container, uint64_t box_o
     return OVT_E_UNSUPPORTED;
   }
   try {
+    const std::optional<uint64_t> before = container->reader->tree_revision();
     const ovt_status st = container->reader->expand(box_offset);  // ISOBMFF: WI-1.204
-    if (st == OVT_OK) {
+    // A no-op expand (a box that is complete already) keeps the current buffer: re-serialising the whole tree on
+    // every call made expanding each box of a file quadratic (fuzz_isobmff_tree timeout).
+    if (st == OVT_OK && (!before || container->reader->tree_revision() != before)) {
       if (auto tree = container->reader->tree(); !tree.empty()) {
         // Held only for the swap: ovt_container_box_at (thread-safe, §8.8) walks the tree under the same lock.
         const std::lock_guard lock(container->bytes.tree_mutex());
-        container->tree = std::move(tree);  // buffers are immutable: a new tree after every expand
+        container->tree = std::move(tree);  // buffers are immutable: a new tree after every change
       }
     }
     return st;

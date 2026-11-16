@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include "container/byte_service.h"
@@ -31,11 +32,15 @@ class Reader {
   // The serialised ContainerTree of the current state; empty when the reader builds none (the handle then
   // keeps its empty tree).
   [[nodiscard]] virtual std::vector<uint8_t> tree() const { return {}; }
-  // Materialises lazy children of the node at `box_offset`; the handle re-reads tree() after OVT_OK.
+  // Materialises lazy children of the node at `box_offset`; the handle re-reads tree() after OVT_OK when
+  // tree_revision() changed (or is nullopt).
   virtual ovt_status expand(uint64_t box_offset) {
     (void)box_offset;
     return OVT_E_UNSUPPORTED;
   }
+  // A counter expand() bumps whenever it changes the tree, so the handle skips re-serialising the whole tree after a
+  // no-op expand (an O(tree) cost per call). nullopt: the reader does not track it and every OVT_OK re-reads tree().
+  [[nodiscard]] virtual std::optional<uint64_t> tree_revision() const noexcept { return std::nullopt; }
   // RawVideoFormat FlatBuffer (Y4M and raw readers); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> raw_format() const { return {}; }
   // SampleTable FlatBuffer of `count` samples from `first` (count 0 = all); empty when unsupported.
