@@ -37,7 +37,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     samples[i] = data[3U + i];
   }
   p.data = samples.data();
-  if (plane_md5(p) != plane_md5(p) || plane_crc(p) != plane_crc(p) || plane_checksum(p) != plane_checksum(p)) {
+  const Md5Digest md5 = plane_md5(p);
+  const uint32_t crc = plane_crc(p);
+  const uint32_t sum = plane_checksum(p);
+  if (md5 != plane_md5(p) || crc != plane_crc(p) || sum != plane_checksum(p)) {
     std::abort();
   }
   return 0;

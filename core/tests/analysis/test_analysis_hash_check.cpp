@@ -41,9 +41,11 @@ Plane make_plane(uint32_t w, uint32_t h, uint8_t depth, Fn&& v, uint32_t pad = 3
   for (uint32_t y = 0; y < h; ++y) {
     for (uint32_t x = 0; x < w; ++x) {
       const uint32_t s = v(x, y);
-      p.bytes[(static_cast<std::size_t>(y) * stride) + (x * sb)] = static_cast<uint8_t>(s & 0xFFU);
+      p.bytes[(static_cast<std::size_t>(y) * stride) + (static_cast<std::size_t>(x) * sb)] =
+          static_cast<uint8_t>(s & 0xFFU);
       if (sb == 2U) {
-        p.bytes[(static_cast<std::size_t>(y) * stride) + (x * sb) + 1U] = static_cast<uint8_t>(s >> 8U);
+        p.bytes[(static_cast<std::size_t>(y) * stride) + (static_cast<std::size_t>(x) * sb) + 1U] =
+            static_cast<uint8_t>(s >> 8U);
       }
     }
   }
@@ -145,6 +147,7 @@ ovt::syntax::h265::DecodedPictureHash hash_of(uint32_t type, const std::vector<P
 
 std::vector<PlaneView> views(const std::vector<Plane>& planes) {
   std::vector<PlaneView> v;
+  v.reserve(planes.size());
   for (const Plane& p : planes) {
     v.push_back(p.view);
   }
@@ -216,6 +219,7 @@ namespace {
 std::vector<uint8_t> frame_with_planes(int decode_index, const std::vector<std::string>& ids) {
   flatbuffers::FlatBufferBuilder fbb;
   std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>> refs;
+  refs.reserve(ids.size());
   for (std::size_t i = 0; i < ids.size(); ++i) {
     refs.push_back(ovt::fb::CreatePlaneRef(fbb, ovt::fb::PlaneStage::Reconstruction, static_cast<uint8_t>(i), 16, 8, 16,
                                            8, 1, false, fbb.CreateString(ids[i])));

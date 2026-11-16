@@ -20,12 +20,7 @@ namespace av1 = ovt::syntax::av1;
 namespace {
 
 bool has(const std::vector<ConformanceDiagnostic>& d, const std::string& code) {
-  for (const auto& x : d) {
-    if (x.code == code) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(d.begin(), d.end(), [&code](const ConformanceDiagnostic& x) { return x.code == code; });
 }
 
 h265::Sps hevc(uint32_t level_idc, uint32_t w, uint32_t h, uint32_t dpb_minus1) {
@@ -52,7 +47,7 @@ h264::Sps avc(uint32_t profile, uint32_t level_idc, bool cs3, uint32_t w_mbs, ui
   return s;
 }
 
-av1::SequenceHeader seq(uint32_t w, uint32_t h, std::vector<uint8_t> levels) {
+av1::SequenceHeader seq(uint32_t w, uint32_t h, const std::vector<uint8_t>& levels) {
   av1::SequenceHeader s;
   s.max_frame_width = w;
   s.max_frame_height = h;

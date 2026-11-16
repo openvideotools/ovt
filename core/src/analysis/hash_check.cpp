@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstring>
 #include <memory>
 #include <utility>
 
@@ -47,7 +46,8 @@ bool hashable(const PlaneView& p) noexcept {
 }
 
 uint32_t sample_at(const PlaneView& p, uint32_t x, uint32_t y) noexcept {
-  const uint8_t* row = p.data + static_cast<std::size_t>(y) * p.stride_bytes;
+  const std::span<const uint8_t> all(p.data, static_cast<std::size_t>(p.stride_bytes) * p.height);
+  const auto row = all.subspan(static_cast<std::size_t>(y) * p.stride_bytes);
   if (p.sample_bytes == 1U) {
     return row[x];
   }
@@ -101,7 +101,7 @@ int hex_digit(char c) noexcept {
 
 Md5::Md5() noexcept : state_{0x67452301U, 0xefcdab89U, 0x98badcfeU, 0x10325476U} {}
 
-void Md5::block(const uint8_t* p) noexcept {
+void Md5::block(std::span<const uint8_t, 64> p) noexcept {
   std::array<uint32_t, 16> m{};
   for (std::size_t i = 0; i < 16; ++i) {
     m[i] = static_cast<uint32_t>(p[4 * i]) | (static_cast<uint32_t>(p[(4 * i) + 1]) << 8U) |
@@ -145,19 +145,19 @@ void Md5::update(std::span<const uint8_t> data) noexcept {
   std::size_t pos = 0;
   if (fill != 0U) {
     const std::size_t take = std::min(data.size(), 64U - fill);
-    std::memcpy(buffer_.data() + fill, data.data(), take);
+    std::copy_n(data.begin(), take, buffer_.begin() + static_cast<std::ptrdiff_t>(fill));
     pos = take;
     fill += take;
     if (fill < 64U) {
       return;
     }
-    block(buffer_.data());
+    block(buffer_);
   }
   for (; pos + 64U <= data.size(); pos += 64U) {
-    block(data.data() + pos);
+    block(data.subspan(pos, 64U).first<64>());
   }
   if (pos < data.size()) {
-    std::memcpy(buffer_.data(), data.data() + pos, data.size() - pos);
+    std::copy(data.begin() + static_cast<std::ptrdiff_t>(pos), data.end(), buffer_.begin());
   }
 }
 

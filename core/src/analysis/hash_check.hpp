@@ -38,7 +38,7 @@ class Md5 {
   [[nodiscard]] Md5Digest finish() noexcept;  // the object must not be used afterwards
 
  private:
-  void block(const uint8_t* p) noexcept;
+  void block(std::span<const uint8_t, 64> p) noexcept;
   std::array<uint32_t, 4> state_{};
   std::array<uint8_t, 64> buffer_{};
   uint64_t total_ = 0;

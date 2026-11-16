@@ -71,13 +71,13 @@ std::string h265_level_name(uint32_t idc) {
 }  // namespace
 
 uint32_t h264_max_fs(std::string_view level_name) noexcept {
-  const auto it = std::find_if(kH264Levels.begin(), kH264Levels.end(),
-                               [level_name](const H264Level& l) { return l.name == level_name; });
+  const auto* const it = std::find_if(kH264Levels.begin(), kH264Levels.end(),
+                                      [level_name](const H264Level& l) { return l.name == level_name; });
   return it == kH264Levels.end() ? 0U : it->max_fs;
 }
 
 uint32_t h265_max_luma_ps(uint32_t general_level_idc) noexcept {
-  const auto it = std::find_if(kH265Levels.begin(), kH265Levels.end(), [general_level_idc](const H265Level& l) {
+  const auto* const it = std::find_if(kH265Levels.begin(), kH265Levels.end(), [general_level_idc](const H265Level& l) {
     return l.general_level_idc == general_level_idc;
   });
   return it == kH265Levels.end() ? 0U : it->max_luma_ps;
