@@ -153,7 +153,7 @@ void ActiveSets::put_pps(Pps pps, std::span<const uint8_t> rbsp, uint64_t unit_i
   fresh.unit_index = unit_index;
   fresh.generation = next_generation_++;
   fresh.parsed_with_sps_generation = parsed_with;
-  if (picture_open_ && active_pps_ == static_cast<int>(id) && e.value) {
+  if (picture_open_ && picture_pps_.test(id) && e.value) {
     diags.push_back({Severity::Error, kChangedInPicture, fmt::format("PPS {} changed within a picture", id)});
     pps_pending_[id] = std::move(fresh);
     return;
@@ -173,13 +173,15 @@ void ActiveSets::reparse_stale_pps(std::vector<SetDiagnostic>& diags) {
     if (sps_id >= kMaxSps) {
       continue;
     }
-    // The SPS the PPS refers to; a PPS used only by MVC views may refer to a subset SPS (H.7.4.1.2.1).
+    // The SPS the PPS refers to. The SPS table wins when both hold the id: a PPS is re-parsed against what a base-view
+    // slice would activate, and a PPS used only by MVC views may refer to a subset SPS alone (H.7.4.1.2.1). Both
+    // tables carry the same seq_parameter_set_data() fields parse_pps() reads (chroma_format_idc for the 8x8 lists).
     const Entry<Sps>& s = sps_[sps_id].value ? sps_[sps_id] : subset_sps_[sps_id];
     if (!s.value || e.parsed_with_sps_generation == s.generation) {
       continue;
     }
-    // Never re-parse the PPS of the open picture: its content is fixed until end_picture().
-    if (picture_open_ && active_pps_ == static_cast<int>(id)) {
+    // Never re-parse a PPS the open picture uses: its content is fixed until end_picture().
+    if (picture_open_ && picture_pps_.test(id)) {
       continue;
     }
     SpsTable one;
@@ -230,7 +232,7 @@ std::optional<Activation> ActiveSets::activate(const NalHeader& nal, const Slice
     diags.push_back({Severity::Error, kMissingSets, fmt::format("slice references missing PPS {}", pps_id)});
     return std::nullopt;
   }
-  if (!picture_open_ || active_pps_ != static_cast<int>(pps_id)) {
+  if (!picture_open_ || !picture_pps_.test(pps_id)) {
     reparse_stale_pps(diags);
   }
   PpsEntry& pe = pps_[pps_id];
@@ -258,10 +260,8 @@ std::optional<Activation> ActiveSets::activate(const NalHeader& nal, const Slice
   a.sps_unit = se.unit_index;
   a.pps_generation = pe.generation;
   a.sps_generation = se.generation;
-  if (!picture_open_) {
-    picture_open_ = true;
-    active_pps_ = static_cast<int>(pps_id);
-  }
+  picture_open_ = true;
+  picture_pps_.set(pps_id);
   if (subset) {
     active_subset_sps_ = static_cast<int>(sps_id);
   } else {
@@ -272,7 +272,8 @@ std::optional<Activation> ActiveSets::activate(const NalHeader& nal, const Slice
 
 void ActiveSets::end_picture() {
   picture_open_ = false;
-  active_pps_ = active_sps_ = active_subset_sps_ = -1;
+  picture_pps_.reset();
+  active_sps_ = active_subset_sps_ = -1;
   for (unsigned i = 0; i < kMaxSps; ++i) {
     if (sps_pending_[i].value) {
       sps_[i] = std::move(sps_pending_[i]);

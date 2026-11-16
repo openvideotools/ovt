@@ -141,6 +141,14 @@ QString Platform::graphicsApiName(QSGRendererInterface::GraphicsApi api) {
   }
 }
 
+bool Platform::pictureHostAvailable() {
+#if defined(OVT_HAVE_PICTURE_HOST)
+  return true;
+#else
+  return false;
+#endif
+}
+
 QString Platform::rhiBackend() {
   return graphicsApiName(g_selected == QSGRendererInterface::Unknown ? defaultGraphicsApi() : g_selected);
 }

@@ -3,11 +3,14 @@
 
 package org.openvideotools.studio
 
+import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.Display
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
@@ -29,6 +32,11 @@ import java.util.function.Consumer
 class MainActivity : AppCompatActivity() {
     private lateinit var hdrSurface: HdrSurfaceView
     private lateinit var qtView: QtQuickView
+    private lateinit var filePicker: FilePicker
+    private var overlay: DebugInfoOverlay? = null
+
+    /** The `ovt_jni_open_fd` session of the file on screen, 0 for none. Touched on the main thread only. */
+    private var session = 0L
     private val headroomListener =
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
@@ -63,6 +71,17 @@ class MainActivity : AppCompatActivity() {
         // Top child: the Qt Quick UI, created once the window's decor view is attached (see addQtView).
         window.decorView.doOnAttach { addQtView(host) }
 
+        // File opening (WI-0.051): picker, VIEW/SEND intents, drag-and-drop; the debug overlay on debuggable builds
+        // (addQtView brings it back in front of the Qt view, which is added later).
+        filePicker = FilePicker(this, ::onFileOpened)
+        filePicker.attachDropTarget(host)
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            val debugOverlay = DebugInfoOverlay(this, filePicker::pick)
+            overlay = debugOverlay
+            host.addView(debugOverlay, debugOverlay.topStartParams())
+        }
+        filePicker.handleIntent(intent)
+
         Log.i(TAG, "OVT: native ${OvtNative.version()}")
     }
 
@@ -88,6 +107,7 @@ class MainActivity : AppCompatActivity() {
         )
         // Otherwise Qt's ActivityLifecycleCallbacks set the state at the next onResume.
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
+        overlay?.bringToFront() // the WI-0.051 debug overlay stays above the Qt view
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
@@ -157,6 +177,38 @@ class MainActivity : AppCompatActivity() {
         } else {
             windowManager.defaultDisplay
         }
+
+    // launchMode singleTask: a second VIEW/SEND reaches the running Activity here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        filePicker.handleIntent(intent)
+    }
+
+    // Ctrl+O opens the picker (ChromeOS and hardware keyboards) until the Qt shell has its own File menu.
+    override fun onKeyDown(
+        keyCode: Int,
+        event: KeyEvent,
+    ): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_O && event.isCtrlPressed) {
+            filePicker.pick()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onDestroy() {
+        filePicker.shutdown()
+        OvtNative.close(session)
+        session = 0L
+        super.onDestroy()
+    }
+
+    private fun onFileOpened(opened: FilePicker.OpenedFile) {
+        OvtNative.close(session) // the previous file, if any
+        session = opened.session
+        overlay?.show(OvtNative.infoJson(session))
+    }
 
     private companion object {
         const val TAG = "OVT"
