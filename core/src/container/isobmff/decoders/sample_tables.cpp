@@ -158,7 +158,7 @@ class Table {
       const std::span<const uint8_t> w = pages_.window(at, need);
       if (w.size() < need) {  // the file shrank under us
         fb_.rebind(br_, at);
-        throw ParseError("BR-0001", "table window shorter than the box payload", at * 8U);
+        throw ParseError("BR-0001", "table window shorter than the box payload", br_.bit_pos());
       }
       BitReader wr(w);
       fb_.rebind(wr, at);
@@ -401,14 +401,14 @@ uint64_t decode_stsz(BoxContext& ctx, BitReader& br, FieldBuilder& fb) {
   const uint32_t sample_size = fb.u32("sample_size");
   const uint32_t declared = fb.u32("sample_count");
   note_sample_count(ctx, declared);
+  Table table(ctx, br, fb);
   if (sample_size != 0) {  // one size for every sample: no entries
     fb.derived("total " + std::to_string(uint64_t{sample_size} * declared) + " bytes");
-    if (const uint64_t extra = br.bits_left() / 8U; extra > 0) {
+    if (const uint64_t extra = table.remaining_after(table.start()); extra > 0) {
       fb.diag(Severity::Info, "CNT-1005", std::to_string(extra) + " unparsed trailing bytes in stsz");
     }
     return 0;
   }
-  Table table(ctx, br, fb);
   const uint32_t count = table.fit(declared, 32);
   SizeStats stats;
   table.walk(count, 32, "entries", "entry", [&](const Entry& e, uint64_t i) { stats.add(e.u32("entry_size"), i); });

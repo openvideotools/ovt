@@ -430,7 +430,7 @@ void FieldBuilder::diag(Severity sev, std::string_view code, std::string_view ms
 }
 
 uint64_t FieldBuilder::bytes_consumed() const {
-  return (br_->bit_pos() - origin_) / 8U;
+  return (br_->bit_pos() - origin_ + base_ - base0_) / 8U;
 }
 
 void FieldBuilder::report_truncated(const ParseError& e) {

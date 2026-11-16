@@ -435,6 +435,27 @@ class CountingFile final : public ovt::io::RandomAccessFile {
   mutable std::atomic<uint64_t> served_{0};
 };
 
+// Claims `claimed` bytes but holds only the first `data.size()`: a file that shrank under the reader.
+class ShrunkFile final : public ovt::io::RandomAccessFile {
+ public:
+  ShrunkFile(Bytes data, uint64_t claimed)
+      : RandomAccessFile(ovt::io::FileInfo{claimed, 0, "shrunk"}), data_(std::move(data)) {}
+  size_t read(uint64_t offset, size_t len, uint8_t* dst) const override {
+    if (offset >= data_.size()) {
+      return 0;
+    }
+    const size_t n = std::min<size_t>(len, data_.size() - offset);
+    std::copy_n(data_.begin() + static_cast<std::ptrdiff_t>(offset), n, dst);
+    return n;
+  }
+  [[nodiscard]] Holder view(uint64_t /*offset*/, size_t /*len*/) const override { return {}; }
+  void advise(uint64_t /*offset*/, uint64_t /*len*/, Access /*a*/) const noexcept override {}
+  [[nodiscard]] bool is_mapped() const noexcept override { return false; }
+
+ private:
+  Bytes data_;
+};
+
 Bytes stsz_table(uint32_t count) {
   Bytes entries;
   for (uint32_t i = 0; i < count; ++i) {
@@ -528,4 +549,27 @@ TEST_CASE("108 000 samples serialise to at most 8 MiB with 80 materialised entri
     }
   }
   ovt_container_close(container);
+}
+
+TEST_CASE("a window that comes back short gives CNT-1002 at the window start",
+          "[container][decoders][stbl][windowed]") {
+  constexpr uint32_t kCount = 400000;  // 1.6 MB: the second 1 MiB window starts at entry 262144
+  const Bytes data = file_with({stsz_table(kCount)});
+  Bytes cut(data.begin(), data.begin() + 1'200'000);
+  const ShrunkFile file(std::move(cut), data.size());
+  const iso::WalkResult r = iso::walk(file);
+  const BoxNodeT* n = r.top_level[1]->children[0]->children[0]->children[0]->children[0].get();
+  const BoxNodeT& stsz = *child(*n, "stsz");
+  const auto* d = diag_of(stsz, "CNT-1002");
+  REQUIRE(d != nullptr);
+  const uint64_t base_bits = uint64_t{8 + 4 + 8} * 8U;
+  CHECK(d->span->bit_offset() == base_bits + uint64_t{262144} * 32U);
+  CHECK(field(stsz.fields, "entries") != nullptr);
+}
+
+TEST_CASE("a constant-size stsz counts its trailing bytes from the whole payload",
+          "[container][decoders][stbl][stsz]") {
+  const Bytes data = file_with({full("stsz", 0, cat({u32s({512, 100}), Bytes(7, 0)}))});
+  const Walked w = walk_stbl(data);
+  CHECK(diag_of(box_of(w, "stsz"), "CNT-1005")->message.starts_with("7 unparsed"));
 }
