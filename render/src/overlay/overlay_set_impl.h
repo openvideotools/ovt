@@ -23,6 +23,13 @@ struct PartitionLine {
   uint16_t partition = 0;                  // PartitionInfo.index of that partition
 };
 
+// One block label (§10.5.5, WI-2.433): the string of OverlayConfig.label for one block, laid out at draw time.
+struct BlockLabel {
+  float cx = 0, cy = 0;  // NOLINT(readability-isolate-declaration): block centre, luma samples
+  float min_side = 0;    // the block's smaller side, luma samples
+  std::string text;      // UTF-8; '\n' separates lines
+};
+
 class OverlaySet {
  public:
   OverlaySet() = default;
@@ -49,6 +56,9 @@ class OverlaySet {
 
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
+
+  // One label per leaf block with a non-empty string (§10.5.5). Empty unless Labels is set and label != None.
+  std::vector<BlockLabel> block_labels;
 
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.

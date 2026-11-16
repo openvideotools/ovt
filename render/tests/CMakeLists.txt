@@ -114,5 +114,8 @@ target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/rende
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
 
+# WI-2.433a: SDF atlas layout and block label strings (§10.5.1, §10.5.5).
+target_sources(ovt_tests_render PRIVATE test_labels.cpp)
+
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)

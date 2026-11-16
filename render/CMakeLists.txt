@@ -55,6 +55,9 @@ endif()
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
+# WI-2.433a: block label strings (§10.5.5) for the label pass; the SDF atlas render/fonts/dejavu_sans_mono_sdf.h comes
+# from tools/gen_sdf_atlas.py (Bitstream Vera licence in render/fonts/LICENSE.DejaVu).
+target_sources(ovt_render PRIVATE src/overlay/label_text.cpp)
 foreach(shader IN ITEMS diff fill hatch heatmap)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
