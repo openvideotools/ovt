@@ -295,6 +295,8 @@ std::size_t background_pixels(const std::vector<std::uint8_t>& px) {
 
 }  // namespace
 
+// Catch2's REQUIRE/CHECK/INFO expand to branches; the test's own control flow is a short loop at most.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST_CASE("picture_host_matches_sdr_png8_of_frame_0", "[fast][gui]") {
   if (app_or_null() == nullptr) {
     SKIP("no X display (run under xvfb-run)");
@@ -326,6 +328,8 @@ TEST_CASE("picture_host_matches_sdr_png8_of_frame_0", "[fast][gui]") {
   CHECK(shown[mid + (static_cast<std::size_t>(w - 1) * 4)] >= 254);
 }
 
+// Catch2's REQUIRE/CHECK/INFO expand to branches; the test's own control flow is a short loop at most.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TEST_CASE("picture_host_resize_once_per_size_without_flicker", "[fast][gui]") {
   if (app_or_null() == nullptr) {
     SKIP("no X display (run under xvfb-run)");

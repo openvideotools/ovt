@@ -298,7 +298,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     switch (interop_) {
       case DisplayTarget::Interop::VulkanSharedDevice:
       case DisplayTarget::Interop::MetalTexture: {
-        const quint64 object = reinterpret_cast<quintptr>(ext.handle);  // NOLINT: VkImage / id<MTLTexture>
+        // The handle is a VkImage or an id<MTLTexture>; QRhiTexture::createFrom takes it as an integer.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+        const auto object = reinterpret_cast<quintptr>(ext.handle);
         const int layout = static_cast<int>(ext.layout);
         if (wrapped_ == nullptr || wrapped_object_ != object || wrapped_->pixelSize() != size) {
           src_texture_ = nullptr;
@@ -331,8 +333,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
         return nullptr;
       }
     }
-    cpu_bytes_ = QByteArray(reinterpret_cast<const char*>(px.bytes.data()),  // NOLINT: byte buffer
-                            static_cast<qsizetype>(px.bytes.size()));
+    // QByteArray copies the RGBA8 bytes; it takes them as char.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    cpu_bytes_ = QByteArray(reinterpret_cast<const char*>(px.bytes.data()), static_cast<qsizetype>(px.bytes.size()));
     QRhiTextureSubresourceUploadDescription sub(cpu_bytes_);
     sub.setDataStride(static_cast<quint32>(px.width) * 4U);
     updates->uploadTexture(cpu_texture_.get(), QRhiTextureUploadDescription(QRhiTextureUploadEntry(0, 0, sub)));
