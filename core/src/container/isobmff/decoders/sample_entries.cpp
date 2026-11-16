@@ -13,7 +13,6 @@
 // `stpp`, `mett`, `metx`, `urim`, `tmcd`) have rows of their own. Derived text goes into `Field.svalue`
 // (SPEC-ASSUMPTION(#415), field_builder.h).
 
-
 #include <algorithm>
 #include <array>
 #include <bit>
