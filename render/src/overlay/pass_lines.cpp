@@ -7,7 +7,6 @@
 
 #include <algorithm>
 #include <array>
-#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -55,6 +54,74 @@ void emit_block(const GridNode& n, float pw, float ph, std::vector<GridVertex>& 
   }
 }
 
+std::string shader_source(const char* stage, bool fragment) {
+  std::string src = "#version 450\n#define ";
+  src += stage;
+  src += "\n";
+  src +=
+      fragment ? "layout(binding = 1) uniform sampler2D palette;\n" : "layout(binding = 0) uniform sampler2D ends;\n";
+  src += shaders::kLines;
+  return src;
+}
+
+pl_pass create_line_pass(pl_gpu gpu, pl_fmt target_format, pl_fmt corner_fmt, std::string& err) {
+  if (!gpu->glsl.vulkan) {
+    err = "overlay passes need libplacebo's Vulkan backend";
+    return nullptr;
+  }
+  if (gpu->limits.max_pushc_size < sizeof(LinePassConstants)) {
+    err = "the line pass needs " + std::to_string(sizeof(LinePassConstants)) + " bytes of push constants";
+    return nullptr;
+  }
+  const std::string vertex = shader_source("OVT_VERTEX", false);
+  const std::string fragment = shader_source("OVT_FRAGMENT", true);
+  std::array<struct pl_desc, 2> descs = {
+      pl_desc{.name = "ends", .type = PL_DESC_SAMPLED_TEX, .binding = 0, .access = PL_DESC_ACCESS_READONLY},
+      pl_desc{.name = "palette", .type = PL_DESC_SAMPLED_TEX, .binding = 1, .access = PL_DESC_ACCESS_READONLY}};
+  struct pl_vertex_attrib attrib = {};
+  attrib.name = "corner";
+  attrib.fmt = corner_fmt;
+  attrib.offset = 0;
+  attrib.location = 0;
+  // Straight-alpha fragments "over" a premultiplied layer, as the cell passes (§10.5, #467).
+  struct pl_blend_params blend = {};
+  blend.src_rgb = PL_BLEND_SRC_ALPHA;
+  blend.dst_rgb = PL_BLEND_ONE_MINUS_SRC_ALPHA;
+  blend.src_alpha = PL_BLEND_ONE;
+  blend.dst_alpha = PL_BLEND_ONE_MINUS_SRC_ALPHA;
+  struct pl_pass_params params = {};
+  params.type = PL_PASS_RASTER;
+  params.descriptors = descs.data();
+  params.num_descriptors = static_cast<int>(descs.size());
+  params.push_constants_size = sizeof(LinePassConstants);
+  params.glsl_shader = fragment.c_str();
+  params.vertex_type = PL_PRIM_TRIANGLE_LIST;
+  params.vertex_attribs = &attrib;
+  params.num_vertex_attribs = 1;
+  params.vertex_stride = corner_fmt->texel_size;
+  params.vertex_shader = vertex.c_str();
+  params.target_format = target_format;
+  params.blend_params = &blend;
+  params.load_target = true;
+  pl_pass p = pl_pass_create(gpu, &params);
+  if (p == nullptr) {
+    err = "pl_pass_create failed for the grid line pass";
+  }
+  return p;
+}
+
+// The per-vertex corner attribute: an 8-bit unsigned integer where the GPU takes it as a vertex format with the
+// required stride alignment, else 32 bits.
+pl_fmt find_corner_fmt(pl_gpu gpu) {
+  for (const char* name : {"r8u", "r16u", "r32u"}) {
+    pl_fmt f = pl_find_named_fmt(gpu, name);
+    if (f != nullptr && (f->caps & PL_FMT_CAP_VERTEX) != 0 &&
+        (gpu->limits.align_vertex_stride == 0 || f->texel_size % gpu->limits.align_vertex_stride == 0)) {
+      return f;
+    }
+  }
+  return nullptr;
+}
 }  // namespace
 
 ImageRect visible_image_rect(int w, int h, double pan_x, double pan_y, double zoom) {
@@ -145,79 +212,6 @@ bool GridLineCache::update(const OverlaySet& set, uint32_t layers, double zoom, 
   ++builds_;
   return true;
 }
-
-namespace {
-
-std::string shader_source(const char* stage, bool fragment) {
-  std::string src = "#version 450\n#define ";
-  src += stage;
-  src += "\n";
-  src +=
-      fragment ? "layout(binding = 1) uniform sampler2D palette;\n" : "layout(binding = 0) uniform sampler2D ends;\n";
-  src += shaders::kLines;
-  return src;
-}
-
-pl_pass create_line_pass(pl_gpu gpu, pl_fmt target_format, pl_fmt corner_fmt, std::string& err) {
-  if (!gpu->glsl.vulkan) {
-    err = "overlay passes need libplacebo's Vulkan backend";
-    return nullptr;
-  }
-  if (gpu->limits.max_pushc_size < sizeof(LinePassConstants)) {
-    err = "the line pass needs " + std::to_string(sizeof(LinePassConstants)) + " bytes of push constants";
-    return nullptr;
-  }
-  const std::string vertex = shader_source("OVT_VERTEX", false);
-  const std::string fragment = shader_source("OVT_FRAGMENT", true);
-  std::array<struct pl_desc, 2> descs = {
-      pl_desc{.name = "ends", .type = PL_DESC_SAMPLED_TEX, .binding = 0, .access = PL_DESC_ACCESS_READONLY},
-      pl_desc{.name = "palette", .type = PL_DESC_SAMPLED_TEX, .binding = 1, .access = PL_DESC_ACCESS_READONLY}};
-  struct pl_vertex_attrib attrib = {};
-  attrib.name = "corner";
-  attrib.fmt = corner_fmt;
-  attrib.offset = 0;
-  attrib.location = 0;
-  // Straight-alpha fragments "over" a premultiplied layer, as the cell passes (§10.5, #467).
-  struct pl_blend_params blend = {};
-  blend.src_rgb = PL_BLEND_SRC_ALPHA;
-  blend.dst_rgb = PL_BLEND_ONE_MINUS_SRC_ALPHA;
-  blend.src_alpha = PL_BLEND_ONE;
-  blend.dst_alpha = PL_BLEND_ONE_MINUS_SRC_ALPHA;
-  struct pl_pass_params params = {};
-  params.type = PL_PASS_RASTER;
-  params.descriptors = descs.data();
-  params.num_descriptors = static_cast<int>(descs.size());
-  params.push_constants_size = sizeof(LinePassConstants);
-  params.glsl_shader = fragment.c_str();
-  params.vertex_type = PL_PRIM_TRIANGLE_LIST;
-  params.vertex_attribs = &attrib;
-  params.num_vertex_attribs = 1;
-  params.vertex_stride = corner_fmt->texel_size;
-  params.vertex_shader = vertex.c_str();
-  params.target_format = target_format;
-  params.blend_params = &blend;
-  params.load_target = true;
-  pl_pass p = pl_pass_create(gpu, &params);
-  if (p == nullptr) {
-    err = "pl_pass_create failed for the grid line pass";
-  }
-  return p;
-}
-
-// The per-vertex corner attribute: an 8-bit unsigned integer where the GPU takes it as a vertex format with the
-// required stride alignment, else 32 bits.
-pl_fmt find_corner_fmt(pl_gpu gpu) {
-  for (const char* name : {"r8u", "r16u", "r32u"}) {
-    pl_fmt f = pl_find_named_fmt(gpu, name);
-    if (f != nullptr && (f->caps & PL_FMT_CAP_VERTEX) != 0 &&
-        (gpu->limits.align_vertex_stride == 0 || f->texel_size % gpu->limits.align_vertex_stride == 0)) {
-      return f;
-    }
-  }
-  return nullptr;
-}
-
-}  // namespace
 
 bool LinePass::ensure_corners(pl_gpu gpu, int vertex_count, std::string& err) {
   if (corner_fmt_ == nullptr) {

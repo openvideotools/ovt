@@ -1,12 +1,10 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Minimal 8-bit RGB PNG writer and reader for the render goldens (chapter 10 §10.9.2 item 4), without zlib. By default
-// the writer stores the image data in uncompressed deflate blocks; with `compress` it writes one fixed-Huffman deflate
-// block whose matches repeat the previous pixel or the pixel above (WI-2.432: a 1920 x 1080 golden is 6 MB stored, over
-// the 2 MB pre-commit file cap). The reader accepts exactly what the writer produces (colour type 2, bit depth 8, no
-// interlace, stored or fixed-Huffman deflate blocks, filter type 0). A golden re-saved by another tool with dynamic
-// Huffman blocks is reported as unreadable rather than misread: regenerate it with OVT_UPDATE_GOLDEN=1.
+// Minimal 8-bit RGB PNG writer and reader for the render goldens (§10.9.2 item 4), without zlib: stored deflate blocks,
+// or with `compress` one fixed-Huffman block matching the previous pixel or the pixel above (WI-2.432: a stored 1080p
+// golden is 6 MB, over the 2 MB file cap). The reader takes exactly that (RGB8, no interlace, filter 0); a golden
+// re-saved with dynamic Huffman blocks is reported unreadable rather than misread: regenerate it (OVT_UPDATE_GOLDEN=1).
 
 #ifndef OVT_RENDER_TESTS_PNG_IO_H
 #define OVT_RENDER_TESTS_PNG_IO_H
@@ -132,8 +130,7 @@ inline void fixed_symbol(BitWriter& w, uint32_t sym) {
 // One final fixed-Huffman block. Matches are tried at distance 3 (previous pixel) and `stride` (the pixel above).
 inline void deflate_fixed(const std::vector<uint8_t>& raw, size_t stride, std::vector<uint8_t>& z) {
   BitWriter w(z);
-  w.bits(1, 1);  // BFINAL
-  w.bits(1, 2);  // BTYPE = 01 (fixed Huffman)
+  w.bits(3, 3);  // BFINAL = 1, BTYPE = 01 (fixed Huffman)
   size_t i = 0;
   while (i < raw.size()) {
     size_t best = 0;

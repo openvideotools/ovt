@@ -40,9 +40,8 @@ struct GridFixtureOptions {
   bool tiles_2x2 = false;  // four Tile partitions split at the picture centre (slice/tile boundary pass)
 };
 
-// The partition-grid fixture of `tools/gen_fixture_fb.py --kind grid` (synthetic_4k_grid.fb, chapter 14 §14.3.3),
-// built in C++ so the render tests need no corpus fetch: an H.265 intra picture, CTU 64 in raster order, the CU size
-// of CTU (cx, cy) is 64 >> ((cx + cy) % 4), and a CU larger than 8 that crosses the picture edge is split further.
+// C++ twin of `tools/gen_fixture_fb.py --kind grid` (synthetic_4k_grid.fb, §14.3.3; no corpus fetch): HEVC intra,
+// CTU 64 in raster order, CU size of CTU (cx, cy) 64 >> ((cx + cy) % 4), CUs > 8 crossing the picture edge split.
 std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
 
 // WI-2.434: the in-memory twin of `tools/gen_fixture_fb.py --kind mv` (render/tests/fixtures/synthetic_4k_mv.fb for

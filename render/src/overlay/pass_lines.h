@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The grid line pass of chapter 10 §10.5.3 (WI-2.432): passes 5 (partition grids TU -> PU -> CU -> CTU) and 6 (slice /
-// tile boundaries) of §10.5.6. The CPU side walks the block tree with rect pruning and R-GRID-1 level culling and
-// emits each edge once (left/top rule); the GPU side expands every line to a pixel-snapped screen-aligned quad by
-// vertex pulling of its two endpoints (K = 6). Internal to libovt-render.
+// Grid line pass (§10.5.3, WI-2.432), passes 5-6 of §10.5.6: block-tree walk with rect pruning, R-GRID-1 level culling
+// and the left/top edge rule on the CPU; pixel-snapped quads by vertex pulling of both endpoints (K = 6) on the GPU.
 
 #ifndef OVT_RENDER_SRC_OVERLAY_PASS_LINES_H
 #define OVT_RENDER_SRC_OVERLAY_PASS_LINES_H
@@ -23,8 +21,7 @@ namespace ovt::render::detail {
 
 // One line-list vertex of §10.5.1 (12 B): an endpoint in luma samples and the §10.5.2 colour row of its line.
 struct GridVertex {
-  float x = 0;
-  float y = 0;
+  float x = 0, y = 0;  // NOLINT(readability-isolate-declaration)
   uint8_t color_idx = 0;
   std::array<uint8_t, 3> pad{};
 };
@@ -34,20 +31,15 @@ static_assert(sizeof(GridVertex) == 12, "§10.5.1 line-list vertex is 12 bytes")
 inline constexpr uint8_t kColorGridCtu = 8;
 inline constexpr uint8_t kColorPartition = 12;
 
-// R-GRID-1: a level whose smallest block is below this many device px is not drawn.
-inline constexpr float kGridMinPx = 6.0F;
-// §10.5.1: the line list covers the visible image rect expanded by this fraction of its size on each side.
-inline constexpr float kGridMargin = 0.25F;
+inline constexpr float kGridMinPx = 6.0F;    // R-GRID-1: levels with smaller blocks are not drawn
+inline constexpr float kGridMargin = 0.25F;  // §10.5.1: pre-fetch margin per side, fraction of the visible size
 
-// An axis-aligned rect in luma samples, x0 <= x1, y0 <= y1.
-struct ImageRect {
+struct ImageRect {                       // luma samples, x0 <= x1, y0 <= y1
   float x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
 };
 
-// The visible image rect of a w x h drawable centred on (pan_x, pan_y) at `zoom` device px per luma sample.
+// The visible image rect of a w x h drawable centred on (pan_x, pan_y) at `zoom`; expand_margin() adds kGridMargin.
 OVT_RENDER_API ImageRect visible_image_rect(int w, int h, double pan_x, double pan_y, double zoom);
-
-// `r` grown by kGridMargin of its width / height on every side.
 OVT_RENDER_API ImageRect expand_margin(const ImageRect& r);
 
 // Bit i set = grid level slot i (GridLevel order TU, PU, CU, CTU) is drawn: its layer bit is in `layers` and its
@@ -68,10 +60,9 @@ OVT_RENDER_API void build_grid_lines(const OverlaySet& set, uint32_t levels, boo
                                      const ImageRect& area, GridLines& out);
 
 // Rebuild triggers of §10.5.1 (WI-2.432 step 5): a new set, a zoom crossing a level threshold (the drawn level mask
-// changes) or a visible rect that leaves the area pre-fetched with the 25 % margin.
+// changes) or a visible rect that leaves the pre-fetched area. update() returns true when it rebuilt the list.
 class OVT_RENDER_API GridLineCache {
  public:
-  // Returns true when the line list was rebuilt.
   bool update(const OverlaySet& set, uint32_t layers, double zoom, const ImageRect& visible);
   void reset() { valid_ = false; }
   [[nodiscard]] const GridLines& lines() const { return lines_; }
@@ -100,13 +91,10 @@ static_assert(sizeof(LinePassConstants) == 56, "must match the std430 layout of 
 
 class LinePass {
  public:
-  // destroy() must run before the pl_gpu goes away; the object holds plain libplacebo handles.
-  // Uploads the endpoints of `lines` into the RGBA32F endpoint texture (one texel per vertex: x, y, colour row).
+  // upload(): endpoints into the RGBA32F texture (texel per vertex: x, y, colour row). run(): draws them over `target`
+  // with the §10.5.2 `palette`, a no-op without lines. destroy() must run before the pl_gpu goes away.
   bool upload(pl_gpu gpu, const GridLines& lines, std::string& err);
-
-  // Draws the uploaded lines over `target` with the §10.5.2 `palette`. No-op without lines.
   bool run(pl_gpu gpu, pl_tex target, pl_tex palette, LinePassConstants constants, std::string& err);
-
   void destroy(pl_gpu gpu);
 
  private:
