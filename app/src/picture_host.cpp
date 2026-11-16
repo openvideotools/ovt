@@ -489,7 +489,7 @@ QRect PictureHost::crop() const {
   if (c.w() <= 0 || c.h() <= 0) {
     return {};
   }
-  return {static_cast<int>(c.x()), static_cast<int>(c.y()), static_cast<int>(c.w()), static_cast<int>(c.h())};
+  return {c.x(), c.y(), c.w(), c.h()};  // ovt.fb.Rect fields are int
 }
 
 QVariantList PictureHost::codeValues(int x, int y) const {
@@ -509,10 +509,9 @@ QVariantList PictureHost::codeValues(int x, int y) const {
     // The plane sample covering luma (x, y): scale by the plane's size relative to the luma plane.
     const std::span<const std::uint8_t> bytes(static_cast<const std::uint8_t*>(p.data),
                                               static_cast<std::size_t>(p.stride_bytes) * p.height);
-    const std::uint64_t px = (static_cast<std::uint64_t>(x) * p.width) / pic.coded_width;
-    const std::uint64_t py = (static_cast<std::uint64_t>(y) * p.height) / pic.coded_height;
-    const std::size_t at =
-        (static_cast<std::size_t>(py) * p.stride_bytes) + (static_cast<std::size_t>(px) * p.sample_bytes);
+    const std::size_t px = (static_cast<std::size_t>(x) * p.width) / pic.coded_width;
+    const std::size_t py = (static_cast<std::size_t>(y) * p.height) / pic.coded_height;
+    const std::size_t at = (py * p.stride_bytes) + (px * p.sample_bytes);
     if (at + p.sample_bytes > bytes.size()) {
       break;
     }
