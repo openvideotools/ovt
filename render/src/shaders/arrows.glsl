@@ -4,8 +4,9 @@
 // Overlay passes 8 (intra direction strokes) and 9 (MV arrows) of chapter 10 §10.5.6, drawn by vertex pulling
 // (§10.5, §10.5.4; WI-2.434). One draw covers a range of instances; every instance has K = 9 vertices: corners 0-5
 // are the shaft quad (two triangles) or the 2x2 px dot, 6-8 the head triangle. The vertex buffer holds only the
-// uint8 corner; the instance data is fetched from two textures: `geom` RGBA32F {ox, oy, vx, vy} (luma samples) and
-// `attr` RGBA32UI {color_idx | flags << 8, id, 0, 0}. `palette` holds the §10.5.2 colours (arrows are opaque).
+// integer corner (r8u, or r16u/r32u where the device aligns vertex strides); the instance data is fetched from two
+// textures: `geom` RGBA32F {ox, oy, vx, vy} (luma samples) and `attr` RGBA32UI {color_idx | flags << 8, id, 0, 0}.
+// `palette` holds the §10.5.2 colours (arrows are opaque).
 //
 // The prelude of pass_arrows.cpp declares `pc` (viewport_half, pan, clip, zoom, dpr, min_px, mode, first, tex_w), the
 // samplers and, for the fragment stage, `out_color`; it defines OVT_VERTEX for the vertex stage. Vulkan GLSL

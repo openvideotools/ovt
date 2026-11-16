@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Overlay passes 8 and 9 of chapter 10 §10.5.6 (WI-2.434): intra direction strokes and MV arrows by vertex pulling
-// (§10.5: the vertex buffer holds only a uint8 corner, the instance data lives in an RGBA32F + RGBA32UI texture pair
+// (§10.5: the vertex buffer holds only an integer corner, the instance data lives in an RGBA32F + RGBA32UI texture pair
 // read with texelFetch; K = 9 vertices per instance, §10.5.4 shaft quad + head triangle).
 
 #include "overlay/pass_arrows.h"
@@ -92,6 +92,19 @@ std::array<float, 4> view_rect(const ArrowPassConstants& pc) {
   const float hw = pc.viewport_half[0] / pc.zoom;
   const float hh = pc.viewport_half[1] / pc.zoom;
   return {pc.pan[0] - hw, pc.pan[1] - hh, pc.pan[0] + hw, pc.pan[1] + hh};
+}
+
+// The narrowest unsigned vertex format whose texel size meets the device's vertex stride alignment: r8u on most
+// devices; MoltenVK reports minVertexInputBindingStrideAlignment = 4, so r32u there. The corner lives in the low byte.
+pl_fmt find_corner_fmt(pl_gpu gpu) {
+  for (const char* name : {"r8u", "r16u", "r32u"}) {
+    pl_fmt f = pl_find_named_fmt(gpu, name);
+    if (f != nullptr && (f->caps & PL_FMT_CAP_VERTEX) != 0 &&
+        (gpu->limits.align_vertex_stride == 0 || f->texel_size % gpu->limits.align_vertex_stride == 0)) {
+      return f;
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace
@@ -194,9 +207,9 @@ bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) 
     err = "the arrow pass needs " + std::to_string(sizeof(ArrowPassConstants)) + " bytes of push constants";
     return false;
   }
-  pl_fmt corner_fmt = pl_find_fmt(gpu, PL_FMT_UINT, 1, 8, 8, PL_FMT_CAP_VERTEX);
-  if (corner_fmt == nullptr || gpu->limits.align_vertex_stride > 1) {
-    err = "no uint8 vertex format for the arrow corners";
+  corner_fmt_ = find_corner_fmt(gpu);
+  if (corner_fmt_ == nullptr) {
+    err = "no integer vertex format for the arrow corners";
     return false;
   }
   const std::string vertex = vertex_source();
@@ -211,7 +224,7 @@ bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) 
   }
   struct pl_vertex_attrib attrib = {};
   attrib.name = "corner";
-  attrib.fmt = corner_fmt;
+  attrib.fmt = corner_fmt_;
   attrib.offset = 0;
   attrib.location = 0;
 
@@ -231,7 +244,7 @@ bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) 
   params.vertex_type = PL_PRIM_TRIANGLE_LIST;
   params.vertex_attribs = &attrib;
   params.num_vertex_attribs = 1;
-  params.vertex_stride = 1;
+  params.vertex_stride = corner_fmt_->texel_size;
   params.vertex_shader = vertex.c_str();
   params.target_format = target_format;
   params.blend_params = &blend;
@@ -250,17 +263,18 @@ bool ArrowPass::ensure_corners(pl_gpu gpu, size_t vertices, std::string& err) {
     return true;
   }
   const size_t cap = std::max(vertices, corner_capacity_ * 2);
-  if (cap > gpu->limits.max_vbo_size) {
-    err = "arrow corner buffer of " + std::to_string(cap) + " bytes exceeds max_vbo_size";
+  const size_t ts = corner_fmt_->texel_size;
+  if (cap * ts > gpu->limits.max_vbo_size) {
+    err = "arrow corner buffer of " + std::to_string(cap * ts) + " bytes exceeds max_vbo_size";
     return false;
   }
-  std::vector<uint8_t> data(cap);
+  std::vector<uint8_t> data(cap * ts, 0);
   for (size_t i = 0; i < cap; ++i) {
-    data[i] = static_cast<uint8_t>(i % kVerticesPerInstance);
+    data[i * ts] = static_cast<uint8_t>(i % kVerticesPerInstance);  // little-endian low byte of the texel
   }
   pl_buf_destroy(gpu, &corners_);
   struct pl_buf_params params = {};
-  params.size = cap;
+  params.size = data.size();
   params.drawable = true;
   params.initial_data = data.data();
   corners_ = pl_buf_create(gpu, &params);
@@ -360,6 +374,7 @@ void ArrowPass::destroy(pl_gpu gpu) {
   pl_buf_destroy(gpu, &corners_);
   corner_capacity_ = 0;
   pl_pass_destroy(gpu, &pass_);
+  corner_fmt_ = nullptr;
   full_ = nullptr;
 }
 

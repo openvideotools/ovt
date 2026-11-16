@@ -2,7 +2,8 @@
 
 Machine: cloud container, Ubuntu 24.04 x86_64 (Intel Xeon @ 2.30 GHz, 4 cores), GCC 13.3.0, pinned libplacebo 7.349.0
 (built from source with the two `third_party/patches/libplacebo` patches), Mesa 25.2.8 lavapipe (llvmpipe, LLVM 20.1.2).
-Date: 2026-11-16. Spec version: 1.0-rc37. Spec questions: #644 (intra strokes), #645 (AT1 viewport, timer, K = 9), both accepted as proposed.
+Date: 2026-11-16. Spec version: 1.0-rc38. Spec questions: #644 (intra strokes), #645 (AT1 viewport, timer,
+K = 9), both accepted as proposed.
 
 Both acceptance tests are automated in `render/tests/test_overlay_arrows.cpp`:
 

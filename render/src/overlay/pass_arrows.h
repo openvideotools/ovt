@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Overlay passes 8 (intra direction strokes) and 9 (MV arrows) of chapter 10 §10.5.6 (WI-2.434 steps 2, 3 and 6):
-// vertex pulling from an instance texture pair (§10.5, §10.5.1), a static uint8 corner buffer grown on demand, and
+// vertex pulling from an instance texture pair (§10.5, §10.5.1), a static integer corner buffer grown on demand, and
 // the R-8K-1 viewport-culled upload. The GLSL is render/src/shaders/arrows.glsl. Internal to libovt-render.
 
 #ifndef OVT_RENDER_SRC_OVERLAY_PASS_ARROWS_H
@@ -82,7 +82,8 @@ class ArrowPass {
   pl_tex geom_ = nullptr;
   pl_tex attr_ = nullptr;
   pl_buf corners_ = nullptr;
-  size_t corner_capacity_ = 0;  // vertices
+  size_t corner_capacity_ = 0;   // vertices
+  pl_fmt corner_fmt_ = nullptr;  // r8u, or wider where the vertex stride must be aligned
   pl_pass pass_ = nullptr;
 };
 
