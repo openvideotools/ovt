@@ -80,7 +80,7 @@ fb::FrameType merge_frame_type(fb::FrameType a, fb::FrameType b) noexcept {
   return a == fb::FrameType::P || b == fb::FrameType::P ? fb::FrameType::P : fb::FrameType::I;
 }
 
-int64_t h265_ticks_per_picture(const syntax::h265::VuiParameters& vui) noexcept {
+int64_t h265_ticks_per_picture(const syntax::h265::VuiParameters& vui) {
   if (!vui.hrd_parameters) {
     return 1;
   }

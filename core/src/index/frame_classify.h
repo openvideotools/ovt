@@ -48,7 +48,7 @@ void classify_h265(FrameRec& f, const syntax::h265::NalHeader& nal, const syntax
 
 /// Clock ticks per picture of chapter 6 §6.2.6: elemental_duration_in_tc_minus1 + 1 of the highest sub-layer
 /// when the VUI HRD fixes the picture rate, else 1.
-[[nodiscard]] int64_t h265_ticks_per_picture(const syntax::h265::VuiParameters& vui) noexcept;
+[[nodiscard]] int64_t h265_ticks_per_picture(const syntax::h265::VuiParameters& vui);
 
 }  // namespace ovt::index
 
