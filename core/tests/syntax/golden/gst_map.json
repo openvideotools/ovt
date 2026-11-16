@@ -1,5 +1,5 @@
 {
- "_comment": "Test-side map between the gstparse goldens (GStreamer codecparsers struct members, chapter 14 \u00a714.4.2) and OVT's syntax trees, used by ovt_syntax_golden_run --oracle gstparse (WI-1.572). structs: golden structure key -> unit types that carry it. qualified_parents: members whose leaves are keyed '<parent>.<leaf>' (the same leaf name occurs under several parents). rename: '<structure>.<key>' -> OVT key, for GStreamer names that tools/gen_gst_fields.py RENAMES does not map. skip: '<structure>.<key>' -> why the member is not compared.",
+ "_comment": "Test-side map between the gstparse goldens (GStreamer codecparsers struct members, chapter 14 §14.4.2) and OVT's syntax trees, used by ovt_syntax_golden_run --oracle gstparse (WI-1.572). structs: golden structure key -> unit types that carry it. qualified_parents: members whose leaves are keyed '<parent>.<leaf>' (the same leaf name occurs under several parents). rename: '<structure>.<key>' -> OVT key, for GStreamer names that tools/gen_gst_fields.py RENAMES does not map. skip: '<structure>.<key>' -> why the member is not compared.",
  "h264": {
   "structs": {
    "sps": [
@@ -26,5 +26,126 @@
    "pps.num_ref_idx_l1_active_minus1": "num_ref_idx_l1_default_active_minus1"
   },
   "skip": {}
+ },
+ "h265": {
+  "structs": {
+   "vps": [
+    32
+   ],
+   "sps": [
+    33
+   ],
+   "pps": [
+    34
+   ],
+   "slice_header": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+   ]
+  },
+  "qualified_parents": [],
+  "rename": {
+   "pps.beta_offset_div2": "pps_beta_offset_div2",
+   "pps.cb_qp_offset": "pps_cb_qp_offset",
+   "pps.cr_qp_offset": "pps_cr_qp_offset",
+   "pps.deblocking_filter_disabled_flag": "pps_deblocking_filter_disabled_flag",
+   "pps.id": "pps_pic_parameter_set_id",
+   "pps.loop_filter_across_slices_enabled_flag": "pps_loop_filter_across_slices_enabled_flag",
+   "pps.pps_extension_flag": "pps_extension_present_flag",
+   "pps.scaling_list_data_present_flag": "pps_scaling_list_data_present_flag",
+   "pps.slice_chroma_qp_offsets_present_flag": "pps_slice_chroma_qp_offsets_present_flag",
+   "pps.sps_id": "pps_seq_parameter_set_id",
+   "pps.tc_offset_div2": "pps_tc_offset_div2",
+   "slice_header.pic_order_cnt_lsb": "slice_pic_order_cnt_lsb",
+   "sps.frame_only_constraint_flag": "general_frame_only_constraint_flag",
+   "sps.hrd_parameters_present_flag": "vui_hrd_parameters_present_flag",
+   "sps.id": "sps_seq_parameter_set_id",
+   "sps.interlaced_source_flag": "general_interlaced_source_flag",
+   "sps.intra_constraint_flag": "general_intra_constraint_flag",
+   "sps.level_idc": "general_level_idc",
+   "sps.log2_diff_max_min_transform_block_size": "log2_diff_max_min_luma_transform_block_size",
+   "sps.log2_min_transform_block_size_minus2": "log2_min_luma_transform_block_size_minus2",
+   "sps.lower_bit_rate_constraint_flag": "general_lower_bit_rate_constraint_flag",
+   "sps.max_10bit_constraint_flag": "general_max_10bit_constraint_flag",
+   "sps.max_12bit_constraint_flag": "general_max_12bit_constraint_flag",
+   "sps.max_14bit_constraint_flag": "general_max_14bit_constraint_flag",
+   "sps.max_420chroma_constraint_flag": "general_max_420chroma_constraint_flag",
+   "sps.max_422chroma_constraint_flag": "general_max_422chroma_constraint_flag",
+   "sps.max_8bit_constraint_flag": "general_max_8bit_constraint_flag",
+   "sps.max_monochrome_constraint_flag": "general_max_monochrome_constraint_flag",
+   "sps.max_sub_layers_minus1": "sps_max_sub_layers_minus1",
+   "sps.non_packed_constraint_flag": "general_non_packed_constraint_flag",
+   "sps.num_ticks_poc_diff_one_minus1": "vui_num_ticks_poc_diff_one_minus1",
+   "sps.num_units_in_tick": "vui_num_units_in_tick",
+   "sps.one_picture_only_constraint_flag": "general_one_picture_only_constraint_flag",
+   "sps.poc_proportional_to_timing_flag": "vui_poc_proportional_to_timing_flag",
+   "sps.profile_compatibility_flag": "general_profile_compatibility_flag",
+   "sps.profile_idc": "general_profile_idc",
+   "sps.profile_space": "general_profile_space",
+   "sps.progressive_source_flag": "general_progressive_source_flag",
+   "sps.scaling_list_data_present_flag": "sps_scaling_list_data_present_flag",
+   "sps.sps_extension_flag": "sps_extension_present_flag",
+   "sps.sub_layer_ordering_info_present_flag": "sps_sub_layer_ordering_info_present_flag",
+   "sps.temporal_id_nesting_flag": "sps_temporal_id_nesting_flag",
+   "sps.temporal_mvp_enabled_flag": "sps_temporal_mvp_enabled_flag",
+   "sps.tier_flag": "general_tier_flag",
+   "sps.time_scale": "vui_time_scale",
+   "sps.timing_info_present_flag": "vui_timing_info_present_flag",
+   "sps.vps_id": "sps_video_parameter_set_id",
+   "vps.base_layer_available_flag": "vps_base_layer_available_flag",
+   "vps.base_layer_internal_flag": "vps_base_layer_internal_flag",
+   "vps.frame_only_constraint_flag": "general_frame_only_constraint_flag",
+   "vps.id": "vps_video_parameter_set_id",
+   "vps.interlaced_source_flag": "general_interlaced_source_flag",
+   "vps.intra_constraint_flag": "general_intra_constraint_flag",
+   "vps.level_idc": "general_level_idc",
+   "vps.lower_bit_rate_constraint_flag": "general_lower_bit_rate_constraint_flag",
+   "vps.max_10bit_constraint_flag": "general_max_10bit_constraint_flag",
+   "vps.max_12bit_constraint_flag": "general_max_12bit_constraint_flag",
+   "vps.max_14bit_constraint_flag": "general_max_14bit_constraint_flag",
+   "vps.max_420chroma_constraint_flag": "general_max_420chroma_constraint_flag",
+   "vps.max_422chroma_constraint_flag": "general_max_422chroma_constraint_flag",
+   "vps.max_8bit_constraint_flag": "general_max_8bit_constraint_flag",
+   "vps.max_layer_id": "vps_max_layer_id",
+   "vps.max_layers_minus1": "vps_max_layers_minus1",
+   "vps.max_monochrome_constraint_flag": "general_max_monochrome_constraint_flag",
+   "vps.max_sub_layers_minus1": "vps_max_sub_layers_minus1",
+   "vps.non_packed_constraint_flag": "general_non_packed_constraint_flag",
+   "vps.num_hrd_parameters": "vps_num_hrd_parameters",
+   "vps.num_layer_sets_minus1": "vps_num_layer_sets_minus1",
+   "vps.num_ticks_poc_diff_one_minus1": "vps_num_ticks_poc_diff_one_minus1",
+   "vps.num_units_in_tick": "vps_num_units_in_tick",
+   "vps.one_picture_only_constraint_flag": "general_one_picture_only_constraint_flag",
+   "vps.poc_proportional_to_timing_flag": "vps_poc_proportional_to_timing_flag",
+   "vps.profile_compatibility_flag": "general_profile_compatibility_flag",
+   "vps.profile_idc": "general_profile_idc",
+   "vps.profile_space": "general_profile_space",
+   "vps.progressive_source_flag": "general_progressive_source_flag",
+   "vps.sub_layer_ordering_info_present_flag": "vps_sub_layer_ordering_info_present_flag",
+   "vps.temporal_id_nesting_flag": "vps_temporal_id_nesting_flag",
+   "vps.tier_flag": "general_tier_flag",
+   "vps.time_scale": "vps_time_scale",
+   "vps.timing_info_present_flag": "vps_timing_info_present_flag",
+   "vps.vps_extension": "vps_extension_flag"
+  },
+  "skip": {
+   "sps.par_n": "GStreamer derives the pixel aspect ratio from aspect_ratio_idc; not a syntax element",
+   "sps.par_d": "GStreamer derives the pixel aspect ratio from aspect_ratio_idc; not a syntax element",
+   "sps.parsed": "GStreamer bookkeeping flag, not a syntax element"
+  }
  }
 }

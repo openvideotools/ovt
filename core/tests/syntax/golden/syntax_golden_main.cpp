@@ -11,7 +11,8 @@
 // and compares OVT's trees with the golden: trace_headers element by element (§14.4.1), gstparse member values
 // (§14.4.2). --dump writes OVT's syntax elements as JSON for debugging.
 // SPEC-ASSUMPTION(#603): this driver stands in for `ovt syntax` (WI-1.504) until it exists.
-// Exit: 0 equal, 1 different, 2 usage or input error, 77 skipped (corpus not fetched and OVT_REQUIRE_CORPORA unset).
+// Exit: 0 equal, 1 different (or a unit OVT could not parse), 2 usage or input error, 77 skipped (corpus not fetched
+// and OVT_REQUIRE_CORPORA unset).
 
 #include <fmt/format.h>
 
@@ -111,22 +112,26 @@ std::vector<sg::ParsedUnit> parse_input(const std::filesystem::path& input, sg::
   const std::string text = sg::read_text(input);
   std::vector<uint8_t> stream(text.begin(), text.end());
   if (!sg::looks_like_annexb(stream)) {
-    stream = sg::h264_container_to_annexb(input, kContainerPackets);
+    stream = sg::container_to_annexb(input, codec, kContainerPackets);
   }
   const auto all = sg::annexb_units(stream);
   const auto units = sg::cut_to_pictures(all, codec, pictures);
-  return sg::parse_h264(units);
+  return codec == sg::Codec::kH264 ? sg::parse_h264(units) : sg::parse_h265(units);
 }
 
-void print_parse_errors(const std::vector<sg::ParsedUnit>& parsed) {
+// Prints the diagnostics of the units whose parser stopped; true when there is any.
+bool print_parse_errors(const std::vector<sg::ParsedUnit>& parsed) {
+  bool any = false;
   for (const auto& u : parsed) {
     if (!u.parse_error) {
       continue;
     }
+    any = true;
     for (const auto& d : u.diagnostics) {
       std::cout << fmt::format("unit {} (type {}): parse error {} at bit {}\n", u.index, u.type, d.code, d.bit_offset);
     }
   }
+  return any;
 }
 
 int run(const Args& a) {
@@ -142,7 +147,7 @@ int run(const Args& a) {
       (a.corpus.empty() == a.input.empty())) {
     return usage("missing argument");
   }
-  if (*codec != sg::Codec::kH264) {
+  if (*codec == sg::Codec::kAv1) {
     return usage("codec not supported yet: " + a.codec);
   }
   std::filesystem::path input = a.input;
@@ -172,7 +177,11 @@ int run(const Args& a) {
     std::cout << fmt::format("{}: {} units parsed, {} golden units\n", input.filename().string(), parsed.size(),
                              golden_doc.size());
   }
-  print_parse_errors(parsed);
+  // A unit OVT could not parse fails the test even when the values it did read match: gstparse compares only the
+  // members the golden holds, so a parser that stops early can otherwise pass on zero-filled members.
+  if (print_parse_errors(parsed) && diffs.empty()) {
+    diffs.emplace_back("OVT stopped parsing at least one unit (see the parse errors above)");
+  }
   if (diffs.empty()) {
     std::cout << (trace ? "syntax elements equal\n" : "header values equal\n");
     return 0;
