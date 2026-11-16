@@ -16,7 +16,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "luts/turbo.h"
 #include "ovt/render/video_surface.h"
@@ -40,14 +39,20 @@ using Kind = CompareMode::Kind;
 constexpr int kW = 64;
 constexpr int kH = 32;
 
-// A 10-bit 4:2:0 limited BT.709 picture of kW x kH with constant planes.
-OwnedPicture flat10(uint32_t y, uint32_t u = 512, uint32_t v = 512, uint64_t generation = 1) {
-  OwnedPicture p(kW, kH, 10, 1, 2);
+// A limited BT.709 picture with constant planes (chroma_format as OwnedPicture's).
+OwnedPicture flat(uint32_t w, uint32_t h, uint8_t bits, uint8_t chroma_format, uint8_t sample_bytes, uint32_t y,
+                  uint32_t u, uint32_t v, uint64_t generation) {
+  OwnedPicture p(w, h, bits, chroma_format, sample_bytes);
   p.fill_plane(0, y);
   p.fill_plane(1, u);
   p.fill_plane(2, v);
   p.pic.generation = generation;
   return p;
+}
+
+// The 10-bit 4:2:0 picture of kW x kH most cases use.
+OwnedPicture flat10(uint32_t y, uint32_t u = 512, uint32_t v = 512, uint64_t generation = 1) {
+  return flat(kW, kH, 10, 1, 2, y, u, v, generation);
 }
 
 ViewState view_1to1() {
@@ -58,27 +63,21 @@ ViewState view_1to1() {
   return v;
 }
 
-struct Rgba8Image {
-  int width = 0;
-  int height = 0;
-  std::vector<uint8_t> rgba;
-};
-
-Rgba8Image render_image(VideoSurface& s, const ViewState& v) {
+OutputPixels render_image(VideoSurface& s, const ViewState& v) {
   s.render(v);
   OutputPixels out;
   REQUIRE(ovt::render::detail::download_output(s, out));
   REQUIRE(out.texel_bytes == 4);
-  return Rgba8Image{out.width, out.height, out.bytes};
+  return out;
 }
 
 // The golden check of the WI-2.431 overlay tests: at most 0.1 % of the pixels may have a channel more than 2 codes off
 // (§10.9.2 item 4; SPEC-ASSUMPTION(#469)). OVT_UPDATE_GOLDEN=1 rewrites the golden, never on CI.
-void check_golden(const Rgba8Image& img, const char* name) {
+void check_golden(const OutputPixels& img, const char* name) {
   RgbImage actual{img.width, img.height, {}};
-  for (size_t i = 0; i + 3 < img.rgba.size(); i += 4) {
-    actual.rgb.insert(actual.rgb.end(), img.rgba.begin() + static_cast<std::ptrdiff_t>(i),
-                      img.rgba.begin() + static_cast<std::ptrdiff_t>(i + 3));
+  for (size_t i = 0; i + 3 < img.bytes.size(); i += 4) {
+    actual.rgb.insert(actual.rgb.end(), img.bytes.begin() + static_cast<std::ptrdiff_t>(i),
+                      img.bytes.begin() + static_cast<std::ptrdiff_t>(i + 3));
   }
   const std::string golden = std::string(OVT_RENDER_GOLDEN_DIR) + "/" + name;
   const char* update = std::getenv("OVT_UPDATE_GOLDEN");  // NOLINT(concurrency-mt-unsafe): test setup
@@ -97,9 +96,9 @@ void check_golden(const Rgba8Image& img, const char* name) {
   CHECK(differing * 1000 <= actual.rgb.size() / 3);
 }
 
-std::array<int, 3> rgb_at(const Rgba8Image& img, int x, int y) {
+std::array<int, 3> rgb_at(const OutputPixels& img, int x, int y) {
   const size_t at = ((static_cast<size_t>(y) * static_cast<size_t>(img.width)) + static_cast<size_t>(x)) * 4;
-  return {img.rgba.at(at), img.rgba.at(at + 1), img.rgba.at(at + 2)};
+  return {img.bytes.at(at), img.bytes.at(at + 1), img.bytes.at(at + 2)};
 }
 
 bool near(const std::array<int, 3>& rgb, int r, int g, int b, int tol) {
@@ -148,10 +147,7 @@ TEST_CASE("render_test_compare: slot B conversion and RND-0010/RND-0011 (§10.6.
   a.bit_depth = 10;
   a.sample_bytes = 2;
 
-  OwnedPicture b(kW, kH, 8, 2, 1);  // 8-bit 4:2:2
-  b.fill_plane(0, 100);
-  b.fill_plane(1, 50);
-  b.fill_plane(2, 200);
+  const OwnedPicture b = flat(kW, kH, 8, 2, 1, 100, 50, 200, 1);  // 8-bit 4:2:2
   PreparedB prep;
   REQUIRE(ovt::render::detail::prepare_b(b.pic, a, false, prep).empty());
   CHECK(prep.converted);
@@ -163,10 +159,7 @@ TEST_CASE("render_test_compare: slot B conversion and RND-0010/RND-0011 (§10.6.
   CHECK(prep.storage[0].at(1) == (400 >> 8));
   CHECK(prep.storage[2].at(0) == (800 & 0xFF));
 
-  OwnedPicture small(32, 16, 10, 1, 2);
-  small.fill_plane(0, 500);
-  small.fill_plane(1, 512);
-  small.fill_plane(2, 512);
+  const OwnedPicture small = flat(32, 16, 10, 1, 2, 500, 512, 512, 1);
   REQUIRE(ovt::render::detail::prepare_b(small.pic, a, false, prep).empty());
   CHECK(prep.size_mismatch);
   CHECK(prep.message == "RND-0010 compare slot B is 32×16, A is 64×32; set allow_scale_b to resample");
@@ -186,16 +179,14 @@ TEST_CASE("render_test_compare: identical A and B, Difference gain 32, are all z
   s->set_frame(a.pic);
   s->set_compare(b.pic, difference(32.0F));
   CHECK(std::string(s->last_error()).empty());
-  const Rgba8Image img = render_image(*s, view_1to1());
+  const OutputPixels img = render_image(*s, view_1to1());
   for (int y = 0; y < kH; ++y) {
     for (int x = 0; x < kW; ++x) {
       REQUIRE(rgb_at(img, x, y) == std::array<int, 3>{0, 0, 0});
     }
   }
   const ovt::render::Measurements m = s->measure();
-  CHECK(m.region_psnr[0] == 99.0F);
-  CHECK(m.region_psnr[1] == 99.0F);
-  CHECK(m.region_psnr[2] == 99.0F);
+  CHECK((m.region_psnr[0] == 99.0F && m.region_psnr[1] == 99.0F && m.region_psnr[2] == 99.0F));
 }
 
 TEST_CASE("render_test_compare: B = A + 4 code values on 10-bit luma at gain 8 shows grey 8 (AT2)",
@@ -208,7 +199,7 @@ TEST_CASE("render_test_compare: B = A + 4 code values on 10-bit luma at gain 8 s
     CompareMode m = difference(8.0F);
     m.diff_plane = static_cast<int8_t>(plane);
     s->set_compare(b.pic, m);
-    const Rgba8Image img = render_image(*s, view_1to1());
+    const OutputPixels img = render_image(*s, view_1to1());
     // round(8 x 4/1023 x 255) = 8, written directly as the output code value
     CHECK(near(rgb_at(img, 0, 0), 8, 8, 8, 1));
     CHECK(near(rgb_at(img, kW - 1, kH - 1), 8, 8, 8, 1));
@@ -264,9 +255,9 @@ TEST_CASE("render_test_compare: difference golden diff_gain8.png and false colou
   }
   s->set_frame(a.pic);
   s->set_compare(b.pic, difference(8.0F));
-  const Rgba8Image img = render_image(*s, view_1to1());
-  CHECK(render_image(*s, view_1to1()).rgba == img.rgba);  // FR-PLN-101 / §10.9.2 item 5
-  CHECK(near(rgb_at(img, 63, 31), 20, 20, 20, 1));        // 10 code values: round(8 x 10/1023 x 255) = 20
+  const OutputPixels img = render_image(*s, view_1to1());
+  CHECK(render_image(*s, view_1to1()).bytes == img.bytes);  // FR-PLN-101 / §10.9.2 item 5
+  CHECK(near(rgb_at(img, 63, 31), 20, 20, 20, 1));          // 10 code values: round(8 x 10/1023 x 255) = 20
   check_golden(img, "diff_gain8.png");
 
   CompareMode fc = difference(8.0F);
@@ -285,7 +276,7 @@ TEST_CASE("render_test_compare: split, side by side and golden split_v.png", "[f
   m.kind = Kind::Split;
   m.split_position = 0.5F;
   s->set_compare(b.pic, m);
-  const Rgba8Image split = render_image(*s, view_1to1());
+  const OutputPixels split = render_image(*s, view_1to1());
   CHECK(near(rgb_at(split, 10, 10), 0, 0, 0, 1));
   CHECK(near(rgb_at(split, 50, 10), 255, 255, 255, 1));
   CHECK(near(rgb_at(split, 31, 0), 255, 255, 255, 0));  // divider
@@ -304,14 +295,14 @@ TEST_CASE("render_test_compare: split, side by side and golden split_v.png", "[f
   s->set_compare(cb.pic, m);
   ViewState v = view_1to1();
   v.zoom = 2.0;  // nearest-neighbour magnification under the scissor
-  const Rgba8Image img = render_image(*s, v);
-  CHECK(render_image(*s, v).rgba == img.rgba);
+  const OutputPixels img = render_image(*s, v);
+  CHECK(render_image(*s, v).bytes == img.bytes);
   check_golden(img, "split_v.png");
 
   s->set_frame(a.pic);
   m.kind = Kind::SideBySide;
   s->set_compare(b.pic, m);
-  const Rgba8Image sbs = render_image(*s, view_1to1());
+  const OutputPixels sbs = render_image(*s, view_1to1());
   CHECK(near(rgb_at(sbs, 5, 5), 0, 0, 0, 1));
   CHECK(near(rgb_at(sbs, 30, 5), 0, 0, 0, 1));
   CHECK(near(rgb_at(sbs, 31, 5), 255, 255, 255, 0));
@@ -350,14 +341,10 @@ TEST_CASE("render_test_compare: mismatched B: hatch (RND-0010), resample and con
   auto s = surface_or_skip(kW, kH);
   const OwnedPicture a = flat10(500);
   s->set_frame(a.pic);
-  OwnedPicture small(32, 16, 10, 1, 2);
-  small.fill_plane(0, 500);
-  small.fill_plane(1, 512);
-  small.fill_plane(2, 512);
-  small.pic.generation = 2;
+  const OwnedPicture small = flat(32, 16, 10, 1, 2, 500, 512, 512, 2);
   s->set_compare(small.pic, difference(32.0F));
   CHECK(std::string(s->last_error()).rfind("RND-0010 compare slot B is 32×16, A is 64×32", 0) == 0);
-  const Rgba8Image hatch = render_image(*s, view_1to1());
+  const OutputPixels hatch = render_image(*s, view_1to1());
   bool dark = false;
   bool light = false;
   for (int x = 0; x < 16; ++x) {
@@ -375,11 +362,7 @@ TEST_CASE("render_test_compare: mismatched B: hatch (RND-0010), resample and con
   CHECK(near(rgb_at(render_image(*s, view_1to1()), 9, 9), 0, 0, 0, 0));
   CHECK(s->measure().region_psnr[0] == 99.0F);
 
-  OwnedPicture b8(kW, kH, 8, 2, 1);  // 8-bit 4:2:2, code 125 << 2 = 500
-  b8.fill_plane(0, 125);
-  b8.fill_plane(1, 128);
-  b8.fill_plane(2, 128);
-  b8.pic.generation = 3;
+  const OwnedPicture b8 = flat(kW, kH, 8, 2, 1, 125, 128, 128, 3);  // 8-bit 4:2:2, code 125 << 2 = 500
   s->set_compare(b8.pic, difference(32.0F));
   CHECK(std::string(s->last_error()) == "RND-0011 B converted: 4:2:2→4:2:0, 8-bit→10-bit");
   CHECK(near(rgb_at(render_image(*s, view_1to1()), 9, 9), 0, 0, 0, 0));

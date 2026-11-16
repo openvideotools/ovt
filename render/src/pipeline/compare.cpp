@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -54,7 +55,6 @@ CompareLayout compare_layout(const CompareMode& mode, int width, int height, boo
       // One viewport; A before split_position, B from it on.
       const float pos = std::clamp(mode.split_position, 0.0F, 1.0F);
       const int at = static_cast<int>(std::lround(pos * static_cast<float>(extent)));
-      l.draw_b = true;
       l.clip_a = part(0, at);
       l.clip_b = part(at, extent);
       l.draw_a = !l.clip_a.empty();
@@ -77,10 +77,7 @@ CompareLayout compare_layout(const CompareMode& mode, int width, int height, boo
 }
 
 bool flicker_shows_b(int64_t elapsed_ms, uint16_t period_ms) {
-  if (period_ms == 0 || elapsed_ms < 0) {
-    return false;
-  }
-  return ((elapsed_ms / period_ms) % 2) == 1;
+  return period_ms != 0 && elapsed_ms >= 0 && ((elapsed_ms / period_ms) % 2) == 1;
 }
 
 bool clip_rects(pl_rect2df& src, pl_rect2df& dst, const IRect& clip) {
@@ -227,11 +224,8 @@ class Pass {
 };
 
 std::array<float, 8> corners_of(const IRect& r) {
-  const auto x0 = static_cast<float>(r.x0);
-  const auto y0 = static_cast<float>(r.y0);
-  const auto x1 = static_cast<float>(r.x1);
-  const auto y1 = static_cast<float>(r.y1);
-  return {x0, y0, x1, y0, x0, y1, x1, y1};
+  const auto f = [](int v) { return static_cast<float>(v); };
+  return {f(r.x0), f(r.y0), f(r.x1), f(r.y0), f(r.x0), f(r.y1), f(r.x1), f(r.y1)};
 }
 
 float texture_scale(const FrameSlot& s) {
@@ -296,13 +290,8 @@ bool ComparePasses::difference(pl_tex target, const IRect& rect, const FrameSlot
   }
   const bool chroma = a.frame.num_planes == 3 && b.frame.num_planes == 3;
   const bool false_color = p.false_color && lut_ != nullptr;
-  std::string defines = "#define OVT_PASS_DIFF\n";
-  if (chroma) {
-    defines += "#define OVT_HAS_CHROMA\n";
-  }
-  if (false_color) {
-    defines += "#define OVT_FALSE_COLOR\n";
-  }
+  const std::string defines = std::string("#define OVT_PASS_DIFF\n") + (chroma ? "#define OVT_HAS_CHROMA\n" : "") +
+                              (false_color ? "#define OVT_FALSE_COLOR\n" : "");
   Pass pass(defines.c_str());
   pass.tex("ovt_a0", a.tex[0]);
   pass.tex("ovt_b0", b.tex[0]);
@@ -370,10 +359,7 @@ bool ComparePasses::psnr(const FrameSlot& a, const FrameSlot& b, const IRect& vi
     if (!pl_tex_download(gpu_, &tp)) {
       return false;
     }
-    double sse = 0.0;
-    for (const float s : sums) {
-      sse += static_cast<double>(s);
-    }
+    const double sse = std::accumulate(sums.begin(), sums.end(), 0.0);
     psnr.at(static_cast<size_t>(i)) =
         region_psnr(sse, static_cast<double>(r.width()) * static_cast<double>(r.height()), a.bit_depth);
   }
