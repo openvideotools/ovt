@@ -275,6 +275,7 @@ TEST_CASE("check_stsd_entry_count: CNT-1010 when entry_count differs from the en
   iso::check_stsd_entry_count(bad);
   REQUIRE(bad.diagnostics.size() == 1);
   CHECK(bad.diagnostics[0]->code == "CNT-1010");
+  CHECK(bad.diagnostics[0]->spec_ref == "14496-12 §8.5.2");
   BoxNodeT undecoded;
   undecoded.fourcc = "stsd";
   iso::check_stsd_entry_count(undecoded);
