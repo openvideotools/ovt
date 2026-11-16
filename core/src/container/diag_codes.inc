@@ -90,6 +90,9 @@ X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "Q
 X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
 X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
+// WI-1.206 (stsd and sample entries, §8.3.2).
+X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
 
