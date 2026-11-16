@@ -85,7 +85,6 @@ int hex_digit(char c) {
 
 // The rewrite recurses along the tables of the schema, at most kMaxDepth deep, and along nested buffers, at
 // most kMaxNestedBuffers deep.
-// NOLINTBEGIN(misc-no-recursion)
 class Importer {
  public:
   Importer(SchemaId id, const reflection::Schema& schema) : schema_(schema), parser_(parser_options()) {
@@ -96,6 +95,7 @@ class Importer {
   }
 
   /// The buffer of @p json parsed as @p object, as the Parser builds it (not canonical).
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
   Bytes parse(std::string_view json, const reflection::Object& object, std::string_view identifier) {
     const std::string text = Rewriter(*this, json).run(object);
     // Set after the rewrite: it parses nested buffers with this same Parser.
@@ -138,6 +138,7 @@ class Importer {
    public:
     Rewriter(Importer& importer, std::string_view in) : importer_(importer), in_(in) {}
 
+    // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
     std::string run(const reflection::Object& root) {
       skip_space();
       if (peek() != '{') {
@@ -290,6 +291,7 @@ class Importer {
       append_bytes(out_, bytes);
     }
 
+    // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
     void table_vector(const reflection::Object& element) {
       out_ += in_[pos_++];  // [
       for (bool first = true;; first = false) {
@@ -342,6 +344,7 @@ class Importer {
 
     /// Rewrites the value at the cursor, of member @p key with @p shape; a string under an `X_type` key is
     /// noted in @p type_names.
+    // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
     void value(const Shape& shape, std::string_view key, TypeNames& type_names) {
       const char c = peek();
       if (shape.kind == Shape::Kind::Nested && shape.table != nullptr && c == '{') {  // a fixed table: no sibling
@@ -362,6 +365,7 @@ class Importer {
     }
 
     /// Rewrites the object at the cursor as a table of type @p table.
+    // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
     void object(const reflection::Object& table) {
       if (++depth_ > kMaxDepth) {
         fail("nesting deeper than " + std::to_string(kMaxDepth) + " levels");
@@ -404,6 +408,7 @@ class Importer {
   };
 
   /// The bytes of the nested buffer whose JSON object is @p json: no identifier (§6.3.3).
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxDepth and kMaxNestedBuffers
   Bytes nested(std::string_view json, const reflection::Object& object) {
     if (nesting_ == detail::kMaxNestedBuffers) {
       fail("nested buffers deeper than " + std::to_string(detail::kMaxNestedBuffers) + " levels");
@@ -414,7 +419,6 @@ class Importer {
     return bytes;
   }
 };
-// NOLINTEND(misc-no-recursion)
 
 }  // namespace
 
