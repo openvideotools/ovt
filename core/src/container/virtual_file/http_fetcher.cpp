@@ -76,8 +76,13 @@ void common_options(Handle& h, const std::string& url) {
   curl_easy_setopt(c, CURLOPT_URL, url.c_str());
   curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(c, CURLOPT_MAXREDIRS, 5L);
+#if LIBCURL_VERSION_NUM >= 0x075500  // 7.85.0: the string forms; older libcurl (Ubuntu 22.04's 7.81) has the bitmasks
   curl_easy_setopt(c, CURLOPT_PROTOCOLS_STR, "http,https");
   curl_easy_setopt(c, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
+#else
+  curl_easy_setopt(c, CURLOPT_PROTOCOLS, static_cast<long>(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+  curl_easy_setopt(c, CURLOPT_REDIR_PROTOCOLS, static_cast<long>(CURLPROTO_HTTP | CURLPROTO_HTTPS));
+#endif
   curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, kConnectTimeoutSec);
   curl_easy_setopt(c, CURLOPT_TIMEOUT, kTotalTimeoutSec);
   curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
