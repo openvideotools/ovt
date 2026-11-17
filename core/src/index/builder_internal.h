@@ -46,8 +46,9 @@ struct UnitRec {
   syntax::SyntaxNodeBuffer header;
   int32_t sample_index = -1;
   std::vector<DiagRec> diagnostics;
-  bool parameter_set = false;  // listed in StreamIndex.parameter_sets
-  bool sei = false;            // listed in StreamIndex.sei
+  bool parameter_set = false;        // listed in StreamIndex.parameter_sets
+  bool sei = false;                  // listed in StreamIndex.sei
+  bool temporal_unit_start = false;  // UnitInput.temporal_unit_start (AV1 Annex B, WI-1.124)
   std::optional<SampleTiming> timing;
 };
 
@@ -82,7 +83,7 @@ struct FrameRec {
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
   std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
-  std::vector<int32_t> dpb_after;
+  std::vector<int32_t> dpb_after;      // AV1: the 8 slots, -1 for an empty slot
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
   // ---- S9 inputs (not serialised) ----
@@ -170,7 +171,8 @@ class CodecDispatch {
   virtual void end_of_stream(BuilderCore& core) = 0;
 };
 
-[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch();
+/// `operating_point` and `annexb` are BuilderOptions.av1_operating_point / av1_annexb (WI-1.124).
+[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch(uint8_t operating_point = 0, bool annexb = false);
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h264_dispatch();
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h265_dispatch();
 

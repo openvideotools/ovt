@@ -137,6 +137,7 @@ idx::UnitInput input_of(const syn::ScannedUnit& u, const idx::SampleTiming* timi
   in.prefix_span = u.prefix_span;
   in.sample_index = u.container_sample_index;
   in.timing = timing;
+  in.temporal_unit_start = u.temporal_unit_start;
   return in;
 }
 
@@ -238,6 +239,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
     idx::BuilderOptions options;
     options.codec = stream.codec;
     options.lazy_after_frames = stream.lazy_after_frames;
+    options.av1_annexb = stream.framing == Framing::ObuAnnexB;
     resume->builder = std::make_unique<idx::StreamIndexBuilder>(options);
   }
   idx::StreamIndexBuilder& builder = *resume->builder;
