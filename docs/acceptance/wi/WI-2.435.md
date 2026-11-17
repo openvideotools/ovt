@@ -31,5 +31,20 @@ $ ./render/tests/ovt_tests_render                # whole render suite
 All tests passed (142454 assertions in 130 test cases)
 ```
 
-MoltenVK (Mac Mini): to be recorded here from `./render/tests/ovt_tests_render "[pick]"` in the macos-arm64-debug
-build directory.
+## MoltenVK (Mac Mini)
+
+Machine: Mac Mini, Apple M4, macOS 15.8.2, macos-arm64-debug, pinned libplacebo 7.349.0. Date: 2026-11-17.
+
+At e61ab97 `render_test_pick_block_id_and_codes` failed: every probe luma read was 63 codes off. The cause is in the
+pinned libplacebo: its Vulkan transfer passes the rect's end coordinates as the copy extent, so any download whose rect
+does not start at (0, 0) reads the wrong texels. Upstream has since fixed it. b2212b3 stages sub-rect downloads at the
+origin (`stage_rect` in `render/src/overlay/idbuffer.cpp`). The same code was audited in issue #715.
+
+```console
+$ ./render/tests/ovt_tests_render "[pick]"      # b2212b3, three runs
+All tests passed (104 assertions in 8 test cases)
+All tests passed (104 assertions in 8 test cases)
+All tests passed (104 assertions in 8 test cases)
+```
+
+Full log: `wi2435-pick-pr714-b2212b3-mini-20261117T020317Z.txt` in the project files.

@@ -29,8 +29,9 @@ struct Staged {
 
 // The pinned libplacebo 7.349 passes a transfer rect's end coordinates as the Vulkan copy extent (upstream later uses
 // pl_rect_w/h), so a download whose rect does not start at (0, 0) reads the wrong texels: MoltenVK returned the
-// sample 63 codes off, and the copy can run past the buffer. A sub-rect is therefore blitted to `scratch` at the
-// origin first; a texture that cannot be blitted is downloaded from the origin up to the rect's far corner instead.
+// sample 63 codes off, and the copy can run past the buffer (issue #715). A sub-rect is therefore blitted to `scratch`
+// at the origin first; a texture that cannot be blitted is downloaded from the origin up to the rect's far corner
+// instead.
 Staged stage_rect(pl_gpu gpu, pl_tex tex, const pl_rect3d& rc, pl_tex& scratch) {
   if (rc.x0 == 0 && rc.y0 == 0) {
     return {tex, rc, 0, 0};
