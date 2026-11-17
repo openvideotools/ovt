@@ -81,7 +81,7 @@ struct FrameRec {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
-  std::vector<int32_t> declared_refs;  // stays empty: the DPB models are stubs in WI-1.121 (§7.4.4)
+  std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
   std::vector<int32_t> dpb_after;
   int32_t frame_num = -1;
   uint16_t slice_count = 0;

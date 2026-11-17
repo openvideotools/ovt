@@ -15,6 +15,8 @@ Item {
 
     // Set by PicturePanel when loaded; null leaves the host on its defaults (fit, YUV).
     property PictureController controller: null
+    // The panel's CompareController (WI-2.486); null leaves the host on Single.
+    property CompareController compare: null
     readonly property alias host: host
 
     PictureHost {
@@ -37,7 +39,28 @@ Item {
         gamutClipOverlay: HdrView.gamutClipOverlay
         dither: HdrView.dither
 
+        compareKind: view.compare ? view.compare.kind : 0
+        splitAxis: view.compare ? view.compare.splitAxis : 0
+        splitPosition: view.compare ? view.compare.splitPosition : 0.5
+        overlayAlpha: view.compare ? view.compare.overlayAlpha : 0.5
+        diffGain: view.compare ? view.compare.diffGain : 1
+        diffFalseColour: view.compare ? view.compare.diffFalseColour : false
+        flickerPeriodMs: view.compare ? view.compare.flickerPeriodMs : 500
+
         onPictureChanged: view.pushPicture()
+    }
+
+    // The controller asks, the host does: snapshot A into slot B, swap, clear.
+    Connections {
+        target: view.compare
+        ignoreUnknownSignals: true
+
+        function onSnapshotRequested() { view.compare.snapshotTaken(host.snapshotAsB()) }
+        function onSwapRequested() { host.swapAB() }
+        function onBChanged() {
+            if (view.compare.bSource === "none")
+                host.clearB()
+        }
     }
 
     function pushPicture() {

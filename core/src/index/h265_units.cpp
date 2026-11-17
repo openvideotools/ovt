@@ -3,7 +3,7 @@
 //
 // H.265 dispatch of the StreamIndex builder (chapter 7 §7.4.2 S2–S6, WI-1.121): one NAL unit at a time through
 // the §7.3.5 parsers, the parameter-set activation of §7.3.8, the frame-boundary rule of §7.3.9 and the picture
-// order count of §7.3.10.2. The RPS / DPB model joins with WI-1.123. WI-1.125 adds the lazy trees of §7.4.5 and
+// order count of §7.3.10.2, and the RPS / DPB model of §7.4.4 (WI-1.123). WI-1.125 adds the lazy trees of §7.4.5 and
 // the lazy EPB stripping of §7.4.6.
 
 #include <algorithm>
@@ -14,6 +14,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "index/builder_internal.h"
@@ -252,6 +253,14 @@ class H265Dispatch final : public CodecDispatch {
       f.sequence = ++sequence_;
     }
     classify_h265(f, h, sh, *act->sps, poc);  // S6
+    // §7.4.4 on the first slice segment of the picture; the diagnostics (SYN-H265-0102) go on that unit.
+    h265::DpbStepResult step = dpb_.step(f.decode_index, h, sh, *act->sps, *act->pps, poc);
+    h265::FrameRefs refs = h265::frame_refs(step, f.decode_index);
+    f.declared_refs = std::move(refs.declared_refs);
+    f.dpb_after = std::move(refs.dpb_after);
+    for (h265::IndexDiagnostic& d : step.diagnostics) {
+      core.unit_diagnostic(unit, DiagRec{d.severity, std::move(d.code), std::move(d.message), BitSpan{0, 0}});
+    }
   }
 
   // A VCL unit whose slice segment header is not parsed: the first-segment flag alone places it. `base` is false
@@ -286,6 +295,7 @@ class H265Dispatch final : public CodecDispatch {
   ActiveSets sets_;
   h265::FrameBoundary boundary_;
   h265::PocState poc_;
+  h265::Dpb dpb_;
   std::vector<SetDiagnostic> set_diags_;
   NalHeader header_;                                    // of the unit being parsed
   std::optional<SliceSegmentHeader> prev_independent_;  // §7.4.7.1: what a dependent slice segment copies from
