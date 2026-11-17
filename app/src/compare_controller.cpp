@@ -9,7 +9,9 @@
 #include <QStringList>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <cstddef>
 #include <utility>
 #include <vector>
 
@@ -20,7 +22,7 @@ namespace {
 constexpr const char* kFindOrigin = "compare";
 
 // CompareMode::Kind indices of chapter 10 §10.2.4: Single, SideBySide, Split, Overlay, Difference, Flicker.
-constexpr int kKindOfMode[CompareController::kModeCount] = {0, 1, 2, 2, 3, 4, 5};
+constexpr std::array<int, CompareController::kModeCount> kKindOfMode = {0, 1, 2, 2, 3, 4, 5};
 
 }  // namespace
 
@@ -36,7 +38,7 @@ QStringList CompareController::mode_names() {
 }
 
 int CompareController::kind() const noexcept {
-  return kKindOfMode[std::clamp(mode_, 0, kModeCount - 1)];
+  return kKindOfMode.at(static_cast<std::size_t>(std::clamp(mode_, 0, kModeCount - 1)));
 }
 
 void CompareController::set_mode(int mode) {
@@ -329,8 +331,7 @@ void CompareController::completeFirstMismatch(bool found, int display_index, int
   }
   // The probe is in luma samples (§11.4.1); (x, y) is in the plane's own samples.
   const QPoint probe(x * std::max(sub_x, 1), y * std::max(sub_y, 1));
-  static const char* const kPlane[] = {"Y", "U", "V"};
-  const QString plane_name = QString::fromLatin1(kPlane[std::clamp(plane, 0, 2)]);
+  const QString plane_name = QString::fromLatin1("YUV").mid(std::clamp(plane, 0, 2), 1);
   if (diagnostics_ != nullptr) {
     DiagnosticEntry entry;
     entry.severity = DiagSeverity::Info;
@@ -373,16 +374,17 @@ void CompareController::failFirstMismatch(const QString& message) {
 // ---- Actions -------------------------------------------------------------------------------------------------------
 
 bool CompareController::handleAction(const QString& id) {
-  static const struct {
+  struct ModeAction {
     const char* id;
     int mode;
-  } kModes[] = {{"compare.single", Single},
-                {"compare.sideBySide", SideBySide},
-                {"compare.splitVertical", SplitVertical},
-                {"compare.splitHorizontal", SplitHorizontal},
-                {"compare.overlay", Overlay},
-                {"compare.difference", Difference},
-                {"compare.flicker", Flicker}};
+  };
+  static constexpr std::array<ModeAction, 7> kModes = {{{"compare.single", Single},
+                                                        {"compare.sideBySide", SideBySide},
+                                                        {"compare.splitVertical", SplitVertical},
+                                                        {"compare.splitHorizontal", SplitHorizontal},
+                                                        {"compare.overlay", Overlay},
+                                                        {"compare.difference", Difference},
+                                                        {"compare.flicker", Flicker}}};
   for (const auto& m : kModes) {
     if (id == QLatin1String(m.id)) {
       set_mode(m.mode);

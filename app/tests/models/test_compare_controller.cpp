@@ -90,7 +90,7 @@ TEST_CASE("Difference gain steps through the powers of two 1 to 64 and the keys 
 TEST_CASE("Swap A/B asks the host to exchange its pictures and flips the flag", "[fast][gui][compare]") {
   ovt::app::testing::qt_app();
   CompareController c;
-  QSignalSpy swaps(&c, &CompareController::swapRequested);
+  const QSignalSpy swaps(&c, &CompareController::swapRequested);
   c.swapAB();  // no B: nothing to swap
   CHECK(swaps.count() == 0);
   c.setFileB(4);
@@ -104,7 +104,7 @@ TEST_CASE("Swap A/B asks the host to exchange its pictures and flips the flag", 
 TEST_CASE("Set as B from memory: the host snapshots the picture and slot B appears", "[fast][gui][compare]") {
   ovt::app::testing::qt_app();
   CompareController c;
-  QSignalSpy asked(&c, &CompareController::snapshotRequested);
+  const QSignalSpy asked(&c, &CompareController::snapshotRequested);
   c.setAsBFromMemory();
   CHECK(asked.count() == 1);
   c.snapshotTaken(false);  // the host had no picture
@@ -128,7 +128,7 @@ TEST_CASE("Dual view resets the mode to Single and disables compare", "[fast][gu
   c.nextMode();
   c.set_mode(CompareController::SplitVertical);
   CHECK(c.mode() == CompareController::Single);
-  QSignalSpy asked(&c, &CompareController::snapshotRequested);
+  const QSignalSpy asked(&c, &CompareController::snapshotRequested);
   c.setAsBFromMemory();
   CHECK(asked.count() == 0);
   c.set_dual_view(false);
