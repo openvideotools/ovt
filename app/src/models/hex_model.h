@@ -9,7 +9,7 @@
 //
 // SPEC-ASSUMPTION(#704): the app has no SyntaxNode reader yet (the Syntax panel is WI-1.457), so the per-unit flattened
 // field spans of §11.3.5 are supplied through setFieldProvider(); without one the reverse lookup stops at the unit.
-// The byte source is likewise given by the caller (FileByteSource over the open file, or the core's byte service).
+// The byte source is likewise given by the caller (ContainerByteSource over the core's byte service).
 
 #ifndef OVT_APP_MODELS_HEX_MODEL_H
 #define OVT_APP_MODELS_HEX_MODEL_H
@@ -17,7 +17,6 @@
 #include <QtQml/qqmlregistration.h>
 #include <QAbstractTableModel>
 #include <QByteArray>
-#include <QFile>
 #include <QHash>
 #include <QList>
 #include <QPointer>
@@ -37,11 +36,11 @@
 #include "models/selection_model.h"
 #include "models/stream_index_adapter.h"
 #include "models/stream_index_model.h"
+#include "ovt/container.h"
 
 namespace ovt::app {
 
-// Random access to the bytes of the open file. read() is thread-safe; mapped() is the whole file when it is
-// memory-mapped (the search of WI-1.458b then scans it in place) and empty otherwise.
+// Random access to the bytes of the open file. read() is thread-safe.
 class ByteSource {
  public:
   ByteSource() = default;
@@ -54,7 +53,6 @@ class ByteSource {
   [[nodiscard]] virtual std::uint64_t size() const = 0;
   // Copies up to `len` bytes at `offset`; returns the number copied (short at the end of the file, 0 on error).
   [[nodiscard]] virtual std::size_t read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const = 0;
-  [[nodiscard]] virtual std::span<const std::uint8_t> mapped() const { return {}; }
 };
 
 class MemoryByteSource final : public ByteSource {
@@ -62,33 +60,22 @@ class MemoryByteSource final : public ByteSource {
   explicit MemoryByteSource(std::vector<std::uint8_t> bytes) : bytes_(std::move(bytes)) {}
   [[nodiscard]] std::uint64_t size() const override { return bytes_.size(); }
   [[nodiscard]] std::size_t read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const override;
-  [[nodiscard]] std::span<const std::uint8_t> mapped() const override { return bytes_; }
 
  private:
   std::vector<std::uint8_t> bytes_;
 };
 
-// A file read through QFile; mapped() is the mmap when the platform gives one.
-class FileByteSource final : public ByteSource {
+// The bytes of an open container through the core's byte service (chapter 08 §8.8, `ovt_container_bytes`: at most
+// 1 MiB per call, bounded by the core's page cache). The app never opens or maps the media file itself. The container
+// must outlive the source.
+class ContainerByteSource final : public ByteSource {
  public:
-  explicit FileByteSource(const QString& path);
-  ~FileByteSource() override;
-  FileByteSource(const FileByteSource&) = delete;
-  FileByteSource& operator=(const FileByteSource&) = delete;
-  FileByteSource(FileByteSource&&) = delete;
-  FileByteSource& operator=(FileByteSource&&) = delete;
-
-  [[nodiscard]] bool ok() const { return ok_; }
-  [[nodiscard]] std::uint64_t size() const override { return size_; }
+  explicit ContainerByteSource(ovt_Container* container);
+  [[nodiscard]] std::uint64_t size() const override;
   [[nodiscard]] std::size_t read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const override;
-  [[nodiscard]] std::span<const std::uint8_t> mapped() const override;
 
  private:
-  mutable QFile file_;
-  mutable std::mutex mutex_;
-  const std::uint8_t* map_ = nullptr;
-  std::uint64_t size_ = 0;
-  bool ok_ = false;
+  ovt_Container* container_;
 };
 
 // One band of the file: a unit (start code / length prefix + payload) or a container box (header + payload).
@@ -174,8 +161,6 @@ class HexModel : public QAbstractTableModel {
   void set_selection(SelectionModel* selection);
   // The open file's bytes (nullptr clears).
   void setSource(std::shared_ptr<const ByteSource> source);
-  // Opens `path` as the source; false (and no source) when it cannot be read.
-  Q_INVOKABLE bool openFile(const QString& path);
   Q_INVOKABLE void closeFile() { setSource(nullptr); }
   // The StreamIndex of the stream (tests and callers without a StreamIndexModel): bands and unit lookups.
   void setHandle(std::shared_ptr<const StreamIndexHandle> handle);

@@ -4,6 +4,7 @@
 #include "models/hex_model.h"
 
 #include <QMetaObject>
+
 #include <QRegularExpression>
 #include <QStringList>
 
@@ -12,6 +13,7 @@
 #include <cstring>
 
 #include "goto_parser.h"
+#include "ovt/status.h"
 
 namespace ovt::app {
 
@@ -26,45 +28,33 @@ std::size_t MemoryByteSource::read(std::uint64_t offset, std::uint8_t* dst, std:
   return n;
 }
 
-FileByteSource::FileByteSource(const QString& path) : file_(path) {
-  if (!file_.open(QIODevice::ReadOnly)) {
-    return;
-  }
-  size_ = static_cast<std::uint64_t>(file_.size());
-  ok_ = true;
-  if (size_ > 0) {
-    map_ = file_.map(0, static_cast<qint64>(size_));  // may be null: read() then goes through the file
-  }
+ContainerByteSource::ContainerByteSource(ovt_Container* container) : container_(container) {}
+
+std::uint64_t ContainerByteSource::size() const {
+  return ovt_container_size(container_);
 }
 
-FileByteSource::~FileByteSource() {
-  if (map_ != nullptr) {
-    file_.unmap(const_cast<uchar*>(map_));
+std::size_t ContainerByteSource::read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const {
+  constexpr std::size_t kMaxCall = std::size_t{1} << 20U;  // the byte service's limit per call
+  std::size_t done = 0;
+  while (done < len && offset + done < size()) {
+    const auto want = static_cast<std::uint32_t>(std::min(len - done, kMaxCall));
+    ovt_Buffer buffer{};
+    if (ovt_container_bytes(container_, offset + done, want, &buffer) != OVT_OK || buffer.data == nullptr) {
+      break;
+    }
+    const std::size_t got = std::min<std::size_t>(buffer.size, want);
+    std::memcpy(dst + done, buffer.data, got);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    ovt_buffer_free(&buffer);
+    done += got;
+    if (got == 0) {
+      break;
+    }
   }
+  return done;
 }
 
-std::size_t FileByteSource::read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const {
-  if (offset >= size_) {
-    return 0;
-  }
-  const std::size_t n = std::min<std::uint64_t>(len, size_ - offset);
-  if (map_ != nullptr) {
-    std::memcpy(dst, std::span(map_, size_).subspan(offset, n).data(), n);
-    return n;
-  }
-  const std::scoped_lock lock(mutex_);
-  if (!file_.seek(static_cast<qint64>(offset))) {
-    return 0;
-  }
-  const qint64 got = file_.read(reinterpret_cast<char*>(dst), static_cast<qint64>(n));
-  return got < 0 ? 0 : static_cast<std::size_t>(got);
-}
-
-std::span<const std::uint8_t> FileByteSource::mapped() const {
-  return map_ != nullptr ? std::span<const std::uint8_t>(map_, size_) : std::span<const std::uint8_t>();
-}
-
-// ---- bands, patterns, search ------------------------------------------------------------------------------------
+// ---- bands ------------------------------------------------------------------------------------
 
 std::vector<HexBand> hex_bands_from_index(const fb::StreamIndex& index) {
   std::vector<HexBand> bands;
@@ -142,16 +132,6 @@ void HexModel::setSource(std::shared_ptr<const ByteSource> source) {
   endResetModel();
   rebuild_view();
   Q_EMIT sourceChanged();
-}
-
-bool HexModel::openFile(const QString& path) {
-  auto source = std::make_shared<FileByteSource>(path);
-  if (!source->ok()) {
-    setSource(nullptr);
-    return false;
-  }
-  setSource(std::move(source));
-  return true;
 }
 
 void HexModel::setHandle(std::shared_ptr<const StreamIndexHandle> handle) {
