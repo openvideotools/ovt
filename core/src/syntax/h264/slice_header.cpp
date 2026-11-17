@@ -75,9 +75,8 @@ Active activate(BitReader& br, SyntaxBuilder& b, const NalHeader& nal, const Par
                      br.bit_pos()};
   }
   sh.seq_parameter_set_id = pps->seq_parameter_set_id;
-  b.derived("active parameter sets",
-            std::string_view{fmt::format("active parameter sets = PPS {} -> {} {}", sh.pic_parameter_set_id,
-                                         sh.uses_subset_sps ? "subset SPS" : "SPS", sh.seq_parameter_set_id)});
+  b.derived_format("active parameter sets", "active parameter sets = PPS {} -> {} {}", sh.pic_parameter_set_id,
+                   sh.uses_subset_sps ? "subset SPS" : "SPS", sh.seq_parameter_set_id);
   if (sets.on_activate) {
     sets.on_activate(nal, *pps, *sps);
   }

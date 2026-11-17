@@ -30,6 +30,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <utility>
 
 #include "ovt/cxx/bitreader.hpp"
 
@@ -98,6 +99,13 @@ class SyntaxBuilder final : public BitReader::DiagnosticSink {
   // Derived values: appended as a child node {name, kind None, derived:text, span:{bit_pos,0}} of the current
   // struct.
   void derived(std::string_view name, std::string_view text);
+  // Same, with the text formatted only while recording (WI-1.125 §7.4.6 audit: a value-only parse formats nothing).
+  template <class... Args>
+  void derived_format(std::string_view name, fmt::format_string<Args...> format, Args&&... args) {
+    if (recording_) {
+      derived(name, std::string_view{fmt::format(format, std::forward<Args>(args)...)});
+    }
+  }
   template <class T>
     requires(!std::is_convertible_v<const T&, std::string_view>)  // text goes to the overload above
   void derived(std::string_view name, T value) {

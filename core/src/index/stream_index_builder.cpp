@@ -5,7 +5,9 @@
 // bookkeeping shared by every codec (S5 open / extend, S7 size accounting, S8), the fallback time base of
 // chapter 6 §6.2.6 and the serialisation of the result (S10). Per-codec dispatch (S4, S6) is behind
 // CodecDispatch; the display order (S9) is display_order.cpp. WI-1.125 adds the lazy-tree policy of §7.4.5 (the
-// dispatch asks BuilderCore::record_full_tree) and the partial index of §7.4.6 (finish_partial).
+// dispatch asks BuilderCore::record_full_tree) and the partial index of §7.4.6 (finish_partial); its memory rule
+// ("the memory of the index is its bytes, not its trees") puts every recorded tree into the index buffer as its
+// unit arrives (BuilderCore::store_tree), so that S10 only appends the records.
 
 #include "ovt/cxx/index/stream_index_builder.hpp"
 
@@ -50,11 +52,12 @@ flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fb::Diagnostic>>> wr
   return fbb.CreateVector(out);
 }
 
+// `header` is the unit's recorded tree in `fbb` (0 for none): UnitRec::header when `fbb` is the core's index,
+// a copy otherwise.
 flatbuffers::Offset<fb::Unit> write_unit(flatbuffers::FlatBufferBuilder& fbb, const UnitRec& u, uint32_t index,
-                                         int32_t display_index) {
+                                         int32_t display_index, flatbuffers::Offset<fb::SyntaxNode> header) {
   const auto type_name = fbb.CreateSharedString(u.type_name.data(), u.type_name.size());
   const auto epb = u.epb_positions.empty() ? 0 : fbb.CreateVector(u.epb_positions);
-  const auto header = u.header.empty() ? 0 : u.header.to_flatbuffer(fbb);
   const auto diags = write_diagnostics(fbb, u.diagnostics);
   const fb::ByteSpan file_span(u.file_offset, u.length);
   const fb::ByteSpan prefix_span(u.prefix_span.offset, u.prefix_span.length);
@@ -165,6 +168,34 @@ FrameRec& BuilderCore::start_frame(uint32_t unit) {
   return *open_;
 }
 
+void BuilderCore::store_tree(uint32_t unit, syntax::SyntaxNodeBuffer tree, std::string_view root_name) {
+  if (tree.empty()) {
+    return;
+  }
+  tree.set_root_name(root_name);
+  units[unit].header = tree.to_flatbuffer(index_);
+}
+
+flatbuffers::Offset<fb::SyntaxNode> BuilderCore::copy_tree(flatbuffers::FlatBufferBuilder& dst, uint32_t unit) const {
+  const flatbuffers::Offset<fb::SyntaxNode> header = units[unit].header;
+  if (header.IsNull()) {
+    return 0;
+  }
+  // The tree is complete in the unfinished index (a FlatBuffer table is self-contained, read relative to its own
+  // position); the pointer holds until the next write to index_.
+  return syntax::copy_syntax_node(dst, *flatbuffers::GetTemporaryPointer(index_, header));
+}
+
+std::vector<uint8_t> BuilderCore::tree_bytes(uint32_t unit) const {
+  if (unit >= units.size() || units[unit].header.IsNull()) {
+    return {};
+  }
+  flatbuffers::FlatBufferBuilder fbb(4096);
+  fbb.Finish(copy_tree(fbb, unit));
+  const std::span<const uint8_t> out(fbb.GetBufferPointer(), fbb.GetSize());
+  return {out.begin(), out.end()};
+}
+
 void BuilderCore::extend_frame(uint32_t unit) {
   if (!open_) {
     return;
@@ -213,21 +244,35 @@ void BuilderCore::index_diagnostic(Severity severity, std::string_view code, std
 // ---- StreamIndexBuilder --------------------------------------------------------------------------------------
 
 struct StreamIndexBuilder::Impl {
+  explicit Impl(const BuilderOptions& o) : options(o), core(index_reserve(o)) {}
+
   BuilderOptions options;
   BuilderCore core;
   std::unique_ptr<CodecDispatch> dispatch;
 
-  // S9 and S10 over units[0, unit_count) and every finished frame. `extra` diagnostics follow the core's. Leaves
-  // the core as it is apart from FrameRec.display_index (S9), so a partial index can be followed by more units.
-  [[nodiscard]] std::vector<uint8_t> serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
-                                               std::vector<DiagRec> extra);
+  // S9 and S10 over units[0, unit_count) and every finished frame. `extra` diagnostics follow the core's. A
+  // `complete` index is the core's own buffer, released as it is (its trees are already there; the core is spent
+  // afterwards). A partial index is a separate buffer with copies of the trees, and leaves the core as it is
+  // apart from FrameRec.display_index (S9), so more units can follow.
+  [[nodiscard]] flatbuffers::DetachedBuffer serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
+                                                      std::vector<DiagRec> extra, bool complete);
+  // A size for the buffer of a partial index: the trees so far plus the records, a little over the real size.
+  [[nodiscard]] size_t estimate_size(uint32_t unit_count, size_t diagnostics) const noexcept;
+  // The index memory reserved up front (§7.4.6): about the recorded bytes of `expected_units` units, between
+  // the default and a cap, untouched until written.
+  [[nodiscard]] static size_t index_reserve(const BuilderOptions& o) noexcept {
+    constexpr size_t kBytesPerUnit = 1024;
+    constexpr size_t kCap = size_t{256} << 20U;
+    return std::clamp(o.expected_units * kBytesPerUnit, BuilderCore::kDefaultIndexReserve, kCap);
+  }
 };
 
-StreamIndexBuilder::StreamIndexBuilder(const BuilderOptions& options) : impl_(std::make_unique<Impl>()) {
-  impl_->options = options;
+StreamIndexBuilder::StreamIndexBuilder(const BuilderOptions& options) : impl_(std::make_unique<Impl>(options)) {
   impl_->core.lazy_after_frames = options.lazy_after_frames;
   impl_->core.record_only_unit = options.record_only_unit;
   impl_->core.lazy_strip_chunk = options.lazy_strip_chunk;
+  impl_->core.units.reserve(options.expected_units);
+  impl_->core.frames.reserve(options.expected_units);
   switch (options.codec) {
     case fb::Codec::AV1:
       impl_->dispatch = make_av1_dispatch();
@@ -271,22 +316,22 @@ void StreamIndexBuilder::add_scan_diagnostic(const syntax::ScanDiagnostic& d) {
                                fmt::format("{} (file offset {})", d.message, d.file_offset));
 }
 
-std::vector<uint8_t> StreamIndexBuilder::finish(std::span<const uint8_t, 32> source_hash) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::finish(std::span<const uint8_t, 32> source_hash) {
   BuilderCore& core = impl_->core;
   impl_->dispatch->end_of_stream(core);  // S8
   core.finish_frame();
   if (core.units.empty()) {
     core.index_diagnostic(Severity::Error, kDiagNoUnits, "no video units found");
   }
-  return impl_->serialise(source_hash, static_cast<uint32_t>(core.units.size()), {});
+  return impl_->serialise(source_hash, static_cast<uint32_t>(core.units.size()), {}, /*complete=*/true);
 }
 
-std::vector<uint8_t> StreamIndexBuilder::finish_partial(std::span<const uint8_t, 32> source_hash) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::finish_partial(std::span<const uint8_t, 32> source_hash) {
   const uint32_t cut = impl_->core.first_open_unit();
   std::vector<DiagRec> extra;
   extra.push_back(DiagRec{Severity::Warning, std::string(kDiagTruncated),
                           fmt::format("index truncated at unit {}", cut), BitSpan{0, 0}});
-  return impl_->serialise(source_hash, cut, std::move(extra));
+  return impl_->serialise(source_hash, cut, std::move(extra), /*complete=*/false);
 }
 
 uint32_t StreamIndexBuilder::unit_count() const noexcept {
@@ -294,15 +339,12 @@ uint32_t StreamIndexBuilder::unit_count() const noexcept {
 }
 
 std::vector<uint8_t> StreamIndexBuilder::unit_syntax(uint32_t unit) const {
-  const std::vector<UnitRec>& units = impl_->core.units;
-  if (unit >= units.size()) {
-    return {};
-  }
-  return units[unit].header.to_flatbuffer();
+  return impl_->core.tree_bytes(unit);
 }
 
-std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
-                                                         std::vector<DiagRec> extra) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::Impl::serialise(std::span<const uint8_t, 32> source_hash,
+                                                                uint32_t unit_count, std::vector<DiagRec> extra,
+                                                                bool complete) {
   const std::vector<int32_t> display_order = assign_display_order(options.codec, core.frames);  // S9
   bool fallback_timing = false;
   const std::vector<SampleTiming> timing = frame_timing(core, fallback_timing);
@@ -314,7 +356,8 @@ std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t
   diagnostics.insert(diagnostics.end(), std::make_move_iterator(extra.begin()), std::make_move_iterator(extra.end()));
 
   // S10. Units are written once; parameter_sets and sei refer to the same tables.
-  flatbuffers::FlatBufferBuilder fbb(size_t{1} << 16U);
+  flatbuffers::FlatBufferBuilder partial(complete ? 64 : estimate_size(unit_count, diagnostics.size()));
+  flatbuffers::FlatBufferBuilder& fbb = complete ? core.index() : partial;
   std::vector<flatbuffers::Offset<fb::Unit>> units;
   std::vector<flatbuffers::Offset<fb::Unit>> parameter_sets;
   std::vector<flatbuffers::Offset<fb::Unit>> sei;
@@ -322,7 +365,7 @@ std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t
   for (uint32_t i = 0; i < unit_count; ++i) {
     const UnitRec& u = core.units[i];
     const int32_t display_index = u.frame >= 0 ? core.frames[static_cast<size_t>(u.frame)].display_index : -1;
-    units.push_back(write_unit(fbb, u, i, display_index));
+    units.push_back(write_unit(fbb, u, i, display_index, complete ? u.header : core.copy_tree(fbb, i)));
     if (u.parameter_set) {
       parameter_sets.push_back(units.back());
     }
@@ -353,8 +396,33 @@ std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t
   b.add_sei(sei_off);
   b.add_diagnostics(diags_off);
   fbb.Finish(b.Finish());
-  const std::span<const uint8_t> out(fbb.GetBufferPointer(), fbb.GetSize());
-  return {out.begin(), out.end()};
+  if (complete) {
+    // The core is spent: the records go, and the buffer leaves with its allocator (no copy, §7.4.6).
+    std::vector<UnitRec>().swap(core.units);
+    std::vector<FrameRec>().swap(core.frames);
+  }
+  return fbb.Release();
+}
+
+// The trees copied so far plus the Unit / FrameInfo tables, their vectors and the diagnostics at a few dozen
+// bytes each. An estimate below the real size costs a reallocation, never a wrong index.
+size_t StreamIndexBuilder::Impl::estimate_size(uint32_t unit_count, size_t diagnostics) const noexcept {
+  constexpr size_t kUnit = 128;
+  constexpr size_t kFrame = 144;
+  constexpr size_t kDiagnostic = 112;
+  size_t epb = 0;
+  size_t unit_diags = 0;
+  for (uint32_t i = 0; i < unit_count; ++i) {
+    epb += core.units[i].epb_positions.size() * sizeof(uint32_t);
+    unit_diags += core.units[i].diagnostics.size();
+  }
+  size_t frame_units = 0;
+  for (const FrameRec& f : core.frames) {
+    frame_units += f.units.size() * sizeof(uint32_t);
+  }
+  const size_t records = (size_t{unit_count} * kUnit) + (core.frames.size() * kFrame) + epb + frame_units +
+                         ((diagnostics + unit_diags) * kDiagnostic);
+  return core.index_bytes() + records + (size_t{64} << 10U);
 }
 
 }  // namespace ovt::index
