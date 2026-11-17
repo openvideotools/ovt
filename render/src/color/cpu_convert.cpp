@@ -139,7 +139,7 @@ bool code_to_nonlinear_rgb(const CodeColor& color, const std::array<int32_t, 3>&
 }
 
 bool code_to_light(const CodeColor& color, const std::array<int32_t, 3>& code, ProbeLight& out) {
-  constexpr double kWhite = kSdrWhiteNits;
+  constexpr auto kWhite = static_cast<double>(kSdrWhiteNits);
   out = ProbeLight{};
   std::array<float, 3> e{};
   if (!code_to_nonlinear_rgb(color, code, e)) {
@@ -150,7 +150,8 @@ bool code_to_light(const CodeColor& color, const std::array<int32_t, 3>& code, P
   const pl_matrix3x3 to_xyz = pl_get_rgb2xyz_matrix(raw);
   const auto row = [&](int i, const std::array<double, 3>& v) {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-constant-array-index): fixed 3x3 matrix of libplacebo
-    return (double{to_xyz.m[i][0]} * v[0]) + (double{to_xyz.m[i][1]} * v[1]) + (double{to_xyz.m[i][2]} * v[2]);
+    return (static_cast<double>(to_xyz.m[i][0]) * v[0]) + (static_cast<double>(to_xyz.m[i][1]) * v[1]) +
+           (static_cast<double>(to_xyz.m[i][2]) * v[2]);
   };
 
   // Linear light per channel, 1.0 = 203 nits.
@@ -158,12 +159,12 @@ bool code_to_light(const CodeColor& color, const std::array<int32_t, 3>& code, P
   const double gamma = power_gamma(color.transfer);
   if (color.transfer == PL_COLOR_TRC_PQ) {
     for (size_t i = 0; i < 3; ++i) {
-      lin.at(i) = double{pq_eotf_nits(e.at(i))} / kWhite;
+      lin.at(i) = static_cast<double>(pq_eotf_nits(e.at(i))) / kWhite;
     }
   } else if (color.transfer == PL_COLOR_TRC_HLG) {
     std::array<double, 3> scene{};
     for (size_t i = 0; i < 3; ++i) {
-      scene.at(i) = hlg_inverse_oetf(e.at(i));
+      scene.at(i) = static_cast<double>(hlg_inverse_oetf(e.at(i)));
     }
     const double ys = std::max(row(1, scene), 0.0);  // scene luminance with the content primaries' Y row
     const double ootf = kHlgPeakNits * (ys > 0.0 ? std::pow(ys, kHlgGamma - 1.0) : 0.0);
@@ -176,7 +177,7 @@ bool code_to_light(const CodeColor& color, const std::array<int32_t, 3>& code, P
     }
   } else if (color.transfer == PL_COLOR_TRC_LINEAR) {
     for (size_t i = 0; i < 3; ++i) {
-      lin.at(i) = e.at(i);
+      lin.at(i) = static_cast<double>(e.at(i));
     }
   } else if (gamma > 0.0) {
     for (size_t i = 0; i < 3; ++i) {
