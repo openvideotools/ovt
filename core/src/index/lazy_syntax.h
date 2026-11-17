@@ -3,12 +3,9 @@
 //
 // Lazy header trees (chapter 7 §7.4.5) and lazy emulation-prevention stripping (§7.4.6), WI-1.125. Module-internal.
 //
-// LazyRbsp strips the EPBs of one H.26x NAL unit in chunks: the index parses a slice header from the first 2 KiB
-// and strips more only when the parse runs past them, while Unit.epb_positions still lists every EPB of the unit
-// (a memchr scan of the rest, no copy). reparse_unit_syntax() rebuilds the full tree of one unit of a finished
-// StreamIndex on demand: it replays the units the target depends on (parameter sets, the earlier units of its
-// frame, and for AV1 everything since the last key frame) with recording off and records only the target, so the
-// tree is byte-identical to the one an eager run records (acceptance test 4).
+// LazyRbsp strips the EPBs of one H.26x NAL unit in chunks (a slice header parses from the first 2 KiB; more only
+// when it runs past them) while Unit.epb_positions still lists every EPB. reparse_unit_syntax() rebuilds the tree
+// of one unit of a finished StreamIndex by replaying the units it depends on with recording off (acceptance test 4).
 
 #ifndef OVT_INDEX_LAZY_SYNTAX_H
 #define OVT_INDEX_LAZY_SYNTAX_H

@@ -73,8 +73,8 @@ void LazyRbsp::scan_rest() {
 
 // ---- reparse_unit_syntax ------------------------------------------------------------------------------------
 // SPEC-ASSUMPTION(#711): §7.4.5 wants activation snapshots stored in the index; the schema has no field for them,
-// so the units the target depends on are replayed from the index instead (parameter sets and the earlier units
-// of its frame; for AV1 everything since the nearest coded key frame).
+// so the units the target depends on are replayed from the index instead (parameter sets, the first VCL unit of
+// the previous picture and the earlier units of its frame; for AV1 everything since the nearest coded key frame).
 
 namespace {
 
@@ -92,7 +92,12 @@ int32_t av1_replay_start(const fb::StreamIndex& index, int32_t frame) {
   return 0;
 }
 
-// Units of the target's frame (H.26x: the earlier units of the frame; AV1: every unit since the nearest coded key
+bool is_h26x_vcl(fb::Codec codec, uint8_t type) {
+  return codec == fb::Codec::H264 ? ((type >= 1 && type <= 5) || type == 20 || type == 21) : type < 32;
+}
+
+// Units of the target's frame (H.26x: the earlier units of the frame, and the first VCL unit of the previous
+// picture, whose activation is the SPS context of the SEI parsers; AV1: every unit since the nearest coded key
 // frame) that precede the target.
 void frame_units_before(const fb::StreamIndex& index, uint32_t target, int32_t frame, std::vector<uint32_t>& out) {
   const auto* frames = index.frames();
@@ -102,6 +107,18 @@ void frame_units_before(const fb::StreamIndex& index, uint32_t target, int32_t f
   if (index.codec() != fb::Codec::AV1) {
     if (const auto* units = frames->Get(static_cast<flatbuffers::uoffset_t>(frame))->units(); units != nullptr) {
       std::copy_if(units->begin(), units->end(), std::back_inserter(out), [target](uint32_t u) { return u < target; });
+    }
+    if (frame == 0) {
+      return;
+    }
+    const auto* previous = frames->Get(static_cast<flatbuffers::uoffset_t>(frame - 1))->units();
+    const auto* all = index.units();
+    for (uint32_t i = 0; previous != nullptr && all != nullptr && i < previous->size(); ++i) {
+      const uint32_t u = previous->Get(i);
+      if (u < target && u < all->size() && is_h26x_vcl(index.codec(), all->Get(u)->type())) {
+        out.push_back(u);
+        break;
+      }
     }
     return;
   }

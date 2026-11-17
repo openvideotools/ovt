@@ -28,6 +28,7 @@ inline constexpr uint32_t kDefaultLazyAfterFrames = 10000;
 struct ResumeState {
   std::unique_ptr<index::StreamIndexBuilder> builder;
   uint32_t units_fed = 0;
+  bool scan_complete = false;  // the cancelled pass fed every unit (Driver::end() threw): nothing is left to scan
 };
 
 }  // namespace ovt::api

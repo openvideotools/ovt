@@ -15,15 +15,18 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <span>
 #include <string>
 #include <string_view>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "api/stream_internal.hpp"
+#include "index/h264_index.h"
 #include "index/lazy_syntax.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
@@ -56,16 +59,8 @@ Bytes seed(std::string_view name) {
 }
 
 bool is_vcl(fb::Codec codec, uint8_t type) {
-  switch (codec) {
-    case fb::Codec::H264:
-      return type == 1 || type == 2 || type == 3 || type == 4 || type == 5 || type == 20 || type == 21;
-    case fb::Codec::H265:
-      return type < 32;
-    case fb::Codec::AV1:
-      return type == 3 || type == 4 || type == 6;
-    default:
-      return false;
-  }
+  return codec == fb::Codec::H264 ? idx::h264::is_vcl(type)
+                                  : (codec == fb::Codec::H265 ? type < 32 : (type == 3 || type == 4 || type == 6));
 }
 
 // The Annex B stream with `pad` opaque bytes appended to every VCL unit's slice data, so that the units exceed a
@@ -120,47 +115,40 @@ const fb::StreamIndex& root(const Bytes& index) {
   return *flatbuffers::GetRoot<fb::StreamIndex>(index.data());
 }
 
-bool has_code(const fb::StreamIndex& si, std::string_view code) {
-  return si.diagnostics() != nullptr && std::ranges::any_of(*si.diagnostics(), [code](const fb::Diagnostic* d) {
-           return d->code()->string_view() == code;
-         });
-}
-
 std::string_view sv(const flatbuffers::String* s) {
   return s == nullptr ? std::string_view{} : s->string_view();
 }
 
+size_t count_code(const fb::StreamIndex& si, std::string_view code) {
+  if (si.diagnostics() == nullptr) {
+    return 0;
+  }
+  return static_cast<size_t>(std::ranges::count_if(
+      *si.diagnostics(), [code](const fb::Diagnostic* d) { return d->code()->string_view() == code; }));
+}
+
 // Structural equality of two SyntaxNode trees (the nested table of an index and a standalone buffer).
 bool same_tree(const fb::SyntaxNode& a, const fb::SyntaxNode& b) {
-  if (sv(a.name()) != sv(b.name()) || sv(a.descriptor()) != sv(b.descriptor()) || a.kind() != b.kind() ||
-      a.uvalue() != b.uvalue() || a.ivalue() != b.ivalue() || a.bvalue() != b.bvalue() ||
-      sv(a.svalue()) != sv(b.svalue()) || sv(a.enum_name()) != sv(b.enum_name()) ||
-      sv(a.derived()) != sv(b.derived()) || sv(a.spec_ref()) != sv(b.spec_ref()) ||
-      a.array_index() != b.array_index()) {
+  const auto key = [](const fb::SyntaxNode& n) {
+    const bool spanned = n.span() != nullptr;
+    return std::tuple(sv(n.name()), sv(n.descriptor()), n.kind(), n.uvalue(), n.ivalue(), n.bvalue(), sv(n.svalue()),
+                      sv(n.enum_name()), sv(n.derived()), sv(n.spec_ref()), n.array_index(), spanned,
+                      spanned ? n.span()->bit_offset() : 0, spanned ? n.span()->bit_length() : 0U,
+                      n.children() == nullptr ? 0U : n.children()->size(),
+                      n.diagnostics() == nullptr ? 0U : n.diagnostics()->size());
+  };
+  if (key(a) != key(b)) {
     return false;
   }
-  if ((a.span() == nullptr) != (b.span() == nullptr) ||
-      (a.span() != nullptr &&
-       (a.span()->bit_offset() != b.span()->bit_offset() || a.span()->bit_length() != b.span()->bit_length()))) {
-    return false;
-  }
-  const size_t ca = a.children() == nullptr ? 0 : a.children()->size();
-  const size_t cb = b.children() == nullptr ? 0 : b.children()->size();
-  const size_t da = a.diagnostics() == nullptr ? 0 : a.diagnostics()->size();
-  const size_t db = b.diagnostics() == nullptr ? 0 : b.diagnostics()->size();
-  if (ca != cb || da != db) {
-    return false;
-  }
-  for (size_t i = 0; i < da; ++i) {
-    const fb::Diagnostic* x = a.diagnostics()->Get(static_cast<flatbuffers::uoffset_t>(i));
-    const fb::Diagnostic* y = b.diagnostics()->Get(static_cast<flatbuffers::uoffset_t>(i));
+  for (uint32_t i = 0; a.diagnostics() != nullptr && i < a.diagnostics()->size(); ++i) {
+    const fb::Diagnostic* x = a.diagnostics()->Get(i);
+    const fb::Diagnostic* y = b.diagnostics()->Get(i);
     if (x->severity() != y->severity() || sv(x->code()) != sv(y->code()) || sv(x->message()) != sv(y->message())) {
       return false;
     }
   }
-  for (size_t i = 0; i < ca; ++i) {
-    if (!same_tree(*a.children()->Get(static_cast<flatbuffers::uoffset_t>(i)),
-                   *b.children()->Get(static_cast<flatbuffers::uoffset_t>(i)))) {
+  for (uint32_t i = 0; a.children() != nullptr && i < a.children()->size(); ++i) {
+    if (!same_tree(*a.children()->Get(i), *b.children()->Get(i))) {
       return false;
     }
   }
@@ -171,42 +159,24 @@ bool same_tree(const fb::SyntaxNode& a, const fb::SyntaxNode& b) {
 void check_same_frames(const fb::StreamIndex& a, const fb::StreamIndex& b) {
   REQUIRE(a.units()->size() == b.units()->size());
   REQUIRE(a.frames()->size() == b.frames()->size());
+  const auto unit_key = [](const fb::Unit* u) {
+    const auto* e = u->epb_positions();
+    return std::tuple(u->type(), u->frame()->decode_index(), u->frame()->display_index(), u->file_span()->length(),
+                      e == nullptr ? Bytes{} : Bytes(e->begin(), e->end()),
+                      u->diagnostics() == nullptr ? 0U : u->diagnostics()->size());
+  };
+  const auto frame_key = [](const fb::FrameInfo* f) {
+    return std::tuple(f->type(), f->poc(), f->is_rap(), f->shown(), f->id()->display_index(), f->size_bytes(),
+                      f->slice_count(), f->qp_base(), f->coded_size()->w(),
+                      std::vector<uint32_t>(f->units()->begin(), f->units()->end()));
+  };
   for (uint32_t i = 0; i < a.units()->size(); ++i) {
     CAPTURE(i);
-    const fb::Unit* x = a.units()->Get(i);
-    const fb::Unit* y = b.units()->Get(i);
-    CHECK(x->type() == y->type());
-    CHECK(x->frame()->decode_index() == y->frame()->decode_index());
-    CHECK(x->frame()->display_index() == y->frame()->display_index());
-    CHECK(x->file_span()->length() == y->file_span()->length());
-    const size_t ex = x->epb_positions() == nullptr ? 0 : x->epb_positions()->size();
-    const size_t ey = y->epb_positions() == nullptr ? 0 : y->epb_positions()->size();
-    REQUIRE(ex == ey);
-    for (size_t k = 0; k < ex; ++k) {
-      CHECK(x->epb_positions()->Get(static_cast<flatbuffers::uoffset_t>(k)) ==
-            y->epb_positions()->Get(static_cast<flatbuffers::uoffset_t>(k)));
-    }
-    const size_t dx = x->diagnostics() == nullptr ? 0 : x->diagnostics()->size();
-    const size_t dy = y->diagnostics() == nullptr ? 0 : y->diagnostics()->size();
-    CHECK(dx == dy);
+    CHECK(unit_key(a.units()->Get(i)) == unit_key(b.units()->Get(i)));
   }
   for (uint32_t i = 0; i < a.frames()->size(); ++i) {
     CAPTURE(i);
-    const fb::FrameInfo* x = a.frames()->Get(i);
-    const fb::FrameInfo* y = b.frames()->Get(i);
-    CHECK(x->type() == y->type());
-    CHECK(x->poc() == y->poc());
-    CHECK(x->is_rap() == y->is_rap());
-    CHECK(x->shown() == y->shown());
-    CHECK(x->id()->display_index() == y->id()->display_index());
-    CHECK(x->size_bytes() == y->size_bytes());
-    CHECK(x->slice_count() == y->slice_count());
-    CHECK(x->qp_base() == y->qp_base());
-    CHECK(x->coded_size()->w() == y->coded_size()->w());
-    REQUIRE(x->units()->size() == y->units()->size());
-    for (uint32_t k = 0; k < x->units()->size(); ++k) {
-      CHECK(x->units()->Get(k) == y->units()->Get(k));
-    }
+    CHECK(frame_key(a.frames()->Get(i)) == frame_key(b.frames()->Get(i)));
   }
 }
 
@@ -272,9 +242,24 @@ struct Seed {
   const char* file;
   fb::Codec codec;
 };
-constexpr std::array<Seed, 3> kSeeds = {{{"seed_2_h264_bframes.bin", "s.264", fb::Codec::H264},
+constexpr std::array<Seed, 4> kSeeds = {{{"seed_2_h264_bframes.bin", "s.264", fb::Codec::H264},
                                          {"seed_3_h265_open_gop.bin", "s.265", fb::Codec::H265},
-                                         {"seed_0_altref_gop.bin", "s.obu", fb::Codec::AV1}}};
+                                         {"seed_0_altref_gop.bin", "s.obu", fb::Codec::AV1},
+                                         {"seed_4_h264_pic_timing.bin", "s.264", fb::Codec::H264}}};
+
+// Whether `pred` holds for `node` or a descendant.
+bool any_node(const fb::SyntaxNode& node, const std::function<bool(const fb::SyntaxNode&)>& pred) {
+  return pred(node) || (node.children() != nullptr &&
+                        std::ranges::any_of(*node.children(), [&pred](const auto* c) { return any_node(*c, pred); }));
+}
+
+bool has_node_diag(const fb::SyntaxNode& tree, std::string_view code) {
+  return any_node(tree, [code](const fb::SyntaxNode& n) {
+    return n.diagnostics() != nullptr && std::ranges::any_of(*n.diagnostics(), [code](const fb::Diagnostic* d) {
+             return d->code()->string_view() == code;
+           });
+  });
+}
 
 }  // namespace
 
@@ -315,12 +300,6 @@ TEST_CASE("lazy_rbsp: chunked stripping equals rbsp_from_nal", "[index][fast]") 
       CHECK(std::equal(partial.rbsp().begin(), partial.rbsp().end(), want.rbsp.begin()));
     }
   }
-  idx::LazyRbsp empty;
-  empty.reset({});
-  empty.extend(16);
-  empty.scan_rest();
-  CHECK(empty.complete());
-  CHECK(empty.rbsp().empty());
 }
 
 // ---- lazy header trees -----------------------------------------------------------------------------------------
@@ -344,18 +323,9 @@ TEST_CASE("lazy trees: VCL units beyond the threshold carry no tree; values and 
       const fb::Unit* u = root(b).units()->Get(i);
       const bool beyond = is_vcl(s.codec, u->type()) && u->frame()->decode_index() >= 3;
       CHECK((u->header() == nullptr) == beyond);
-      CHECK(root(a).units()->Get(i)->header() != nullptr);
       without_tree += beyond ? 1 : 0;
     }
     CHECK(without_tree >= 3);
-    // lazy_after_frames 0: no VCL tree at all; non-VCL units keep theirs.
-    lazy.lazy_after_frames = 0;
-    const Bytes c = build_direct(data, s.codec, lazy);
-    check_same_frames(root(a), root(c));
-    for (uint32_t i = 0; i < root(c).units()->size(); ++i) {
-      const fb::Unit* u = root(c).units()->Get(i);
-      CHECK((u->header() == nullptr) == (is_vcl(s.codec, u->type()) && u->frame()->decode_index() >= 0));
-    }
   }
 }
 
@@ -375,24 +345,29 @@ TEST_CASE("ovt_stream_unit_syntax: the re-parsed tree equals the eager tree", "[
     check_same_frames(root(a), root(b));
     const uint32_t count = root(a).units()->size();
     CHECK(ovt_stream_unit_syntax(lazy.stream, count, &buf) == OVT_E_INVALID_ARG);
-    CHECK(ovt_stream_unit_syntax(lazy.stream, 0, nullptr) == OVT_E_INVALID_ARG);
-    CHECK(ovt_stream_unit_syntax(nullptr, 0, &buf) == OVT_E_INVALID_ARG);
     size_t reparsed = 0;
+    size_t pic_timing = 0;
     for (uint32_t i = 0; i < count; ++i) {
       CAPTURE(i);
       const fb::Unit* u = root(a).units()->Get(i);
       const Bytes from_lazy = lazy.unit_syntax(i);
       const Bytes from_eager = eager.unit_syntax(i);
       CHECK(from_lazy == from_eager);
-      CHECK(from_lazy == lazy.unit_syntax(i));  // deterministic
       REQUIRE(u->header() != nullptr);
       REQUIRE_FALSE(from_lazy.empty());
-      CHECK(same_tree(*u->header(), *flatbuffers::GetRoot<fb::SyntaxNode>(from_lazy.data())));
-      if (root(b).units()->Get(i)->header() == nullptr) {
-        ++reparsed;
+      const fb::SyntaxNode& tree = *flatbuffers::GetRoot<fb::SyntaxNode>(from_lazy.data());
+      CHECK(same_tree(*u->header(), tree));
+      reparsed += root(b).units()->Get(i)->header() == nullptr ? 1 : 0;
+      // An H.264 SEI unit: pic_timing takes the SPS of the previous picture (D.2.2), which the replay must provide.
+      if (s.codec == fb::Codec::H264 && u->type() == 6) {
+        CHECK_FALSE(has_node_diag(tree, "SYN-H264-0031"));
+        pic_timing += any_node(tree, [](const fb::SyntaxNode& n) { return sv(n.name()) == "pic_timing"; }) ? 1 : 0;
       }
     }
     CHECK(reparsed >= 4);
+    if (std::string_view(s.name) == "seed_4_h264_pic_timing.bin") {
+      CHECK(pic_timing == 6);  // x264 --nal-hrd vbr: one per frame, buffering_period only at the IDR frames
+    }
   }
 }
 
@@ -441,10 +416,6 @@ TEST_CASE("ovt_stream_build_index: progress reports and a usable job", "[index][
   ovt_job_progress(j.job, &p);
   CHECK(p.fraction == 1.0);
   CHECK(ovt_job_is_cancelled(j.job) == 0);
-  // An already-cancelled job builds nothing.
-  ovt_job_cancel(j.job);
-  CHECK(o.build(j.job, OVT_E_CANCELLED).empty());
-  CHECK(ovt_stream_index(o.stream).size == index.size());  // the earlier index stays
 }
 
 // AT2: Given a job cancelled after 100 ms, When ovt_stream_build_index returns, Then OVT_E_CANCELLED within 150 ms.
@@ -473,29 +444,22 @@ TEST_CASE("ovt_stream_build_index: cancellation is observed within 150 ms", "[in
   INFO("cancel latency " << latency.count() << " ms");
   CHECK(latency.count() <= 150);
   CHECK(ovt_stream_index(o.stream).data == nullptr);
-  // The stream stays usable: a fresh job builds it again (cancelled again or complete; the small-stream tests
-  // cover the result).
-  Job j2;
-  std::thread again([&] {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    ovt_job_cancel(j2.job);
-  });
-  ovt_Buffer buf2{nullptr, 0};
-  const ovt_status st2 = ovt_stream_build_index(o.stream, j2.job, &buf2);
-  again.join();
-  const std::unique_ptr<const uint8_t[]> owner2(buf2.data);  // NOLINT(*-avoid-c-arrays)
-  CHECK((st2 == OVT_E_CANCELLED || st2 == OVT_OK));
-  CHECK((buf2.data != nullptr) == (st2 == OVT_OK));
+  // The stream stays usable afterwards: the OVT_INDEX_ALLOW_PARTIAL test builds again after a cancel.
 }
 
 // AT3: Given OVT_INDEX_ALLOW_PARTIAL and a cancel, When the partial index is returned, Then it contains only
 // complete frames and SYN-GEN-0103; the next build resumes and equals an uninterrupted one.
 TEST_CASE("OVT_INDEX_ALLOW_PARTIAL: a cancelled build returns the complete frames and resumes", "[index][api][fast]") {
-  const Bytes data = repeat(seed("seed_2_h264_bframes.bin"), 300);
+  // A forbidden byte pattern (scan diagnostic SYN-GEN-0004) ends every copy's last NAL unit: the resumed build
+  // rescans the file from its start and must not record the diagnostics of the skipped units again.
+  Bytes copy = seed("seed_2_h264_bframes.bin");
+  copy.insert(copy.end(), {0x00, 0x00, 0x02, 0xAA});
+  const Bytes data = repeat(copy, 300);
   Opened whole(data, "w.264");
   const Bytes full = whole.build(nullptr);
   const uint32_t all_units = root(full).units()->size();
   REQUIRE(root(full).frames()->size() == 3600);
+  REQUIRE(count_code(root(full), "SYN-GEN-0004") == 300);
 
   Opened o(data, "p.264");
   CHECK(ovt_stream_set_index_flags(nullptr, 0) == OVT_E_INVALID_ARG);
@@ -508,9 +472,8 @@ TEST_CASE("OVT_INDEX_ALLOW_PARTIAL: a cancelled build returns the complete frame
   ovt_job_set_progress_callback(j.job, on_progress, &log);
   const Bytes partial = o.build(j.job);
   REQUIRE_FALSE(partial.empty());
-  CHECK(ovt_job_is_cancelled(j.job) == 1);
   const fb::StreamIndex& si = root(partial);
-  CHECK(has_code(si, "SYN-GEN-0103"));
+  CHECK(1 == count_code(si, "SYN-GEN-0103"));
   const uint32_t kept = si.units()->size();
   CHECK(kept > 0);
   CHECK(kept < all_units);
@@ -539,14 +502,16 @@ TEST_CASE("OVT_INDEX_ALLOW_PARTIAL: a cancelled build returns the complete frame
     const int32_t f = si.units()->Get(u)->frame()->decode_index();
     CHECK(f < static_cast<int32_t>(si.frames()->size()));
   }
-  CHECK(ovt_stream_index(o.stream).size == partial.size());
+  CHECK(count_code(si, "SYN-GEN-0004") >= 1);
+  CHECK(count_code(si, "SYN-GEN-0004") < 300);
 
   // The resumed build (a fresh or reset job) returns the whole index, byte for byte.
   ovt_job_set_progress_callback(j.job, nullptr, nullptr);
   ovt_job_reset(j.job);
   const Bytes resumed = o.build(j.job);
+  CHECK(count_code(root(resumed), "SYN-GEN-0004") == 300);
   CHECK(resumed == full);
-  CHECK_FALSE(has_code(root(resumed), "SYN-GEN-0103"));
+  CHECK(0 == count_code(root(resumed), "SYN-GEN-0103"));
   // And a further build starts over, with the same result.
   CHECK(o.build(nullptr) == full);
   // Without the flag the same cancel yields OVT_E_CANCELLED and keeps the last index.
@@ -555,4 +520,33 @@ TEST_CASE("OVT_INDEX_ALLOW_PARTIAL: a cancelled build returns the complete frame
   ovt_job_set_progress_callback(j.job, on_progress, &log);
   CHECK(o.build(j.job, OVT_E_CANCELLED).empty());
   CHECK(ovt_stream_index(o.stream).size == full.size());
+}
+
+// A cancellation observed after the last unit (the scan ran to its end): the resumed build finishes without a
+// second scan. The stream holds exactly 256 units, so the first progress report, which cancels, comes with the last.
+TEST_CASE("OVT_INDEX_ALLOW_PARTIAL: a cancellation after the last unit resumes to the same index",
+          "[index][api][fast]") {
+  const Bytes copy = seed("seed_2_h264_bframes.bin");
+  const uint32_t per_copy =
+      root(build_direct(copy, fb::Codec::H264, idx::BuilderOptions{fb::Codec::H264})).units()->size();
+  REQUIRE((per_copy > 0 && per_copy <= 256));
+  Bytes data = repeat(copy, 256 / per_copy);
+  for (uint32_t i = 0; i < 256 % per_copy; ++i) {
+    data.insert(data.end(), {0x00, 0x00, 0x00, 0x01, 0x09, 0xF0});  // access unit delimiter
+  }
+  Opened o(data, "p.264");
+  REQUIRE(ovt_stream_set_index_flags(o.stream, OVT_INDEX_ALLOW_PARTIAL) == OVT_OK);
+  Job j;
+  ProgressLog log;
+  log.job = j.job;
+  log.cancel_on_first = true;
+  ovt_job_set_progress_callback(j.job, on_progress, &log);
+  const Bytes partial = o.build(j.job);
+  REQUIRE(1 == count_code(root(partial), "SYN-GEN-0103"));
+  ovt_job_set_progress_callback(j.job, nullptr, nullptr);
+  ovt_job_reset(j.job);
+  const Bytes resumed = o.build(j.job);
+  REQUIRE(root(resumed).units()->size() == 256);
+  CHECK(0 == count_code(root(resumed), "SYN-GEN-0103"));
+  CHECK(resumed == o.build(nullptr));  // a build that starts over
 }

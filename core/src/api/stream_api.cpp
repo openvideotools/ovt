@@ -4,10 +4,9 @@
 // ovt/index.h entry points (chapter 12 §12.3.8, WI-1.121): ovt_stream_open() / ovt_stream_close(),
 // ovt_stream_codec(), ovt_stream_build_index(), ovt_stream_index() and ovt_stream_rap_before(). The stream reads
 // its units straight from the container's file: an Annex B byte stream (H.264, H.265), a Section 5 or Annex B OBU
-// stream, or IVF frames (AV1). WI-1.125 runs the build under its ovt_Job (chapter 7 §7.4.6: cancellation every 256
-// units or 50 ms, progress in bytes, the partial index of OVT_INDEX_ALLOW_PARTIAL and its resumption) and adds
-// ovt_stream_unit_syntax() (§7.4.5). The other functions of the block return OVT_E_UNSUPPORTED or -1 until their
-// work items land (the WI-1.121 Produces line of chapter 7, issue #642).
+// stream, or IVF frames (AV1). WI-1.125 runs the build under its ovt_Job (§7.4.6: cancellation, progress, the partial
+// index of OVT_INDEX_ALLOW_PARTIAL) and adds ovt_stream_unit_syntax() (§7.4.5). The other functions of the block
+// return OVT_E_UNSUPPORTED or -1 until their work items land (the WI-1.121 Produces line of chapter 7, issue #642).
 
 #include <algorithm>
 #include <array>
@@ -43,8 +42,9 @@ namespace {
 
 using ovt::api::Framing;
 
-constexpr uint32_t kFourccAv01 = 0x31305641;          // "AV01", first byte in the low byte
-constexpr size_t kSniffWindow = size_t{64} << 10U;    // parameter sets are looked for in the first 64 KiB
+constexpr uint32_t kFourccAv01 = 0x31305641;        // "AV01", first byte in the low byte
+constexpr size_t kSniffWindow = size_t{64} << 10U;  // parameter sets are looked for in the first 64 KiB
+
 constexpr uint32_t kCheckEveryUnits = 256;            // §7.4.6: check_cancel every 256 units ...
 constexpr std::chrono::milliseconds kCheckEvery{50};  // ... or 50 ms
 constexpr uint32_t kClockEveryUnits = 16;             // how often the 50 ms rule looks at the clock
@@ -159,13 +159,23 @@ class Driver {
       check(u.file_offset);
     }
   }
-  void on_diag(const syn::ScanDiagnostic& d) { builder_.add_scan_diagnostic(d); }
+  // A scan diagnostic. The cancelled pass reported every diagnostic up to its last unit (the throw happens inside
+  // on_unit, after add_unit), so the resumed pass drops those of the units it skips.
+  void on_diag(const syn::ScanDiagnostic& d) {
+    if (skip_ == 0) {
+      builder_.add_scan_diagnostic(d);
+    }
+  }
 
   // After the scan: the last chance to observe a cancellation before the index is finished.
   void end() {
+    scan_complete_ = true;
     cancel_.throw_if_requested();
     sink_(ovt::jobs::Progress{total_, total_, "index"});
   }
+
+  // Whether the scan ran to the end (a cancellation observed in end() leaves nothing to rescan).
+  [[nodiscard]] bool scan_complete() const noexcept { return scan_complete_; }
 
  private:
   using Clock = std::chrono::steady_clock;
@@ -183,6 +193,7 @@ class Driver {
   const ovt::jobs::Pool::ProgressSink& sink_;
   Clock::time_point last_;
   uint32_t count_ = 0;
+  bool scan_complete_ = false;
 };
 
 // IVF: one sample per frame, pts = dts = the frame's timestamp in scale / rate seconds (chapter 6 §6.2.6). A
@@ -234,6 +245,10 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
   const auto on_unit = [&driver](const syn::ScannedUnit& u) { driver.on_unit(u, nullptr); };
   const auto on_diag = [&driver](const syn::ScanDiagnostic& d) { driver.on_diag(d); };
   try {
+    if (resume->scan_complete) {
+      driver.end();
+      return builder.finish(idx::source_hash(file));
+    }
     switch (stream.framing) {
       case Framing::AnnexB:
         syn::scan_annexb(file, on_unit, on_diag);
@@ -261,6 +276,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
     }
     std::vector<uint8_t> partial = builder.finish_partial(idx::source_hash(file));
     resume->units_fed = builder.unit_count();
+    resume->scan_complete = driver.scan_complete();
     stream.resume = std::move(resume);
     return partial;
   }
