@@ -27,6 +27,14 @@ target_compile_definitions(ovt_tests_index_h264
 ovt_set_license(ovt_tests_index_h264 "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_index_h264)
 
+# WI-1.122: H.264 DPB simulation (§7.4.4). h264_reflist_vs_jm reads the JM goldens of tests/golden/h264.
+add_executable(ovt_tests_index_h264_dpb test_index_h264_dpb.cpp)
+target_link_libraries(ovt_tests_index_h264_dpb PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
+target_include_directories(ovt_tests_index_h264_dpb PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
+target_compile_definitions(ovt_tests_index_h264_dpb PRIVATE OVT_GOLDEN_H264_DIR="${PROJECT_SOURCE_DIR}/tests/golden/h264")
+ovt_set_license(ovt_tests_index_h264_dpb "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_index_h264_dpb)
+
 # WI-1.121: StreamIndex builder (§7.4.2). The libaom-encoded streams of the index_builder fuzz seeds double as a
 # corpus-free end-to-end test.
 # test_index_vs_ffprobe.cpp (H.264 / H.265, acceptance test 1) runs ffprobe through the helpers of
