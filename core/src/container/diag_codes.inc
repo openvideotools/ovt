@@ -101,6 +101,12 @@ X(CNT_1023, "CNT-1023", Warning, "`clap` yields non-integral or out-of-range ape
 X(CNT_5002, "CNT-5002", Warning, "QuickTime `nclc` colr in non-`qt` file", "QTFF")
 X(CNT_5020, "CNT-5020", Warning, "`dvcC` used for profile ≥ 8 or `dvvC` for ≤ 7", "DV-ISOBMFF §2.2")
 
+// WI-1.207 (codec configuration records, §8.3.3).
+X(CNT_1020, "CNT-1020", Info, "`avc3`/`avc4` sample entry carries SPS/PPS in `avcC` (allowed, but in-band is the point)",
+  "14496-15 §5.4")
+X(CNT_1021, "CNT-1021", Error, "`av1C.configOBUs` contains an OBU other than sequence header / metadata",
+  "AV1-ISOBMFF §2.3.4")
+
 // WI-1.209 (sample tables, §8.3.4 and §8.4.1; the box-level checks of the group D decoders).
 X(CNT_2001, "CNT-2001", Warning, "`stts.sample_delta == 0` for a non-last sample", "14496-12 §8.6.1.2")
 X(CNT_2002, "CNT-2002", Warning, "`ctts` v0 offset ≥ 2^31 treated as negative", "14496-12 §8.6.1.3")
