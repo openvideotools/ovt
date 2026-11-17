@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <utility>
@@ -31,8 +32,10 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/idbuffer.h"
 #include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
+#include "color/cpu_convert.h"
 #include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
@@ -382,6 +385,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (measurer_.due()) {
       measurer_.run(slot_a_);
     }
+    end_ids(view);
     offscreen_.end_frame();  // submit and hand the texture to the host
   }
 
@@ -389,7 +393,65 @@ class VideoSurfaceImpl final : public VideoSurface {
     return native_ != nullptr ? ExternalTexture{} : offscreen_.describe(target_);  // a NATIVE target presents itself
   }
 
-  [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
+  // §10.5.7 / §10.6.3 (WI-2.435): CPU cell lookup, the id buffer of the last completed readback, and the code values
+  // of a 64x64-sample window converted on the CPU. Never waits for the GPU except to download a new window.
+  [[nodiscard]] Pick pick(int px, int py) const override {
+    Pick p;
+    if (!picked_view_ || !slot_a_.valid) {
+      return p;
+    }
+    // Inverse §10.2.3 view transform at the pixel centre (the overlay passes map gl_FragCoord the same way).
+    const double zoom = last_view_.zoom > 0.0 ? last_view_.zoom : 1.0;
+    const double fx = ((px + 0.5 - (target_.width / 2.0)) / zoom) + last_view_.pan_x;
+    const double fy = ((py + 0.5 - (target_.height / 2.0)) / zoom) + last_view_.pan_y;
+    if (fx < 0.0 || fy < 0.0 || fx >= slot_a_.coded_width || fy >= slot_a_.coded_height) {
+      return p;  // outside the coded picture
+    }
+    p.hit = true;
+    p.image_x = static_cast<int>(std::floor(fx));
+    p.image_y = static_cast<int>(std::floor(fy));
+    p.cell_x = p.image_x / 4;
+    p.cell_y = p.image_y / 4;
+    if (overlays_ != nullptr && std::cmp_less(p.cell_x, overlays_->cells_w) &&
+        std::cmp_less(p.cell_y, overlays_->cells_h) && !overlays_->cell_block_id.empty()) {
+      p.block_id = overlays_->cell_block_id.at((static_cast<size_t>(p.cell_y) * overlays_->cells_w) +
+                                               static_cast<size_t>(p.cell_x));
+    }
+    if (overlay_gpu_ != nullptr) {
+      const uint32_t id = overlay_gpu_->lookup_id(px, py);
+      if ((id & detail::kIdArrowBit) != 0) {  // arrows take precedence over blocks
+        p.mv_index = static_cast<int32_t>(id & ~detail::kIdArrowBit);
+      }
+    }
+    std::array<int32_t, 3> code{};
+    if (windows_a_.read(gpu_, slot_a_, p.image_x, p.image_y, code)) {
+      std::copy(code.begin(), code.end(), std::begin(p.code));
+      detail::ProbeLight light;
+      if (detail::code_to_light(code_color(slot_a_), code, light)) {
+        std::copy(light.rgb_linear.begin(), light.rgb_linear.end(), std::begin(p.rgb_linear));
+        p.nits_luminance = light.nits_luminance;
+        p.nits_maxrgb = light.nits_maxrgb;
+        p.pq_code = light.pq_code;
+        p.cie_x = light.cie_x;
+        p.cie_y = light.cie_y;
+      }
+    }
+    // SPEC-ASSUMPTION(#713): picture B is read at the same image position, whatever the compare layout.
+    if (mode_.kind != CompareMode::Kind::Single && slot_b_.valid &&
+        windows_b_.read(gpu_, slot_b_, p.image_x, p.image_y, code)) {
+      std::copy(code.begin(), code.end(), std::begin(p.code_b));
+    }
+    return p;
+  }
+
+  // Tests: the id readback and the probe windows.
+  bool wait_ids(uint64_t timeout_ns) { return overlay_gpu_ != nullptr && overlay_gpu_->ids().wait(timeout_ns); }
+  void set_id_region_mode(bool region) {
+    if (overlay_gpu_ != nullptr) {
+      overlay_gpu_->ids().set_region_mode(region);
+    }
+  }
+  [[nodiscard]] uint64_t window_downloads() const { return windows_a_.downloads(); }
 
   // §10.7.9: never blocks. SPEC-ASSUMPTION(#478): region_psnr (Difference) reduces the visible region of the last
   // render() here rather than in render(), so only a host that asks waits for the readback.
@@ -508,6 +570,26 @@ class VideoSurfaceImpl final : public VideoSurface {
     for (const std::string& line : lines) {
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
       (void)std::fprintf(stderr, "[%s] %s\n", prefix_.c_str(), line.c_str());
+    }
+  }
+
+  // The colour description the probe converts with: the §10.3.3 mapping the slot's frame already carries.
+  static detail::CodeColor code_color(const detail::FrameSlot& slot) {
+    detail::CodeColor c;
+    c.sys = slot.frame.repr.sys;
+    c.levels = slot.frame.repr.levels;
+    c.primaries = slot.frame.color.primaries;
+    c.transfer = slot.frame.color.transfer;
+    c.bit_depth = slot.bit_depth;
+    return c;
+  }
+
+  // After a render: keeps the view for pick() and reads back the id buffer the frame drew (§10.5.7).
+  void end_ids(const ViewState& view) {
+    last_view_ = view;
+    picked_view_ = true;
+    if (overlay_gpu_ != nullptr) {
+      overlay_gpu_->end_frame();
     }
   }
 
@@ -787,6 +869,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (measurer_.due()) {  // §10.7.9, as in render()
       measurer_.run(slot_a_);
     }
+    end_ids(view);
     const bool submitted = pl_swapchain_submit_frame(sw_);
     offscreen_.end_frame();
     if (!submitted) {
@@ -1049,6 +1132,10 @@ class VideoSurfaceImpl final : public VideoSurface {
   std::unique_ptr<OverlaySet> overlays_;
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
   detail::Measurer measurer_;                             // §10.7 (WI-4.452)
+  ViewState last_view_;                                   // the last render()'s view, for pick()
+  bool picked_view_ = false;                              // a render() has run
+  mutable detail::SampleWindows windows_a_;               // probe code-value windows of slots A and B (§10.5.7)
+  mutable detail::SampleWindows windows_b_;
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
@@ -1105,6 +1192,23 @@ bool hold_readbacks(VideoSurface& surface, bool hold) {
 bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width, int& height) {
   auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
   return impl != nullptr && impl->download_scope(kind, rgba16hf, width, height);
+}
+
+bool wait_id_readback(VideoSurface& surface, uint64_t timeout_ns) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->wait_ids(timeout_ns);
+}
+
+void set_id_region_mode(VideoSurface& surface, bool region) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl != nullptr) {
+    impl->set_id_region_mode(region);
+  }
+}
+
+uint64_t probe_window_downloads(const VideoSurface& surface) {
+  const auto* impl = dynamic_cast<const VideoSurfaceImpl*>(&surface);
+  return impl != nullptr ? impl->window_downloads() : 0;
 }
 
 bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {

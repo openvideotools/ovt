@@ -1197,7 +1197,7 @@ One row per requirement. **WIs** lists the chapter-16 work items that realise it
 | HDR | FR-HDR-004 | 1 | must | WI-1.403 |
 | HDR | FR-HDR-005 | 1 | must | WI-1.402, WI-1.462 |
 | HDR | FR-HDR-006 | 3 | should | WI-3.532, WI-4.452, WI-4.457 |
-| HDR | FR-HDR-007 | 1 | must | WI-1.456, WI-1.463 |
+| HDR | FR-HDR-007 | 1 | must | WI-1.456, WI-1.463, WI-1.463b |
 | HDR | FR-HDR-008 | 1 | must | WI-1.403 |
 | HDR | FR-HDR-009 | 3 | should | WI-3.303 |
 | HDR | FR-HDR-010 | 4 | nice | WI-4.453, WI-4.454 |
@@ -1205,7 +1205,7 @@ One row per requirement. **WIs** lists the chapter-16 work items that realise it
 | HDR | FR-HDR-012 | 4 | nice | WI-4.455 |
 | HDR | FR-HDR-013 | 4 | nice | WI-4.456 |
 | HDR | FR-HDR-014 | 2 | should | WI-2.431 |
-| HDR | FR-HDR-101 | 1 | must | WI-1.463, WI-A.400 |
+| HDR | FR-HDR-101 | 1 | must | WI-1.463, WI-1.463b, WI-A.400 |
 | VQ | FR-VQ-001 | 3 | must | WI-3.300, WI-3.318 |
 | VQ | FR-VQ-002 | 3 | must | WI-3.301, WI-3.305, WI-3.318 |
 | VQ | FR-VQ-003 | 3 | must | WI-3.304, WI-4.309 |
