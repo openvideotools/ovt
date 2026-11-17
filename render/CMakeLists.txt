@@ -76,6 +76,8 @@ target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
 target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
 # WI-2.432: grid line pass with viewport/level culling (§10.5.3).
 target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+# WI-2.437: overlay cache (LRU of 8 built OverlaySets per surface, §10.5.8) and the set_overlays() lifecycle.
+target_sources(ovt_render PRIVATE src/overlay/overlay_cache.cpp)
 # WI-2.435: id buffer, readback and probe windows (§10.5.7) and the probe's CPU colour math (§10.6.3).
 target_sources(ovt_render PRIVATE src/overlay/idbuffer.cpp src/color/cpu_convert.cpp)
 # WI-2.436: deblocking edges (cell pass 7, src/shaders/deblock.glsl) and the selection / probe / rectangle marks (§10.5.6).

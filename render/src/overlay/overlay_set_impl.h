@@ -40,6 +40,21 @@ struct GridNode {
   GridLevel level = GridLevel::None;
 };
 
+namespace detail {
+
+// Key of the WI-2.437 overlay cache (overlay_cache.h).
+struct OverlayCacheKey {
+  int32_t decode_index = -1;
+  uint64_t frame = 0;   // fingerprint of the FrameAnalysis beyond decode_index (another stream, a re-analysis)
+  uint64_t config = 0;  // overlay_config_hash()
+  uint64_t custom = 0;  // hash of the host's custom_cells when the build reads them, else 0
+  OverlayConfig gpu{};  // gpu_relevant_config(), compared field by field so a hash collision cannot alias two sets
+
+  [[nodiscard]] bool same_as(const OverlayCacheKey& o) const;
+};
+
+}  // namespace detail
+
 class OverlaySet {
  public:
   OverlaySet() = default;
@@ -97,6 +112,15 @@ class OverlaySet {
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.
   std::vector<std::string> diagnostics;
+
+  // WI-2.437 overlay cache (overlay_cache.h). A handle handed out by the cache owns no arrays of its own: `shared`
+  // holds them and `config` is the configuration asked for (its uniforms may differ from shared->config). Readers
+  // of the arrays go through data().
+  std::shared_ptr<const OverlaySet> shared;
+  bool cache_tagged = false;  // a builder miss: set_overlays() adds the arrays to the surface's cache under cache_key
+  detail::OverlayCacheKey cache_key;
+
+  [[nodiscard]] const OverlaySet& data() const { return shared != nullptr ? *shared : *this; }
 };
 
 namespace detail {
@@ -108,6 +132,8 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
                                               const uint16_t* custom_cells);
 std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
                                               const uint16_t* custom_cells);
+// flatbuffers::Verifier over an untrusted FrameAnalysis buffer, with the table limit a dense 4K frame needs.
+bool verify_frame_analysis(const uint8_t* buf, size_t size);
 
 // WI-2.436: the §10.5.2 class of one CellGrid.deblock_bs_v/h value (chapter 6 §6.3: H.264 bS 0..4, HEVC bS 0..2, AV1
 // filter size 0/4/6/8/16, 0xFF unknown): 0 = nothing drawn, 1 = weak (row 13), 2 = strong (row 14).

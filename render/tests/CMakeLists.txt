@@ -134,6 +134,9 @@ target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.c
 # render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
 target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
 
+# WI-2.437: overlay cache and set_overlays() lifecycle (§10.5.8). The cache cases need no GPU; one [vulkan] case checks
+# the re-upload skip and teardown with live handles.
+target_sources(ovt_tests_render PRIVATE test_overlay_cache.cpp)
 # WI-2.435: id buffer, readback and pick() (§10.5.7), probe colour math (§10.6.3).
 target_sources(ovt_tests_render PRIVATE test_pick.cpp)
 # WI-2.436: deblocking edges, reference-index fill and selection / probe / rectangle passes (§10.5.6 passes 3, 7, 10, 12),

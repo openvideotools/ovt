@@ -105,6 +105,7 @@ void OverlayLayerGpu::drop_set() {
   cells_h_ = 0;
   cfg_ = OverlayConfig{};
   set_ = nullptr;
+  uploaded_ = false;
   grid_cache_.reset();
 }
 
@@ -151,18 +152,26 @@ bool OverlayLayerGpu::ensure_static(std::string& err) {
   return true;
 }
 
-bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
+bool OverlayLayerGpu::upload(const OverlaySet* handle, std::string& err) {
+  // WI-2.437: a handle sharing the arrays already uploaded (the caller keeps the previous set alive meanwhile) changes
+  // only uniforms: keep the textures, the arrow upload and the culled grid lines.
+  if (handle != nullptr && uploaded_ && &handle->data() == set_) {
+    cfg_ = handle->config;
+    return true;
+  }
   drop_set();
-  if (set == nullptr) {
+  if (handle == nullptr) {
     return true;
   }
   if (!ensure_static(err)) {
     return false;
   }
   // The grid lines need only the block tree and the partition lines, not the cell grid.
-  cfg_ = set->config;
+  const OverlaySet* set = &handle->data();
+  cfg_ = handle->config;
   set_ = set;
   if (set->cells_w == 0 || set->cells_h == 0) {
+    uploaded_ = true;
     return true;
   }
   const auto w = static_cast<int>(set->cells_w);
@@ -194,6 +203,7 @@ bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
   }
   cells_w_ = set->cells_w;
   cells_h_ = set->cells_h;
+  uploaded_ = true;
   return true;
 }
 

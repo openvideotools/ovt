@@ -38,9 +38,13 @@ class OverlayLayerGpu {
   OverlayLayerGpu& operator=(OverlayLayerGpu&&) = delete;
   ~OverlayLayerGpu();
 
-  // Uploads the cell textures of `set` (set_overlays()). nullptr drops them. Returns false with `err` set when a
-  // texture cannot be created; nothing is drawn then.
-  bool upload(const OverlaySet* set, std::string& err);
+  // Uploads the cell textures of `handle` (set_overlays()). nullptr drops them. Returns false with `err` set when a
+  // texture cannot be created; nothing is drawn then. A set whose data() is the one already uploaded only replaces
+  // the configuration (WI-2.437); the caller keeps the previous set alive until this returns.
+  bool upload(const OverlaySet* handle, std::string& err);
+
+  // True while the arrays of a set are on the GPU (tests of the WI-2.437 re-upload skip).
+  [[nodiscard]] const OverlaySet* uploaded_data() const { return uploaded_ ? set_ : nullptr; }
 
   // The arrow/stroke pass state (WI-2.434), for tests and the overlay benchmarks.
   [[nodiscard]] const ArrowPass& arrows() const { return arrows_; }
@@ -81,7 +85,8 @@ class OverlayLayerGpu {
   uint32_t cells_w_ = 0;
   uint32_t cells_h_ = 0;
   CellPasses passes_;
-  const OverlaySet* set_ = nullptr;  // the uploaded set (owned by the surface); grid lines are built from it
+  const OverlaySet* set_ = nullptr;  // data() of the uploaded set (owned by the surface); grid lines are built from it
+  bool uploaded_ = false;            // set_'s arrays are fully uploaded
   GridLineCache grid_cache_;         // WI-2.432: culled line list and its rebuild triggers
   LinePass lines_;
   ArrowPass arrows_;
