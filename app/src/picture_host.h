@@ -54,6 +54,15 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(int planeMode READ plane_mode WRITE set_plane_mode NOTIFY viewChanged)  // 0 YUV, 1 Y, 2 U, 3 V, 4 gray
   Q_PROPERTY(bool showCropped READ show_cropped WRITE set_show_cropped NOTIFY viewChanged)
   Q_PROPERTY(QColor backgroundColor READ background_color WRITE set_background_color NOTIFY viewChanged)
+  // The HDR fields of ViewState (§10.2.3), set from the HDR panel's Display tab (HdrView, WI-1.462). Enum values are
+  // the indices of render::ToneMap and render::GamutMap.
+  Q_PROPERTY(int toneMap READ tone_map WRITE set_tone_map NOTIFY viewChanged)
+  Q_PROPERTY(int gamutMap READ gamut_map WRITE set_gamut_map NOTIFY viewChanged)
+  Q_PROPERTY(double clipNits READ clip_nits WRITE set_clip_nits NOTIFY viewChanged)
+  Q_PROPERTY(double targetPeakOverride READ target_peak_override WRITE set_target_peak_override NOTIFY viewChanged)
+  Q_PROPERTY(bool falseColor READ false_color WRITE set_false_color NOTIFY viewChanged)
+  Q_PROPERTY(bool gamutClipOverlay READ gamut_clip_overlay WRITE set_gamut_clip_overlay NOTIFY viewChanged)
+  Q_PROPERTY(bool dither READ dither WRITE set_dither NOTIFY viewChanged)
   Q_PROPERTY(bool hasPicture READ has_picture NOTIFY pictureChanged)
   Q_PROPERTY(int pictureWidth READ picture_width NOTIFY pictureChanged)
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
@@ -89,6 +98,20 @@ class PictureHost : public QQuickRhiItem {
   void set_show_cropped(bool on);
   [[nodiscard]] QColor background_color() const { return background_; }
   void set_background_color(const QColor& color);
+  [[nodiscard]] int tone_map() const noexcept { return tone_map_; }
+  void set_tone_map(int value) { set_view(tone_map_, value); }
+  [[nodiscard]] int gamut_map() const noexcept { return gamut_map_; }
+  void set_gamut_map(int value) { set_view(gamut_map_, value); }
+  [[nodiscard]] double clip_nits() const noexcept { return clip_nits_; }
+  void set_clip_nits(double value) { set_view(clip_nits_, value); }
+  [[nodiscard]] double target_peak_override() const noexcept { return target_peak_override_; }
+  void set_target_peak_override(double value) { set_view(target_peak_override_, value); }
+  [[nodiscard]] bool false_color() const noexcept { return false_color_; }
+  void set_false_color(bool on) { set_view(false_color_, on); }
+  [[nodiscard]] bool gamut_clip_overlay() const noexcept { return gamut_clip_overlay_; }
+  void set_gamut_clip_overlay(bool on) { set_view(gamut_clip_overlay_, on); }
+  [[nodiscard]] bool dither() const noexcept { return dither_; }
+  void set_dither(bool on) { set_view(dither_, on); }
 
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
   [[nodiscard]] int picture_width() const noexcept;
@@ -119,6 +142,16 @@ class PictureHost : public QQuickRhiItem {
  private:
   friend class PictureHostRenderer;
 
+  template <typename T>
+  void set_view(T& field, T value) {
+    if (field == value) {
+      return;
+    }
+    field = value;
+    Q_EMIT viewChanged();
+    update();
+  }
+
   std::shared_ptr<const PictureFrame> frame_;
   double zoom_ = 0.0;
   double pan_x_ = 0.0;
@@ -126,6 +159,13 @@ class PictureHost : public QQuickRhiItem {
   int plane_mode_ = 0;
   bool show_cropped_ = true;
   QColor background_{0x20, 0x20, 0x20};  // ViewState::background_rgba default 0x202020FF
+  int tone_map_ = 0;                     // ToneMap::Auto
+  int gamut_map_ = 0;                    // GamutMap::Perceptual
+  double clip_nits_ = 1000.0;
+  double target_peak_override_ = 0.0;
+  bool false_color_ = false;
+  bool gamut_clip_overlay_ = false;
+  bool dither_ = true;
   PictureHostStats stats_;
 };
 
