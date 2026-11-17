@@ -21,6 +21,7 @@
 #include <string_view>
 #include <vector>
 
+#include "cmd/cache.h"
 #include "exit_codes.h"
 
 namespace ovt::cli {
@@ -67,6 +68,10 @@ struct Context {
   // Environment lookup; empty = the process environment.
   std::function<std::optional<std::string>(const std::string&)> getenv;
   CompletionScripts completions;
+  // `ovt cache` (WI-1.509): the answer source of the confirmation prompt, and the record codecs of `import`.
+  std::FILE* in = stdin;
+  bool stdin_tty = false;
+  const cmd::RecordIo* record_io = nullptr;  // null = unavailable (#673)
 };
 
 // The CLI11 tree with its bound variables. gen_completions (cli/tools/) walks app() at build time.
@@ -108,14 +113,17 @@ class Cli {
   [[nodiscard]] const Raw& raw() const noexcept { return raw_; }
   [[nodiscard]] bool given(std::string_view long_name) const;  // the option appeared on the command line
   [[nodiscard]] CLI::App* completion() const noexcept { return completion_; }
+  [[nodiscard]] const cmd::CacheArgs& cache() const noexcept { return cache_; }
 
- private:
+  // An option restricted to `canonical` (plus the accepted `extra` spellings); completion offers `canonical`.
   CLI::Option* add_choice(CLI::App& app, const std::string& name, std::string& var, const std::string& help,
                           std::vector<std::string> canonical, std::vector<std::string> extra = {});
 
+ private:
   CLI::App app_;
   Raw raw_;
   CLI::App* completion_ = nullptr;
+  cmd::CacheArgs cache_;
   std::map<const CLI::Option*, std::vector<std::string>> choices_;
 };
 

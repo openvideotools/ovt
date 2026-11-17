@@ -96,6 +96,11 @@ X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries 
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
 
+// WI-1.208 (group C part 2: colour, HDR and Dolby Vision boxes, §8.3.3).
+X(CNT_1023, "CNT-1023", Warning, "`clap` yields non-integral or out-of-range aperture", "14496-12 §12.1.4")
+X(CNT_5002, "CNT-5002", Warning, "QuickTime `nclc` colr in non-`qt` file", "QTFF")
+X(CNT_5020, "CNT-5020", Warning, "`dvcC` used for profile ≥ 8 or `dvvC` for ≤ 7", "DV-ISOBMFF §2.2")
+
 // WI-1.209 (sample tables, §8.3.4 and §8.4.1; the box-level checks of the group D decoders).
 X(CNT_2001, "CNT-2001", Warning, "`stts.sample_delta == 0` for a non-last sample", "14496-12 §8.6.1.2")
 X(CNT_2002, "CNT-2002", Warning, "`ctts` v0 offset ≥ 2^31 treated as negative", "14496-12 §8.6.1.3")

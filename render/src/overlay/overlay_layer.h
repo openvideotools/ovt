@@ -19,6 +19,7 @@
 #include "overlay/overlay_set_impl.h"
 #include "overlay/pass_arrows.h"
 #include "overlay/pass_fill.h"
+#include "overlay/pass_lines.h"
 #include "ovt/render/overlay_set.h"
 #include "ovt/render/render_api.h"
 #include "ovt/render/video_surface.h"
@@ -41,7 +42,7 @@ class OverlayLayerGpu {
   // The arrow/stroke pass state (WI-2.434), for tests and the overlay benchmarks.
   [[nodiscard]] const ArrowPass& arrows() const { return arrows_; }
 
-  // Draws passes 2-4 and 8-9 into a w x h layer for `view`, limited to `picture` (device-px rect of the drawn picture),
+  // Draws passes 2-6 and 8-9 into a w x h layer for `view`, limited to `picture` (device-px rect of the drawn picture),
   // and fills `out` for pl_frame.overlays. Returns false when there is nothing to draw (no set, no enabled layer with
   // data) or on error (`err` set).
   bool draw(const ViewState& view, int w, int h, float dpr, const pl_rect2df& picture, struct pl_overlay& out,
@@ -50,6 +51,8 @@ class OverlayLayerGpu {
  private:
   bool ensure_static(std::string& err);
   bool ensure_layer(int w, int h, std::string& err);
+  bool update_lines(const ViewState& view, int w, int h, bool& lines, std::string& err);  // WI-2.432
+  bool run_lines(const CellPassConstants& pc, std::string& err);
   void drop_set();
 
   pl_gpu gpu_;
@@ -63,6 +66,9 @@ class OverlayLayerGpu {
   uint32_t cells_w_ = 0;
   uint32_t cells_h_ = 0;
   CellPasses passes_;
+  const OverlaySet* set_ = nullptr;  // the uploaded set (owned by the surface); grid lines are built from it
+  GridLineCache grid_cache_;         // WI-2.432: culled line list and its rebuild triggers
+  LinePass lines_;
   ArrowPass arrows_;
   struct pl_overlay_part part_ = {};
 };

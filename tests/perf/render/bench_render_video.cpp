@@ -19,8 +19,8 @@
 //   --frames N         length of the scripted path of bench_render_video_4k (default 100, the "100 frames" of §14.9.3)
 //   --viewport WxH     size of the offscreen target (default: the size of the picture)
 //
-// SPEC-ASSUMPTION(#627): §14.9.3 names "real_*_hevc_frame.fb planes" as input, but those fixtures carry no samples;
-// only their coded size is used and the planes are synthetic.
+// Input (§14.9.3, #627): only the coded size of the fixture is used; the planes are a synthetic picture, because a
+// FrameAnalysis carries no samples.
 //
 // Times are CPU wall-clock times of the calling thread around the call. VideoSurface::render() returns only after the
 // GPU has finished an offscreen frame (the surface waits on its own timeline semaphore before it hands the texture
@@ -89,10 +89,7 @@ struct SyntheticPicture {
   SyntheticPicture(uint32_t w, uint32_t h) {
     pic.coded_width = w;
     pic.coded_height = h;
-    pic.crop.mutate_x(0);
-    pic.crop.mutate_y(0);
-    pic.crop.mutate_w(static_cast<int>(w));
-    pic.crop.mutate_h(static_cast<int>(h));
+    pic.crop = ovt::fb::Rect(0, 0, static_cast<int>(w), static_cast<int>(h));
     pic.color.struct_size = sizeof(ovt_ColorDescription);
     pic.color.bit_depth = 10;
     pic.color.chroma_format = 1;

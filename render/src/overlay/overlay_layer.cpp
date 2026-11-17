@@ -32,6 +32,8 @@ constexpr uint32_t bit(OverlayLayer l) {
 }
 
 constexpr uint32_t kFillLayers = bit(OverlayLayer::PredFill) | bit(OverlayLayer::RefIdxFill);
+constexpr uint32_t kLineLayers = bit(OverlayLayer::GridTU) | bit(OverlayLayer::GridPU) | bit(OverlayLayer::GridCU) |
+                                 bit(OverlayLayer::GridCTU) | bit(OverlayLayer::GridPartition);
 
 pl_tex make_texture(pl_gpu gpu, const char* fmt_name, int w, int h, const void* data, size_t row_pitch,
                     std::string& err) {
@@ -69,6 +71,7 @@ OverlayLayerGpu::~OverlayLayerGpu() {
   drop_set();
   arrows_.destroy(gpu_);
   passes_.destroy(gpu_);
+  lines_.destroy(gpu_);
   pl_tex_destroy(gpu_, &layer_);
   pl_tex_destroy(gpu_, &palette_);
   for (pl_tex& t : luts_) {
@@ -85,6 +88,8 @@ void OverlayLayerGpu::drop_set() {
   cells_w_ = 0;
   cells_h_ = 0;
   cfg_ = OverlayConfig{};
+  set_ = nullptr;
+  grid_cache_.reset();
 }
 
 bool OverlayLayerGpu::ensure_static(std::string& err) {
@@ -120,11 +125,17 @@ bool OverlayLayerGpu::ensure_static(std::string& err) {
 
 bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
   drop_set();
-  if (set == nullptr || set->cells_w == 0 || set->cells_h == 0) {
+  if (set == nullptr) {
     return true;
   }
   if (!ensure_static(err)) {
     return false;
+  }
+  // The grid lines need only the block tree and the partition lines, not the cell grid.
+  cfg_ = set->config;
+  set_ = set;
+  if (set->cells_w == 0 || set->cells_h == 0) {
+    return true;
   }
   const auto w = static_cast<int>(set->cells_w);
   const auto h = static_cast<int>(set->cells_h);
@@ -153,7 +164,6 @@ bool OverlayLayerGpu::upload(const OverlaySet* set, std::string& err) {
     drop_set();
     return false;
   }
-  cfg_ = set->config;
   cells_w_ = set->cells_w;
   cells_h_ = set->cells_h;
   return true;
@@ -181,14 +191,45 @@ bool OverlayLayerGpu::ensure_layer(int w, int h, std::string& err) {
   return true;
 }
 
+bool OverlayLayerGpu::update_lines(const ViewState& view, int w, int h, bool& lines, std::string& err) {
+  lines = false;
+  if ((cfg_.layers & kLineLayers) == 0 || set_ == nullptr) {
+    return true;
+  }
+  // WI-2.432 step 5: rebuild only on a new set, a level threshold crossing or a pan beyond the pre-fetched margin.
+  const ImageRect visible = visible_image_rect(w, h, view.pan_x, view.pan_y, view.zoom);
+  if (grid_cache_.update(*set_, cfg_.layers, view.zoom, visible) && !lines_.upload(gpu_, grid_cache_.lines(), err)) {
+    grid_cache_.reset();
+    return false;
+  }
+  lines = !grid_cache_.lines().vertices.empty();
+  return true;
+}
+
+// 5 grids TU -> PU -> CU -> CTU and 6 slice/tile boundaries, one draw in that order (§10.5.3).
+bool OverlayLayerGpu::run_lines(const CellPassConstants& pc, std::string& err) {
+  LinePassConstants lc;
+  lc.viewport_half = pc.viewport_half;
+  lc.pan = pc.pan;
+  lc.clip = pc.clip;
+  lc.picture = {static_cast<float>(set_->picture_w), static_cast<float>(set_->picture_h)};
+  lc.zoom = pc.zoom;
+  lc.line_scale = std::max(cfg_.line_px, 0.0F) * pc.dpr;
+  return lines_.run(gpu_, layer_, palette_, lc, err);
+}
+
 bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const pl_rect2df& picture,
                            struct pl_overlay& out, std::string& err) {
   const uint32_t layers = cfg_.layers;
   const bool heatmap = (layers & bit(OverlayLayer::Heatmap)) != 0 && heat_ != nullptr;
   const bool fill = (layers & kFillLayers) != 0 && attr_ != nullptr;
   const bool hatch = (layers & bit(OverlayLayer::SkipHatch)) != 0 && attr_ != nullptr;
+  bool lines = false;
+  if (!update_lines(view, w, h, lines, err)) {
+    return false;
+  }
   const bool arrows = arrows_.has_work(layers);
-  if (!heatmap && !fill && !hatch && !arrows) {
+  if (!heatmap && !fill && !hatch && !lines && !arrows) {
     return false;
   }
   if (!ensure_layer(w, h, err)) {
@@ -219,6 +260,9 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
     return false;
   }
   if (hatch && !passes_.run(gpu_, CellPass::Hatch, layer_, pc, {attr_, palette_}, err)) {
+    return false;
+  }
+  if (lines && !run_lines(pc, err)) {
     return false;
   }
   // 8 intra direction strokes, 9 MV arrows (L1, L0, bi).
