@@ -31,6 +31,8 @@ add_executable(
   models/test_sample_streams.cpp
   models/test_picture_controller.cpp
   models/test_hdr_metadata_model.cpp
+  models/test_android_state.cpp
+  ../src/platform/android_state.cpp
   ../src/picture_controller.cpp
   ../src/models/hdr_metadata_model.cpp
   ../../core/src/syntax/common/h273_names.cpp

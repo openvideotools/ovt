@@ -139,6 +139,12 @@ void SelectionModel::commit(State next, const QString& origin) {
   Q_EMIT changed(static_cast<int>(mask));
 }
 
+void SelectionModel::restore(const Snapshot& snapshot, const QString& origin) {
+  State next;
+  static_cast<Snapshot&>(next) = snapshot;
+  commit(std::move(next), origin);
+}
+
 // ---- setters ------------------------------------------------------------------------------------------------------
 
 void SelectionModel::setSource(const QString& file_id, int track_index, const QString& origin) {
