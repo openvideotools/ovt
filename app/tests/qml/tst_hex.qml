@@ -68,10 +68,10 @@ TestCase {
     }
 
     function openPanel() {
-        // Bytes with "//" pairs to find: an SPDX-style comment line, repeated.
+        // Bytes with "//" pairs to find: a comment-like line, repeated.
         let text = ""
         for (let i = 0; i < 40; ++i)
-            text += "// SPDX-License-Identifier: GPL-3.0-or-later\n"
+            text += "// hex panel test line, repeated for bytes to find\n"
         panel.hex.openBytes(text)
         tryVerify(function () { return panel.table.visible })
         stage.requestActivate()
