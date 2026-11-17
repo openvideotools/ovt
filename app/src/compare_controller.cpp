@@ -38,7 +38,7 @@ QStringList CompareController::mode_names() {
 }
 
 int CompareController::kind() const noexcept {
-  return kKindOfMode.at(static_cast<std::size_t>(std::clamp(mode_, 0, kModeCount - 1)));
+  return kKindOfMode[static_cast<std::size_t>(std::clamp(mode_, 0, kModeCount - 1))];
 }
 
 void CompareController::set_mode(int mode) {
