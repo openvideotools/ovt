@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """The IPC client and the ``studio`` fixture against a fake ``ovt-studio`` (WI-0.568 step 4).
 
-The real server arrives with WI-1.465; the fake implements the proposed wire format of conftest.py so the client
-can be tested now and the server tested against the same client later.
+The fake implements the wire format of conftest.py, so the client is tested without the application; the real
+server (WI-1.465) is tested against the same client in test_test_ipc.py.
 """
 
 from __future__ import annotations

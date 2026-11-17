@@ -91,6 +91,10 @@ constexpr auto kCases = std::to_array<Case>({
     {"fiel", "hvc1", false, "stsd"},
     {"srat", "mp4a", true, "stsd"},
     {"colr", "ipco", false},
+    // WI-1.207 group C part 1: the codec configuration records (their parameter sets go through the syntax module).
+    {"avcC", "avc1", false, "stsd"},
+    {"hvcC", "hvc1", false, "stsd"},
+    {"av1C", "av01", false, "stsd"},
     // WI-1.211 group E part 1: movie extends and movie fragments.
     {"mehd", "mvex", true},
     {"trex", "mvex", true},
