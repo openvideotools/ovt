@@ -110,6 +110,19 @@ _ovt_studio_describe_qt(ovt_tests_app_qml)
 add_test(NAME ovt_tests_app_qml COMMAND ovt_tests_app_qml)
 set_tests_properties(ovt_tests_app_qml PROPERTIES LABELS "fast;gui" TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# ---- NativeSurfaceHost (WI-1.463): child window lifecycle, geometry sync and the popup rule, on the offscreen platform
+# with a test backend (a QGuiApplication, so not in ovt_tests_app_models) ----------------------------------------
+add_executable(ovt_tests_app_native_host models/test_native_surface_host.cpp)
+set_target_properties(ovt_tests_app_native_host PROPERTIES AUTOMOC ON)
+ovt_studio_add_native_host(ovt_tests_app_native_host)
+target_include_directories(ovt_tests_app_native_host PRIVATE ../src)
+target_link_libraries(ovt_tests_app_native_host PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test ovt::flags
+                                                        ${Catch2_TARGET})
+target_compile_definitions(ovt_tests_app_native_host PRIVATE QT_NO_KEYWORDS)
+ovt_set_license(ovt_tests_app_native_host "GPL-3.0-or-later")
+_ovt_studio_describe_qt(ovt_tests_app_native_host)
+ovt_catch_discover_tests(ovt_tests_app_native_host EXTRA_LABELS gui)
+
 # ---- PictureHost (WI-1.405): the item on a real RHI through QQuickRenderControl ---------------------------------
 # Vulkan on Linux needs an X display for Qt's Vulkan instance (the offscreen platform has none), so the test runs
 # under xvfb-run where it exists and skips (Catch2 exit code 4) without a display; macOS renders Metal on the
@@ -118,6 +131,7 @@ if(OVT_STUDIO_PICTURE_HOST)
   add_executable(ovt_tests_app_picture picture/test_picture_host.cpp ../src/picture_host.cpp ../src/picture_host.h
                                        ../src/render_stub.cpp)
   set_target_properties(ovt_tests_app_picture PROPERTIES AUTOMOC ON)
+  ovt_studio_add_native_host(ovt_tests_app_picture) # PictureHost follows a NativeSurfaceHost (WI-1.463)
   ovt_studio_add_picture_shaders(ovt_tests_app_picture)
   target_include_directories(ovt_tests_app_picture PRIVATE ../src "${PROJECT_SOURCE_DIR}/render/src")
   target_link_libraries(ovt_tests_app_picture PRIVATE Qt6::Core Qt6::Gui Qt6::GuiPrivate Qt6::Quick ovt::render

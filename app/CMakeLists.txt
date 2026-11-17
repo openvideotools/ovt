@@ -29,6 +29,24 @@ elseif(NOT ANDROID)
   message(STATUS "OVT Studio builds without the PictureHost item (needs Qt >= 6.7 and OVT_BUILD_RENDER)")
 endif()
 
+# The NATIVE-mode host (WI-1.463, §11.2.1): portable in native_surface_host.cpp; the macOS backend (child
+# QWindow(MetalSurface) -> CAMetalLayer) is Objective-C++ with ARC. Other desktops have no backend in phase 1 (the
+# Linux host is WI-4.450). Also used by app/tests.
+if(APPLE)
+  enable_language(OBJCXX)
+endif()
+function(ovt_studio_add_native_host target)
+  set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
+  target_sources(${target} PRIVATE "${app_dir}/src/native_surface_host.h" "${app_dir}/src/native_surface_host.cpp")
+  if(APPLE)
+    set(mm "${app_dir}/src/platform/mac_native_host.mm")
+    target_sources(${target} PRIVATE "${mm}")
+    set_source_files_properties("${mm}" PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+    set_target_properties(${target} PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+    target_link_libraries(${target} PRIVATE "-framework AppKit" "-framework QuartzCore")
+  endif()
+endfunction()
+
 # The passthrough shaders of PictureHost as resources under the module prefix
 # (:/qt/qml/OvtStudio/shaders/picture_quad.{vert,frag}.qsb). Also called by app/tests for the PictureHost test.
 function(ovt_studio_add_picture_shaders target)
@@ -173,6 +191,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/render_stub.cpp"
     "${app_dir}/src/models/hdr_metadata_model.h"
     "${app_dir}/src/models/hdr_metadata_model.cpp"
+    "${app_dir}/src/native_surface_host.h"
+    "${app_dir}/src/native_surface_host.cpp"
     # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
     "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}
@@ -192,6 +212,9 @@ function(ovt_studio_add_qml_module target)
                                           "$<BUILD_INTERFACE:ovt_schemas>" ovt::flags)
   # No QSettings anywhere in app/ (D8) and no Qt keyword macros (the headers use Q_SIGNALS).
   target_compile_definitions(${target} PRIVATE QT_NO_KEYWORDS)
+  if(APPLE)
+    ovt_studio_add_native_host(${target}) # the .mm backend; the portable part is in SOURCES above
+  endif()
   if(OVT_STUDIO_PICTURE_HOST)
     # render/src for the exported download helper of the Interop::None row (surface/output_download.h).
     # QRhi's headers (<rhi/qrhi.h>, semi-public since Qt 6.6) are on Qt6::GuiPrivate's include path.

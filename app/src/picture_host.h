@@ -12,6 +12,11 @@
 //   anything else   Interop::None: the surface renders on its own device and the renderer uploads a CPU copy (no
 //                   zero-copy row exists for it in phase 1; Android's GlTexture host is WI-A.403).
 //
+// NATIVE mode (WI-1.463, §10.1.2): with a NativeSurfaceHost attached, the renderer follows the host's target: it calls
+// VideoSurface::retarget() with the host's child-window target (macOS: the CAMetalLayer) and from then on renders and
+// presents there, drawing only the background into the item; when the host goes back to EMBEDDED it retargets to the
+// OffscreenTexture of the item's size. The surface and its uploaded frames are kept across both switches (§10.2.7).
+//
 // Video and overlays are never drawn with scene-graph primitives (FR-GUI-030). Requires Qt 6.7 (QQuickRhiItem); the
 // build compiles this file only then (app/CMakeLists.txt, OVT_HAVE_PICTURE_HOST).
 
@@ -20,6 +25,8 @@
 
 #include <QtQml/qqmlregistration.h>
 #include <QColor>
+#include <QMetaObject>
+#include <QPointer>
 #include <QQuickRhiItem>
 #include <QRect>
 #include <QString>
@@ -28,6 +35,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "native_surface_host.h"
 #include "picture_frame.h"
 
 namespace ovt::app {
@@ -35,11 +43,15 @@ namespace ovt::app {
 // What the renderer last reported to the item (copied in QQuickRhiItemRenderer::synchronize, when the GUI thread
 // is blocked).
 struct PictureHostStats {
-  QString interop;          // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
-  QString error;            // VideoSurface::last_error() or the renderer's own reason; "" when none
-  int surface_resizes = 0;  // VideoSurface::resize() calls since the surface was created
-  int frames_rendered = 0;  // render() calls that drew the surface's texture
-  int surface_width = 0;    // the OffscreenTexture target size in device pixels
+  QString interop;      // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
+  QString error;        // VideoSurface::last_error() or the renderer's own reason; "" when none
+  bool native = false;  // the surface presents to the NativeSurfaceHost's target (WI-1.463)
+  QString encoding;     // VideoSurface::active_encoding(): "Srgb8", "ScRgbLinear16F", "Pq10", "Hlg10"; "" before
+  std::uint64_t native_failed = 0;  // the host target generation whose retarget() to NATIVE failed; 0 = none
+  int native_frames = 0;            // NATIVE renders (presents) since the surface was created
+  int surface_resizes = 0;          // VideoSurface::resize() calls since the surface was created
+  int frames_rendered = 0;          // render() calls that drew the surface's texture
+  int surface_width = 0;            // the OffscreenTexture target size in device pixels
   int surface_height = 0;
 };
 
@@ -73,6 +85,11 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(QString lastError READ last_error NOTIFY statsChanged)
   Q_PROPERTY(int surfaceResizes READ surface_resizes NOTIFY statsChanged)
   Q_PROPERTY(int framesRendered READ frames_rendered NOTIFY statsChanged)
+  // NATIVE mode (WI-1.463): the host whose target the renderer follows (null = always EMBEDDED), whether the surface
+  // presents there now, and the surface's output encoding (DisplayCaps.outputEncoding, the status bar).
+  Q_PROPERTY(ovt::app::NativeSurfaceHost* nativeHost READ native_host WRITE set_native_host NOTIFY nativeHostChanged)
+  Q_PROPERTY(bool nativeActive READ native_active NOTIFY statsChanged)
+  Q_PROPERTY(QString outputEncoding READ output_encoding NOTIFY statsChanged)
 
  public:
   explicit PictureHost(QQuickItem* parent = nullptr);
@@ -126,6 +143,10 @@ class PictureHost : public QQuickRhiItem {
   [[nodiscard]] QString last_error() const { return stats_.error; }
   [[nodiscard]] int surface_resizes() const noexcept { return stats_.surface_resizes; }
   [[nodiscard]] int frames_rendered() const noexcept { return stats_.frames_rendered; }
+  [[nodiscard]] NativeSurfaceHost* native_host() const { return native_host_; }
+  void set_native_host(NativeSurfaceHost* host);
+  [[nodiscard]] bool native_active() const noexcept { return stats_.native; }
+  [[nodiscard]] QString output_encoding() const { return stats_.encoding; }
   [[nodiscard]] const PictureHostStats& stats() const noexcept { return stats_; }
 
   // Called by the renderer during synchronize() (GUI thread blocked); the change signal is queued to the GUI thread.
@@ -135,6 +156,7 @@ class PictureHost : public QQuickRhiItem {
   void viewChanged();
   void pictureChanged();
   void statsChanged();
+  void nativeHostChanged();
 
  protected:
   QQuickRhiItemRenderer* createRenderer() override;
@@ -167,6 +189,9 @@ class PictureHost : public QQuickRhiItem {
   bool gamut_clip_overlay_ = false;
   bool dither_ = true;
   PictureHostStats stats_;
+  QPointer<NativeSurfaceHost> native_host_;
+  QMetaObject::Connection native_target_connection_;
+  QMetaObject::Connection native_refresh_connection_;
 };
 
 }  // namespace ovt::app

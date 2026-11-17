@@ -61,6 +61,7 @@ struct HostState {
   bool false_color = false;
   bool gamut_clip_overlay = false;
   bool dither = true;
+  NativeTargetDesc target;  // the NativeSurfaceHost's target (WI-1.463); EMBEDDED without a host
 };
 
 std::uint32_t to_rgba(const QColor& c) {
@@ -153,7 +154,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       if (!init_failed_) {
         create_surface(size);
       }
-    } else if (size != surface_size_) {
+    } else if (size != surface_size_ && !native_) {
+      // (While NATIVE the swapchain follows the host's target; the EMBEDDED texture gets the item's size when the
+      // renderer retargets back, apply_target().)
       // §10.11 WI-1.405 step 4 / acceptance test 2: one VideoSurface::resize() per new size. The old texture is
       // destroyed by the resize while Qt may still sample it in a frame in flight, so wait for the GPU first.
       rhi_->finish();
@@ -191,6 +194,7 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     state_.false_color = host->false_color_;
     state_.gamut_clip_overlay = host->gamut_clip_overlay_;
     state_.dither = host->dither_;
+    state_.target = host->native_host_ != nullptr ? host->native_host_->target() : NativeTargetDesc{};
     if (host->window() != nullptr) {
       device_pixel_ratio_ = host->window()->effectiveDevicePixelRatio();
     }
@@ -198,12 +202,14 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   }
 
   void render(QRhiCommandBuffer* cb) override {
+    apply_target();
     QRhiResourceUpdateBatch* updates = rhi_->nextResourceUpdateBatch();
     if (!vertices_uploaded_ && vbuf_ != nullptr) {
       updates->uploadStaticBuffer(vbuf_.get(), quad_.data());
       vertices_uploaded_ = true;
     }
-    QRhiTexture* src = render_surface(updates);
+    // NATIVE: the surface presents to the host's child window over the item; the item itself shows the background.
+    QRhiTexture* src = native_ ? render_native() : render_surface(updates);
     const std::uint32_t bg = state_.background_rgba;
     const QColor clear(static_cast<int>((bg >> 24U) & 0xFFU), static_cast<int>((bg >> 16U) & 0xFFU),
                        static_cast<int>((bg >> 8U) & 0xFFU), static_cast<int>(bg & 0xFFU));
@@ -254,11 +260,124 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       stats_.interop = interop_name(interop_);
       stats_.surface_width = size.width();
       stats_.surface_height = size.height();
+      stats_.encoding = encoding_name(surface_->active_encoding());
       return;
     }
     stats_.error = QString::fromUtf8(surface_->last_error());
     surface_.reset();
     init_failed_ = true;  // no retry every frame; the panel shows lastError
+  }
+
+  // WI-1.463: follows the NativeSurfaceHost's target. retarget() keeps the surface's uploaded frames (§10.2.7).
+  void apply_target() {
+    const NativeTargetDesc& d = state_.target;
+    if (d.generation == applied_generation_) {
+      return;
+    }
+    if (surface_ == nullptr) {
+      if (init_failed_ && d.native) {  // no surface to present with: the host hides its window again
+        applied_generation_ = d.generation;
+        stats_.native_failed = d.generation;
+      }
+      return;
+    }
+    applied_generation_ = d.generation;
+    if (d.native && d.handle != nullptr && d.width > 0 && d.height > 0) {
+      DisplayTarget t;
+      t.kind = static_cast<DisplayTarget::Kind>(d.kind);
+      t.native = d.handle;
+      t.width = d.width;
+      t.height = d.height;
+      t.device_pixel_ratio = static_cast<float>(d.device_pixel_ratio);
+      t.hdr_capable = d.hdr_capable;
+      t.headroom = static_cast<float>(std::max(1.0, d.headroom));
+      // §10.4.1: scRGB is the macOS default; "System PQ pass-through" is Pq10.
+      t.encoding =
+          d.encoding == 1 ? DisplayTarget::OutputEncoding::Pq10 : DisplayTarget::OutputEncoding::ScRgbLinear16F;
+      t.interop = interop_;
+      surface_->retarget(t);
+      const std::string_view err = surface_->last_error();
+      if (err.substr(0, 8) == "RND-0002") {
+        // Back to the offscreen texture (a failed swapchain may have left the surface half-switched); the host hides
+        // its window (PictureHost::report_stats) and the panel shows why.
+        const QString why = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
+        retarget_embedded();
+        stats_.error = why;
+        stats_.native_failed = d.generation;
+        return;
+      }
+      native_ = true;
+      native_size_ = QSize(d.width, d.height);
+      stats_.native = true;
+      stats_.encoding = encoding_name(surface_->active_encoding());
+      return;
+    }
+    if (native_) {
+      retarget_embedded();
+    }
+  }
+
+  // Back to the OffscreenTexture of the item's size, with the interop of init(). The wrapped texture goes: the surface
+  // makes a new one.
+  void retarget_embedded() {
+    rhi_->finish();
+    src_texture_ = nullptr;
+    wrapped_.reset();
+    cpu_texture_.reset();
+    const QSize size = colorTexture() != nullptr ? colorTexture()->pixelSize() : surface_size_;
+    DisplayTarget target;
+    target.kind = DisplayTarget::Kind::OffscreenTexture;
+    target.width = size.width();
+    target.height = size.height();
+    target.offscreen_format = DisplayTarget::OffscreenFormat::Rgba8Srgb;  // the Qt Quick window is SDR (§10.1.2)
+    target.device_pixel_ratio = static_cast<float>(device_pixel_ratio_);
+    target.interop = interop_;
+#if QT_CONFIG(vulkan)
+    if (interop_ == DisplayTarget::Interop::VulkanSharedDevice) {
+      target.interop_device = &vk_info_;
+    }
+#endif
+    surface_->retarget(target);
+    native_ = false;
+    stats_.native = false;
+    stats_.encoding = encoding_name(surface_->active_encoding());
+    const std::string_view err = surface_->last_error();
+    stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
+    if (err.empty() && size != surface_size_) {
+      surface_size_ = size;
+      ++stats_.surface_resizes;
+      stats_.surface_width = size.width();
+      stats_.surface_height = size.height();
+    }
+  }
+
+  // One NATIVE frame: uploads a new picture, then renders and presents to the host's window. Returns nullptr: the
+  // item draws nothing over its background.
+  QRhiTexture* render_native() {
+    if (state_.frame != nullptr && state_.frame->picture.generation != uploaded_generation_) {
+      surface_->set_frame(state_.frame->picture);
+      uploaded_generation_ = state_.frame->picture.generation;
+    }
+    surface_->render(view_for(state_, native_size_.width(), native_size_.height()));
+    const std::string_view err = surface_->last_error();
+    stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
+    stats_.encoding = encoding_name(surface_->active_encoding());
+    ++stats_.native_frames;
+    return nullptr;
+  }
+
+  static QString encoding_name(DisplayTarget::OutputEncoding encoding) {
+    switch (encoding) {
+      case DisplayTarget::OutputEncoding::ScRgbLinear16F:
+        return QStringLiteral("ScRgbLinear16F");
+      case DisplayTarget::OutputEncoding::Pq10:
+        return QStringLiteral("Pq10");
+      case DisplayTarget::OutputEncoding::Hlg10:
+        return QStringLiteral("Hlg10");
+      case DisplayTarget::OutputEncoding::Srgb8:
+        break;
+    }
+    return QStringLiteral("Srgb8");
   }
 
   // §10.2.2 interop table, by the RHI backend in use.
@@ -467,6 +586,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   ovt::render::VulkanDeviceInfo vk_info_{};  // the device Qt shares with libplacebo (VulkanSharedDevice)
 #endif
   bool init_failed_ = false;
+  bool native_ = false;                   // the surface presents to the host's target (WI-1.463)
+  QSize native_size_;                     // its drawable size in device pixels
+  std::uint64_t applied_generation_ = 0;  // the host target generation the surface follows
   qreal device_pixel_ratio_ = 1.0;
   std::uint64_t uploaded_generation_ = 0;
   HostState state_;
@@ -611,10 +733,32 @@ void PictureHost::set_background_color(const QColor& color) {
   update();
 }
 
+void PictureHost::set_native_host(NativeSurfaceHost* host) {
+  if (host == native_host_) {
+    return;
+  }
+  disconnect(native_target_connection_);
+  disconnect(native_refresh_connection_);
+  native_host_ = host;
+  if (host != nullptr) {
+    // A new target, and the 500 ms headroom poll while NATIVE (§10.4.1), each need a render pass.
+    native_target_connection_ = connect(host, &NativeSurfaceHost::targetChanged, this, &QQuickItem::update);
+    native_refresh_connection_ = connect(host, &NativeSurfaceHost::refreshRequested, this, &QQuickItem::update);
+  }
+  Q_EMIT nativeHostChanged();
+  update();
+}
+
 void PictureHost::report_stats(const PictureHostStats& stats) {
   const bool changed = stats.interop != stats_.interop || stats.error != stats_.error ||
                        stats.surface_resizes != stats_.surface_resizes ||
-                       stats.frames_rendered != stats_.frames_rendered;
+                       stats.frames_rendered != stats_.frames_rendered || stats.native != stats_.native ||
+                       stats.encoding != stats_.encoding;
+  if (stats.native_failed != 0 && stats.native_failed != stats_.native_failed && native_host_ != nullptr) {
+    // On the GUI thread: the host hides its child window and stays EMBEDDED until the request or display changes.
+    QMetaObject::invokeMethod(native_host_.data(), "reportNativeFailure", Qt::QueuedConnection,
+                              Q_ARG(QString, stats.error));
+  }
   stats_ = stats;
   if (changed) {
     // By name: the functor overload trips clang-analyzer's NewDeleteLeaks inside Qt's header.
