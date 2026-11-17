@@ -204,8 +204,8 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * WI-A.451 (§11.5.2): a resize (split-screen, freeform, desktop windowing) changes the Configuration without
-     * recreating the Activity (manifest configChanges). On the emulator Qt's timers did not fire in this embedded view
-     * and a QML item width is in device pixels, so the QML root gets the window width in dp from here.
+     * recreating the Activity (manifest configChanges). The QML root gets the window width in dp from here, when
+     * Android reports it, rather than by polling or from a QML item width (device pixels on Android).
      */
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)

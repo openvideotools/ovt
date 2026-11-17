@@ -1,6 +1,6 @@
 # WI-A.451 acceptance record
 
-Machine: cloud container, Linux x86_64 (Ubuntu 24.04), Qt 6.4.2 from apt, no Android SDK/NDK, no emulator.
+Machines: desktop half in a cloud container (Linux x86_64, Ubuntu 24.04, Qt 6.4.2 from apt); emulator half on the Mac Mini.
 Date: 2026-11-17. Spec version: see the PR body.
 
 ## Test 1: resizing 1300 → 900 → 700 dp switches three-pane → two-pane → vertical without losing `Selection.frame`
@@ -32,22 +32,37 @@ frame=<decode index>` that `CompactLayout.qml` writes on every class change. It 
 app read the width it was given, and that `frame` did not change. It skips without `adb`/an attached emulator.
 Mac Mini runs (emulator `ovt-api36-arm64`, 1080x2400, 420 dpi):
 
-- 7c4a50d: the NDK build passed (arm64 and x86_64, no warnings); the script failed on the log level, a duplicate
-  launch line and a runtime resize that did not reach the layout class.
-- 36cbdfc: `Platform.widthDp` was in device pixels (Qt's item width is in pixels there, device pixel ratio 1) and
-  an item's `width` stopped changing after start-up, so an item width is never used on Android any more.
-- 69e862e: a 200 ms `QTimer` poll of `Configuration.screenWidthDp` read the right start-up width (1300) but never
-  fired again (one read in 22 s, on the Qt thread, Activity context). Likely cause: Qt's Android event dispatcher
-  skips timers while the Qt application state is below Active (this view is created after the first onResume).
-  Replaced by a push: `MainActivity.onConfigurationChanged` sets the QML root's `configurationWidthDp`
-  (`QtQuickView.setProperty`, a queued call, not a timer), and `AndroidShell.qml` calls
-  `Platform.refresh(widthDp)`. Logcat now shows `OVT: configuration screenWidthDp=...` (tag OVT),
-  `OVT: configuration widthDp=...` (qml) and `OVT: Platform read widthDp=... appState=...` at start-up, so a failure
-  names the side that stopped. Desktop coverage: Catch2 "Platform: a pushed width change switches the layout class"
-  and `tst_android_shell.qml` `test_configurationWidthDrivesTheLayout`.
+- 7c4a50d, 36cbdfc, 69e862e: failed. Besides two test-script bugs (log level, a duplicate launch line) and a
+  QML item width in device pixels (device pixel ratio 1, so an item width is no longer used on Android), the
+  resize never reached the layout after start-up. The cause was the emulator, not the app: started with
+  `-gpu auto` on the headless Mini, it picked SwiftShader, and under CI load Qt's GUI thread blocked in
+  `QWindow::setVisible` waiting for the render thread (stuck in `glGetProgramBinary`), so neither timers nor
+  posted calls ran. With `-gpu host` the 69e862e poll passes too.
+- 07d68cc (`-gpu host`, Apple M4 host GLES): **PASS**. The width is pushed, not polled:
+  `MainActivity.onConfigurationChanged` sets the QML root's `configurationWidthDp` (`QtQuickView.setProperty`) and
+  `AndroidShell.qml` calls `Platform.refresh(widthDp)`. Log of the 2026-11-17 run, kept in the project files as
+  `wa451-pr707-07d68cc-mini-20261117T022943Z.txt`:
+
+```console
+$ python3 -m pytest app/tests/scripts/test_android_breakpoints.py   # no media
+============================== 1 passed in 6.98s ===============================
+I default : OVT: Platform read widthDp=1300 ok=1 appState=2
+D qml     : OVT: layout three widthDp=1300 frame=-1
+I OVT     : OVT: configuration screenWidthDp=900 shellReady=true
+D qml     : OVT: configuration widthDp=900
+D qml     : OVT: layout two widthDp=900 frame=-1
+I OVT     : OVT: configuration screenWidthDp=700 shellReady=true
+D qml     : OVT: configuration widthDp=700
+D qml     : OVT: layout vertical widthDp=700 frame=-1
+```
+
+  Manual resizes 1300 → 900 → 700 → 1300 dp and 1300 → 900 → 700 → 600 → 500 dp (4 s per step) followed every
+  step (three, two, vertical, three; vertical at 600, single at 500; 700 → 1300 grows to three) with no Activity
+  recreation. A `layout <old class>
+  widthDp=<new>` line can precede the new class in the same millisecond; the test keeps the last line of each run.
+  Desktop coverage: Catch2 "Platform: a pushed width change switches the layout class" and
+  `tst_android_shell.qml` `test_configurationWidthDrivesTheLayout`.
 - Frame half **blocked**: a VIEW intent opens the fd natively (`OVT: opened fd size=...`) but the open file never
   reaches the QML `Project`/`Selection` (the debug app still shows the no-file page and `frame` stays -1). That is
   the gap between `OvtSession` and the Project model (WI-A.452 / WI-1.509b), not this item, so "frame is kept" is
   proved on the desktop only (`tst_breakpoints.qml`, frame 42) until that lands.
-
-Re-run of the class sequence pending.

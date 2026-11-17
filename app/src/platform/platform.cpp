@@ -53,8 +53,8 @@ Platform::Platform()
       windowing_mode_(isAndroid() ? QStringLiteral("fullscreen") : QStringLiteral("desktop")) {
   if (isAndroid()) {
     // The start-up width. Later changes are pushed by MainActivity.onConfigurationChanged through AndroidShell.qml
-    // and refresh(): Qt's timers did not fire in the embedded QtQuickView (a 200 ms poll ran once in 22 s on the
-    // emulator), and the item width stopped following the window after start-up.
+    // and refresh(), at the moment Android reports them (no polling), never from a QML item width, which is in
+    // device pixels on Android.
     refreshFromAndroid(true);
   }
 }

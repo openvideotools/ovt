@@ -73,8 +73,8 @@ bool Platform::refreshFromAndroid(bool read_width) {
     }
   }
   if (read_width) {
-    // For the emulator record: the width read and the Qt application state (Qt's Android event dispatcher skips
-    // timers while the state is below Active, which would explain the dead 200 ms poll of an earlier attempt).
+    // For the emulator record (test_android_breakpoints.py prints it on failure): the start-up width read and the Qt
+    // application state (2, Inactive, is normal at this point).
     qInfo("OVT: Platform read widthDp=%d ok=%d appState=%d", static_cast<int>(width_dp_), ok ? 1 : 0,
           static_cast<int>(QGuiApplication::applicationState()));
   }
