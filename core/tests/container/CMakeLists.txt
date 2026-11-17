@@ -11,6 +11,7 @@ add_executable(
   byte_service_test.cpp
   c_api_test.cpp
   decoders_fragment_boxes_test.cpp
+  decoders_colour_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   field_builder_test.cpp

@@ -28,6 +28,14 @@ Item {
         panY: view.controller ? view.controller.panY : 0
         planeMode: view.controller ? view.controller.planeMode : 0
         showCropped: view.controller ? view.controller.showCropped : true
+        // The HDR fields of the ViewState come from the HDR panel's Display tab (WI-1.462).
+        toneMap: HdrView.toneMap
+        gamutMap: HdrView.gamutMap
+        clipNits: HdrView.clipNits
+        targetPeakOverride: HdrView.targetPeakOverride
+        falseColor: HdrView.falseColor
+        gamutClipOverlay: HdrView.gamutClipOverlay
+        dither: HdrView.dither
 
         onPictureChanged: view.pushPicture()
     }

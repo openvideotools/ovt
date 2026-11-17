@@ -126,6 +126,10 @@ target_sources(ovt_tests_render PRIVATE test_overlay_legend.cpp test_overlay_con
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
 
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3), with the image golden synthetic_4k_grid.png. The 4K
+# partition-grid fixture is built in C++ (fixtures/make_grid.cpp), the twin of tools/gen_fixture_fb.py --kind grid.
+target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.cpp)
+
 # WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
 # render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
 target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)

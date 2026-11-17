@@ -33,6 +33,17 @@ std::vector<uint8_t> make_synthetic(const SyntheticOptions& opts = {});
 
 int expected_qp(uint32_t cx, uint32_t cy);
 
+struct GridFixtureOptions {
+  uint32_t width = 3840;  // luma samples; 3840 x 2160 is the 4K fixture of §10.9.2 item 4
+  uint32_t height = 2160;
+  bool tus = false;        // each CU additionally gets four TU children (half its size): exercises TU culling
+  bool tiles_2x2 = false;  // four Tile partitions split at the picture centre (slice/tile boundary pass)
+};
+
+// C++ twin of `tools/gen_fixture_fb.py --kind grid` (synthetic_4k_grid.fb, §14.3.3; no corpus fetch): HEVC intra,
+// CTU 64 in raster order, CU size of CTU (cx, cy) 64 >> ((cx + cy) % 4), CUs > 8 crossing the picture edge split.
+std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
+
 // WI-2.434: the in-memory twin of `tools/gen_fixture_fb.py --kind mv` (render/tests/fixtures/synthetic_4k_mv.fb for
 // w x h = 3840 x 2160): one L0 MotionVector per 4x4 cell, ref 1, in the generator's order (64x64 superblocks in
 // raster order, cells in raster order inside each), forming a rotation about the picture centre:

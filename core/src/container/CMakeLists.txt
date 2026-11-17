@@ -14,6 +14,7 @@ target_sources(
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
           isobmff/decoders/fragment_boxes.cpp
+          isobmff/decoders/colour_hdr.cpp
           isobmff/decoders/movie.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/field_builder.cpp
