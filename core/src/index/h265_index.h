@@ -143,4 +143,17 @@ class Dpb {
   std::vector<DpbPicture> dpb_;  // reference pictures only
 };
 
+// ---- Builder integration (§7.4.4, WI-1.123) --------------------------------------------------------------------
+
+/// The FrameInfo fields of one Dpb::step.
+struct FrameRefs {
+  std::vector<int32_t> declared_refs;  // other frames only
+  std::vector<int32_t> dpb_after;      // includes `decode_index` itself (§7.4.4 "∪ {current}")
+};
+
+/// Takes declared_refs and dpb_after out of `step` for the picture `decode_index`.
+// SPEC-ASSUMPTION(#733): the current picture that pps_curr_pic_ref_enabled_flag puts into RefPicList0 (SCC intra
+// block copy) is not a dependency on another frame, so declared_refs leaves it out; dpb_after keeps it.
+[[nodiscard]] FrameRefs frame_refs(DpbStepResult& step, int32_t decode_index);
+
 }  // namespace ovt::index::h265

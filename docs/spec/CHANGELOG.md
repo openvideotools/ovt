@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc44 — 2026-11-17
+
+PATCH-level: spec-amendment pass 24 folds in the accepted answer of `spec-question` issue #725 from WI-A.403 and completes the pass-20 WI-1.209 amendment (PR #681). No public interface, FlatBuffers schema, plugin ABI or CLI grammar change; no new diagnostic code.
+
+- 10 §10.2.2 Android row, WI-A.403 steps 3 and 4 — `pl_opengl_create` runs on the shared context that the host makes current around every `VideoSurface` call and restores Qt's after; no make/release-current callbacks (they would need a `DisplayTarget` field; the NATIVE path of WI-A.401 keeps its own context, §10.4.3); `GlTexture` requires the share group, so the `EGL_KHR_fence_sync` cross-share-group branch is dropped and a host that cannot create the shared context falls back to `Interop::None` — WI-A.403 (#725)
+- 8 WI-1.209 step-6 note — the walker hands a windowed decoder the whole box payload as `BoxContext::payload_pages` (a `PagedSpan*` valid only during the decoder call); the decoder reads it in windows of at most 1 MiB in 64 KiB pages, builds one `BitReader` per window and calls `FieldBuilder::rebind()`; a decoder run outside the walker has `payload_pages == nullptr`; the first window is read twice, so `lazy_test` bounds the open cost at `bytes_read < 2 MiB` — WI-1.209 (PR #681, pass-20 follow-up)
+
 ## 1.0.0-rc43 — 2026-11-17
 
 PATCH-level: spec-amendment pass 23 folds in the accepted answers of `spec-question` issues #710 and #711 from WI-1.125 (PR #717, Fable reviewer rulings) and #704 from WI-1.458. One public C header addition (`ovt_IndexFlags`, `ovt_stream_set_index_flags` in `ovt/index.h`, already merged with PR #717 under the owner's 2026-11-09 rule that a Fable reviewer's approval suffices for public headers). No FlatBuffers schema, plugin ABI or CLI grammar change; no new diagnostic code.

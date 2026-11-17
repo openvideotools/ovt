@@ -34,9 +34,11 @@ add_executable(
   models/test_hdr_metadata_model.cpp
   models/test_android_state.cpp
   ../src/platform/android_state.cpp
+  models/test_hex_model.cpp
   ../src/picture_controller.cpp
   ../src/compare_controller.cpp
   ../src/models/hdr_metadata_model.cpp
+  ../src/models/hex_model.cpp
   ../../core/src/syntax/common/h273_names.cpp
   ../src/settings.cpp
   ../src/keymap.cpp

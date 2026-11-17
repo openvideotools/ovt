@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <utility>
+#include <vector>
 
 #include "h265_index.h"
 
@@ -216,6 +218,14 @@ DpbStepResult Dpb::build_lists(const RefPicSets& sets, int32_t current_decode_in
       }
     }
   }
+  return out;
+}
+
+FrameRefs frame_refs(DpbStepResult& step, int32_t decode_index) {
+  FrameRefs out;
+  out.declared_refs = std::move(step.declared_refs);
+  std::erase(out.declared_refs, decode_index);
+  out.dpb_after = std::move(step.dpb_after);
   return out;
 }
 
