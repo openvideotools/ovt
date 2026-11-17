@@ -88,6 +88,9 @@ class SafFlowsTest {
             }
             // The handle is a live ovt_File: the core reports the document's size through it.
             assertEquals(File(documents, "seekable.y4m").length(), OvtNative.fileSize(onMain { OvtSession.current!!.handle }))
+            // Close only once Qt has started; MainActivity.finish defers until then anyway (the Mini's crash).
+            val activity = activityOf(scenario)
+            waitUntil("Qt has started") { activity.qtStarted }
         } // finishes the Activity, which closes the session
 
         onMain { assertEquals(null, OvtSession.current) }

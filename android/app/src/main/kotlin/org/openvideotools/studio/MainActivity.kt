@@ -58,6 +58,15 @@ class MainActivity : AppCompatActivity() {
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
 
+    /**
+     * True once Qt's start-up actions have run (OvtQtResume.whenStartupActionsRan); internal for the tests. Until
+     * then [finish] waits: finishing earlier detaches the window under Qt's pending display-metrics action, which then
+     * crashes on the null insets (WI-A.452, found by SafFlowsTest on the Mini).
+     */
+    internal var qtStarted = false
+        private set
+    private var finishWhenQtStarted = false
+
     /** True only inside a finishing onDestroy (issue #614). */
     private var keepQtAlive = false
 
@@ -149,6 +158,14 @@ class MainActivity : AppCompatActivity() {
         )
         // Otherwise Qt's ActivityLifecycleCallbacks set the state at the next onResume.
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
+        OvtQtResume.whenStartupActionsRan {
+            qtStarted = true
+            if (finishWhenQtStarted) {
+                finishWhenQtStarted = false
+                Log.i(TAG, "OVT: Qt started, finishing now")
+                super.finish()
+            }
+        }
         overlay?.bringToFront() // the WI-0.051 debug overlay stays above the Qt view
     }
 
@@ -269,6 +286,19 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /**
+     * Defers the finish of an Activity whose Qt view is still starting until Qt's start-up actions have run (see
+     * [qtStarted]); a user backing out right after launch would otherwise crash the app inside Qt 6.8.
+     */
+    override fun finish() {
+        if (::qtView.isInitialized && !qtStarted) {
+            Log.i(TAG, "OVT: finish deferred until Qt has started")
+            finishWhenQtStarted = true
+            return
+        }
+        super.finish()
     }
 
     // The handles outlive a recreation; they are closed only when the Activity really finishes (§11.5.7: jobs are

@@ -209,6 +209,10 @@ internal class FilePicker(
                 } catch (e: SecurityException) {
                     Log.e(TAG, "no access to $uri: ${e.message}")
                     return OpenResult.Failed(gone = true)
+                } catch (e: RuntimeException) {
+                    // Providers also throw IllegalArgumentException/IllegalStateException for documents they reject.
+                    Log.e(TAG, "provider failed to open $uri: $e")
+                    return OpenResult.Failed(gone = false)
                 } ?: return OpenResult.Failed(gone = false)
             if (!isRegularFile(pfd)) {
                 pfd.close()

@@ -3,9 +3,20 @@
 Machine: cloud container, Linux x86_64, no Android SDK/NDK and no emulator (Google's Maven and the SDK downloads are
 blocked by the container's proxy). Date: 2026-11-17. Spec version: 1.0-rc41.
 
-**Status: both tests owed on the emulator.** The instrumentation tests below need the API 36 emulator (the Mac
-Mini, AVD `ovt-api36-arm64`, run with `-gpu host`). Until the Android instrumentation job of WI-1.577 exists, the
-results are recorded here.
+**Status: test 1 by hand PASS; the instrumentation tests are being re-run after a crash fix.** They run on the Mac
+Mini's API 36 emulator (AVD `ovt-api36-arm64`, arm64-v8a, `-gpu host`) until the Android instrumentation job of
+WI-1.577 exists.
+
+Run at 89fedca (2026-11-17, Mini): both assemble tasks pass. `SafFlowsTest`: `exportCreatesAndWritesTheDocument`,
+`cancelledCopyLeavesNoFile`, `fstatDecidesSeekability` and `recentEntryOfAGoneDocumentIsRemoved` PASS. Then the app
+crashed inside Qt during `documentOpensShowsInRecentListAndReopens`, which stopped the run. The crash was a
+NullPointerException in `QtDisplayManager.setApplicationDisplayMetrics` (Qt 6.8.3, line 296). It came from the
+display-metrics action that `QtEmbeddedDelegate` queues once the native plugin is ready, and that action read the
+root insets of an Activity that had already finished. An Activity finished right after launch (a test, or a user
+backing out at once) left the action queued. It then ran against the detached window when the next Activity came up.
+The fix: `MainActivity.finish()` waits until `OvtQtResume.whenStartupActionsRan` reports that Qt's start-up action has
+run (its own action is queued behind Qt's in `QtNative.runAction`'s order). The test also waits for that before it
+closes the first Activity. Re-run: owed.
 
 What was checked here: every changed Kotlin file, `SafFlowsTest.kt` and the debug-only `TestDocumentsProvider.kt`
 compile with `kotlinc` 2.0.21 `-Werror` against `android-all` 16 (Robolectric's API 36 jar) and stubs of the AndroidX
@@ -38,16 +49,28 @@ $ adb shell am start -n org.openvideotools.studio.debug/org.openvideotools.studi
 # the overlay lists the file under "Recent files"; tap it: no picker appears and the overlay shows its info JSON
 ```
 
-Output: owed.
+Output (89fedca, Mini, 2026-11-17; real DocumentsUI, `mini.mp4` in Downloads): PASS.
+
+```console
+# picked mini.mp4: logcat "OVT: opened fd size=475988"; overlay "Recent files / mini.mp4 · isobmff"
+$ adb shell am force-stop org.openvideotools.studio.debug          # pidof empty afterwards
+$ adb shell am start -W -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity   # TotalTime 1774 ms
+# overlay still lists "mini.mp4 · isobmff" with "no file" open; tapped it: "OVT: opened fd size=475988", no
+# SecurityException, info JSON {"name":"mini.mp4","size":475988,"format":"isobmff","track_count":0,"tracks":[]}
+```
+
+Screenshots in the project files (`wa452-at1-opened.png`, `wa452-at1-relaunch.png`, `wa452-at1-reopened.png`), not
+committed. `track_count` 0 comes from WI-0.051's info JSON and the core's ISOBMFF track list, not from this WI.
 
 ## Test 2: a non-seekable provider raises `GUI-AND-0001` with the copy action, and the copy opens
 
 Automated: `SafFlowsTest.nonSeekableDocumentRaisesGuiAnd0001AndOpensAfterCopy` (a `pipe-` document of the test
 provider is a pipe; the `GUI-AND-0001` dialog appears, nothing reaches the core, "Copy to app storage" streams the
 document to `getExternalFilesDir(null)/copies/` (SPEC-ASSUMPTION(#722)) and the copy opens and enters the recent
-list). Supporting: `fstatDecidesSeekability`, `copyNamesAreSafeAndUnique`, `cancelledCopyLeavesNoFile`.
+list). Supporting: `fstatDecidesSeekability` (PASS at 89fedca), `copyNamesAreSafeAndUnique`,
+`cancelledCopyLeavesNoFile` (PASS at 89fedca).
 
-Output: owed.
+Output: owed (the run at 89fedca stopped at the crash above, before this test).
 
 ## Export (step 3, no acceptance line)
 

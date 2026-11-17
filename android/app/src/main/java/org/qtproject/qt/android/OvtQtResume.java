@@ -26,4 +26,35 @@ public final class OvtQtResume {
         QtNative.setApplicationState(QtNative.ApplicationState.ApplicationActive);
         QtNative.updateWindow();
     }
+
+    /**
+     * Runs {@code settled} on the UI thread once the start-up action that Qt 6.8 queues for the hosting Activity has
+     * run (WI-A.452). When the native plugin integration becomes ready, QtEmbeddedDelegate passes
+     * QtDisplayManager.setApplicationDisplayMetrics() to QtNative.runAction(), and that method reads the decor view's
+     * root window insets without a null check. If the Activity finishes before the action runs, the window is
+     * detached, the insets are null and the app crashes with a NullPointerException. QtNative.runAction() keeps its
+     * actions in order (one main-thread Handler, or the list it replays in order when the app becomes active), so an
+     * action passed to it after Qt's own runs after it.
+     *
+     * <p>Call on the UI thread, after constructing the QtQuickView, which registers the delegate's listener first.
+     */
+    public static void whenStartupActionsRan(Runnable settled) {
+        if (QtNative.getStateDetails().nativePluginIntegrationReady) {
+            QtNative.runAction(settled);
+            return;
+        }
+        QtNative.registerAppStateListener(new QtNative.AppStateDetailsListener() {
+            @Override
+            public void onNativePluginIntegrationReadyChanged(boolean ready) {
+                if (!ready)
+                    return;
+                final QtNative.AppStateDetailsListener self = this;
+                // Unregistered from the action, not here: Qt is iterating its listener list right now.
+                QtNative.runAction(() -> {
+                    QtNative.unregisterAppStateListener(self);
+                    settled.run();
+                });
+            }
+        });
+    }
 }
