@@ -54,7 +54,12 @@ std::string vertex_source() {
   return std::string("#version 450\n#define OVT_VERTEX 1\n") + kPrelude + shaders::kArrows;
 }
 
-std::string fragment_source() {
+// `ids`: the id-buffer variant (WI-2.435), writing a uint into an r32u target.
+std::string fragment_source(bool ids) {
+  if (ids) {
+    return std::string("#version 450\n#define OVT_ID_OUTPUT 1\n") + kPrelude +
+           "layout(location = 0) out uint out_id;\n" + shaders::kArrows;
+  }
   return std::string("#version 450\n") + kPrelude + "layout(location = 0) out vec4 out_color;\n" + shaders::kArrows;
 }
 
@@ -195,8 +200,9 @@ bool ArrowPass::ensure_view(pl_gpu gpu, const ArrowPassConstants& pc, std::strin
   return true;
 }
 
-bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) {
-  if (pass_ != nullptr) {
+bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, bool ids, std::string& err) {
+  pl_pass& pass = ids ? id_pass_ : pass_;
+  if (pass != nullptr) {
     return true;
   }
   if (!gpu->glsl.vulkan) {
@@ -213,7 +219,7 @@ bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) 
     return false;
   }
   const std::string vertex = vertex_source();
-  const std::string fragment = fragment_source();
+  const std::string fragment = fragment_source(ids);
 
   std::array<struct pl_desc, 3> descs = {};
   const std::array<const char*, 3> names = {"geom", "attr", "palette"};
@@ -247,10 +253,10 @@ bool ArrowPass::ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err) 
   params.vertex_stride = corner_fmt_->texel_size;
   params.vertex_shader = vertex.c_str();
   params.target_format = target_format;
-  params.blend_params = &blend;
+  params.blend_params = ids ? nullptr : &blend;  // integer targets cannot blend
   params.load_target = true;
-  pass_ = pl_pass_create(gpu, &params);
-  if (pass_ == nullptr) {
+  pass = pl_pass_create(gpu, &params);
+  if (pass == nullptr) {
     err = "pl_pass_create failed for the arrow pass";
     return false;
   }
@@ -288,12 +294,12 @@ bool ArrowPass::ensure_corners(pl_gpu gpu, size_t vertices, std::string& err) {
 }
 
 bool ArrowPass::run(pl_gpu gpu, pl_tex target, pl_tex palette, ArrowPassConstants pc, uint32_t first, uint32_t end,
-                    uint32_t mode, std::string& err) {
+                    uint32_t mode, bool ids, std::string& err) {
   if (end <= first || geom_ == nullptr) {
     return true;
   }
   const size_t vertices = static_cast<size_t>(end - first) * kVerticesPerInstance;
-  if (!ensure_pass(gpu, target->params.format, err) || !ensure_corners(gpu, vertices, err)) {
+  if (!ensure_pass(gpu, target->params.format, ids, err) || !ensure_corners(gpu, vertices, err)) {
     return false;
   }
   pc.first = static_cast<int32_t>(first);
@@ -307,7 +313,7 @@ bool ArrowPass::run(pl_gpu gpu, pl_tex target, pl_tex palette, ArrowPassConstant
     bindings.at(i).sample_mode = PL_TEX_SAMPLE_NEAREST;  // texelFetch only
   }
   struct pl_pass_run_params r = {};
-  r.pass = pass_;
+  r.pass = ids ? id_pass_ : pass_;
   r.desc_bindings = bindings.data();
   r.push_constants = &pc;
   r.target = target;
@@ -337,11 +343,11 @@ bool ArrowPass::draw_intra(pl_gpu gpu, pl_tex target, pl_tex palette, uint32_t l
   if (!ensure_view(gpu, pc, err)) {
     return false;
   }
-  return run(gpu, target, palette, pc, resident_seg_.intra, resident_seg_.end, 0, err);
+  return run(gpu, target, palette, pc, resident_seg_.intra, resident_seg_.end, 0, false, err);
 }
 
 bool ArrowPass::draw_mvs(pl_gpu gpu, pl_tex target, pl_tex palette, uint32_t layers, const ArrowPassConstants& pc,
-                         std::string& err) {
+                         std::string& err, bool ids) {
   // R-MV-1 (§10.5.4): arrows only when a cell is at least 4 device px.
   if (!has_work(layers) || 4.0F * pc.zoom < 4.0F) {
     return true;
@@ -357,14 +363,14 @@ bool ArrowPass::draw_mvs(pl_gpu gpu, pl_tex target, pl_tex palette, uint32_t lay
   // §10.5.6 pass 9: L1, then L0, then bi. L1 [0, l0_bi) and L0 [l0_bi, intra) are adjacent: one draw when both are on.
   bool ok = true;
   if (l0 && l1) {
-    ok = run(gpu, target, palette, pc, 0, s.intra, skip, err);
+    ok = run(gpu, target, palette, pc, 0, s.intra, skip, ids, err);
   } else if (l1) {
-    ok = run(gpu, target, palette, pc, 0, s.l0_bi, skip, err);
+    ok = run(gpu, target, palette, pc, 0, s.l0_bi, skip, ids, err);
   } else if (l0) {
-    ok = run(gpu, target, palette, pc, s.l0_bi, s.intra, skip, err);
+    ok = run(gpu, target, palette, pc, s.l0_bi, s.intra, skip, ids, err);
   }
   if (ok && bi) {
-    ok = run(gpu, target, palette, pc, s.l1_bi, s.l0_uni, kModeBiDraw, err);
+    ok = run(gpu, target, palette, pc, s.l1_bi, s.l0_uni, kModeBiDraw, ids, err);
   }
   return ok;
 }
@@ -374,6 +380,7 @@ void ArrowPass::destroy(pl_gpu gpu) {
   pl_buf_destroy(gpu, &corners_);
   corner_capacity_ = 0;
   pl_pass_destroy(gpu, &pass_);
+  pl_pass_destroy(gpu, &id_pass_);
   corner_fmt_ = nullptr;
   full_ = nullptr;
 }

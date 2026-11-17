@@ -21,6 +21,20 @@ Item {
     // The panel that Ctrl+Tab cycles from (the last one focused or clicked).
     property string focusedPanel: "picture"
     readonly property alias dropIndicator: dropIndicator
+    // The outer SplitView, for tests (horizontal, vertical in the stacked classes).
+    readonly property alias splitRoot: row
+    // The layout class of §11.5.2 (WI-A.451): "three" is the desktop skeleton unchanged; CompactLayout sets the others.
+    // "two": picture 60 % + right tabbed area, compact timeline (120 dp), the left area only while `drawerOpen`.
+    // "vertical": picture on top (50 %), timeline strip (96 dp), tabbed area below. "single": one area at a time,
+    // `singleIndex` 0 Picture, 1 Timeline (bottom), 2 Info (right), 3 More (left).
+    property string layoutClass: "three"
+    property bool drawerOpen: false
+    property int singleIndex: 0
+    readonly property bool compact: layoutClass !== "three"
+    readonly property bool single: layoutClass === "single"
+    readonly property bool stacked: layoutClass === "vertical" || layoutClass === "single"
+    // Dock drag-and-drop is off below 1200 dp (§11.5.2); tabs reorder by long-press there (WI-A.453).
+    readonly property bool dragEnabled: !compact
     readonly property real handleSize: Platform.isAndroid ? 12 : 6 // §11.2.2: 6 dip, 12 dip touch area
 
     property var panelItems: ({})
@@ -67,10 +81,27 @@ Item {
     }
 
     function applySizes() {
+        if (compact) {
+            applyCompactSizes()
+            return
+        }
+        leftArea.SplitView.preferredWidth = -1
         leftArea.SplitView.preferredWidth = width * DockModel.leftSize
         rightArea.SplitView.preferredWidth = width * DockModel.rightSize
         bottomArea.SplitView.preferredHeight = column.height * DockModel.bottomSize
     }
+
+    // The compact classes size the areas from the window, not from the persisted desktop fractions, which stay as
+    // they are for the next time the window is wide.
+    function applyCompactSizes() {
+        const timelineHeight = layoutClass === "two" ? 120 : 96
+        if (layoutClass === "two")
+            rightArea.SplitView.preferredWidth = width * 0.4
+        bottomArea.SplitView.preferredHeight = timelineHeight
+        column.SplitView.preferredHeight = stacked ? height * 0.5 + timelineHeight : -1
+    }
+    onLayoutClassChanged: applySizes()
+    onHeightChanged: if (compact) applySizes()
 
     Connections {
         target: DockModel
@@ -128,7 +159,7 @@ Item {
 
     // Writes the area sizes back once a splitter drag ends.
     function storeAreaSizes() {
-        if (width > 0 && column.height > 0) {
+        if (!compact && width > 0 && column.height > 0) {
             DockModel.leftSize = leftArea.visible ? leftArea.width / width : DockModel.leftSize
             DockModel.rightSize = rightArea.visible ? rightArea.width / width : DockModel.rightSize
             DockModel.bottomSize = bottomArea.visible ? bottomArea.height / column.height : DockModel.bottomSize
@@ -139,7 +170,7 @@ Item {
         id: row
 
         anchors.fill: parent
-        orientation: Qt.Horizontal
+        orientation: workspace.stacked ? Qt.Vertical : Qt.Horizontal
         handle: Handle {}
         onResizingChanged: if (!resizing) workspace.storeAreaSizes()
 
@@ -149,15 +180,21 @@ Item {
             objectName: "dockArea_left"
             areaName: "left"
             workspace: workspace
+            // The Left area becomes a drawer below 1200 dp (opened from the hamburger; "More" in the single pane).
             visible: DockModel.leftVisible && !DockModel.pictureOnly && groupCount > 0
-            SplitView.minimumWidth: 120
+                     && (!workspace.compact || (workspace.single ? workspace.singleIndex === 3 : workspace.drawerOpen))
+            SplitView.minimumWidth: workspace.stacked ? 0 : 120
+            SplitView.minimumHeight: workspace.stacked ? 60 : 0
+            SplitView.fillHeight: workspace.single
         }
 
         SplitView {
             id: column
 
             orientation: Qt.Vertical
-            SplitView.fillWidth: true
+            visible: !workspace.single || workspace.singleIndex <= 1
+            SplitView.fillWidth: !workspace.stacked
+            SplitView.fillHeight: workspace.single
             onHeightChanged: workspace.applySizes()
             handle: Handle {}
             onResizingChanged: if (!resizing) workspace.storeAreaSizes()
@@ -172,6 +209,7 @@ Item {
                 groupIndex: info.group
                 panelIds: info.panelIds
                 currentIndex: info.currentIndex
+                visible: !workspace.single || workspace.singleIndex === 0
                 SplitView.fillHeight: true
             }
 
@@ -182,7 +220,12 @@ Item {
                 areaName: "bottom"
                 workspace: workspace
                 visible: DockModel.bottomVisible && !DockModel.pictureOnly && groupCount > 0
-                SplitView.minimumHeight: 80
+                         && (!workspace.single || workspace.singleIndex === 1)
+                SplitView.fillHeight: workspace.single
+                SplitView.minimumHeight: workspace.compact && !workspace.single ? 0 : 80
+                SplitView.maximumHeight: workspace.compact && !workspace.single ? preferredHeightCompact : Infinity
+                // The timeline is a fixed strip in the compact classes (120 dp two-pane, 96 dp vertical).
+                readonly property real preferredHeightCompact: workspace.layoutClass === "two" ? 120 : 96
             }
         }
 
@@ -193,7 +236,10 @@ Item {
             areaName: "right"
             workspace: workspace
             visible: DockModel.rightVisible && !DockModel.pictureOnly && groupCount > 0
-            SplitView.minimumWidth: 120
+                     && (!workspace.single || workspace.singleIndex === 2)
+            SplitView.minimumWidth: workspace.stacked ? 0 : 120
+            SplitView.minimumHeight: workspace.stacked ? 60 : 0
+            SplitView.fillHeight: workspace.stacked
         }
     }
 
