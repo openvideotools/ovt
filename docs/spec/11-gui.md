@@ -88,7 +88,7 @@ Rules:
 |---|---|
 | **File** | Open… (Ctrl+O) · Open Reference… (Ctrl+Shift+O, sets role `reference`) · Open Recent ▸ · New Window (Ctrl+N) · Save Project (Ctrl+S) · Save Project As… · Close File (Ctrl+W) · Export ▸ {Frame as PNG (SDR/HDR)…, Plane as PGM/Y4M…, Statistics CSV…, Metrics CSV/JSON…, Syntax as JSON…, Container as JSON…, Selected Unit bytes…} · Quit (Ctrl+Q; macOS: app menu) |
 | **Edit** | Copy (Ctrl+C: context-dependent — selected node as text, hex selection as bytes, block as JSON) · Copy as JSON (Ctrl+Shift+C) · Find… (Ctrl+F, in focused panel) · Go to… (Ctrl+G: frame / time / byte offset / unit index) · Preferences… (Ctrl+,) |
-| **View** | Layout ▸ {Analyze, Syntax, Quality, HDR, Compare, Save current…, Manage…} · Panels ▸ (checkable list of all 19) · Picture only (Ctrl+Shift+F) · Dual view (Ctrl+D, checkable; Arrangement ▸ Horizontal/Vertical) · Full screen (F) · Decode order / Display order (O) · Zoom ▸ {In (+), Out (−), Fit (R), 100 % (Ctrl+1), 200 % (Ctrl+2), 400 % (Ctrl+4)} · Plane ▸ {YUV (1), Y (2), U (3), V (4), Gray (5)} · HDR output (Ctrl+H, checkable) · Theme ▸ {System, Light, Dark} |
+| **View** | Layout ▸ {Analyze, Syntax, Quality, HDR, Compare, Save current…, Manage…} · Panels ▸ (checkable list of all 19) · Picture only (Ctrl+Shift+F) · Dual view (Ctrl+D, checkable; Arrangement ▸ Horizontal/Vertical) · Full screen (F) · Decode order / Display order (O) · Zoom ▸ {In (+), Out (−), Fit (R), 100 % (Ctrl+1), 200 % (Ctrl+2), 400 % (Ctrl+4)} · Plane ▸ {YUV (1), Y (2), U (3), V (4), Gray (5)} · HDR output (Ctrl+H, checkable) · HDR monitor window (checkable, desktop only; WI-1.463b) · Theme ▸ {System, Light, Dark} |
 | **Overlays** | Modes F1–F12 (§11.4.2) · Toggles: Picture (P), Info labels (I), Grid (G), Motion vectors (M), Heatmap (T), Legend (L), Hex/Dec (H / D) · Heatmap colour map ▸ · Colour-blind-safe palette (checkable) |
 | **Navigate** | Next/Previous frame (→/←) · ±10 frames (Shift+→/←) · Next/Previous I/Key frame (Ctrl+→/←) · Next/Previous frame of type ▸ {I, P, B, same temporal id} · First/Last (Home/End) · Next/Previous error (Ctrl+↓ / Ctrl+↑) · Next/Previous bookmark (N / Shift+N) · Play/Pause (Space) · Playback rate ▸ |
 | **Analysis** | Analyse current frame (A) · Analyse GOP (Shift+A) · Analyse range… · Cancel all jobs (Ctrl+.) · Metrics job… (Ctrl+M) · HDR scan range… · Clear cache for file |
@@ -862,14 +862,25 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 
 ### WI-1.463 — HDR output toggle and NATIVE-mode host (desktop)
 **Goal:** Picture panel creates/positions the child `QWindow` and calls `retarget()`.
-**Overlap:** phase-1 scope is the macOS NATIVE host only; the Linux host is added by WI-4.450. See chapter 16 §16.3.
+**Overlap:** phase-1 scope is the macOS NATIVE host only; the Linux host is added by WI-4.450. See chapter 16 §16.3. The HDR monitor window is split off as WI-1.463b (§16.2.6, #702).
 **Depends on:** WI-1.406 (macOS native target), WI-1.456. (The Linux host arrives in phase 4 with the Linux HDR work item and is not a dependency.)
-**Produces:** `app/src/native_surface_host.{h,cpp}`, `app/src/platform/mac_native_host.mm` (the `CAMetalLayer` target itself is the chapter 10 WI-1.406 file in `render/src/platform/`), `app/tests/models/test_native_surface_host.cpp`.
+**Produces:** `app/src/native_surface_host.{h,cpp}`, `app/src/platform/mac_native_host.mm` (the `CAMetalLayer` target itself is the chapter 10 WI-1.406 file in `render/src/platform/`), `app/tests/models/test_native_surface_host.cpp`; amends `render/src/surface/video_surface_impl.cpp` so that `retarget()` to a NATIVE target is accepted from the `MetalTexture` (EMBEDDED) state, not only from offscreen (#702).
 **Interface:** `NativeSurfaceHost { retarget(), setGeometry(QRect), setVisible(bool) }`; `VideoSurface::retarget` (chapter 10 §10.2.2).
-**Steps:** 1. Child window lifecycle. 2. Geometry sync. 3. Popup rule (desktop: `Popup.popupType = Popup.Window` where supported, else hide sibling). 4. HDR monitor window.
+**Steps:** 1. Child window lifecycle. 2. Geometry sync. 3. Desktop popup rule (`Popup.popupType = Popup.Window` where supported; otherwise hide the child window only while a popup intersects the picture rect). 4. `retarget()` from the EMBEDDED state (`video_surface_impl.cpp`). (The HDR monitor window is WI-1.463b.)
 **Acceptance tests:** 1. Given an XDR Mac, When `Ctrl+H`, Then `active_encoding() == ScRgbLinear16F` and the child window rect equals the item rect ±1 px during a 100-step splitter drag.
 **Size:** M.
-**Notes / pitfalls:** geometry must be mapped through `Window.contentItem` and `devicePixelRatio` on every change (§11.2.1); the popup rule (§11.5.5 item 3) applies on desktop too where `Popup.Window` is unavailable.
+**Notes / pitfalls:** geometry must be mapped through `Window.contentItem` and `devicePixelRatio` on every change (§11.2.1). Desktop popup rule (#702): where `Popup.Window` is unavailable, only a QML `Popup`/`Menu`/`Dialog` whose rect intersects the picture rect hides the NATIVE child window (the Picture shows the EMBEDDED texture meanwhile); a window that merely loses focus keeps NATIVE output. §11.5.5 item 3 (hide on any popup or on focus loss) stays Android-specific.
+
+### WI-1.463b — HDR monitor window
+**Goal:** `View ▸ HDR monitor window` opens a second `ApplicationWindow` holding only a Picture panel (§11.2.1), typically dragged to an HDR display, driven by the same `NativeSurfaceHost` and following the current frame of the main window.
+**Split:** from WI-1.463 step 4 (§16.2.6, #702); the toggle and host land in WI-1.463 first.
+**Depends on:** WI-1.463, WI-2.171 (playback decoder; the second window shows decoded frames).
+**Produces:** `app/qml/HdrMonitorWindow.qml`, `app/src/models/hdr_monitor_window.{h,cpp}`, `app/tests/models/test_hdr_monitor_window.cpp`.
+**Interface:** `View ▸ HDR monitor window` (§11.2.3, checkable); `NativeSurfaceHost` (WI-1.463); `PicturePanel` (WI-1.456).
+**Steps:** 1. Second `ApplicationWindow` with a Picture panel bound to the main window's `SelectionState`. 2. `NativeSurfaceHost` per window; `Ctrl+H` applies to the focused window. 3. Close/reopen keeps the window geometry in the layout preset. 4. Tests.
+**Acceptance tests:** 1. Given a file open, When `View ▸ HDR monitor window` is checked, Then a second window appears showing the current frame and stepping (`→`) in the main window updates it within one frame. 2. Given the monitor window on an XDR display and the main window on an SDR display, When `Ctrl+H` is pressed with the monitor window focused, Then only the monitor window's surface reports `active_encoding() == ScRgbLinear16F` and the main window keeps its `Tone-mapped` badge (FR-HDR-007).
+**Size:** S.
+**Notes / pitfalls:** chrome stays SDR (FR-HDR-101); on Android there is exactly one window (§11.2.1), so the menu entry is desktop-only.
 
 ### WI-1.464 — Welcome page, empty states, first-run banners
 **Goal:** §11.8.
@@ -888,7 +899,7 @@ All GUI WIs produce files under `app/` (or `android/`) and add tests to `app/tes
 **Produces:** `app/src/testipc/{test_ipc_server,command_dispatch}.{h,cpp}`, `app/src/render_stub.cpp` (`OVT_RENDER_STUB=1`), the `gui` job added to `.github/workflows/ci.yml` (file owned by chapter 13 WI-0.031; this WI contributes the job definition).
 **Interface:** chapter 14 §14.10.3 command set (`open`, `click`, `select-syntax-node`, `key`, `get`, `screenshot`, `wait-idle`) and its request/response JSON shape (`{"id","cmd","args"}` → `{"id","ok","value"|"error"}`; issue #353), JSON lines over a Unix domain socket (`QLocalServer`), enabled only with `--test-ipc <socket>`.
 **Steps:** 1. Socket server on the GUI thread (`QLocalServer`). 2. Command dispatch to `objectName` lookups (`QQuickItem::mapToScene` for click coordinates). 3. `wait-idle` = no running jobs and no pending render. 4. Stub renderer. 5. Workflow job wiring (`ctest -L gui`).
-**Acceptance tests:** 1. Given CI on Linux offscreen, When the GUI job runs, Then the five required scripts of §14.10.3 and the §11.9 scripts pass and screenshots match within the §14.10.2 tolerance. 2. Given no `--test-ipc` flag, When the app starts, Then no socket exists.
+**Acceptance tests:** 1. Given CI on Linux offscreen, When the `gui` job runs `ctest -L gui`, Then the Catch2 tests of the dispatch and socket server (`app/tests/testipc`) pass and `app/tests/scripts/test_test_ipc.py` runs every §14.10.3 command against the real `ovt-studio` started with `--test-ipc` (the §14.10.3 scripts and the §14.10.2 screenshot comparison are WI-1.576's, per the Overlap line and §16.3; #690). 2. Given no `--test-ipc` flag, When the app starts, Then no socket exists.
 **Size:** M.
 **Notes / pitfalls:** the IPC is GPL app code and must not be compiled into release builds (`OVT_BUILD_TESTS`); `QTest::mouseClick` on QML items needs scene coordinates, never item-local ones.
 
