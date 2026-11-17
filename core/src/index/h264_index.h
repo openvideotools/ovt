@@ -9,8 +9,11 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -48,6 +51,30 @@ enum class UnitRole : uint8_t {
   ExtensionSlice,  // nal_unit_type 20 / 21 (MVC non-base view, SVC / 3D-AVC layer): belongs to the open access unit
 };
 
+/// The numbers of the §7.3.9 rules that fired, in order: at most ten, held inline so that a slice costs no heap
+/// allocation (chapter 7 §7.4.6, WI-1.125). Compares with, and converts to, a std::vector<uint8_t>.
+class RuleList {
+ public:
+  void push_back(uint8_t rule) { rules_.at(size_++) = rule; }
+  [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
+  [[nodiscard]] size_t size() const noexcept { return size_; }
+  [[nodiscard]] const uint8_t* begin() const noexcept { return rules_.data(); }
+  [[nodiscard]] const uint8_t* end() const noexcept { return std::next(begin(), static_cast<std::ptrdiff_t>(size_)); }
+  [[nodiscard]] std::vector<uint8_t> to_vector() const { return {begin(), end()}; }
+  // NOLINTNEXTLINE(google-explicit-constructor,hicpp-explicit-conversions): the natural view of the list
+  operator std::vector<uint8_t>() const { return to_vector(); }
+  friend bool operator==(const RuleList& a, const RuleList& b) noexcept {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end());
+  }
+  friend bool operator==(const RuleList& a, const std::vector<uint8_t>& b) noexcept {
+    return std::equal(a.begin(), a.end(), b.begin(), b.end());
+  }
+
+ private:
+  std::array<uint8_t, 10> rules_{};
+  size_t size_ = 0;
+};
+
 struct BoundaryDecision {
   UnitRole role = UnitRole::Preceding;
   /// True when this unit starts a new access unit, i.e. the open picture ends before it. Set on the first rule-10
@@ -63,7 +90,7 @@ struct BoundaryDecision {
   int32_t second_field_of = -1;
   /// FirstSlice: the numbers (1..10) of the §7.3.9 rules that started the picture; empty for the first picture and
   /// for the first picture after an end of sequence / stream.
-  std::vector<uint8_t> rules;
+  RuleList rules;
   /// NextSlice: Info SYN-H264-0060 when first_mb_in_slice is 0.
   std::vector<IndexDiagnostic> diagnostics;
 };

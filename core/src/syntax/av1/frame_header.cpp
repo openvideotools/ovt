@@ -73,9 +73,8 @@ void parse_show_existing(BitReader& br, SyntaxBuilder& b, const SequenceHeader& 
   // them (RefValid is its SYN-AV1-0013 check). The header carries the slot's state for the analysis path.
   h.state = slot.load();
   h.is_rap = false;  // a show_existing_frame of a KEY slot is is_rap in the slot model (§7.4.3)
-  b.derived("show_existing", fmt::format("frame_type = {}, refresh_frame_flags = {}, RefValid = {}, OrderHint = {}",
-                                         frame_type_name(h.frame_type), h.refresh_frame_flags, slot.RefValid ? 1 : 0,
-                                         slot.RefOrderHint));
+  b.derived_format("show_existing", "frame_type = {}, refresh_frame_flags = {}, RefValid = {}, OrderHint = {}",
+                   frame_type_name(h.frame_type), h.refresh_frame_flags, slot.RefValid ? 1 : 0, slot.RefOrderHint);
 }
 
 // buffer_removal_time_present_flag and the per-operating-point buffer_removal_time[opNum] (AV1 §5.9.2).
@@ -149,7 +148,7 @@ void parse_inter_refs(BitReader& br, SyntaxBuilder& b, const SequenceHeader& seq
     if (!h.frame_refs_short_signaling) {
       h.ref_frame_idx[si] = static_cast<int>(b.read_u("ref_frame_idx", 3));
     } else {
-      b.derived("ref_frame_idx", fmt::format("ref_frame_idx[{}] = {} (set_frame_refs)", i, h.ref_frame_idx[si]));
+      b.derived_format("ref_frame_idx", "ref_frame_idx[{}] = {} (set_frame_refs)", i, h.ref_frame_idx[si]);
     }
     b.set_enum(ref_frame_name(i + kLastFrame));
     if (seq.frame_id_numbers_present_flag) {
@@ -381,8 +380,8 @@ void parse_tiles_quant_segmentation(BitReader& br, SyntaxBuilder& b, const Seque
   // init_coeff_cdfs() / load_previous_segment_ids(): no-ops for OVT.
   h.lossless = compute_lossless(h.quantization_params, h.segmentation_params,
                                 h.frame_size.FrameWidth == h.frame_size.UpscaledWidth);
-  b.derived("lossless", fmt::format("CodedLossless = {}, AllLossless = {}", h.lossless.CodedLossless ? 1 : 0,
-                                    h.lossless.AllLossless ? 1 : 0));
+  b.derived_format("lossless", "CodedLossless = {}, AllLossless = {}", h.lossless.CodedLossless ? 1 : 0,
+                   h.lossless.AllLossless ? 1 : 0);
 }
 
 // loop_filter_params() … film_grain_params() (§7.3.6 rows 20–27, WI-1.118) in AV1 §5.9.2 order, from the values

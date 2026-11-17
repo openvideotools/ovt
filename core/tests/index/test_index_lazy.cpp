@@ -4,20 +4,23 @@
 // Tests of WI-1.125 part a (chapter 7 §7.4.5, §7.4.6): lazy EPB stripping, lazy header trees and their on-demand
 // re-parse through ovt_stream_unit_syntax() (acceptance test 4), and the job wiring of ovt_stream_build_index():
 // progress, cancellation (acceptance test 2) and the partial index of OVT_INDEX_ALLOW_PARTIAL with its resumption
-// (acceptance test 3). The allocation audit and the performance test are part b.
+// (acceptance test 3), and the allocation audit of §7.4.6 (part b; the performance test is bench_index_h264_1h_1080p).
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <new>
 #include <span>
 #include <string>
 #include <string_view>
@@ -263,6 +266,31 @@ bool has_node_diag(const fb::SyntaxNode& tree, std::string_view code) {
 
 }  // namespace
 
+// ---- allocation counter -------------------------------------------------------------------------------------
+// The replaced global operator new counts while `g_count_allocations` is set (the audit of §7.4.6: no heap
+// allocation per unit when recording is off).
+namespace {
+std::atomic<bool> g_count_allocations{false};
+std::atomic<size_t> g_allocations{0};
+}  // namespace
+
+void* operator new(size_t n) {
+  if (g_count_allocations.load(std::memory_order_relaxed)) {
+    g_allocations.fetch_add(1, std::memory_order_relaxed);
+  }
+  void* p = std::malloc(n == 0 ? 1 : n);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+  if (p == nullptr) {
+    throw std::bad_alloc();
+  }
+  return p;
+}
+void operator delete(void* p) noexcept {
+  std::free(p);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+}
+void operator delete(void* p, size_t /*n*/) noexcept {
+  std::free(p);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+}
+
 // ---- lazy EPB stripping ----------------------------------------------------------------------------------------
 
 TEST_CASE("lazy_rbsp: chunked stripping equals rbsp_from_nal", "[index][fast]") {
@@ -326,6 +354,57 @@ TEST_CASE("lazy trees: VCL units beyond the threshold carry no tree; values and 
       without_tree += beyond ? 1 : 0;
     }
     CHECK(without_tree >= 3);
+  }
+}
+
+TEST_CASE("lazy trees: a value-only parse allocates nothing per unit beyond the records", "[index][fast]") {
+  // §7.4.6 audit with a counting allocator: once the builder's vectors have grown, a lazily parsed slice costs no
+  // heap allocation apart from the records of the unit and its frame (and the amortised growth of their vectors).
+  const Bytes once = pad_vcl(seed("seed_2_h264_bframes.bin"), fb::Codec::H264, 3000);
+  const Bytes data = repeat(once, 40);
+  std::vector<syn::ScannedUnit> units;  // bytes point into `data`
+  syn::scan_annexb(data, 0, syn::kNoContainerSample, [&units](const syn::ScannedUnit& u) { units.push_back(u); });
+  REQUIRE(units.size() >= 400);
+  idx::BuilderOptions options;
+  options.codec = fb::Codec::H264;
+  options.lazy_after_frames = 0;
+  idx::StreamIndexBuilder builder(options);
+  const auto add = [&builder](const syn::ScannedUnit& u) {
+    idx::UnitInput in;
+    in.file_offset = u.file_offset;
+    in.bytes = u.bytes;
+    in.prefix_span = u.prefix_span;
+    builder.add_unit(in);
+  };
+  const size_t half = units.size() / 2;
+  for (size_t i = 0; i < half; ++i) {
+    add(units[i]);
+  }
+  size_t vcl = 0;
+  size_t vcl_allocations = 0;
+  size_t other_allocations = 0;
+  for (size_t i = half; i < units.size(); ++i) {
+    const bool is_slice = is_vcl(fb::Codec::H264, units[i].bytes[0] & 0x1FU);
+    g_allocations = 0;
+    g_count_allocations = true;
+    add(units[i]);
+    g_count_allocations = false;
+    (is_slice ? vcl_allocations : other_allocations) += g_allocations.load();
+    vcl += is_slice ? 1 : 0;
+  }
+  INFO("allocations: " << vcl_allocations << " for " << vcl << " lazy slices, " << other_allocations << " for "
+                       << (units.size() - half - vcl) << " non-VCL units with trees");
+  // The budget per slice of this stream: the FrameRec's unit list (every slice starts a picture), the Unit record's
+  // EPB list (every padded slice holds EPBs) and the slice header's own MMCO list (the B slices carry one), plus the
+  // amortised growth of the units and frames vectors. An allocation inside the lazy path itself (an arena node, a
+  // whole-unit RBSP copy, a formatted derived text, the boundary rule list) would add one or more per slice.
+  CHECK(vcl_allocations <= (3 * vcl) + 16);
+  CHECK(other_allocations > vcl_allocations);  // the recorded trees of the parameter sets do allocate
+  const std::array<uint8_t, 32> hash{};
+  const Bytes index = builder.finish(hash);
+  for (uint32_t i = 0; i < root(index).units()->size(); ++i) {
+    const fb::Unit* u = root(index).units()->Get(i);
+    CHECK((u->header() == nullptr) == is_vcl(fb::Codec::H264, u->type()));
   }
 }
 

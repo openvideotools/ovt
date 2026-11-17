@@ -41,7 +41,7 @@ const ActivePps& activate(BitReader& br, SyntaxBuilder& b, const PpsTable& ppss,
   if (a == nullptr || a->pps == nullptr || a->sps == nullptr) {
     throw ParseError{std::string{kMissingPps}, fmt::format("slice references missing PPS {}", pps_id), br.bit_pos()};
   }
-  b.derived("active PPS", fmt::format("pps {} -> sps {}", pps_id, a->sps->sps_seq_parameter_set_id));
+  b.derived_format("active PPS", "pps {} -> sps {}", pps_id, a->sps->sps_seq_parameter_set_id);
   return *a;
 }
 
