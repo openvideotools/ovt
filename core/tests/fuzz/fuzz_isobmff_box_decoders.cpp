@@ -78,6 +78,35 @@ constexpr auto kCases = std::to_array<Case>({
     {"uriI", "urim", true, "stsd"},
     {"tmcd", "stsd", false},
     {"name", "tmcd", false, "stsd"},
+    // WI-1.208 group C part 2: colour, HDR, Dolby Vision and other sample-entry children.
+    {"btrt", "hvc1", false, "stsd"},
+    {"pasp", "hvc1", false, "stsd"},
+    {"clap", "hvc1", false, "stsd"},
+    {"colr", "hvc1", false, "stsd"},
+    {"mdcv", "hvc1", false, "stsd"},
+    {"clli", "hvc1", false, "stsd"},
+    {"cclv", "hvc1", false, "stsd"},
+    {"dvcC", "hvc1", false, "stsd"},
+    {"dvvC", "hvc1", false, "stsd"},
+    {"fiel", "hvc1", false, "stsd"},
+    {"srat", "mp4a", true, "stsd"},
+    {"colr", "ipco", false},
+    // WI-1.207 group C part 1: the codec configuration records (their parameter sets go through the syntax module).
+    {"avcC", "avc1", false, "stsd"},
+    {"hvcC", "hvc1", false, "stsd"},
+    {"av1C", "av01", false, "stsd"},
+    // WI-1.209 group D part 1: the sample tables of `stbl` (windowed decoders; the payload is read from memory here).
+    {"stts", "stbl", true},
+    {"ctts", "stbl", true},
+    {"cslg", "stbl", true},
+    {"stsc", "stbl", true},
+    {"stsz", "stbl", true},
+    {"stz2", "stbl", true},
+    {"stco", "stbl", true},
+    {"co64", "stbl", true},
+    {"stss", "stbl", true},
+    {"stps", "stbl", true},
+    {"sdtp", "stbl", true},
 });
 
 void require(bool ok) {

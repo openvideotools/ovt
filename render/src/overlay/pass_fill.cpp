@@ -25,7 +25,19 @@ namespace {
 struct PassSpec {
   const char* body;
   std::array<const char*, 3> samplers;  // GLSL declarations, binding = index; nullptr = unused
+  bool id_output = false;               // writes a uint id unblended instead of blending a colour
 };
+
+// The id-only run of the fill pass (§10.5.6): block_id + 1 per cell; the 0xFFFFFFFF "no block" wraps to 0 = no id.
+constexpr const char* kBlockIdBody = R"glsl(
+void main() {
+  ivec2 cell;
+  if (!ovt_cell(cell)) {
+    discard;
+  }
+  out_id = texelFetch(block_ids, cell, 0).r + 1u;
+}
+)glsl";
 
 PassSpec spec_of(CellPass pass) {
   switch (pass) {
@@ -35,6 +47,8 @@ PassSpec spec_of(CellPass pass) {
       return {shaders::kFill, {"usampler2D cells", "sampler2D palette", nullptr}};
     case CellPass::Hatch:
       return {shaders::kHatch, {"usampler2D cells", "sampler2D palette", nullptr}};
+    case CellPass::BlockId:
+      return {kBlockIdBody, {"usampler2D block_ids", nullptr, nullptr}, true};
   }
   return {shaders::kFill, {nullptr, nullptr, nullptr}};
 }
@@ -53,8 +67,6 @@ layout(std430, push_constant) uniform PushC {
   uint layers;
   ivec2 cells;
 } pc;
-
-layout(location = 0) out vec4 out_color;
 
 bool ovt_cell(out ivec2 cell) {
   vec2 p = gl_FragCoord.xy;  // pixel centre, origin top-left
@@ -86,6 +98,7 @@ std::string fragment_source(const PassSpec& spec) {
     }
   }
   src += kPrelude;
+  src += spec.id_output ? "layout(location = 0) out uint out_id;\n" : "layout(location = 0) out vec4 out_color;\n";
   src += spec.body;
   return src;
 }
@@ -143,7 +156,7 @@ pl_pass create_pass(pl_gpu gpu, CellPass pass, pl_fmt target_format, std::string
   params.vertex_stride = 2 * sizeof(float);
   params.vertex_shader = kVertexShader;
   params.target_format = target_format;
-  params.blend_params = &blend;
+  params.blend_params = spec.id_output ? nullptr : &blend;  // integer targets cannot blend
   params.load_target = true;
   pl_pass p = pl_pass_create(gpu, &params);
   if (p == nullptr) {

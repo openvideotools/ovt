@@ -30,8 +30,10 @@ ovt_catch_discover_tests(ovt_tests_index_h264)
 # WI-1.121: StreamIndex builder (§7.4.2). The libaom-encoded streams of the index_builder fuzz seeds double as a
 # corpus-free end-to-end test.
 # test_index_vs_ffprobe.cpp (H.264 / H.265, acceptance test 1) runs ffprobe through the helpers of
-# core/tests/container/units_oracle.hpp.
-add_executable(ovt_tests_index_builder test_index_builder.cpp test_index_vs_ffprobe.cpp)
+# core/tests/container/units_oracle.hpp. test_index_lazy.cpp is WI-1.125 (lazy trees, lazy EPB stripping, the job
+# wiring and the partial index of ovt_stream_build_index()).
+add_executable(ovt_tests_index_builder test_index_builder.cpp test_index_vs_ffprobe.cpp test_stream_api.cpp
+                                       test_index_lazy.cpp)
 target_link_libraries(ovt_tests_index_builder PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
 target_include_directories(ovt_tests_index_builder PRIVATE "${PROJECT_SOURCE_DIR}/core/src"
                                                            "${PROJECT_SOURCE_DIR}/core/tests")

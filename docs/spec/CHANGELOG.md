@@ -2,12 +2,31 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
-## 1.0.0-rc43 — 2026-11-17
+## 1.0.0-rc44 — 2026-11-17
 
 MINOR-level (FlatBuffers schema, additive): WI-4.106 part a (PR #607) folds in the accepted answer of `spec-question` #606. No public C header, plugin ABI or CLI grammar change; the chapter 7 §7.6.4, chapter 12 §12.2.12 and WI-4.106 **Produces** prose follows in spec-amendment pass 17, which closes #606.
 
 - 6 §6.3 `VerifyFrame` — appended `diagnostics:[Diagnostic]` (the `VER-0001..VER-0004` Diagnostics of the frame, chapter 7 §7.6.4), `mismatch_map_blob:string` (Picture-store key of the mismatch heat map: U8, one byte per 4×4 luma cell, row-major, bit p set when plane p differs; empty when the frame matches) and `mismatch_cells_w:uint`, `mismatch_cells_h:uint` (⌈coded_w/4⌉ × ⌈coded_h/4⌉; 0 without a map); §6.3 had no slot for the Diagnostics chapter 7 and FR-CLI-014 require — WI-4.106 (#606 points 1, 3)
 - 6 §6.3 `VerifyReport` — appended `diagnostics:[Diagnostic]` for Diagnostics of the run that belong to no single frame — WI-4.106 (#606 point 1)
+
+## 1.0.0-rc43 — 2026-11-17
+
+PATCH-level: spec-amendment pass 23 folds in the accepted answers of `spec-question` issues #710 and #711 from WI-1.125 (PR #717, Fable reviewer rulings) and #704 from WI-1.458. One public C header addition (`ovt_IndexFlags`, `ovt_stream_set_index_flags` in `ovt/index.h`, already merged with PR #717 under the owner's 2026-11-09 rule that a Fable reviewer's approval suffices for public headers). No FlatBuffers schema, plugin ABI or CLI grammar change; no new diagnostic code.
+
+- 12 §12.3.8, 0 §0.6.1 mirror, 7 §7.4.6, WI-1.125 Produces and AT3 — `typedef enum ovt_IndexFlags { OVT_INDEX_ALLOW_PARTIAL = 1 }` and `ovt_stream_set_index_flags(ovt_Stream*, uint32_t)` after `ovt_stream_codec`; the flag is a stream option, not a job option; a cancelled build with it returns `OVT_OK` with the complete frames and Warning `SYN-GEN-0103` (the §7.9 registry row wins over the former "Info"); the resumed build is byte-identical to an uninterrupted one — WI-1.125 (#710)
+- 7 §7.4.5, WI-1.125 step 3 — no per-frame activation snapshots; `ovt_stream_unit_syntax` replays the units the index names, values only (H.26x: preceding parameter sets, first VCL unit of the previous frame in decode order, earlier units of the target's frame; AV1: sequence headers and every unit from the nearest coded key frame), then parses the target with recording on; chapter 6 unchanged — WI-1.125 (#711)
+- 11 §11.3.5 Interactions, WI-1.457 Interface, WI-1.458 Interface, step 6 and notes — the per-unit flattened `[{path, BitSpan}]` list reaches the Hex panel through `HexModel::setFieldProvider`, fed from the Syntax panel's once-per-unit flattening; a single-byte click inside a field calls `Selection.setField` (the field's raw bytes become `byte_range`), a click outside any field or on an EPB byte and any drag call `Selection.setBytes`; inverse mapping `rbsp_byte = rel − count(epb_positions < rel)`; container-field reverse lookup deferred to WI-1.460 — WI-1.458 (#704)
+
+## 1.0.0-rc42 — 2026-11-17
+
+PATCH-level: spec-amendment pass 22 folds in the accepted answers of `spec-question` issues #690 from WI-1.465, #695 from WI-2.165, #706 from WI-2.437 and #702 from WI-1.463, and splits the HDR monitor window out of WI-1.463 as WI-1.463b (§16.2.6). No new diagnostic code. No FlatBuffers schema, plugin ABI, public C header or CLI grammar change.
+
+- 11 WI-1.465 AT1, 14 WI-1.576 AT3 — the `gui` CI job runs `ctest -L gui`, the Catch2 `app/tests/testipc` tests and `app/tests/scripts/test_test_ipc.py` against the built `ovt-studio`; interaction scripts 2 and 5 against the real `ovt-studio` through the WI-1.465 test-IPC server move to WI-1.576 AT3 — WI-1.465 (#690)
+- 7 §7.6 H.265 output process, S6 — RASL pictures of a CRA whose `NoRaslOutputFlag = 1` comes from the bitstream itself (`PocResult::rasl_skipped`) are `shown = false`, `display_index = −1` and raise no Diagnostic; other CRAs are output normally; `SYN-H265-0101` stays on the analysis path — WI-2.165 (#695)
+- 10 §10.5.8 row, WI-2.437 title, Goal, steps and notes, 16 §16.4 row — overlay sets are cached per (`decode_index`, 64-bit frame fingerprint, masked `OverlayConfig` hash) in a per-surface LRU of 8 built sets of CPU arrays; `set_overlays()` uploads the GPU textures; draw-time uniforms are not part of the key — WI-2.437 (#706)
+- 10 §10.4.1, WI-1.406 Produces — the app-side glue is `app/src/platform/mac_native_host.mm` (was `mac_layer.mm`) — WI-1.463 (#702)
+- 11 WI-1.463 Overlap, Produces, steps and notes — desktop popup rule: where `Popup.Window` is unavailable only a popup intersecting the picture rect hides the NATIVE child window, focus loss keeps NATIVE (§11.5.5 item 3 stays Android-specific); `render/src/surface/video_surface_impl.cpp` added so that `retarget()` to NATIVE is accepted from the `MetalTexture` state — WI-1.463 (#702)
+- 11 new WI-1.463b block, §11.2.3 View menu, 16 §16.4 row and M1.4 list, 4 FR-HDR-007 and FR-HDR-101 WI claims — HDR monitor window split from WI-1.463 step 4 (§16.2.6), size S, depends on WI-1.463 and WI-2.171, `View ▸ HDR monitor window` (checkable, desktop only) — WI-1.463b (#702)
 
 ## 1.0.0-rc41 — 2026-11-16
 

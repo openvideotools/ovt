@@ -98,4 +98,24 @@ TestCase {
         verify(popover.y >= toolBarBottom, "popover y " + popover.y + " above the toolbar bottom " + toolBarBottom)
         popover.close()
     }
+
+    // WI-A.451: MainActivity.onConfigurationChanged sets `configurationWidthDp` on the root (QtQuickView.setProperty)
+    // on every resize; that width becomes Platform.widthDp, which the shell's breakpoint layouts follow. The shell
+    // is put into its compact (Android) mode so that the class switches as it does in the APK.
+    function test_configurationWidthDrivesTheLayout() {
+        const shell = createShell()
+        shell.shellItem.compactEnabled = true
+        try {
+            for (const [width, layout] of [[1300, "three"], [900, "two"], [700, "vertical"], [1300, "three"]]) {
+                shell.configurationWidthDp = width
+                compare(Platform.widthDp, width)
+                compare(shell.shellItem.layoutClass, layout)
+            }
+            // 0 is "no change pushed yet" and leaves the width alone.
+            shell.configurationWidthDp = 0
+            compare(Platform.widthDp, 1300)
+        } finally {
+            Platform.widthDp = 1280
+        }
+    }
 }

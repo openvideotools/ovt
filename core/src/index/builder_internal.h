@@ -95,6 +95,28 @@ class BuilderCore {
   std::vector<FrameRec> frames;        // finished frames, decode order
   std::vector<DiagRec> diagnostics;    // StreamIndex.diagnostics
   std::optional<StreamTiming> timing;  // set by the codec dispatch
+  uint32_t lazy_after_frames = 10000;  // BuilderOptions.lazy_after_frames
+  int64_t record_only_unit = -1;       // BuilderOptions.record_only_unit
+  size_t lazy_strip_chunk = 2048;      // BuilderOptions.lazy_strip_chunk
+
+  /// §7.4.5 record_full_tree(u): whether the dispatch records the header tree of `unit`, which the codec peeked to
+  /// be a VCL unit (`vcl`) that starts a new picture (`starts_frame`) or not. The frames finished so far plus the
+  /// open one, if the unit closes it, give the decode index the unit's frame will have, so "VCL units of the first N
+  /// frames" is exact for every unit whose peek is right (a picture started by a slice that does not look like a
+  /// first slice is off by one frame).
+  [[nodiscard]] bool record_full_tree(uint32_t unit, bool vcl, bool starts_frame) const noexcept {
+    if (record_only_unit >= 0) {
+      return int64_t{unit} == record_only_unit;
+    }
+    if (!vcl) {
+      return true;
+    }
+    const size_t frame = frames.size() + ((starts_frame && open_) ? 1 : 0);
+    return frame < lazy_after_frames;
+  }
+  /// The first unit that is not part of a finished frame: the first pending non-VCL unit, else the first unit of
+  /// the open frame, else units.size(). Everything before it belongs to complete frames or to no frame.
+  [[nodiscard]] uint32_t first_open_unit() const noexcept;
 
   [[nodiscard]] bool frame_open() const noexcept { return open_.has_value(); }
   /// The open frame, or null when none is open.
