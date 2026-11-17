@@ -47,8 +47,15 @@ std::optional<StreamTiming> stream_timing(const SequenceHeader& seq) {
 class Av1Dispatch final : public CodecDispatch {
  public:
   void on_unit(BuilderCore& core, uint32_t unit, std::span<const uint8_t> bytes) override {
+    // §7.4.5 (WI-1.125): frame, frame header and tile group OBUs are AV1's VCL units; the tree is recorded as
+    // BuilderCore::record_full_tree says.
+    const auto peek_type = static_cast<ObuType>(bytes.empty() ? 0U : ((bytes[0] >> 3U) & 0x0FU));
+    const bool vcl =
+        peek_type == ObuType::Frame || peek_type == ObuType::FrameHeader || peek_type == ObuType::TileGroup;
     BitReader br(bytes);
     syntax::SyntaxBuilder sb(br);
+    const bool starts = peek_type == ObuType::Frame || peek_type == ObuType::FrameHeader;
+    sb.set_recording(core.record_full_tree(unit, vcl, starts));
     ObuEvent e;
     std::optional<FrameHeader> frame_header;
     bool parsed = false;

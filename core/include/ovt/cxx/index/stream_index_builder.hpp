@@ -46,6 +46,15 @@ struct UnitInput {
 
 struct BuilderOptions {
   fb::Codec codec = fb::Codec::Unknown;
+  /// §7.4.5 (WI-1.125): VCL units of frames with a decode index at or beyond this count are parsed with recording
+  /// off (values only, Unit.header null); non-VCL units always keep their tree. 0 records no VCL tree at all.
+  uint32_t lazy_after_frames = 10000;
+  /// Re-parse mode of ovt_stream_unit_syntax (WI-1.125): when >= 0, only the unit with this builder index records a
+  /// tree, whatever `lazy_after_frames` says; every other unit is parsed for its values. -1 = normal indexing.
+  int64_t record_only_unit = -1;
+  /// §7.4.6 lazy EPB stripping: raw bytes stripped per step for a VCL unit parsed without a tree (the stripped
+  /// prefix doubles while the header runs past it). 2 KiB; tests lower it to exercise the retry.
+  size_t lazy_strip_chunk = size_t{2} << 10U;
 };
 
 /// Thrown by the constructor for a codec the index has no dispatch for.
@@ -75,6 +84,19 @@ class StreamIndexBuilder {
   /// the finished StreamIndex buffer (root table ovt.fb.StreamIndex, no file identifier). Deterministic
   /// (§0.7.5): the same units give the same bytes. Call once; add_unit() must not be called afterwards.
   [[nodiscard]] std::vector<uint8_t> finish(std::span<const uint8_t, 32> source_hash);
+
+  /// §7.4.6 partial index (WI-1.125): the StreamIndex of the units and frames that are complete so far, with Warning
+  /// SYN-GEN-0103 "index truncated at unit N", where N is the first unit left out (the first unit of the open
+  /// frame, or of the non-VCL units pending before it). The builder keeps its state: add_unit() may go on and
+  /// finish() still returns the index of the whole stream, byte-identical to an uninterrupted run.
+  [[nodiscard]] std::vector<uint8_t> finish_partial(std::span<const uint8_t, 32> source_hash);
+
+  /// Number of units added so far.
+  [[nodiscard]] uint32_t unit_count() const noexcept;
+
+  /// The recorded header tree of unit `unit` as a standalone SyntaxNode FlatBuffer (root table, no file
+  /// identifier); empty when nothing was recorded for it (lazy VCL unit, or an unparsed unit without diagnostics).
+  [[nodiscard]] std::vector<uint8_t> unit_syntax(uint32_t unit) const;
 
  private:
   struct Impl;

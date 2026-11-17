@@ -16,3 +16,6 @@ target_sources(ovt_core_objects PRIVATE h264_frame_boundary.cpp h264_poc.cpp)
 # WI-1.121: StreamIndex builder (§7.4.2): core state machine, AV1 dispatch, classification and display order.
 target_sources(ovt_core_objects PRIVATE stream_index_builder.cpp av1_units.cpp h264_units.cpp h265_units.cpp
                                         frame_classify.cpp display_order.cpp rap_map.cpp source_hash.cpp)
+
+# WI-1.125: lazy header trees and lazy EPB stripping (§7.4.5, §7.4.6), the on-demand re-parse of one unit.
+target_sources(ovt_core_objects PRIVATE lazy_syntax.cpp)
