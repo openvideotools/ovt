@@ -431,7 +431,7 @@ void CompareController::set_selection(SelectionModel* selection) {
   if (selection_ != nullptr) {
     // SelectionB follows SelectionA's frame (§11.4.1).
     connect(selection_, &SelectionModel::changed, this, [this](int mask) {
-      if ((mask & SelectionModel::ChangeFrame) != 0) {
+      if ((static_cast<unsigned>(mask) & SelectionModel::ChangeFrame) != 0U) {
         Q_EMIT selectionBChanged();
       }
     });
