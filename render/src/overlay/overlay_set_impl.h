@@ -8,8 +8,10 @@
 #ifndef OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 #define OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,6 +26,18 @@ struct PartitionLine {
   int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
   uint8_t kind = 0;                        // ovt::fb::PartitionKind of the first partition that owns the edge
   uint16_t partition = 0;                  // PartitionInfo.index of that partition
+};
+
+// Grid level slots of §10.5.3, in OverlayLayer bit order (GridTU = 1u << 3 ... GridCTU = 1u << 6).
+enum class GridLevel : uint8_t { TU = 0, PU = 1, CU = 2, CTU = 3, None = 0xFF };
+
+// Block tree node for the grid line pass (§10.5.3; the FrameAnalysis does not outlive build()): rect clipped to the
+// coded picture (luma samples), children grid_nodes[first_child .. first_child + child_count).
+struct GridNode {
+  int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
+  uint32_t first_child = 0;
+  uint32_t child_count = 0;
+  GridLevel level = GridLevel::None;
 };
 
 class OverlaySet {
@@ -52,6 +66,13 @@ class OverlaySet {
 
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
+
+  // Grid block tree, node 0 = blocks[0]; empty unless a GridTU..GridCTU layer is set. grid_min_side: smallest
+  // unclipped block side per level (R-GRID-1), INT32_MAX when the level has no block.
+  std::vector<GridNode> grid_nodes;
+  std::array<int32_t, 4> grid_min_side{std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max(),
+                                       std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
+  int32_t picture_w = 0, picture_h = 0;  // NOLINT(readability-isolate-declaration): coded size, luma samples
 
   // MV arrow and intra direction stroke instances (§10.5.1, §10.5.4; WI-2.434). Empty unless MvL0, MvL1, MvBi or
   // IntraDirs is set.

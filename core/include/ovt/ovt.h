@@ -14,6 +14,7 @@
 #include "ovt/color.h"      // IWYU pragma: export
 #include "ovt/container.h"  // IWYU pragma: export
 #include "ovt/decode.h"     // IWYU pragma: export
+#include "ovt/index.h"      // IWYU pragma: export
 #include "ovt/io.h"         // IWYU pragma: export
 #include "ovt/jobs.h"
 #include "ovt/log.h"

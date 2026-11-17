@@ -8,3 +8,6 @@
 
 target_sources(ovt_core_objects PRIVATE buffer.cpp cache_api.cpp file_api.cpp jobs_api.cpp json_api.cpp log_api.cpp
                                         validate_api.cpp)
+
+# WI-1.121: ovt/index.h (§12.3.8), the ovt_Stream handle and ovt_stream_build_index().
+target_sources(ovt_core_objects PRIVATE stream_api.cpp)

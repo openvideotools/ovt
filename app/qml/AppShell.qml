@@ -128,7 +128,8 @@ Item {
             Layout.fillHeight: true
             actions: actions
             panelComponents: ({"picture": pictureComponent, "diagnostics": diagnosticsComponent,
-                               "bookmarks": bookmarksComponent})
+                               "bookmarks": bookmarksComponent, "hdr": hdrComponent,
+                               "display_caps": displayCapsComponent})
         }
     }
 
@@ -153,5 +154,17 @@ Item {
         id: bookmarksComponent
 
         BookmarksPanel {}
+    }
+
+    // The HDR panel (§11.3.14) and the Display Capabilities panel (§11.3.15), WI-1.462.
+    Component {
+        id: hdrComponent
+
+        HdrPanel {}
+    }
+    Component {
+        id: displayCapsComponent
+
+        DisplayCapsPanel {}
     }
 }
