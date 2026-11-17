@@ -230,7 +230,7 @@ StreamIndexBuilder::StreamIndexBuilder(const BuilderOptions& options) : impl_(st
   impl_->core.lazy_strip_chunk = options.lazy_strip_chunk;
   switch (options.codec) {
     case fb::Codec::AV1:
-      impl_->dispatch = make_av1_dispatch();
+      impl_->dispatch = make_av1_dispatch(options.av1_operating_point, options.av1_annexb);
       break;
     case fb::Codec::H264:
       impl_->dispatch = make_h264_dispatch();
@@ -262,6 +262,7 @@ void StreamIndexBuilder::add_unit(const UnitInput& u) {
   if (u.timing != nullptr) {
     rec.timing = *u.timing;
   }
+  rec.temporal_unit_start = u.temporal_unit_start;
   core.units.push_back(std::move(rec));
   impl_->dispatch->on_unit(core, index, u.bytes);
 }

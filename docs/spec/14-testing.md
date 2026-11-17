@@ -794,7 +794,7 @@ All targets live in `core/tests/fuzz/fuzz_<name>.cpp` (backbone §0.4) and build
 
 ### 14.7.2 Corpus seeding
 
-`tools/fuzz_seed.py --target <t>` regenerates seeds from the local corpus cache: extracts units per type (`--max-per-type 3`, `--max-bytes 65536`), minimises with `build/linux-x64-fuzz/fuzz/ovt_fuzz_<t> -merge=1 corpus_new core/tests/fuzz/corpus/<t>`, and commits only the merged set (≤ 2 MiB per target) under `core/tests/fuzz/corpus/<t>/`. Argon streams (nightly) are the richest seed source for AV1 and are merged nightly into a **non-committed** corpus stored in the CI cache (`fuzz-corpus-<target>`), which the smoke job restores.
+`tools/fuzz_seed.py --target <t>` regenerates seeds from the local corpus cache: extracts units per type (`--max-per-type 3`, `--max-bytes 65536`), minimises with `build/linux-x64-fuzz/fuzz/ovt_fuzz_<t> -merge=1 corpus_new core/tests/fuzz/corpus/<t>`, and commits only the merged set (≤ 2 MiB per target) under `core/tests/fuzz/corpus/<t>/`; a committed seed MUST be OVT-generated (`--make-streams` recipes, WI-1.129) or cut from a corpus entry whose licence allows redistribution under the repository's REUSE annotation, never from the ITU-T or AOM conformance vectors (#742). Argon streams (nightly) are the richest seed source for AV1 and are merged nightly into a **non-committed** corpus stored in the CI cache (`fuzz-corpus-<target>`), which the smoke job restores.
 
 ### 14.7.3 CI smoke
 
