@@ -1043,7 +1043,8 @@ Bytes index_h265(std::span<const uint8_t> stream) {
     in.sample_index = u.container_sample_index;
     b.add_unit(in);
   });
-  Bytes index = b.finish(std::array<uint8_t, 32>{});
+  const flatbuffers::DetachedBuffer out = b.finish(std::array<uint8_t, 32>{});
+  Bytes index(out.data(), out.data() + out.size());
   for (const auto& v : ovt::model::validate_stream_index(index)) {
     FAIL_CHECK(v.rule << ": " << v.message << " at " << v.path);
   }
