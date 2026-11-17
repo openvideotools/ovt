@@ -11,6 +11,8 @@
 #include <libplacebo/shaders/dithering.h>
 #include <libplacebo/tone_mapping.h>
 
+#include "pipeline/view_transform.h"
+
 namespace ovt::render::detail {
 namespace {
 
@@ -120,14 +122,12 @@ bool is_float_encoding(DisplayTarget::OutputEncoding encoding) {
 }
 
 pl_rect2df target_rect(const pl_rect2df& source, const ViewState& view, int width, int height) {
-  const double zoom = view.zoom > 0.0 ? view.zoom : 1.0;
-  const double half_w = width / 2.0;
-  const double half_h = height / 2.0;
-  auto map = [zoom](float v, double pan, double half) {
-    return static_cast<float>(((static_cast<double>(v) - pan) * zoom) + half);
-  };
-  return pl_rect2df{map(source.x0, view.pan_x, half_w), map(source.y0, view.pan_y, half_h),
-                    map(source.x1, view.pan_x, half_w), map(source.y1, view.pan_y, half_h)};
+  // §10.2.3 forward mapping through the shared view transform (WI-1.409): every edge is snapped to a whole device pixel
+  // at zoom >= 1, the same rounding sample_at_device() inverts.
+  const ViewportSize vp{width, height};
+  const Point a = image_to_device(view, vp, static_cast<double>(source.x0), static_cast<double>(source.y0));
+  const Point b = image_to_device(view, vp, static_cast<double>(source.x1), static_cast<double>(source.y1));
+  return pl_rect2df{static_cast<float>(a.x), static_cast<float>(a.y), static_cast<float>(b.x), static_cast<float>(b.y)};
 }
 
 void RenderParamSet::build(const ViewState& view, DisplayTarget::OutputEncoding encoding, bool offscreen,
@@ -136,7 +136,7 @@ void RenderParamSet::build(const ViewState& view, DisplayTarget::OutputEncoding 
 
   // §10.3.1 filters: nearest-neighbour from 1:1 upwards (pixel-exact inspection), the ViewState downscaler below.
   const double zoom = view.zoom > 0.0 ? view.zoom : 1.0;
-  params_.upscaler = zoom >= 1.0 ? &pl_filter_nearest : &pl_filter_bilinear;
+  params_.upscaler = zoom_filter(zoom) == ZoomFilter::Nearest ? &pl_filter_nearest : &pl_filter_bilinear;
   params_.downscaler = downscale_filter(view.downscale);
   params_.plane_upscaler = view.chroma_upscale == ChromaUpscale::Nearest ? &pl_filter_nearest : &pl_filter_bilinear;
   params_.skip_anti_aliasing = zoom >= 1.0;

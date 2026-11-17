@@ -233,20 +233,31 @@ TEST_CASE("render_test_plane_views: plane U at zoom 8 is nearest-neighbour at ch
   const OutputPixels px = render_deterministic(*surface, view);
   for (int cy = 0; cy < static_cast<int>(kH / 2); ++cy) {
     for (int cx = 0; cx < static_cast<int>(kW / 2); ++cx) {
-      const Rgb first = pixel(px, cx * kCell, cy * kCell);
+      const Rgb first = pixel(px, (cx * kCell) + 4, (cy * kCell) + 4);  // inside the sample, off the grid lines
       INFO("chroma sample (" << cx << ", " << cy << ") code " << cb(cx, cy) << " -> " << first.r);
       CHECK(grey(first));
       // Full-range normalisation: the 8-bit code is the output value (± 1 for GPU rounding).
       CHECK(std::abs(first.r - cb(cx, cy)) <= 1);
-      // Sharp edges: all 16 x 16 pixels of the sample are identical.
+      // Sharp edges: all 16 x 16 pixels of the sample are identical, except the pixels of the 1-px luma sample grid
+      // that R-ZOOM-4 draws from zoom 8 (WI-1.409): the lines at multiples of 8 device pixels and the last pixel line
+      // of the picture's right and bottom edges, which are lighter or darker (a sample of code 128 has the grid's own
+      // colour and shows no difference).
       int mismatches = 0;
+      int grid_pixels = 0;
       for (int y = cy * kCell; y < (cy + 1) * kCell; ++y) {
         for (int x = cx * kCell; x < (cx + 1) * kCell; ++x) {
           const Rgb p = pixel(px, x, y);
-          mismatches += (p.r != first.r || p.g != first.g || p.b != first.b) ? 1 : 0;
+          const bool differs = p.r != first.r || p.g != first.g || p.b != first.b;
+          const bool on_grid = x % kZoom == 0 || y % kZoom == 0 || x == (kW * kZoom) - 1 || y == (kH * kZoom) - 1;
+          if (on_grid) {
+            grid_pixels += differs ? 1 : 0;
+          } else {
+            mismatches += differs ? 1 : 0;
+          }
         }
       }
       CHECK(mismatches == 0);
+      CHECK((grid_pixels > 0 || std::abs(first.r - 128) <= 4));
     }
   }
   check_golden("plane_u_nearest.png", px);

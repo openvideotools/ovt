@@ -40,6 +40,7 @@
 #include "pipeline/frame_upload.h"
 #include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
+#include "pipeline/sample_grid.h"
 #include "platform/native_target.h"
 #include "platform/offscreen.h"
 #include "vk_no_timestamps.h"
@@ -543,6 +544,7 @@ class VideoSurfaceImpl final : public VideoSurface {
                  const detail::IRect& view_rect, struct pl_frame target, bool linear, bool offscreen,
                  bool with_overlays = false) {
     pl_rect2df src = detail::source_rect(slot, view.show_cropped);
+    const pl_rect2df src_full = src;  // the sample grid's luma-sample rectangle, before any scissor clip
     pl_rect2df dst = detail::map_into(src, view, view_rect);
     const pl_rect2df unclipped = dst;  // the picture rectangle the overlay layer is laid out on
     // A scissor narrower than the target clips both rectangles; the whole target is left to libplacebo's own clipping.
@@ -577,15 +579,27 @@ class VideoSurfaceImpl final : public VideoSurface {
     plane_views_.apply(plane_view, image, params, target);
     // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1). It describes
     // slot A in the full viewport: drawn only where A is (Single, Flicker's A phase; SPEC-ASSUMPTION(#478)).
-    struct pl_overlay overlay = {};
+    // WI-1.409: the 1-px sample grid of R-ZOOM-4 goes first, under the overlay layer.
+    std::array<struct pl_overlay, 2> overlays = {};
+    int num_overlays = 0;
     std::string overlay_err;
-    if (with_overlays && overlay_gpu_ != nullptr &&
-        overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio, unclipped, overlay,
-                           overlay_err)) {
-      target.overlays = &overlay;
-      target.num_overlays = 1;
-    } else if (!overlay_err.empty()) {
+    if (with_overlays) {
+      if (sample_grid_.draw(gpu_, view, target_.width, target_.height, src_full, unclipped, overlays.at(0),
+                            overlay_err)) {
+        ++num_overlays;
+      }
+      if (overlay_gpu_ != nullptr && overlay_err.empty() &&
+          overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio, unclipped,
+                             overlays.at(static_cast<size_t>(num_overlays)), overlay_err)) {
+        ++num_overlays;
+      }
+    }
+    if (!overlay_err.empty()) {
       error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
+    }
+    if (num_overlays > 0) {
+      target.overlays = overlays.data();
+      target.num_overlays = num_overlays;
     }
     if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
@@ -1007,6 +1021,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
       plane_views_.destroy(gpu_);
+      sample_grid_.destroy(gpu_);
       detail::destroy_slot(gpu_, slot_b_);
     }
     compare_.destroy();
@@ -1048,6 +1063,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
+  detail::SampleGridLayer sample_grid_;                   // WI-1.409
   detail::Measurer measurer_;                             // §10.7 (WI-4.452)
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;

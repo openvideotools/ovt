@@ -134,3 +134,7 @@ target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.c
 # render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
 target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
 target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
+
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2). The transform tests are CPU
+# only; the grid golden is tests/golden/render/grid_zoom8.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_view_transform.cpp)
