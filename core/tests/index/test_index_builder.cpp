@@ -395,7 +395,7 @@ TEST_CASE("index_builder_av1: damaged streams still give an index", "[index][av1
   }
 }
 
-TEST_CASE("index_builder: only AV1 has a dispatch in part a", "[index][fast]") {
+TEST_CASE("index_builder: a codec without a dispatch is refused", "[index][fast]") {
   CHECK_THROWS_AS(idx::StreamIndexBuilder(idx::BuilderOptions{fb::Codec::VP9}), idx::UnsupportedCodec);
 }
 
