@@ -177,6 +177,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/picture_controller.cpp"
     "${app_dir}/src/platform/android_state.h"
     "${app_dir}/src/platform/android_state.cpp"
+    "${app_dir}/src/compare_controller.h"
+    "${app_dir}/src/compare_controller.cpp"
     "${app_dir}/src/render_stub.h"
     "${app_dir}/src/render_stub.cpp"
     "${app_dir}/src/models/hdr_metadata_model.h"

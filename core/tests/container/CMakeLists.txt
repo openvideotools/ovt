@@ -10,9 +10,12 @@ add_executable(
   box_walk_test.cpp
   byte_service_test.cpp
   c_api_test.cpp
+  decoders_fragment_boxes_test.cpp
+  decoders_codec_config_test.cpp
   decoders_colour_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
+  decoders_sample_tables_test.cpp
   field_builder_test.cpp
   ivf_test.cpp
   lazy_test.cpp

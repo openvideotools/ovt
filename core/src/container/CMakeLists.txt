@@ -13,11 +13,15 @@ target_sources(
           isobmff/box_registry.cpp
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
+          isobmff/decoders/fragment_boxes.cpp
+          isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp
           isobmff/decoders/movie.cpp
           isobmff/decoders/sample_entries.cpp
+          isobmff/decoders/sample_tables.cpp
           isobmff/field_builder.cpp
           isobmff/lazy.cpp
+          isobmff/paged_span.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp

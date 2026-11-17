@@ -470,6 +470,8 @@ void       ovt_container_close(ovt_Container*);
 
 typedef struct ovt_Stream ovt_Stream;                 /* one video track / elementary stream */
 ovt_status ovt_stream_open(ovt_Container*, int track_index, ovt_Stream** out);
+typedef enum ovt_IndexFlags { OVT_INDEX_ALLOW_PARTIAL = 1 } ovt_IndexFlags;
+ovt_status ovt_stream_set_index_flags(ovt_Stream*, uint32_t flags);   /* stream options for build_index (#710) */
 ovt_status ovt_stream_build_index(ovt_Stream*, ovt_Job* job /* nullable */, ovt_Buffer* out_index /* StreamIndex */);
 ovt_Buffer ovt_stream_index(ovt_Stream*);             /* last built StreamIndex; handle-owned */
 ovt_status ovt_stream_unit_bytes(ovt_Stream*, uint32_t unit_index, ovt_Buffer* out_raw, ovt_Buffer* out_rbsp);
