@@ -54,6 +54,13 @@ struct HostState {
   int plane_mode = 0;
   bool show_cropped = true;
   std::uint32_t background_rgba = 0x202020FFU;
+  int tone_map = 0;
+  int gamut_map = 0;
+  double clip_nits = 1000.0;
+  double target_peak_override = 0.0;
+  bool false_color = false;
+  bool gamut_clip_overlay = false;
+  bool dither = true;
 };
 
 std::uint32_t to_rgba(const QColor& c) {
@@ -68,6 +75,15 @@ ViewState view_for(const HostState& s, int w, int h) {
   v.plane_mode = s.plane_mode;
   v.show_cropped = s.show_cropped;
   v.background_rgba = s.background_rgba;
+  v.tone_map =
+      static_cast<ovt::render::ToneMap>(std::clamp(s.tone_map, 0, static_cast<int>(ovt::render::ToneMap::None)));
+  v.gamut_map = static_cast<ovt::render::GamutMap>(
+      std::clamp(s.gamut_map, 0, static_cast<int>(ovt::render::GamutMap::Highlight)));
+  v.clip_nits = static_cast<float>(s.clip_nits);
+  v.target_peak_override = static_cast<float>(s.target_peak_override);
+  v.false_color = s.false_color;
+  v.gamut_clip_overlay = s.gamut_clip_overlay;
+  v.dither = s.dither;
   v.zoom = s.zoom;
   v.pan_x = s.pan_x;
   v.pan_y = s.pan_y;
@@ -168,6 +184,13 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     state_.plane_mode = host->plane_mode_;
     state_.show_cropped = host->show_cropped_;
     state_.background_rgba = to_rgba(host->background_);
+    state_.tone_map = host->tone_map_;
+    state_.gamut_map = host->gamut_map_;
+    state_.clip_nits = host->clip_nits_;
+    state_.target_peak_override = host->target_peak_override_;
+    state_.false_color = host->false_color_;
+    state_.gamut_clip_overlay = host->gamut_clip_overlay_;
+    state_.dither = host->dither_;
     if (host->window() != nullptr) {
       device_pixel_ratio_ = host->window()->effectiveDevicePixelRatio();
     }
