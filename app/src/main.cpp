@@ -35,6 +35,9 @@
 #include "ovt_version_full.h"  // generated: OVT_VERSION_FULL = <VERSION>+<git sha>
 #include "platform/platform.h"
 #include "project.h"
+#if defined(Q_OS_ANDROID) && defined(OVT_HAVE_PICTURE_HOST)
+#include "picture_selftest.h"
+#endif
 #ifdef OVT_ENABLE_TEST_IPC
 #include "testipc/test_ipc_server.h"
 #endif
@@ -128,6 +131,9 @@ Q_DECL_EXPORT int main(int argc, char* argv[]) {
   format.setAlphaBufferSize(8);
   QSurfaceFormat::setDefaultFormat(format);
   QQuickWindow::setDefaultAlphaBuffer(true);
+#if defined(OVT_HAVE_PICTURE_HOST)
+  ovt::app::maybe_schedule_picture_selftest();  // WI-A.403: debuggable APK + debug.ovt.picture_selftest=1 only
+#endif
   return QGuiApplication::exec();
 #else
   QQmlApplicationEngine engine;

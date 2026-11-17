@@ -195,13 +195,13 @@ val qtCMakeArguments =
         // -ovt triplet from ANDROID_ABI) -> vcpkg -> the pinned NDK's android.toolchain.cmake.
         "-DQT_CHAINLOAD_TOOLCHAIN_FILE=$ovtRoot/cmake/toolchains/android-vcpkg.cmake",
         "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=$ndkDir/build/cmake/android.toolchain.cmake",
-        // §13.4.2: GUI shell on, CLI off. The renderer (WI-A.401), the aom plugin and the codec-pack plugins
-        // (WI-0.053) join with the work items that put them in the APK; WI-0.050 ships the empty window only.
+        // §13.4.2: GUI shell on, CLI off. The renderer is in the APK since WI-A.403 (the Picture panel's EMBEDDED
+        // mode); the aom plugin and the codec-pack plugins (WI-0.053) join with the work items that put them in it.
         "-DOVT_BUILD_GUI=ON",
         "-DOVT_BUILD_CLI=OFF",
         "-DOVT_BUILD_TESTS=OFF",
         "-DOVT_BUILD_PYTHON=OFF",
-        "-DOVT_BUILD_RENDER=OFF",
+        "-DOVT_BUILD_RENDER=ON",
         "-DOVT_BUILD_PLUGIN_AOM=OFF",
         "-DOVT_BUILD_PLUGIN_DE265=OFF",
         "-DOVT_BUILD_PLUGIN_FFMPEG=OFF",

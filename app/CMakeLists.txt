@@ -15,17 +15,18 @@
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
 
 # The Picture panel's PictureHost (WI-1.405) is a QQuickRhiItem (Qt 6.7+) drawing libovt-render's offscreen texture
-# with a passthrough shader compiled by Qt Shader Tools. Distro builds with an older Qt, builds without ovt_render and
-# Android (its EMBEDDED host is WI-A.403) get the panel without it: Platform.pictureHostAvailable is false there.
+# with a passthrough shader compiled by Qt Shader Tools. On Android it draws through the shared-context GL interop of
+# WI-A.403 (picture_host_android.cpp). Distro builds with an older Qt and builds without ovt_render get the panel
+# without it: Platform.pictureHostAvailable is false there.
 set(OVT_STUDIO_PICTURE_HOST OFF)
-if(NOT ANDROID AND TARGET ovt::render AND Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
+if(TARGET ovt::render AND Qt6_VERSION VERSION_GREATER_EQUAL 6.7)
   find_package(Qt6 COMPONENTS ShaderTools QUIET)
   if(TARGET Qt6::ShaderTools OR COMMAND qt_add_shaders)
     set(OVT_STUDIO_PICTURE_HOST ON)
   else()
     message(STATUS "Qt Shader Tools not found: OVT Studio builds without the PictureHost item")
   endif()
-elseif(NOT ANDROID)
+else()
   message(STATUS "OVT Studio builds without the PictureHost item (needs Qt >= 6.7 and OVT_BUILD_RENDER)")
 endif()
 
@@ -89,7 +90,14 @@ function(ovt_studio_add_qml_module target)
   if(OVT_STUDIO_PICTURE_HOST)
     list(APPEND qml_files "${app_dir}/qml/panels/PictureView.qml")
     set(picture_sources "${app_dir}/src/picture_frame.h" "${app_dir}/src/picture_host.h"
-                        "${app_dir}/src/picture_host.cpp")
+                        "${app_dir}/src/picture_host.cpp" "${app_dir}/src/picture_host_android.h")
+    if(ANDROID)
+      # The §10.2.2 Android row (WI-A.403): the shared EGL context lives with the JNI glue's native sources.
+      # picture_selftest.cpp: WI-A.403's on-device acceptance check (debuggable APKs, behind a system property).
+      list(APPEND picture_sources "${app_dir}/src/picture_host_android.cpp" "${app_dir}/src/picture_selftest.h"
+           "${app_dir}/src/picture_selftest.cpp" "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp/gl_share.h"
+           "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp/gl_share.cpp")
+    endif()
   endif()
   # Android reads its Configuration, input devices and windowing mode in platform_android.cpp (WI-A.451).
   set(platform_sources "")
@@ -205,6 +213,11 @@ function(ovt_studio_add_qml_module target)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/render/src")
     target_compile_definitions(${target} PRIVATE OVT_HAVE_PICTURE_HOST=1)
     ovt_studio_add_picture_shaders(${target})
+    if(ANDROID)
+      # gl_share.h, and the NDK's EGL and GLES 3.0 for the shared context and its fence (WI-A.403).
+      target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp")
+      target_link_libraries(${target} PRIVATE EGL GLESv3)
+    endif()
   endif()
 endfunction()
 
@@ -341,6 +354,10 @@ elseif(ANDROID)
   qt_policy(SET QTP0002 NEW)
   set_property(TARGET ovt_studio APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "$<TARGET_FILE:ovt_core>"
                                                  "$<TARGET_FILE:ovt_jni>")
+  if(TARGET ovt_render)
+    # The renderer of the Picture panel's EMBEDDED mode (WI-A.403).
+    set_property(TARGET ovt_studio APPEND PROPERTY QT_ANDROID_EXTRA_LIBS "$<TARGET_FILE:ovt_render>")
+  endif()
   # Nothing links ovt_jni (the JVM loads it), so make sure it is built before androiddeployqt packages it.
   add_dependencies(ovt_studio ovt_jni)
 else()
