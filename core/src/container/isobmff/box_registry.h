@@ -124,8 +124,10 @@ const RegistryEntry* lookup_uuid(const std::array<uint8_t, 16>& usertype);
 bool register_decoder(const BoxDecoder* d);  // appends to the global registry; lookup() joins lazily
 
 struct DecodeOutcome {
-  uint64_t children_offset = 0;  // ContainerWithPrefix: payload offset of the first child
-  bool truncated = false;        // the decoder threw ParseError; CNT-1002 is on the node
+  // ContainerWithPrefix: payload offset of the first child. A decoder of any other kind (Leaf, Opaque) must leave it
+  // at 0: fill_payload walks the children of any decoder whose offset lies inside the payload, whatever the row's kind.
+  uint64_t children_offset = 0;
+  bool truncated = false;  // the decoder threw ParseError; CNT-1002 is on the node
 };
 // The walker's call of a decoder: a ParseError is caught and becomes CNT-1002 ("truncated <box>: <message>"); fields
 // recorded before the throw are kept.
