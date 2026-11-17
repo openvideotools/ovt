@@ -351,6 +351,22 @@ TEST_CASE("lazy: an expand that changes nothing keeps the tree buffer", "[contai
   CHECK(ovt_container_tree(o.container).data == grown.data);
 }
 
+TEST_CASE("lazy: ovt_container_box_at sees an expand before the tree is read again",
+          "[container][isobmff][lazy][fast]") {
+  // The handle serialises the tree lazily, on its next read; box_at is such a read.
+  const Bytes data = fragmented_file(70);
+  Opened o(std::make_unique<ovt::io::MemoryFile>(data));
+  const uint64_t moof = moof_offsets(tree_of(o.container))[69];
+  const uint64_t traf = moof + 8 + 16;  // after the moof header and its 16-byte mfhd
+  uint64_t box = 0;
+  int depth = 0;
+  REQUIRE(ovt_container_box_at(o.container, traf + 4, &box, &depth) == OVT_OK);
+  CHECK(box == moof);  // header-only: no traf yet
+  REQUIRE(ovt_container_expand(o.container, moof) == OVT_OK);
+  REQUIRE(ovt_container_box_at(o.container, traf + 4, &box, &depth) == OVT_OK);
+  CHECK(box == traf);
+}
+
 TEST_CASE("lazy: a moof whose first child is not mfhd keeps no children until expanded",
           "[container][isobmff][lazy][fast]") {
   Bytes data = fragmented_file(65);

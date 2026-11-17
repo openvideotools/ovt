@@ -70,12 +70,22 @@ ovt_status status_of_current_exception() noexcept;
 
 }  // namespace ovt::container
 
+struct ovt_Container;
+namespace ovt::container {
+// Re-serialises the handle's tree when an expand marked it stale; a no-op otherwise. The caller holds
+// bytes.tree_mutex(). Throws what Reader::tree() throws (std::bad_alloc).
+void refresh_tree(ovt_Container& c);
+}  // namespace ovt::container
+
 struct ovt_Container {
   ovt_File* file = nullptr;  // not owned; outlives the container
   ovt::container::Format format = ovt::container::Format::Unknown;
   std::unique_ptr<ovt::container::Reader> reader;
-  std::vector<uint8_t> tree;          // serialised ContainerTree, rebuilt after every expand
+  std::vector<uint8_t> tree;          // serialised ContainerTree; rebuilt on the next read after an expand changed it
   ovt::container::ByteService bytes;  // page cache and tree lock of the thread-safe byte service (§8.8)
+  // An expand changed the reader's tree since `tree` was serialised. Guarded by bytes.tree_mutex(), like `tree`.
+  // Serialising lazily keeps a run of expands linear: each one used to re-serialise the whole tree.
+  bool tree_stale = false;
 };
 
 #endif  // OVT_CONTAINER_CONTAINER_HPP
