@@ -32,7 +32,7 @@ ColumnLayout {
 
     spacing: 0
 
-    // Qt's logical pixels are dp on Android (density scaling is always on, §11.5.4); the platform value wins.
+    // Android ignores the width given: Qt's item width is in device pixels there. The platform polls Configuration.
     onWidthChanged: if (trackWindow) Platform.refresh(width)
 
     // Logged for the emulator test (test_android_breakpoints.py): the class, the width it came from and the selected frame.

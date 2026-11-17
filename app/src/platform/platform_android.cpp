@@ -69,6 +69,11 @@ bool Platform::refreshFromAndroid(bool read_width) {
       ok = true;
     }
   }
+  // Devices and windowing change rarely; the width is polled at 5 Hz (platform.cpp), these are not.
+  static int tick = 0;
+  if (tick++ % 10 != 0) {
+    return ok;
+  }
   setHasHover(anyHoverDevice());
   // Activity.isInMultiWindowMode() (API 24): split-screen, freeform and desktop windowing all report true. An
   // application Context has no such method; the call then leaves a pending exception that is cleared.

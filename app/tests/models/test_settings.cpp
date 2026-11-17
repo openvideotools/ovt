@@ -17,7 +17,11 @@
 #include <QString>
 #include <QTemporaryDir>
 
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QSignalSpy>
 #include "platform/platform.h"
+#include "qt_test_app.h"
 #include "settings.h"
 
 namespace {
@@ -154,4 +158,31 @@ TEST_CASE("Platform: RHI backend names", "[fast][gui][platform]") {
 #else
   CHECK(Platform::defaultGraphicsApi() == QSGRendererInterface::Vulkan);
 #endif
+}
+
+// WI-A.451: the Android Configuration is polled (the width of a window is not an event Qt delivers reliably); the
+// polling path runs here with a stand-in for the Configuration read, so a resize after start-up is covered.
+TEST_CASE("Platform: a polled width change switches the layout class", "[fast][gui][platform]") {
+  CHECK(Platform::layoutClassForWidth(1300) == QStringLiteral("three"));
+  CHECK(Platform::layoutClassForWidth(900) == QStringLiteral("two"));
+  CHECK(Platform::layoutClassForWidth(700) == QStringLiteral("vertical"));
+  Platform platform;
+  double configuration_dp = 1300;
+  platform.startPolling([&platform, &configuration_dp] { platform.setWidthDp(configuration_dp); }, 5);
+  QSignalSpy changed(&platform, &Platform::widthDpChanged);
+  auto wait_for = [&](double expected) {
+    QElapsedTimer timer;
+    timer.start();
+    while (platform.widthDp() != expected && timer.elapsed() < 2000) {
+      QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    }
+    return platform.widthDp() == expected;
+  };
+  for (const auto& [width, layout] :
+       {std::pair{1300.0, "three"}, {900.0, "two"}, {700.0, "vertical"}, {1300.0, "three"}}) {
+    configuration_dp = width;
+    REQUIRE(wait_for(width));
+    CHECK(Platform::layoutClassForWidth(platform.widthDp()) == QString::fromLatin1(layout));
+  }
+  CHECK(changed.count() == 4);  // 1280 (the default) -> 1300 -> 900 -> 700 -> 1300: each change once
 }

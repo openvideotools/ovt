@@ -69,7 +69,7 @@ TestCase {
         compare(Platform.layoutClassForWidth(320), "single")
     }
 
-    // The window's width, when given, is the width (a stale Configuration read must not hold the old class).
+    // Where there is no Configuration (desktop), the window width given is the width.
     function test_refreshTakesTheWindowWidth() {
         Platform.refresh(700)
         compare(Platform.widthDp, 700)

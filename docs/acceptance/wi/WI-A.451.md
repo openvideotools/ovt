@@ -30,5 +30,17 @@ The script sets the window size with `adb shell wm size` at the device density (
 1300, 900, 700), starts the app and waits for the `qml` log lines `OVT: layout three|two|vertical widthDp=<n>
 frame=<decode index>` that `CompactLayout.qml` writes on every class change. It asserts the class sequence, that the
 app read the width it was given, and that `frame` did not change. It skips without `adb`/an attached emulator.
-Mac Mini run of 7c4a50d: the NDK build passed; the script failed on three counts (log level, a duplicate launch
-line, and a runtime resize that did not reach the layout class), fixed in the follow-up commit. Re-run pending.
+Mac Mini runs (emulator `ovt-api36-arm64`, 1080x2400, 420 dpi):
+
+- 7c4a50d: the NDK build passed (arm64 and x86_64, no warnings); the script failed on the log level, a duplicate
+  launch line and a runtime resize that did not reach the layout class.
+- 36cbdfc: `Platform.widthDp` was in device pixels (Qt's item width is in pixels there, device pixel ratio 1) and
+  an item's `width` stopped changing after start-up. Fixed by never using an item width on Android: `Platform`
+  now polls `Configuration.screenWidthDp` every 200 ms (the poll is covered on the desktop by the Catch2 test
+  "Platform: a polled width change switches the layout class").
+- Frame half **blocked**: a VIEW intent opens the fd natively (`OVT: opened fd size=...`) but the open file never
+  reaches the QML `Project`/`Selection` (the debug app still shows the no-file page and `frame` stays -1). That is
+  the gap between `OvtSession` and the Project model (WI-A.452 / WI-1.509b), not this item, so "frame is kept" is
+  proved on the desktop only (`tst_breakpoints.qml`, frame 42) until that lands.
+
+Re-run of the class sequence pending.

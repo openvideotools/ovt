@@ -4,7 +4,8 @@
 two-pane -> vertical without losing ``Selection.frame``.
 
 The app logs ``OVT: layout <class> widthDp=<n> frame=<decode index>`` (CompactLayout.qml) whenever the layout class
-changes. Set ``OVT_ANDROID_MEDIA_URI`` to open a file first so that "the frame is kept" is tested on a real frame.
+changes. Set ``OVT_ANDROID_MEDIA_URI`` to open a file first; "the frame is kept" is only meaningful on a real frame once such
+a file reaches Selection (blocked on WI-A.452 / WI-1.509b).
 The test installs nothing: it needs a debug build of the app on a running emulator (``adb`` on the PATH,
 ``OVT_ANDROID_SERIAL`` for a particular one) and is skipped otherwise, because the emulator CI (WI-0.035, #487) is
 not merged; the run is recorded in docs/acceptance/wi/WI-A.451.md. It changes the window size with ``adb shell wm
@@ -25,8 +26,9 @@ import pytest
 
 PACKAGE = os.environ.get("OVT_ANDROID_PACKAGE", "org.openvideotools.studio.debug")
 SERIAL = os.environ.get("OVT_ANDROID_SERIAL")
-# content:// URI of a video on the device (see docs/acceptance/wi/WI-A.450.md test 2); without it no file is open and
-# Selection.frame stays -1 across the switches, which proves the class sequence only.
+# content:// URI of a video on the device (see docs/acceptance/wi/WI-A.450.md test 2). Without it, and until a file
+# opened through an intent reaches the QML Selection (WI-A.452 / WI-1.509b; today Selection.frame stays -1), the frame
+# check proves "unchanged at -1" and the class sequence only.
 MEDIA_URI = os.environ.get("OVT_ANDROID_MEDIA_URI")
 LAYOUT_RE = re.compile(r"OVT: layout (\w+) widthDp=(\d+) frame=(-?\d+)")
 # The widths of the acceptance test and the class §11.5.2 gives each.
@@ -92,12 +94,6 @@ def test_resize_switches_layouts_keeping_the_frame(emulator):
     adb(*start)
     _, first_width, frame = wait_for_class("three")
     assert abs(first_width - 1300) <= 1
-    if MEDIA_URI:
-        deadline = time.monotonic() + 20
-        while frame < 0 and time.monotonic() < deadline:
-            time.sleep(1)
-            frame = layouts()[-1][2]
-        assert frame >= 0, "the file did not open (no selected frame)"
     for width_dp, expected in STEPS[1:]:
         adb("shell", "wm", "size", f"{round(width_dp * density / 160)}x{height}")
         _, reported, now = wait_for_class(expected)

@@ -13,6 +13,10 @@
 #include <QSGRendererInterface>
 #include <QString>
 
+#include <functional>
+
+class QTimer;
+
 namespace ovt::app {
 
 class Platform : public QObject {
@@ -56,10 +60,12 @@ class Platform : public QObject {
   // "single" (< 600). Layouts switch on these names (CompactLayout.qml).
   Q_INVOKABLE static QString layoutClassForWidth(double width_dp);
 
-  // Android: re-reads the input devices and the multi-window state, and takes the width of the window in dp
-  // (`window_width_dp`) when it is positive, else Configuration.screenWidthDp (platform_android.cpp); elsewhere it
-  // takes `window_width_dp` when it is positive. QML calls it when the window resizes, so a
-  // switch happens within a frame (§11.5.3).
+  // Android: re-reads Configuration.screenWidthDp, the input devices and the multi-window state (platform_android.cpp;
+  // `window_width_dp` is ignored there, see refresh()); elsewhere takes `window_width_dp` when it is positive. QML
+  // calls it when the window resizes.
+  // Calls `read` every `interval_ms` (Android polls its Configuration this way; tests pass a stand-in).
+  void startPolling(std::function<void()> read, int interval_ms);
+
   Q_INVOKABLE void refresh(double window_width_dp = 0);
 
  Q_SIGNALS:
@@ -104,6 +110,7 @@ class Platform : public QObject {
   bool has_hover_ = false;
   double width_dp_ = 1280;  // desktop default: the three-pane layout
   QString windowing_mode_;
+  QTimer* poll_ = nullptr;
 };
 
 }  // namespace ovt::app
