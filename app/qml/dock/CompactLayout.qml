@@ -36,11 +36,26 @@ ColumnLayout {
     onWidthChanged: if (trackWindow) Platform.refresh(width)
 
     // Logged for the emulator test (test_android_breakpoints.py): the class, the width it came from and the selected frame.
+    // Once per class and width, not once per trigger: the class change and the first layout pass both ask.
+    property string lastLogged: ""
     function logLayout() {
-        console.log("OVT: layout " + layoutClass + " widthDp=" + Math.round(widthDp) + " frame=" + Selection.frameDecodeIndex)
+        const line = "OVT: layout " + layoutClass + " widthDp=" + Math.round(widthDp) + " frame=" + Selection.frameDecodeIndex
+        if (line !== lastLogged) {
+            lastLogged = line
+            console.log(line)
+        }
     }
     onLayoutClassChanged: if (active) logLayout()
+    onWidthDpChanged: if (active) logLayout()
     Component.onCompleted: if (active) logLayout()
+
+    Connections {
+        target: Selection
+        function onChanged() {
+            if (root.active)
+                root.logLayout()
+        }
+    }
 
     // The drawer button of the two-pane and vertical layouts.
     ToolBar {

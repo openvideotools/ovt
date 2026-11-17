@@ -4,7 +4,8 @@
 two-pane -> vertical without losing ``Selection.frame``.
 
 The app logs ``OVT: layout <class> widthDp=<n> frame=<decode index>`` (CompactLayout.qml) whenever the layout class
-changes. The test installs nothing: it needs a debug build of the app on a running emulator (``adb`` on the PATH,
+changes. Set ``OVT_ANDROID_MEDIA_URI`` to open a file first so that "the frame is kept" is tested on a real frame.
+The test installs nothing: it needs a debug build of the app on a running emulator (``adb`` on the PATH,
 ``OVT_ANDROID_SERIAL`` for a particular one) and is skipped otherwise, because the emulator CI (WI-0.035, #487) is
 not merged; the run is recorded in docs/acceptance/wi/WI-A.451.md. It changes the window size with ``adb shell wm
 size`` at the device's own density (dp = px * 160 / density, so the Configuration the app reads is the one a user
@@ -24,6 +25,9 @@ import pytest
 
 PACKAGE = os.environ.get("OVT_ANDROID_PACKAGE", "org.openvideotools.studio.debug")
 SERIAL = os.environ.get("OVT_ANDROID_SERIAL")
+# content:// URI of a video on the device (see docs/acceptance/wi/WI-A.450.md test 2); without it no file is open and
+# Selection.frame stays -1 across the switches, which proves the class sequence only.
+MEDIA_URI = os.environ.get("OVT_ANDROID_MEDIA_URI")
 LAYOUT_RE = re.compile(r"OVT: layout (\w+) widthDp=(\d+) frame=(-?\d+)")
 # The widths of the acceptance test and the class §11.5.2 gives each.
 STEPS = [(1300, "three"), (900, "two"), (700, "vertical")]
@@ -38,8 +42,11 @@ def adb(*args: str, check: bool = True) -> str:
 
 
 def layouts() -> list[tuple[str, int, int]]:
-    log = adb("logcat", "-d", "-s", "qml:I")
-    return [(m.group(1), int(m.group(2)), int(m.group(3))) for m in LAYOUT_RE.finditer(log)]
+    log = adb("logcat", "-d", "-s", "qml:D")
+    found = [(m.group(1), int(m.group(2)), int(m.group(3))) for m in LAYOUT_RE.finditer(log)]
+    # console.log is level D. A class is logged again when the width settles or the frame changes: keep the last
+    # entry of each run of one class.
+    return [entry for i, entry in enumerate(found) if i + 1 == len(found) or found[i + 1][0] != entry[0]]
 
 
 def wait_for_class(name: str, timeout: float = 20.0) -> tuple[str, int, int]:
@@ -78,9 +85,19 @@ def test_resize_switches_layouts_keeping_the_frame(emulator):
     adb("shell", "am", "force-stop", PACKAGE)
     # Start at 1300 dp so that the first layout the app logs is the three-pane one.
     adb("shell", "wm", "size", f"{round(1300 * density / 160)}x{height}")
-    adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/org.openvideotools.studio.MainActivity")
+    start = ["shell", "am", "start", "-W", "-n", f"{PACKAGE}/org.openvideotools.studio.MainActivity"]
+    if MEDIA_URI:
+        # A file open, so that Selection.frame is a frame and not -1 (see the module docstring).
+        start += ["-a", "android.intent.action.VIEW", "-t", "video/mp4", "--grant-read-uri-permission", "-d", MEDIA_URI]
+    adb(*start)
     _, first_width, frame = wait_for_class("three")
     assert abs(first_width - 1300) <= 1
+    if MEDIA_URI:
+        deadline = time.monotonic() + 20
+        while frame < 0 and time.monotonic() < deadline:
+            time.sleep(1)
+            frame = layouts()[-1][2]
+        assert frame >= 0, "the file did not open (no selected frame)"
     for width_dp, expected in STEPS[1:]:
         adb("shell", "wm", "size", f"{round(width_dp * density / 160)}x{height}")
         _, reported, now = wait_for_class(expected)

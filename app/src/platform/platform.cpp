@@ -52,7 +52,7 @@ Platform::Platform()
     : has_hover_(!isAndroid()),
       windowing_mode_(isAndroid() ? QStringLiteral("fullscreen") : QStringLiteral("desktop")) {
   if (isAndroid()) {
-    refreshFromAndroid();
+    refreshFromAndroid(true);
   }
 }
 
@@ -94,13 +94,20 @@ QString Platform::layoutClassForWidth(double width_dp) {
 }
 
 void Platform::refresh(double window_width_dp) {
-  if (!refreshFromAndroid() && window_width_dp > 0) {
+  // On Android the Activity's Configuration can lag the window by a frame (the Qt content is resized first, and a
+  // stale read would leave the old layout class in force with no later event to correct it), so a window width
+  // that is given wins; the Configuration supplies the start-up value, before the first window exists.
+  const bool have_window_width = window_width_dp > 0;
+  const bool configured = refreshFromAndroid(!have_window_width);
+  if (have_window_width) {
     setWidthDp(window_width_dp);
+  } else if (!configured) {
+    return;
   }
 }
 
 #ifndef Q_OS_ANDROID
-bool Platform::refreshFromAndroid() {
+bool Platform::refreshFromAndroid(bool /*read_width*/) {
   return false;
 }
 #endif

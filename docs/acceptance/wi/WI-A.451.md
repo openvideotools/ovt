@@ -30,4 +30,4 @@ The script sets the window size with `adb shell wm size` at the device density (
 1300, 900, 700), starts the app and waits for the `qml` log lines `OVT: layout three|two|vertical widthDp=<n>
 frame=<decode index>` that `CompactLayout.qml` writes on every class change. It asserts the class sequence, that the
 app read the width it was given, and that `frame` did not change. It skips without `adb`/an attached emulator.
-Run it on the Mac Mini AVD (`ovt-api36-arm64`) and paste the output here: **not yet run**.
+Mac Mini run of 7c4a50d: the NDK build passed; the script failed on three counts (log level, a duplicate launch line, and a runtime resize that did not reach the layout class), fixed in the follow-up commit. Re-run pending.

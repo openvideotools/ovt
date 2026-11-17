@@ -52,7 +52,7 @@ bool anyHoverDevice() {
 
 }  // namespace
 
-bool Platform::refreshFromAndroid() {
+bool Platform::refreshFromAndroid(bool read_width) {
   const QJniObject context = QNativeInterface::QAndroidApplication::context();
   if (!context.isValid()) {
     return false;
@@ -62,7 +62,7 @@ bool Platform::refreshFromAndroid() {
       resources.isValid() ? resources.callObjectMethod("getConfiguration", "()Landroid/content/res/Configuration;")
                           : QJniObject();
   bool ok = false;
-  if (configuration.isValid()) {
+  if (read_width && configuration.isValid()) {
     const jint width = configuration.getField<jint>("screenWidthDp");
     if (width > 0) {
       setWidthDp(width);

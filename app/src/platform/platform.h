@@ -56,8 +56,9 @@ class Platform : public QObject {
   // "single" (< 600). Layouts switch on these names (CompactLayout.qml).
   Q_INVOKABLE static QString layoutClassForWidth(double width_dp);
 
-  // Android: re-reads Configuration.screenWidthDp and the input devices (platform_android.cpp); elsewhere it takes
-  // `window_width_dp` (the width of the window in dp) when it is positive. QML calls it when the window resizes, so a
+  // Android: re-reads the input devices and the multi-window state, and takes the width of the window in dp
+  // (`window_width_dp`) when it is positive, else Configuration.screenWidthDp (platform_android.cpp); elsewhere it
+  // takes `window_width_dp` when it is positive. QML calls it when the window resizes, so a
   // switch happens within a frame (§11.5.3).
   Q_INVOKABLE void refresh(double window_width_dp = 0);
 
@@ -98,7 +99,7 @@ class Platform : public QObject {
  private:
   // Android: Configuration.screenWidthDp of the Activity, the input devices and the multi-window state
   // (platform_android.cpp). Elsewhere a no-op that returns false.
-  bool refreshFromAndroid();
+  bool refreshFromAndroid(bool read_width);
 
   bool has_hover_ = false;
   double width_dp_ = 1280;  // desktop default: the three-pane layout

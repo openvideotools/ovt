@@ -69,6 +69,14 @@ TestCase {
         compare(Platform.layoutClassForWidth(320), "single")
     }
 
+    // The window's width, when given, is the width (a stale Configuration read must not hold the old class).
+    function test_refreshTakesTheWindowWidth() {
+        Platform.refresh(700)
+        compare(Platform.widthDp, 700)
+        Platform.refresh(0)
+        compare(Platform.widthDp, 700)
+    }
+
     // The desktop never compacts: the same width on a desktop shell stays three-pane.
     function test_desktopStaysThreePane() {
         const shell = createTemporaryObject(shellComponent, host.contentItem, {"compactEnabled": false})
