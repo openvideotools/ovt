@@ -88,7 +88,7 @@ ovt_status finish_container(ovt_File* file, Format f, std::unique_ptr<Reader> re
   if (tree.empty()) {
     tree = empty_tree(f);
   }
-  *out = new ovt_Container{file, f, std::move(reader), std::move(tree), {}};
+  *out = new ovt_Container{file, f, std::move(reader), std::move(tree), {}, false};
   return OVT_OK;
 }
 
@@ -197,7 +197,13 @@ OVT_API ovt_Buffer ovt_container_tree(ovt_Container* container) {
   if (container == nullptr) {
     return ovt_Buffer{nullptr, 0};
   }
-  return ovt_Buffer{container->tree.data(), container->tree.size()};
+  try {
+    const std::lock_guard lock(container->bytes.tree_mutex());
+    ovt::container::refresh_tree(*container);
+    return ovt_Buffer{container->tree.data(), container->tree.size()};
+  } catch (...) {
+    return ovt_Buffer{nullptr, 0};  // only std::bad_alloc while serialising
+  }
 }
 
 OVT_API ovt_status ovt_container_expand(ovt_Container* container, uint64_t box_offset) {
@@ -208,16 +214,14 @@ OVT_API ovt_status ovt_container_expand(ovt_Container* container, uint64_t box_o
     return OVT_E_UNSUPPORTED;
   }
   try {
+    // Held across the reader's expand: ovt_container_box_at (thread-safe, §8.8) may serialise the reader's tree.
+    const std::lock_guard lock(container->bytes.tree_mutex());
     const std::optional<uint64_t> before = container->reader->tree_revision();
     const ovt_status st = container->reader->expand(box_offset);  // ISOBMFF: WI-1.204
-    // A no-op expand (a box that is complete already) keeps the current buffer: re-serialising the whole tree on
-    // every call made expanding each box of a file quadratic (fuzz_isobmff_tree timeout).
+    // The tree is re-serialised on its next read, not here: a run of expands (fuzz_isobmff_tree expands every box)
+    // re-serialised the whole tree each time, quadratic in the number of boxes. A no-op expand leaves it as it is.
     if (st == OVT_OK && (!before || container->reader->tree_revision() != before)) {
-      if (auto tree = container->reader->tree(); !tree.empty()) {
-        // Held only for the swap: ovt_container_box_at (thread-safe, §8.8) walks the tree under the same lock.
-        const std::lock_guard lock(container->bytes.tree_mutex());
-        container->tree = std::move(tree);  // buffers are immutable: a new tree after every change
-      }
+      container->tree_stale = true;
     }
     return st;
   } catch (...) {
@@ -304,3 +308,17 @@ OVT_API void ovt_container_close(ovt_Container* container) {
 }
 
 }  // extern "C"
+
+namespace ovt::container {
+
+void refresh_tree(ovt_Container& c) {
+  if (!c.tree_stale) {
+    return;
+  }
+  if (auto tree = c.reader->tree(); !tree.empty()) {
+    c.tree = std::move(tree);  // buffers are immutable: a new one after every change
+  }
+  c.tree_stale = false;
+}
+
+}  // namespace ovt::container

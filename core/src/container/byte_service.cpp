@@ -203,6 +203,7 @@ OVT_API ovt_status ovt_container_box_at(ovt_Container* container, uint64_t offse
   }
   try {
     const std::lock_guard lock(container->bytes.tree_mutex());  // against ovt_container_expand swapping the tree
+    ovt::container::refresh_tree(*container);
     if (container->tree.empty()) {
       return OVT_E_INVALID_ARG;
     }
