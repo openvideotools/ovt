@@ -31,7 +31,7 @@ ovt_catch_discover_tests(ovt_tests_index_h264)
 # corpus-free end-to-end test.
 # test_index_vs_ffprobe.cpp (H.264 / H.265, acceptance test 1) runs ffprobe through the helpers of
 # core/tests/container/units_oracle.hpp.
-add_executable(ovt_tests_index_builder test_index_builder.cpp test_index_vs_ffprobe.cpp)
+add_executable(ovt_tests_index_builder test_index_builder.cpp test_index_vs_ffprobe.cpp test_stream_api.cpp)
 target_link_libraries(ovt_tests_index_builder PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
 target_include_directories(ovt_tests_index_builder PRIVATE "${PROJECT_SOURCE_DIR}/core/src"
                                                            "${PROJECT_SOURCE_DIR}/core/tests")
