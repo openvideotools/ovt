@@ -18,6 +18,10 @@ Automated parts (every CI platform unless noted):
   back (WI-1.463)` in `render/tests/test_macos_metal.mm`: the surface the macOS PictureHost creates
   (`Interop::MetalTexture`) retargets to a real `CAMetalLayer` with `active_encoding() == ScRgbLinear16F`, presents,
   and retargets back to its offscreen texture.
+  Run on the Mac Mini (Apple M4, macOS 15.8.2, `macos-arm64-debug`, commit 54878c4, 2026-11-17):
+  `ovt_tests_render "render_test_macos_metal*"` passed (29 assertions in 5 test cases) and all 56 `[vulkan]` render
+  cases passed (10 777 assertions), no skips. Log: project file
+  `wi1463-pr703-render-mini-20261117T033557Z.txt`.
 
 **Deferred manual record** (needs a macOS XDR display, §16.5.3; owed to Karl together with the WI-1.406 record, since
 the Mac Mini's display is SDR). Steps:
