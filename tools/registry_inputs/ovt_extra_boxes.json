@@ -20,6 +20,7 @@
     {"fourcc": "chan", "type": "FullBox", "description": "QuickTime audio channel layout", "containers": ["AudioSampleEntry", "wave"], "spec_ref": "QTFF", "versions": [0]},
     {"fourcc": "gmhd", "type": "Box", "description": "QuickTime base media information header", "containers": ["minf"], "spec_ref": "QTFF"},
     {"fourcc": "gmin", "type": "FullBox", "description": "QuickTime base media info", "containers": ["gmhd"], "spec_ref": "QTFF", "versions": [0]},
+    {"fourcc": "stps", "type": "FullBox", "description": "QuickTime partial sync sample table", "containers": ["stbl"], "spec_ref": "QTFF", "versions": [0]},
     {"fourcc": "tapt", "type": "Box", "description": "QuickTime track aperture mode dimensions", "containers": ["trak"], "spec_ref": "QTFF"},
     {"fourcc": "clef", "type": "FullBox", "description": "QuickTime track clean aperture dimensions", "containers": ["tapt"], "spec_ref": "QTFF", "versions": [0]},
     {"fourcc": "prof", "type": "FullBox", "description": "QuickTime track production aperture dimensions", "containers": ["tapt"], "spec_ref": "QTFF", "versions": [0]},

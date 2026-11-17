@@ -80,6 +80,11 @@ class FieldBuilder {
   // derived "identity", "rotation 90°", "rotation 180°", "rotation 270°" or "custom".
   void matrix(std::string_view name = "matrix");
 
+  // Windowed reads (chapter 08 §8.2.3, WI-1.209): continue on `br`, which holds the bytes of the payload that start
+  // `payload_byte` bytes after the start of the reader this builder was constructed on. Spans stay payload relative;
+  // open groups keep their start, so a group may span several windows.
+  void rebind(BitReader& br, uint64_t payload_byte);
+
   // ---- grouping ----
   FieldBuilder& group(std::string_view name);  // push a parent field (struct)
   // Parent of an array: a group with uvalue = `count` (svalue "see Sample Table view" when count > 1024). Read only
@@ -121,10 +126,11 @@ class FieldBuilder {
   fb::BoxNodeT* node_;
   uint64_t box_off_;
   BitReader* br_;
-  uint64_t base_;
+  uint64_t base0_;  // the payload_bit_base of the constructor
+  uint64_t base_;   // span of the reader position `origin_`
   uint64_t origin_;
-  std::vector<fb::FieldT*> stack_;  // open groups, outermost first
-  std::vector<uint64_t> stack_start_;
+  std::vector<fb::FieldT*> stack_;     // open groups, outermost first
+  std::vector<uint64_t> stack_start_;  // span bit offset where each group starts
   fb::FieldT* last_ = nullptr;
 };
 

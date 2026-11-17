@@ -15,6 +15,8 @@ target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1).
 target_sources(ovt_render PRIVATE src/pipeline/plane_views.cpp)
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2).
+target_sources(ovt_render PRIVATE src/pipeline/view_transform.cpp src/pipeline/sample_grid.cpp)
 # WI-1.410: compare modes (§10.2.4, §10.6.4); src/shaders/diff.glsl is embedded by the WI-2.431 loop below.
 target_sources(ovt_render PRIVATE src/pipeline/compare.cpp src/pipeline/compare_convert.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).

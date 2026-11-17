@@ -258,4 +258,46 @@ TestCase {
         verify(text.indexOf("Y " + (p.x % 256) + " U 128 V 64") > 0, text)
         verify(text.indexOf("100 %") > 0, text)
     }
+    // ---- Compare controls (WI-2.486) ------------------------------------------------------------------------------
+
+    function test_compareComboNeedsB() {
+        const panel = openPanel()
+        const combo = findByName(panel, "compareCombo")
+        verify(combo !== null)
+        verify(!combo.enabled)
+        panel.compare.setFileB(10)
+        verify(combo.enabled)
+        compare(combo.count, 7)
+        panel.compare.nextMode()
+        compare(combo.currentIndex, 1)
+        verify(!findByName(panel, "compareDivider").visible)
+    }
+
+    function test_splitDividerTrackMovesTheDivider() {
+        const panel = openPanel()
+        panel.compare.setFileB(10)
+        panel.compare.mode = CompareController.SplitVertical
+        const divider = findByName(panel, "compareDivider")
+        verify(divider.visible)
+        const track = findByName(panel, "compareDividerTrack")
+        mouseClick(track, divider.width * 0.25, 5)
+        verify(Math.abs(panel.compare.splitPosition - 0.25) <= 0.01, "split " + panel.compare.splitPosition)
+    }
+
+    function test_cKeyCyclesWithPanelFocus() {
+        const panel = openPanel()
+        panel.compare.setFileB(10)
+        panel.stage.requestActivate()
+        tryVerify(function () { return panel.stage.active })
+        const input = findByName(panel, "pictureInput")
+        input.forceActiveFocus()
+        tryVerify(function () { return input.activeFocus })
+        const order = [1, 2, 3, 4, 5, 6]
+        for (let i = 0; i < order.length; ++i) {
+            keyClick(Qt.Key_C)
+            compare(panel.compare.mode, order[i])
+        }
+        keyClick(Qt.Key_X)
+        verify(panel.compare.swapped)
+    }
 }
