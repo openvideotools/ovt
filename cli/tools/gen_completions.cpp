@@ -19,6 +19,8 @@
 #include <string_view>
 #include <vector>
 
+#include <algorithm>
+
 #include "app.h"
 
 namespace {
@@ -270,6 +272,18 @@ int generate(std::span<char*> args) {
   for (const CLI::App* sub : app.get_subcommands({})) {
     Cmd c{sub->get_name(), sub->get_description(), {}, {}};
     c.opts = options_of(cli, *sub, &c.positional_choices);
+    // Nested subcommands (`ovt cache clear`): the names complete as the first word, and their options are
+    // offered on the parent (the shell scripts know one level).
+    for (const CLI::App* inner : sub->get_subcommands({})) {
+      c.positional_choices.push_back(inner->get_name());
+      for (Opt& o : options_of(cli, *inner, nullptr)) {
+        const bool known = std::any_of(c.opts.begin(), c.opts.end(),
+                                       [&](const Opt& e) { return !o.longs.empty() && e.longs == o.longs; });
+        if (!known) {
+          c.opts.push_back(std::move(o));
+        }
+      }
+    }
     std::erase_if(c.opts, [](const Opt& o) { return !o.longs.empty() && o.longs.front() == "help"; });
     cmds.push_back(std::move(c));
   }
