@@ -25,6 +25,7 @@
 #include <QVariantList>
 #include <QVariantMap>
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -33,6 +34,7 @@
 #include <span>
 #include <vector>
 
+#include "models/jobs_model.h"
 #include "models/selection_model.h"
 #include "models/stream_index_adapter.h"
 #include "models/stream_index_model.h"
@@ -99,6 +101,20 @@ struct HexField {
 };
 using HexFieldProvider = std::function<std::vector<HexField>(int unit_index)>;
 
+// A byte pattern with wildcards (`00 00 01`, `00 ?? 01`, `000001`).
+struct HexPattern {
+  std::vector<std::uint8_t> bytes;
+  std::vector<std::uint8_t> mask;  // 0xFF: must match, 0: wildcard
+  [[nodiscard]] std::size_t size() const { return bytes.size(); }
+};
+[[nodiscard]] std::optional<HexPattern> parse_hex_pattern(const QString& text, QString* error = nullptr);
+
+// Every offset in [begin, end) where `pattern` starts (overlapping matches included), ascending, at most
+// `max_results`. `cancelled` is polled once per chunk. Reads through the byte source in chunks.
+[[nodiscard]] std::vector<std::uint64_t> hex_find_all(const ByteSource& source, const HexPattern& pattern,
+                                                      std::uint64_t begin, std::uint64_t end, std::size_t max_results,
+                                                      const std::function<bool()>& cancelled = {});
+
 // The result of Go to: a file offset, or the reason.
 struct HexGoto {
   std::optional<std::uint64_t> offset;
@@ -111,6 +127,7 @@ class HexModel : public QAbstractTableModel {
   QML_ELEMENT
   Q_PROPERTY(StreamIndexModel* streamIndex READ stream_index WRITE set_stream_index NOTIFY streamIndexChanged)
   Q_PROPERTY(SelectionModel* selection READ selection WRITE set_selection NOTIFY selectionChanged)
+  Q_PROPERTY(JobsModel* jobs READ jobs WRITE set_jobs NOTIFY jobsChanged)
   Q_PROPERTY(qulonglong fileSize READ file_size NOTIFY sourceChanged)
   Q_PROPERTY(bool hasSource READ has_source NOTIFY sourceChanged)
   // 0 File, 1 Unit, 2 Box: restricts the rows to the selected unit / box (offsets stay absolute).
@@ -119,12 +136,17 @@ class HexModel : public QAbstractTableModel {
   // 8 bytes around the field start: [{offset, value, bits, mask, epb}] and the field's name.
   Q_PROPERTY(QVariantList ribbon READ ribbon NOTIFY highlightChanged)
   Q_PROPERTY(QString ribbonField READ ribbon_field NOTIFY highlightChanged)
+  Q_PROPERTY(int matchCount READ match_count NOTIFY searchChanged)
+  Q_PROPERTY(int currentMatch READ current_match NOTIFY searchChanged)
+  Q_PROPERTY(bool searching READ searching NOTIFY searchChanged)
+  Q_PROPERTY(bool truncated READ truncated NOTIFY searchChanged)
 
  public:
   static constexpr int kBytesPerRow = 16;
   static constexpr int kPageRows = 4096;
   static constexpr std::uint64_t kPageBytes = static_cast<std::uint64_t>(kBytesPerRow) * kPageRows;  // 64 KiB
   static constexpr std::size_t kMaxCachedPages = 32;
+  static constexpr std::size_t kMaxMatches = 1000000;
   static constexpr int kRibbonBytes = 8;
 
   enum Column : int { ColOffset = 0, ColByte0 = 1, ColAscii = 17, ColumnCount = 18 };
@@ -159,9 +181,13 @@ class HexModel : public QAbstractTableModel {
   void set_stream_index(StreamIndexModel* model);
   [[nodiscard]] SelectionModel* selection() const { return selection_; }
   void set_selection(SelectionModel* selection);
+  [[nodiscard]] JobsModel* jobs() const { return jobs_; }
+  void set_jobs(JobsModel* jobs);
   // The open file's bytes (nullptr clears).
   void setSource(std::shared_ptr<const ByteSource> source);
   Q_INVOKABLE void closeFile() { setSource(nullptr); }
+  // Shows these bytes as the file (tests and the panel's own QML tests; the app proper uses ContainerByteSource).
+  Q_INVOKABLE void openBytes(const QByteArray& bytes);
   // The StreamIndex of the stream (tests and callers without a StreamIndexModel): bands and unit lookups.
   void setHandle(std::shared_ptr<const StreamIndexHandle> handle);
   // Extra bands (container boxes) beside the unit bands; replaces the previous box bands.
@@ -207,20 +233,37 @@ class HexModel : public QAbstractTableModel {
   Q_INVOKABLE [[nodiscard]] QString copyHex(qlonglong offset, qlonglong length) const;
   Q_INVOKABLE [[nodiscard]] QString copyCArray(qlonglong offset, qlonglong length) const;
 
+  // ---- search -----------------------------------------------------------------------------------------------
+  // Starts the search job; returns "" or why the pattern is invalid. Replaces the previous search.
+  Q_INVOKABLE QString search(const QString& pattern);
+  Q_INVOKABLE void cancelSearch();
+  Q_INVOKABLE bool findNext();
+  Q_INVOKABLE bool findPrevious();
+  [[nodiscard]] const std::vector<std::uint64_t>& matches() const noexcept { return matches_; }
+  [[nodiscard]] int match_count() const noexcept { return static_cast<int>(matches_.size()); }
+  [[nodiscard]] int current_match() const noexcept { return current_match_; }
+  [[nodiscard]] bool searching() const noexcept { return searching_; }
+  [[nodiscard]] bool truncated() const noexcept { return truncated_; }
+
   [[nodiscard]] QVariantList ribbon() const;
   [[nodiscard]] QString ribbon_field() const { return highlight_.name; }
 
  Q_SIGNALS:
   void streamIndexChanged();
   void selectionChanged();
+  void jobsChanged();
   void sourceChanged();
   void scopeChanged();
   void ribbonChanged();
   void highlightChanged();
+  void searchChanged();
   // The view should scroll so that this row is visible (Go to, find next, selection from another panel).
   void revealRequested(int row);
 
  private:
+  // Called on the GUI thread (queued, by name) when the search job has stored its result.
+  Q_INVOKABLE void takeSearchResult(quint64 generation);
+
   struct Highlight {
     bool active = false;
     std::uint64_t first = 0;  // file offsets of the first and last covered byte
@@ -244,11 +287,14 @@ class HexModel : public QAbstractTableModel {
   [[nodiscard]] const HexBand* band_at(std::uint64_t offset, std::size_t* ordinal = nullptr) const;
   [[nodiscard]] bool is_epb(std::uint64_t offset) const;
   [[nodiscard]] std::uint8_t highlight_mask(std::uint64_t offset) const;
+  void finish_search(quint64 generation, std::vector<std::uint64_t> found, std::size_t pattern_size);
+  void select_match(int index);
   [[nodiscard]] const Page* page_for(std::uint64_t offset) const;
   [[nodiscard]] std::optional<std::uint8_t> byte_at(std::uint64_t offset) const;
   [[nodiscard]] QString ascii_of_row(std::uint64_t row_offset) const;
   [[nodiscard]] QVariant byte_cell(std::uint64_t off, int role) const;
 
+  JobsModel* jobs_ = nullptr;
   StreamIndexModel* stream_index_ = nullptr;
   SelectionModel* selection_ = nullptr;
   std::shared_ptr<const ByteSource> source_;
@@ -266,6 +312,17 @@ class HexModel : public QAbstractTableModel {
   std::uint64_t view_begin_ = 0;
   std::uint64_t view_end_ = 0;
   Highlight highlight_;
+
+  std::vector<std::uint64_t> matches_;
+  int current_match_ = -1;
+  std::size_t match_size_ = 0;
+  bool searching_ = false;
+  bool truncated_ = false;
+  quint64 search_generation_ = 0;
+  quint64 search_job_ = 0;
+  std::shared_ptr<std::atomic<bool>> search_cancel_;
+  std::mutex result_mutex_;
+  std::vector<std::uint64_t> result_;  // written by the job, taken on the GUI thread
 
   mutable QHash<std::uint64_t, Page> pages_;
   mutable QList<std::uint64_t> page_order_;

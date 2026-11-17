@@ -17,6 +17,58 @@
 
 namespace ovt::app {
 
+namespace {
+
+constexpr std::uint64_t kSearchChunk = std::uint64_t{1} << 20U;  // the byte service's per-call limit
+
+std::optional<int> hex_digit(QChar c) {
+  const ushort u = c.unicode();
+  if (u >= '0' && u <= '9') {
+    return u - '0';
+  }
+  if (u >= 'a' && u <= 'f') {
+    return u - 'a' + 10;
+  }
+  if (u >= 'A' && u <= 'F') {
+    return u - 'A' + 10;
+  }
+  return std::nullopt;
+}
+
+void set_error(QString* error, const QString& text) {
+  if (error != nullptr) {
+    *error = text;
+  }
+}
+
+// The matches that start in data[0, starts), at file offset `base` + index. True when `found` reached `max_results`.
+bool scan_chunk(std::span<const std::uint8_t> data, std::uint64_t starts, const HexPattern& pattern, std::size_t anchor,
+                std::uint64_t base, std::size_t max_results, std::vector<std::uint64_t>& found) {
+  const std::size_t n = pattern.size();
+  for (std::uint64_t i = 0; i < starts; ++i) {
+    // Skip to the next byte equal to the pattern's first fixed byte.
+    const std::span<const std::uint8_t> window = data.subspan(i + anchor, starts - i);
+    const auto hit = std::find(window.begin(), window.end(), pattern.bytes[anchor]);
+    if (hit == window.end()) {
+      break;
+    }
+    i += static_cast<std::uint64_t>(hit - window.begin());
+    bool match = true;
+    for (std::size_t j = 0; j < n && match; ++j) {
+      match = (data[i + j] & pattern.mask[j]) == (pattern.bytes[j] & pattern.mask[j]);
+    }
+    if (match) {
+      found.push_back(base + i);
+      if (found.size() >= max_results) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
 // ---- byte sources -----------------------------------------------------------------------------------------------
 
 std::size_t MemoryByteSource::read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const {
@@ -84,11 +136,81 @@ std::vector<HexBand> hex_bands_from_index(const fb::StreamIndex& index) {
   return bands;
 }
 
+std::optional<HexPattern> parse_hex_pattern(const QString& text, QString* error) {
+  HexPattern pattern;
+  const QStringList tokens = text.simplified().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+  for (const QString& token : tokens) {
+    if (token.size() % 2 != 0) {
+      set_error(error, QStringLiteral("bytes are two hex digits each, e.g. 00 00 01 (?? matches any byte)"));
+      return std::nullopt;
+    }
+    for (qsizetype i = 0; i < token.size(); i += 2) {
+      if (token.at(i) == QLatin1Char('?') && token.at(i + 1) == QLatin1Char('?')) {
+        pattern.bytes.push_back(0);
+        pattern.mask.push_back(0);
+        continue;
+      }
+      const std::optional<int> hi = hex_digit(token.at(i));
+      const std::optional<int> lo = hex_digit(token.at(i + 1));
+      if (!hi || !lo) {
+        set_error(error, QStringLiteral("\"%1\" is not a hex byte or ??").arg(token.mid(i, 2)));
+        return std::nullopt;
+      }
+      pattern.bytes.push_back(static_cast<std::uint8_t>((*hi << 4) | *lo));
+      pattern.mask.push_back(0xFF);
+    }
+  }
+  if (pattern.bytes.empty()) {
+    set_error(error, QStringLiteral("enter bytes to find, e.g. 00 00 01"));
+    return std::nullopt;
+  }
+  if (std::none_of(pattern.mask.begin(), pattern.mask.end(), [](std::uint8_t m) { return m != 0; })) {
+    set_error(error, QStringLiteral("a pattern of only ?? matches everywhere"));
+    return std::nullopt;
+  }
+  return pattern;
+}
+
+std::vector<std::uint64_t> hex_find_all(const ByteSource& source, const HexPattern& pattern, std::uint64_t begin,
+                                        std::uint64_t end, std::size_t max_results,
+                                        const std::function<bool()>& cancelled) {
+  std::vector<std::uint64_t> found;
+  const std::uint64_t n = pattern.size();
+  end = std::min(end, source.size());
+  if (n == 0 || begin >= end || end - begin < n) {
+    return found;
+  }
+  std::size_t anchor = 0;  // first byte that is not a wildcard, for the memchr skip
+  while (anchor < n && pattern.mask[anchor] == 0) {
+    ++anchor;
+  }
+  std::vector<std::uint8_t> buffer;
+  const std::uint64_t last_start = end - n;  // inclusive
+  for (std::uint64_t s = begin; s <= last_start; s += kSearchChunk) {
+    if (cancelled && cancelled()) {
+      break;
+    }
+    const std::uint64_t starts = std::min<std::uint64_t>(kSearchChunk, last_start - s + 1);
+    buffer.resize(starts + n - 1);
+    if (source.read(s, buffer.data(), buffer.size()) != buffer.size()) {
+      break;
+    }
+    if (scan_chunk(buffer, starts, pattern, anchor, s, max_results, found)) {
+      break;
+    }
+  }
+  return found;
+}
+
 // ---- HexModel: inputs -------------------------------------------------------------------------------------------
 
 HexModel::HexModel(QObject* parent) : QAbstractTableModel(parent) {}
 
-HexModel::~HexModel() = default;
+HexModel::~HexModel() {
+  if (search_cancel_) {
+    search_cancel_->store(true);
+  }
+}
 
 void HexModel::set_stream_index(StreamIndexModel* model) {
   if (stream_index_ == model) {
@@ -123,7 +245,17 @@ void HexModel::set_selection(SelectionModel* selection) {
   Q_EMIT selectionChanged();
 }
 
+void HexModel::set_jobs(JobsModel* jobs) {
+  if (jobs_ != jobs) {
+    jobs_ = jobs;
+    Q_EMIT jobsChanged();
+  }
+}
+
 void HexModel::setSource(std::shared_ptr<const ByteSource> source) {
+  cancelSearch();
+  matches_.clear();
+  current_match_ = -1;
   beginResetModel();
   source_ = std::move(source);
   pages_.clear();
@@ -132,6 +264,12 @@ void HexModel::setSource(std::shared_ptr<const ByteSource> source) {
   endResetModel();
   rebuild_view();
   Q_EMIT sourceChanged();
+  Q_EMIT searchChanged();
+}
+
+void HexModel::openBytes(const QByteArray& bytes) {
+  const auto* data = reinterpret_cast<const std::uint8_t*>(bytes.constData());
+  setSource(std::make_shared<MemoryByteSource>(std::vector<std::uint8_t>(data, std::next(data, bytes.size()))));
 }
 
 void HexModel::setHandle(std::shared_ptr<const StreamIndexHandle> handle) {
@@ -702,6 +840,138 @@ QString HexModel::copyCArray(qlonglong offset, qlonglong length) const {
     p.prepend(QStringLiteral("0x"));
   }
   return QStringLiteral("{ %1 }").arg(parts.join(QStringLiteral(", ")));
+}
+
+// ---- HexModel: search -------------------------------------------------------------------------------------------
+
+QString HexModel::search(const QString& pattern_text) {
+  QString error;
+  const std::optional<HexPattern> pattern = parse_hex_pattern(pattern_text, &error);
+  if (!pattern) {
+    return error;
+  }
+  if (!source_) {
+    return QStringLiteral("no file is open");
+  }
+  cancelSearch();
+  matches_.clear();
+  current_match_ = -1;
+  truncated_ = false;
+  match_size_ = pattern->size();
+  searching_ = true;
+  const quint64 generation = ++search_generation_;
+  const std::uint64_t begin = view_begin_;
+  const std::uint64_t end = view_end_;
+  Q_EMIT searchChanged();
+  auto source = source_;
+  auto cancel = std::make_shared<std::atomic<bool>>(false);
+  search_cancel_ = cancel;
+  auto run = [source, pattern = *pattern, begin, end, cancel]() {
+    return hex_find_all(*source, pattern, begin, end, kMaxMatches + 1, [cancel] { return cancel->load(); });
+  };
+  if (jobs_ == nullptr) {
+    finish_search(generation, run(), pattern->size());
+    return {};
+  }
+  const QPointer<HexModel> self(this);
+  search_job_ = jobs_->enqueue(QStringLiteral("Hex search"), [self, run, cancel, generation](JobContext& ctx) {
+    auto found = run();
+    if (cancel->load() || ctx.cancelled()) {
+      return OVT_E_CANCELLED;
+    }
+    if (self != nullptr) {
+      {
+        const std::scoped_lock lock(self->result_mutex_);
+        self->result_ = std::move(found);
+      }
+      // By name: the functor overload trips clang-analyzer's NewDeleteLeaks inside Qt's header.
+      QMetaObject::invokeMethod(self.data(), "takeSearchResult", Qt::QueuedConnection, Q_ARG(quint64, generation));
+    }
+    return OVT_OK;
+  });
+  return {};
+}
+
+void HexModel::takeSearchResult(quint64 generation) {
+  std::vector<std::uint64_t> found;
+  {
+    const std::scoped_lock lock(result_mutex_);
+    found = std::move(result_);
+    result_.clear();
+  }
+  finish_search(generation, std::move(found), match_size_);
+}
+
+void HexModel::finish_search(quint64 generation, std::vector<std::uint64_t> found, std::size_t pattern_size) {
+  if (generation != search_generation_) {
+    return;  // a newer search replaced this one
+  }
+  truncated_ = found.size() > kMaxMatches;
+  if (truncated_) {
+    found.resize(kMaxMatches);
+  }
+  matches_ = std::move(found);
+  match_size_ = pattern_size;
+  searching_ = false;
+  current_match_ = -1;
+  Q_EMIT searchChanged();
+}
+
+void HexModel::cancelSearch() {
+  if (search_cancel_) {
+    search_cancel_->store(true);
+  }
+  if (jobs_ != nullptr && search_job_ != 0) {
+    jobs_->cancel(search_job_);
+  }
+  search_job_ = 0;
+  ++search_generation_;
+  if (searching_) {
+    searching_ = false;
+    Q_EMIT searchChanged();
+  }
+}
+
+void HexModel::select_match(int index) {
+  current_match_ = index;
+  const std::uint64_t off = matches_[static_cast<std::size_t>(index)];
+  if (selection_ != nullptr) {
+    selection_->selectBytes(static_cast<qlonglong>(off), static_cast<qlonglong>(match_size_), QStringLiteral("hex"));
+  }
+  reveal(off);
+  Q_EMIT searchChanged();
+}
+
+bool HexModel::findNext() {
+  if (matches_.empty()) {
+    return false;
+  }
+  int next = 0;
+  if (current_match_ >= 0) {
+    next = (current_match_ + 1) % match_count();
+  } else if (selection_ != nullptr && selection_->byte_length() > 0) {
+    const auto it =
+        std::upper_bound(matches_.begin(), matches_.end(), static_cast<std::uint64_t>(selection_->byte_offset()));
+    next = it == matches_.end() ? 0 : static_cast<int>(it - matches_.begin());
+  }
+  select_match(next);
+  return true;
+}
+
+bool HexModel::findPrevious() {
+  if (matches_.empty()) {
+    return false;
+  }
+  int prev = match_count() - 1;
+  if (current_match_ >= 0) {
+    prev = (current_match_ + match_count() - 1) % match_count();
+  } else if (selection_ != nullptr && selection_->byte_length() > 0) {
+    const auto it =
+        std::lower_bound(matches_.begin(), matches_.end(), static_cast<std::uint64_t>(selection_->byte_offset()));
+    prev = it == matches_.begin() ? match_count() - 1 : static_cast<int>(it - matches_.begin()) - 1;
+  }
+  select_match(prev);
+  return true;
 }
 
 }  // namespace ovt::app

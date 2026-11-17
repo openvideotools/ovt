@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Tests of HexModel (WI-1.458a; chapter 11 §11.3.5). Acceptance test 1 (EPB mapping) is here; acceptance tests 2
-// (search) and 3 (Ctrl+B and B) come with the search and the panel (WI-1.458b). The expected values are worked out by
-// hand from the normative algorithm of §11.3.5, not computed with the code under test.
+// Tests of HexModel (WI-1.458; chapter 11 §11.3.5). Acceptance test 1 (EPB mapping) and 2 (search = start codes) are
+// here; acceptance test 3 (Ctrl+B and B) is app/tests/qml/tst_hex.qml. The expected values are worked out by hand from
+// the normative algorithm of §11.3.5, not computed with the code under test.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "models/hex_model.h"
+#include "models/jobs_model.h"
 #include "models/selection_model.h"
 #include "models/stream_index_adapter.h"
 #include "ovt_model_generated.h"
@@ -130,6 +131,90 @@ TEST_CASE("Hex bands tint units and their start codes", "[fast][gui][hex]") {
   const auto second = static_cast<qlonglong>(units->Get(1)->prefix_span()->offset());
   REQUIRE(model.bandTintAt(second) == HexModel::TintUnitPrefix);
   REQUIRE(model.bandTintAt(second + 4) == HexModel::TintUnitB);
+}
+
+TEST_CASE("Hex acceptance 2: searching 00 00 01 finds the start codes of the index", "[fast][gui][hex]") {
+  const auto bytes = ovt::app::testing::build_index(ovt::app::testing::gop60(8, 1000), 1, 1000);
+  auto handle = StreamIndexHandle::adopt(bytes);
+  REQUIRE(handle != nullptr);
+  // An Annex B file: 0xAB filler, `00 00 00 01` at every prefix.
+  std::vector<std::uint8_t> file(200000, 0xAB);
+  std::vector<std::uint64_t> expected;
+  const auto* units = handle->index().units();
+  for (flatbuffers::uoffset_t i = 0; i < units->size(); ++i) {
+    const auto at = units->Get(i)->prefix_span()->offset();
+    file.at(at) = 0;
+    file.at(at + 1) = 0;
+    file.at(at + 2) = 0;
+    file.at(at + 3) = 1;
+    expected.push_back(at + 1);  // 00 00 01 starts at the second zero of a 4-byte start code
+  }
+  REQUIRE(expected.size() == 16);
+
+  SECTION("without a job model (inline)") {
+    HexModel model;
+    model.setSource(std::make_shared<MemoryByteSource>(file));
+    REQUIRE(model.search(QStringLiteral("00 00 01")).isEmpty());
+    REQUIRE(model.matches() == expected);
+    REQUIRE(model.match_count() == 16);
+    REQUIRE_FALSE(model.searching());
+  }
+  SECTION("as a job, with wildcards, and next / previous select the match") {
+    JobsModel jobs(2);
+    SelectionModel selection;
+    HexModel model;
+    model.setSource(std::make_shared<MemoryByteSource>(file));
+    model.set_jobs(&jobs);
+    model.set_selection(&selection);
+    REQUIRE(model.search(QStringLiteral("00 ?? 01")).isEmpty());
+    REQUIRE(model.searching());
+    REQUIRE(ovt::app::testing::spin_until([&] { return !model.searching(); }, 5000ms));
+    REQUIRE(model.matches() == expected);
+    REQUIRE(model.findNext());
+    REQUIRE(selection.byte_offset() == static_cast<qlonglong>(expected[0]));
+    REQUIRE(selection.byte_length() == 3);
+    REQUIRE(model.findNext());
+    REQUIRE(selection.byte_offset() == static_cast<qlonglong>(expected[1]));
+    REQUIRE(model.findPrevious());
+    REQUIRE(model.findPrevious());  // wraps to the last match
+    REQUIRE(selection.byte_offset() == static_cast<qlonglong>(expected.back()));
+  }
+}
+
+TEST_CASE("Hex search patterns and chunk boundaries", "[fast][gui][hex]") {
+  QString error;
+  REQUIRE_FALSE(parse_hex_pattern(QString(), &error).has_value());
+  REQUIRE_FALSE(parse_hex_pattern(QStringLiteral("0"), &error).has_value());
+  REQUIRE_FALSE(parse_hex_pattern(QStringLiteral("zz"), &error).has_value());
+  REQUIRE_FALSE(parse_hex_pattern(QStringLiteral("?? ??"), &error).has_value());
+  const auto contiguous = ovt::app::testing::must(parse_hex_pattern(QStringLiteral("0000 01")));
+  REQUIRE(contiguous.bytes == std::vector<std::uint8_t>{0, 0, 1});
+
+  // A source is read in 1 MiB chunks; a match across a chunk edge (4 MiB - 1) is still found, once.
+  struct ReadOnly final : ByteSource {
+    std::vector<std::uint8_t> data;
+    [[nodiscard]] std::uint64_t size() const override { return data.size(); }
+    [[nodiscard]] std::size_t read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const override {
+      if (offset >= data.size()) {
+        return 0;
+      }
+      const std::size_t n = std::min<std::uint64_t>(len, data.size() - offset);
+      std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(offset), n, dst);
+      return n;
+    }
+  };
+  ReadOnly source;
+  source.data.assign((4U << 20U) + 100, 0x11);
+  const std::uint64_t edge = (4U << 20U) - 1;
+  source.data[edge] = 0xDE;
+  source.data[edge + 1] = 0xAD;
+  source.data[edge + 2] = 0xBE;
+  const auto pattern = ovt::app::testing::must(parse_hex_pattern(QStringLiteral("DE ad ?? ")));
+  REQUIRE(hex_find_all(source, pattern, 0, source.size(), 10) == std::vector<std::uint64_t>{edge});
+  // The scope [begin, end) is respected and max_results truncates.
+  REQUIRE(hex_find_all(source, pattern, edge + 1, source.size(), 10).empty());
+  const auto filler = ovt::app::testing::must(parse_hex_pattern(QStringLiteral("11")));
+  REQUIRE(hex_find_all(source, filler, 0, source.size(), 5).size() == 5);
 }
 
 TEST_CASE("Hex Go to: 0x, decimal, unit:N and frame:N", "[fast][gui][hex]") {

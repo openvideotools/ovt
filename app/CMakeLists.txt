@@ -83,7 +83,9 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/panels/BookmarksPanel.qml"
       "${app_dir}/qml/panels/PicturePanel.qml"
       "${app_dir}/qml/panels/HdrPanel.qml"
-      "${app_dir}/qml/panels/DisplayCapsPanel.qml")
+      "${app_dir}/qml/panels/DisplayCapsPanel.qml"
+      "${app_dir}/qml/panels/HexPanel.qml"
+      "${app_dir}/qml/controls/BitRibbon.qml")
   # PictureView.qml instantiates PictureHost, so it exists only where the type does (PicturePanel loads it by URL).
   set(picture_sources "")
   if(OVT_STUDIO_PICTURE_HOST)
