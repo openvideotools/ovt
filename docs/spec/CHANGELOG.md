@@ -2,6 +2,14 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc43 — 2026-11-17
+
+PATCH-level: spec-amendment pass 23 folds in the accepted answers of `spec-question` issues #710 and #711 from WI-1.125 (PR #717, Fable reviewer rulings) and #704 from WI-1.458. One public C header addition (`ovt_IndexFlags`, `ovt_stream_set_index_flags` in `ovt/index.h`, already merged with PR #717 under the owner's 2026-11-09 rule that a Fable reviewer's approval suffices for public headers). No FlatBuffers schema, plugin ABI or CLI grammar change; no new diagnostic code.
+
+- 12 §12.3.8, 0 §0.6.1 mirror, 7 §7.4.6, WI-1.125 Produces and AT3 — `typedef enum ovt_IndexFlags { OVT_INDEX_ALLOW_PARTIAL = 1 }` and `ovt_stream_set_index_flags(ovt_Stream*, uint32_t)` after `ovt_stream_codec`; the flag is a stream option, not a job option; a cancelled build with it returns `OVT_OK` with the complete frames and Warning `SYN-GEN-0103` (the §7.9 registry row wins over the former "Info"); the resumed build is byte-identical to an uninterrupted one — WI-1.125 (#710)
+- 7 §7.4.5, WI-1.125 step 3 — no per-frame activation snapshots; `ovt_stream_unit_syntax` replays the units the index names, values only (H.26x: preceding parameter sets, first VCL unit of the previous frame in decode order, earlier units of the target's frame; AV1: sequence headers and every unit from the nearest coded key frame), then parses the target with recording on; chapter 6 unchanged — WI-1.125 (#711)
+- 11 §11.3.5 Interactions, WI-1.457 Interface, WI-1.458 Interface, step 6 and notes — the per-unit flattened `[{path, BitSpan}]` list reaches the Hex panel through `HexModel::setFieldProvider`, fed from the Syntax panel's once-per-unit flattening; a single-byte click inside a field calls `Selection.setField` (the field's raw bytes become `byte_range`), a click outside any field or on an EPB byte and any drag call `Selection.setBytes`; inverse mapping `rbsp_byte = rel − count(epb_positions < rel)`; container-field reverse lookup deferred to WI-1.460 — WI-1.458 (#704)
+
 ## 1.0.0-rc42 — 2026-11-17
 
 PATCH-level: spec-amendment pass 22 folds in the accepted answers of `spec-question` issues #690 from WI-1.465, #695 from WI-2.165, #706 from WI-2.437 and #702 from WI-1.463, and splits the HDR monitor window out of WI-1.463 as WI-1.463b (§16.2.6). No new diagnostic code. No FlatBuffers schema, plugin ABI, public C header or CLI grammar change.
