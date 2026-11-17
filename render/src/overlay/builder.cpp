@@ -123,6 +123,13 @@ void build_attributes(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   });
 }
 
+// WI-2.435: the block id per cell for pick() and the id buffer, whatever the layers.
+void build_block_ids(const ovt::fb::CellGrid& grid, uint64_t cells, OverlaySet& set) {
+  if (const auto* ids = grid.block_id(); cells > 0 && ids != nullptr && ids->size() == cells) {
+    set.cell_block_id.assign(ids->begin(), ids->end());
+  }
+}
+
 // True when at least one CellGrid vector has exactly `cells` entries. Every per-cell output costs O(cells) memory and
 // time, so a grid whose size no column backs (a few bytes claiming 30 M cells, issue #649) must not drive that work:
 // a usable column is physically in the buffer, which bounds the build by the input size.
@@ -293,6 +300,7 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
     if (want_attr && backed) {
       build_attributes(*fa, *set);
     }
+    build_block_ids(grid, cells64, *set);
     if (want_heat && (backed || (cells64 > 0 && host_heat))) {
       detail::HeatmapResult h;
       if (detail::build_heatmap(grid, is_av1_frame(*fa), cfg, custom_cells, h, set->diagnostics)) {
