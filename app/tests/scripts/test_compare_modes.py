@@ -69,7 +69,9 @@ def test_divider_drag_sets_split_position(compare_studio: Studio) -> None:
     assert studio.get("compareController.splitPosition") == pytest.approx(0.25, abs=0.01)
 
 
-@pytest.mark.skip(reason="needs the core compare job in the GUI (WI-3.450) and tests/corpora/compare_expected.json")
+@pytest.mark.skip(
+    reason="#729: needs the core compare job in the GUI (WI-3.450), the decoder path (WI-2.171) and tests/corpora/compare_expected.json"
+)
 def test_first_mismatch_bitflip_f37() -> None:
     """AT3: A = src_1080p_8bit, B = syn_metrics_1080p_bitflip_f37; Find first mismatch reports frame 37, plane Y,
     (611, 203), selects frame 37 and pins the probe there. The model half is test_compare_controller.cpp."""

@@ -286,6 +286,8 @@ void CompareController::finish_find(const QString& status) {
   Q_EMIT findingChanged();
 }
 
+// SPEC-ASSUMPTION(#729): no job runner is installed until the core compare job reaches the GUI (WI-3.450) and the
+// decoder path exists (WI-2.171); the end-to-end test is skipped until then.
 bool CompareController::findFirstMismatch() {
   if (finding_) {
     return false;
