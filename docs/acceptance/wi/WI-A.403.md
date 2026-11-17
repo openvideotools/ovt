@@ -33,14 +33,42 @@ warning flags and `-Werror` under GCC 13 and clang 18, against the Qt 6.8.3 head
 with the Android branches enabled; clang-tidy reports nothing on the changed files. The real NDK build is the
 `android-build` CI job, which builds the renderer into the APK from this WI on.
 
+## Emulator half: the in-app self-check
+
+The app cannot show a picture on Android through its UI yet. No decoder feeds PictureHost (WI-2.171), and an opened
+file does not reach `Project` (see the WI-A.451 record). So debuggable APKs carry `app/src/picture_selftest.cpp`,
+which runs both tests inside the app when the system property `debug.ovt.picture_selftest` is `1`. It renders a
+PictureHost through `QQuickRenderControl` on Qt's OpenGL ES backend (so through `Interop::GlTexture` and the fence),
+reads the Qt Quick window back, and compares it with an `Interop::None` VideoSurface of the same picture (the image
+`SdrPng8` encodes, as in WI-1.405's desktop test). Release APKs never run it (`ApplicationInfo.FLAG_DEBUGGABLE`).
+
+From `android/`, with the API 36 emulator running (`-gpu host`):
+
+```console
+./gradlew :app:assembleFossDebug :app:installFossDebug
+adb shell setprop debug.ovt.picture_selftest 1
+adb logcat -c
+adb shell am start -W -n org.openvideotools.studio.debug/org.openvideotools.studio.MainActivity
+sleep 60
+adb logcat -d | grep -E "OVT|ovt_render|UnsatisfiedLink|FATAL|dlopen"
+adb shell setprop debug.ovt.picture_selftest 0
+```
+
 ## Test 1: EMBEDDED frame on the emulator equals `SdrPng8` within 0.1 %
 
-Not yet done: needs the emulator. Steps: install the foss debug APK on the API 36 emulator (`-gpu host`, see
-project notes on SwiftShader), open `sdr709_ramp.mp4`, show frame 0 in the Picture panel, check that the status
-strip reports `interop = gl-texture` (PictureHost's `interop` property), screenshot the PictureHost item and compare
-it with the offscreen `SdrPng8` export of frame 0 (chapter 10 §10.8; ≤ 0.1 % pixels differ).
+Self-check line: `OVT: picture-selftest AT1 backend=OpenGL interop=gl-texture size=1920x1080 differ=<n>/2073600
+... result=PASS` (frame 0 of sdr709_ramp, built from its pattern definition; pass when at most 0.1 % of the pixels
+differ by more than 1 per channel, the interop is `gl-texture` and PictureHost reports no error).
+
+Result: owed (Mac Mini run).
 
 ## Test 2: 300 frames with the fence path show no partially rendered texture
 
-Host half above. Device half not yet done: needs the emulator. Steps: play 300 frames with `OVT_RENDER_GL_FINISH`
-unset and compare each presented frame's checksum with an offscreen render of the same frame.
+Host half above. Self-check line: `OVT: picture-selftest AT2 interop=gl-texture frames=300 ... bad=0 ...
+result=PASS`. It presents 300 different 320x180 pictures (moving diagonal stripes) one after another, with
+dithering off in both renders, and a frame is bad when any pixel differs from its `Interop::None` render by more
+than 1 per channel. A frame sampled before the surface finished it would show the previous picture there. The ±1
+tolerance replaces "checksum equal" because the GL and Vulkan backends of libplacebo may round differently; `exact`
+counts the frames whose bytes are identical as well.
+
+Result: owed (Mac Mini run).

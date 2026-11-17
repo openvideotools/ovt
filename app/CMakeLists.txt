@@ -93,8 +93,9 @@ function(ovt_studio_add_qml_module target)
                         "${app_dir}/src/picture_host.cpp" "${app_dir}/src/picture_host_android.h")
     if(ANDROID)
       # The §10.2.2 Android row (WI-A.403): the shared EGL context lives with the JNI glue's native sources.
-      list(APPEND picture_sources "${app_dir}/src/picture_host_android.cpp"
-           "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp/gl_share.h"
+      # picture_selftest.cpp: WI-A.403's on-device acceptance check (debuggable APKs, behind a system property).
+      list(APPEND picture_sources "${app_dir}/src/picture_host_android.cpp" "${app_dir}/src/picture_selftest.h"
+           "${app_dir}/src/picture_selftest.cpp" "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp/gl_share.h"
            "${PROJECT_SOURCE_DIR}/android/app/src/main/cpp/gl_share.cpp")
     endif()
   endif()
