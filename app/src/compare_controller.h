@@ -4,10 +4,9 @@
 // CompareController (chapter 11 §11.3.2 "Compare modes", §11.4.1 SelectionB; WI-2.486): the model behind the Picture
 // panel's compare controls. It owns the ovt::render::CompareMode values (chapter 10 §10.2.4) as plain properties,
 // cycles the mode (`C` / `Shift+C`), swaps A and B (`X`), steps the Difference gain (`[` `]`), maps divider drags to
-// `split_position`, derives SelectionB (the B frame that goes with the selected A frame) and runs the first-mismatch
-// finder (FR-PLN-009). It never renders and never calls the core: PictureHost binds to the properties and draws
-// (FR-GUI-030); the first-mismatch job is run by a JobRunner that the application installs, and its result is
-// delivered to completeFirstMismatch().
+// `split_position`, derives SelectionB and runs the first-mismatch finder (FR-PLN-009). It never renders or calls the
+// core: PictureHost binds to the properties and draws (FR-GUI-030); an installed JobRunner runs the job and delivers
+// its result to completeFirstMismatch().
 //
 // Plane modes are not part of CompareMode: ViewState.plane_mode applies to both slots (spec rc41, #623).
 
