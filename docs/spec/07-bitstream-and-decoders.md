@@ -696,7 +696,7 @@ PicOrderCntVal = PicOrderCntMsb + slice_pic_order_cnt_lsb      // IDR: slice_pic
 after: if TemporalId == 0 && !RASL && !RADL && !sub-layer-non-ref: prevTid0Pic = this picture
 FrameInfo.poc = PicOrderCntVal
 ```
-RASL pictures associated with a CRA that has `NoRaslOutputFlag = 1` are marked `shown = false` with Diagnostic Info `SYN-H265-0101 "RASL picture not output (random access at CRA)"` **only in the analysis path when decoding starts at that CRA**; in the full index they are normal pictures.
+RASL pictures associated with a CRA whose `NoRaslOutputFlag = 1` comes from the bitstream itself (the first picture of the stream, or the first after an end-of-sequence NAL unit; `PocResult::rasl_skipped`) are never output by any conforming decoder: in the full index they are `shown = false`, `display_index = −1`, without a Diagnostic (#695). RASL pictures of any other CRA are normal pictures in the full index and are marked `shown = false` with Diagnostic Info `SYN-H265-0101 "RASL picture not output (random access at CRA)"` **only in the analysis path when decoding starts at that CRA**.
 
 #### 7.3.10.3 H.265 `st_ref_pic_set` derivation (§7.4.8, needed for RPS/DPB)
 
@@ -846,7 +846,7 @@ build_index(stream, job):
           H.264: type from slice_type; is_rap = IdrPicFlag; structure = field_pic_flag ? (bottom ? BottomField : TopField) : (MbaffFrameFlag ? Mbaff : Frame)
                  poc = 7.3.10.1; qp_base = SliceQPY; coded_size = {0,0,PicWidthInSamplesL, PicHeightInMbs*16} (= FrameHeightInMbs*16 for frames, half that for a field picture — chapter 6 §6.2.4); crop; chroma_format; bit depths
                  recovery RAP: if a recovery_point SEI with recovery_frame_cnt == 0 preceded this frame and (slice is I or the SEI's exact_match_flag): frame.is_rap = true and derived "recovery point"
-          H.265: type from slice_type; is_rap = nal_unit_type in 16..23 (IRAP); shown = pic_output_flag && !(RASL after CRA-with-NoRaslOutputFlag in analysis path); poc = 7.3.10.2; qp_base = SliceQpY; coded_size = {0,0,pic_width_in_luma_samples,pic_height}; crop = conformance window
+          H.265: type from slice_type; is_rap = nal_unit_type in 16..23 (IRAP); shown = pic_output_flag && !rasl_skipped (RASL of a CRA whose NoRaslOutputFlag = 1 comes from the bitstream, #695) && !(RASL after CRA-with-NoRaslOutputFlag in analysis path); poc = 7.3.10.2; qp_base = SliceQpY; coded_size = {0,0,pic_width_in_luma_samples,pic_height}; crop = conformance window
           AV1:   type: KEY→Key, INTER→Inter, INTRA_ONLY→IntraOnly, SWITCH→Switch; shown = show_frame; show_existing: see 7.3.9; is_rap = (KEY && show_frame) || (show_existing_frame && RefFrameType[slot] == KEY);
                  poc = OrderHint; qp_base = base_q_idx; coded_size = {0,0,FrameWidth,FrameHeight}; crop = {0,0,RenderWidth,RenderHeight}
           all:   pts/dts/timebase from the container (the first unit's sample); temporal_id; layer_id

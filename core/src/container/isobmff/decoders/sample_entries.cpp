@@ -205,7 +205,8 @@ uint64_t decode_stsd(BoxContext& ctx, BitReader& br, FieldBuilder& fb) {
     return br.bits_left() / 8U;
   }
   ctx.stsd_version = version;
-  fb.u32("entry_count");
+  ctx.stbl.has_stsd = true;
+  ctx.stbl.stsd_entries = fb.u32("entry_count");  // stsc's CNT-2004 check
   return fb.bytes_consumed();
 }
 
