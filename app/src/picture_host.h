@@ -9,8 +9,10 @@
 //
 //   Vulkan (Linux)  Interop::VulkanSharedDevice: libplacebo imports Qt's VkDevice; Qt wraps the VkImage.
 //   Metal (macOS)   Interop::MetalTexture: the surface exports an id<MTLTexture>; Qt wraps it.
+//   GLES (Android)  Interop::GlTexture: the surface draws on a context shared with Qt's and fences the texture name
+//                   Qt wraps (picture_host_android.h, WI-A.403).
 //   anything else   Interop::None: the surface renders on its own device and the renderer uploads a CPU copy (no
-//                   zero-copy row exists for it in phase 1; Android's GlTexture host is WI-A.403).
+//                   zero-copy row exists for it in phase 1).
 //
 // Video and overlays are never drawn with scene-graph primitives (FR-GUI-030). Requires Qt 6.7 (QQuickRhiItem); the
 // build compiles this file only then (app/CMakeLists.txt, OVT_HAVE_PICTURE_HOST).
@@ -35,7 +37,8 @@ namespace ovt::app {
 // What the renderer last reported to the item (copied in QQuickRhiItemRenderer::synchronize, when the GUI thread
 // is blocked).
 struct PictureHostStats {
-  QString interop;          // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
+  QString interop;          // "vulkan-shared-device", "metal-texture", "gl-texture", "cpu-copy" or "" before the
+                            // first frame
   QString error;            // VideoSurface::last_error() or the renderer's own reason; "" when none
   int surface_resizes = 0;  // VideoSurface::resize() calls since the surface was created
   int frames_rendered = 0;  // render() calls that drew the surface's texture
