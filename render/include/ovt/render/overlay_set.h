@@ -67,7 +67,10 @@ struct OverlayConfig {
   float mv_min_px = 2.0F;              // arrows shorter than this on screen are drawn as 2×2 dots
   float line_px = 1.0F;                // grid line width in device pixels (scaled by device_pixel_ratio)
   uint32_t selected_block = 0xFFFFFFFFU;
-  int32_t selected_mv = -1;
+  int32_t selected_mv = -1;  // selected_mv outlines MotionVector.rect with row 15 (#746)
+  // Row-16 hover outline, drawn before the selection outline; set by the chapter 11 §11.3.2 hover wiring; draw-time
+  // uniform, not in the WI-2.437 cache key (#746).
+  uint32_t hovered_block = 0xFFFFFFFFU;
   ovt::fb::Rect selection_rect;    // zero w/h = none
   int probe_x = -1, probe_y = -1;  // image coordinates of the pixel probe; -1 none
 };

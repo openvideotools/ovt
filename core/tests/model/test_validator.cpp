@@ -177,6 +177,20 @@ TEST_CASE("validator V-031: a consistent StreamIndex is clean, each mutation fir
   const auto clean = ovt::model::validate_stream_index(ovt::test::pack_index(ovt::test::tiny_stream_index()));
   INFO(describe(clean));
   CHECK(clean.empty());
+  {
+    // SPEC-ASSUMPTION(#733, #732): a frame is in its own dpb_after (chapter 7 §7.4.4).
+    auto si = ovt::test::tiny_stream_index();
+    si.frames[1]->dpb_after = {0, 1};
+    const auto own = ovt::model::validate_stream_index(ovt::test::pack_index(si));
+    INFO(describe(own));
+    CHECK(own.empty());
+    // An AV1 slot table has -1 for an empty slot and may repeat a frame; H.265 rejects the -1 (index_mutations()).
+    si.codec = fb::Codec::AV1;
+    si.frames[2]->dpb_after = {2, 2, -1, 0, -1, 1, 1, 2};
+    const auto av1 = ovt::model::validate_stream_index(ovt::test::pack_index(si));
+    INFO(describe(av1));
+    CHECK(av1.empty());
+  }
   for (const auto& row : ovt::test::index_mutations()) {
     INFO(std::string(row.rule) + ": " + std::string(row.what));
     auto si = ovt::test::tiny_stream_index();

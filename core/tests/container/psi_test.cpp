@@ -789,3 +789,139 @@ TEST_CASE("psi: a short-form section on a PSI PID is malformed, not decoded", "[
     }
   }
 }
+
+TEST_CASE("psi: the tree of a DVB stream carries SVC and EVNT nodes and names every table",
+          "[container][mpegts][psi][fast]") {
+  uint8_t cc0 = 0;
+  uint8_t cc1 = 0;
+  uint8_t cc2 = 0;
+  uint8_t cc3 = 0;
+  uint8_t cc4 = 0;
+  Bytes data;
+  append(data, packetize(0, section(0x00, 7, 0, pat_body({{1, 0x100}})), cc0));
+  const Bytes sd = descriptor(0x48, {0x01, 0x04, 'P', 'r', 'o', 'v', 0x04, 'N', 'e', 'w', 's'});
+  Bytes sdt;
+  put16(sdt, 0x1234);
+  sdt.push_back(0xFF);
+  put16(sdt, 1);
+  sdt.push_back(0xFD);
+  put16(sdt, 0x8000U | 0x1000U | static_cast<unsigned>(sd.size()));
+  append(sdt, sd);
+  append(data, packetize(ts::kSdtPid, section(0x42, 7, 2, sdt), cc1));
+  Bytes ev;
+  put16(ev, 0x2468);
+  ev.insert(ev.end(), {0xC0, 0x79, 0x12, 0x45, 0x00, 0x01, 0x00, 0x00});
+  const Bytes sed = descriptor(0x4D, {'e', 'n', 'g', 0x05, 'H', 'e', 'l', 'l', 'o', 0x05, 'W', 'o', 'r', 'l', 'd'});
+  put16(ev, 0x4000U | static_cast<unsigned>(sed.size()));
+  append(ev, sed);
+  Bytes eit;
+  put16(eit, 7);
+  put16(eit, 0x1234);
+  eit.push_back(0);
+  eit.push_back(0x4E);
+  append(eit, ev);
+  append(data, packetize(ts::kEitPid, section(0x4E, 1, 0, eit), cc2));
+  // NIT actual, BAT and a table id the analyser does not name: generic section nodes with an extension field.
+  Bytes nit;
+  put16(nit, 0xF000U);
+  put16(nit, 0xF000U);
+  append(data, packetize(ts::kSdtPid, section(0x40, 0x3001, 0, nit), cc4));
+  Bytes tdt{0x70, 0x70, 0x05, 0xC0, 0x79, 0x12, 0x45, 0x00};
+  Bytes tot{0x73, 0x70, 0x00, 0xC0, 0x79, 0x12, 0x45, 0x00, 0xF0, 0x00};
+  tot[2] = static_cast<uint8_t>(tot.size() - 3 + 4);
+  const uint32_t crc = ts::crc32_mpeg2(tot);
+  put16(tot, crc >> 16U);
+  put16(tot, crc & 0xFFFFU);
+  Bytes both = tdt;
+  append(both, tot);
+  append(data, packetize(ts::kTimePid, both, cc3));
+
+  const ovt::io::MemoryFile file(std::span<const uint8_t>(data.data(), data.size()));
+  const auto reader = ts::make_reader(file);
+  REQUIRE(reader != nullptr);
+  const auto buf = reader->tree();
+  const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
+  REQUIRE(t->root()->size() == 2);
+  const auto* psit = t->root()->Get(1);
+  std::set<std::string> kinds;
+  size_t svc_nodes = 0;
+  size_t evnt_nodes = 0;
+  bool saw_event_time = false;
+  for (const auto* sec : *psit->children()) {
+    kinds.insert(sec->fourcc()->c_str());
+    if (sec->children() == nullptr) {
+      continue;
+    }
+    for (const auto* child : *sec->children()) {
+      svc_nodes += std::string(child->fourcc()->c_str()) == "SVC" ? 1U : 0U;
+      evnt_nodes += std::string(child->fourcc()->c_str()) == "EVNT" ? 1U : 0U;
+      if (child->fields() != nullptr) {
+        for (const auto* fld : *child->fields()) {
+          saw_event_time = saw_event_time || std::string(fld->name()->c_str()) == "start_time_utc";
+        }
+      }
+    }
+  }
+  CHECK(svc_nodes == 1);
+  CHECK(evnt_nodes == 1);
+  CHECK(saw_event_time);
+  CHECK(kinds.count("SDT") == 1);
+  CHECK(kinds.count("NIT") == 1);
+  CHECK(kinds.count("TDT") + kinds.count("TOT") >= 1);
+}
+
+TEST_CASE("psi: format_dvb_time rejects invalid BCD and out-of-range dates", "[container][mpegts][psi][fast]") {
+  CHECK(ts::format_dvb_time(0xC079124500ULL) == "1993-10-13 12:45:00");
+  CHECK(ts::format_dvb_time(0xC0791A4500ULL) == "invalid");  // BCD digit 0xA
+  CHECK(ts::format_dvb_time(0xC079246000ULL) == "invalid");  // hour 24
+  CHECK(ts::format_dvb_time(0xC079126000ULL) == "invalid");  // minute 60
+  CHECK(ts::format_dvb_time(0xC079124560ULL) == "invalid");  // second 60
+}
+
+TEST_CASE("psi: ES nodes name the common stream types", "[container][mpegts][psi][fast]") {
+  const std::vector<std::pair<uint8_t, std::string>> kTypes{{0x01, "MPEG-1 video"},      {0x02, "MPEG-2 video"},
+                                                            {0x03, "MPEG-1 audio"},      {0x04, "MPEG-2 audio"},
+                                                            {0x05, "private sections"},  {0x06, "PES private data"},
+                                                            {0x0F, "AAC audio (ADTS)"},  {0x11, "AAC audio (LATM)"},
+                                                            {0x15, "metadata in PES"},   {0x1B, "AVC video"},
+                                                            {0x24, "HEVC video"},        {0x33, "VVC video"},
+                                                            {0x81, "AC-3 audio (ATSC)"}, {0x87, "E-AC-3 audio (ATSC)"},
+                                                            {0x90, "user private"},      {0x77, "other"}};
+  std::vector<Es> streams;
+  streams.reserve(kTypes.size());
+  unsigned pid = 0x101;
+  for (const auto& [type, name] : kTypes) {
+    streams.push_back({type, pid++, {}});
+  }
+  uint8_t cc0 = 0;
+  uint8_t cc1 = 0;
+  Bytes data;
+  append(data, packetize(0, section(0x00, 7, 0, pat_body({{1, 0x100}})), cc0));
+  append(data, packetize(0x100, section(0x02, 1, 0, pmt_body(0x101, {}, streams)), cc1));
+  const ovt::io::MemoryFile file(std::span<const uint8_t>(data.data(), data.size()));
+  const auto reader = ts::make_reader(file);
+  REQUIRE(reader != nullptr);
+  const auto buf = reader->tree();
+  const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
+  REQUIRE(t->root()->size() == 2);
+  std::set<std::string> names;
+  for (const auto* sec : *t->root()->Get(1)->children()) {
+    if (sec->children() == nullptr) {
+      continue;
+    }
+    for (const auto* es : *sec->children()) {
+      if (es->fields() == nullptr) {
+        continue;
+      }
+      for (const auto* fld : *es->fields()) {
+        if (std::string(fld->name()->c_str()) == "stream_type_name" && fld->svalue() != nullptr) {
+          names.insert(fld->svalue()->c_str());
+        }
+      }
+    }
+  }
+  for (const auto& [type, name] : kTypes) {
+    INFO(name);
+    CHECK(names.count(name) == 1);
+  }
+}

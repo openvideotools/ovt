@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Cell passes 2-4 of chapter 10 §10.5.6 (WI-2.431): heatmap, prediction / reference-index fill and skip hatch, each a
-// full-viewport quad whose fragment shader maps its device pixel back to a 4x4 cell (§10.5.1 "Cell attribute textures
-// are indexed by image position") and reads the cell textures with texelFetch.
+// Cell passes 2-4 and 7 of chapter 10 §10.5.6 (WI-2.431, WI-2.436): heatmap, prediction / reference-index fill, skip
+// hatch and deblocking edges, each a full-viewport quad whose fragment shader maps its device pixel back to a 4x4 cell
+// (§10.5.1 "Cell attribute textures are indexed by image position") and reads the cell textures with texelFetch.
 
 #include "overlay/pass_fill.h"
 
@@ -15,6 +15,7 @@
 
 #include <libplacebo/gpu.h>
 
+#include "shaders/deblock_glsl.h"
 #include "shaders/fill_glsl.h"
 #include "shaders/hatch_glsl.h"
 #include "shaders/heatmap_glsl.h"
@@ -49,6 +50,8 @@ PassSpec spec_of(CellPass pass) {
       return {shaders::kHatch, {"usampler2D cells", "sampler2D palette", nullptr}};
     case CellPass::BlockId:
       return {kBlockIdBody, {"usampler2D block_ids", nullptr, nullptr}, true};
+    case CellPass::Deblock:
+      return {shaders::kDeblock, {"usampler2D edges", "sampler2D palette", "sampler2D halo"}};
   }
   return {shaders::kFill, {nullptr, nullptr, nullptr}};
 }

@@ -1003,6 +1003,8 @@ ovt_status ovt_json_to_fb(const char* json, const char* root_type, ovt_Buffer* o
 typedef struct ovt_Stream ovt_Stream;
 ovt_status ovt_stream_open(ovt_Container*, int track_index, ovt_Stream** out);
 uint8_t    ovt_stream_codec(const ovt_Stream*);                                  /* ovt.fb.Codec */
+typedef enum ovt_IndexFlags { OVT_INDEX_ALLOW_PARTIAL = 1 } ovt_IndexFlags;    /* stream options for build_index (#710) */
+ovt_status ovt_stream_set_index_flags(ovt_Stream*, uint32_t flags);              /* ovt_IndexFlags bits; applies to the next build_index; chapter 07 §7.4.6 */
 ovt_status ovt_stream_build_index(ovt_Stream*, ovt_Job* job, ovt_Buffer* out_index /* StreamIndex, caller-owned */);  /* uses/updates cache */
 ovt_Buffer ovt_stream_index(ovt_Stream*);                                        /* last built StreamIndex; by-value → handle-owned (rule 3b, D4); .data == NULL before build_index */
 ovt_status ovt_stream_index_summary(ovt_Stream*, ovt_Buffer* out /* IndexSummary */);

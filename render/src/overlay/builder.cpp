@@ -130,6 +130,53 @@ void build_block_ids(const ovt::fb::CellGrid& grid, uint64_t cells, OverlaySet& 
   }
 }
 
+// WI-2.436: the edge classes of pass 7 (§10.5.6), R = left edge, G = top edge of each cell; only with DeblockEdges
+// and a grid that some column backs (`backed`).
+void build_deblock_edges(const ovt::fb::FrameAnalysis& fa, bool backed, OverlaySet& set) {
+  if ((set.config.layers & static_cast<uint32_t>(OverlayLayer::DeblockEdges)) == 0 || !backed) {
+    return;
+  }
+  const ovt::fb::CellGrid& grid = *fa.grid();
+  const size_t cells = static_cast<size_t>(set.cells_w) * set.cells_h;
+  const auto* v = sized(grid.deblock_bs_v(), cells, "deblock_bs_v", set.diagnostics);
+  const auto* h = sized(grid.deblock_bs_h(), cells, "deblock_bs_h", set.diagnostics);
+  if (v == nullptr && h == nullptr) {
+    return;
+  }
+  const detail::IntraCodec codec = detail::intra_codec_of(fa);
+  set.deblock_edges.assign(cells * 2, 0);
+  for (size_t i = 0; i < cells; ++i) {
+    const auto idx = static_cast<flatbuffers::uoffset_t>(i);
+    set.deblock_edges[i * 2] = v != nullptr ? detail::deblock_edge_class(codec, v->Get(idx)) : 0;
+    set.deblock_edges[(i * 2) + 1] = h != nullptr ? detail::deblock_edge_class(codec, h->Get(idx)) : 0;
+  }
+}
+
+// x0, y0, x1, y1 of `r`; an empty rect (or one whose far edge does not fit int32) is {0, 0, 0, 0}.
+std::array<int32_t, 4> rect_edges(const ovt::fb::Rect* r) {
+  if (r == nullptr || r->w() <= 0 || r->h() <= 0 || int64_t{r->x()} + r->w() > INT32_MAX ||
+      int64_t{r->y()} + r->h() > INT32_MAX) {
+    return {0, 0, 0, 0};
+  }
+  return {r->x(), r->y(), r->x() + r->w(), r->y() + r->h()};
+}
+
+// WI-2.436: block and MV rects for the selection outline (pass 10), indexed like FrameAnalysis.blocks / mvs.
+void build_selection_rects(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
+  if (const auto* blocks = fa.blocks(); blocks != nullptr) {
+    set.block_rects.reserve(blocks->size());
+    for (const auto* b : *blocks) {
+      set.block_rects.push_back(rect_edges(b->rect()));
+    }
+  }
+  if (const auto* mvs = fa.mvs(); mvs != nullptr) {
+    set.mv_rects.reserve(mvs->size());
+    for (const auto* m : *mvs) {
+      set.mv_rects.push_back(rect_edges(m->rect()));
+    }
+  }
+}
+
 // True when at least one CellGrid vector has exactly `cells` entries. Every per-cell output costs O(cells) memory and
 // time, so a grid whose size no column backs (a few bytes claiming 30 M cells, issue #649) must not drive that work:
 // a usable column is physically in the buffer, which bounds the build by the input size.
@@ -274,6 +321,9 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
   build_grid_tree(fa, *set);  // the grid lines need the block tree only, not the CellGrid
+  if (fa != nullptr) {
+    build_selection_rects(*fa, *set);
+  }
   if (fa == nullptr || fa->grid() == nullptr) {
     set->diagnostics.emplace_back("FrameAnalysis has no CellGrid; overlay data is empty");
     return set;
@@ -301,6 +351,7 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
       build_attributes(*fa, *set);
     }
     build_block_ids(grid, cells64, *set);
+    build_deblock_edges(*fa, backed, *set);
     if (want_heat && (backed || (cells64 > 0 && host_heat))) {
       detail::HeatmapResult h;
       if (detail::build_heatmap(grid, is_av1_frame(*fa), cfg, custom_cells, h, set->diagnostics)) {
@@ -334,6 +385,22 @@ bool verify_frame_analysis(const uint8_t* buf, size_t size) {
   opts.max_tables = 4 * kMaxCells;
   flatbuffers::Verifier verifier(buf, size, opts);
   return ovt::fb::VerifyFrameAnalysisBuffer(verifier);
+}
+
+uint8_t deblock_edge_class(IntraCodec codec, uint8_t value) {
+  if (value == 0 || value == 0xFF) {
+    return 0;
+  }
+  switch (codec) {
+    case IntraCodec::H264:
+      return value >= 3 ? 2 : 1;  // bS 3 / 4: an intra macroblock on either side (8.7.2.1)
+    case IntraCodec::AV1:
+      return value >= 16 ? 2 : 1;  // filterSize 16: the 13-tap luma filter (7.14.6.4)
+    case IntraCodec::H265:
+    case IntraCodec::Unknown:
+      break;
+  }
+  return value >= 2 ? 2 : 1;  // HEVC bS 2: an intra block on either side (8.7.2.4)
 }
 
 }  // namespace detail
