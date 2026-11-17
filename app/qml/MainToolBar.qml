@@ -43,7 +43,36 @@ ToolBar {
         ToolSeparator {}
         ComboBox { model: ["Single"]; enabled: false; Layout.preferredWidth: 84; Accessible.name: "Compare mode" }
         ToolSeparator {}
-        ToolButton { text: "HDR output"; checkable: true; enabled: false }
+        // Lit while the picture is in NATIVE (HDR) mode; disabled with the reason on an SDR display (§11.2.4, WI-1.463).
+        Item {
+            implicitWidth: hdrOutputButton.implicitWidth
+            implicitHeight: hdrOutputButton.implicitHeight
+            ToolButton {
+                id: hdrOutputButton
+
+                objectName: "hdrOutputButton"
+                text: "HDR output"
+                readonly property bool lit: DisplayCaps.outputEncoding !== "" && DisplayCaps.outputEncoding !== "Srgb8"
+
+                checkable: true
+                checked: lit
+                enabled: DisplayCaps.hdrCapable
+                onClicked: {
+                    HdrView.hdrOutput = !HdrView.hdrOutput
+                    checked = Qt.binding(() => hdrOutputButton.lit)  // the click toggled it; NATIVE mode decides
+                }
+                Accessible.description: hdrOutputHover.toolTipText
+            }
+            // A disabled button gets no hover, so the tooltip hangs on its parent.
+            HoverHandler {
+                id: hdrOutputHover
+
+                readonly property string toolTipText: DisplayCaps.hdrCapable ? qsTr("HDR output (Ctrl+H)")
+                                                                             : DisplayCaps.reason
+            }
+            ToolTip.visible: hdrOutputHover.hovered
+            ToolTip.text: hdrOutputHover.toolTipText
+        }
         Item { Layout.fillWidth: true }
         ToolButton {
             objectName: "jobsButton"
