@@ -16,7 +16,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -253,9 +252,7 @@ class SafFlowsTest {
     private fun document(name: String): Uri {
         val header = "YUV4MPEG2 W16 H16 F25:1 Ip A1:1 C420jpeg\nFRAME\n".toByteArray(Charsets.US_ASCII)
         File(documents, name).writeBytes(header + ByteArray(16 * 16 * 3 / 2))
-        val uri = DocumentsContract.buildDocumentUri(authority(), name)
-        assertNotEquals(null, uri)
-        return uri
+        return DocumentsContract.buildDocumentUri(authority(), name)
     }
 
     private fun <T> onMain(block: () -> T): T {

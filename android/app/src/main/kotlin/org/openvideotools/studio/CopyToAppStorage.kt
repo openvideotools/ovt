@@ -23,13 +23,9 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The "Copy to app storage" action of `GUI-AND-0001` (chapter 11 §11.5.6, §11.7; WI-A.452; FR-AND-005): a document
- * whose provider hands out a pipe instead of a seekable file is streamed once into app-specific storage, and the
- * local copy is opened instead.
- *
- * SPEC-ASSUMPTION(#722): the copy goes to `getExternalFilesDir(null)/copies/` as §11.5.6 says, not to the cache
- * directory of FR-AND-005, because the system deletes cache files on its own and the copy is what the recent list (and
- * a project) points at. Without external storage it falls back to `filesDir/copies/`.
+ * The "Copy to app storage" action of `GUI-AND-0001` (§11.5.6, §11.7; WI-A.452; FR-AND-005): a non-seekable document
+ * is streamed once into app storage and the copy opened instead. SPEC-ASSUMPTION(#722): `getExternalFilesDir(null)/
+ * copies/` (§11.5.6), not FR-AND-005's cache directory, which the system clears on its own; else `filesDir/copies/`.
  */
 internal class CopyToAppStorage(
     private val context: Context,

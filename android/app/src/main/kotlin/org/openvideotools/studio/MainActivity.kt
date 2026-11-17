@@ -146,8 +146,10 @@ class MainActivity : AppCompatActivity() {
      * sets the Qt application state to Active, which runs the actions Qt queued (root window, display metrics).
      */
     private fun addQtView(host: FrameLayout) {
-        qtView = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
-        qtView.setStatusChangeListener { status -> onShellStatus(status) }
+        val view = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
+        qtView = view
+        // A status change after onDestroy finds the native QQuickView gone (SIGSEGV in rootObject()): drop it.
+        view.setStatusChangeListener { status -> if (!isDestroyed && view === qtView) onShellStatus(status) }
         host.addView(
             qtView,
             FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
@@ -288,7 +290,17 @@ class MainActivity : AppCompatActivity() {
     override fun finish() {
         if (::qtView.isInitialized && !qtStarted) {
             Log.i(TAG, "OVT: finish deferred until Qt has started")
-            finishWhenQtStarted = true
+            if (!finishWhenQtStarted) {
+                finishWhenQtStarted = true
+                // Bounded: if Qt never starts (a native load failure), Back must still work.
+                window.decorView.postDelayed({
+                    if (finishWhenQtStarted) {
+                        finishWhenQtStarted = false
+                        Log.w(TAG, "OVT: Qt did not start within $FINISH_DEFER_MS ms, finishing anyway")
+                        super.finish()
+                    }
+                }, FINISH_DEFER_MS)
+            }
             return
         }
         super.finish()
@@ -324,6 +336,9 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "OVT"
+
+        /** Longest wait of a deferred [finish] for Qt's start-up action. */
+        const val FINISH_DEFER_MS = 2_000L
 
         /** Top margin of the HDR surface as a share of the window height, until WI-A.400 follows the Picture panel. */
         const val SHELL_HEADER_FRACTION = 0.25f

@@ -35,11 +35,8 @@ import java.util.concurrent.Executors
  * `ContentResolver.openFileDescriptor` → `ParcelFileDescriptor.detachFd()` hands the descriptor to
  * `ovt_file_open_fd` through [OvtNative.openFd], which owns it from then on.
  *
- * WI-A.452 (chapter 11 §11.5.6) adds the recent list ([RecentFiles]; a picked document's grant is taken through
- * [PersistedGrants]) and the seekability check: the core reads with `pread`, so a descriptor that `fstat` does not
- * report as a regular file (a pipe or socket from a streaming or cloud provider) is not handed over. [onNotSeekable]
- * gets it instead, and MainActivity raises `GUI-AND-0001` with the copy action ([CopyToAppStorage]). Nothing is read
- * from the document to decide this.
+ * WI-A.452 (§11.5.6) adds [RecentFiles], [PersistedGrants] and the seekability check: a descriptor that `fstat` does
+ * not call a regular file (a pipe from a streaming provider; the core needs `pread`) goes, unread, to [onNotSeekable].
  *
  * Construct it in `Activity.onCreate` (the result launcher must be registered before the Activity starts). The
  * open itself runs on a single background thread because a provider can be slow; [onOpened] and [onNotSeekable] are

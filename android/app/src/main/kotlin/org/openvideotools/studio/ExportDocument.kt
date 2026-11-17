@@ -22,15 +22,9 @@ import java.io.OutputStream
 import java.util.concurrent.Executors
 
 /**
- * Export through the Storage Access Framework (chapter 11 §11.5.6; WI-A.452): `ACTION_CREATE_DOCUMENT` lets the user
- * choose where the file goes (any provider: Downloads, a cloud drive, a USB stick), and the request's writer fills the
- * new document on a background thread. No storage permission is used.
- *
- * FR-AND-017: a PNG export of HDR content is SDR tone-mapped on Android, and the user is told so before the picker
- * opens ([needsSdrNotice]).
- *
- * Construct it in `Activity.onCreate` (the result launcher must be registered before the Activity starts). One export
- * runs at a time; a request made while the picker is open replaces the pending one.
+ * Export through the Storage Access Framework (chapter 11 §11.5.6; WI-A.452): `ACTION_CREATE_DOCUMENT`, then the
+ * request's writer fills the document on a background thread. FR-AND-017: HDR → PNG shows [SDR_NOTICE] first.
+ * Construct in `Activity.onCreate`; a request made while the picker is open replaces the pending one.
  */
 internal class ExportDocument(
     private val activity: AppCompatActivity,

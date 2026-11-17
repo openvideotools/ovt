@@ -11,7 +11,8 @@ Run at 89fedca (2026-11-17, Mini): both assemble tasks pass. `SafFlowsTest`: `ex
 `cancelledCopyLeavesNoFile`, `fstatDecidesSeekability` and `recentEntryOfAGoneDocumentIsRemoved` PASS. Then the app
 crashed in Qt during `documentOpensShowsInRecentListAndReopens`: an NPE in `QtDisplayManager.setApplicationDisplayMetrics`
 (Qt 6.8.3), whose start-up action outlived an Activity finished right after launch and read its null insets. Fix:
-`MainActivity.finish()` waits for `OvtQtResume.whenStartupActionsRan`, and the test waits for it too. Re-run: owed.
+`MainActivity.finish()` waits for `OvtQtResume.whenStartupActionsRan` (at most 2 s). At 11cf4cb that worked, but a late
+QML status change of the destroyed Activity's view then hit its freed QQuickView (SIGSEGV); it is now dropped. Re-run: owed.
 
 What was checked here: every changed Kotlin file, `SafFlowsTest.kt` and the debug-only `TestDocumentsProvider.kt`
 compile with `kotlinc` 2.0.21 `-Werror` against `android-all` 16 (Robolectric's API 36 jar) and stubs of the AndroidX
