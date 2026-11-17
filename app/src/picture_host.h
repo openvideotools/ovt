@@ -63,6 +63,16 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(bool falseColor READ false_color WRITE set_false_color NOTIFY viewChanged)
   Q_PROPERTY(bool gamutClipOverlay READ gamut_clip_overlay WRITE set_gamut_clip_overlay NOTIFY viewChanged)
   Q_PROPERTY(bool dither READ dither WRITE set_dither NOTIFY viewChanged)
+  // CompareMode (§10.2.4) from the panel's CompareController (WI-2.486): kind and split_axis are the enum indices.
+  // Kind::Single (0) or no slot-B picture shows picture A alone.
+  Q_PROPERTY(int compareKind READ compare_kind WRITE set_compare_kind NOTIFY compareChanged)
+  Q_PROPERTY(int splitAxis READ split_axis WRITE set_split_axis NOTIFY compareChanged)
+  Q_PROPERTY(double splitPosition READ split_position WRITE set_split_position NOTIFY compareChanged)
+  Q_PROPERTY(double overlayAlpha READ overlay_alpha WRITE set_overlay_alpha NOTIFY compareChanged)
+  Q_PROPERTY(int diffGain READ diff_gain WRITE set_diff_gain NOTIFY compareChanged)
+  Q_PROPERTY(bool diffFalseColour READ diff_false_colour WRITE set_diff_false_colour NOTIFY compareChanged)
+  Q_PROPERTY(int flickerPeriodMs READ flicker_period_ms WRITE set_flicker_period_ms NOTIFY compareChanged)
+  Q_PROPERTY(bool hasPictureB READ has_picture_b NOTIFY compareChanged)
   Q_PROPERTY(bool hasPicture READ has_picture NOTIFY pictureChanged)
   Q_PROPERTY(int pictureWidth READ picture_width NOTIFY pictureChanged)
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
@@ -114,6 +124,32 @@ class PictureHost : public QQuickRhiItem {
   void set_dither(bool on) { set_view(dither_, on); }
 
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
+
+  // ---- Compare (slot B) ------------------------------------------------------------------------------------------
+  [[nodiscard]] int compare_kind() const noexcept { return compare_kind_; }
+  void set_compare_kind(int kind);
+  [[nodiscard]] int split_axis() const noexcept { return split_axis_; }
+  void set_split_axis(int axis);
+  [[nodiscard]] double split_position() const noexcept { return split_position_; }
+  void set_split_position(double fraction);
+  [[nodiscard]] double overlay_alpha() const noexcept { return overlay_alpha_; }
+  void set_overlay_alpha(double alpha);
+  [[nodiscard]] int diff_gain() const noexcept { return diff_gain_; }
+  void set_diff_gain(int gain);
+  [[nodiscard]] bool diff_false_colour() const noexcept { return diff_false_colour_; }
+  void set_diff_false_colour(bool on);
+  [[nodiscard]] int flicker_period_ms() const noexcept { return flicker_period_ms_; }
+  void set_flicker_period_ms(int ms);
+  [[nodiscard]] bool has_picture_b() const noexcept { return frame_b_ != nullptr; }
+  [[nodiscard]] std::shared_ptr<const PictureFrame> picture_b() const { return frame_b_; }
+  // Slot B from a decoded picture (the reference file's frame); nullptr clears it.
+  void set_picture_b(std::shared_ptr<const PictureFrame> frame);
+  // "Set as B from memory": copies the shown picture into slot B under a new generation, so B keeps this frame while
+  // A moves on. False without a picture.
+  Q_INVOKABLE bool snapshotAsB();
+  // `X`: exchanges the pictures of slots A and B.
+  Q_INVOKABLE void swapAB();
+  Q_INVOKABLE void clearB();
   [[nodiscard]] int picture_width() const noexcept;
   [[nodiscard]] int picture_height() const noexcept;
   [[nodiscard]] QRect crop() const;
@@ -133,11 +169,13 @@ class PictureHost : public QQuickRhiItem {
 
  Q_SIGNALS:
   void viewChanged();
+  void compareChanged();
   void pictureChanged();
   void statsChanged();
 
  protected:
   QQuickRhiItemRenderer* createRenderer() override;
+  void timerEvent(QTimerEvent* event) override;
 
  private:
   friend class PictureHostRenderer;
@@ -152,7 +190,19 @@ class PictureHost : public QQuickRhiItem {
     update();
   }
 
+  void set_compare(int& field, int value);
+  void update_flicker_timer();
+
   std::shared_ptr<const PictureFrame> frame_;
+  std::shared_ptr<const PictureFrame> frame_b_;
+  int compare_kind_ = 0;
+  int split_axis_ = 0;
+  double split_position_ = 0.5;
+  double overlay_alpha_ = 0.5;
+  int diff_gain_ = 1;
+  bool diff_false_colour_ = false;
+  int flicker_period_ms_ = 500;
+  int flicker_timer_ = 0;
   double zoom_ = 0.0;
   double pan_x_ = 0.0;
   double pan_y_ = 0.0;
