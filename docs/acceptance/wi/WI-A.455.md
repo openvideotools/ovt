@@ -51,19 +51,27 @@ Google Maven cannot be reached from the container, and CI's `android-build` does
 ### Emulator half (owed until the emulator CI of WI-0.035 / #487 runs it)
 
 ```console
+adb shell settings put global always_finish_activities 1 && adb reboot && adb wait-for-device \
+  && until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 2; done
 cd android && ./gradlew :app:connectedFossDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=org.openvideotools.studio.StateRestoreTest
+adb shell settings put global always_finish_activities 0 && adb reboot   # afterwards
 ```
+
+On the API 36 image the setting reads back at once but takes effect only after a reboot (the Developer options
+switch calls the hidden `ActivityManager.setAlwaysFinish()`), hence the reboot. The class runs alone: the other
+instrumentation classes use `ActivityScenario`, which refuses to launch while the setting is on, so `StateRestoreTest`
+uses plain intents and the lifecycle monitor.
 
 on the x86_64 or arm64 API 36 emulator started with `-gpu host`. `StateRestoreTest` has two tests:
 
-- `recreationRestoresFrameAndSelection`: `ActivityScenario.recreate()` runs the same path "Don't keep activities"
+- `recreationRestoresFrameAndSelection`: `Activity.recreate()` runs the same path "Don't keep activities"
   runs (`onSaveInstanceState`, `onDestroy` while not finishing, `onCreate` with the Bundle).
-- `dontKeepActivitiesBackgroundAndResume` (acceptance test 1): sets `always_finish_activities` to 1, starts the app
-  with a plain intent (ActivityScenario refuses to launch while "Don't keep activities" is on), puts frame 42/40
+- `dontKeepActivitiesBackgroundAndResume` (acceptance test 1): requires `always_finish_activities` = 1 (in effect),
+  puts frame 42/40
   and a byte selection into the QML root, goes to the launcher until the Activity is destroyed, starts the app again
   and asserts that the new Activity's own QML root publishes the same frame, selection, file and layout within
-  2 000 ms. The setting is put back afterwards.
+  2 000 ms.
 
 `MainActivity` logs `OVT: GUI state restored <n> ms after onCreate` for the record.
 
@@ -73,4 +81,8 @@ Mac Mini runs (emulator `ovt-api36-arm64`, API 36 arm64, 1080x2400, 420 dpi, `-g
   APK built. `recreationRestoresFrameAndSelection` **PASS** (2.6 s; `OVT: GUI state restored 404 ms after
   onCreate`). `dontKeepActivitiesBackgroundAndResume` failed before the app ran: `ActivityScenario.launch()`
   throws `IllegalStateException` while "Don't keep activities" is on. The test now starts the app with an intent.
+- 0176274 (`wa455-pr730-0176274-mini-20261117T045936Z.txt`): `recreationRestoresFrameAndSelection` **PASS** (4.1 s;
+  restored 1559 ms after onCreate). `dontKeepActivitiesBackgroundAndResume` timed out waiting for the destroy:
+  `settings put global always_finish_activities 1` had no effect without a reboot on this image. Now the run
+  procedure sets it and reboots first.
 - Next head: _pending_.
