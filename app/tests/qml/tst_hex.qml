@@ -76,8 +76,10 @@ TestCase {
         tryVerify(function () { return panel.table.visible })
         stage.requestActivate()
         tryVerify(function () { return stage.active })
-        panel.table.forceActiveFocus()
-        verify(panel.table.activeFocus)
+        tryVerify(function () {
+            panel.table.forceActiveFocus()
+            return panel.table.activeFocus
+        })
     }
 
     function test_emptyWithoutFile() {
