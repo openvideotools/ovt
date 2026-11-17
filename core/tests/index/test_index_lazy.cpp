@@ -357,11 +357,11 @@ TEST_CASE("ovt_stream_unit_syntax: the re-parsed tree equals the eager tree", "[
       REQUIRE_FALSE(from_lazy.empty());
       const fb::SyntaxNode& tree = *flatbuffers::GetRoot<fb::SyntaxNode>(from_lazy.data());
       CHECK(same_tree(*u->header(), tree));
-      reparsed += root(b).units()->Get(i)->header() == nullptr ? 1 : 0;
+      reparsed += root(b).units()->Get(i)->header() == nullptr ? 1U : 0U;
       // An H.264 SEI unit: pic_timing takes the SPS of the previous picture (D.2.2), which the replay must provide.
       if (s.codec == fb::Codec::H264 && u->type() == 6) {
         CHECK_FALSE(has_node_diag(tree, "SYN-H264-0031"));
-        pic_timing += any_node(tree, [](const fb::SyntaxNode& n) { return sv(n.name()) == "pic_timing"; }) ? 1 : 0;
+        pic_timing += any_node(tree, [](const fb::SyntaxNode& n) { return sv(n.name()) == "pic_timing"; }) ? 1U : 0U;
       }
     }
     CHECK(reparsed >= 4);
