@@ -14,6 +14,7 @@ add_executable(
   decoders_colour_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
+  decoders_sample_tables_test.cpp
   field_builder_test.cpp
   ivf_test.cpp
   lazy_test.cpp

@@ -114,6 +114,30 @@ void check_golden(const std::string& name, const OutputPixels& px) {
   CHECK(differing * 1000 <= pixels);
 }
 
+// Pixels of the 16 x 16 chroma sample (cx, cy) of the zoom-8 plane U test that differ from `first`, split into the grid
+// pixels (the lines at multiples of 8 device pixels and the last pixel line of the picture's right and bottom edges,
+// R-ZOOM-4: lighter or darker; a sample of code 128 has the grid's own colour and shows no difference) and the rest.
+struct SampleDifferences {
+  int interior = 0;
+  int grid = 0;
+};
+
+SampleDifferences count_sample_differences(const OutputPixels& px, int cx, int cy, const Rgb& first) {
+  constexpr int kZoom = 8;
+  constexpr int kCell = 16;
+  constexpr int kLast = (16 * kZoom) - 1;  // last device pixel of the 16 x 16 picture
+  SampleDifferences d;
+  for (int y = cy * kCell; y < (cy + 1) * kCell; ++y) {
+    for (int x = cx * kCell; x < (cx + 1) * kCell; ++x) {
+      const Rgb p = pixel(px, x, y);
+      const int differs = (p.r != first.r || p.g != first.g || p.b != first.b) ? 1 : 0;
+      const bool on_grid = x % kZoom == 0 || y % kZoom == 0 || x == kLast || y == kLast;
+      (on_grid ? d.grid : d.interior) += differs;
+    }
+  }
+  return d;
+}
+
 }  // namespace
 
 TEST_CASE("render_test_plane_views: plane mode, neutral code and chroma rectangle helpers", "[fast][render]") {
@@ -233,20 +257,18 @@ TEST_CASE("render_test_plane_views: plane U at zoom 8 is nearest-neighbour at ch
   const OutputPixels px = render_deterministic(*surface, view);
   for (int cy = 0; cy < static_cast<int>(kH / 2); ++cy) {
     for (int cx = 0; cx < static_cast<int>(kW / 2); ++cx) {
-      const Rgb first = pixel(px, cx * kCell, cy * kCell);
+      const Rgb first = pixel(px, (cx * kCell) + 4, (cy * kCell) + 4);  // inside the sample, off the grid lines
       INFO("chroma sample (" << cx << ", " << cy << ") code " << cb(cx, cy) << " -> " << first.r);
       CHECK(grey(first));
       // Full-range normalisation: the 8-bit code is the output value (± 1 for GPU rounding).
       CHECK(std::abs(first.r - cb(cx, cy)) <= 1);
-      // Sharp edges: all 16 x 16 pixels of the sample are identical.
-      int mismatches = 0;
-      for (int y = cy * kCell; y < (cy + 1) * kCell; ++y) {
-        for (int x = cx * kCell; x < (cx + 1) * kCell; ++x) {
-          const Rgb p = pixel(px, x, y);
-          mismatches += (p.r != first.r || p.g != first.g || p.b != first.b) ? 1 : 0;
-        }
-      }
+      // Sharp edges: all 16 x 16 pixels of the sample are identical, except the pixels of the 1-px luma sample grid
+      // that R-ZOOM-4 draws from zoom 8 (WI-1.409), see count_sample_differences().
+      const SampleDifferences d = count_sample_differences(px, cx, cy, first);
+      const int mismatches = d.interior;
+      const int grid_pixels = d.grid;
       CHECK(mismatches == 0);
+      CHECK((grid_pixels > 0 || std::abs(first.r - 128) <= 4));
     }
   }
   check_golden("plane_u_nearest.png", px);
