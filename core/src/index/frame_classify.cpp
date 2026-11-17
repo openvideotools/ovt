@@ -126,7 +126,10 @@ void classify_h264(FrameRec& f, const syntax::h264::NalHeader& nal, const syntax
 void classify_h265(FrameRec& f, const syntax::h265::NalHeader& nal, const syntax::h265::SliceSegmentHeader& sh,
                    const syntax::h265::Sps& sps, const h265::PocResult& poc) {
   f.type = h265_slice_frame_type(sh);
-  f.shown = sh.pic_output_flag;
+  // SPEC-ASSUMPTION(#695): a RASL picture whose CRA has NoRaslOutputFlag = 1 in the stream itself (first picture
+  // or first after an end of sequence) is output by no decoder, so it is not shown; the RASL pictures of any
+  // other CRA stay shown in the full index (§7.3.10.2).
+  f.shown = sh.pic_output_flag && !poc.rasl_skipped;
   f.structure = fb::PictureStructure::Frame;
   f.temporal_id = nal.TemporalId;
   f.layer_id = nal.nuh_layer_id;
