@@ -31,7 +31,8 @@ ovt_catch_discover_tests(ovt_tests_index_h264)
 add_executable(ovt_tests_index_h264_dpb test_index_h264_dpb.cpp)
 target_link_libraries(ovt_tests_index_h264_dpb PRIVATE ovt_core_objects ovt_test_support ovt::flags ${Catch2_TARGET})
 target_include_directories(ovt_tests_index_h264_dpb PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
-target_compile_definitions(ovt_tests_index_h264_dpb PRIVATE OVT_GOLDEN_H264_DIR="${PROJECT_SOURCE_DIR}/tests/golden/h264")
+target_compile_definitions(ovt_tests_index_h264_dpb
+                           PRIVATE OVT_GOLDEN_H264_DIR="${PROJECT_SOURCE_DIR}/tests/golden/h264")
 ovt_set_license(ovt_tests_index_h264_dpb "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_index_h264_dpb)
 
