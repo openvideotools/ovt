@@ -1947,14 +1947,25 @@ void v031_frame(Reporter& r, const fb::StreamIndex& si, std::size_t i, const fb:
     r.report(kRule, "size_bytes " + std::to_string(f.size_bytes()) + " != sum of unit spans " + std::to_string(size),
              at("frames", i, "size_bytes"));
   }
-  for (const auto& [vec, name] :
-       {std::pair{f.declared_refs(), "declared_refs"}, std::pair{f.dpb_after(), "dpb_after"}}) {
-    for (std::size_t k = 0; k < vsize(vec); ++k) {
-      const std::int64_t v = vec->Get(static_cast<flatbuffers::uoffset_t>(k));
-      if (v < 0 || v >= n_frames || v == static_cast<std::int64_t>(i)) {
-        r.report(kRule, std::string(name) + " entry " + str(v) + " must name another frame",
-                 at(at("frames", i, name), k));
-      }
+  const auto self = static_cast<std::int64_t>(i);
+  const auto* refs = f.declared_refs();
+  for (std::size_t k = 0; k < vsize(refs); ++k) {
+    const std::int64_t v = refs->Get(static_cast<flatbuffers::uoffset_t>(k));
+    if (v < 0 || v >= n_frames || v == self) {
+      r.report(kRule, "declared_refs entry " + str(v) + " must name another frame",
+               at(at("frames", i, "declared_refs"), k));
+    }
+  }
+  // SPEC-ASSUMPTION(#733, #732): the DPB after frame i holds frame i itself and no later frame (chapter 7 §7.4.4);
+  // -1 is an empty slot, which only the AV1 slot table has; AV1 slots may repeat a frame.
+  const std::int64_t lowest = si.codec() == fb::Codec::AV1 ? -1 : 0;
+  const auto* dpb = f.dpb_after();
+  for (std::size_t k = 0; k < vsize(dpb); ++k) {
+    const std::int64_t v = dpb->Get(static_cast<flatbuffers::uoffset_t>(k));
+    if (v < lowest || v > self) {
+      r.report(kRule,
+               "dpb_after entry " + str(v) + " must be a frame decoded up to this one (or -1 for an empty AV1 slot)",
+               at(at("frames", i, "dpb_after"), k));
     }
   }
 }
