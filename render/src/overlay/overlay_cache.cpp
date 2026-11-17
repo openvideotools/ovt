@@ -167,6 +167,7 @@ size_t overlay_set_bytes(const OverlaySet& set) {
   size_t n = sizeof(OverlaySet);
   n += vec_bytes(set.cell_attributes) + vec_bytes(set.heatmap) + vec_bytes(set.heat_valid);
   n += vec_bytes(set.partition_lines) + vec_bytes(set.grid_nodes);
+  n += vec_bytes(set.cell_block_id);
   n += vec_bytes(set.arrows.geom) + vec_bytes(set.arrows.attr);
   for (const std::string& d : set.diagnostics) {
     n += d.capacity();

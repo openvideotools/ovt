@@ -83,6 +83,7 @@ void OverlayLayerGpu::drop_set() {
   pl_tex_destroy(gpu_, &attr_);
   pl_tex_destroy(gpu_, &heat_);
   pl_tex_destroy(gpu_, &heat_valid_);
+  pl_tex_destroy(gpu_, &block_ids_);
   std::string ignored;
   arrows_.set(gpu_, nullptr, 0, ignored);
   cells_w_ = 0;
@@ -149,6 +150,12 @@ bool OverlayLayerGpu::upload(const OverlaySet* handle, std::string& err) {
   const auto w = static_cast<int>(set->cells_w);
   const auto h = static_cast<int>(set->cells_h);
   const size_t cells = static_cast<size_t>(set->cells_w) * set->cells_h;
+  if (set->cell_block_id.size() == cells) {  // WI-2.435: the id-only fill pass
+    block_ids_ = make_texture(gpu_, "r32u", w, h, set->cell_block_id.data(), size_t{set->cells_w} * 4, err);
+    if (block_ids_ == nullptr) {
+      return false;
+    }
+  }
   if (set->cell_attributes.size() == cells * 4) {
     attr_ = make_texture(gpu_, "rgba8u", w, h, set->cell_attributes.data(), size_t{set->cells_w} * 4, err);
     if (attr_ == nullptr) {
@@ -228,9 +235,67 @@ bool OverlayLayerGpu::run_lines(const CellPassConstants& pc, std::string& err) {
   return lines_.run(gpu_, layer_, palette_, lc, err);
 }
 
+namespace {
+
+ArrowPassConstants arrow_constants(const CellPassConstants& pc, float min_px) {
+  ArrowPassConstants apc;
+  apc.viewport_half = pc.viewport_half;
+  apc.pan = pc.pan;
+  apc.clip = pc.clip;
+  apc.zoom = pc.zoom;
+  apc.dpr = pc.dpr;
+  apc.min_px = min_px;
+  return apc;
+}
+
+}  // namespace
+
+// The id buffer of §10.5.6: the id-only run of pass 3 (block_id + 1, even when no fill layer is on), then pass 9's
+// arrows (0x80000000 | mv_index) under the same layer bits and R-MV-1 rule as the visible arrows.
+bool OverlayLayerGpu::draw_ids(const CellPassConstants& pc, int w, int h, std::string& err) {
+  if (set_ == nullptr || (block_ids_ == nullptr && !arrows_.has_work(cfg_.layers))) {
+    return true;
+  }
+  if (!ids_.begin(w, h, err)) {
+    return false;
+  }
+  if (block_ids_ != nullptr && !passes_.run(gpu_, CellPass::BlockId, ids_.target(), pc, {block_ids_}, err)) {
+    return false;
+  }
+  if (!arrows_.draw_mvs(gpu_, ids_.target(), palette_, cfg_.layers, arrow_constants(pc, cfg_.mv_min_px), err, true)) {
+    return false;
+  }
+  ids_drawn_ = true;
+  return true;
+}
+
+void OverlayLayerGpu::end_frame() {
+  if (ids_drawn_) {
+    ids_.readback();
+  } else {
+    ids_.invalidate();
+  }
+  ids_drawn_ = false;
+}
+
 bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const pl_rect2df& picture,
                            struct pl_overlay& out, std::string& err) {
   const uint32_t layers = cfg_.layers;
+  CellPassConstants pc;
+  pc.viewport_half = {static_cast<float>(w) / 2.0F, static_cast<float>(h) / 2.0F};
+  pc.pan = {static_cast<float>(view.pan_x), static_cast<float>(view.pan_y)};
+  // pl_rect2df may be flipped (x1 < x0); the shader wants the normalised rect.
+  pc.clip = {std::min(picture.x0, picture.x1), std::min(picture.y0, picture.y1), std::max(picture.x0, picture.x1),
+             std::max(picture.y0, picture.y1)};
+  pc.zoom = static_cast<float>(view.zoom);
+  pc.alpha = cfg_.heatmap_alpha;
+  pc.dpr = dpr > 0.0F ? dpr : 1.0F;
+  pc.layers = layers;
+  pc.cells = {static_cast<int32_t>(cells_w_), static_cast<int32_t>(cells_h_)};
+  if (!draw_ids(pc, w, h, err)) {
+    return false;
+  }
+
   const bool heatmap = (layers & bit(OverlayLayer::Heatmap)) != 0 && heat_ != nullptr;
   const bool fill = (layers & kFillLayers) != 0 && attr_ != nullptr;
   const bool hatch = (layers & bit(OverlayLayer::SkipHatch)) != 0 && attr_ != nullptr;
@@ -246,18 +311,6 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
     return false;
   }
   pl_tex_clear_ex(gpu_, layer_, pl_clear_color{});  // transparent
-
-  CellPassConstants pc;
-  pc.viewport_half = {static_cast<float>(w) / 2.0F, static_cast<float>(h) / 2.0F};
-  pc.pan = {static_cast<float>(view.pan_x), static_cast<float>(view.pan_y)};
-  // pl_rect2df may be flipped (x1 < x0); the shader wants the normalised rect.
-  pc.clip = {std::min(picture.x0, picture.x1), std::min(picture.y0, picture.y1), std::max(picture.x0, picture.x1),
-             std::max(picture.y0, picture.y1)};
-  pc.zoom = static_cast<float>(view.zoom);
-  pc.alpha = cfg_.heatmap_alpha;
-  pc.dpr = dpr > 0.0F ? dpr : 1.0F;
-  pc.layers = layers;
-  pc.cells = {static_cast<int32_t>(cells_w_), static_cast<int32_t>(cells_h_)};
 
   // §10.5.6 draw order: 2 heatmap, 3 fills, 4 skip hatch.
   if (heatmap) {
@@ -277,13 +330,7 @@ bool OverlayLayerGpu::draw(const ViewState& view, int w, int h, float dpr, const
   }
   // 8 intra direction strokes, 9 MV arrows (L1, L0, bi).
   if (arrows) {
-    ArrowPassConstants apc;
-    apc.viewport_half = pc.viewport_half;
-    apc.pan = pc.pan;
-    apc.clip = pc.clip;
-    apc.zoom = pc.zoom;
-    apc.dpr = pc.dpr;
-    apc.min_px = cfg_.mv_min_px;
+    const ArrowPassConstants apc = arrow_constants(pc, cfg_.mv_min_px);
     if (!arrows_.draw_intra(gpu_, layer_, palette_, layers, apc, err) ||
         !arrows_.draw_mvs(gpu_, layer_, palette_, layers, apc, err)) {
       return false;

@@ -137,4 +137,6 @@ target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
 # WI-2.437: overlay cache and set_overlays() lifecycle (§10.5.8). The cache cases need no GPU; one [vulkan] case checks
 # the re-upload skip and teardown with live handles.
 target_sources(ovt_tests_render PRIVATE test_overlay_cache.cpp)
+# WI-2.435: id buffer, readback and pick() (§10.5.7), probe colour math (§10.6.3).
+target_sources(ovt_tests_render PRIVATE test_pick.cpp)
 target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")

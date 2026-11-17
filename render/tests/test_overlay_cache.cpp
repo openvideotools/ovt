@@ -323,6 +323,9 @@ TEST_CASE("render_test_overlay_cache GPU: a cache hit draws its own uniforms; te
   const std::vector<uint8_t> faint_px = render(*surface, std::move(faint_set));
   CHECK(faint_px != strong_px);
   CHECK(faint_px == want_faint);
+  // pick() reads the block ids through the handle (WI-2.435 + WI-2.437): cell 79 of the fixture is in block 1.
+  CHECK(surface->pick(kW - 2, 10).block_id == 1);
+  CHECK(surface->pick(2, 10).block_id == 0);
   // Back to the first alpha: a hit again, and the same pixels as the fresh build.
   CHECK(render(*surface, build(builder, fa, strong)) == strong_px);
 

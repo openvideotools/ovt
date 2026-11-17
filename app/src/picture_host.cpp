@@ -33,6 +33,7 @@
 #include <utility>
 
 #include "ovt/render/video_surface.h"
+#include "render_stub.h"
 #include "surface/output_download.h"  // ovt::render::detail::download_output (exported, for Interop::None)
 
 namespace ovt::app {
@@ -222,6 +223,14 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
 
  private:
   void create_surface(QSize size) {
+    if (render_stub_enabled()) {
+      // OVT_RENDER_STUB=1 (chapter 14 §14.10.2, WI-1.465): no surface, so render() draws the background colour only.
+      stats_.interop = QStringLiteral("stub");
+      stats_.surface_width = size.width();
+      stats_.surface_height = size.height();
+      init_failed_ = true;
+      return;
+    }
     surface_ = VideoSurface::create("studio");
     DisplayTarget target;
     target.kind = DisplayTarget::Kind::OffscreenTexture;
