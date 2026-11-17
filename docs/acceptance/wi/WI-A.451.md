@@ -43,23 +43,23 @@ Mac Mini runs (emulator `ovt-api36-arm64`, 1080x2400, 420 dpi):
   `AndroidShell.qml` calls `Platform.refresh(widthDp)`. Log of the 2026-11-17 run, kept in the project files as
   `wa451-pr707-07d68cc-mini-20261117T022943Z.txt`:
 
-```console
-$ python3 -m pytest app/tests/scripts/test_android_breakpoints.py   # no media
-============================== 1 passed in 6.98s ===============================
-I default : OVT: Platform read widthDp=1300 ok=1 appState=2
-D qml     : OVT: layout three widthDp=1300 frame=-1
-I OVT     : OVT: configuration screenWidthDp=900 shellReady=true
-D qml     : OVT: configuration widthDp=900
-D qml     : OVT: layout two widthDp=900 frame=-1
-I OVT     : OVT: configuration screenWidthDp=700 shellReady=true
-D qml     : OVT: configuration widthDp=700
-D qml     : OVT: layout vertical widthDp=700 frame=-1
-```
+  ```console
+  $ python3 -m pytest app/tests/scripts/test_android_breakpoints.py   # no media
+  ============================== 1 passed in 6.98s ===============================
+  I default : OVT: Platform read widthDp=1300 ok=1 appState=2
+  D qml     : OVT: layout three widthDp=1300 frame=-1
+  I OVT     : OVT: configuration screenWidthDp=900 shellReady=true
+  D qml     : OVT: configuration widthDp=900
+  D qml     : OVT: layout two widthDp=900 frame=-1
+  I OVT     : OVT: configuration screenWidthDp=700 shellReady=true
+  D qml     : OVT: configuration widthDp=700
+  D qml     : OVT: layout vertical widthDp=700 frame=-1
+  ```
 
   Manual resizes 1300 → 900 → 700 → 1300 dp and 1300 → 900 → 700 → 600 → 500 dp (4 s per step) followed every
   step (three, two, vertical, three; vertical at 600, single at 500; 700 → 1300 grows to three) with no Activity
-  recreation. A `layout <old class>
-  widthDp=<new>` line can precede the new class in the same millisecond; the test keeps the last line of each run.
+  recreation. A `layout <old class> widthDp=<new>` line can precede the new class in the same millisecond; the
+  test keeps the last line of each run.
   Desktop coverage: Catch2 "Platform: a pushed width change switches the layout class" and
   `tst_android_shell.qml` `test_configurationWidthDrivesTheLayout`.
 - Frame half **blocked**: a VIEW intent opens the fd natively (`OVT: opened fd size=...`) but the open file never
