@@ -2,7 +2,7 @@
 
 Spec version: 1.0-rc41. Scope per chapter 16 §16.3: the macOS NATIVE host only (the Linux host is WI-4.450).
 
-## Test 1: XDR Mac, `Ctrl+H` → `active_encoding() == ScRgbLinear16F`; child window rect = item rect ±1 px during a 100-step splitter drag
+## Test 1: XDR Mac, `Ctrl+H` → `ScRgbLinear16F`; child window = item rect ±1 px over a 100-step splitter drag
 
 Automated parts (every CI platform unless noted):
 
