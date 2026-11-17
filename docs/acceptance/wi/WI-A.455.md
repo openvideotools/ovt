@@ -51,7 +51,7 @@ Google Maven cannot be reached from the container, and CI's `android-build` does
 ### Emulator half (owed until the emulator CI of WI-0.035 / #487 runs it)
 
 ```console
-./gradlew -p android :app:connectedFossDebugAndroidTest \
+cd android && ./gradlew :app:connectedFossDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=org.openvideotools.studio.StateRestoreTest
 ```
 
@@ -59,11 +59,18 @@ on the x86_64 or arm64 API 36 emulator started with `-gpu host`. `StateRestoreTe
 
 - `recreationRestoresFrameAndSelection`: `ActivityScenario.recreate()` runs the same path "Don't keep activities"
   runs (`onSaveInstanceState`, `onDestroy` while not finishing, `onCreate` with the Bundle).
-- `dontKeepActivitiesBackgroundAndResume` (acceptance test 1): sets `always_finish_activities` to 1, puts frame 42/40
+- `dontKeepActivitiesBackgroundAndResume` (acceptance test 1): sets `always_finish_activities` to 1, starts the app
+  with a plain intent (ActivityScenario refuses to launch while "Don't keep activities" is on), puts frame 42/40
   and a byte selection into the QML root, goes to the launcher until the Activity is destroyed, starts the app again
   and asserts that the new Activity's own QML root publishes the same frame, selection, file and layout within
   2 000 ms. The setting is put back afterwards.
 
 `MainActivity` logs `OVT: GUI state restored <n> ms after onCreate` for the record.
 
-Mac Mini run: _pending_.
+Mac Mini runs (emulator `ovt-api36-arm64`, API 36 arm64, 1080x2400, 420 dpi, `-gpu host`):
+
+- f965fbf (2026-11-17, `wa455-pr730-staterestore-mini-20261117T045426Z.txt` in the project files): the androidTest
+  APK built. `recreationRestoresFrameAndSelection` **PASS** (2.6 s; `OVT: GUI state restored 404 ms after
+  onCreate`). `dontKeepActivitiesBackgroundAndResume` failed before the app ran: `ActivityScenario.launch()`
+  throws `IllegalStateException` while "Don't keep activities" is on. The test now starts the app with an intent.
+- Next head: _pending_.

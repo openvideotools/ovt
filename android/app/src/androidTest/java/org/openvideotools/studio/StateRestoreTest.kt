@@ -24,7 +24,7 @@ import org.junit.runner.RunWith
 /**
  * Instrumentation tests of WI-A.455 (chapter 11 §11.5.7): the GUI state (project files, `SelectionState`, `ViewState`,
  * layout preset, panel state) survives the Activity being destroyed and created again, which "Don't keep activities"
- * does on every navigation away. Run with `./gradlew -p android :app:connectedFossDebugAndroidTest` on the x86_64
+ * does on every navigation away. Run from `android/` with `./gradlew :app:connectedFossDebugAndroidTest` on the x86_64
  * API 36 emulator (`-gpu host`); the record is docs/acceptance/wi/WI-A.455.md until the emulator CI (#487) runs it.
  *
  * The state is put into the live QML root through the same `restoredState` property a restore uses, so the tests need
@@ -53,32 +53,42 @@ class StateRestoreTest {
     }
 
     // Acceptance test 1: with "Don't keep activities" on, going to the launcher destroys the Activity; coming back
-    // creates a new one, which shows the same frame and selection within 2 s.
+    // creates a new one, which shows the same frame and selection within 2 s. ActivityScenario refuses to launch while
+    // the setting is on, so the Activities are started with plain intents and found through the lifecycle monitor.
     @Test
     fun dontKeepActivitiesBackgroundAndResume() {
         val before = shell("settings get global always_finish_activities").trim()
         shell("settings put global always_finish_activities 1")
+        var second: MainActivity? = null
         try {
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                val first = showState(scenario.activity())
-
-                instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
-                waitUntil("the Activity is destroyed in the background") { first.isDestroyed }
-
-                val resumedAt = SystemClock.uptimeMillis()
-                context.startActivity(
-                    Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                )
-                var second: MainActivity? = null
-                waitUntil("a new MainActivity is resumed") {
-                    second = resumedMainActivity()
-                    second != null && second !== first
-                }
-                val elapsed = waitForRestoredState(second!!, resumedAt)
-                assertTrue("restored after $elapsed ms, budget $RESTORE_BUDGET_MS ms", elapsed <= RESTORE_BUDGET_MS)
+            context.startActivity(
+                Intent(context, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+            )
+            var launched: MainActivity? = null
+            waitUntil("MainActivity is resumed", SHELL_TIMEOUT_NS) {
+                launched = resumedMainActivity()
+                launched != null
             }
+            val first = showState(launched!!)
+
+            instrumentation.uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
+            waitUntil("the Activity is destroyed in the background") { first.isDestroyed }
+
+            val resumedAt = SystemClock.uptimeMillis()
+            context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            waitUntil("a new MainActivity is resumed") {
+                second = resumedMainActivity()
+                second != null && second !== first
+            }
+            val elapsed = waitForRestoredState(second!!, resumedAt)
+            assertTrue("restored after $elapsed ms, budget $RESTORE_BUDGET_MS ms", elapsed <= RESTORE_BUDGET_MS)
         } finally {
             shell("settings put global always_finish_activities ${if (before == "1") "1" else "0"}")
+            second?.let { activity ->
+                onMain { activity.finish() }
+                waitUntil("the Activity finishes") { activity.isDestroyed }
+            }
         }
     }
 
