@@ -230,7 +230,7 @@ TEST_CASE("avcC, hvcC and av1C have decoders in sample entries and outside them"
   }
 }
 
-// AT1, adapted (SPEC-ASSUMPTION(#675)): recipe 29 is an x264 Baseline encode, so the record has profile 66
+// AT1 (spec 1.0-rc41, #675): recipe 29 is an x264 Baseline encode, so the record has profile 66
 // and no High-profile extension; the extension fields are covered by the High profile case below.
 TEST_CASE("avcC of the recipe-29 encode: profile from the SPS, 4-byte lengths, one SPS with its syntax tree",
           "[container][decoders][codec_config]") {
@@ -529,7 +529,7 @@ TEST_CASE("the configuration records of the container-smoke corpus decode withou
   }
 }
 
-// AT1 on the corpus file, as adapted by #675 (SPEC-ASSUMPTION(#675)).
+// AT1 on the corpus file (spec 1.0-rc41, #675).
 TEST_CASE("AT1 on syn_h264_multislice_cavlc_mp4: avcC profile, 4-byte lengths, one SPS, no extension",
           "[container][decoders][codec_config][needs-corpus]") {
   std::unique_ptr<ovt::io::RandomAccessFile> file;
@@ -565,7 +565,7 @@ TEST_CASE("AT2 on syn_h265_main10_hev1: hvcC Main 10, bitDepthLumaMinus8 2, arra
 }
 
 // AT3 on the corpus file the #675 ruling names (recipe 15a: the recipe-15 encode with HDR metadata OBUs, muxed by
-// MP4Box). SPEC-ASSUMPTION(#689): a 1080p30 aomenc encode carries seq_level_idx_0 8 ("4.0"), not 5.1; the expected
+// MP4Box). Spec 1.0-rc41 (#689): a 1080p30 aomenc encode carries seq_level_idx_0 8 ("4.0"), not 5.1; the expected
 // value is the one mp4box.js reports for the file (recorded in the PR).
 TEST_CASE("AT3 on syn_av1_pq_hdr_obu: av1C high_bitdepth, level and one sequence header",
           "[container][decoders][codec_config][needs-corpus]") {
