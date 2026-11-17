@@ -74,6 +74,8 @@ target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
 target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
 # WI-2.432: grid line pass with viewport/level culling (§10.5.3).
 target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+# WI-2.437: overlay cache (LRU of 8 built OverlaySets per surface, §10.5.8) and the set_overlays() lifecycle.
+target_sources(ovt_render PRIVATE src/overlay/overlay_cache.cpp)
 foreach(shader IN ITEMS arrows diff fill hatch heatmap lines)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")

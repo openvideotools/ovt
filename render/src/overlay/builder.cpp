@@ -313,36 +313,26 @@ std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, 
 
 std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
                                               const uint16_t* custom_cells) {
-  if (buf == nullptr) {
+  if (buf == nullptr || !verify_frame_analysis(buf, size)) {
     return nullptr;
   }
+  return build_overlay_set(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+}
+
+bool verify_frame_analysis(const uint8_t* buf, size_t size) {
   // A dense 4K frame has a Block and a MotionVector per 4x4 cell (over a million tables, synthetic_4k_mv.fb); the
   // default verifier limit of 1 M tables would reject it. kMaxCells bounds what the build uses anyway.
   flatbuffers::Verifier::Options opts;
   opts.max_tables = 4 * kMaxCells;
   flatbuffers::Verifier verifier(buf, size, opts);
-  if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
-    return nullptr;
-  }
-  return build_overlay_set(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+  return ovt::fb::VerifyFrameAnalysisBuffer(verifier);
 }
 
 }  // namespace detail
 
 OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
-  return detail::build_overlay_set(fa, cfg, custom_cells);
-}
-
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): as above
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  (void)owner_;
-  return detail::build_overlay_set(buf, size, cfg, custom_cells);
-}
+// The two build() overloads are in overlay_cache.cpp (WI-2.437), so that the fuzz target, which compiles this file
+// without a VideoSurface, does not need the surface's cache.
 
 }  // namespace ovt::render

@@ -133,4 +133,8 @@ target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.c
 # WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
 # render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
 target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
+
+# WI-2.437: overlay cache and set_overlays() lifecycle (§10.5.8). The cache cases need no GPU; one [vulkan] case checks
+# the re-upload skip and teardown with live handles.
+target_sources(ovt_tests_render PRIVATE test_overlay_cache.cpp)
 target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
