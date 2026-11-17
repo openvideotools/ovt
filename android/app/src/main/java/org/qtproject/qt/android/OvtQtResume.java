@@ -26,4 +26,30 @@ public final class OvtQtResume {
         QtNative.setApplicationState(QtNative.ApplicationState.ApplicationActive);
         QtNative.updateWindow();
     }
+
+    /**
+     * Runs {@code settled} on the UI thread after QtEmbeddedDelegate's display-metrics action (queued through
+     * QtNative.runAction() once the native plugin is ready), which NPEs on the null insets of a finished Activity
+     * (WI-A.452). runAction() keeps its actions in order, so one queued after Qt's runs after it. Call on the UI
+     * thread after constructing the QtQuickView (the delegate's listener is then registered first).
+     */
+    public static void whenStartupActionsRan(Runnable settled) {
+        if (QtNative.getStateDetails().nativePluginIntegrationReady) {
+            QtNative.runAction(settled);
+            return;
+        }
+        QtNative.registerAppStateListener(new QtNative.AppStateDetailsListener() {
+            @Override
+            public void onNativePluginIntegrationReadyChanged(boolean ready) {
+                if (!ready)
+                    return;
+                final QtNative.AppStateDetailsListener self = this;
+                // Unregistered from the action, not here: Qt is iterating its listener list right now.
+                QtNative.runAction(() -> {
+                    QtNative.unregisterAppStateListener(self);
+                    settled.run();
+                });
+            }
+        });
+    }
 }

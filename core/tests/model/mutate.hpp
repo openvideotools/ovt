@@ -256,6 +256,8 @@ inline const std::vector<IndexMutation>& index_mutations() {
       {"V-031", "dpb_after names a missing frame", [](fb::StreamIndexT& si) { si.frames[1]->dpb_after = {0, 3}; }},
       {"V-031", "dpb_after names a later frame", [](fb::StreamIndexT& si) { si.frames[1]->dpb_after = {0, 1, 2}; }},
       {"V-031", "dpb_after entry below -1", [](fb::StreamIndexT& si) { si.frames[1]->dpb_after = {-2, 0}; }},
+      {"V-031", "dpb_after empty slot in an H.265 index",
+       [](fb::StreamIndexT& si) { si.frames[1]->dpb_after = {-1, 1}; }},
   };
   return rows;
 }

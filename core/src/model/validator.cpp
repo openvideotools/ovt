@@ -1957,12 +1957,14 @@ void v031_frame(Reporter& r, const fb::StreamIndex& si, std::size_t i, const fb:
     }
   }
   // SPEC-ASSUMPTION(#733, #732): the DPB after frame i holds frame i itself and no later frame (chapter 7 §7.4.4);
-  // -1 is an empty AV1 slot, and AV1 slots may repeat a frame.
+  // -1 is an empty slot, which only the AV1 slot table has; AV1 slots may repeat a frame.
+  const std::int64_t lowest = si.codec() == fb::Codec::AV1 ? -1 : 0;
   const auto* dpb = f.dpb_after();
   for (std::size_t k = 0; k < vsize(dpb); ++k) {
     const std::int64_t v = dpb->Get(static_cast<flatbuffers::uoffset_t>(k));
-    if (v < -1 || v > self) {
-      r.report(kRule, "dpb_after entry " + str(v) + " must be -1 or a frame decoded up to this one",
+    if (v < lowest || v > self) {
+      r.report(kRule,
+               "dpb_after entry " + str(v) + " must be a frame decoded up to this one (or -1 for an empty AV1 slot)",
                at(at("frames", i, "dpb_after"), k));
     }
   }

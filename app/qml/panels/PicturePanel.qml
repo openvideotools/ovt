@@ -6,7 +6,7 @@
 // it, and the status strip with the probe read-out. With no file open the panel is the Welcome page (§11.3.19).
 //
 // PictureController owns the ViewState and turns input into ViewState and Selection changes (gesture table
-// §11.4.4); this file only routes events to it. Compare modes (WI-1.458) and overlays (WI-2.481) come later. The
+// §11.4.4); this file only routes events to it. Compare modes are CompareController's (WI-2.486); overlays (WI-2.481) come later. The
 // window-scope keys (1–5 planes, + − R Ctrl+1/2/4 zoom) arrive through the shell's Actions; the same keys pressed
 // while the panel has focus and no window shortcut took them (a panel built alone, as in the tests) go through the
 // Keymap here.
@@ -28,6 +28,7 @@ Rectangle {
     // The PictureHost item once PictureView.qml is loaded, else null.
     readonly property var host: pictureView.item ? pictureView.item.host : null
     readonly property alias controller: controller
+    readonly property alias compare: compare
     readonly property bool showsPicture: Project.fileCount > 0
 
     color: OvtStyle.panel
@@ -44,13 +45,25 @@ Rectangle {
         sampleReader: function (x, y) { return panel.host ? panel.host.codeValues(x, y) : [] }
     }
 
+    // Compare modes, divider, gain, A/B swap, SelectionB and "Set as B" (WI-2.486, §11.3.2).
+    CompareController {
+        id: compare
+
+        objectName: "compareController"
+        selection: Selection
+        diagnostics: DiagnosticsModel
+        origin: panel.panelId
+    }
+
     Connections {
         target: panel.shellActions
         ignoreUnknownSignals: true
 
         function onActivated(id) {
-            if (panel.showsPicture)
-                controller.handleAction(id)
+            if (!panel.showsPicture)
+                return
+            if (!controller.handleAction(id))
+                compare.handleAction(id)
         }
     }
 
@@ -69,6 +82,94 @@ Rectangle {
         height: visible ? OvtStyle.minHitTarget + 4 : 0
         visible: panel.showsPicture
         color: OvtStyle.window
+
+        // Compare controls (§11.3.2): the combo is the C / Shift+C cycle; the rest apply to the mode shown.
+        Row {
+            id: compareRow
+
+            objectName: "compareControls"
+            anchors { left: parent.left; leftMargin: OvtStyle.spacing; verticalCenter: parent.verticalCenter }
+            spacing: OvtStyle.spacing
+
+            ComboBox {
+                objectName: "compareCombo"
+                enabled: compare.enabled && compare.hasB
+                implicitHeight: OvtStyle.minHitTarget
+                focusPolicy: Qt.NoFocus
+                model: compare.modeNames
+                currentIndex: compare.mode
+                Accessible.name: qsTr("Compare mode")
+                onActivated: function (index) { compare.mode = index }
+            }
+            Button {
+                objectName: "compareSetAsB"
+                text: qsTr("Set as B")
+                enabled: compare.enabled && panel.host !== null && panel.host.hasPicture
+                focusPolicy: Qt.NoFocus
+                implicitHeight: OvtStyle.minHitTarget
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Snapshot the picture shown as slot B (Picture \u25B8 Set as B from memory)")
+                onClicked: compare.setAsBFromMemory()
+            }
+            Button {
+                objectName: "compareSwap"
+                text: qsTr("Swap A/B")
+                visible: compare.hasB
+                enabled: compare.enabled
+                focusPolicy: Qt.NoFocus
+                implicitHeight: OvtStyle.minHitTarget
+                ToolTip.visible: hovered
+                ToolTip.text: qsTr("Swap A and B (X)")
+                onClicked: compare.swapAB()
+            }
+            Slider {
+                objectName: "compareAlpha"
+                visible: compare.mode === CompareController.Overlay
+                width: 100
+                from: 0
+                to: 1
+                value: compare.overlayAlpha
+                focusPolicy: Qt.NoFocus
+                Accessible.name: qsTr("Overlay alpha")
+                onMoved: compare.overlayAlpha = value
+            }
+            ComboBox {
+                objectName: "compareGain"
+                visible: compare.mode === CompareController.Difference
+                implicitHeight: OvtStyle.minHitTarget
+                focusPolicy: Qt.NoFocus
+                model: ["1", "2", "4", "8", "16", "32"]
+                currentIndex: Math.round(Math.log(Math.max(1, compare.diffGain)) / Math.LN2)
+                Accessible.name: qsTr("Difference gain")
+                onActivated: function (index) { compare.diffGain = Math.pow(2, index) }
+            }
+            Button {
+                objectName: "compareFalseColour"
+                visible: compare.mode === CompareController.Difference
+                text: qsTr("False colour")
+                checkable: true
+                checked: compare.diffFalseColour
+                focusPolicy: Qt.NoFocus
+                implicitHeight: OvtStyle.minHitTarget
+                onClicked: compare.diffFalseColour = checked
+            }
+            Button {
+                objectName: "compareFindMismatch"
+                visible: compare.hasB
+                text: compare.finding ? qsTr("Cancel") : qsTr("Find first mismatch")
+                focusPolicy: Qt.NoFocus
+                implicitHeight: OvtStyle.minHitTarget
+                onClicked: compare.finding ? compare.cancelFirstMismatch() : compare.findFirstMismatch()
+            }
+            Label {
+                objectName: "compareStatus"
+                anchors.verticalCenter: parent.verticalCenter
+                text: compare.findStatus
+                color: OvtStyle.textMuted
+                elide: Text.ElideRight
+                width: Math.min(implicitWidth, 260)
+            }
+        }
 
         Row {
             anchors { right: parent.right; rightMargin: OvtStyle.spacing; verticalCenter: parent.verticalCenter }
@@ -133,7 +234,81 @@ Rectangle {
             active: Platform.pictureHostAvailable && panel.showsPicture
             visible: active
             source: "PictureView.qml"
-            onLoaded: item.controller = controller
+            onLoaded: {
+                item.controller = controller
+                item.compare = compare
+            }
+        }
+
+        // Split compare: the divider (drag it) and a track along the top / left edge that jumps it to the pointer.
+        // The picture region is device pixels (dpr); the controller takes the position as a fraction of the item.
+        Item {
+            id: splitDivider
+
+            objectName: "compareDivider"
+            readonly property bool vertical: compare.splitAxis === 0
+            anchors.fill: parent
+            z: 10  // above the picture's input area, which is declared later
+            visible: compare.kind === 2 && compare.hasB && compare.enabled
+
+            Rectangle {
+                objectName: "compareDividerLine"
+                color: "#1E88E5"
+                x: splitDivider.vertical ? compare.splitPosition * splitDivider.width - 1 : 0
+                y: splitDivider.vertical ? 0 : compare.splitPosition * splitDivider.height - 1
+                width: splitDivider.vertical ? 2 : splitDivider.width
+                height: splitDivider.vertical ? splitDivider.height : 2
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    cursorShape: splitDivider.vertical ? Qt.SplitHCursor : Qt.SplitVCursor
+                    onPositionChanged: function (mouse) {
+                        if (!pressed)
+                            return
+                        const p = mapToItem(splitDivider, mouse.x, mouse.y)
+                        compare.dragDivider(splitDivider.vertical ? p.x : p.y,
+                                            splitDivider.vertical ? splitDivider.width : splitDivider.height)
+                    }
+                }
+            }
+            Label {
+                text: "A"
+                color: "#1E88E5"
+                font.bold: true
+                x: splitDivider.vertical ? Math.max(0, compare.splitPosition * splitDivider.width - width - 6) : 6
+                y: splitDivider.vertical ? 16 : Math.max(0, compare.splitPosition * splitDivider.height - height - 6)
+            }
+            Label {
+                text: "B"
+                color: "#FB8C00"
+                font.bold: true
+                x: splitDivider.vertical ? compare.splitPosition * splitDivider.width + 6 : 6
+                y: splitDivider.vertical ? 16 : compare.splitPosition * splitDivider.height + 6
+            }
+            MouseArea {
+                objectName: "compareDividerTrack"
+                x: 0
+                y: 0
+                width: splitDivider.vertical ? splitDivider.width : 14
+                height: splitDivider.vertical ? 14 : splitDivider.height
+                cursorShape: splitDivider.vertical ? Qt.SplitHCursor : Qt.SplitVCursor
+                function move(mouse) {
+                    compare.dragDivider(splitDivider.vertical ? mouse.x : mouse.y,
+                                        splitDivider.vertical ? splitDivider.width : splitDivider.height)
+                }
+                onPressed: function (mouse) { move(mouse) }
+                onPositionChanged: function (mouse) { if (pressed) move(mouse) }
+            }
+        }
+
+        // SelectionB is empty (a manual offset or a shorter B puts it outside B): "no frame" in place of B (§11.4.1).
+        Label {
+            objectName: "compareNoFrameB"
+            anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: OvtStyle.spacing }
+            visible: compare.kind !== 0 && compare.bEmpty
+            text: qsTr("B: no frame")
+            color: "#FB8C00"
         }
 
         EmptyState {
@@ -287,6 +462,14 @@ Rectangle {
                 for (const id of windowActions) {
                     if (Keymap.matches("action." + id, event.key, event.modifiers)) {
                         event.accepted = controller.handleAction(id)
+                        return
+                    }
+                }
+                const compareActions = ["compare.nextMode", "compare.previousMode", "compare.swap",
+                                        "compare.gainDown", "compare.gainUp", "compare.falseColour"]
+                for (const id of compareActions) {
+                    if (Keymap.matches("action." + id, event.key, event.modifiers)) {
+                        event.accepted = compare.handleAction(id)
                         return
                     }
                 }
