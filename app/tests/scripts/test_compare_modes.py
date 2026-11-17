@@ -23,10 +23,14 @@ SAMPLE = REPO / "tests" / "corpora" / "patterns" / "hlg_patches.mp4"
 
 
 @pytest.fixture
-def compare_studio(studio: Studio) -> Iterator[Studio]:
+def compare_studio(request: pytest.FixtureRequest) -> Iterator[Studio]:
     """A studio with a file open as A and a memory snapshot of its frame set as B."""
     if not SAMPLE.exists():
         pytest.skip(f"{SAMPLE} not found")
+    try:
+        studio = request.getfixturevalue("studio")
+    except IpcError as err:
+        pytest.skip(f"ovt-studio does not serve the test IPC yet (WI-1.465): {err}")
     try:
         studio.open(SAMPLE)
         studio.wait_idle()

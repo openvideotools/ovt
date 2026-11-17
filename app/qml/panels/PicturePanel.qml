@@ -248,6 +248,7 @@ Rectangle {
             objectName: "compareDivider"
             readonly property bool vertical: compare.splitAxis === 0
             anchors.fill: parent
+            z: 10  // above the picture's input area, which is declared later
             visible: compare.kind === 2 && compare.hasB && compare.enabled
 
             Rectangle {
