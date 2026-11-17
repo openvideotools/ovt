@@ -3,8 +3,8 @@
 Machine: cloud container, Linux x86_64, no Android SDK/NDK and no emulator (Google's Maven and the SDK downloads are
 blocked by the container's proxy). Date: 2026-11-17. Spec version: 1.0-rc41.
 
-**Status: test 1 by hand PASS; the instrumentation tests are being re-run after a crash fix.** They run on the Mac
-Mini's API 36 emulator (AVD `ovt-api36-arm64`, arm64-v8a, `-gpu host`) until the Android instrumentation job of
+**Status: PASS.** `SafFlowsTest` 9 of 9 at c642e04, and test 1 by hand at 89fedca. They run on the Mac Mini's API 36
+emulator (AVD `ovt-api36-arm64`, arm64-v8a, `-gpu host`) until the Android instrumentation job of
 WI-1.577 exists.
 
 Run at 89fedca (2026-11-17, Mini): both assemble tasks pass. `SafFlowsTest`: `exportCreatesAndWritesTheDocument`,
@@ -12,7 +12,10 @@ Run at 89fedca (2026-11-17, Mini): both assemble tasks pass. `SafFlowsTest`: `ex
 crashed in Qt during `documentOpensShowsInRecentListAndReopens`: an NPE in `QtDisplayManager.setApplicationDisplayMetrics`
 (Qt 6.8.3), whose start-up action outlived an Activity finished right after launch and read its null insets. Fix:
 `MainActivity.finish()` waits for `OvtQtResume.whenStartupActionsRan` (at most 2 s). At 11cf4cb that worked, but a late
-QML status change of the destroyed Activity's view then hit its freed QQuickView (SIGSEGV); it is now dropped. Re-run: owed.
+QML status change of the destroyed Activity's view then hit its freed QQuickView (SIGSEGV); it is now dropped.
+
+Run at c642e04 (2026-11-17 06:50 UTC, Mini): both assemble tasks pass; `SafFlowsTest` finished 9 tests, all PASS, no
+crash or FATAL in logcat ("finish deferred until Qt has started", then "Qt started, finishing now" 0.5 s later).
 
 What was checked here: every changed Kotlin file, `SafFlowsTest.kt` and the debug-only `TestDocumentsProvider.kt`
 compile with `kotlinc` 2.0.21 `-Werror` against `android-all` 16 (Robolectric's API 36 jar) and stubs of the AndroidX
@@ -66,7 +69,7 @@ document to `getExternalFilesDir(null)/copies/` (SPEC-ASSUMPTION(#722)) and the 
 list). Supporting: `fstatDecidesSeekability` (PASS at 89fedca), `copyNamesAreSafeAndUnique`,
 `cancelledCopyLeavesNoFile` (PASS at 89fedca).
 
-Output: owed (the run at 89fedca stopped at the crash above, before this test).
+Output: PASS at c642e04 (`nonSeekableDocumentRaisesGuiAnd0001AndOpensAfterCopy` and its supporting tests).
 
 ## Export (step 3, no acceptance line)
 
