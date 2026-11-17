@@ -8,6 +8,7 @@
 #ifndef OVT_INDEX_BUILDER_INTERNAL_H
 #define OVT_INDEX_BUILDER_INTERNAL_H
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -45,9 +46,19 @@ struct UnitRec {
   syntax::SyntaxNodeBuffer header;
   int32_t sample_index = -1;
   std::vector<DiagRec> diagnostics;
-  bool parameter_set = false;  // listed in StreamIndex.parameter_sets
-  bool sei = false;            // listed in StreamIndex.sei
+  bool parameter_set = false;        // listed in StreamIndex.parameter_sets
+  bool sei = false;                  // listed in StreamIndex.sei
+  bool temporal_unit_start = false;  // UnitInput.temporal_unit_start (AV1 Annex B, WI-1.124)
   std::optional<SampleTiming> timing;
+};
+
+/// One entry of a reference list of a frame's first slice (§7.4.4: the "RefSlot names L0[i] / L1[i]" kept privately
+/// for the plugin host and the GOP graph; not serialised).
+struct RefSlotRec {
+  int32_t decode_index = -1;  // -1: an H.264 non-existing frame
+  int64_t poc = 0;            // of the referenced frame, or of the field for a field reference
+  fb::PictureStructure structure = fb::PictureStructure::Frame;  // Frame, TopField or BottomField
+  bool long_term = false;
 };
 
 /// One ovt.fb.FrameInfo in the making, plus what S9 needs and the schema does not carry.
@@ -72,12 +83,14 @@ struct FrameRec {
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
   std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
-  std::vector<int32_t> dpb_after;
+  std::vector<int32_t> dpb_after;      // AV1: the 8 slots, -1 for an empty slot
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
   // ---- S9 inputs (not serialised) ----
   uint32_t sequence = 0;         // H.26x: ordinal of the coded video sequence the picture belongs to
   int32_t second_field_of = -1;  // H.264: decode index of the first field of the complementary pair
+  // ---- §7.4.4 private per-frame references (not serialised) ----
+  std::array<std::vector<RefSlotRec>, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice
 };
 
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:
@@ -158,7 +171,8 @@ class CodecDispatch {
   virtual void end_of_stream(BuilderCore& core) = 0;
 };
 
-[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch();
+/// `operating_point` and `annexb` are BuilderOptions.av1_operating_point / av1_annexb (WI-1.124).
+[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch(uint8_t operating_point = 0, bool annexb = false);
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h264_dispatch();
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h265_dispatch();
 
