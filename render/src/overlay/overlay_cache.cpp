@@ -84,6 +84,7 @@ OverlayConfig gpu_relevant_config(const OverlayConfig& cfg) {
   const OverlayConfig defaults;
   g.layers &= ~kUniformLayers;
   g.selected_block = defaults.selected_block;
+  g.hovered_block = defaults.hovered_block;  // WI-2.436 hover outline, a draw-time uniform like the selection
   g.selected_mv = defaults.selected_mv;
   g.selection_rect = defaults.selection_rect;
   g.probe_x = defaults.probe_x;
@@ -168,6 +169,7 @@ size_t overlay_set_bytes(const OverlaySet& set) {
   n += vec_bytes(set.cell_attributes) + vec_bytes(set.heatmap) + vec_bytes(set.heat_valid);
   n += vec_bytes(set.partition_lines) + vec_bytes(set.grid_nodes);
   n += vec_bytes(set.cell_block_id);
+  n += vec_bytes(set.deblock_edges) + vec_bytes(set.block_rects) + vec_bytes(set.mv_rects);
   n += vec_bytes(set.arrows.geom) + vec_bytes(set.arrows.attr);
   for (const std::string& d : set.diagnostics) {
     n += d.capacity();

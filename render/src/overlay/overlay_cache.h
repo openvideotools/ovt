@@ -39,7 +39,7 @@ inline constexpr size_t kOverlayCacheBudgetBytes = size_t{256} << 20U;
 #endif
 
 // `cfg` with every field that is a draw-time uniform reset to its default: Selection, Probe and SelectionRect layer
-// bits, selected_block, selected_mv, selection_rect, probe_x/y (WI-2.437 note), and heatmap_alpha, lut,
+// bits, selected_block, hovered_block, selected_mv, selection_rect, probe_x/y (WI-2.437 note), and heatmap_alpha, lut,
 // label_zoom_threshold, mv_min_px and line_px, which the passes read when drawing. What is left (the other layer
 // bits, heatmap source and range, label content, mv_scale, which the arrow instances bake in) decides the built data.
 // A pass that bakes another field into OverlaySet must keep it here.

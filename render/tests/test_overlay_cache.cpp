@@ -136,6 +136,7 @@ TEST_CASE("render_test_overlay_cache_key: uniforms are not in the key, mv_scale 
     OverlayConfig moved = base;
     moved.layers |= bit(OverlayLayer::Selection) | bit(OverlayLayer::Probe) | bit(OverlayLayer::SelectionRect);
     moved.selected_block = 1;
+    moved.hovered_block = 0;
     moved.selected_mv = 12;
     moved.selection_rect = fb::Rect(4, 4, 16, 16);
     moved.probe_x = 10;
@@ -147,6 +148,10 @@ TEST_CASE("render_test_overlay_cache_key: uniforms are not in the key, mv_scale 
     auto set = build(builder, fa, moved);
     REQUIRE(is_hit(*set));
     CHECK(set->config.selected_block == 1);
+    CHECK(set->config.hovered_block == 0);
+    // The WI-2.436 marks read block_rects / mv_rects through data(): a handle owns none of its own.
+    CHECK(set->block_rects.empty());
+    CHECK(set->data().block_rects.size() == 2);
     CHECK(set->config.probe_x == 10);
     CHECK(set->config.heatmap_alpha == 0.25F);
     CHECK(set->config.layers == moved.layers);
