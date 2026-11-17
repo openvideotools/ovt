@@ -42,7 +42,7 @@ bool SampleGridLayer::draw(pl_gpu gpu, const ViewState& view, int w, int h, cons
     }
     const std::vector<uint8_t> px = rasterize_sample_grid(lines, vp, picture);
     pl_fmt fmt = pl_find_named_fmt(gpu, "rgba8");
-    if (fmt == nullptr || !(fmt->caps & PL_FMT_CAP_SAMPLEABLE)) {
+    if (fmt == nullptr || (fmt->caps & PL_FMT_CAP_SAMPLEABLE) == 0) {
       err = "sample grid format rgba8 is not sampleable";
       return false;
     }

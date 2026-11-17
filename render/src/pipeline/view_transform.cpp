@@ -38,7 +38,7 @@ double edge(double i, double pan, double zoom, double half) {
 
 // Sample index of device pixel `p` along one axis, the inverse of edge() with the same rounding.
 int sample_axis(double pan, double zoom, double half, int p) {
-  const double dev = static_cast<double>(p);
+  const auto dev = static_cast<double>(p);
   int i = floor_int(pan + ((dev - half) / zoom));
   for (int k = 0; k < kSnapSteps && edge(static_cast<double>(i) + 1.0, pan, zoom, half) <= dev; ++k) {
     ++i;
@@ -56,15 +56,14 @@ std::vector<int> axis_lines(double pan, double zoom, double half, double lo, dou
   if (!(dev_hi > dev_lo) || !(hi > lo)) {
     return out;
   }
-  const double first = std::max(lo, std::floor(pan + ((dev_lo - half) / zoom)) - 1.0);
-  const double last = std::min(hi, std::ceil(pan + ((dev_hi - half) / zoom)) + 1.0);
-  for (double i = first; i <= last; i += 1.0) {
-    const bool far_edge = i >= hi;
-    if (far_edge && i > hi) {
-      break;
-    }
-    double d = edge(i, pan, zoom, half);
-    if (far_edge) {
+  // Integer loop counter over the sample edges: the first / last edge that can reach [dev_lo, dev_hi), clamped to the
+  // picture [lo, hi], where `hi` is the far picture edge.
+  const auto first = static_cast<long>(std::max(lo, std::floor(pan + ((dev_lo - half) / zoom)) - 1.0));
+  const auto last = static_cast<long>(std::min(hi, std::ceil(pan + ((dev_hi - half) / zoom)) + 1.0));
+  const auto far_edge_index = static_cast<long>(hi);
+  for (long i = first; i <= last; ++i) {
+    double d = edge(static_cast<double>(i), pan, zoom, half);
+    if (i >= far_edge_index) {
       d -= 1.0;  // the picture's right / bottom edge: the last device pixel of the last sample
     }
     if (d >= dev_lo && d < dev_hi) {
