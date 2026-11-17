@@ -87,7 +87,7 @@ TEST_CASE("ts packets: parse survives damage to every byte of the first packets"
     CHECK(parsed->packet_count == 12);
     CHECK(parsed->pids.size() == 2);
   }
-  for (size_t i = 0; i < 4 * 188; ++i) {
+  for (size_t i = 0; i < size_t{4} * 188; ++i) {
     for (const uint8_t value : {uint8_t{0x00}, uint8_t{0xFF}, uint8_t{0x47}, uint8_t{0x80}}) {
       Bytes d = clean;
       d[i] = value;

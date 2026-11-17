@@ -888,6 +888,7 @@ TEST_CASE("psi: ES nodes name the common stream types", "[container][mpegts][psi
                                                             {0x81, "AC-3 audio (ATSC)"}, {0x87, "E-AC-3 audio (ATSC)"},
                                                             {0x90, "user private"},      {0x77, "other"}};
   std::vector<Es> streams;
+  streams.reserve(kTypes.size());
   unsigned pid = 0x101;
   for (const auto& [type, name] : kTypes) {
     streams.push_back({type, pid++, {}});
