@@ -253,6 +253,7 @@ inline const std::vector<IndexMutation>& index_mutations() {
       {"V-031", "frame lists another frame's unit", [](fb::StreamIndexT& si) { si.frames[2]->units[0] = 0; }},
       {"V-031", "declared ref names the frame itself", [](fb::StreamIndexT& si) { si.frames[1]->declared_refs = {1}; }},
       {"V-031", "parameter set outside units", [](fb::StreamIndexT& si) { si.parameter_sets[0]->index = 6; }},
+      {"V-031", "dpb_after names a missing frame", [](fb::StreamIndexT& si) { si.frames[1]->dpb_after = {0, 3}; }},
   };
   return rows;
 }

@@ -72,7 +72,7 @@ struct FrameRec {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
-  std::vector<int32_t> declared_refs;  // §7.4.4; AV1 fills them (WI-1.124), H.26x with WI-1.122 / WI-1.123
+  std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
   std::vector<int32_t> dpb_after;      // AV1: the 8 slots, -1 for an empty slot
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
