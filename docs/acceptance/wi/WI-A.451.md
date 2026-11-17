@@ -22,8 +22,8 @@ Totals: 99 passed, 0 failed, 0 skipped, 0 blacklisted
 Emulator half, owed (the emulator CI of WI-0.035 / #487 is not merged):
 
 ```console
-$ ./gradlew -p android :app:assembleFossDebug :app:installFossDebug   # emulator running
-$ python3 -m pytest app/tests/scripts/test_android_breakpoints.py -v
+./gradlew -p android :app:assembleFossDebug :app:installFossDebug   # emulator running
+python3 -m pytest app/tests/scripts/test_android_breakpoints.py -v
 ```
 
 The script sets the window size with `adb shell wm size` at the device density (so `Configuration.screenWidthDp` is
