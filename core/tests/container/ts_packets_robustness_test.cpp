@@ -26,7 +26,7 @@ Bytes packet(uint16_t pid, uint8_t afc, uint8_t cc, const Bytes& af_body, int af
   p[0] = ts::kSyncByte;
   p[1] = static_cast<uint8_t>(0x40U | (pid >> 8U));
   p[2] = static_cast<uint8_t>(pid & 0xFFU);
-  p[3] = static_cast<uint8_t>((afc << 4U) | (cc & 0x0FU));
+  p[3] = static_cast<uint8_t>((static_cast<unsigned>(afc) << 4U) | (cc & 0x0FU));
   if ((afc & 2U) != 0) {
     p[4] = static_cast<uint8_t>(af_length < 0 ? static_cast<int>(af_body.size()) : af_length);
     for (size_t i = 0; i < af_body.size() && 5 + i < p.size(); ++i) {
