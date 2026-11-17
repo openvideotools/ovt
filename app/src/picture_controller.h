@@ -25,6 +25,8 @@
 #include <QRect>
 #include <QString>
 
+#include <optional>
+
 #include "models/selection_model.h"
 
 namespace ovt::app {
@@ -138,6 +140,22 @@ class PictureController : public QObject {
   // true when there was something to clear.
   Q_INVOKABLE bool escape();
 
+  // ---- Saved state (§11.5.7, WI-A.455) ----------------------------------------------------------------------------
+  // The ViewState Android saves across Activity recreation (app/src/platform/android_state.cpp).
+  struct ViewSnapshot {
+    bool fit = true;
+    double zoom = 1.0;
+    double pan_x = 0;
+    double pan_y = 0;
+    int plane_mode = 0;
+    int stage = 0;
+    bool show_cropped = true;
+  };
+  [[nodiscard]] ViewSnapshot viewSnapshot() const;
+  // Puts a saved ViewState back. Zoom and pan need the picture (pan is clamped to it): with no picture yet they wait
+  // for the next setPicture(), which then applies them instead of fitting.
+  void restoreView(const ViewSnapshot& view);
+
   // ---- Actions ------------------------------------------------------------------------------------------------------
   // The window-scope actions of the Keymap that act on the Picture (view.plane.*, view.zoom.*), given without the
   // "action." prefix. Returns true when the id is one of them.
@@ -227,6 +245,7 @@ class PictureController : public QObject {
   QPointF pan_last_;
   QJSValue sample_reader_;
   QString readout_;
+  std::optional<ViewSnapshot> pending_view_;  // zoom and pan of restoreView() waiting for a picture
 };
 
 }  // namespace ovt::app
