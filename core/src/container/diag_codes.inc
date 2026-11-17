@@ -101,6 +101,12 @@ X(CNT_1023, "CNT-1023", Warning, "`clap` yields non-integral or out-of-range ape
 X(CNT_5002, "CNT-5002", Warning, "QuickTime `nclc` colr in non-`qt` file", "QTFF")
 X(CNT_5020, "CNT-5020", Warning, "`dvcC` used for profile ≥ 8 or `dvvC` for ≤ 7", "DV-ISOBMFF §2.2")
 
+// WI-1.207 (codec configuration records, §8.3.3).
+X(CNT_1020, "CNT-1020", Info, "`avc3`/`avc4` sample entry carries SPS/PPS in `avcC` (allowed, but in-band is the point)",
+  "14496-15 §5.4")
+X(CNT_1021, "CNT-1021", Error, "`av1C.configOBUs` contains an OBU other than sequence header / metadata",
+  "AV1-ISOBMFF §2.3.4")
+
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
