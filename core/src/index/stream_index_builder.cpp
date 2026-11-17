@@ -167,6 +167,11 @@ void BuilderCore::extend_frame(uint32_t unit) {
   if (!open_) {
     return;
   }
+  for (const uint32_t v : pending_) {
+    open_->units.push_back(v);
+    units[v].frame = open_->decode_index;
+  }
+  pending_.clear();
   open_->units.push_back(unit);
   units[unit].frame = open_->decode_index;
 }
@@ -206,6 +211,12 @@ StreamIndexBuilder::StreamIndexBuilder(const BuilderOptions& options) : impl_(st
   switch (options.codec) {
     case fb::Codec::AV1:
       impl_->dispatch = make_av1_dispatch();
+      break;
+    case fb::Codec::H264:
+      impl_->dispatch = make_h264_dispatch();
+      break;
+    case fb::Codec::H265:
+      impl_->dispatch = make_h265_dispatch();
       break;
     default:
       throw UnsupportedCodec(

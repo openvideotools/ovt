@@ -24,8 +24,8 @@
 
 #include "container/ivf.hpp"
 #include "index/builder_internal.h"
+#include "io/memory_file.hpp"
 #include "ovt/cxx/index/stream_index_builder.hpp"
-#include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt/cxx/model/validator.hpp"
 #include "ovt/cxx/syntax/unit_scan.hpp"
 #include "ovt_model_generated.h"
@@ -79,14 +79,10 @@ Bytes index_ivf(const std::filesystem::path& path, size_t cut = 0) {
   Bytes data = read_file(path);
   REQUIRE(data.size() > cut);
   data.resize(data.size() - cut);
-  const auto tmp = std::filesystem::temp_directory_path() / ("ovt_index_builder_" + path.filename().string());
-  {
-    std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): std::ostream::write takes char*
-    out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
-  }
-  const auto file = ovt::io::RandomAccessFile::open(tmp.string());
-  const auto ivf = ovt::container::ivf::parse(*file);
+  // In memory: every test case is its own ctest process, so a temporary file with a shared name would be
+  // rewritten under another process that has it mapped.
+  const ovt::io::MemoryFile file(data, path.filename().string());
+  const auto ivf = ovt::container::ivf::parse(file);
   REQUIRE(ivf.has_value());
   idx::StreamIndexBuilder b(idx::BuilderOptions{fb::Codec::AV1});
   for (size_t i = 0; i < ivf->frames.size(); ++i) {
@@ -106,7 +102,6 @@ Bytes index_ivf(const std::filesystem::path& path, size_t cut = 0) {
         [&b, &timing](const ovt::syntax::ScannedUnit& u) { b.add_unit(input_of(u, &timing)); },
         [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
   }
-  std::filesystem::remove(tmp);
   return b.finish(kHash);
 }
 
@@ -395,7 +390,7 @@ TEST_CASE("index_builder_av1: damaged streams still give an index", "[index][av1
   }
 }
 
-TEST_CASE("index_builder: only AV1 has a dispatch in part a", "[index][fast]") {
+TEST_CASE("index_builder: a codec without a dispatch is refused", "[index][fast]") {
   CHECK_THROWS_AS(idx::StreamIndexBuilder(idx::BuilderOptions{fb::Codec::VP9}), idx::UnsupportedCodec);
 }
 

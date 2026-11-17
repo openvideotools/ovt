@@ -15,6 +15,7 @@ import base64
 import copy
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -104,27 +105,93 @@ def test_probe_envelope_with_large_ulong_as_string() -> None:
     assert errors(envelope("probe", tree)) == []
 
 
-def test_analyze_envelope_with_decoded_nested_tables() -> None:
-    frame = {
+def analyze_frame() -> dict[str, Any]:
+    return {
         "frame": {"id": {"decode_index": 0, "display_index": 0}, "type": "I", "size_bytes": 4096},
         "grid": {"cells_w": 2, "cells_h": 1, "pred": [1, 2], "qp": [26, 27]},
         "blocks": [
-            {
-                "id": 0,
-                "parent": -1,
-                "kind": "MB",
-                "pred": "Intra",
-                "ext_type": "AvcMb",
-                "ext": base64.b64encode(b"\x01\x02\x03").decode(),
-                "ext_decoded": {"mb_type": "I_16x16_0_0_0"},
-            }
+            {"id": 0, "parent": -1, "kind": "MB", "pred": "Intra", "ext_type": "AvcMb", "ext": {"mb_type": 1}},
+            {"id": 1, "parent": 0, "kind": "CU", "ext_type": "HevcCu", "ext": {"palette": {"PaletteIndexMap": [0]}}},
+            {"id": 2, "parent": 0, "kind": "Other", "ext_type": "", "ext": [1, 2, 3]},
+            {"id": 3, "parent": 0, "kind": "Block", "ext_type": "Av1Block", "ext": {"palette": []}},
         ],
         "filter_params_type": "AvcFilterParams",
-        "filter_params": None,
-        "filter_params_decoded": {},
+        "filter_params": {},
         "qp_hist": [0] * 256,
     }
+
+
+def test_analyze_envelope_with_nested_tables_in_place() -> None:
+    assert errors(envelope("analyze", [analyze_frame()])) == []
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda f: f["blocks"][0].update(ext_decoded={"mb_type": 1}),  # no `_decoded` keys (§12.1.4)
+        lambda f: f["blocks"][0].update(ext=None),  # an absent field is left out, never null
+        lambda f: f["blocks"][0].update(ext=base64.b64encode(b"\x01\x02\x03").decode()),  # no base64
+        lambda f: f["blocks"][0].update(ext=[1, 2, 3]),  # `ext_type` names a table: an object (or [])
+        lambda f: f["blocks"][2].update(ext={"mb_type": 1}),  # no table named: the bytes stay numbers
+        lambda f: f["blocks"][1]["ext"].update(palette=[1, 2, 3]),  # a palette is an object or []
+        lambda f: f["blocks"][1]["ext"].update(palette={"palette_colors_y": [1]}),  # an Av1Palette field
+        lambda f: f["grid"].update(pred="AQ=="),  # other [ubyte] vectors are arrays of numbers
+        lambda f: f["grid"].update(pred=[256]),
+    ],
+)
+def test_rejects_other_forms_of_bytes_and_nested_tables(mutate: Any) -> None:
+    frame = analyze_frame()
+    mutate(frame)
+    assert errors(envelope("analyze", [frame]))
+
+
+def test_an_empty_nested_vector_is_an_empty_array() -> None:
+    frame = analyze_frame()
+    frame["blocks"][0]["ext"] = []
+    frame["filter_params"] = []
     assert errors(envelope("analyze", [frame])) == []
+
+
+@pytest.mark.parametrize(
+    ("value", "valid"),
+    [
+        ("00ff" * 16, True),
+        ("", True),
+        ("00FF", False),  # hex is lowercase
+        ("0ff", False),  # two digits per byte
+        ("AP8=", False),  # not base64
+        ([0, 255], False),  # a hash is not an array of numbers
+    ],
+)
+def test_hash_fields_are_lowercase_hex(value: Any, valid: bool) -> None:
+    found = errors({"source_hash": value}, SCHEMAS / "StreamIndex.schema.json")
+    assert (found == []) == valid, found
+
+
+def test_bool_byte_above_one_prints_as_integer() -> None:
+    assert errors({"frame": {"shown": 2, "is_rap": True}}, SCHEMAS / "FrameAnalysis.schema.json") == []
+    assert errors({"frame": {"shown": 1}}, SCHEMAS / "FrameAnalysis.schema.json")
+    assert errors({"frame": {"shown": "true"}}, SCHEMAS / "FrameAnalysis.schema.json")
+
+
+def test_hash_fields_equal_the_exporter_list() -> None:
+    header = (ROOT / "core" / "src" / "model" / "json_rules.hpp").read_text(encoding="utf-8")
+    body = header[header.index("kHashFields = {") : header.index("};", header.index("kHashFields = {"))]
+    assert tuple(re.findall(r'"([a-z_]+)"', body)) == fbs_to_jsonschema.HASH_FIELDS
+
+
+@pytest.mark.parametrize(
+    ("golden", "table"),
+    [
+        ("tiny16_hevc.json", "FrameAnalysis"),
+        ("tiny16_hevc.index.json", "StreamIndex"),
+        ("tiny_metrics.json", "MetricsReport"),
+    ],
+)
+def test_exporter_goldens_validate(golden: str, table: str) -> None:
+    """What ovt::model::to_json writes (the WI-0.088 goldens) validates against the generated schemas."""
+    doc = json.loads((ROOT / "core" / "tests" / "golden" / golden).read_text(encoding="utf-8"))
+    assert errors(doc, SCHEMAS / f"{table}.schema.json") == []
 
 
 def test_unknown_enum_value_prints_as_integer() -> None:
@@ -163,8 +230,8 @@ def test_rejects_invalid_envelopes(mutate: Any, where: str) -> None:
     assert any(e.startswith(where) for e in found), found
 
 
-def test_decoded_table_must_match_its_type_field() -> None:
-    block = {"ext_type": "HevcCu", "ext_decoded": {"mb_type": "I_16x16_0_0_0"}}  # an AvcMb field
+def test_nested_table_must_match_its_type_field() -> None:
+    block = {"ext_type": "HevcCu", "ext": {"mb_type": 1}}  # an AvcMb field
     assert errors(envelope("analyze", [{"blocks": [block]}]))
     block["ext_type"] = "AvcMb"
     assert errors(envelope("analyze", [{"blocks": [block]}])) == []
@@ -173,6 +240,7 @@ def test_decoded_table_must_match_its_type_field() -> None:
 def test_cellgrid_bytes_are_integer_arrays() -> None:
     grid = {"pred": base64.b64encode(b"\x01").decode()}
     assert errors(envelope("analyze", [{"grid": grid}]))
+    assert errors(envelope("analyze", [{"grid": {"pred": [1, 255]}}])) == []
 
 
 def test_check_jsonschema_accepts_an_envelope(tmp_path: Path) -> None:

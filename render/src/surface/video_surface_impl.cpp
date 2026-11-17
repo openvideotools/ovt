@@ -4,13 +4,13 @@
 // The one concrete VideoSurface (chapter 10 §10.1.3, §10.2.7). WI-1.400 is the skeleton: an OffscreenTexture target
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
-// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
-// dithering (WI-1.403), the compare modes of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp),
-// overlays, measurements
-// (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are
-// inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
-// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the
-// swapchain with the content's static HDR metadata on init and on source change (§10.3.6).
+// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402; WI-1.408 adds the plane modes
+// (src/pipeline/plane_views.h). The full render parameters, target frames and dithering (WI-1.403), the compare modes
+// of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp), overlays, measurements (WI-4.452,
+// render/src/measure/) and export arrive with their own work items; until then those entry points are inert. WI-1.406
+// adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput (src/platform/native_target.h),
+// retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the swapchain with the content's
+// static HDR metadata on init and on source change (§10.3.6).
 
 #include <algorithm>
 #include <array>
@@ -38,6 +38,7 @@
 #include "ovt/render/video_surface.h"
 #include "pipeline/compare.h"
 #include "pipeline/frame_upload.h"
+#include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
 #include "platform/native_target.h"
 #include "platform/offscreen.h"
@@ -541,7 +542,6 @@ class VideoSurfaceImpl final : public VideoSurface {
   void draw_slot(const detail::FrameSlot& slot, const ViewState& view, const detail::IRect& clip,
                  const detail::IRect& view_rect, struct pl_frame target, bool linear, bool offscreen,
                  bool with_overlays = false) {
-    struct pl_frame image = slot.frame;
     pl_rect2df src = detail::source_rect(slot, view.show_cropped);
     pl_rect2df dst = detail::map_into(src, view, view_rect);
     const pl_rect2df unclipped = dst;  // the picture rectangle the overlay layer is laid out on
@@ -550,7 +550,14 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (!whole && !detail::clip_rects(src, dst, clip)) {
       return;
     }
-    image.crop = src;
+    // The view transform works in luma samples; plane modes U/V sample the chroma plane over the same picture area
+    // (WI-1.408, §10.6.1). They apply to every slot drawn here, so both sides of a compare view show the same plane.
+    struct pl_frame image = {};
+    std::string err = plane_views_.build_image(gpu_, slot, view, src, image);
+    if (!err.empty()) {
+      error_ = std::move(err);
+      return;
+    }
 
     if (linear) {
       target.color.transfer = PL_COLOR_TRC_LINEAR;
@@ -561,6 +568,13 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (linear) {
       target.repr.bits = pl_bit_encoding{};  // a float texture holds normalised values; no integer depth scaling
     }
+    struct pl_render_params params = params_.params();  // still points at params_'s members
+    // The overlay blend needs linear light, so raw_code_values (a pass-through of the stored codes) applies only to
+    // views drawn in the target's own encoding. SPEC-ASSUMPTION(#623): §10.6.1 does not say how plane modes combine
+    // with the §10.6.4 compare views.
+    ViewState plane_view = view;
+    plane_view.raw_code_values = view.raw_code_values && !linear;
+    plane_views_.apply(plane_view, image, params, target);
     // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1). It describes
     // slot A in the full viewport: drawn only where A is (Single, Flicker's A phase; SPEC-ASSUMPTION(#478)).
     struct pl_overlay overlay = {};
@@ -573,7 +587,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     } else if (!overlay_err.empty()) {
       error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
     }
-    if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
@@ -992,6 +1006,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
+      plane_views_.destroy(gpu_);
       detail::destroy_slot(gpu_, slot_b_);
     }
     compare_.destroy();
@@ -1027,6 +1042,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   detail::IRect psnr_region_;
   std::array<float, 3> psnr_ = {-1.0F, -1.0F, -1.0F};
   detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
+  detail::PlaneViews plane_views_;    // plane modes 1-4 (§10.6.1)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;

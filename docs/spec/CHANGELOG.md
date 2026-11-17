@@ -2,6 +2,33 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc41 — 2026-11-16
+
+PATCH-level: spec-amendment pass 21 folds in the accepted answers of `spec-question` issues #673 from WI-1.509, #674 points 2 to 4 from the C-API follow-up of #673, #675 from WI-1.207, #676, #677 and #678 from WI-1.208, #682 from WI-1.462, #683 from WI-1.234, #670, #671 and #672 from WI-1.211 and #623 from WI-1.408/WI-1.410, and records the WI-1.501 schema regeneration of PR #668. No new diagnostic code. No FlatBuffers schema, plugin ABI or CLI grammar change in this pass; the `DiagnosticList` table of #674 point 1 lands with its implementing PR (schema and §6.3 block together), and the public headers `ovt/validate.h` and `ovt/syntax.h` of #673/#674 go through the Fable reviewer on that PR.
+
+- 12 §12.2.13 `cache import` and `cache clear` rows, WI-1.509 Depends, step 4 — a `.json` import is the §12.2.0 envelope (hash from `input.source_hash`) or a bare root-table export; a bare `FrameAnalysis` takes the hash from the first `PlaneRef.blob_id`, else exit 2; every `clear` needs `--yes` or a TTY answer; `import` sits behind `cli/src/cmd/record_io.h` until the C entry points land — WI-1.509 (#673)
+- 12 §12.3.8 `ovt/validate.h` and `ovt_json_to_fb` comments — validation findings are `MDL-VAL-0nnn` with message `"V-nnn: …"` plus ` (at <path>)`, `OVT_OK` whenever the arguments are valid; `root_type` with or without the `ovt.fb.` prefix, unknown → `OVT_E_INVALID_ARG`, rejected text → `OVT_E_CORRUPT`; `ovt/syntax.h` created with the two JSON functions only — C-API follow-up (#674)
+- 8 WI-1.207 AT1 and AT3 — recipe 29 is a Baseline encode, so AT1 checks `profile_idc == 66` and the absence of `chroma_format`, with a second synthetic High-profile record; AT3 uses `syn_av1_pq_hdr_obu.mp4` (recipe 15a) with `seq_level_idx_0 == 8` derived `"4.0"` and metadata OBUs allowed beside the single sequence header in `configOBUs` — WI-1.207 (#675, #689)
+- 8 WI-1.208 AT1, 14 §14.3.3 recipe 10 — the MP4 of recipe 10 must carry `colr`/`mdcv`/`clli` written explicitly from the SEI values (MP4Box, or FFmpeg 7.1.1 if the corpora thread verifies it); the `[needs-corpus]` test skips on the pre-#676 sha256 — WI-1.208 (#676)
+- 8 WI-1.208 AT2 — no ISOBMFF Dolby Vision profile 8 corpus entry exists; AT2 decodes a synthetic `dvvC` (profile 8, compatibility id 1) and the real profile 5 `dvcC` of `gpac_dolby_vision_cenc` — WI-1.208 (#677)
+- 8 §8.3.3 `clap` row — fields stay raw `u32`; the derived rectangle and `CNT-1023` read `horizOffN`/`vertOffN` as two's-complement `int32` — WI-1.208 (#678)
+- 11 WI-1.462 acceptance tests — AT1 is tested against the `HdrMetadata` table the core will return, its real-file run and AT3 are deferred to the `Project` → `ovt_container_hdr_metadata` wiring (after WI-1.223) and the Measurements-tab binding (WI-4.452, after WI-3.532); `DisplayCaps.testPattern` — WI-1.462 (#682)
+- 8 WI-1.234 title, Produces, steps 4 and 6, notes, 16 §16.4 row — `paged_span.h` removed (WI-1.209's); the internal `read_unit_bytes` path with the public `ovt_stream_unit_bytes` declared by WI-1.130; `ovt_container_stats_json` implemented; the `container.h` doc comment waits for the next PR that touches that header — WI-1.234 (#683)
+- 8 §8.2.7 `BoxContext`, §8.3.5 `trex` row, WI-1.211 step 1 — `trex_for_track` becomes the shared `track_defaults` map keyed by `track_ID` (trex defaults plus `mdhd` timescale) — WI-1.211 (#670)
+- 8 §8.3.5 `mfhd` row, WI-1.211 step 4 and AT3 — `check_fragment_children` raises `CNT-1011` for a missing `mfhd`/`tfhd` and sets the `moof` description; `CNT-4001` stays with the §8.4.3 builder — WI-1.211 (#671)
+- 8 WI-1.211 step 3 and AT1 — each `sample_flags`-type value is a UInt leaf followed by a `<name>.bits` group with the bit-span children — WI-1.211 (#672)
+- 10 §10.6.4 — plane modes apply to every compare slot; `raw_code_values` is ignored in the `Overlay` blend; `Difference` keeps `diff_plane` — WI-1.408/WI-1.410 (#623)
+- 6 WI-0.088 notes, 12 WI-1.501 step 2 and notes — `tools/fbs_to_jsonschema.py` and `docs/spec/schemas/*.schema.json` follow §6.8.1/§12.1.4 since PR #668; nested fields are `anyOf` plus `if`/`then` on the sibling `*_type`, not `oneOf` — WI-1.501 (#668, #493)
+
+## 1.0.0-rc40 — 2026-11-16
+
+PATCH-level: spec-amendment pass 20 folds in the accepted answer of `spec-question` issue #662 from the WI-1.112 AUD/EOS/EOB/FD follow-up (PR #664), and records the WI-1.415 partial (PR #625), the WI-1.204 landing (PR #639) and the WI-1.209 `PagedSpan` reading (PR #681). One new diagnostic code is registered (D2: `SYN-H265-0033`, with its `tests/corpora/corrupt_conditions.json` `not_in_table` entry); no public C header under `core/include/`, FlatBuffers schema, plugin ABI or CLI grammar change.
+
+- 7 §7.3.5 row 15, §7.9 — bytes after the NAL unit header of the empty H.265 `end_of_seq_rbsp()` / `end_of_bitstream_rbsp()` are kept as the opaque node `trailing_data` and reported with the new Info `SYN-H265-0033` (mirrors `SYN-H264-0033`, #551); the `filler_data_rbsp()` `ff_byte` run is one Bytes node `ff_byte` (`f(8)*<n>`, `ff_byte_count` derived) expanded per byte by the golden comparison — WI-1.112 follow-up (#662)
+- 10 WI-1.415 notes, 16 §16.4 row — WI-1.415 landed as a partial in PR #625 with `gpu_time: null`; the per-pass GPU counters are its only open item and are tracked in issue #628, not in a second WI — WI-1.415
+- 8 WI-1.204 Produces and notes, 16 §16.4 row — WI-1.204 landed in PR #639; the benchmark is `tests/perf/core/bench_container_open_moov_1h.cpp` (per-area layout of chapter 14 §14.2.1, D14) and the fuzz seeds live under `core/tests/fuzz/corpus/isobmff_tree/`; the `PagedSpan` windowed reads belong to WI-1.209 step 6 (#630) — WI-1.204
+- 8 §8.2.3 reading strategy, WI-1.209 step 6 — a leaf larger than 1 MiB is walked through a `PagedSpan` with one `BitReader` per 1 MiB window, not one reader over a paged source, because the chapter 7 `BitReader` helper is a public header left untouched — WI-1.209 (PR #681)
+
 ## 1.0.0-rc39 — 2026-11-16
 
 PATCH-level: spec-amendment pass 19 folds in the accepted answers of `spec-question` issues #637 and #638 from WI-1.412 (PR #643), #644 and #645 from WI-2.434 (PR #647), #650 from WI-1.456 (PR #651), #624 from WI-2.432 (PR #652), #648 from WI-2.433 (PR #653), and #641 and #642 from WI-1.121. No new diagnostic code; no FlatBuffers schema, plugin ABI or CLI grammar change. `core/include/ovt/index.h` (#642) declares the §12.3.8 block verbatim, so no declaration changes; the header itself lands with the WI-1.121 part c PR under the Fable reviewer's approval.

@@ -561,7 +561,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.201 | 8 §8.10 | Implement the ISOBMFF box header walk with spans and truncation handling | M | 1 | M1.1 | WI-1.200, WI-0.553 | FR-CNT-001, FR-CNT-101 |
 | WI-1.202 | 8 §8.10 | Implement `FieldBuilder`, `BoxContext` propagation and the decoder registration macro | M | 1 | M1.1 | WI-1.201 | — |
 | WI-1.203 | 8 §8.10 | Write `tools/gen_box_registry.py` and generate `box_registry.gen.cpp` | M | 1 | M1.1 | WI-1.202 | FR-CNT-003 |
-| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
+| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location (landed, PR #639; `PagedSpan` windowed reads moved to WI-1.209, #630) | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
 | WI-1.205 | 8 §8.10 | Hand decoders, group A (file and movie level) | M | 1 | M1.2 | WI-1.202 | FR-CNT-002 |
 | WI-1.206 | 8 §8.10 | Hand decoders, group B (`stsd` and sample entries) | M | 1 | M1.2 | WI-1.205 | FR-CNT-002 |
 | WI-1.207 | 8 §8.10 | Hand decoders, group C part 1 (codec configuration records) | L | 1 | M1.2 | WI-1.206, WI-1.108, WI-1.112, WI-1.116 | FR-CNT-002 |
@@ -591,7 +591,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.231 | 8 §8.10 | Implement the unit splitter (length-prefixed, Annex B, AV1 OBU) | S | 1 | M1.1 | WI-1.226, WI-1.227 | FR-CNT-007 |
 | WI-1.232 | 8 §8.10 | Implement track ↔ stream matching, `sample_index` mapping and `seek_to_sample` | S | 1 | M1.3 | WI-1.230, WI-1.231, WI-1.218, WI-1.219 | FR-CNT-103, FR-GEN-005 |
 | WI-1.233 | 8 §8.10 | Extract `codec_private` for plugin `create()` and integrate with the plugin host | S | 1 | M1.3 | WI-1.232, WI-2.150 | — |
-| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at`, `ovt_stream_unit_bytes` | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
+| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at` and the unit-bytes path | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
 | WI-1.235 | 8 §8.10 | Add `ovt probe` container subcommand hooks (reduced, §16.3) | S | 1 | M1.3 | WI-1.224, WI-1.232, WI-1.234, WI-1.500 | — |
 | WI-1.236 | 8 §8.10 | Build the golden-test harness and oracle normalisers (reduced, §16.3) | M | 1 | M1.4 | WI-1.235 | — |
 | WI-1.237 | 8 §8.10 | Write corpus manifests, fetcher integration and licence tags (reduced, §16.3) | S | 1 | M1.1 | WI-0.551, WI-0.552 | — |
@@ -612,7 +612,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.412 | 10 §10.11 | PNG export (`HdrPng16`, `SdrPng8`, `ViewPng8`) | M | 1 | M1.3 | WI-1.403, WI-1.410 | FR-PLN-010 |
 | WI-1.413 | 10 §10.11 | Test pattern generator and measurement expectations | S | 1 | M1.1 | none | — |
 | WI-1.414 | 10 §10.11 | libplacebo/mpv parity test harness (superseded by WI-1.575; see chapter 16 §16.3) | S | 1 | M1.4 | WI-1.412, WI-1.413 | — |
-| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
+| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; landed as a partial in PR #625, GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
 | WI-1.450 | 11 §11.10 | Application skeleton, RHI selection, `Platform` singleton, settings (reduced, §16.3) | M | 1 | M1.1 | WI-0.001, WI-0.018, WI-0.019 | FR-GUI-001, FR-GUI-002, FR-GUI-023, FR-GUI-025, NFR-008, NFR-021, NFR-025 |
 | WI-1.451 | 11 §11.10 | Dock manager (`SplitView`-based) with presets and serialisation | L | 1 | M1.2 | WI-1.450 | FR-GUI-001, FR-GUI-002 |
 | WI-1.452 | 11 §11.10 | `SelectionModel` and the derivation rules | M | 1 | M1.2 | WI-1.450, WI-0.083 | FR-GUI-004, FR-GUI-011, FR-GUI-101 |
