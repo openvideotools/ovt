@@ -171,6 +171,8 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/picture_controller.cpp"
     "${app_dir}/src/models/hdr_metadata_model.h"
     "${app_dir}/src/models/hdr_metadata_model.cpp"
+    "${app_dir}/src/models/hex_model.h"
+    "${app_dir}/src/models/hex_model.cpp"
     # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
     "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}
