@@ -64,6 +64,11 @@ class OverlaySet {
   std::vector<uint8_t> heat_valid;
   float heat_lo = 0, heat_hi = 0;  // NOLINT(readability-isolate-declaration): the range actually applied
 
+  // CellGrid.block_id (cells_w * cells_h, 0xFFFFFFFF = no block): pick()'s CPU cell lookup and the id-only fill pass
+  // (§10.5.6, §10.5.7; WI-2.435). Filled whatever the layers, so picking works with every overlay hidden; empty when
+  // the grid has no block_id column of that length.
+  std::vector<uint32_t> cell_block_id;
+
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
 

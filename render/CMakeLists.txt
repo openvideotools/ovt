@@ -15,6 +15,8 @@ target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
 # WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1).
 target_sources(ovt_render PRIVATE src/pipeline/plane_views.cpp)
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2).
+target_sources(ovt_render PRIVATE src/pipeline/view_transform.cpp src/pipeline/sample_grid.cpp)
 # WI-1.410: compare modes (§10.2.4, §10.6.4); src/shaders/diff.glsl is embedded by the WI-2.431 loop below.
 target_sources(ovt_render PRIVATE src/pipeline/compare.cpp src/pipeline/compare_convert.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
@@ -74,6 +76,8 @@ target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
 target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
 # WI-2.432: grid line pass with viewport/level culling (§10.5.3).
 target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+# WI-2.435: id buffer, readback and probe windows (§10.5.7) and the probe's CPU colour math (§10.6.3).
+target_sources(ovt_render PRIVATE src/overlay/idbuffer.cpp src/color/cpu_convert.cpp)
 foreach(shader IN ITEMS arrows diff fill hatch heatmap lines)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")

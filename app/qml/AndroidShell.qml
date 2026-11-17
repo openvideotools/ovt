@@ -27,6 +27,16 @@ Page {
     readonly property alias shellItem: shell
     // The product name of the application, read by MainActivity through QtQuickView.getProperty() (issue #547).
     readonly property string productName: Qt.application.displayName
+    // The Activity's Configuration.screenWidthDp, set by MainActivity.onConfigurationChanged through
+    // QtQuickView.setProperty() (WI-A.451, §11.5.2): the window width the breakpoint layouts follow after start-up.
+    // 0 until the first change; Platform reads the start-up width itself.
+    property int configurationWidthDp: 0
+    onConfigurationWidthDpChanged: {
+        if (configurationWidthDp > 0) {
+            console.log("OVT: configuration widthDp=" + configurationWidthDp)
+            Platform.refresh(configurationWidthDp)
+        }
+    }
 
     // Main.qml's window palette, less placeholderText, which a Control's palette does not offer on Qt 6.4 (the
     // oldest Qt the desktop tests build with); the controls' own default applies there.

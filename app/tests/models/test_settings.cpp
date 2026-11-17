@@ -14,8 +14,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSGRendererInterface>
+#include <QSignalSpy>
 #include <QString>
 #include <QTemporaryDir>
+
+#include <utility>
 
 #include "platform/platform.h"
 #include "settings.h"
@@ -154,4 +157,24 @@ TEST_CASE("Platform: RHI backend names", "[fast][gui][platform]") {
 #else
   CHECK(Platform::defaultGraphicsApi() == QSGRendererInterface::Vulkan);
 #endif
+}
+
+// WI-A.451: after start-up the window width arrives as Configuration.screenWidthDp pushed through refresh() (from
+// MainActivity.onConfigurationChanged via AndroidShell.qml); each pushed width that differs notifies once and selects
+// the class of §11.5.2, and a refresh without a width keeps the last one on the desktop.
+TEST_CASE("Platform: a pushed width change switches the layout class", "[fast][gui][platform]") {
+  Platform platform;
+  const QSignalSpy changed(&platform, &Platform::widthDpChanged);
+  for (const auto& [width, layout] :
+       {std::pair{1300.0, "three"}, {900.0, "two"}, {900.0, "two"}, {700.0, "vertical"}, {1300.0, "three"}}) {
+    platform.refresh(width);
+    CHECK(platform.widthDp() == width);
+    CHECK(Platform::layoutClassForWidth(platform.widthDp()) == QString::fromLatin1(layout));
+  }
+  CHECK(changed.count() == 4);  // 1280 (the default) -> 1300 -> 900 -> 700 -> 1300; the repeated 900 is silent
+  if (!Platform::isAndroid()) {
+    platform.refresh(0);
+    CHECK(platform.widthDp() == 1300);
+    CHECK(changed.count() == 4);
+  }
 }
