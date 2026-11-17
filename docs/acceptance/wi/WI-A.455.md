@@ -51,15 +51,19 @@ Google Maven cannot be reached from the container, and CI's `android-build` does
 ### Emulator half (owed until the emulator CI of WI-0.035 / #487 runs it)
 
 ```console
+adb shell settings put global development_settings_enabled 1
 adb shell settings put global always_finish_activities 1 && adb reboot && adb wait-for-device \
   && until [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; do sleep 2; done
 cd android && ./gradlew :app:connectedFossDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=org.openvideotools.studio.StateRestoreTest
-adb shell settings put global always_finish_activities 0 && adb reboot   # afterwards
+# afterwards
+adb shell settings put global always_finish_activities 0
+adb shell settings delete global development_settings_enabled && adb reboot
 ```
 
 On the API 36 image the setting reads back at once but takes effect only after a reboot (the Developer options
-switch calls the hidden `ActivityManager.setAlwaysFinish()`), hence the reboot. The class runs alone: the other
+switch calls the hidden `ActivityManager.setAlwaysFinish()`), hence the reboot. Without
+`development_settings_enabled` the boot resets `always_finish_activities` to 0. The class runs alone: the other
 instrumentation classes use `ActivityScenario`, which refuses to launch while the setting is on, so `StateRestoreTest`
 uses plain intents and the lifecycle monitor.
 
@@ -85,4 +89,9 @@ Mac Mini runs (emulator `ovt-api36-arm64`, API 36 arm64, 1080x2400, 420 dpi, `-g
   restored 1559 ms after onCreate). `dontKeepActivitiesBackgroundAndResume` timed out waiting for the destroy:
   `settings put global always_finish_activities 1` had no effect without a reboot on this image. Now the run
   procedure sets it and reboots first.
-- Next head: _pending_.
+- 08d1680 (`wa455-pr730-08d1680-mini-20261117T050937Z.txt`): **2 of 2 PASS**.
+  `dontKeepActivitiesBackgroundAndResume` **PASS** (10.6 s): the Activity was destroyed in the background and created
+  again, and the state was restored 1307 ms after onCreate, within the 2 s of acceptance test 1.
+  `recreationRestoresFrameAndSelection` **PASS** (4.3 s; restored 1051 ms after onCreate). The first attempt of that
+  run hit the guard (the setting was reset at boot without `development_settings_enabled`), which the procedure above
+  now includes.

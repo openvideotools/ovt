@@ -195,7 +195,10 @@ class StateRestoreTest {
         const val RESTORE_BUDGET_MS = 2_000L // §11.5.7 and WI-A.455 acceptance test 1
         const val DONT_KEEP_PROCEDURE =
             "Turn it on and reboot the emulator before the run: adb shell settings put global " +
-                "always_finish_activities 1 && adb reboot (and back to 0 and a reboot afterwards)"
+                "development_settings_enabled 1 && adb shell settings put global always_finish_activities 1 && " +
+                "adb reboot (without development_settings_enabled the boot resets it to 0). Afterwards: " +
+                "settings put global always_finish_activities 0, settings delete global development_settings_enabled, " +
+                "adb reboot"
 
         /** A GUI state document (app/src/platform/android_state.h): one file, frame 42 / 40, a byte range, Compare. */
         val STATE: JSONObject =
