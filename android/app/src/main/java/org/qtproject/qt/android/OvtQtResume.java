@@ -28,15 +28,10 @@ public final class OvtQtResume {
     }
 
     /**
-     * Runs {@code settled} on the UI thread once the start-up action that Qt 6.8 queues for the hosting Activity has
-     * run (WI-A.452). When the native plugin integration becomes ready, QtEmbeddedDelegate passes
-     * QtDisplayManager.setApplicationDisplayMetrics() to QtNative.runAction(), and that method reads the decor view's
-     * root window insets without a null check. If the Activity finishes before the action runs, the window is
-     * detached, the insets are null and the app crashes with a NullPointerException. QtNative.runAction() keeps its
-     * actions in order (one main-thread Handler, or the list it replays in order when the app becomes active), so an
-     * action passed to it after Qt's own runs after it.
-     *
-     * <p>Call on the UI thread, after constructing the QtQuickView, which registers the delegate's listener first.
+     * Runs {@code settled} on the UI thread after QtEmbeddedDelegate's display-metrics action (queued through
+     * QtNative.runAction() once the native plugin is ready), which NPEs on the null insets of a finished Activity
+     * (WI-A.452). runAction() keeps its actions in order, so one queued after Qt's runs after it. Call on the UI
+     * thread after constructing the QtQuickView (the delegate's listener is then registered first).
      */
     public static void whenStartupActionsRan(Runnable settled) {
         if (QtNative.getStateDetails().nativePluginIntegrationReady) {

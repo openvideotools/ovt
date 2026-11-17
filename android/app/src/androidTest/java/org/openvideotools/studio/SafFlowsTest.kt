@@ -28,11 +28,9 @@ import java.io.File
  * `DocumentsProvider` ([TestDocumentsProvider], in the debug build, enabled only while a test runs). Run with
  * `./gradlew -p android :app:connectedFossDebugAndroidTest` on the API 36 emulator.
  *
- * The documents are `content://` URIs of that provider, so FilePicker takes the same path as for a document picked
- * in the system picker; only the picker UI itself is skipped (the test calls `FilePicker.open(uri, persist = true)`,
- * which is what the picker's result callback does). A provider of the app's own UID offers no persistable grant, so
- * the grant step logs and goes on; reopening after a real process restart, with a real provider, is in
- * `docs/acceptance/wi/WI-A.452.md`.
+ * The test calls `FilePicker.open(uri, persist = true)`, what the picker's result callback does, with `content://`
+ * URIs of that provider. Its own-UID provider offers no persistable grant; the real-picker restart check is manual
+ * (`docs/acceptance/wi/WI-A.452.md`).
  */
 @RunWith(AndroidJUnit4::class)
 class SafFlowsTest {

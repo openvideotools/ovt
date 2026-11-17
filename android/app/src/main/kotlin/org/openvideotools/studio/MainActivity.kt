@@ -58,11 +58,7 @@ class MainActivity : AppCompatActivity() {
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
 
-    /**
-     * True once Qt's start-up actions have run (OvtQtResume.whenStartupActionsRan); internal for the tests. Until
-     * then [finish] waits: finishing earlier detaches the window under Qt's pending display-metrics action, which then
-     * crashes on the null insets (WI-A.452, found by SafFlowsTest on the Mini).
-     */
+    /** True once Qt's start-up actions have run (OvtQtResume.whenStartupActionsRan); [finish] waits for it. */
     internal var qtStarted = false
         private set
     private var finishWhenQtStarted = false
@@ -288,10 +284,7 @@ class MainActivity : AppCompatActivity() {
         return super.onKeyDown(keyCode, event)
     }
 
-    /**
-     * Defers the finish of an Activity whose Qt view is still starting until Qt's start-up actions have run (see
-     * [qtStarted]); a user backing out right after launch would otherwise crash the app inside Qt 6.8.
-     */
+    // Finishing before Qt's display-metrics action ran crashes Qt 6.8 on null insets (WI-A.452): defer until then.
     override fun finish() {
         if (::qtView.isInitialized && !qtStarted) {
             Log.i(TAG, "OVT: finish deferred until Qt has started")

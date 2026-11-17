@@ -11,6 +11,7 @@ import android.util.Log
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.annotation.MainThread
 import androidx.annotation.VisibleForTesting
 import androidx.annotation.WorkerThread
@@ -230,13 +231,7 @@ internal class CopyPrompt(
                     .onFailure { error ->
                         if (error !is CopyToAppStorage.CancelledException && !activity.isDestroyed) {
                             Log.e(TAG, "copy of $displayName failed: ${error.message}")
-                            dialog =
-                                AlertDialog
-                                    .Builder(activity)
-                                    .setTitle(FilePicker.GUI_AND_0001)
-                                    .setMessage("$COPY_FAILED ${error.message}")
-                                    .setPositiveButton(android.R.string.ok, null)
-                                    .show()
+                            Toast.makeText(activity, "$COPY_FAILED ${error.message}", Toast.LENGTH_LONG).show()
                         }
                     }
             }

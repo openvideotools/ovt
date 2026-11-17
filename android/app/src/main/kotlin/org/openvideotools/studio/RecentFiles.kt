@@ -16,14 +16,9 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /**
- * The Android recent files list (chapter 11 §11.5.6; WI-A.452): the documents opened through the Storage Access
- * Framework, newest first, as {uri, display name, codec, last opened}. Entries are kept in the app's
- * SharedPreferences, so the list survives a process restart; the document itself reopens after a restart because
- * [FilePicker] took a persistable read grant for it (see [PersistedGrants]).
- *
- * An entry stays until it falls off the end of the list or reopening it finds the document gone or no longer
- * readable ([FilePicker.reopen] then removes it). The list holds [CAPACITY] entries, the size of the desktop list
- * (`RecentFiles::kCapacity`, FR-GUI-027).
+ * The Android recent files list (chapter 11 §11.5.6; WI-A.452): SAF documents, newest first, as {uri, display name,
+ * codec, last opened}, kept in SharedPreferences so it survives a restart (the document reopens thanks to the grant
+ * [PersistedGrants] took). [FilePicker.reopen] drops entries whose document is gone. [CAPACITY] as on the desktop.
  *
  * SPEC-ASSUMPTION(#723): `codec` holds the container format of `ovt_container_format()` (for example `mp4`, `h264`)
  * until the JNI info carries the codec of the first video track (WI-1.500).
@@ -71,19 +66,16 @@ internal class RecentFiles(
         update((listOf(entry) + entries.filter { it.uri != uri }).take(CAPACITY))
     }
 
-    /** Removes the entry of [uri], if any. */
     @MainThread
     fun remove(uri: Uri) {
         if (entries.any { it.uri == uri }) update(entries.filter { it.uri != uri })
     }
 
-    /** Empties the list. */
     @MainThread
     fun clear() {
         update(emptyList())
     }
 
-    /** Adds [listener] and tells it the current entries. */
     @MainThread
     fun addListener(listener: Listener) {
         listeners += listener

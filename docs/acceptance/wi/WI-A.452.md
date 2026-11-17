@@ -9,14 +9,9 @@ WI-1.577 exists.
 
 Run at 89fedca (2026-11-17, Mini): both assemble tasks pass. `SafFlowsTest`: `exportCreatesAndWritesTheDocument`,
 `cancelledCopyLeavesNoFile`, `fstatDecidesSeekability` and `recentEntryOfAGoneDocumentIsRemoved` PASS. Then the app
-crashed inside Qt during `documentOpensShowsInRecentListAndReopens`, which stopped the run. The crash was a
-NullPointerException in `QtDisplayManager.setApplicationDisplayMetrics` (Qt 6.8.3, line 296). It came from the
-display-metrics action that `QtEmbeddedDelegate` queues once the native plugin is ready, and that action read the
-root insets of an Activity that had already finished. An Activity finished right after launch (a test, or a user
-backing out at once) left the action queued. It then ran against the detached window when the next Activity came up.
-The fix: `MainActivity.finish()` waits until `OvtQtResume.whenStartupActionsRan` reports that Qt's start-up action has
-run (its own action is queued behind Qt's in `QtNative.runAction`'s order). The test also waits for that before it
-closes the first Activity. Re-run: owed.
+crashed in Qt during `documentOpensShowsInRecentListAndReopens`: an NPE in `QtDisplayManager.setApplicationDisplayMetrics`
+(Qt 6.8.3), whose start-up action outlived an Activity finished right after launch and read its null insets. Fix:
+`MainActivity.finish()` waits for `OvtQtResume.whenStartupActionsRan`, and the test waits for it too. Re-run: owed.
 
 What was checked here: every changed Kotlin file, `SafFlowsTest.kt` and the debug-only `TestDocumentsProvider.kt`
 compile with `kotlinc` 2.0.21 `-Werror` against `android-all` 16 (Robolectric's API 36 jar) and stubs of the AndroidX
