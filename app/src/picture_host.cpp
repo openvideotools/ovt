@@ -35,6 +35,7 @@
 #include <string_view>
 #include <utility>
 
+#include "overlay/overlay_set_impl.h"  // the complete OverlaySet: the host owns built sets until set_overlays()
 #include "ovt/render/overlay_set.h"
 #include "ovt/render/video_surface.h"
 #include "render_stub.h"
