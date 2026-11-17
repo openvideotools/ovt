@@ -591,7 +591,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.231 | 8 §8.10 | Implement the unit splitter (length-prefixed, Annex B, AV1 OBU) | S | 1 | M1.1 | WI-1.226, WI-1.227 | FR-CNT-007 |
 | WI-1.232 | 8 §8.10 | Implement track ↔ stream matching, `sample_index` mapping and `seek_to_sample` | S | 1 | M1.3 | WI-1.230, WI-1.231, WI-1.218, WI-1.219 | FR-CNT-103, FR-GEN-005 |
 | WI-1.233 | 8 §8.10 | Extract `codec_private` for plugin `create()` and integrate with the plugin host | S | 1 | M1.3 | WI-1.232, WI-2.150 | — |
-| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at`, `ovt_stream_unit_bytes` | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
+| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at` and the unit-bytes path | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
 | WI-1.235 | 8 §8.10 | Add `ovt probe` container subcommand hooks (reduced, §16.3) | S | 1 | M1.3 | WI-1.224, WI-1.232, WI-1.234, WI-1.500 | — |
 | WI-1.236 | 8 §8.10 | Build the golden-test harness and oracle normalisers (reduced, §16.3) | M | 1 | M1.4 | WI-1.235 | — |
 | WI-1.237 | 8 §8.10 | Write corpus manifests, fetcher integration and licence tags (reduced, §16.3) | S | 1 | M1.1 | WI-0.551, WI-0.552 | — |
