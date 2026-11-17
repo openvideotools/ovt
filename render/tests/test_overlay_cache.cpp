@@ -218,7 +218,8 @@ TEST_CASE("render_test_overlay_cache_budget: byte budget and eviction keep shown
           "[fast][render][overlay]") {
   const std::vector<uint8_t> fa = frame(1);
   auto make = [&](int32_t index) {
-    auto set = ovt::render::detail::build_overlay_set(fa.data(), fa.size(), fill_and_mv(), nullptr);
+    // build_cached without a cache is the plain build (build_overlay_set is not exported from libovt-render).
+    auto set = ovt::render::detail::build_cached(nullptr, fb::GetFrameAnalysis(fa.data()), fill_and_mv(), nullptr);
     REQUIRE(set != nullptr);
     OverlayCacheKey key;
     REQUIRE(ovt::render::detail::overlay_cache_key(*fb::GetFrameAnalysis(fa.data()), fill_and_mv(), nullptr, key));
