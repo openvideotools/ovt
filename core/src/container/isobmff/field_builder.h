@@ -99,6 +99,8 @@ class FieldBuilder {
   [[nodiscard]] uint64_t bytes_consumed() const;  // from the payload begin (construction)
   [[nodiscard]] uint64_t box_file_offset() const noexcept { return box_off_; }
   [[nodiscard]] fb::BoxNodeT& node() noexcept { return *node_; }
+  // The field the last reader call added (inside the open group, if any); nullptr before the first one.
+  [[nodiscard]] fb::FieldT* last_field() noexcept { return last_; }
 
   // Large-array policy (§8.2.5): true when `index` should be materialised as a Field.
   [[nodiscard]] static bool materialise(uint32_t index, uint32_t count) noexcept {

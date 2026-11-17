@@ -37,6 +37,12 @@ OVT_RENDER_API bool slot_a_chroma_shift(const VideoSurface& surface, float& shif
 // restarts the flicker phase at the clock's current value.
 OVT_RENDER_API void set_compare_clock(VideoSurface& surface, std::function<int64_t()> clock_ms);
 
+// WI-2.435 (§10.5.7): waits up to timeout_ns for the id-buffer downloads in flight (true when none is left), forces
+// the 1x1 region readback of the GLES fallback, and counts the probe's sample-window downloads of slot A.
+OVT_RENDER_API bool wait_id_readback(VideoSurface& surface, uint64_t timeout_ns);
+OVT_RENDER_API void set_id_region_mode(VideoSurface& surface, bool region);
+OVT_RENDER_API uint64_t probe_window_downloads(const VideoSurface& surface);
+
 }  // namespace ovt::render::detail
 
 #endif  // OVT_RENDER_SRC_SURFACE_OUTPUT_DOWNLOAD_H
