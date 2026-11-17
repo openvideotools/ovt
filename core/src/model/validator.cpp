@@ -1951,7 +1951,9 @@ void v031_frame(Reporter& r, const fb::StreamIndex& si, std::size_t i, const fb:
        {std::pair{f.declared_refs(), "declared_refs"}, std::pair{f.dpb_after(), "dpb_after"}}) {
     for (std::size_t k = 0; k < vsize(vec); ++k) {
       const std::int64_t v = vec->Get(static_cast<flatbuffers::uoffset_t>(k));
-      if (v < 0 || v >= n_frames || v == static_cast<std::int64_t>(i)) {
+      // SPEC-ASSUMPTION(#733): dpb_after holds the frame itself once it is decoded (chapter 7 §7.4.4).
+      const bool self = v == static_cast<std::int64_t>(i) && std::string_view(name) != "dpb_after";
+      if (v < 0 || v >= n_frames || self) {
         r.report(kRule, std::string(name) + " entry " + str(v) + " must name another frame",
                  at(at("frames", i, name), k));
       }
