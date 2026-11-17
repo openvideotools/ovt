@@ -3,10 +3,11 @@
 //
 // H.264 dispatch of the StreamIndex builder (chapter 7 §7.4.2 S2–S6, WI-1.121): one NAL unit at a time through
 // the §7.3.4 parsers, the parameter-set activation of §7.3.8, the frame-boundary rules of §7.3.9 and the picture
-// order count of §7.3.10.1. The DPB model is a stub until WI-1.122. WI-1.125 adds the lazy trees of §7.4.5 and the
-// lazy EPB stripping of §7.4.6.
+// order count of §7.3.10.1. WI-1.122 adds the DPB model of §7.4.4 (declared_refs, dpb_after). WI-1.125 adds the
+// lazy trees of §7.4.5 and the lazy EPB stripping of §7.4.6.
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -41,6 +42,47 @@ using namespace syntax::h264;  // NOLINT(google-build-using-namespace): the §7.
 constexpr std::string_view kDiagNoParameterSets = "SYN-GEN-0102";   // Warning, §7.4.7
 constexpr std::string_view kMissingParameterSet = "SYN-H264-0010";  // thrown by parse_slice_header()
 constexpr std::string_view kReaderOverrun = "BR-0001";              // a read past the stripped prefix
+// SPEC-ASSUMPTION(#736): Info code of §7.4.4 "later slices differ in num_ref_idx or modification ops".
+constexpr std::string_view kListsDiffer = "SYN-H264-0107";
+
+// What decides a slice's reference lists apart from the DPB (§7.4.4: the index follows the first slice).
+struct ListParams {
+  size_t lists = 0;  // 0 for I and SI slices, 1 for P and SP, 2 for B
+  std::array<uint32_t, 2> active_minus1{};
+  std::array<bool, 2> modified{};
+  std::array<std::vector<std::array<uint32_t, 3>>, 2> ops;  // idc, abs_diff_pic_num_minus1, long_term_pic_num
+
+  static ListParams of(const SliceHeader& sh) {
+    ListParams p;
+    const uint32_t t = sh.slice_type_mod5;
+    p.lists = (t == kSliceI || t == kSliceSI) ? 0 : (t == kSliceB ? 2 : 1);
+    const RefPicListModification& m = sh.ref_pic_list_modification;
+    const std::array<const std::vector<RefPicListModificationOp>*, 2> src{&m.ops_l0, &m.ops_l1};
+    const std::array<bool, 2> flag{m.ref_pic_list_modification_flag_l0, m.ref_pic_list_modification_flag_l1};
+    const std::array<uint32_t, 2> active{sh.num_ref_idx_l0_active_minus1, sh.num_ref_idx_l1_active_minus1};
+    for (size_t x = 0; x < p.lists; ++x) {
+      p.active_minus1[x] = active[x];
+      p.modified[x] = flag[x];
+      for (const RefPicListModificationOp& op : *src[x]) {
+        p.ops[x].push_back({op.modification_of_pic_nums_idc, op.abs_diff_pic_num_minus1, op.long_term_pic_num});
+      }
+    }
+    return p;
+  }
+  friend bool operator==(const ListParams&, const ListParams&) = default;
+};
+
+fb::PictureStructure structure_of(h264::Parity p) {
+  switch (p) {
+    case h264::Parity::Top:
+      return fb::PictureStructure::TopField;
+    case h264::Parity::Bottom:
+      return fb::PictureStructure::BottomField;
+    case h264::Parity::Frame:
+      break;
+  }
+  return fb::PictureStructure::Frame;
+}
 
 // vui_parameters() timing as the elementary-stream time base of chapter 6 §6.2.6: a frame is two ticks.
 std::optional<StreamTiming> stream_timing(const Sps& sps) {
@@ -242,6 +284,7 @@ class H264Dispatch final : public CodecDispatch {
       join(core, unit);
       if (bd.role == h264::UnitRole::NextSlice) {
         vote(core, *sh);
+        check_lists(core, unit, *sh);
       }
       return;
     }
@@ -271,6 +314,20 @@ class H264Dispatch final : public CodecDispatch {
     mmco5_ = poc.mmco5 || (second_field && mmco5_);
     last_picture_ = bd.picture_index;
     last_frame_ = f.decode_index;
+    // §7.4.4: declared_refs and dpb_after from the first slice.
+    h264::DpbStepResult refs = dpb_.step(f.decode_index, h, sh, *act.sps, poc, f.second_field_of);
+    f.declared_refs = std::move(refs.declared_refs);
+    f.dpb_after = std::move(refs.dpb_after);
+    for (size_t x = 0; x < refs.ref_pic_list.size(); ++x) {
+      for (const h264::RefPic& r : refs.ref_pic_list[x]) {
+        f.ref_lists[x].push_back(RefSlotRec{r.decode_index, r.poc, structure_of(r.parity), r.long_term});
+      }
+    }
+    for (h264::IndexDiagnostic& d : refs.diagnostics) {
+      core.unit_diagnostic(unit, DiagRec{d.severity, std::move(d.code), std::move(d.message), BitSpan{0, 0}});
+    }
+    first_lists_ = ListParams::of(sh);
+    lists_differ_ = false;
     // Recovery point RAP (S6): a recovery_point SEI with recovery_frame_cnt 0 preceded this picture.
     if (recovery_point_ && (*recovery_point_ || sh.slice_type_mod5 == kSliceI || sh.slice_type_mod5 == kSliceSI)) {
       f.is_rap = true;
@@ -293,6 +350,18 @@ class H264Dispatch final : public CodecDispatch {
     }
   }
 
+  // SPEC-ASSUMPTION(#736): Info SYN-H264-0107 once per picture when a later slice's lists would differ.
+  void check_lists(BuilderCore& core, uint32_t unit, const SliceHeader& sh) {
+    if (lists_differ_ || !first_lists_ || ListParams::of(sh) == *first_lists_) {
+      return;
+    }
+    lists_differ_ = true;
+    core.unit_diagnostic(unit, DiagRec{syntax::Severity::Info, std::string(kListsDiffer),
+                                       "slice reference lists differ from the first slice; declared_refs follow the "
+                                       "first slice",
+                                       BitSpan{0, 0}});
+  }
+
   // SYN-GEN-0102: a slice whose parameter sets are missing is indexed as a frame of type Unknown. Its header is
   // not known, so the §7.3.9 rules cannot run: the frame ends at the next unit that may only precede a picture.
   void place_unknown(BuilderCore& core, uint32_t unit) {
@@ -309,6 +378,7 @@ class H264Dispatch final : public CodecDispatch {
     f.slice_count = 1;
     f.sequence = sequence_;
     unknown_open_ = true;
+    first_lists_.reset();
     open_sps_.reset();
     open_pps_.reset();
   }
@@ -326,6 +396,9 @@ class H264Dispatch final : public CodecDispatch {
   ActiveSets sets_;
   h264::FrameBoundary boundary_;
   h264::PocState poc_;
+  h264::Dpb dpb_;
+  std::optional<ListParams> first_lists_;  // of the open picture's first slice
+  bool lists_differ_ = false;              // SYN-H264-0107 already raised for the open picture
   std::vector<SetDiagnostic> set_diags_;
   std::shared_ptr<const Sps> open_sps_;  // the open picture's sets (partitions B and C)
   std::shared_ptr<const Pps> open_pps_;
