@@ -1327,7 +1327,7 @@ All WIs follow the §0.1 template. Sizes: S ≤ 1 day, M ≤ 3 days, L ≤ 1 wee
 **Produces:** `app/tests/qml/tst_{ContainerTreeModel,SyntaxTreeModel,HexViewModel,TimelineModel,HdrMetadataModel,Shortcuts}.qml`, reference screenshots under `app/tests/screenshots/<platform>/`, `app/tests/scripts/test_{open_click_field_hex,timeline_scrub,hdr_panel}.py`.
 **Interface:** §14.10.1 test list, §14.10.2 scenes, §14.10.3 scripts 1, 2 and 5 over the test IPC of WI-1.465.
 **Steps:** 1. QML model tests with fixture data. 2. Screenshot scenes (both themes). 3. Scripts 1, 2, 5. 4. CI wiring in the `gui` job of `ci.yml` (owned by WI-1.465 / chapter 13).
-**Acceptance tests:** 1. Given `QT_QPA_PLATFORM=offscreen` on Linux and macOS, When `ctest -R qmltests` runs, Then all tests pass. 2. Given the reference images, When the screenshot job runs, Then all scenes pass `imgdiff --mode ui`. 3. Given `jctvc_AMP_A_Samsung_7`, When script 1 runs, Then the highlighted bit span equals the `trace_headers` golden span for `pic_width_in_luma_samples`.
+**Acceptance tests:** 1. Given `QT_QPA_PLATFORM=offscreen` on Linux and macOS, When `ctest -R qmltests` runs, Then all tests pass. 2. Given the reference images, When the screenshot job runs, Then all scenes pass `imgdiff --mode ui`. 3. Given `jctvc_AMP_A_Samsung_7`, When script 1 runs, Then the highlighted bit span equals the `trace_headers` golden span for `pic_width_in_luma_samples`; and scripts 2 and 5 pass against the real `ovt-studio` through the WI-1.465 test-IPC server (moved here from WI-1.465 AT1, #690).
 **Size:** L.
 **Notes / pitfalls:** `tst_Shortcuts.qml` reads the §11.4.3 table (chapter 11) as its expected list — the single keyboard map.
 
