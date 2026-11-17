@@ -11,8 +11,8 @@
 // host passes a tagged set to set_overlays(), the surface moves its arrays into shared ownership, inserts them into
 // its cache and keeps a handle on screen. An entry that is evicted stays alive for as long as a handle uses it. The
 // cache holds CPU arrays only: the GPU copies belong to the surface's OverlayLayerGpu, which re-uploads only when the
-// shown arrays change, so surface teardown never races a cache entry. SPEC-ASSUMPTION(#706): CPU arrays, not GPU
-// textures, are what the cache keeps; the upload (≤ 1.0 ms, §10.5.8) is not the cost a toggle has to avoid.
+// shown arrays change, so surface teardown never races a cache entry. CPU arrays, not GPU textures, are what the
+// cache keeps (chapter 10 §10.5.8, WI-2.437); the upload (≤ 1.0 ms, §10.5.8) is not the cost a toggle has to avoid.
 
 #ifndef OVT_RENDER_SRC_OVERLAY_OVERLAY_CACHE_H
 #define OVT_RENDER_SRC_OVERLAY_OVERLAY_CACHE_H

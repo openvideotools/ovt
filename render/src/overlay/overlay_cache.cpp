@@ -128,7 +128,7 @@ bool overlay_cache_key(const ovt::fb::FrameAnalysis& fa, const OverlayConfig& cf
   }
   out = OverlayCacheKey{};
   out.decode_index = info->id()->decode_index();
-  // SPEC-ASSUMPTION(#706): the key also fingerprints the frame, so that decode_index n of another stream (or a
+  // The key also fingerprints the frame (WI-2.437 goal), so that decode_index n of another stream (or a
   // re-analysis with another plugin) is not served from the cache.
   Fnv f;
   f.value(info->id()->display_index());
