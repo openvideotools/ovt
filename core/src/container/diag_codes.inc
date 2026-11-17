@@ -106,6 +106,7 @@ X(CNT_1020, "CNT-1020", Info, "`avc3`/`avc4` sample entry carries SPS/PPS in `av
   "14496-15 §5.4")
 X(CNT_1021, "CNT-1021", Error, "`av1C.configOBUs` contains an OBU other than sequence header / metadata",
   "AV1-ISOBMFF §2.3.4")
+X(CNT_1022, "CNT-1022", Warning, "`vpcC.codecIntializationDataSize` ≠ 0 for VP8/VP9", "VP-ISOBMFF §2.3")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")

@@ -95,6 +95,9 @@ constexpr auto kCases = std::to_array<Case>({
     {"avcC", "avc1", false, "stsd"},
     {"hvcC", "hvc1", false, "stsd"},
     {"av1C", "av01", false, "stsd"},
+    {"vpcC", "vp09", true, "stsd"},
+    {"esds", "mp4a", true, "stsd"},
+    {"dOps", "Opus", false, "stsd"},
 });
 
 void require(bool ok) {
