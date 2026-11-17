@@ -446,6 +446,9 @@ uint64_t decode_mdhd(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
   const uint32_t timescale = fb.u32("timescale");
   check_timescale(fb, timescale);
   ctx.track_timescale = timescale;
+  if (ctx.trex_for_track && ctx.track_id != 0) {  // SPEC-ASSUMPTION(#670): tfdt derives seconds from it
+    (*ctx.trex_for_track)[ctx.track_id].timescale = timescale;
+  }
   fb.duration("duration", wide, timescale);
   fb.lang_packed("language");  // pad u(1) + language u(5)[3]; 0x7FFF and invalid codes read "und"
   fb.u16("pre_defined");
