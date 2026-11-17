@@ -268,27 +268,60 @@ bool has_node_diag(const fb::SyntaxNode& tree, std::string_view code) {
 
 // ---- allocation counter -------------------------------------------------------------------------------------
 // The replaced global operator new counts while `g_count_allocations` is set (the audit of §7.4.6: no heap
-// allocation per unit when recording is off).
+// allocation per unit when recording is off). Every unaligned form of new and delete is replaced, so that a
+// block always comes from malloc and goes back to free whichever form allocates and releases it (libstdc++'s
+// temporary buffers use the nothrow form, ovt_job_create too; a sanitizer flags a mix of new and free).
 namespace {
 std::atomic<bool> g_count_allocations{false};
 std::atomic<size_t> g_allocations{0};
-}  // namespace
 
-void* operator new(size_t n) {
+void* counted_malloc(size_t n) noexcept {
   if (g_count_allocations.load(std::memory_order_relaxed)) {
     g_allocations.fetch_add(1, std::memory_order_relaxed);
   }
-  void* p = std::malloc(n == 0 ? 1 : n);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+  return std::malloc(n == 0 ? 1 : n);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+}
+void* counted_new(size_t n) {
+  void* p = counted_malloc(n);
   if (p == nullptr) {
     throw std::bad_alloc();
   }
   return p;
 }
-void operator delete(void* p) noexcept {
+void counted_free(void* p) noexcept {
   std::free(p);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
 }
+}  // namespace
+
+void* operator new(size_t n) {
+  return counted_new(n);
+}
+void* operator new[](size_t n) {
+  return counted_new(n);
+}
+void* operator new(size_t n, const std::nothrow_t& /*tag*/) noexcept {
+  return counted_malloc(n);
+}
+void* operator new[](size_t n, const std::nothrow_t& /*tag*/) noexcept {
+  return counted_malloc(n);
+}
+void operator delete(void* p) noexcept {
+  counted_free(p);
+}
+void operator delete[](void* p) noexcept {
+  counted_free(p);
+}
 void operator delete(void* p, size_t /*n*/) noexcept {
-  std::free(p);  // NOLINT(cppcoreguidelines-no-malloc,cppcoreguidelines-owning-memory)
+  counted_free(p);
+}
+void operator delete[](void* p, size_t /*n*/) noexcept {
+  counted_free(p);
+}
+void operator delete(void* p, const std::nothrow_t& /*tag*/) noexcept {
+  counted_free(p);
+}
+void operator delete[](void* p, const std::nothrow_t& /*tag*/) noexcept {
+  counted_free(p);
 }
 
 // ---- lazy EPB stripping ----------------------------------------------------------------------------------------
