@@ -17,6 +17,48 @@
 #include <libplacebo/gpu.h>
 
 namespace ovt::render::detail {
+namespace {
+
+// What to download for the rect `rc` of a texture: `tex` over `rc`, whose first texel is texture texel (x0, y0).
+struct Staged {
+  pl_tex tex = nullptr;
+  pl_rect3d rc = {};
+  int x0 = 0;
+  int y0 = 0;
+};
+
+// The pinned libplacebo 7.349 passes a transfer rect's end coordinates as the Vulkan copy extent (upstream later uses
+// pl_rect_w/h), so a download whose rect does not start at (0, 0) reads the wrong texels: MoltenVK returned the
+// sample 63 codes off, and the copy can run past the buffer. A sub-rect is therefore blitted to `scratch` at the
+// origin first; a texture that cannot be blitted is downloaded from the origin up to the rect's far corner instead.
+Staged stage_rect(pl_gpu gpu, pl_tex tex, const pl_rect3d& rc, pl_tex& scratch) {
+  if (rc.x0 == 0 && rc.y0 == 0) {
+    return {tex, rc, 0, 0};
+  }
+  const int w = rc.x1 - rc.x0;
+  const int h = rc.y1 - rc.y0;
+  if (tex->params.blit_src) {
+    struct pl_tex_params p = {};
+    p.w = w;
+    p.h = h;
+    p.format = tex->params.format;
+    p.blit_dst = true;
+    p.host_readable = true;
+    if (pl_tex_recreate(gpu, &scratch, &p)) {
+      struct pl_tex_blit_params b = {};
+      b.src = tex;
+      b.dst = scratch;
+      b.src_rc = rc;
+      b.dst_rc = {0, 0, 0, w, h, 1};
+      b.sample_mode = PL_TEX_SAMPLE_NEAREST;
+      pl_tex_blit(gpu, &b);
+      return {scratch, {0, 0, 0, w, h, 1}, rc.x0, rc.y0};
+    }
+  }
+  return {tex, {0, 0, 0, rc.x1, rc.y1, 1}, 0, 0};
+}
+
+}  // namespace
 
 IdBuffer::IdBuffer(pl_gpu gpu) : gpu_(gpu), region_(!gpu->glsl.vulkan) {}
 
@@ -25,6 +67,7 @@ IdBuffer::~IdBuffer() {
     pl_buf_destroy(gpu_, &r.buf);
   }
   pl_tex_destroy(gpu_, &tex_);
+  pl_tex_destroy(gpu_, &scratch_);
 }
 
 bool IdBuffer::begin(int w, int h, std::string& err) {
@@ -40,7 +83,8 @@ bool IdBuffer::begin(int w, int h, std::string& err) {
   params.format = fmt;
   params.renderable = true;
   params.host_readable = true;
-  params.blit_dst = true;  // pl_tex_clear_ex
+  params.blit_dst = true;                                     // pl_tex_clear_ex
+  params.blit_src = (fmt->caps & PL_FMT_CAP_BLITTABLE) != 0;  // region readback (stage_rect)
   if (!pl_tex_recreate(gpu_, &tex_, &params)) {
     err = "pl_tex_recreate failed for the id buffer";
     return false;
@@ -82,17 +126,17 @@ void IdBuffer::readback() {
   const int tw = tex_->params.w;
   const int th = tex_->params.h;
   Readback r = *free;
+  pl_rect3d want = {0, 0, 0, tw, th, 1};
   if (region_) {
-    r.x0 = std::clamp(cursor_x_, 0, tw - 1);
-    r.y0 = std::clamp(cursor_y_, 0, th - 1);
-    r.w = 1;
-    r.h = 1;
-  } else {
-    r.x0 = 0;
-    r.y0 = 0;
-    r.w = tw;
-    r.h = th;
+    r.cx = std::clamp(cursor_x_, 0, tw - 1);
+    r.cy = std::clamp(cursor_y_, 0, th - 1);
+    want = {r.cx, r.cy, 0, r.cx + 1, r.cy + 1, 1};
   }
+  const Staged st = stage_rect(gpu_, tex_, want, scratch_);
+  r.x0 = st.x0;
+  r.y0 = st.y0;
+  r.w = st.rc.x1 - st.rc.x0;
+  r.h = st.rc.y1 - st.rc.y0;
   const size_t size = static_cast<size_t>(r.w) * static_cast<size_t>(r.h) * sizeof(uint32_t);
   if (r.buf == nullptr || r.buf->params.size != size) {
     pl_buf_destroy(gpu_, &r.buf);
@@ -106,8 +150,8 @@ void IdBuffer::readback() {
     }
   }
   struct pl_tex_transfer_params tp = {};
-  tp.tex = tex_;
-  tp.rc = {r.x0, r.y0, 0, r.x0 + r.w, r.y0 + r.h, 1};
+  tp.tex = st.tex;
+  tp.rc = st.rc;
   tp.row_pitch = static_cast<size_t>(r.w) * sizeof(uint32_t);
   tp.buf = r.buf;
   if (!pl_tex_download(gpu_, &tp)) {
@@ -134,12 +178,10 @@ uint32_t IdBuffer::lookup(int px, int py) {
     return kIdNone;
   }
   const Readback& r = slots_.at(static_cast<size_t>(latest_));
-  int x = px - r.x0;
-  int y = py - r.y0;
-  if (region_) {
-    x = 0;  // the texel read at the previous cursor (§10.5.7: pick() reflects the previous frame's cursor)
-    y = 0;
-  } else if (x < 0 || y < 0 || x >= r.w || y >= r.h) {
+  // Region mode: the texel read at the previous cursor (§10.5.7: pick() reflects the previous frame's cursor).
+  const int x = (region_ ? r.cx : px) - r.x0;
+  const int y = (region_ ? r.cy : py) - r.y0;
+  if (x < 0 || y < 0 || x >= r.w || y >= r.h) {
     return kIdNone;
   }
   uint32_t id = kIdNone;
@@ -190,31 +232,39 @@ bool SampleWindows::fetch(pl_gpu gpu, const FrameSlot& slot, int ix, int iy) {
     win.x0 = std::clamp((ix >> sx) - (kSize / 2), 0, tw - win.w);
     win.y0 = std::clamp((iy >> sy) - (kSize / 2), 0, th - win.h);
     const size_t texel = tex->params.format->texel_size;
-    const size_t bytes = static_cast<size_t>(win.w) * static_cast<size_t>(win.h) * texel;
+    pl_tex scratch = nullptr;
+    const Staged st = stage_rect(gpu, tex, {win.x0, win.y0, 0, win.x0 + win.w, win.y0 + win.h, 1}, scratch);
+    const int dw = st.rc.x1 - st.rc.x0;
+    const int dh = st.rc.y1 - st.rc.y0;
+    const size_t bytes = static_cast<size_t>(dw) * static_cast<size_t>(dh) * texel;
     // Through an explicit host-readable buffer, as the scope readback: libplacebo's pointer download path crashes on
     // MoltenVK with an imported device.
     struct pl_buf_params bp = {};
     bp.size = bytes;
     bp.host_readable = true;
     pl_buf buf = pl_buf_create(gpu, &bp);
-    if (buf == nullptr) {
-      return false;
-    }
-    struct pl_tex_transfer_params tp = {};
-    tp.tex = tex;
-    tp.rc = {win.x0, win.y0, 0, win.x0 + win.w, win.y0 + win.h, 1};
-    tp.row_pitch = static_cast<size_t>(win.w) * texel;
-    tp.buf = buf;
     std::vector<uint8_t> raw(bytes);
-    const bool ok = pl_tex_download(gpu, &tp) && pl_buf_read(gpu, buf, 0, raw.data(), bytes);
+    struct pl_tex_transfer_params tp = {};
+    tp.tex = st.tex;
+    tp.rc = st.rc;
+    tp.row_pitch = static_cast<size_t>(dw) * texel;
+    tp.buf = buf;
+    const bool ok = buf != nullptr && pl_tex_download(gpu, &tp) && pl_buf_read(gpu, buf, 0, raw.data(), bytes);
     pl_buf_destroy(gpu, &buf);
+    pl_tex_destroy(gpu, &scratch);
     if (!ok) {
       return false;
     }
+    // Keep the window's own texels; the origin fallback downloaded more.
+    const int ox = win.x0 - st.x0;
+    const int oy = win.y0 - st.y0;
     win.samples.resize(static_cast<size_t>(win.w) * static_cast<size_t>(win.h));
     for (size_t i = 0; i < win.samples.size(); ++i) {
       // R8, or R16 holding little-endian LSB-aligned codes (§10.3.1).
-      win.samples[i] = texel == 1 ? raw[i] : static_cast<uint16_t>(raw[2 * i] | (raw[(2 * i) + 1] << 8U));
+      const size_t x = (i % static_cast<size_t>(win.w)) + static_cast<size_t>(ox);
+      const size_t y = (i / static_cast<size_t>(win.w)) + static_cast<size_t>(oy);
+      const size_t at = ((y * static_cast<size_t>(dw)) + x) * texel;
+      win.samples[i] = texel == 1 ? raw[at] : static_cast<uint16_t>(raw[at] | (raw[at + 1] << 8U));
     }
   }
   ++downloads_;

@@ -134,7 +134,8 @@ int upload_plane(pl_gpu gpu, const Picture& pic, uint8_t i, FrameSlot& slot, str
   tp.format = fmt;
   tp.sampleable = true;
   tp.host_writable = true;
-  tp.host_readable = true;  // the pixel probe downloads 64x64-sample windows (§10.5.7, WI-2.435)
+  tp.host_readable = true;  // the pixel probe downloads 64x64-sample windows (§10.5.7, WI-2.435) ...
+  tp.blit_src = (fmt->caps & PL_FMT_CAP_BLITTABLE) != 0;  // ... staged through a blit (overlay/idbuffer.cpp)
   // Reallocates slot.tex[i] only when the size or format changes (persistent textures per slot).
   if (!pl_tex_recreate(gpu, &slot.tex[i], &tp)) {
     err = reject("cannot allocate the texture of plane " + std::to_string(i));

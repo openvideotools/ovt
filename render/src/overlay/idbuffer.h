@@ -64,6 +64,8 @@ class IdBuffer {
     int h = 0;
     int x0 = 0;  // origin of the download in the texture
     int y0 = 0;
+    int cx = 0;  // region mode: the cursor texel the download was for
+    int cy = 0;
     uint64_t seq = 0;
     bool pending = false;
   };
@@ -71,6 +73,7 @@ class IdBuffer {
 
   pl_gpu gpu_;
   pl_tex tex_ = nullptr;
+  pl_tex scratch_ = nullptr;  // region readback staging (see stage_rect in idbuffer.cpp)
   std::array<Readback, 2> slots_{};
   int latest_ = -1;          // newest completed readback, -1 none
   uint64_t seq_ = 0;         // downloads issued
