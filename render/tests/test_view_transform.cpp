@@ -13,6 +13,7 @@
 #include <cstring>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "ovt/render/video_surface.h"
 #include "pipeline/render_params.h"
@@ -277,4 +278,48 @@ TEST_CASE("render_test_view_transform: the sample grid at zoom 8 matches grid_zo
   REQUIRE(s.x == 10);
   REQUIRE(s.y == 20);
   CHECK(ovt::render::detail::sample_value(big.pic, 0, s.x, s.y).value_or(9999) == ((10U * 3 + 20U * 5) & 0xFFU));
+}
+
+// Review of #709: pick() and the drawn sample agree at the edge pixels of a sample (zoom >= 1 snapping, fractional
+// pan).
+TEST_CASE("render_test_view_transform: pick() selects the sample whose drawn pixels contain the cursor",
+          "[fast][render][vulkan][pick]") {
+  constexpr int kZoom = 8;
+  constexpr uint32_t kW = 16;
+  constexpr uint32_t kH = 12;
+  auto surface = ovt::render::test::surface_or_skip(kW * kZoom, kH * kZoom);
+  OwnedPicture op(kW, kH, 8, 1, 1);
+  op.fill_plane(0, 126);
+  op.fill_plane(1, 128);
+  op.fill_plane(2, 128);
+  op.pic.generation = 1;
+  surface->set_frame(op.pic);
+  ViewState view = view_of(kZoom, 7.3, 5.6);  // fractional pan: samples start at fractional device positions
+  view.dither = false;
+  surface->render(view);
+  REQUIRE(std::string(surface->last_error()).empty());
+  const ViewportSize vp{kW * kZoom, kH * kZoom};
+  int checked = 0;
+  for (int sx = 1; sx < static_cast<int>(kW) - 1; ++sx) {
+    for (int sy = 1; sy < static_cast<int>(kH) - 1; ++sy) {
+      const auto first = image_to_device(view, vp, sx, sy);
+      const auto next = image_to_device(view, vp, sx + 1, sy + 1);
+      const int x0 = static_cast<int>(first.x);
+      const int y0 = static_cast<int>(first.y);
+      const int x1 = static_cast<int>(next.x) - 1;  // last device pixel of the sample
+      const int y1 = static_cast<int>(next.y) - 1;
+      if (x0 < 0 || y0 < 0 || x1 >= vp.w || y1 >= vp.h) {
+        continue;
+      }
+      for (const auto& [px, py] : {std::pair{x0, y0}, std::pair{x1, y1}, std::pair{x0, y1}, std::pair{x1, y0}}) {
+        const ovt::render::Pick pk = surface->pick(px, py);
+        INFO("sample (" << sx << ", " << sy << ") device (" << px << ", " << py << ")");
+        REQUIRE(pk.hit);
+        REQUIRE(pk.image_x == sx);
+        REQUIRE(pk.image_y == sy);
+        ++checked;
+      }
+    }
+  }
+  CHECK(checked > 100);
 }

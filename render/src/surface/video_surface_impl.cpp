@@ -44,6 +44,7 @@
 #include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
 #include "pipeline/sample_grid.h"
+#include "pipeline/view_transform.h"
 #include "platform/native_target.h"
 #include "platform/offscreen.h"
 #include "vk_no_timestamps.h"
@@ -401,16 +402,16 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (!picked_view_ || !slot_a_.valid) {
       return p;
     }
-    // Inverse §10.2.3 view transform at the pixel centre (the overlay passes map gl_FragCoord the same way).
-    const double zoom = last_view_.zoom > 0.0 ? last_view_.zoom : 1.0;
-    const double fx = ((px + 0.5 - (target_.width / 2.0)) / zoom) + last_view_.pan_x;
-    const double fy = ((py + 0.5 - (target_.height / 2.0)) / zoom) + last_view_.pan_y;
-    if (fx < 0.0 || fy < 0.0 || fx >= slot_a_.coded_width || fy >= slot_a_.coded_height) {
+    // Inverse §10.2.3 view transform with the forward transform's whole-pixel rounding (WI-1.409): the sample picked is
+    // the one whose drawn device pixels contain (px, py), also at the edge pixels of a sample at zoom >= 1.
+    const detail::SampleIndex sample = detail::sample_at_device(last_view_, {target_.width, target_.height}, px, py);
+    if (sample.x < 0 || sample.y < 0 || std::cmp_greater_equal(sample.x, slot_a_.coded_width) ||
+        std::cmp_greater_equal(sample.y, slot_a_.coded_height)) {
       return p;  // outside the coded picture
     }
     p.hit = true;
-    p.image_x = static_cast<int>(std::floor(fx));
-    p.image_y = static_cast<int>(std::floor(fy));
+    p.image_x = sample.x;
+    p.image_y = sample.y;
     p.cell_x = p.image_x / 4;
     p.cell_y = p.image_y / 4;
     if (overlays_ != nullptr && std::cmp_less(p.cell_x, overlays_->cells_w) &&
