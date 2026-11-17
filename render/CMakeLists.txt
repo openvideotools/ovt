@@ -72,7 +72,9 @@ target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass
 target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
 # WI-2.434: MV arrow and intra stroke instances (2.434a) and passes 8-9 by vertex pulling (2.434b, §10.5.4).
 target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
-foreach(shader IN ITEMS arrows diff fill hatch heatmap)
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3).
+target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+foreach(shader IN ITEMS arrows diff fill hatch heatmap lines)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
   file(READ "${shader_src}" OVT_SHADER_TEXT)
