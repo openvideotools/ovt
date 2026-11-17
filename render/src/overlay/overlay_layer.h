@@ -35,10 +35,10 @@ class OverlayLayerGpu {
   OverlayLayerGpu& operator=(OverlayLayerGpu&&) = delete;
   ~OverlayLayerGpu();
 
-  // Uploads the cell textures of `set` (set_overlays()). nullptr drops them. Returns false with `err` set when a
+  // Uploads the cell textures of `handle` (set_overlays()). nullptr drops them. Returns false with `err` set when a
   // texture cannot be created; nothing is drawn then. A set whose data() is the one already uploaded only replaces
   // the configuration (WI-2.437); the caller keeps the previous set alive until this returns.
-  bool upload(const OverlaySet* set, std::string& err);
+  bool upload(const OverlaySet* handle, std::string& err);
 
   // True while the arrays of a set are on the GPU (tests of the WI-2.437 re-upload skip).
   [[nodiscard]] const OverlaySet* uploaded_data() const { return uploaded_ ? set_ : nullptr; }

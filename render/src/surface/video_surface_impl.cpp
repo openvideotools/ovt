@@ -346,7 +346,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   // the arrays already on the GPU (a selection, probe or uniform change) only updates the configuration.
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
     // The previous set lives until the upload has compared against it, so a new set cannot reuse its address.
-    std::unique_ptr<OverlaySet> previous = std::move(overlays_);
+    const std::unique_ptr<OverlaySet> previous = std::move(overlays_);
     overlays_ = detail::adopt_into_cache(overlay_cache_, std::move(overlays));
     if (overlay_gpu_ == nullptr) {
       return;
