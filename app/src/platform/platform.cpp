@@ -48,9 +48,62 @@ bool Platform::isLinux() {
 #endif
 }
 
-bool Platform::hasHover() {
-  return !isAndroid();
+Platform::Platform()
+    : has_hover_(!isAndroid()),
+      windowing_mode_(isAndroid() ? QStringLiteral("fullscreen") : QStringLiteral("desktop")) {
+  if (isAndroid()) {
+    refreshFromAndroid();
+  }
 }
+
+Platform::~Platform() = default;
+
+void Platform::setHasHover(bool value) {
+  if (has_hover_ != value) {
+    has_hover_ = value;
+    Q_EMIT hasHoverChanged();
+  }
+}
+
+void Platform::setWidthDp(double value) {
+  if (value > 0 && width_dp_ != value) {
+    width_dp_ = value;
+    Q_EMIT widthDpChanged();
+  }
+}
+
+void Platform::setWindowingMode(const QString& value) {
+  if (windowing_mode_ != value) {
+    windowing_mode_ = value;
+    Q_EMIT windowingModeChanged();
+  }
+}
+
+QString Platform::layoutClassForWidth(double width_dp) {
+  // §11.5.2: smallest-width breakpoints.
+  if (width_dp >= 1200) {
+    return QStringLiteral("three");
+  }
+  if (width_dp >= 840) {
+    return QStringLiteral("two");
+  }
+  if (width_dp >= 600) {
+    return QStringLiteral("vertical");
+  }
+  return QStringLiteral("single");
+}
+
+void Platform::refresh(double window_width_dp) {
+  if (!refreshFromAndroid() && window_width_dp > 0) {
+    setWidthDp(window_width_dp);
+  }
+}
+
+#ifndef Q_OS_ANDROID
+bool Platform::refreshFromAndroid() {
+  return false;
+}
+#endif
 
 bool Platform::isFirstRun() {
   static const bool first_run = !QFileInfo::exists(settingsPath());

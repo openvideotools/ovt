@@ -16,6 +16,14 @@ import OvtStudio
 Item {
     id: shell
 
+    // Compact layouts of §11.5.2 (WI-A.451): on in the Android build, driven by `widthDp` (Platform.widthDp). The
+    // properties exist so that tests can run the breakpoints against a mocked Platform on the desktop.
+    property bool compactEnabled: Platform.isAndroid
+    property real widthDp: Platform.widthDp
+    // The layout class in force: "three", "two", "vertical" or "single".
+    readonly property alias layoutClass: compactLayout.layoutClass
+    // The dock workspace, for tests.
+    readonly property alias dockWorkspace: compactLayout.workspace
     // The central Actions object that the menu bar, the shortcuts and the panels share.
     readonly property alias actions: actions
     // The Open-as dialog, for tests.
@@ -121,11 +129,13 @@ Item {
         FirstRunBanner {
             Layout.fillWidth: true
         }
-        DockWorkspace {
-            id: dockWorkspace
+        CompactLayout {
+            id: compactLayout
 
             Layout.fillWidth: true
             Layout.fillHeight: true
+            active: shell.compactEnabled
+            widthDp: shell.widthDp
             actions: actions
             panelComponents: ({"picture": pictureComponent, "diagnostics": diagnosticsComponent,
                                "bookmarks": bookmarksComponent, "hdr": hdrComponent,
