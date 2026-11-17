@@ -22,8 +22,8 @@ class RapMap {
 
   /// max{ r <= decode_index : frames[r].is_rap }; -1 when there is none or decode_index is out of range.
   [[nodiscard]] int32_t rap_before(int64_t decode_index) const noexcept;
-  /// H.265: frame `decode_index` is a RASL picture and rap_before() of it is a CRA, so a decoder that starts at
-  /// that CRA cannot decode it ("skip when starting at r"). False for the other codecs.
+  /// H.265: frame `decode_index` is a RASL picture and rap_before() of it is a CRA or a BLA_W_LP, so a decoder that
+  /// starts at that picture cannot decode it ("skip when starting at r"). False for the other codecs.
   [[nodiscard]] bool skip_when_starting_at_rap(int64_t decode_index) const noexcept;
   [[nodiscard]] size_t size() const noexcept { return rap_before_.size(); }
 

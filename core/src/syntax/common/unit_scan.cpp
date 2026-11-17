@@ -166,7 +166,8 @@ class AnnexBScanner {
     cb_(ScannedUnit{.file_offset = base_ + start,
                     .bytes = bytes,
                     .prefix_span = ByteRange{.offset = base_ + prefix_.offset, .length = prefix_.length},
-                    .container_sample_index = sample_});
+                    .container_sample_index = sample_,
+                    .temporal_unit_start = false});
   }
 
   uint64_t base_;
@@ -274,7 +275,8 @@ void split_length_prefixed(std::span<const uint8_t> sample, unsigned nal_length_
       cb(ScannedUnit{.file_offset = sample_file_offset + pos,
                      .bytes = sample.subspan(pos, end - pos),
                      .prefix_span = ByteRange{.offset = field_offset, .length = nal_length_size},
-                     .container_sample_index = container_sample_index});
+                     .container_sample_index = container_sample_index,
+                     .temporal_unit_start = false});
     }
     pos = end;
   }
@@ -319,7 +321,8 @@ void scan_obu_low_overhead(std::span<const uint8_t> data, uint64_t data_file_off
     cb(ScannedUnit{.file_offset = obu_offset,
                    .bytes = data.subspan(pos, end - pos),
                    .prefix_span = ByteRange{.offset = obu_offset, .length = 0},
-                   .container_sample_index = container_sample_index});
+                   .container_sample_index = container_sample_index,
+                   .temporal_unit_start = false});
     pos = end;
   }
 }
@@ -359,6 +362,7 @@ void scan_obu_annexb(std::span<const uint8_t> data, uint64_t data_file_offset, i
     if (!read_unit(n, tu_end)) {
       return;
     }
+    bool tu_start = true;
     while (pos < tu_end) {
       size_t fu_end = 0;
       if (!read_unit(tu_end, fu_end)) {
@@ -374,7 +378,9 @@ void scan_obu_annexb(std::span<const uint8_t> data, uint64_t data_file_offset, i
               .file_offset = data_file_offset + pos,
               .bytes = data.subspan(pos, obu_end - pos),
               .prefix_span = ByteRange{.offset = data_file_offset + prefix_start, .length = pos - prefix_start},
-              .container_sample_index = container_sample_index});
+              .container_sample_index = container_sample_index,
+              .temporal_unit_start = tu_start});
+          tu_start = false;
           prefix_start = obu_end;
         }
         pos = obu_end;

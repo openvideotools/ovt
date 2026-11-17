@@ -55,6 +55,7 @@
     "SYN-H264-0104": "needs num_ref_idx_active larger than the DPB holds, a slice header rewrite of every slice; not in this table yet",
     "SYN-H264-0105": "needs ref_pic_list_modification syntax, which the recipe encoders do not write",
     "SYN-H264-0106": "needs more reference frames than max_num_ref_frames, a VUI rewrite; not in this table yet",
+    "SYN-H264-0107": "an Info on a picture whose later slices carry other reference-list parameters than its first slice, not a corruption; needs a multi-slice rewrite; covered by the WI-1.122 unit tests",
     "SYN-H265-0031": "needs tiles or WPP entry points; no recipe input to edit has them",
     "SYN-H265-0040": "needs an SCC stream (pps_curr_pic_ref_enabled_flag); no recipe produces one",
     "SYN-H265-0101": "needs a stream that starts at an open-GOP CRA; the recipe encoders write closed GOPs",

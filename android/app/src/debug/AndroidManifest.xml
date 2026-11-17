@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  Debug builds only (WI-A.452): the test DocumentsProvider of SafFlowsTest. It lives in the app, not in the
+  instrumentation APK, because a DocumentsProvider must be protected by MANAGE_DOCUMENTS, which only the system
+  holds; a provider of the app's own UID is readable by the app without a grant. It ships disabled, so it never
+  appears in the system picker, and SafFlowsTest enables it for the duration of a test.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name="org.openvideotools.studio.TestDocumentsProvider"
+            android:authorities="${applicationId}.testdocuments"
+            android:enabled="false"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+    </application>
+</manifest>
