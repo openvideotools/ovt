@@ -164,7 +164,7 @@ TEST_CASE("Platform: RHI backend names", "[fast][gui][platform]") {
 // the class of §11.5.2, and a refresh without a width keeps the last one on the desktop.
 TEST_CASE("Platform: a pushed width change switches the layout class", "[fast][gui][platform]") {
   Platform platform;
-  QSignalSpy changed(&platform, &Platform::widthDpChanged);
+  const QSignalSpy changed(&platform, &Platform::widthDpChanged);
   for (const auto& [width, layout] :
        {std::pair{1300.0, "three"}, {900.0, "two"}, {900.0, "two"}, {700.0, "vertical"}, {1300.0, "three"}}) {
     platform.refresh(width);

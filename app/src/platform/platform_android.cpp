@@ -12,6 +12,10 @@
 // root (AndroidShell.qml `configurationWidthDp`), which calls Platform.refresh(widthDp), and this re-reads the
 // input devices and the windowing mode.
 
+// Built into Android builds only (app/CMakeLists.txt). The guard (the compiler's own macro) keeps the host-side
+// clang-tidy job, which sees every changed file under app/ but has no Android Qt headers, from parsing it.
+#if defined(__ANDROID__)
+
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QJniEnvironment>
@@ -89,3 +93,5 @@ bool Platform::refreshFromAndroid(bool read_width) {
 }
 
 }  // namespace ovt::app
+
+#endif  // __ANDROID__

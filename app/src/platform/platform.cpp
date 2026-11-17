@@ -109,6 +109,8 @@ void Platform::refresh(double window_width_dp) {
 }
 
 #ifndef Q_OS_ANDROID
+// A member because the Android definition (platform_android.cpp) writes the properties.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 bool Platform::refreshFromAndroid(bool /*read_width*/) {
   return false;
 }
