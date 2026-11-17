@@ -35,9 +35,16 @@ Mac Mini runs (emulator `ovt-api36-arm64`, 1080x2400, 420 dpi):
 - 7c4a50d: the NDK build passed (arm64 and x86_64, no warnings); the script failed on the log level, a duplicate
   launch line and a runtime resize that did not reach the layout class.
 - 36cbdfc: `Platform.widthDp` was in device pixels (Qt's item width is in pixels there, device pixel ratio 1) and
-  an item's `width` stopped changing after start-up. Fixed by never using an item width on Android: `Platform`
-  now polls `Configuration.screenWidthDp` every 200 ms (the poll is covered on the desktop by the Catch2 test
-  "Platform: a polled width change switches the layout class").
+  an item's `width` stopped changing after start-up, so an item width is never used on Android any more.
+- 69e862e: a 200 ms `QTimer` poll of `Configuration.screenWidthDp` read the right start-up width (1300) but never
+  fired again (one read in 22 s, on the Qt thread, Activity context). Likely cause: Qt's Android event dispatcher
+  skips timers while the Qt application state is below Active (this view is created after the first onResume).
+  Replaced by a push: `MainActivity.onConfigurationChanged` sets the QML root's `configurationWidthDp`
+  (`QtQuickView.setProperty`, a queued call, not a timer), and `AndroidShell.qml` calls
+  `Platform.refresh(widthDp)`. Logcat now shows `OVT: configuration screenWidthDp=...` (tag OVT),
+  `OVT: configuration widthDp=...` (qml) and `OVT: Platform read widthDp=... appState=...` at start-up, so a failure
+  names the side that stopped. Desktop coverage: Catch2 "Platform: a pushed width change switches the layout class"
+  and `tst_android_shell.qml` `test_configurationWidthDrivesTheLayout`.
 - Frame half **blocked**: a VIEW intent opens the fd natively (`OVT: opened fd size=...`) but the open file never
   reaches the QML `Project`/`Selection` (the debug app still shows the no-file page and `frame` stays -1). That is
   the gap between `OvtSession` and the Project model (WI-A.452 / WI-1.509b), not this item, so "frame is kept" is

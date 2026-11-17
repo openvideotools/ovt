@@ -7,10 +7,13 @@
 //
 // The width is `Configuration.screenWidthDp` of the Activity's Resources, which follows the window (split-screen,
 // freeform, desktop windowing). `DisplayMetrics` of the display would report the whole screen, so it is never used.
-// The Activity is not recreated on a resize (the manifest declares the configuration changes), so Qt only resizes
-// the window; AndroidShell.qml calls Platform.refresh() from that resize.
+// The Activity is not recreated on a resize (the manifest declares the configuration changes). The width is read here
+// once at start-up; after that MainActivity.onConfigurationChanged pushes Configuration.screenWidthDp into the QML
+// root (AndroidShell.qml `configurationWidthDp`), which calls Platform.refresh(widthDp), and this re-reads the
+// input devices and the windowing mode.
 
 #include <QCoreApplication>
+#include <QGuiApplication>
 #include <QJniEnvironment>
 #include <QJniObject>
 #include <QString>
@@ -69,10 +72,11 @@ bool Platform::refreshFromAndroid(bool read_width) {
       ok = true;
     }
   }
-  // Devices and windowing change rarely; the width is polled at 5 Hz (platform.cpp), these are not.
-  static int tick = 0;
-  if (tick++ % 10 != 0) {
-    return ok;
+  if (read_width) {
+    // For the emulator record: the width read and the Qt application state (Qt's Android event dispatcher skips
+    // timers while the state is below Active, which would explain the dead 200 ms poll of an earlier attempt).
+    qInfo("OVT: Platform read widthDp=%d ok=%d appState=%d", static_cast<int>(width_dp_), ok ? 1 : 0,
+          static_cast<int>(QGuiApplication::applicationState()));
   }
   setHasHover(anyHoverDevice());
   // Activity.isInMultiWindowMode() (API 24): split-screen, freeform and desktop windowing all report true. An

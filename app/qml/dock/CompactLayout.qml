@@ -24,16 +24,15 @@ ColumnLayout {
     // Compact layouts apply on Android only; the desktop keeps the three-pane skeleton at every width (§11.5.2 is
     // an Android rule). Tests turn it on to run the breakpoints against a mocked Platform.widthDp.
     property bool active: Platform.isAndroid
-    // Re-reads Platform from the window's size when it changes (Android; §11.5.3: ≤ 1 frame, no Activity recreation).
-    property bool trackWindow: Platform.isAndroid
     property real widthDp: Platform.widthDp
     readonly property string layoutClass: active ? Platform.layoutClassForWidth(widthDp) : "three"
     readonly property alias workspace: workspace
 
     spacing: 0
 
-    // Android ignores the width given: Qt's item width is in device pixels there. The platform polls Configuration.
-    onWidthChanged: if (trackWindow) Platform.refresh(width)
+    // No onWidthChanged here: on Android an item's width is in device pixels and stopped following the window after
+    // start-up. The width comes from Platform.widthDp, which MainActivity's configuration changes drive
+    // (AndroidShell.qml `configurationWidthDp`).
 
     // Logged for the emulator test (test_android_breakpoints.py): the class, the width it came from and the selected frame.
     // Once per class and width, not once per trigger: the class change and the first layout pass both ask.

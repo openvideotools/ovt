@@ -6,6 +6,7 @@ package org.openvideotools.studio
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -48,6 +49,9 @@ class MainActivity : AppCompatActivity() {
 
     /** True only inside a finishing onDestroy (issue #614). */
     private var keepQtAlive = false
+
+    /** True once the QML root is READY: QtQuickView.setProperty needs the root (WI-A.451). */
+    private var shellReady = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -129,7 +133,11 @@ class MainActivity : AppCompatActivity() {
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
     private fun onShellStatus(status: QtQmlStatus) {
         when (status) {
-            QtQmlStatus.READY -> exposeShellTitle()
+            QtQmlStatus.READY -> {
+                exposeShellTitle()
+                shellReady = true
+                pushWindowWidth(resources.configuration) // a resize while the QML loaded
+            }
             QtQmlStatus.ERROR -> Log.e(TAG, "OVT-FATAL: the QML root $SHELL_QML failed to load")
             else -> Unit
         }
@@ -193,6 +201,23 @@ class MainActivity : AppCompatActivity() {
         } else {
             windowManager.defaultDisplay
         }
+
+    /**
+     * WI-A.451 (§11.5.2): a resize (split-screen, freeform, desktop windowing) changes the Configuration without
+     * recreating the Activity (manifest configChanges). On the emulator Qt's timers did not fire in this embedded view
+     * and a QML item width is in device pixels, so the QML root gets the window width in dp from here.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        pushWindowWidth(newConfig)
+    }
+
+    private fun pushWindowWidth(config: Configuration) {
+        Log.i(TAG, "OVT: configuration screenWidthDp=${config.screenWidthDp} shellReady=$shellReady")
+        if (shellReady && config.screenWidthDp != Configuration.SCREEN_WIDTH_DP_UNDEFINED) {
+            qtView.setProperty(SHELL_WIDTH_PROPERTY, config.screenWidthDp)
+        }
+    }
 
     // launchMode singleTask: a second VIEW/SEND reaches the running Activity here, without recreating it.
     override fun onNewIntent(intent: Intent) {
@@ -258,5 +283,8 @@ class MainActivity : AppCompatActivity() {
 
         /** Root property of AndroidShell.qml holding the product name it displays. */
         const val SHELL_TITLE_PROPERTY = "productName"
+
+        /** Root property of AndroidShell.qml taking Configuration.screenWidthDp (WI-A.451). */
+        const val SHELL_WIDTH_PROPERTY = "configurationWidthDp"
     }
 }

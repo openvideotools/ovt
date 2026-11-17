@@ -31,6 +31,7 @@ SERIAL = os.environ.get("OVT_ANDROID_SERIAL")
 # check proves "unchanged at -1" and the class sequence only.
 MEDIA_URI = os.environ.get("OVT_ANDROID_MEDIA_URI")
 LAYOUT_RE = re.compile(r"OVT: layout (\w+) widthDp=(\d+) frame=(-?\d+)")
+TRAIL_RE = re.compile(r"OVT: (configuration|Platform read)")
 # The widths of the acceptance test and the class §11.5.2 gives each.
 STEPS = [(1300, "three"), (900, "two"), (700, "vertical")]
 
@@ -58,7 +59,9 @@ def wait_for_class(name: str, timeout: float = 20.0) -> tuple[str, int, int]:
         if seen and seen[-1][0] == name:
             return seen[-1]
         time.sleep(0.5)
-    raise AssertionError(f"no 'OVT: layout {name}' line; last seen: {layouts()[-3:]}")
+    # Which side stopped: MainActivity's configuration push (tag OVT), the QML root (qml) or Platform's start-up read.
+    trail = [line for line in adb("logcat", "-d").splitlines() if TRAIL_RE.search(line)]
+    raise AssertionError(f"no 'OVT: layout {name}' line; last seen: {layouts()[-3:]}; trail: {trail[-6:]}")
 
 
 @pytest.fixture

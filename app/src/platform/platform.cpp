@@ -9,24 +9,18 @@
 #include <QGuiApplication>
 #include <QQuickWindow>
 #include <QStandardPaths>
-#include <QTimer>
 #include <QtGlobal>
 
 #include <algorithm>
 #include <array>
 #include <cstdio>
-#include <functional>
 #include <string_view>
-#include <utility>
 
 namespace ovt::app {
 
 namespace {
 
 QSGRendererInterface::GraphicsApi g_selected = QSGRendererInterface::Unknown;
-
-// How often the Android Configuration is re-read: a resize shows within this, not within a frame.
-constexpr int kAndroidPollMs = 200;
 
 }  // namespace
 
@@ -58,25 +52,14 @@ Platform::Platform()
     : has_hover_(!isAndroid()),
       windowing_mode_(isAndroid() ? QStringLiteral("fullscreen") : QStringLiteral("desktop")) {
   if (isAndroid()) {
+    // The start-up width. Later changes are pushed by MainActivity.onConfigurationChanged through AndroidShell.qml
+    // and refresh(): Qt's timers did not fire in the embedded QtQuickView (a 200 ms poll ran once in 22 s on the
+    // emulator), and the item width stopped following the window after start-up.
     refreshFromAndroid(true);
-    // The Activity is not recreated on a resize, and Qt reports no event that reliably follows the window (Activity
-    // Configuration changes reached neither the item width nor a QScreen signal on the emulator), so the
-    // Configuration is polled. One cheap JNI read; widthDp notifies only when the value changes.
-    startPolling([this] { refreshFromAndroid(true); }, kAndroidPollMs);
   }
 }
 
 Platform::~Platform() = default;
-
-void Platform::startPolling(std::function<void()> read, int interval_ms) {
-  if (poll_ == nullptr) {
-    poll_ = new QTimer(this);
-  }
-  poll_->disconnect();
-  poll_->setInterval(interval_ms);
-  connect(poll_, &QTimer::timeout, this, std::move(read));
-  poll_->start();
-}
 
 void Platform::setHasHover(bool value) {
   if (has_hover_ != value) {
@@ -114,12 +97,13 @@ QString Platform::layoutClassForWidth(double width_dp) {
 }
 
 void Platform::refresh(double window_width_dp) {
-  // On Android the width is Configuration.screenWidthDp, never a Qt item width: the QtQuickView content is sized in
-  // device pixels there (device pixel ratio 1, seen on the emulator), and an item's width stopped following the
-  // window after start-up. `window_width_dp` serves the platforms that have no Configuration.
+  // On Android the width is Configuration.screenWidthDp (pushed by MainActivity, or read here when none is given),
+  // never a Qt item width: the QtQuickView content is sized in device pixels there (device pixel ratio 1 on the
+  // emulator).
   if (isAndroid()) {
-    refreshFromAndroid(true);
-  } else if (window_width_dp > 0) {
+    refreshFromAndroid(window_width_dp <= 0);
+  }
+  if (window_width_dp > 0) {
     setWidthDp(window_width_dp);
   }
 }

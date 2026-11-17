@@ -13,10 +13,6 @@
 #include <QSGRendererInterface>
 #include <QString>
 
-#include <functional>
-
-class QTimer;
-
 namespace ovt::app {
 
 class Platform : public QObject {
@@ -60,12 +56,10 @@ class Platform : public QObject {
   // "single" (< 600). Layouts switch on these names (CompactLayout.qml).
   Q_INVOKABLE static QString layoutClassForWidth(double width_dp);
 
-  // Android: re-reads Configuration.screenWidthDp, the input devices and the multi-window state (platform_android.cpp;
-  // `window_width_dp` is ignored there, see refresh()); elsewhere takes `window_width_dp` when it is positive. QML
-  // calls it when the window resizes.
-  // Calls `read` every `interval_ms` (Android polls its Configuration this way; tests pass a stand-in).
-  void startPolling(std::function<void()> read, int interval_ms);
-
+  // Takes the window width in dp when it is positive. On Android it also re-reads the input devices and the windowing
+  // mode, and with no width it re-reads Configuration.screenWidthDp (platform_android.cpp). The Android shell calls
+  // it with the Activity's Configuration.screenWidthDp each time MainActivity.onConfigurationChanged pushes one
+  // (AndroidShell.qml `configurationWidthDp`): a resize recreates no Activity and is not otherwise seen in time.
   Q_INVOKABLE void refresh(double window_width_dp = 0);
 
  Q_SIGNALS:
@@ -103,14 +97,13 @@ class Platform : public QObject {
   static void selectGraphicsApi();
 
  private:
-  // Android: Configuration.screenWidthDp of the Activity, the input devices and the multi-window state
-  // (platform_android.cpp). Elsewhere a no-op that returns false.
+  // Android: Configuration.screenWidthDp of the Activity (when `read_width`), the input devices and the multi-window
+  // state (platform_android.cpp). Elsewhere a no-op that returns false.
   bool refreshFromAndroid(bool read_width);
 
   bool has_hover_ = false;
   double width_dp_ = 1280;  // desktop default: the three-pane layout
   QString windowing_mode_;
-  QTimer* poll_ = nullptr;
 };
 
 }  // namespace ovt::app
