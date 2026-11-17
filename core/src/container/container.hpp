@@ -9,8 +9,10 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
+#include "container/byte_service.h"
 #include "container/format.hpp"
 #include "ovt/container.h"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -30,11 +32,15 @@ class Reader {
   // The serialised ContainerTree of the current state; empty when the reader builds none (the handle then
   // keeps its empty tree).
   [[nodiscard]] virtual std::vector<uint8_t> tree() const { return {}; }
-  // Materialises lazy children of the node at `box_offset`; the handle re-reads tree() after OVT_OK.
+  // Materialises lazy children of the node at `box_offset`; the handle re-reads tree() after OVT_OK when
+  // tree_revision() changed (or is nullopt).
   virtual ovt_status expand(uint64_t box_offset) {
     (void)box_offset;
     return OVT_E_UNSUPPORTED;
   }
+  // A counter expand() bumps whenever it changes the tree, so the handle skips re-serialising the whole tree after a
+  // no-op expand (an O(tree) cost per call). nullopt: the reader does not track it and every OVT_OK re-reads tree().
+  [[nodiscard]] virtual std::optional<uint64_t> tree_revision() const noexcept { return std::nullopt; }
   // RawVideoFormat FlatBuffer (Y4M and raw readers); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> raw_format() const { return {}; }
   // SampleTable FlatBuffer of `count` samples from `first` (count 0 = all); empty when unsupported.
@@ -58,13 +64,18 @@ class Reader {
 [[nodiscard]] std::unique_ptr<Reader> make_reader(Format f, const io::RandomAccessFile& file,
                                                   ovt_status* why = nullptr);
 
+// Maps the exception being handled to the status a C entry point returns (IoError code, OVT_E_NOMEM, OVT_E_INTERNAL).
+// Call from inside a catch block.
+ovt_status status_of_current_exception() noexcept;
+
 }  // namespace ovt::container
 
 struct ovt_Container {
   ovt_File* file = nullptr;  // not owned; outlives the container
   ovt::container::Format format = ovt::container::Format::Unknown;
   std::unique_ptr<ovt::container::Reader> reader;
-  std::vector<uint8_t> tree;  // serialised ContainerTree, rebuilt after every expand
+  std::vector<uint8_t> tree;          // serialised ContainerTree, rebuilt after every expand
+  ovt::container::ByteService bytes;  // page cache and tree lock of the thread-safe byte service (§8.8)
 };
 
 #endif  // OVT_CONTAINER_CONTAINER_HPP

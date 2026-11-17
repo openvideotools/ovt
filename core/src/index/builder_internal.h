@@ -104,7 +104,8 @@ class BuilderCore {
   void add_pending(uint32_t unit) { pending_.push_back(unit); }
   /// S5 (new frame): finishes the open frame, then opens a frame owning the pending units and `unit`.
   FrameRec& start_frame(uint32_t unit);
-  /// S5 (same frame): `unit` joins the open frame. Precondition: frame_open().
+  /// S5 (same frame): `unit` joins the open frame, after any pending units (they precede it in the stream, e.g.
+  /// the H.264 prefix NAL of a later slice). No-op without an open frame.
   void extend_frame(uint32_t unit);
   /// S7: size accounting and frames.push_back(). No-op without an open frame.
   void finish_frame();
@@ -136,6 +137,8 @@ class CodecDispatch {
 };
 
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch();
+[[nodiscard]] std::unique_ptr<CodecDispatch> make_h264_dispatch();
+[[nodiscard]] std::unique_ptr<CodecDispatch> make_h265_dispatch();
 
 /// S9: fills FrameRec.display_index and returns StreamIndex.display_order (display_order.cpp).
 [[nodiscard]] std::vector<int32_t> assign_display_order(fb::Codec codec, std::vector<FrameRec>& frames);
