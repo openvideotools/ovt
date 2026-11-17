@@ -29,6 +29,15 @@ ToolBar {
         }
         Item { Layout.fillWidth: true }
         Label { text: "100 %"; color: OvtStyle.textMuted; objectName: "statusZoom" }
+        // The display's HDR capability (FR-GUI-016): "SDR", "HDR headroom 4.0×" or "PQ pass-through".
+        Label {
+            objectName: "statusDisplay"
+            text: DisplayCaps.statusText
+            color: OvtStyle.textMuted
+            ToolTip.visible: displayHover.hovered && DisplayCaps.reason !== ""
+            ToolTip.text: DisplayCaps.reason
+            HoverHandler { id: displayHover }
+        }
         Label {
             objectName: "statusJobText"
             visible: JobsModel.foregroundActive

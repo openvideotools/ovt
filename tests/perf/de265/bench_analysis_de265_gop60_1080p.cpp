@@ -183,7 +183,7 @@ int iterations() {
   return std::max(1, static_cast<int>(ovt::perf::min_time_seconds()));
 }
 
-benchmark::internal::Benchmark* configure(benchmark::internal::Benchmark* b) {
+::benchmark::Benchmark* configure(::benchmark::Benchmark* b) {
   return b->Unit(benchmark::kMillisecond)
       ->Iterations(iterations())
       ->Repetitions(ovt::perf::repetitions())
