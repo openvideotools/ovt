@@ -42,6 +42,7 @@ struct MarkView {
 };
 
 // The rectangles of passes 10 and 12 for `cfg`, in draw order (each halo before its line):
+//   Selection, hover (cfg.hovered_block): a round(dpr)-px row-16 band just inside the block's edges, halo outside.
 //   Selection (cfg.selected_block, cfg.selected_mv): the rect of that Block / MotionVector, outlined by a band of
 //     2 x round(dpr) device px of row 15 centred on its edges, with a round(dpr)-px #000000 halo outside (§10.5.2).
 //   Probe (cfg.probe_x/y): a round(dpr)-px row-17 horizontal and vertical line through the sample centre across the

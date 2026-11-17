@@ -258,6 +258,17 @@ TEST_CASE("render_test_overlay_misc marks geometry (§10.5.6 passes 10, 12)", "[
       CHECK_FALSE(covers(rects, edge + 1.0F, mid, white));
     }
   }
+  SECTION("hover outline: 1 px of row 16 inside the block, halo outside, drawn before the selection") {
+    cfg.hovered_block = 8;  // device (128, 128)-(256, 256) at zoom 4
+    cfg.selected_block = 8;
+    ovt::render::detail::build_marks(*set, cfg, mark_view(4.0F, 1.0F), rects);
+    const uint32_t gold = ovt::render::kOverlayColors.at(16);
+    CHECK(covers(rects, 128.0F, 192.0F, gold));
+    CHECK_FALSE(covers(rects, 129.0F, 192.0F, gold));
+    CHECK(covers(rects, 127.0F, 192.0F, ovt::render::kOverlayHalo.at(16)));
+    REQUIRE(!rects.empty());
+    CHECK(rects.back().rgba == white);  // the selection outline is drawn last, over the hover
+  }
   SECTION("a device pixel ratio of 2 doubles the widths") {
     cfg.selected_mv = 1;  // (64, 32)-(80, 48)
     ovt::render::detail::build_marks(*set, cfg, mark_view(4.0F, 2.0F), rects);

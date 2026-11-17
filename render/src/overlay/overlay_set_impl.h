@@ -111,8 +111,8 @@ std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, c
 
 // WI-2.436: the §10.5.2 class of one CellGrid.deblock_bs_v/h value (chapter 6 §6.3: H.264 bS 0..4, HEVC bS 0..2, AV1
 // filter size 0/4/6/8/16, 0xFF unknown): 0 = nothing drawn, 1 = weak (row 13), 2 = strong (row 14).
-// SPEC-ASSUMPTION(#745): §10.5.1 names only "Bs 0 none, 1 weak, 2 strong"; the edges that touch an intra block
-// are strong (H.264 bS 3 and 4, HEVC bS 2) and so is AV1's longest luma filter (16); everything else filtered is weak.
+// The edges that touch an intra block are strong (H.264 bS 3 and 4, HEVC bS 2) and so is AV1's longest luma filter
+// (16); everything else filtered is weak (§10.5.2 rows 13/14, #745).
 OVT_RENDER_API uint8_t deblock_edge_class(IntraCodec codec, uint8_t value);
 
 }  // namespace detail

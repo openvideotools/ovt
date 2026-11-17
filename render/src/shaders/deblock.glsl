@@ -7,8 +7,7 @@
 // `halo` (kOverlayHalo, one texel per row). Each edge is a band of round(dpr) device px snapped like the grid lines
 // (start = round(edge) - floor(width / 2)), with the row's 1-px halo on both sides. The pass runs only when a cell is
 // at least 8 device px (§10.5.1), so the nearest cell boundary is the only edge a pixel can touch.
-// SPEC-ASSUMPTION(#745): §10.5.1 describes a line list; the per-cell texture draws the same bands, bounded by the
-// viewport's pixels instead of a 24 MB worst-case list, with no rebuild on zoom or pan.
+// The per-cell texture (§10.5.1, #745) keeps the cost bounded by the viewport's pixels, with no rebuild on zoom or pan.
 
 const int kRowWeak = 13;  // Deblock Bs = 1; row 14 = Bs 2
 

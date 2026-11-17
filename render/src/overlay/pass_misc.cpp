@@ -22,6 +22,7 @@ namespace ovt::render::detail {
 namespace {
 
 constexpr size_t kRowSelection = 15;
+constexpr size_t kRowHover = 16;
 constexpr size_t kRowProbe = 17;
 constexpr size_t kRowSelectionRect = 18;
 constexpr int kFloatsPerVertex = 6;  // x, y (device px), r, g, b, a
@@ -75,6 +76,17 @@ void selection_outline(std::vector<MarkRect>& out, const MarkView& v, const std:
                               static_cast<float>(r[3]));
   ring(out, grow(edge, 2.0F * unit), grow(edge, unit), kOverlayHalo.at(kRowSelection));
   ring(out, grow(edge, unit), grow(edge, -unit), kOverlayColors.at(kRowSelection));
+}
+
+// Pass 10: a 1-unit row-16 band just inside the block's edges with its #000000 halo just outside (§10.5.2).
+void hover_outline(std::vector<MarkRect>& out, const MarkView& v, const std::array<int32_t, 4>& r, float unit) {
+  if (r[2] <= r[0] || r[3] <= r[1]) {
+    return;
+  }
+  const Box edge = device_box(v, static_cast<float>(r[0]), static_cast<float>(r[1]), static_cast<float>(r[2]),
+                              static_cast<float>(r[3]));
+  ring(out, grow(edge, unit), edge, kOverlayHalo.at(kRowHover));
+  ring(out, edge, grow(edge, -unit), kOverlayColors.at(kRowHover));
 }
 
 // Pass 12: the crosshair through the centre of sample (x, y), across the drawn picture.
@@ -193,8 +205,10 @@ void build_marks(const OverlaySet& set, const OverlayConfig& cfg, const MarkView
   out.clear();
   const float unit = std::max(1.0F, std::round(view.dpr));
   if (on(cfg.layers, OverlayLayer::Selection)) {
-    // SPEC-ASSUMPTION(#746): the hover outline (row 16) needs a hovered block, which OverlayConfig does not carry;
-    // pass 10 draws the selection only. selected_mv outlines MotionVector.rect.
+    // Hover first, then the selection (§10.5.6 pass 10); selected_mv outlines MotionVector.rect (#746).
+    if (cfg.hovered_block < set.block_rects.size()) {
+      hover_outline(out, view, set.block_rects[cfg.hovered_block], unit);
+    }
     if (cfg.selected_block < set.block_rects.size()) {
       selection_outline(out, view, set.block_rects[cfg.selected_block], unit);
     }
