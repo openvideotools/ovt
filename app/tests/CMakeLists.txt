@@ -30,7 +30,10 @@ add_executable(
   models/test_bookmarks_model.cpp
   models/test_sample_streams.cpp
   models/test_picture_controller.cpp
+  models/test_hdr_metadata_model.cpp
   ../src/picture_controller.cpp
+  ../src/models/hdr_metadata_model.cpp
+  ../../core/src/syntax/common/h273_names.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
   ../src/goto_parser.cpp
@@ -61,7 +64,7 @@ qt_add_resources(
   FILES
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json"
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
-target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models .)
+target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models . ../../core/src)
 target_link_libraries(
   ovt_tests_app_models
   PRIVATE Qt6::Core

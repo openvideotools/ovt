@@ -270,6 +270,49 @@ TEST_CASE("index_builder_h265: open GOP with leading pictures", "[index][h265][f
   CHECK(si.diagnostics() == nullptr);
 }
 
+// #695: the stream is cut so that it starts with its parameter sets and the CRA. That CRA then has
+// NoRaslOutputFlag = 1 and no decoder outputs its RASL pictures, so the index does not show them either.
+TEST_CASE("index_builder_h265: RASL pictures of a CRA that starts the stream are not shown", "[index][h265][fast]") {
+  const Bytes stream = seed("seed_3_h265_open_gop.bin");
+  Bytes cut;
+  bool at_cra = false;
+  size_t start = 0;
+  const auto nal_type = [&stream](size_t code) {
+    const size_t header = code + (stream[code + 2] == 1 ? 3U : 4U);
+    return header < stream.size() ? (stream[header] >> 1U) & 0x3FU : 0x3FU;
+  };
+  const auto is_start_code = [&stream](size_t i) {
+    return i + 3 <= stream.size() && stream[i] == 0 && stream[i + 1] == 0 &&
+           (stream[i + 2] == 1 || (i + 4 <= stream.size() && stream[i + 2] == 0 && stream[i + 3] == 1));
+  };
+  for (size_t i = 1; i <= stream.size(); ++i) {
+    if (i < stream.size() && (!is_start_code(i) || is_start_code(i - 1))) {
+      continue;
+    }
+    const unsigned type = nal_type(start);
+    at_cra = at_cra || type == 21;
+    if (at_cra || (type >= 32 && type <= 34)) {  // VPS, SPS, PPS
+      cut.insert(cut.end(), stream.begin() + static_cast<std::ptrdiff_t>(start),
+                 stream.begin() + static_cast<std::ptrdiff_t>(i));
+    }
+    start = i;
+  }
+  const Bytes index = index_annexb(cut, fb::Codec::H265);
+  const fb::StreamIndex& si = root(index);
+  REQUIRE(si.frames()->size() == 8);  // the CRA and the seven pictures after it
+  size_t hidden = 0;
+  for (const fb::FrameInfo* f : *si.frames()) {
+    const bool rasl = f->id()->decode_index() == 1 || f->id()->decode_index() == 2;
+    CHECK(f->shown() == !rasl);
+    CHECK((f->id()->display_index() == -1) == rasl);
+    hidden += f->shown() ? 0U : 1U;
+  }
+  CHECK(hidden == 2);
+  CHECK(si.display_order()->size() == 6);
+  CHECK(si.frames()->Get(0)->is_rap());
+  CHECK(si.frames()->Get(0)->id()->display_index() == 0);
+}
+
 TEST_CASE("index_builder_h26x: slices without parameter sets become frames of type Unknown",
           "[index][h264][h265][fast]") {
   struct Case {
@@ -435,10 +478,10 @@ TEST_CASE("index_vs_ffprobe: conformance streams", "[index][h264][h265][fast][ne
       // WPP_A has one slice of several dependent segments per picture; the others are single-slice streams.
       {"jctvc_WPP_A_ericsson_MAIN_2", fb::Codec::H265, "hevc", {true, true, 1}},
       {"jctvc_AMP_A_Samsung_7", fb::Codec::H265, "hevc", {true, true, 1}},
-      // RAP_A starts with a CRA whose RASL pictures FFmpeg drops; NoOutPrior_A discards pictures with
-      // no_output_of_prior_pics_flag. The index keeps both kinds (§7.3.10.2, WI-1.123).
-      {"jctvc_RAP_A_docomo_6", fb::Codec::H265, "hevc", {true, false, 1}},
+      // RAP_A starts with a CRA whose RASL pictures no decoder outputs: not shown in the index either (#695).
+      {"jctvc_RAP_A_docomo_6", fb::Codec::H265, "hevc", {true, true, 1}},
       {"jctvc_POC_A_Bossen_3", fb::Codec::H265, "hevc", {true, true, 1}},
+      // NoOutPrior_A discards pictures with no_output_of_prior_pics_flag; the index keeps them (WI-1.123).
       {"jctvc_NoOutPrior_A_Qualcomm_1", fb::Codec::H265, "hevc", {true, false, 1}},
   }};
   compare_corpus_streams(cases);

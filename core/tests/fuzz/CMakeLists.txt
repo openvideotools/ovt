@@ -142,6 +142,8 @@ ovt_add_fuzz_target(av1_frame_boundary fuzz_av1_frame_boundary.cpp)
 
 # WI-1.121: the StreamIndex builder end to end (unit scan -> add_unit -> finish -> validate_stream_index).
 ovt_add_fuzz_target(index_builder fuzz_index_builder.cpp)
+# WI-1.121: the Stream C API (bytes -> ovt_container_open -> ovt_stream_open -> ovt_stream_build_index).
+ovt_add_fuzz_target(stream_api fuzz_stream_api.cpp)
 
 # The canary (WI-0.033): inert unless OVT_FUZZ_CANARY is set, then it aborts on its seed. fuzz_canary_trips passes
 # only if that replay crashes (expect_crash.cmake; WILL_FAIL cannot invert a signal). Label `canary`: no lane runs it.
