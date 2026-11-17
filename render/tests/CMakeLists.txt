@@ -136,6 +136,9 @@ target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
 
 # WI-2.435: id buffer, readback and pick() (§10.5.7), probe colour math (§10.6.3).
 target_sources(ovt_tests_render PRIVATE test_pick.cpp)
+# WI-2.436: deblocking edges, reference-index fill and selection / probe / rectangle passes (§10.5.6 passes 3, 7, 10, 12),
+# goldens tests/golden/render/{deblock_edges,refidx_fill,selection}.png; fixture in fixtures/make_misc.cpp.
+target_sources(ovt_tests_render PRIVATE test_overlay_misc.cpp fixtures/make_misc.cpp)
 target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
 
 # WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2). The transform tests are CPU
