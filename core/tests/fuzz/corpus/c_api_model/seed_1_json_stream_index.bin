@@ -1,0 +1,131 @@
+{
+  "codec": "H265",
+  "schema_version": 1,
+  "source_hash": "3b424950575e656c737a81888f969da4abb2b9c0c7ced5dce3eaf1f8ff060d14",
+  "units": [
+    {
+      "index": 0,
+      "file_span": {
+        "offset": 4,
+        "length": 143
+      },
+      "prefix_span": {
+        "offset": 0,
+        "length": 4
+      },
+      "type": 19,
+      "type_name": "IDR_W_RADL",
+      "layer_id": 0,
+      "temporal_id": 0,
+      "frame": {
+        "decode_index": 0,
+        "display_index": 0
+      },
+      "sample_index": -1
+    },
+    {
+      "index": 1,
+      "file_span": {
+        "offset": 151,
+        "length": 143
+      },
+      "prefix_span": {
+        "offset": 147,
+        "length": 4
+      },
+      "type": 1,
+      "type_name": "TRAIL_R",
+      "layer_id": 0,
+      "temporal_id": 0,
+      "frame": {
+        "decode_index": 1,
+        "display_index": 1
+      },
+      "sample_index": -1
+    }
+  ],
+  "frames": [
+    {
+      "id": {
+        "decode_index": 0,
+        "display_index": 0
+      },
+      "type": "I",
+      "shown": true,
+      "show_existing_of": -1,
+      "structure": "Frame",
+      "temporal_id": 0,
+      "layer_id": 0,
+      "is_rap": true,
+      "poc": 0,
+      "pts": 0,
+      "dts": 0,
+      "timebase_num": 1,
+      "timebase_den": 90000,
+      "size_bytes": 147,
+      "units": [
+        0
+      ],
+      "coded_size": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "chroma_format": 0,
+      "bit_depth_luma": 0,
+      "bit_depth_chroma": 0,
+      "qp_base": 32,
+      "frame_num": -1,
+      "slice_count": 0
+    },
+    {
+      "id": {
+        "decode_index": 1,
+        "display_index": 1
+      },
+      "type": "P",
+      "shown": true,
+      "show_existing_of": -1,
+      "structure": "Frame",
+      "temporal_id": 0,
+      "layer_id": 0,
+      "is_rap": false,
+      "poc": 1,
+      "pts": 3600,
+      "dts": 0,
+      "timebase_num": 1,
+      "timebase_den": 90000,
+      "size_bytes": 147,
+      "units": [
+        1
+      ],
+      "coded_size": {
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "chroma_format": 0,
+      "bit_depth_luma": 0,
+      "bit_depth_chroma": 0,
+      "qp_base": 32,
+      "declared_refs": [
+        0
+      ],
+      "frame_num": -1,
+      "slice_count": 0
+    }
+  ],
+  "display_order": [
+    0,
+    1
+  ],
+  "diagnostics": [
+    {
+      "severity": "Warning",
+      "code": "SYN-H265-0007",
+      "message": "tab\there, quote \" and µ"
+    }
+  ]
+}

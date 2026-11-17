@@ -25,7 +25,7 @@
 
 | Schema file | `root_type` | `file_identifier` | Other root tables and their identifier (passed explicitly to `Finish()`) |
 |---|---|---|---|
-| `ovt_model.fbs` | `FrameAnalysis` | `"OVTA"` | `StreamIndex` → `"OVTI"`, standalone `SyntaxNode` → `"OVTS"`, `CliEnvelope` → `"OVTE"`, `PluginList` → `"OVTP"` (CLI report tables, §6.3 end; chapter 12) |
+| `ovt_model.fbs` | `FrameAnalysis` | `"OVTA"` | `StreamIndex` → `"OVTI"`, standalone `SyntaxNode` → `"OVTS"`, `CliEnvelope` → `"OVTE"`, `PluginList` → `"OVTP"`, `DiagnosticList` → `"OVTD"` (CLI report tables, §6.3 end; chapter 12) |
 | `ovt_container.fbs` | `ContainerRoot` | `"OVTC"` | — (`ContainerTree` is nested in `ContainerRoot.tree`; §6.4) |
 | `ovt_metrics.fbs` | `MetricsReport` | `"OVTR"` | `MetricsResult` → `"OVTM"` |
 
@@ -876,6 +876,8 @@ table HrdTrace      { frame:[HrdPoint]; bit_rate_bps:ulong; cpb_size_bits:ulong;
                       diagnostics:[Diagnostic]; }                                      // used by chapter 12 §12.2.21 (`ovt hrd`); built by chapter 7 WI-4.112
 table DoctorReport  { build_json:string; plugins:PluginList; hw_decoders:[string]; gpu_json:string; displays_json:string; cpu_features:[string];
                       env:[string]; cache:CacheReport; }                                // used by chapter 12 §12.2.16 (`ovt doctor`)
+
+table DiagnosticList { diagnostics:[Diagnostic]; }                                    // root table, file_identifier "OVTD"; used by chapter 12 §12.3 (`ovt_validate_*`, `ovt_container_validate`, `ovt_BdResult.diagnostics`): the findings of one call
 
 root_type FrameAnalysis;
 file_identifier "OVTA";
