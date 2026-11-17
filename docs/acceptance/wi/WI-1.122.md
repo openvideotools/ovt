@@ -66,7 +66,9 @@ entries. Acceptance test 3 is therefore covered synthetically:
 
 ## Running the tests
 
-    ctest --preset linux-x64-debug -R "h264_dpb|h264_reflist_vs_jm" --output-on-failure
+```sh
+ctest --preset linux-x64-debug -R "h264_dpb|h264_reflist_vs_jm" --output-on-failure
+```
 
 The ctest names are the Catch2 names (`h264_dpb: …`, `h264_reflist_vs_jm: …`), not the executable name
 `ovt_tests_index_h264_dpb`. The corpus cases need `OVT_CORPORA_DIR`; until #738 (V-031) merges, apply its
