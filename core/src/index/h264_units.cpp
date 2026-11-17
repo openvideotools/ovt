@@ -3,8 +3,10 @@
 //
 // H.264 dispatch of the StreamIndex builder (chapter 7 §7.4.2 S2–S6, WI-1.121): one NAL unit at a time through
 // the §7.3.4 parsers, the parameter-set activation of §7.3.8, the frame-boundary rules of §7.3.9 and the picture
-// order count of §7.3.10.1. The DPB model is a stub until WI-1.122.
+// order count of §7.3.10.1. The DPB model is a stub until WI-1.122. WI-1.125 adds the lazy trees of §7.4.5 and the
+// lazy EPB stripping of §7.4.6.
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -17,7 +19,7 @@
 #include "index/builder_internal.h"
 #include "index/frame_classify.h"
 #include "index/h264_index.h"
-#include "ovt/cxx/rbsp.hpp"
+#include "index/lazy_syntax.h"
 #include "ovt/cxx/syntax/h264/active_sets.hpp"
 #include "ovt/cxx/syntax/h264/aud.hpp"
 #include "ovt/cxx/syntax/h264/data_partition.hpp"
@@ -38,6 +40,7 @@ using namespace syntax::h264;  // NOLINT(google-build-using-namespace): the §7.
 
 constexpr std::string_view kDiagNoParameterSets = "SYN-GEN-0102";   // Warning, §7.4.7
 constexpr std::string_view kMissingParameterSet = "SYN-H264-0010";  // thrown by parse_slice_header()
+constexpr std::string_view kReaderOverrun = "BR-0001";              // a read past the stripped prefix
 
 // vui_parameters() timing as the elementary-stream time base of chapter 6 §6.2.6: a frame is two ticks.
 std::optional<StreamTiming> stream_timing(const Sps& sps) {
@@ -53,26 +56,34 @@ std::optional<StreamTiming> stream_timing(const Sps& sps) {
 class H264Dispatch final : public CodecDispatch {
  public:
   void on_unit(BuilderCore& core, uint32_t unit, std::span<const uint8_t> bytes) override {
-    Rbsp rbsp = rbsp_from_nal(bytes);  // S2
-    BitReader br(rbsp.rbsp);
-    syntax::SyntaxBuilder sb(br);
-    try {
-      parse(core, unit, br, sb, rbsp.rbsp);
-    } catch (const ParseError& err) {
-      core.unit_diagnostic(unit, diag_from(err));
-      if (vcl_ && err.code == kMissingParameterSet) {
-        place_unknown(core, unit);
+    // §7.4.5 / §7.4.6 (WI-1.125): the tree is recorded as BuilderCore::record_full_tree says. A slice parsed for its
+    // values only has its EPBs stripped lazily, 2 KiB at a time, until its header is in (S2); slice data
+    // partitions B and C are placed before they are parsed, so they are stripped whole.
+    const uint32_t peek_type = bytes.empty() ? 0U : (bytes[0] & 0x1FU);
+    const bool vcl = h264::is_vcl(peek_type);
+    // first_mb_in_slice == 0 (ue(v): a leading 1 bit) after the one-byte header, or the three further header bytes
+    // of nal_unit_type 20 / 21, is the peek for "starts a picture"; partitions B / C continue one.
+    const size_t header_bytes = peek_type == 20 || peek_type == 21 ? 4 : 1;
+    const bool starts =
+        vcl && peek_type != 3 && peek_type != 4 && bytes.size() > header_bytes && (bytes[header_bytes] & 0x80U) != 0;
+    const bool record = core.record_full_tree(unit, vcl, starts);
+    const bool lazy = vcl && !record && peek_type != 3 && peek_type != 4 && bytes.size() > core.lazy_strip_chunk;
+    rbsp_.reset(bytes);
+    for (size_t limit = lazy ? core.lazy_strip_chunk : bytes.size();; limit = std::min(limit * 2, bytes.size())) {
+      rbsp_.extend(limit);
+      if (attempt(core, unit, record, lazy && limit < bytes.size())) {
+        break;
       }
-      // Any other unit whose header did not parse belongs to no frame (S4 "continue with next unit").
+      set_diags_.clear();  // the next attempt reports them again
     }
+    rbsp_.scan_rest();
     for (SetDiagnostic& d : set_diags_) {
       core.unit_diagnostic(unit, DiagRec{d.severity, std::move(d.code), std::move(d.message), BitSpan{0, 0}});
     }
     set_diags_.clear();
-    UnitRec& u = core.units[unit];
-    u.epb_positions = std::move(rbsp.epb_positions);
-    u.header = sb.finish();
-    u.header.set_root_name("nal_unit");
+    if (!rbsp_.epb_positions().empty()) {
+      core.units[unit].epb_positions = rbsp_.epb_positions();
+    }
   }
 
   void end_of_stream(BuilderCore& core) override {
@@ -95,6 +106,30 @@ class H264Dispatch final : public CodecDispatch {
     } else {
       non_vcl(core, unit, br, sb, h, rbsp);
     }
+  }
+
+  // One parse of the stripped bytes (S3, S4). Returns false when the header ran past a lazily stripped prefix
+  // (BR-0001) and `may_extend` allows another attempt; parse() mutates no state before the slice header is in.
+  bool attempt(BuilderCore& core, uint32_t unit, bool record, bool may_extend) {
+    BitReader br(rbsp_.rbsp());
+    syntax::SyntaxBuilder sb(br);
+    sb.set_recording(record);
+    try {
+      parse(core, unit, br, sb, rbsp_.rbsp());
+    } catch (const ParseError& err) {
+      if (may_extend && err.code == kReaderOverrun) {
+        return false;
+      }
+      core.unit_diagnostic(unit, diag_from(err));
+      if (vcl_ && err.code == kMissingParameterSet) {
+        place_unknown(core, unit);
+      }
+      // Any other unit whose header did not parse belongs to no frame (S4 "continue with next unit").
+    }
+    UnitRec& u = core.units[unit];
+    u.header = sb.finish();
+    u.header.set_root_name("nal_unit");
+    return true;
   }
 
   // S4 for a non-VCL unit. It is placed before it is parsed, so that a parse error leaves it in its access unit.
@@ -287,6 +322,7 @@ class H264Dispatch final : public CodecDispatch {
     buffering_period_sps_id_.reset();
   }
 
+  LazyRbsp rbsp_;  // the unit being parsed, EPBs stripped (S2)
   ActiveSets sets_;
   h264::FrameBoundary boundary_;
   h264::PocState poc_;

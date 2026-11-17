@@ -532,7 +532,7 @@ HDR10+ (ST 2094-40, `Picture.hdr10plus_payload`): parsed by `render/src/color/hd
 
 **Decision (binding, from the task brief):** the video surface uses **libplacebo → Vulkan → MoltenVK → CAMetalLayer**; Qt keeps its default Metal backend and an SDR swapchain. Qt's own `QRhiSwapChain::HDRExtendedSrgbLinear` is **not** used, because (a) it would make the whole QQuickWindow HDR and all QML chrome would need SDR-white scaling (Appendix B.4, QTBUG-134590), (b) libplacebo's MoltenVK path is the one mpv ships and tests (https://github.com/mpv-player/mpv/discussions/14138).
 
-Native target creation (app side, Chapter 11 §11.2.1): the Picture panel creates a child `QWindow` with `setSurfaceType(QSurface::MetalSurface)`, parented to the main `QQuickWindow`, geometry = panel rect in device-independent pixels. `app/src/platform/mac_layer.mm` obtains the layer:
+Native target creation (app side, Chapter 11 §11.2.1): the Picture panel creates a child `QWindow` with `setSurfaceType(QSurface::MetalSurface)`, parented to the main `QQuickWindow`, geometry = panel rect in device-independent pixels. `app/src/platform/mac_native_host.mm` (WI-1.463) obtains the layer:
 
 ```objc
 NSView* view = reinterpret_cast<NSView*>(window->winId());
@@ -809,7 +809,7 @@ Id-buffer readback: after each `render()`, the surface issues `pl_tex_download` 
 | Plane upload (10-bit 4:2:0 as R16: 16.6 + 8.3 MB) | ≤ 2.0 ms | `pl_upload_plane` with persistent staging; skipped when `generation` unchanged |
 | libplacebo render (4K → 1080p viewport, bilinear, no peak detect) | ≤ 4.0 ms | `pl_render_image`; shader cache `pl_cache` saved to `~/.cache/ovt/plcache.bin` |
 | Cell attribute + heatmap textures (2 MB + 1 MB) | ≤ 0.5 ms | built on a worker thread, uploaded with `pl_tex_upload` |
-| MV instance textures (16.6 MB) | ≤ 3.0 ms build (4 threads, SoA → texel), ≤ 1.0 ms upload | built on worker threads in `OverlayBuilder::build()`; cached per (decode_index, mv_scale) in a GPU LRU of 8 frames |
+| MV instance textures (16.6 MB) | ≤ 3.0 ms build (4 threads, SoA → texel), ≤ 1.0 ms upload | built on worker threads in `OverlayBuilder::build()`; cached per (decode_index, frame fingerprint, config) in a per-surface LRU of 8 built sets of CPU arrays (#706) |
 | Arrow pass (4.67 M vertices, K = 9) | ≤ 3.0 ms | vertex pulling; off-screen instances collapsed |
 | Grid lines (≤ 0.46 M vertices) | ≤ 0.5 ms | viewport culling R-GRID-1 |
 | Labels (≤ 36 k glyphs) | ≤ 0.3 ms | SDF atlas |
@@ -1070,7 +1070,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 ### WI-1.406 — macOS EDR native target (MoltenVK swapchain on CAMetalLayer)
 **Goal:** NATIVE mode on macOS with `ScRgbLinear16F` and "system PQ" options.
 **Depends on:** WI-1.403.
-**Produces:** `render/src/platform/macos_metal.mm`, `render/tests/manual_edr_pattern.cpp` (manual); the app-side glue `app/src/platform/mac_layer.mm` (child `QWindow(MetalSurface)` → `CAMetalLayer*`) is delivered by WI-1.463 (chapter 11) against the `DisplayTarget` contract of this WI.
+**Produces:** `render/src/platform/macos_metal.mm`, `render/tests/manual_edr_pattern.cpp` (manual); the app-side glue `app/src/platform/mac_native_host.mm` (child `QWindow(MetalSurface)` → `CAMetalLayer*`) is delivered by WI-1.463 (chapter 11) against the `DisplayTarget` contract of this WI.
 **Interface:** §10.4.1.
 **Steps:** 1. Child `QWindow(MetalSurface)` in the app; obtain `CAMetalLayer`. 2. Layer properties per §10.4.1; `vkCreateMetalSurfaceEXT`; `pl_vulkan_create_swapchain` with the HDR format pair; fallback to `B8G8R8A8 + SRGB_NONLINEAR`. 3. `retarget()` between EMBEDDED and NATIVE. 4. Headroom polling and `retarget` on change. 5. Manual tool renders `pq_patches_1000`.
 **Acceptance tests:** 1. Given an XDR display with HDR enabled, When NATIVE mode is entered, Then `active_encoding() == ScRgbLinear16F` and the 1000-nit patch is measured ≥ 4× the 203-nit patch luminance (colorimeter) or visibly brighter than UI white. 2. Given an SDR external display (a target whose `DisplayTarget.hdr_capable == false`, the field `display_probe()` fills, §10.2.2), When NATIVE requested, Then `init()` falls back to `Srgb8` without raising `RND-0040` (the `DisplayCaps.hdr_capable == false` half is WI-1.407 AT1, #470).
@@ -1241,15 +1241,15 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Size:** S.
 **Notes / pitfalls:** the selection outline is drawn in device pixels (2 px + 1 px halo) regardless of zoom; ref-index fills use the LUT indices 22–29 of §10.5.2, not the heatmap LUT.
 
-### WI-2.437 — GPU overlay cache and `set_overlays` lifecycle
-**Goal:** LRU of 8 built `OverlaySet`s keyed by (decode_index, config hash) to make overlay toggling ≤ 1 frame.
+### WI-2.437 — Overlay cache and `set_overlays` lifecycle
+**Goal:** Per-surface LRU of 8 built `OverlaySet`s (CPU arrays shared by handles; 256 MB desktop, 64 MB Android) keyed by (`decode_index`, 64-bit frame fingerprint, hash of the `OverlayConfig` fields that change built data, hash of the host's `custom_cells` when the heatmap reads them) to make overlay toggling ≤ 1 frame. The fingerprint covers `FrameInfo` `display_index`, `poc`, `pts`, `dts`, `size_bytes`, `type`, `coded_size`, `plugin_id`/`plugin_version`, grid size and the block/MV/partition counts, so another file or a re-analysis never hits a stale entry; the masked config is also compared field by field (#706).
 **Depends on:** WI-2.434.
 **Produces:** `render/src/overlay/overlay_cache.cpp`, `render/tests/test_overlay_cache.cpp`.
 **Interface:** `set_overlays`, `OverlaySet` opaque.
-**Steps:** 1. Hash `OverlayConfig` fields that affect GPU data (not selection/probe). 2. LRU with byte budget (256 MB desktop, 64 MB Android). 3. Eviction tests.
+**Steps:** 1. Frame fingerprint and hash of the `OverlayConfig` fields that affect built data (not selection/probe). 2. LRU of built CPU arrays with byte budget (256 MB desktop, 64 MB Android); `set_overlays()` uploads the GPU textures (≤ 1.0 ms, §10.5.8) and keeps them when the new handle shares arrays already on the GPU. 3. Eviction tests.
 **Acceptance tests:** 1. Given 10 frames built in sequence, When frame 1 is requested again, Then it is rebuilt (evicted) and frame 10 is a hit.
 **Size:** S.
-**Notes / pitfalls:** selection, probe and `selection_rect` are *not* part of the cache key (they are uniforms); `mv_scale` is, because the instance textures bake it in.
+**Notes / pitfalls:** draw-time uniforms are *not* part of the cache key: the selection/probe/selection-rect bits, `selected_block`, `selected_mv`, `selection_rect`, `probe_x/y`, `heatmap_alpha`, `lut`, `label_zoom_threshold`, `mv_min_px`, `line_px` (#706); `mv_scale` is, because the instance arrays bake it in.
 
 ### WI-2.438 — Overlay performance benchmarks (`bench_overlay_*`) and budget enforcement
 **Goal:** Extend WI-1.415 with overlay fixtures and the §10.5.8 step table.
