@@ -64,8 +64,7 @@ class Av1Dispatch final : public CodecDispatch {
     } catch (const ParseError& err) {
       core.unit_diagnostic(unit, diag_from(err));
     }
-    core.units[unit].header = sb.finish();
-    core.units[unit].header.set_root_name("open_bitstream_unit");
+    core.store_tree(unit, sb.finish(), "open_bitstream_unit");
     if (parsed) {
       place(core, unit, e, std::move(frame_header));  // S5
     }

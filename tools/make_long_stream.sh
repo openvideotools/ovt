@@ -6,8 +6,9 @@
 # about 108 000 frames) for bench_index_h264_1h_1080p. It is the recipe-27 file of tests/corpora/synthetic/recipes.json
 # (chapter 16 §16.3.5: the recipe replaces a hand-written encode), produced through the synthetic generator so that
 # the bytes are deterministic (lavfi testsrc2 source, x264 with fixed settings and the pinned tool versions of the
-# recipe file) and never committed. The file lands in the corpus cache (or --out) as syn_h264_1h_1080p.264; point
-# $OVT_CORPORA_DIR at that directory for the benchmark.
+# recipe file) and never committed. The file lands in the corpus cache (or --out) at
+# syn_h264_1h_1080p/syn_h264_1h_1080p.264, the layout of every fetched or generated corpus; point $OVT_CORPORA_DIR
+# at that cache directory for the benchmark. Nothing is written under the repository.
 #
 #   tools/make_long_stream.sh [--out <dir>] [--check]
 #
@@ -29,6 +30,5 @@ done
 for tool in ffmpeg x264; do
   command -v "$tool" >/dev/null 2>&1 || { echo "make_long_stream.sh: $tool is not installed" >&2; exit 2; }
 done
-# The 1080p source fixture first (300 frames of testsrc2; the recipe loops it 360 times), then the recipe itself.
-python3 -I "$generator" --fixtures --local-only "${out[@]}"
+# The recipe needs the 1080p source (300 frames of testsrc2, looped 360 times); the generator makes it first.
 python3 -I "$generator" --only syn_h264_1h_1080p --local-only "${out[@]}" "${check[@]}"

@@ -121,6 +121,12 @@ struct SyntaxBufferState {
   size_t node_count = 0;  // nodes below the root
 };
 
+/// Writes a copy of `node` (a SyntaxNode table in any FlatBuffer, finished or under construction) into `fbb`, in
+/// the same order and with the same string sharing as to_flatbuffer(fbb) uses, so that a copy of a tree serialises
+/// like the tree itself: the partial index and the replayed tree of chapter 7 §7.4.6 (WI-1.125) copy the trees
+/// the index builder already holds in its own buffer.
+flatbuffers::Offset<fb::SyntaxNode> copy_syntax_node(flatbuffers::FlatBufferBuilder& fbb, const fb::SyntaxNode& node);
+
 class SyntaxNodeBuffer {
  public:
   SyntaxNodeBuffer() noexcept;

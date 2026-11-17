@@ -134,9 +134,7 @@ class H265Dispatch final : public CodecDispatch {
       }
       // Any other unit whose header did not parse belongs to no frame (S4 "continue with next unit").
     }
-    UnitRec& u = core.units[unit];
-    u.header = sb.finish();
-    u.header.set_root_name("nal_unit");
+    core.store_tree(unit, sb.finish(), "nal_unit");
     return true;
   }
 

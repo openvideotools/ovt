@@ -55,6 +55,9 @@ struct BuilderOptions {
   /// §7.4.6 lazy EPB stripping: raw bytes stripped per step for a VCL unit parsed without a tree (the stripped
   /// prefix doubles while the header runs past it). 2 KiB; tests lower it to exercise the retry.
   size_t lazy_strip_chunk = size_t{2} << 10U;
+  /// §7.4.6 memory: the number of units (and frames) to reserve records and index memory for up front, so that
+  /// neither grows while the stream is fed; a hint, any count works. 0 = the defaults.
+  size_t expected_units = 0;
 };
 
 /// Thrown by the constructor for a codec the index has no dispatch for.
