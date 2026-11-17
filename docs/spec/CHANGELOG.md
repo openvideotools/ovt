@@ -2,6 +2,17 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc42 — 2026-11-17
+
+PATCH-level: spec-amendment pass 22 folds in the accepted answers of `spec-question` issues #690 from WI-1.465, #695 from WI-2.165, #706 from WI-2.437 and #702 from WI-1.463, and splits the HDR monitor window out of WI-1.463 as WI-1.463b (§16.2.6). No new diagnostic code. No FlatBuffers schema, plugin ABI, public C header or CLI grammar change.
+
+- 11 WI-1.465 AT1, 14 WI-1.576 AT3 — the `gui` CI job runs `ctest -L gui`, the Catch2 `app/tests/testipc` tests and `app/tests/scripts/test_test_ipc.py` against the built `ovt-studio`; interaction scripts 2 and 5 against the real `ovt-studio` through the WI-1.465 test-IPC server move to WI-1.576 AT3 — WI-1.465 (#690)
+- 7 §7.6 H.265 output process, S6 — RASL pictures of a CRA whose `NoRaslOutputFlag = 1` comes from the bitstream itself (`PocResult::rasl_skipped`) are `shown = false`, `display_index = −1` and raise no Diagnostic; other CRAs are output normally; `SYN-H265-0101` stays on the analysis path — WI-2.165 (#695)
+- 10 §10.5.8 row, WI-2.437 title, Goal, steps and notes, 16 §16.4 row — overlay sets are cached per (`decode_index`, 64-bit frame fingerprint, masked `OverlayConfig` hash) in a per-surface LRU of 8 built sets of CPU arrays; `set_overlays()` uploads the GPU textures; draw-time uniforms are not part of the key — WI-2.437 (#706)
+- 10 §10.4.1, WI-1.406 Produces — the app-side glue is `app/src/platform/mac_native_host.mm` (was `mac_layer.mm`) — WI-1.463 (#702)
+- 11 WI-1.463 Overlap, Produces, steps and notes — desktop popup rule: where `Popup.Window` is unavailable only a popup intersecting the picture rect hides the NATIVE child window, focus loss keeps NATIVE (§11.5.5 item 3 stays Android-specific); `render/src/surface/video_surface_impl.cpp` added so that `retarget()` to NATIVE is accepted from the `MetalTexture` state — WI-1.463 (#702)
+- 11 new WI-1.463b block, §11.2.3 View menu, 16 §16.4 row and M1.4 list, 4 FR-HDR-007 and FR-HDR-101 WI claims — HDR monitor window split from WI-1.463 step 4 (§16.2.6), size S, depends on WI-1.463 and WI-2.171, `View ▸ HDR monitor window` (checkable, desktop only) — WI-1.463b (#702)
+
 ## 1.0.0-rc41 — 2026-11-16
 
 PATCH-level: spec-amendment pass 21 folds in the accepted answers of `spec-question` issues #673 from WI-1.509, #674 points 2 to 4 from the C-API follow-up of #673, #675 from WI-1.207, #676, #677 and #678 from WI-1.208, #682 from WI-1.462, #683 from WI-1.234, #670, #671 and #672 from WI-1.211 and #623 from WI-1.408/WI-1.410, and records the WI-1.501 schema regeneration of PR #668. No new diagnostic code. No FlatBuffers schema, plugin ABI or CLI grammar change in this pass; the `DiagnosticList` table of #674 point 1 lands with its implementing PR (schema and §6.3 block together), and the public headers `ovt/validate.h` and `ovt/syntax.h` of #673/#674 go through the Fable reviewer on that PR.
