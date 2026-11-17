@@ -8,6 +8,7 @@
 #ifndef OVT_INDEX_BUILDER_INTERNAL_H
 #define OVT_INDEX_BUILDER_INTERNAL_H
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -50,6 +51,15 @@ struct UnitRec {
   std::optional<SampleTiming> timing;
 };
 
+/// One entry of a reference list of a frame's first slice (§7.4.4: the "RefSlot names L0[i] / L1[i]" kept privately
+/// for the plugin host and the GOP graph; not serialised).
+struct RefSlotRec {
+  int32_t decode_index = -1;  // -1: an H.264 non-existing frame
+  int64_t poc = 0;            // of the referenced frame, or of the field for a field reference
+  fb::PictureStructure structure = fb::PictureStructure::Frame;  // Frame, TopField or BottomField
+  bool long_term = false;
+};
+
 /// One ovt.fb.FrameInfo in the making, plus what S9 needs and the schema does not carry.
 struct FrameRec {
   int32_t decode_index = 0;
@@ -71,13 +81,15 @@ struct FrameRec {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
-  std::vector<int32_t> declared_refs;  // stays empty: the DPB models are stubs in WI-1.121 (§7.4.4)
+  std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
   std::vector<int32_t> dpb_after;
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
   // ---- S9 inputs (not serialised) ----
   uint32_t sequence = 0;         // H.26x: ordinal of the coded video sequence the picture belongs to
   int32_t second_field_of = -1;  // H.264: decode index of the first field of the complementary pair
+  // ---- §7.4.4 private per-frame references (not serialised) ----
+  std::array<std::vector<RefSlotRec>, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice
 };
 
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:

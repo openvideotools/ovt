@@ -8,6 +8,8 @@
 
 #include <algorithm>
 #include <array>
+#include <map>
+#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
@@ -15,6 +17,7 @@
 
 #include "container/diagnostics.h"
 #include "container/isobmff/box_registry.h"
+#include "container/isobmff/decoders/fragment_boxes.h"
 #include "container/isobmff/decoders/sample_entries.h"
 #include "container/isobmff/field_builder.h"
 #include "container/isobmff/paged_span.h"
@@ -376,16 +379,19 @@ void defer_moof(WalkState& st, BoxNodeT& n, uint64_t children_begin, uint64_t en
                                  child_context(ctx, FourCC{'m', 'o', 'o', 'f'}, n), n.diagnostics);
     }
   }
+  check_fragment_children(n);  // SPEC-ASSUMPTION(#671)
   add_diag(n, DiagCode::CNT_0007,
            "box at offset " + std::to_string(pos) + " not yet expanded (lazy; call ovt_container_expand)", pos);
   st.deferred->push_back(DeferredBox{pos, ctx});
 }
 
-// Checks that need a node's children: CNT-1010 on a decoded `stsd` (§8.3.2, SPEC-ASSUMPTION(#592)).
+// Checks that need a node's children: CNT-1010 on a decoded `stsd` (§8.3.2, SPEC-ASSUMPTION(#592)) and CNT-1011 on a
+// `moof` / `traf` (§8.3.5, SPEC-ASSUMPTION(#671)).
 void check_after_children(BoxNodeT& n, const FourCC& type, bool decoded) {
   if (decoded && sv(type) == "stsd") {
     check_stsd_entry_count(n);
   }
+  check_fragment_children(n);
 }
 
 // Steps 2.10-2.13 for one box: registry metadata, FullBox header, the top-level bookkeeping, then the hand decoder,
@@ -518,6 +524,7 @@ WalkResult walk(const io::RandomAccessFile& file, std::vector<DeferredBox>* defe
     return r;
   }
 
+  r.root_ctx.trex_for_track = std::make_shared<std::map<uint32_t, TrackFragmentInfo>>();  // SPEC-ASSUMPTION(#670)
   WalkState st;
   st.file = &file;
   st.deferred = deferred;
@@ -565,6 +572,7 @@ void expand_node(const io::RandomAccessFile& file, fb::BoxNodeT& node, const Box
   st.file = &file;
   node.children = walk_children(st, pos, pos + node.header_length, end, 1,
                                 child_context(ctx, FourCC{'m', 'o', 'o', 'f'}, node), node.diagnostics);
+  check_fragment_children(node);  // SPEC-ASSUMPTION(#671)
 }
 
 // Chapter 8 §8.2.4 rule 4 (issue #631): the located offset is a hint the container reader keeps only if the top-level
