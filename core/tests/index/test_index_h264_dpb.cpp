@@ -12,7 +12,8 @@
 //                        declared_refs is the set of frame stores those lists name;
 //   dpb bounded          (acceptance test 2) MR6_BT_B and MR9_BT_B: dpb_after never exceeds max_num_ref_frames and
 //                        no SYN-H264-0105 / 0106;
-//   frame_num gaps       (acceptance test 3) MR1_BT_A: non-existing frames are inserted with SYN-H264-0102.
+//   frame_num gaps       MR1_BT_A has none (flag 0, contiguous frame_num); acceptance test 3 is the synthetic
+//                        "h264_dpb: frame_num gaps" case.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -578,9 +579,12 @@ TEST_CASE("h264_dpb: MR6_BT_B and MR9_BT_B stay within max_num_ref_frames", "[in
   }
 }
 
-TEST_CASE("h264_dpb: MR1_BT_A infers non-existing frames", "[index][h264][dpb][fast][needs-corpus]") {
+// MR1_BT_A has gaps_in_frame_num_value_allowed_flag = 0 and a contiguous frame_num (JM agrees: no non-existing
+// entries in its lists), so nothing is inferred. Acceptance test 3 is the synthetic "h264_dpb: frame_num gaps" case.
+TEST_CASE("h264_dpb: MR1_BT_A has no frame_num gap", "[index][h264][dpb][fast][needs-corpus]") {
   const std::unique_ptr<Indexed> ix = index_file(ovt::test::corpus_or_skip("jvt_MR1_BT_A"));
-  CHECK(count_code(ix->core, "SYN-H264-0102") > 0);
+  CHECK(count_code(ix->core, "SYN-H264-0102") == 0);
+  CHECK(count_code(ix->core, "SYN-H264-0103") == 0);
 }
 
 }  // namespace
