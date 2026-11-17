@@ -316,7 +316,19 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     wrapped_.reset();
     cpu_texture_.reset();
     const QSize size = colorTexture() != nullptr ? colorTexture()->pixelSize() : surface_size_;
-    surface_->retarget(embedded_target(size, interop_));
+    DisplayTarget target;
+    target.kind = DisplayTarget::Kind::OffscreenTexture;
+    target.width = size.width();
+    target.height = size.height();
+    target.offscreen_format = DisplayTarget::OffscreenFormat::Rgba8Srgb;  // the Qt Quick window is SDR (§10.1.2)
+    target.device_pixel_ratio = static_cast<float>(device_pixel_ratio_);
+    target.interop = interop_;
+#if QT_CONFIG(vulkan)
+    if (interop_ == DisplayTarget::Interop::VulkanSharedDevice) {
+      target.interop_device = &vk_info_;
+    }
+#endif
+    surface_->retarget(target);
     native_ = false;
     stats_.native = false;
     stats_.encoding = encoding_name(surface_->active_encoding());
@@ -343,22 +355,6 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     stats_.encoding = encoding_name(surface_->active_encoding());
     ++stats_.native_frames;
     return nullptr;
-  }
-
-  [[nodiscard]] DisplayTarget embedded_target(QSize size, DisplayTarget::Interop interop) {
-    DisplayTarget target;
-    target.kind = DisplayTarget::Kind::OffscreenTexture;
-    target.width = size.width();
-    target.height = size.height();
-    target.offscreen_format = DisplayTarget::OffscreenFormat::Rgba8Srgb;  // the Qt Quick window is SDR (§10.1.2)
-    target.device_pixel_ratio = static_cast<float>(device_pixel_ratio_);
-    target.interop = interop;
-#if QT_CONFIG(vulkan)
-    if (interop == DisplayTarget::Interop::VulkanSharedDevice) {
-      target.interop_device = &vk_info_;
-    }
-#endif
-    return target;
   }
 
   static QString encoding_name(DisplayTarget::OutputEncoding encoding) {
