@@ -524,19 +524,13 @@ void check_reflist_vs_jm(std::string_view id) {
   CHECK(differ == 0);
 }
 
-// The fast-tagged and the slow-tagged JVT streams of tests/corpora/manifest.json.
+// The fast-tagged JVT streams of tests/corpora/manifest.json; the slow ones are listed inside their [slow] case
+// (tools/check_slow_labels.py attributes literals to the case that follows them).
 constexpr std::array kFastStreams = {
     "jvt_BA1_Sony_D",         "jvt_BA_MW_D",      "jvt_CABA1_SVA_B", "jvt_CVWP1_TOSHIBA_E", "jvt_MR1_BT_A",
     "jvt_Hi422FR1_SONY_A",    "jvt_CI1_FT_B",     "jvt_NRF_MW_E",    "jvt_CVSE2_Sony_B",    "jvt_aud_mw_e",
     "jvt_MIDR_MW_D",          "jvt_CVSE3_Sony_H", "jvt_MR6_BT_B",    "jvt_MR9_BT_B",        "jvt_CVPCMNL1_SVA_C",
     "jvt_FRExt1_Panasonic_D", "jvt_HCAFF1_HHI_B"};
-constexpr std::array kSlowStreams = {"jvt_BAMQ1_JVC_C",        "jvt_CABA3_TOSHIBA_E",  "jvt_CAMA1_Sony_C",
-                                     "jvt_CAPAMA3_Sand_F",     "jvt_CAPM3_Sony_D",     "jvt_HPCV_BRCM_A",
-                                     "jvt_ALPHACONFORMANCEG",  "jvt_sp1_bt_a",         "jvt_cvmp_mot_frm_L31_B",
-                                     "jvt_Sharp_MP_Field_1_B", "jvt_CVFC1_Sony_C",     "jvt_FM1_BT_B",
-                                     "jvt_LS_SVA_D",           "jvt_CVSEFDFT3_Sony_E", "jvt_CVPA1_TOSHIBA_B",
-                                     "jvt_CVFI1_Sony_D",       "jvt_CAQP1_Sony_B",     "jvt_CABAST3_Sony_E",
-                                     "jvt_HPCAFL_BRCM_C",      "jvt_MVCNV_1",          "jvt_SVCBST_1"};
 
 TEST_CASE("h264_reflist_vs_jm: fast JVT streams", "[index][h264][dpb][fast][needs-corpus]") {
   for (const char* id : kFastStreams) {
@@ -547,6 +541,15 @@ TEST_CASE("h264_reflist_vs_jm: fast JVT streams", "[index][h264][dpb][fast][need
 }
 
 TEST_CASE("h264_reflist_vs_jm: slow JVT streams", "[index][h264][dpb][slow][needs-corpus]") {
+  // The slow-tagged JVT streams of tests/corpora/manifest.json.
+  static constexpr std::array kSlowStreams = {
+      "jvt_BAMQ1_JVC_C",        "jvt_CABA3_TOSHIBA_E",  "jvt_CAMA1_Sony_C",
+      "jvt_CAPAMA3_Sand_F",     "jvt_CAPM3_Sony_D",     "jvt_HPCV_BRCM_A",
+      "jvt_ALPHACONFORMANCEG",  "jvt_sp1_bt_a",         "jvt_cvmp_mot_frm_L31_B",
+      "jvt_Sharp_MP_Field_1_B", "jvt_CVFC1_Sony_C",     "jvt_FM1_BT_B",
+      "jvt_LS_SVA_D",           "jvt_CVSEFDFT3_Sony_E", "jvt_CVPA1_TOSHIBA_B",
+      "jvt_CVFI1_Sony_D",       "jvt_CAQP1_Sony_B",     "jvt_CABAST3_Sony_E",
+      "jvt_HPCAFL_BRCM_C",      "jvt_MVCNV_1",          "jvt_SVCBST_1"};
   for (const char* id : kSlowStreams) {
     DYNAMIC_SECTION(id) {
       check_reflist_vs_jm(id);
