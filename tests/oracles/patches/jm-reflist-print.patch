@@ -1,10 +1,17 @@
-JM 19.0 ldecod: print the final RefPicList0/1 of the first slice of each picture (WI-1.122 oracle).
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Tue, 17 Nov 2026 00:00:00 +0000
+Subject: [PATCH] ldecod: print final RefPicList0/1 of each picture's first slice
 
-Scratch print for the h264_reflist_vs_jm goldens (tests/golden/h264/*.jm-reflist.txt.gz); see
-docs/acceptance/wi/WI-1.122.md. Not part of the oracle image build (tests/oracles/build_jm.sh).
+Scratch print for the h264_reflist_vs_jm goldens
+(tests/golden/h264/*.jm-reflist.txt.gz); see docs/acceptance/wi/WI-1.122.md.
+Not part of the oracle image build (tests/oracles/build_jm.sh).
 
+Upstream-Status: Inappropriate [OVT test-oracle scratch print, WI-1.122]
 SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: JM 19.0 has no option that prints the reference picture lists
+  (TRACE does not), so the WI-1.122 goldens need this local print.
 
 diff --git a/ldecod/src/image.c b/ldecod/src/image.c
 index b300919..84a0b8c 100644
