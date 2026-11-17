@@ -140,8 +140,10 @@ SampleGridLines sample_grid_lines(const ViewState& view, ViewportSize vp, const 
   const double dy0 = std::max(0.0, std::floor(static_cast<double>(std::min(picture.y0, picture.y1))));
   const double dy1 =
       std::min(static_cast<double>(vp.h), std::ceil(static_cast<double>(std::max(picture.y0, picture.y1))));
-  lines.columns = axis_lines(view.pan_x, zoom, vp.w / 2.0, source.x0, source.x1, dx0, dx1);
-  lines.rows = axis_lines(view.pan_y, zoom, vp.h / 2.0, source.y0, source.y1, dy0, dy1);
+  lines.columns = axis_lines(view.pan_x, zoom, vp.w / 2.0, static_cast<double>(source.x0),
+                             static_cast<double>(source.x1), dx0, dx1);
+  lines.rows = axis_lines(view.pan_y, zoom, vp.h / 2.0, static_cast<double>(source.y0), static_cast<double>(source.y1),
+                          dy0, dy1);
   return lines;
 }
 
