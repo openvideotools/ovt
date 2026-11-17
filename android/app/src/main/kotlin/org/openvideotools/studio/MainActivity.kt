@@ -37,12 +37,23 @@ import java.util.function.Consumer
 class MainActivity : AppCompatActivity() {
     private lateinit var hdrSurface: HdrSurfaceView
     private lateinit var qtView: QtQuickView
-    private lateinit var filePicker: FilePicker
+
+    /** Opening documents (WI-0.051) and the recent list (WI-A.452); internal for SafFlowsTest. */
+    internal lateinit var filePicker: FilePicker
+        private set
+    internal lateinit var recentFiles: RecentFiles
+        private set
+
+    /** The `GUI-AND-0001` prompt and its copy action (WI-A.452); internal for SafFlowsTest. */
+    internal lateinit var copyPrompt: CopyPrompt
+        private set
+    private lateinit var exporter: ExportDocument
     private var overlay: DebugInfoOverlay? = null
 
     /** This instance's binding to [OvtSession]: shows the open file in the debug overlay. */
     private val sessionListener =
         OvtSession.Listener { file -> overlay?.show(file?.let { OvtNative.infoJson(it.handle) }) }
+    private val recentListener = RecentFiles.Listener { entries -> overlay?.showRecent(entries) }
     private val headroomListener =
         Consumer<Display> { changed -> OvtNative.setHeadroom(hdrSurface.session, changed.hdrSdrRatio) }
     private var headroomDisplay: Display? = null
@@ -85,14 +96,25 @@ class MainActivity : AppCompatActivity() {
 
         // File opening (WI-0.051): picker, VIEW/SEND intents, drag-and-drop; the debug overlay on debuggable builds
         // (addQtView brings it back in front of the Qt view, which is added later). A newly opened file goes to
-        // OvtSession, which closes the one before it.
-        filePicker = FilePicker(this) { opened -> OvtSession.adopt(opened.session, opened.displayName) }
+        // OvtSession, which closes the one before it. WI-A.452 (§11.5.6): the recent list, GUI-AND-0001 with the
+        // copy action for a provider that cannot seek, and export through ACTION_CREATE_DOCUMENT.
+        recentFiles = RecentFiles(this)
+        copyPrompt = CopyPrompt(this, CopyToAppStorage(this)) { file, name -> filePicker.openCopy(file, name) }
+        filePicker =
+            FilePicker(
+                this,
+                recentFiles,
+                onOpened = { opened -> OvtSession.adopt(opened.session, opened.displayName) },
+                onNotSeekable = copyPrompt::show,
+            )
         filePicker.attachDropTarget(host)
+        exporter = ExportDocument(this)
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
-            val debugOverlay = DebugInfoOverlay(this, filePicker::pick)
+            val debugOverlay = DebugInfoOverlay(this, filePicker::pick, ::exportInfo, filePicker::reopen)
             overlay = debugOverlay
             host.addView(debugOverlay, debugOverlay.topStartParams())
         }
+        recentFiles.addListener(recentListener)
 
         // Re-bind to the handles of the process (WI-A.450). The launch intent is handled on a fresh start only: a
         // recreated Activity gets the same intent again, and opening it would replace (and re-index) the file that
@@ -226,6 +248,17 @@ class MainActivity : AppCompatActivity() {
         filePicker.handleIntent(intent)
     }
 
+    /** Exports the open file's info JSON (the debug overlay's "Export info…"; WI-A.452 export flow). */
+    private fun exportInfo() {
+        val file = OvtSession.current ?: return
+        val json = OvtNative.infoJson(file.handle) ?: return
+        exporter.export(
+            ExportDocument.Request("${file.displayName}.info.json", "application/json") { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+            },
+        )
+    }
+
     // Ctrl+O opens the picker (ChromeOS and hardware keyboards) until the Qt shell has its own File menu.
     override fun onKeyDown(
         keyCode: Int,
@@ -242,6 +275,9 @@ class MainActivity : AppCompatActivity() {
     // cancelled on onDestroy with isFinishing).
     override fun onDestroy() {
         filePicker.shutdown()
+        exporter.shutdown()
+        copyPrompt.cancel()
+        recentFiles.removeListener(recentListener)
         OvtSession.unbind(sessionListener)
         if (isFinishing) OvtSession.close()
         // Issue #614: keep Qt running when the Activity finishes (see isChangingConfigurations).
