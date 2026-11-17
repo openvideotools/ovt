@@ -26,5 +26,9 @@ if(OVT_HOST_EGL_LIBRARY AND OVT_HOST_GLES_LIBRARY AND OVT_HOST_EGL_INCLUDE)
   target_link_libraries(ovt_tests_android_gl_share PRIVATE ovt::flags ${Catch2_TARGET} "${OVT_HOST_EGL_LIBRARY}"
                                                            "${OVT_HOST_GLES_LIBRARY}")
   ovt_set_license(ovt_tests_android_gl_share "GPL-3.0-or-later")
+  # libglvnd / Mesa on Linux (MIT), linked by path; the licence gate needs their description (chapter 15).
+  foreach(lib IN ITEMS "${OVT_HOST_EGL_LIBRARY}" "${OVT_HOST_GLES_LIBRARY}")
+    ovt_set_dependency_license("${lib}" SOURCE system SPDX "MIT" LINKAGE shared)
+  endforeach()
   ovt_catch_discover_tests(ovt_tests_android_gl_share)
 endif()
