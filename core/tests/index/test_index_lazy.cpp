@@ -111,7 +111,8 @@ Bytes build_direct(const Bytes& data, fb::Codec codec, const idx::BuilderOptions
     syn::scan_annexb(data, 0, syn::kNoContainerSample, on_unit, on_diag);
   }
   const std::array<uint8_t, 32> hash{};
-  return builder.finish(hash);
+  const flatbuffers::DetachedBuffer out = builder.finish(hash);
+  return Bytes(out.data(), out.data() + out.size());
 }
 
 const fb::StreamIndex& root(const Bytes& index) {
@@ -434,7 +435,8 @@ TEST_CASE("lazy trees: a value-only parse allocates nothing per unit beyond the 
   CHECK(vcl_allocations <= (3 * vcl) + 16);
   CHECK(other_allocations > vcl_allocations);  // the recorded trees of the parameter sets do allocate
   const std::array<uint8_t, 32> hash{};
-  const Bytes index = builder.finish(hash);
+  const flatbuffers::DetachedBuffer finished = builder.finish(hash);
+  const Bytes index(finished.data(), finished.data() + finished.size());
   for (uint32_t i = 0; i < root(index).units()->size(); ++i) {
     const fb::Unit* u = root(index).units()->Get(i);
     CHECK((u->header() == nullptr) == is_vcl(fb::Codec::H264, u->type()));

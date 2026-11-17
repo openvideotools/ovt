@@ -7,13 +7,18 @@
 // (≤ 200 MB RSS), WI-1.125 acceptance test 1. The counter `peak_rss_mb` is the process high-water mark after the
 // first build in the process: what one `ovt index` run costs. `peak_rss_all_mb` is the high-water mark after
 // every repetition; it is larger where the allocator keeps a worker thread's freed memory for that thread
-// (glibc gives each pool worker its own arena, so repeats over different workers add up). The harness repeats
+// (glibc gives each pool worker its own arena, so repeats over different workers add up). On macOS
+// `peak_footprint_mb` is the kernel's physical footprint peak after the first build (see peak_footprint_mb()
+// for why ru_maxrss overstates there). The harness repeats
 // the run, so the timings are warm-cache ones (the 2 s target is a warm-cache figure); drop the page cache before
 // `tools/perf_run.py` for a cold measurement. Without the corpus file the benchmark is skipped with an error,
 // never faked with a stand-in: the budget is about this stream.
 
 #include <benchmark/benchmark.h>
 #include <sys/resource.h>
+#if defined(__APPLE__)
+#include <mach/mach.h>
+#endif
 
 #include <cstdlib>
 #include <filesystem>
@@ -58,6 +63,24 @@ double peak_rss_mb() {
 #endif
 }
 
+// macOS: the peak physical footprint (the kernel's memory accounting of the process: anonymous, compressed and
+// wired pages, which is what Activity Monitor and jetsam use). ru_maxrss on macOS also counts pages malloc has
+// freed but the kernel has not reclaimed yet and the file pages of the page cache the process touched, so it
+// overstates what the process holds. 0 on other platforms.
+double peak_footprint_mb() {
+#if defined(__APPLE__)
+  task_vm_info_data_t info{};
+  mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): the Mach interface takes an integer array
+  if (task_info(mach_task_self(), TASK_VM_INFO, reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS) {
+    return 0.0;
+  }
+  return static_cast<double>(info.ledger_phys_footprint_peak) / (1024.0 * 1024.0);
+#else
+  return 0.0;
+#endif
+}
+
 void bench_index_h264_1h_1080p(benchmark::State& state) {
   static const std::string path = input_path();
   if (path.empty()) {
@@ -76,6 +99,7 @@ void bench_index_h264_1h_1080p(benchmark::State& state) {
     return;
   }
   static double first_build_rss_mb = 0.0;  // after the first build of the process, whichever repetition
+  static double first_build_footprint_mb = 0.0;
   double index_bytes = 0;
   for (auto _ : state) {  // NOLINT(clang-analyzer-deadcode.DeadStores): the idiom of Google Benchmark
     ovt_Buffer index{nullptr, 0};
@@ -85,6 +109,7 @@ void bench_index_h264_1h_1080p(benchmark::State& state) {
     }
     if (first_build_rss_mb == 0.0) {
       first_build_rss_mb = peak_rss_mb();
+      first_build_footprint_mb = peak_footprint_mb();
     }
     benchmark::DoNotOptimize(index.size);
     index_bytes = static_cast<double>(index.size);
@@ -95,6 +120,7 @@ void bench_index_h264_1h_1080p(benchmark::State& state) {
   state.counters["index_bytes"] = index_bytes;
   state.counters["peak_rss_mb"] = first_build_rss_mb;
   state.counters["peak_rss_all_mb"] = peak_rss_mb();
+  state.counters["peak_footprint_mb"] = first_build_footprint_mb;  // macOS only
   ovt_stream_close(stream);
   ovt_container_close(container);
   ovt_file_close(file);

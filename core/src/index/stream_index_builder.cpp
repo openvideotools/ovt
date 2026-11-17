@@ -251,11 +251,11 @@ struct StreamIndexBuilder::Impl {
   std::unique_ptr<CodecDispatch> dispatch;
 
   // S9 and S10 over units[0, unit_count) and every finished frame. `extra` diagnostics follow the core's. A
-  // `complete` index is the core's own buffer (its trees are already there; the core is spent afterwards). A
-  // partial index is a separate buffer with copies of the trees, and leaves the core as it is apart from
-  // FrameRec.display_index (S9), so more units can follow.
-  [[nodiscard]] std::vector<uint8_t> serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
-                                               std::vector<DiagRec> extra, bool complete);
+  // `complete` index is the core's own buffer, released as it is (its trees are already there; the core is spent
+  // afterwards). A partial index is a separate buffer with copies of the trees, and leaves the core as it is
+  // apart from FrameRec.display_index (S9), so more units can follow.
+  [[nodiscard]] flatbuffers::DetachedBuffer serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
+                                                      std::vector<DiagRec> extra, bool complete);
   // A size for the buffer of a partial index: the trees so far plus the records, a little over the real size.
   [[nodiscard]] size_t estimate_size(uint32_t unit_count, size_t diagnostics) const noexcept;
   // The index memory reserved up front (§7.4.6): about the recorded bytes of `expected_units` units, between
@@ -316,7 +316,7 @@ void StreamIndexBuilder::add_scan_diagnostic(const syntax::ScanDiagnostic& d) {
                                fmt::format("{} (file offset {})", d.message, d.file_offset));
 }
 
-std::vector<uint8_t> StreamIndexBuilder::finish(std::span<const uint8_t, 32> source_hash) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::finish(std::span<const uint8_t, 32> source_hash) {
   BuilderCore& core = impl_->core;
   impl_->dispatch->end_of_stream(core);  // S8
   core.finish_frame();
@@ -326,7 +326,7 @@ std::vector<uint8_t> StreamIndexBuilder::finish(std::span<const uint8_t, 32> sou
   return impl_->serialise(source_hash, static_cast<uint32_t>(core.units.size()), {}, /*complete=*/true);
 }
 
-std::vector<uint8_t> StreamIndexBuilder::finish_partial(std::span<const uint8_t, 32> source_hash) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::finish_partial(std::span<const uint8_t, 32> source_hash) {
   const uint32_t cut = impl_->core.first_open_unit();
   std::vector<DiagRec> extra;
   extra.push_back(DiagRec{Severity::Warning, std::string(kDiagTruncated),
@@ -342,8 +342,9 @@ std::vector<uint8_t> StreamIndexBuilder::unit_syntax(uint32_t unit) const {
   return impl_->core.tree_bytes(unit);
 }
 
-std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
-                                                         std::vector<DiagRec> extra, bool complete) {
+flatbuffers::DetachedBuffer StreamIndexBuilder::Impl::serialise(std::span<const uint8_t, 32> source_hash,
+                                                                uint32_t unit_count, std::vector<DiagRec> extra,
+                                                                bool complete) {
   const std::vector<int32_t> display_order = assign_display_order(options.codec, core.frames);  // S9
   bool fallback_timing = false;
   const std::vector<SampleTiming> timing = frame_timing(core, fallback_timing);
@@ -396,12 +397,11 @@ std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t
   b.add_diagnostics(diags_off);
   fbb.Finish(b.Finish());
   if (complete) {
-    // The core is spent: its records go before the index is copied out, so that the two never coexist (§7.4.6).
+    // The core is spent: the records go, and the buffer leaves with its allocator (no copy, §7.4.6).
     std::vector<UnitRec>().swap(core.units);
     std::vector<FrameRec>().swap(core.frames);
   }
-  const std::span<const uint8_t> out(fbb.GetBufferPointer(), fbb.GetSize());
-  return {out.begin(), out.end()};
+  return fbb.Release();
 }
 
 // The trees copied so far plus the Unit / FrameInfo tables, their vectors and the diagnostics at a few dozen

@@ -232,7 +232,8 @@ void feed_ivf(const RandomAccessFile& file, Driver& driver) {
 // §7.4.2 S1–S10 over the stream's units, under `cancel`. A cancellation throws ovt::Cancelled unless
 // OVT_INDEX_ALLOW_PARTIAL is set: then the partial index comes back and the builder stays on the stream for the
 // next call to resume from (§7.4.6). A build that runs to the end drops any such state.
-std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& sink) {
+flatbuffers::DetachedBuffer build(ovt_Stream& stream, ovt::jobs::Cancel& cancel,
+                                  const ovt::jobs::Pool::ProgressSink& sink) {
   const RandomAccessFile& file = *stream.container->file->file;
   std::unique_ptr<ovt::api::ResumeState> resume = std::move(stream.resume);
   if (!resume) {
@@ -280,7 +281,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
     if ((stream.index_flags & OVT_INDEX_ALLOW_PARTIAL) == 0) {
       throw;
     }
-    std::vector<uint8_t> partial = builder.finish_partial(idx::source_hash(file));
+    flatbuffers::DetachedBuffer partial = builder.finish_partial(idx::source_hash(file));
     resume->units_fed = builder.unit_count();
     resume->scan_complete = driver.scan_complete();
     stream.resume = std::move(resume);
@@ -290,7 +291,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
 }
 
 // Installs a freshly built index on the stream and hands the caller its copy.
-ovt_status install(ovt_Stream& stream, std::vector<uint8_t> index, ovt_Buffer* out_index) {
+ovt_status install(ovt_Stream& stream, flatbuffers::DetachedBuffer index, ovt_Buffer* out_index) {
   const ovt_status st = ovt::api::make_buffer(index.data(), index.size(), out_index);
   if (st != OVT_OK) {
     return st;

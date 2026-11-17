@@ -56,7 +56,8 @@ Bytes index_annexb(std::span<const uint8_t> stream, fb::Codec codec) {
       },
       [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
   const std::array<uint8_t, 32> hash{};
-  Bytes index = b.finish(hash);
+  const flatbuffers::DetachedBuffer finished = b.finish(hash);
+  Bytes index(finished.data(), finished.data() + finished.size());
   for (const auto& issue : ovt::model::validate_stream_index(index)) {
     FAIL_CHECK(issue.rule << ": " << issue.message);
   }

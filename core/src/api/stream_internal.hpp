@@ -37,8 +37,8 @@ struct ovt_Stream {
   ovt_Container* container = nullptr;  // not owned; outlives the stream
   ovt::fb::Codec codec = ovt::fb::Codec::Unknown;
   ovt::api::Framing framing = ovt::api::Framing::AnnexB;
-  std::vector<uint8_t> index;  // the last built StreamIndex (ovt_stream_index())
-  ovt::index::RapMap raps;     // §7.4.2 S11
+  flatbuffers::DetachedBuffer index;  // the last built StreamIndex (ovt_stream_index()), the builder's own buffer
+  ovt::index::RapMap raps;            // §7.4.2 S11
   bool built = false;
   uint32_t index_flags = 0;                                        // ovt_IndexFlags
   uint32_t lazy_after_frames = ovt::api::kDefaultLazyAfterFrames;  // BuilderOptions.lazy_after_frames

@@ -82,21 +82,17 @@ struct FrameRec {
 
 /// The memory of the index under construction: uninitialised blocks, so that only the pages the builder has
 /// written are resident (§7.4.6), unlike the zero-filled vectors of a std::vector-backed block. FlatBufferBuilder
-/// writes back to front and copies only the bytes in use when it grows.
+/// writes back to front and copies only the bytes in use when it grows. The builder owns the allocator and
+/// hands it over with the buffer when the index is released (BuilderCore::index(), S10).
 class IndexAllocator final : public flatbuffers::Allocator {
  public:
   uint8_t* allocate(size_t size) override {
-    // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): make_unique would zero-fill (touch) every page
-    blocks_.emplace_back(new uint8_t[size]);
-    return blocks_.back().get();
+    return new uint8_t[size];  // NOLINT(cppcoreguidelines-owning-memory): make_unique would zero-fill (touch) every
+                               // page
   }
   void deallocate(uint8_t* p, size_t /*size*/) override {
-    std::erase_if(blocks_, [p](const Block& b) { return b.get() == p; });
+    delete[] p;  // NOLINT(cppcoreguidelines-owning-memory)
   }
-
- private:
-  using Block = std::unique_ptr<uint8_t[]>;  // NOLINT(modernize-avoid-c-arrays): an uninitialised byte block
-  std::vector<Block> blocks_;
 };
 
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:
@@ -112,7 +108,8 @@ class BuilderCore {
  public:
   /// `index_reserve` bytes of index memory are reserved up front (untouched, so free until written): a build
   /// that outgrows it copies the bytes so far into a larger block once per growth step.
-  explicit BuilderCore(size_t index_reserve = kDefaultIndexReserve) : index_(index_reserve, &allocator_) {}
+  explicit BuilderCore(size_t index_reserve = kDefaultIndexReserve)
+      : index_(index_reserve, new IndexAllocator, /*own_allocator=*/true) {}
   static constexpr size_t kDefaultIndexReserve = size_t{1} << 20U;
 
   std::vector<UnitRec> units;
@@ -145,7 +142,7 @@ class BuilderCore {
   /// (§7.4.6: the memory of the index is its bytes, not its trees). An empty tree stores nothing.
   void store_tree(uint32_t unit, syntax::SyntaxNodeBuffer tree, std::string_view root_name);
   /// The index under construction. The recorded trees are already in it (UnitRec::header is their offset);
-  /// S10 appends the records and finishes it, after which the core is spent.
+  /// S10 appends the records, finishes it and releases the buffer, after which the core is spent.
   [[nodiscard]] flatbuffers::FlatBufferBuilder& index() noexcept { return index_; }
   [[nodiscard]] size_t index_bytes() const noexcept { return index_.GetSize(); }
   /// A copy of `unit`'s recorded tree in `dst` (0 when none is recorded), in the same order and with the same
@@ -176,7 +173,6 @@ class BuilderCore {
   std::optional<FrameRec> open_;
   std::vector<uint32_t> pending_;
   int32_t next_decode_index_ = 0;
-  IndexAllocator allocator_;  // before index_: the builder frees its block first
   flatbuffers::FlatBufferBuilder index_;
 };
 
