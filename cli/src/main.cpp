@@ -25,6 +25,7 @@ int run_main(int argc, char** argv) {
   ovt::cli::Context ctx;
   ctx.stdout_tty = isatty(STDOUT_FILENO) == 1;
   ctx.stderr_tty = isatty(STDERR_FILENO) == 1;
+  ctx.stdin_tty = isatty(STDIN_FILENO) == 1;
   ctx.completions = ovt::cli::embedded_completions();
   return ovt::cli::run(args, ctx);
 }
