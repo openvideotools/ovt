@@ -12,9 +12,11 @@
 #include <QByteArray>
 #include <QFile>
 #include <QMetaObject>
+#include <QPoint>
 #include <QPointer>
 #include <QQuickRhiItemRenderer>
 #include <QQuickWindow>
+#include <QRect>
 #include <QSize>
 #include <QString>
 #include <QTimerEvent>
@@ -33,6 +35,7 @@
 #include <string_view>
 #include <utility>
 
+#include "ovt/render/overlay_set.h"
 #include "ovt/render/video_surface.h"
 #include "render_stub.h"
 #include "surface/output_download.h"  // ovt::render::detail::download_output (exported, for Interop::None)
@@ -70,6 +73,8 @@ struct HostState {
   int diff_gain = 1;
   bool diff_false_colour = false;
   int flicker_period_ms = 500;
+  QPoint probe{-1, -1};
+  QRect selection_rect;
 };
 
 // The CompareMode of §10.2.4 for the state (allow_scale_b stays false: a size mismatch is RND-0010).
@@ -222,6 +227,8 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     state_.diff_gain = host->diff_gain_;
     state_.diff_false_colour = host->diff_false_colour_;
     state_.flicker_period_ms = host->flicker_period_ms_;
+    state_.probe = host->probe_;
+    state_.selection_rect = host->selection_rect_;
     if (host->window() != nullptr) {
       device_pixel_ratio_ = host->window()->effectiveDevicePixelRatio();
     }
@@ -362,6 +369,35 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     a_changed_ = false;
   }
 
+  // The probe crosshair and the selection rectangle are overlay passes of the surface (§10.5.6 pass 12, WI-2.436,
+  // issue #650). No FrameAnalysis reaches the Picture panel yet, so the overlay set carries only these two draw-time
+  // fields; it is rebuilt when one of them changes.
+  void apply_marks() {
+    if (marks_applied_ && state_.probe == applied_probe_ && state_.selection_rect == applied_rect_) {
+      return;
+    }
+    ovt::render::OverlayConfig cfg;
+    const QRect& r = state_.selection_rect;
+    if (state_.probe.x() >= 0 && state_.probe.y() >= 0) {
+      cfg.layers |= static_cast<std::uint32_t>(ovt::render::OverlayLayer::Probe);
+      cfg.probe_x = state_.probe.x();
+      cfg.probe_y = state_.probe.y();
+    }
+    if (r.width() > 0 && r.height() > 0) {
+      cfg.layers |= static_cast<std::uint32_t>(ovt::render::OverlayLayer::SelectionRect);
+      cfg.selection_rect = ovt::fb::Rect(r.x(), r.y(), r.width(), r.height());
+    }
+    if (cfg.layers != 0) {
+      ovt::render::OverlayBuilder builder(*surface_);
+      surface_->set_overlays(builder.build(nullptr, cfg));
+    } else {
+      surface_->set_overlays(nullptr);
+    }
+    applied_probe_ = state_.probe;
+    applied_rect_ = r;
+    marks_applied_ = true;
+  }
+
   // Renders the current frame into the surface's texture and returns the QRhiTexture that shows it (nullptr when
   // there is no surface).
   QRhiTexture* render_surface(QRhiResourceUpdateBatch* updates) {
@@ -378,6 +414,7 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       return nullptr;
     }
     apply_compare();
+    apply_marks();
     surface_->render(view_for(state_, surface_size_.width(), surface_size_.height()));
     const std::string_view err = surface_->last_error();
     stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
@@ -531,6 +568,9 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   ovt::render::CompareMode applied_;
   bool compare_active_ = false;
   bool a_changed_ = false;
+  bool marks_applied_ = false;
+  QPoint applied_probe_{-1, -1};
+  QRect applied_rect_;
   HostState state_;
   PictureHostStats stats_;
 
