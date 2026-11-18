@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors --py of any
+     third-party manifest. -->
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpdn="PTS1M0" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p1" skart="PT0S" duration="P:40S">
+    <AdaptationSet id="1" kontentType="vinitializatistideo" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="upresentationID$/seg-$Number%05d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>

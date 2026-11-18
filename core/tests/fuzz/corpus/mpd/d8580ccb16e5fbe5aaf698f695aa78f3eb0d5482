@@ -1,0 +1,12 @@
+<?xml vencoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Vnifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+timescaleaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>https://mxa#eple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="uationID$/seg-$Number%05d$.m4s"/>
+    tation>
+    </AdaptationSet>
+  </Period>
+</MPD>

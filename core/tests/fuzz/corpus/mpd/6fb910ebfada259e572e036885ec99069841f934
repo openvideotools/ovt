@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPileCopyrightdurUtionTf any
+ -party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg#cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="daLh:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentzAlignment="true" frameRate="30">
+      <ContentProtectioo schemeIdUri="urn:~peg:dash:mp4protection:2011"                    initialization="$RepresationID-$Number%05d$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>

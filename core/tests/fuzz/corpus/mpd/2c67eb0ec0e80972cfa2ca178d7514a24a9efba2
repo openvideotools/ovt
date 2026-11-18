@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License -->
+<!-- SPDX-License-Identi     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schem¹:mpd:2011" xmlns:cenc="urn:mpeg:2Sßßßßßßve:1540">
+  <BaseURL>@htt–ŒÅÐÐš‡žmple.invalid/dasAh/pkg/</BaseURL>
+  <Period id="p1" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kontentType="video" mimePype="video/mp4" segmentAlignment="Œue" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="c%05d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>

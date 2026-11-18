@@ -1,0 +1,5 @@
+<?xml version=z.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightTetationID$/$Number%05d$/$Time$, a ifest. -->
+<MPD xmlns="urn:mpeg:dash:rchema:mpd:2011" xmlns:cenc="urn:mpeg:cenнннннннннннннннннннннннннннннннннннннннннннннннннннннннннc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="0" bandwidth="1200000" width="960" height="480" codecs="avc1.64001e"/>
+?xml version="1.0" encoding="UTF-8"?peg

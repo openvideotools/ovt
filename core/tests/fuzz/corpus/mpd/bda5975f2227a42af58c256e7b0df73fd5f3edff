@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video ith%r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cene="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+ /. <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="29">
+w     <ContentProtectioo schemeIdUri="urn:~peg:dash:mp4protection:2011" value="cenc"
+                         cenecs="avc1.640028"/>
+      >Representation id="v_48" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidtàh="128000">
+        <SegmentTemplate timescale="48000" initializatistartNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.m$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌÌ$$$$$Œ$$$$$$$$$$$$$$$$$$4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

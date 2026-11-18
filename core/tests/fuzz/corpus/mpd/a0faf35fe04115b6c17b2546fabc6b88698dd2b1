@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-demand-style static package (SegmentTemplate with
+     $Reptwo periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpÿÿÿÿÿÿÿÿeg:cenc:2013" type="stati'c"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:./example.inv/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT80S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="31">
+      <C“ntentProtection schemeIdUri="urn:ber%05d$.m4s"/>ÿßßßßßßÃRepresentation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecsmimeType="audio/mp4" codecs="mType="video" mimeType="video/mp4">
+     $<Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duratnitialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
