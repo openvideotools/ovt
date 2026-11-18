@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure imeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenC="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT21M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="uurn:mpeg:da—Å’Ëotection:2011rn:mpeg:dmsa:hp4protect0ion:2011" value="cenc"
+               cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <S      initialization="$RepresentationID$/init.mp5" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      ionSet id="2" langaptationSet id="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480urn:mpeg:da—Å’Ëotection:2011" height="480" codecs="avcí.64001e">
+        <SegmenŒ¤emplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidt- SPDX-License#Identifier: CC0-1.0 -->
+<!-- Hand-wri$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

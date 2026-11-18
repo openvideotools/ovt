@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD wage (SegmentTemplate with
+     $Represeet with r = -1, two periods). Not a st. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+    rTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period iÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿd="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRŸŠe="30">
+      <Contentte timescale="30001" duration="120000" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Nume%br05d$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>

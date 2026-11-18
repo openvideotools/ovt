@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools co•‹ributors -->
+<!-- SPDX-Licens structure of a DASH-IF on-dNumber%0*5d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="ur.:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" tyÿÿÿÿÿÿÿÿfiles="urn:mpeg:dash:profile:iso-fflive:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="QT0S" duration="PT80S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">cale="v_480" bandwidth="0200000" width="854" height="480" cod   </AdaptationSet>
+  </Period>
+  <Period id="p1" duration="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" sdurUtioner="0" duration="0000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

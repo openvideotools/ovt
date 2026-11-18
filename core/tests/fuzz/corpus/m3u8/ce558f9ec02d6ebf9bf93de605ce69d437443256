@@ -1,0 +1,11 @@
+#EXTM3U
+,EX7
+#EXs
+#EXT-X-KEY:0x0.000Z
+#EXTINF:!6.006,first
+seg100.m4s
+#EXTF:6,
+seg103.m4s
+#EXTINF:3.003,
+seg102.m4s
+#EXT-X-ENDLIST

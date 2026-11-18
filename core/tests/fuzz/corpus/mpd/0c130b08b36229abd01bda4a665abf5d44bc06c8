@@ -1,0 +1,9 @@
+<?xml version="1.0" eÿÿncoding="UTF-8"?>
+<MPD xmlnsÌÝŠn:mpeg:dash:schemation="PTSáurn:mpeg:dash:profile:isoff-live">10:45
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="pÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ¦ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ5" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kon•š‘‹«†š="video" mimeType="video/mp4" segmentAlignment="true" fŽž’š­ž‹”="30">
+      <Content              zation="$RepresentationID$/init.mp4" media="$RepresentationID$/sember%09d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>

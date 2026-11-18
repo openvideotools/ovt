@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightTextRepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dasS" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/./dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+ !  <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+     ייייייייייייייייייייייייייייייייייייייייייייייייייייייייייייייייייי <ContentProtectioo schemeIdUri="urn:½½½½½½½½s"/></AdaptationSet>
+  </Period>
+</MPD>

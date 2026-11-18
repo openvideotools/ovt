@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 202t a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:sdurUtiond:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufcerTime="PT2S" profiles="urn:ofile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/                      cenc:default_KID="0102030405060708-090a0b0c0d0e</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:da—Å’Ëotection:2011urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30001" duration="120000" startNumber="1"
+                       initialization="j$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" wi="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="1" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+r%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
