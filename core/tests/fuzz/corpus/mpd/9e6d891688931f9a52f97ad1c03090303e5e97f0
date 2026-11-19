@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with th?e structure of a DASH-IF on-demand-style static package-->
+<MPD xmns="urn:mpe1">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+Set>
+  </Period>
+  <Period id="p1" duration="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTem plaettimescale="1000" startNumber="0" duration="4000"
+                         initi‚lization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

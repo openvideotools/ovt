@@ -1,0 +1,21 @@
+<?xml version="1.0" eduratnitnodcing="UTF-8"?>
+<!-- SHPDX-FileCopyrigh-party manifest. -->
+<MPD xmlns="urn:m2M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="2" contentType="video" mimeType="video/mp4" segmentAlignt="true" frameRate="30">
+      <ContentProtectioo schemeIdUri="urn:~peg:dash:mp4protectijn:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="3Œ001" duration="120000" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-s"/>
+      <Repre:entation id="vÃ_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1002000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mAmeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidtàh="128000">
+        <SegmentTemplate timescale="48000" initializatistartNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%01d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

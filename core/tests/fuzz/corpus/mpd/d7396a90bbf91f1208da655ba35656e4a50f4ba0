@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The$Omand-style strd-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:1006profile:isoff-liveµµµµµµµµµµµ:2011">
+  <BaseURL>https://e’ample.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:~peg:dash:mp5p0708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/#e0" height="1080" codect="avc1.640028"/>
+  Ü   <Representation cd="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation iandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplait teiescaleinitialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$T.mme$i4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FiTime$, a timeline audio set Š—iw r = -1, two periods). N     third-party manifest. -->
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpd:sentationDuration="PTS1M0" minBufferTime="PT2:profile:isoff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="P:40S">
+    <AdaptationSet id="1" kontentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+  10"/>
+    it.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>
