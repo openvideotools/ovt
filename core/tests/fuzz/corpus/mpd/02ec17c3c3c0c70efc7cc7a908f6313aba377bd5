@@ -1,0 +1,9 @@
+<?xml version="1.0" encodi-8"?>
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpd:sentationDuration="PTS1M0" minBufferTime="PT2S" profiles="urn:mpeg:dash:soff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="pÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿT40S">
+    <AdaptationSet id="1" konnt="true" fŽž’š­ž‹”="30">
+      <Content                  initialization="$RepresentationID$/init.mp8" media="$RepresentationID$/seg-$Number%10d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>

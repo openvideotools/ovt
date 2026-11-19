@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-Fi026 The Open Video Tor: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DAS Fmplate with
+     $RepresentationID$/$Number%05d$/ -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:ce="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:daf-live:2011">
+  <BaseURL>htOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO$tduratnitps:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" contentType="video"    </AdaptationSet>
+  </Period>
+</MPD>

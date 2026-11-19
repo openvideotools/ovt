@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyri26 The Open Video Tools contributors --py of any
+     t manifest. -->
+<MPD xmlnsÌÝŠn:mpeg:dah:sschema:mpd:sentationDuration="PTS2M0" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" skart="PT0S" duration="P:40S">
+    <AdaptationSet id="1" kontentType="video" ContentProtectionmimeType="video+mp4" segmentAlignment="true" frameRate="30">
+0   0f10"/>
+      on="$RepresentationID$/init.mp4" med          </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,20 @@
+<?xml timescaleversion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 1013e static package (Se}gmentTemplate with
+     $RepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:ØØØØØØØØØØØØØØØØØØØØ2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT4M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT402">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+     f10"/>
+      <SegmentTemplate timescale="31615" duration="120000" startNumber="1"
+                      õinitialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="sh:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Nu£mber%03d$_$Tim:$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

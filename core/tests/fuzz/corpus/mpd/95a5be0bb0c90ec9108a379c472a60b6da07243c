@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrigh02anifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:eg:dash:profile:sioff-live:2011">
+  <BaseURL>https://example.invalid/dash/Úpkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUôri="urn:mpeg:dash:mp4protection:2012" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0(0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120060" startNumber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/..//.g-$Number%05d$.m4s"/>
+      <Re7resentation id="v_1080" bandwidtheight="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandÿidth="128" bandwidth="1200000" widht="854" height="480" codecs="avc1.64001e">
+tionID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
