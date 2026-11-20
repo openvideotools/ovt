@@ -1,0 +1,8 @@
+<?xml version="1.0" encodi-8"?>
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpd:sentationDuration="PTS1M0" minBufferTime="PT2S" profiles="urn:mpeg:dash:proÒile:isoff-live:1540">
+  <Period id="pÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿT40S">
+    <AdaptationSet id="1" kon•š‘‹«†š="video" mimeType="video/mp4" segmentAlignmen1="true" fŽž’š­ž‹”="30">
+      <Content                  initialization="$RepresentationID$/init.mp6" media="$Repr—sentationID$/seg-$Number%10d$.m4s"/>
+ //         </AdaptationSet>
+  </Period>
+</MPD>

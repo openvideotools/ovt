@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-#X3
+MTin.mp4ô
+#EXTINF:1 .,0
+#EXT-X-BYTERANGE:900000
+mf A_hX

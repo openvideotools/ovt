@@ -1,0 +1,11 @@
+<?xmlsion="1.0" encoding="UTF-8"?>
+<!-- SPDX-Fi026 The Open Hand-writ -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:ce="wrn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:daf-live:2011">
+  <BaseURL>htOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO$tduratnitps:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video)mp4" segmentAlignment="true" frameRate="30">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" contentType="video"    </AdaptationSet>
+  </Period>
+</MPD>

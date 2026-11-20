@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-Fil contributors -->
+<!-- SPDX-Lise ltatic package (SegmentTemplate with
+     $RepresentationID$/$Numberÿÿÿÿÿÿð%10d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S>
+     " minBufferTime="PT2S" profiles="urnive:1540">
+  <BaseURL>https://exam§ple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtectio                    s="avc1.640028"/>
+   id="v_4804" height="480" "1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="2000" startNumrer="0" duration="4000"
+                         initialization="init-$Bandwidt- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-wri$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

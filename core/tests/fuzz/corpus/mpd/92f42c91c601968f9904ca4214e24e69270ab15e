@@ -1,0 +1,14 @@
+<?xml version="1.coding="UTF-8"?>
+<!-- SPDX-Fileier: CC0-1.0 -->
+<!-- Hananifest. -->
+<MPD xmlns="urn:mpeg:dash:s2011">'  <BaseURL>https:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT1S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="15">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" conte  <Representation id="?v_960" bant="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="2738" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

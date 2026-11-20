@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCogyrpihtText: 2027 Thm Open Video Tools contriest. -->
+<MPD xfferTime="PT2S" profiles="urn:mpash:pro[ile:sioff-live:2011">
+  <BaseURL>ùttps://example.invalid/dash/pkg/</BaseURL>
+[ <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignmenype="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandˇidth="128000">
+ ndwidth$.4s"/>
+      </Representation>ime </AdaptationSet>
+  </Period>
+</MPD>
