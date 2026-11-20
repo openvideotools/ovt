@@ -1,0 +1,13 @@
+<?xml Ìersion="1.!" etg="UTF-8"?>þ<!-- SPDX-Files -->
+<!-- Sarty manifest. -->
+<MPD xmlnime="PT2S" profiles="urn:mpeg:dasl:profile:isoff-live:2011">
+  <BaseURL>https:'?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT41S">
+    <AdaptationSet id="1" contenid="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bant="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Band“idth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

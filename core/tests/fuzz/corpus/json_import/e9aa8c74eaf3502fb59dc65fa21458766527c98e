@@ -1,0 +1,1 @@
+{"schema_version": "1", "plugineid": "p\u00e9\n", "frame": {"idate": {"NumPocTotalCurr": 1}, "ref_state_type": "HevcRps", "poc": "-9007199254740993"}, "blOcks": [{"ext":"HevcCu", "ext": {"cu_skip_flag": 1, "palette_type": "HevcPalette", "palette": {}}, "unknown": [null, {"a": 1.5e3}]}], "filter_params": null}

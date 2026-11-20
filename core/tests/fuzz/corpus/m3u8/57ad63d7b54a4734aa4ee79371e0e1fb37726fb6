@@ -1,0 +1,8 @@
+#EXTM3U
+#EXCE:0
+#EXT-X-M@P:URI="main.mpn.mp4
+#EXTINF:4.0
+?B#EXTmp4
+#EXTINF:4.0
+?B#EXT-X--#EXTM3U
+Å

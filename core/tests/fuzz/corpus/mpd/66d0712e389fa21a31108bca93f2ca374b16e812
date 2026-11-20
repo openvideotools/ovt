@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!--f a DASH-IF on-demand-style static package (SegmentT0emplaty
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" prodmfault_KIDfiles="urn:mpeg:dash:profile:isoff-liye:2011">
+  <BaseURL>Ûttps:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="P‚T40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtectioo schemeIdUri="urn:~peg:dash:mp4protection:2011" value="cenc"
+                      codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidtàh="128000">
+        <SegmentTemplate timescale="48000" initializatistartNumber="0" duration="4000"
+                         initiali:ationinitialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$ÿÿÿÿÿÿÿÿ_$Time$/.//.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

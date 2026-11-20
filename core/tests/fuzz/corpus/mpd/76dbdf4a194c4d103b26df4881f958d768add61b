@@ -1,0 +1,15 @@
+<?xmir selvon="1.0" encoding="UTF-8"?>duratnit
+<!-- SPDX-Fi026 The Open Video Tools cÿutors -->
+<!-- SPDX-Licens<!-- Hand-written MPD with the structure of a DASH-IF on-demand-style static package (SegNumber%05d$   third-party manifest. -->
+<MPD xmlns="urma:mpd:2011" xmdiaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>htOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOoOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO$tps:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+       <BaseURL>p1/</BaseURL>
+    ¼Adaptationideo" mimeType="video/mp4">
+      <Representation id="v_480" bant="480" codecs="avc1.6400*e">
+     ype="video" mimeType="video/mp4" segmeAtlnignment"0" duration="4>
+      </Representation>
+ Y   </AdaptationSet>
+  </Period>
+</MPD>

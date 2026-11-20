@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The iods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:m:cenc:2013" type="static"
+     mediaPresentationDuration="P0MT1S" minBufferTime="PT2Se:2011">
+  <BaseURL>https:p1example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    t>ationSet>
+  </Period>
+</MPD>
