@@ -250,3 +250,15 @@ SPDX-License-Identifier = "MIT"
 path = ["third_party/vcpkg-overlays/spdlog/usage", "third_party/vcpkg-overlays/spdlog/vcpkg.json"]
 SPDX-FileCopyrightText = "Microsoft Corporation and contributors"
 SPDX-License-Identifier = "MIT"
+
+# Upstream fmt commit vendored as a patch in the fmt overlay port (third_party/vcpkg-overlays/fmt/README.md); fmt is MIT.
+[[annotations]]
+path = ["third_party/vcpkg-overlays/fmt/patches/*.patch"]
+SPDX-FileCopyrightText = "2012-present Victor Zverovich and fmt contributors"
+SPDX-License-Identifier = "MIT"
+
+# vcpkg's own port files copied unchanged from the pinned baseline; MIT (microsoft/vcpkg).
+[[annotations]]
+path = ["third_party/vcpkg-overlays/fmt/usage", "third_party/vcpkg-overlays/fmt/vcpkg.json"]
+SPDX-FileCopyrightText = "Microsoft Corporation and contributors"
+SPDX-License-Identifier = "MIT"
