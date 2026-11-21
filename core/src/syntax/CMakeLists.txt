@@ -75,3 +75,6 @@ target_sources(ovt_core_objects PRIVATE h265/sei.cpp h265/sei_timing.cpp h265/se
                                         h265/sei_picture.cpp h265/sei_user_data.cpp)
 # WI-1.111: H.264 parameter-set activation (chapter 7 §7.3.8).
 target_sources(ovt_core_objects PRIVATE h264/active_sets.cpp)
+# WI-1.207: parse_parameter_set(), the entry point the container's codec configuration decoders (avcC, hvcC, av1C)
+# hand their parameter sets to (chapter 8 §8.3.3).
+target_sources(ovt_core_objects PRIVATE common/parameter_set.cpp)

@@ -25,6 +25,7 @@ layout(location = 0) in uint corner;
 layout(location = 0) flat out vec4 v_color;
 layout(location = 1) out float v_dist;  // device px along the shaft from the origin
 layout(location = 2) flat out uint v_dashed;
+layout(location = 3) flat out uint v_id;  // attr.y: the FrameAnalysis.mvs index of an arrow (id buffer, WI-2.435)
 
 // Outside the clip volume; every vertex of a culled instance (and of an unused triangle) is this same point, so the
 // triangle is degenerate with three identical vertices and no tiler rasterises a sliver (WI-2.434 pitfall).
@@ -43,6 +44,7 @@ void hide() {
   v_color = vec4(0.0);
   v_dist = 0.0;
   v_dashed = 0u;
+  v_id = 0u;
 }
 
 void main() {
@@ -124,6 +126,17 @@ void main() {
   v_dist = dist;
   // L1 shafts are dashed (§10.5.4 list coding); L0, bi (in the bi slot) and strokes are solid.
   v_dashed = (!bi_draw && !stroke && k < 6u && (flags & kInstDashed) != 0u) ? 1u : 0u;
+  v_id = a.y;
+}
+
+#elif defined(OVT_ID_OUTPUT)
+
+// Id-buffer run of pass 9 (§10.5.6): 0x80000000 | mv_index, unblended. Dash gaps are written too, so an L1 arrow
+// can be picked anywhere along its shaft.
+layout(location = 3) flat in uint v_id;
+
+void main() {
+  out_id = 0x80000000u | v_id;
 }
 
 #else

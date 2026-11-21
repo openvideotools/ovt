@@ -4,13 +4,15 @@
 // The StreamIndex builder state machine (chapter 7 §7.4.2, WI-1.121): unit records (S2, S3), the frame
 // bookkeeping shared by every codec (S5 open / extend, S7 size accounting, S8), the fallback time base of
 // chapter 6 §6.2.6 and the serialisation of the result (S10). Per-codec dispatch (S4, S6) is behind
-// CodecDispatch; the display order (S9) is display_order.cpp.
+// CodecDispatch; the display order (S9) is display_order.cpp. WI-1.125 adds the lazy-tree policy of §7.4.5 (the
+// dispatch asks BuilderCore::record_full_tree) and the partial index of §7.4.6 (finish_partial).
 
 #include "ovt/cxx/index/stream_index_builder.hpp"
 
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <string>
 #include <utility>
@@ -23,8 +25,9 @@ namespace {
 
 using syntax::Severity;
 
-constexpr std::string_view kDiagNoUnits = "SYN-GEN-0101";   // Error, §7.4.7
-constexpr std::string_view kDiagNoTiming = "SYN-GEN-0104";  // Info, chapter 6 §6.2.6
+constexpr std::string_view kDiagNoUnits = "SYN-GEN-0101";    // Error, §7.4.7
+constexpr std::string_view kDiagNoTiming = "SYN-GEN-0104";   // Info, chapter 6 §6.2.6
+constexpr std::string_view kDiagTruncated = "SYN-GEN-0103";  // Warning, §7.4.6 partial index
 
 // Registry severity (§7.9) of a unit scanner finding: BR-0009 and SYN-GEN-0004 are Warnings, the rest Errors.
 Severity scan_severity(std::string_view code) noexcept {
@@ -108,14 +111,13 @@ flatbuffers::Offset<fb::FrameInfo> write_frame(flatbuffers::FlatBufferBuilder& f
 }
 
 // Chapter 6 §6.2.6: a frame keeps the container timing of its sample; without one, pts counts display slots and
-// dts decode slots in the stream's own time base (VUI / timing_info), or in 1/1 with Info SYN-GEN-0104.
-std::vector<SampleTiming> frame_timing(BuilderCore& core) {
+// dts decode slots in the stream's own time base (VUI / timing_info), or in 1/1 with Info SYN-GEN-0104, which the
+// caller appends when `fallback_diag` comes back true (this function does not touch the core).
+std::vector<SampleTiming> frame_timing(const BuilderCore& core, bool& fallback_diag) {
   std::vector<SampleTiming> out(core.frames.size());
   const bool fallback =
       std::any_of(core.frames.begin(), core.frames.end(), [](const FrameRec& f) { return !f.timing.has_value(); });
-  if (fallback && !core.timing) {
-    core.index_diagnostic(Severity::Info, kDiagNoTiming, "no timing information; frame-count time base");
-  }
+  fallback_diag = fallback && !core.timing;
   const StreamTiming st = core.timing.value_or(StreamTiming{});
   // A frame that is never output (display_index -1) takes the pts of the next output frame in decode order.
   // SPEC-ASSUMPTION(#641): §6.2.6 gives no pts for such a frame.
@@ -189,6 +191,16 @@ void BuilderCore::finish_frame() {
   open_.reset();
 }
 
+uint32_t BuilderCore::first_open_unit() const noexcept {
+  if (!pending_.empty()) {
+    return pending_.front();
+  }
+  if (open_ && !open_->units.empty()) {
+    return open_->units.front();
+  }
+  return static_cast<uint32_t>(units.size());
+}
+
 void BuilderCore::unit_diagnostic(uint32_t unit, DiagRec d) {
   diagnostics.push_back(DiagRec{d.severity, d.code, fmt::format("unit {}: {}", unit, d.message), d.span});
   units[unit].diagnostics.push_back(std::move(d));
@@ -204,13 +216,21 @@ struct StreamIndexBuilder::Impl {
   BuilderOptions options;
   BuilderCore core;
   std::unique_ptr<CodecDispatch> dispatch;
+
+  // S9 and S10 over units[0, unit_count) and every finished frame. `extra` diagnostics follow the core's. Leaves
+  // the core as it is apart from FrameRec.display_index (S9), so a partial index can be followed by more units.
+  [[nodiscard]] std::vector<uint8_t> serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
+                                               std::vector<DiagRec> extra);
 };
 
 StreamIndexBuilder::StreamIndexBuilder(const BuilderOptions& options) : impl_(std::make_unique<Impl>()) {
   impl_->options = options;
+  impl_->core.lazy_after_frames = options.lazy_after_frames;
+  impl_->core.record_only_unit = options.record_only_unit;
+  impl_->core.lazy_strip_chunk = options.lazy_strip_chunk;
   switch (options.codec) {
     case fb::Codec::AV1:
-      impl_->dispatch = make_av1_dispatch();
+      impl_->dispatch = make_av1_dispatch(options.av1_operating_point, options.av1_annexb);
       break;
     case fb::Codec::H264:
       impl_->dispatch = make_h264_dispatch();
@@ -242,6 +262,7 @@ void StreamIndexBuilder::add_unit(const UnitInput& u) {
   if (u.timing != nullptr) {
     rec.timing = *u.timing;
   }
+  rec.temporal_unit_start = u.temporal_unit_start;
   core.units.push_back(std::move(rec));
   impl_->dispatch->on_unit(core, index, u.bytes);
 }
@@ -258,19 +279,51 @@ std::vector<uint8_t> StreamIndexBuilder::finish(std::span<const uint8_t, 32> sou
   if (core.units.empty()) {
     core.index_diagnostic(Severity::Error, kDiagNoUnits, "no video units found");
   }
-  const std::vector<int32_t> display_order = assign_display_order(impl_->options.codec, core.frames);  // S9
-  const std::vector<SampleTiming> timing = frame_timing(core);
+  return impl_->serialise(source_hash, static_cast<uint32_t>(core.units.size()), {});
+}
+
+std::vector<uint8_t> StreamIndexBuilder::finish_partial(std::span<const uint8_t, 32> source_hash) {
+  const uint32_t cut = impl_->core.first_open_unit();
+  std::vector<DiagRec> extra;
+  extra.push_back(DiagRec{Severity::Warning, std::string(kDiagTruncated),
+                          fmt::format("index truncated at unit {}", cut), BitSpan{0, 0}});
+  return impl_->serialise(source_hash, cut, std::move(extra));
+}
+
+uint32_t StreamIndexBuilder::unit_count() const noexcept {
+  return static_cast<uint32_t>(impl_->core.units.size());
+}
+
+std::vector<uint8_t> StreamIndexBuilder::unit_syntax(uint32_t unit) const {
+  const std::vector<UnitRec>& units = impl_->core.units;
+  if (unit >= units.size()) {
+    return {};
+  }
+  return units[unit].header.to_flatbuffer();
+}
+
+std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t, 32> source_hash, uint32_t unit_count,
+                                                         std::vector<DiagRec> extra) {
+  const std::vector<int32_t> display_order = assign_display_order(options.codec, core.frames);  // S9
+  bool fallback_timing = false;
+  const std::vector<SampleTiming> timing = frame_timing(core, fallback_timing);
+  std::vector<DiagRec> diagnostics = core.diagnostics;
+  if (fallback_timing) {
+    diagnostics.push_back(DiagRec{Severity::Info, std::string(kDiagNoTiming),
+                                  "no timing information; frame-count time base", BitSpan{0, 0}});
+  }
+  diagnostics.insert(diagnostics.end(), std::make_move_iterator(extra.begin()), std::make_move_iterator(extra.end()));
 
   // S10. Units are written once; parameter_sets and sei refer to the same tables.
   flatbuffers::FlatBufferBuilder fbb(size_t{1} << 16U);
   std::vector<flatbuffers::Offset<fb::Unit>> units;
   std::vector<flatbuffers::Offset<fb::Unit>> parameter_sets;
   std::vector<flatbuffers::Offset<fb::Unit>> sei;
-  units.reserve(core.units.size());
-  for (size_t i = 0; i < core.units.size(); ++i) {
+  units.reserve(unit_count);
+  for (uint32_t i = 0; i < unit_count; ++i) {
     const UnitRec& u = core.units[i];
     const int32_t display_index = u.frame >= 0 ? core.frames[static_cast<size_t>(u.frame)].display_index : -1;
-    units.push_back(write_unit(fbb, u, static_cast<uint32_t>(i), display_index));
+    units.push_back(write_unit(fbb, u, i, display_index));
     if (u.parameter_set) {
       parameter_sets.push_back(units.back());
     }
@@ -289,9 +342,9 @@ std::vector<uint8_t> StreamIndexBuilder::finish(std::span<const uint8_t, 32> sou
   const auto order_off = fbb.CreateVector(display_order);
   const auto ps_off = fbb.CreateVector(parameter_sets);
   const auto sei_off = fbb.CreateVector(sei);
-  const auto diags_off = write_diagnostics(fbb, core.diagnostics);
+  const auto diags_off = write_diagnostics(fbb, diagnostics);
   fb::StreamIndexBuilder b(fbb);
-  b.add_codec(impl_->options.codec);
+  b.add_codec(options.codec);
   b.add_schema_version(1);
   b.add_source_hash(hash_off);
   b.add_units(units_off);

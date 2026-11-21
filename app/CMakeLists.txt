@@ -183,10 +183,16 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/dock/dock_model.cpp"
     "${app_dir}/src/picture_controller.h"
     "${app_dir}/src/picture_controller.cpp"
+    "${app_dir}/src/platform/android_state.h"
+    "${app_dir}/src/platform/android_state.cpp"
+    "${app_dir}/src/compare_controller.h"
+    "${app_dir}/src/compare_controller.cpp"
     "${app_dir}/src/render_stub.h"
     "${app_dir}/src/render_stub.cpp"
     "${app_dir}/src/models/hdr_metadata_model.h"
     "${app_dir}/src/models/hdr_metadata_model.cpp"
+    "${app_dir}/src/models/hex_model.h"
+    "${app_dir}/src/models/hex_model.cpp"
     # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
     "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}

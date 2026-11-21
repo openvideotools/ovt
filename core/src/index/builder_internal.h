@@ -8,6 +8,7 @@
 #ifndef OVT_INDEX_BUILDER_INTERNAL_H
 #define OVT_INDEX_BUILDER_INTERNAL_H
 
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -45,9 +46,19 @@ struct UnitRec {
   syntax::SyntaxNodeBuffer header;
   int32_t sample_index = -1;
   std::vector<DiagRec> diagnostics;
-  bool parameter_set = false;  // listed in StreamIndex.parameter_sets
-  bool sei = false;            // listed in StreamIndex.sei
+  bool parameter_set = false;        // listed in StreamIndex.parameter_sets
+  bool sei = false;                  // listed in StreamIndex.sei
+  bool temporal_unit_start = false;  // UnitInput.temporal_unit_start (AV1 Annex B, WI-1.124)
   std::optional<SampleTiming> timing;
+};
+
+/// One entry of a reference list of a frame's first slice (§7.4.4: the "RefSlot names L0[i] / L1[i]" kept privately
+/// for the plugin host and the GOP graph; not serialised).
+struct RefSlotRec {
+  int32_t decode_index = -1;  // -1: an H.264 non-existing frame
+  int64_t poc = 0;            // of the referenced frame, or of the field for a field reference
+  fb::PictureStructure structure = fb::PictureStructure::Frame;  // Frame, TopField or BottomField
+  bool long_term = false;
 };
 
 /// One ovt.fb.FrameInfo in the making, plus what S9 needs and the schema does not carry.
@@ -71,13 +82,15 @@ struct FrameRec {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
-  std::vector<int32_t> declared_refs;  // stays empty: the DPB models are stubs in WI-1.121 (§7.4.4)
-  std::vector<int32_t> dpb_after;
+  std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
+  std::vector<int32_t> dpb_after;      // AV1: the 8 slots, -1 for an empty slot
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
   // ---- S9 inputs (not serialised) ----
   uint32_t sequence = 0;         // H.26x: ordinal of the coded video sequence the picture belongs to
   int32_t second_field_of = -1;  // H.264: decode index of the first field of the complementary pair
+  // ---- §7.4.4 private per-frame references (not serialised) ----
+  std::array<std::vector<RefSlotRec>, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice
 };
 
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:
@@ -95,6 +108,28 @@ class BuilderCore {
   std::vector<FrameRec> frames;        // finished frames, decode order
   std::vector<DiagRec> diagnostics;    // StreamIndex.diagnostics
   std::optional<StreamTiming> timing;  // set by the codec dispatch
+  uint32_t lazy_after_frames = 10000;  // BuilderOptions.lazy_after_frames
+  int64_t record_only_unit = -1;       // BuilderOptions.record_only_unit
+  size_t lazy_strip_chunk = 2048;      // BuilderOptions.lazy_strip_chunk
+
+  /// §7.4.5 record_full_tree(u): whether the dispatch records the header tree of `unit`, which the codec peeked to
+  /// be a VCL unit (`vcl`) that starts a new picture (`starts_frame`) or not. The frames finished so far plus the
+  /// open one, if the unit closes it, give the decode index the unit's frame will have, so "VCL units of the first N
+  /// frames" is exact for every unit whose peek is right (a picture started by a slice that does not look like a
+  /// first slice is off by one frame).
+  [[nodiscard]] bool record_full_tree(uint32_t unit, bool vcl, bool starts_frame) const noexcept {
+    if (record_only_unit >= 0) {
+      return int64_t{unit} == record_only_unit;
+    }
+    if (!vcl) {
+      return true;
+    }
+    const size_t frame = frames.size() + ((starts_frame && open_) ? 1 : 0);
+    return frame < lazy_after_frames;
+  }
+  /// The first unit that is not part of a finished frame: the first pending non-VCL unit, else the first unit of
+  /// the open frame, else units.size(). Everything before it belongs to complete frames or to no frame.
+  [[nodiscard]] uint32_t first_open_unit() const noexcept;
 
   [[nodiscard]] bool frame_open() const noexcept { return open_.has_value(); }
   /// The open frame, or null when none is open.
@@ -136,7 +171,8 @@ class CodecDispatch {
   virtual void end_of_stream(BuilderCore& core) = 0;
 };
 
-[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch();
+/// `operating_point` and `annexb` are BuilderOptions.av1_operating_point / av1_annexb (WI-1.124).
+[[nodiscard]] std::unique_ptr<CodecDispatch> make_av1_dispatch(uint8_t operating_point = 0, bool annexb = false);
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h264_dispatch();
 [[nodiscard]] std::unique_ptr<CodecDispatch> make_h265_dispatch();
 

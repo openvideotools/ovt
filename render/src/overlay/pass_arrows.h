@@ -52,10 +52,11 @@ class ArrowPass {
 
   // Pass 8 (IntraDirs) and pass 9 (MvL1, MvL0, then MvBi) for `layers`, blended over `target`. `pc` carries the view;
   // first/mode/tex_w are set here. Nothing is drawn below R-MV-1 (cell < 4 device px). Returns false on error.
+  // draw_mvs with `ids` writes 0x80000000 | mv_index into an r32u id buffer instead (§10.5.6, WI-2.435).
   bool draw_intra(pl_gpu gpu, pl_tex target, pl_tex palette, uint32_t layers, const ArrowPassConstants& pc,
                   std::string& err);
   bool draw_mvs(pl_gpu gpu, pl_tex target, pl_tex palette, uint32_t layers, const ArrowPassConstants& pc,
-                std::string& err);
+                std::string& err, bool ids = false);
 
   // True when there is anything to draw for `layers`.
   [[nodiscard]] bool has_work(uint32_t layers) const;
@@ -69,10 +70,10 @@ class ArrowPass {
  private:
   bool upload(pl_gpu gpu, const ArrowInstances& inst, std::string& err);
   bool ensure_view(pl_gpu gpu, const ArrowPassConstants& pc, std::string& err);
-  bool ensure_pass(pl_gpu gpu, pl_fmt target_format, std::string& err);
+  bool ensure_pass(pl_gpu gpu, pl_fmt target_format, bool ids, std::string& err);
   bool ensure_corners(pl_gpu gpu, size_t vertices, std::string& err);
   bool run(pl_gpu gpu, pl_tex target, pl_tex palette, ArrowPassConstants pc, uint32_t first, uint32_t end,
-           uint32_t mode, std::string& err);
+           uint32_t mode, bool ids, std::string& err);
   void drop_textures(pl_gpu gpu);
 
   const ArrowInstances* full_ = nullptr;
@@ -85,6 +86,7 @@ class ArrowPass {
   size_t corner_capacity_ = 0;   // vertices
   pl_fmt corner_fmt_ = nullptr;  // r8u, or wider where the vertex stride must be aligned
   pl_pass pass_ = nullptr;
+  pl_pass id_pass_ = nullptr;  // id-buffer variant of pass_
 };
 
 }  // namespace ovt::render::detail

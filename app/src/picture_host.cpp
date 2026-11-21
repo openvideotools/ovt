@@ -12,11 +12,14 @@
 #include <QByteArray>
 #include <QFile>
 #include <QMetaObject>
+#include <QPoint>
 #include <QPointer>
 #include <QQuickRhiItemRenderer>
 #include <QQuickWindow>
+#include <QRect>
 #include <QSize>
 #include <QString>
+#include <QTimerEvent>
 #include <QtGlobal>
 
 #if QT_CONFIG(vulkan)
@@ -32,6 +35,8 @@
 #include <string_view>
 #include <utility>
 
+#include "overlay/overlay_set_impl.h"  // the complete OverlaySet: the host owns built sets until set_overlays()
+#include "ovt/render/overlay_set.h"
 #include "ovt/render/video_surface.h"
 #include "picture_host_android.h"
 #include "render_stub.h"
@@ -62,7 +67,31 @@ struct HostState {
   bool false_color = false;
   bool gamut_clip_overlay = false;
   bool dither = true;
+  std::shared_ptr<const PictureFrame> frame_b;
+  int compare_kind = 0;
+  int split_axis = 0;
+  double split_position = 0.5;
+  double overlay_alpha = 0.5;
+  int diff_gain = 1;
+  bool diff_false_colour = false;
+  int flicker_period_ms = 500;
+  QPoint probe{-1, -1};
+  QRect selection_rect;
 };
+
+// The CompareMode of §10.2.4 for the state (allow_scale_b stays false: a size mismatch is RND-0010).
+ovt::render::CompareMode compare_for(const HostState& s) {
+  using ovt::render::CompareMode;
+  CompareMode m;
+  m.kind = static_cast<CompareMode::Kind>(std::clamp(s.compare_kind, 0, static_cast<int>(CompareMode::Kind::Flicker)));
+  m.split_axis = s.split_axis == 1 ? CompareMode::Axis::Horizontal : CompareMode::Axis::Vertical;
+  m.split_position = static_cast<float>(s.split_position);
+  m.overlay_alpha = static_cast<float>(s.overlay_alpha);
+  m.diff_gain = static_cast<float>(s.diff_gain);
+  m.diff_false_color = s.diff_false_colour;
+  m.flicker_period_ms = static_cast<std::uint16_t>(std::clamp(s.flicker_period_ms, 1, 65535));
+  return m;
+}
 
 std::uint32_t to_rgba(const QColor& c) {
   return (static_cast<std::uint32_t>(c.red()) << 24U) | (static_cast<std::uint32_t>(c.green()) << 16U) |
@@ -197,6 +226,16 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     state_.false_color = host->false_color_;
     state_.gamut_clip_overlay = host->gamut_clip_overlay_;
     state_.dither = host->dither_;
+    state_.frame_b = host->frame_b_;
+    state_.compare_kind = host->compare_kind_;
+    state_.split_axis = host->split_axis_;
+    state_.split_position = host->split_position_;
+    state_.overlay_alpha = host->overlay_alpha_;
+    state_.diff_gain = host->diff_gain_;
+    state_.diff_false_colour = host->diff_false_colour_;
+    state_.flicker_period_ms = host->flicker_period_ms_;
+    state_.probe = host->probe_;
+    state_.selection_rect = host->selection_rect_;
     if (host->window() != nullptr) {
       device_pixel_ratio_ = host->window()->effectiveDevicePixelRatio();
     }
@@ -334,6 +373,60 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     return QStringLiteral("cpu-copy");
   }
 
+  // Slot B and the compare mode (§10.2.4), after set_frame() (the order SPEC-ASSUMPTION(#478) fixes). Kind::Single
+  // clears B in the surface; the same B generation is not uploaded twice (§10.2.1).
+  void apply_compare() {
+    const bool want = state_.compare_kind != 0 && state_.frame_b != nullptr;
+    const ovt::render::CompareMode mode = compare_for(state_);
+    if (want) {
+      const ovt::render::Picture& b = state_.frame_b->picture;
+      const bool same = compare_active_ && b.generation == uploaded_b_generation_ && mode.kind == applied_.kind &&
+                        mode.split_axis == applied_.split_axis && mode.split_position == applied_.split_position &&
+                        mode.overlay_alpha == applied_.overlay_alpha && mode.diff_gain == applied_.diff_gain &&
+                        mode.diff_false_color == applied_.diff_false_color &&
+                        mode.flicker_period_ms == applied_.flicker_period_ms && !a_changed_;
+      if (!same) {
+        surface_->set_compare(b, mode);
+        uploaded_b_generation_ = b.generation;
+        applied_ = mode;
+        compare_active_ = true;
+      }
+    } else if (compare_active_) {
+      surface_->set_compare(state_.frame->picture, ovt::render::CompareMode{});
+      compare_active_ = false;
+    }
+    a_changed_ = false;
+  }
+
+  // The probe crosshair and the selection rectangle are overlay passes of the surface (§10.5.6 pass 12, WI-2.436,
+  // issue #650). No FrameAnalysis reaches the Picture panel yet, so the overlay set carries only these two draw-time
+  // fields; it is rebuilt when one of them changes.
+  void apply_marks() {
+    if (marks_applied_ && state_.probe == applied_probe_ && state_.selection_rect == applied_rect_) {
+      return;
+    }
+    ovt::render::OverlayConfig cfg;
+    const QRect& r = state_.selection_rect;
+    if (state_.probe.x() >= 0 && state_.probe.y() >= 0) {
+      cfg.layers |= static_cast<std::uint32_t>(ovt::render::OverlayLayer::Probe);
+      cfg.probe_x = state_.probe.x();
+      cfg.probe_y = state_.probe.y();
+    }
+    if (r.width() > 0 && r.height() > 0) {
+      cfg.layers |= static_cast<std::uint32_t>(ovt::render::OverlayLayer::SelectionRect);
+      cfg.selection_rect = ovt::fb::Rect(r.x(), r.y(), r.width(), r.height());
+    }
+    if (cfg.layers != 0) {
+      ovt::render::OverlayBuilder builder(*surface_);
+      surface_->set_overlays(builder.build(nullptr, cfg));
+    } else {
+      surface_->set_overlays(nullptr);
+    }
+    applied_probe_ = state_.probe;
+    applied_rect_ = r;
+    marks_applied_ = true;
+  }
+
   // Renders the current frame into the surface's texture and returns the QRhiTexture that shows it (nullptr when
   // there is no surface).
   QRhiTexture* render_surface(QRhiResourceUpdateBatch* updates) {
@@ -346,11 +439,14 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       if (state_.frame != nullptr && state_.frame->picture.generation != uploaded_generation_) {
         surface_->set_frame(state_.frame->picture);  // uploads now; the frame outlives the call (§10.2.1)
         uploaded_generation_ = state_.frame->picture.generation;
+        a_changed_ = true;
       }
       // No picture: background only, which the pass clears to (slot A may still hold an earlier frame).
       if (state_.frame == nullptr) {
         return nullptr;
       }
+      apply_compare();
+      apply_marks();
       surface_->render(view_for(state_, surface_size_.width(), surface_size_.height()));
       const std::string_view err = surface_->last_error();
       stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
@@ -508,6 +604,13 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   bool init_failed_ = false;
   qreal device_pixel_ratio_ = 1.0;
   std::uint64_t uploaded_generation_ = 0;
+  std::uint64_t uploaded_b_generation_ = 0;
+  ovt::render::CompareMode applied_;
+  bool compare_active_ = false;
+  bool a_changed_ = false;
+  bool marks_applied_ = false;
+  QPoint applied_probe_{-1, -1};
+  QRect applied_rect_;
   HostState state_;
   PictureHostStats stats_;
 
@@ -542,6 +645,128 @@ void PictureHost::set_picture(std::shared_ptr<const PictureFrame> frame) {
   frame_ = std::move(frame);
   Q_EMIT pictureChanged();
   update();
+}
+
+namespace {
+
+// A deep copy of `src` under a new generation: the planes are copied and the Picture's pointers re-aimed at them.
+std::shared_ptr<const PictureFrame> clone_frame(const PictureFrame& src) {
+  auto copy = std::make_shared<PictureFrame>();
+  copy->picture = src.picture;
+  copy->planes = src.planes;
+  for (std::size_t i = 0; i < copy->picture.num_planes && i < copy->planes.size(); ++i) {
+    copy->picture.planes[i].data = copy->planes.at(i).data();
+  }
+  copy->picture.generation = next_picture_generation();
+  return copy;
+}
+
+}  // namespace
+
+bool PictureHost::snapshotAsB() {
+  if (frame_ == nullptr) {
+    return false;
+  }
+  set_picture_b(clone_frame(*frame_));
+  return true;
+}
+
+void PictureHost::set_picture_b(std::shared_ptr<const PictureFrame> frame) {
+  if (frame == frame_b_) {
+    return;
+  }
+  frame_b_ = std::move(frame);
+  Q_EMIT compareChanged();
+  update_flicker_timer();
+  update();
+}
+
+void PictureHost::clearB() {
+  set_picture_b(nullptr);
+}
+
+void PictureHost::swapAB() {
+  if (frame_b_ == nullptr) {
+    return;
+  }
+  std::swap(frame_, frame_b_);
+  Q_EMIT pictureChanged();
+  Q_EMIT compareChanged();
+  update();
+}
+
+void PictureHost::set_compare(int& field, int value) {
+  if (field == value) {
+    return;
+  }
+  field = value;
+  Q_EMIT compareChanged();
+  update_flicker_timer();
+  update();
+}
+
+void PictureHost::set_compare_kind(int kind) {
+  set_compare(compare_kind_, std::clamp(kind, 0, 5));
+}
+
+void PictureHost::set_split_axis(int axis) {
+  set_compare(split_axis_, std::clamp(axis, 0, 1));
+}
+
+void PictureHost::set_diff_gain(int gain) {
+  set_compare(diff_gain_, std::clamp(gain, 1, 64));
+}
+
+void PictureHost::set_flicker_period_ms(int ms) {
+  set_compare(flicker_period_ms_, std::clamp(ms, 1, 65535));
+}
+
+void PictureHost::set_split_position(double fraction) {
+  const double v = std::clamp(fraction, 0.0, 1.0);
+  if (qFuzzyCompare(v + 1.0, split_position_ + 1.0)) {
+    return;
+  }
+  split_position_ = v;
+  Q_EMIT compareChanged();
+  update();
+}
+
+void PictureHost::set_overlay_alpha(double alpha) {
+  const double v = std::clamp(alpha, 0.0, 1.0);
+  if (qFuzzyCompare(v + 1.0, overlay_alpha_ + 1.0)) {
+    return;
+  }
+  overlay_alpha_ = v;
+  Q_EMIT compareChanged();
+  update();
+}
+
+void PictureHost::set_diff_false_colour(bool on) {
+  if (on == diff_false_colour_) {
+    return;
+  }
+  diff_false_colour_ = on;
+  Q_EMIT compareChanged();
+  update();
+}
+
+// Flicker alternates A and B by the clock (§10.6.4), so the item repaints on a timer while it is on screen.
+void PictureHost::update_flicker_timer() {
+  const bool want = compare_kind_ == 5 && frame_b_ != nullptr;
+  if (want && flicker_timer_ == 0) {
+    flicker_timer_ = startTimer(16);
+  } else if (!want && flicker_timer_ != 0) {
+    killTimer(flicker_timer_);
+    flicker_timer_ = 0;
+  }
+}
+
+void PictureHost::timerEvent(QTimerEvent* event) {
+  if (event->timerId() == flicker_timer_) {
+    update();
+    return;
+  }
+  QQuickRhiItem::timerEvent(event);
 }
 
 int PictureHost::picture_width() const noexcept {
