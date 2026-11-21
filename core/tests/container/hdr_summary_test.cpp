@@ -271,7 +271,7 @@ bool has_diag(const Run& r, std::string_view code) {
 
 // ---- acceptance tests 2 and 3 (corpus) ----
 
-TEST_CASE("AT2: hdr_hlg_bt2020 is HLG", "[container][hdr][needs-corpus]") {
+TEST_CASE("AT2: hdr_hlg_bt2020 is HLG", "[container][hdr][needs-corpus][slow]") {
   const auto file = ovt::io::RandomAccessFile::open(ovt::test::corpus_or_skip("hdr_hlg_bt2020").string());
   const Run r = summarize(*file);
   CHECK(r.meta.kind == HdrKind::HLG);
