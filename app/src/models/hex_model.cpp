@@ -204,11 +204,23 @@ std::vector<std::uint64_t> hex_find_all(const ByteSource& source, const HexPatte
 
 // ---- HexModel: inputs -------------------------------------------------------------------------------------------
 
-HexModel::HexModel(QObject* parent) : QAbstractTableModel(parent) {}
+HexModel::HexModel(QObject* parent) : QAbstractTableModel(parent) {
+  shared_->model = this;
+}
 
 HexModel::~HexModel() {
+  {
+    // A job past its cancel check stores nothing once it sees !alive; a queued takeSearchResult to a deleted model
+    // is discarded by Qt.
+    const std::scoped_lock lock(shared_->mutex);
+    shared_->alive = false;
+    shared_->model = nullptr;
+  }
   if (search_cancel_) {
     search_cancel_->store(true);
+  }
+  if (jobs_ != nullptr && search_job_ != 0) {
+    jobs_->cancel(search_job_);
   }
 }
 
@@ -873,19 +885,20 @@ QString HexModel::search(const QString& pattern_text) {
     finish_search(generation, run(), pattern->size());
     return {};
   }
-  const QPointer<HexModel> self(this);
-  search_job_ = jobs_->enqueue(QStringLiteral("Hex search"), [self, run, cancel, generation](JobContext& ctx) {
+  const std::shared_ptr<SearchShared> shared = shared_;
+  search_job_ = jobs_->enqueue(QStringLiteral("Hex search"), [shared, run, cancel, generation](JobContext& ctx) {
     auto found = run();
     if (cancel->load() || ctx.cancelled()) {
       return OVT_E_CANCELLED;
     }
-    if (self != nullptr) {
-      {
-        const std::scoped_lock lock(self->result_mutex_);
-        self->result_ = std::move(found);
-      }
+    // Store and queue under the lock, so the destructor cannot run in between and a newer search's result is never
+    // overwritten by this older one (takeSearchResult checks the stored generation).
+    const std::scoped_lock lock(shared->mutex);
+    if (shared->alive && generation >= shared->result_generation) {
+      shared->result = std::move(found);
+      shared->result_generation = generation;
       // By name: the functor overload trips clang-analyzer's NewDeleteLeaks inside Qt's header.
-      QMetaObject::invokeMethod(self.data(), "takeSearchResult", Qt::QueuedConnection, Q_ARG(quint64, generation));
+      QMetaObject::invokeMethod(shared->model, "takeSearchResult", Qt::QueuedConnection, Q_ARG(quint64, generation));
     }
     return OVT_OK;
   });
@@ -895,9 +908,12 @@ QString HexModel::search(const QString& pattern_text) {
 void HexModel::takeSearchResult(quint64 generation) {
   std::vector<std::uint64_t> found;
   {
-    const std::scoped_lock lock(result_mutex_);
-    found = std::move(result_);
-    result_.clear();
+    const std::scoped_lock lock(shared_->mutex);
+    if (shared_->result_generation != generation) {
+      return;  // another search stored a result since; its own call follows
+    }
+    found = std::move(shared_->result);
+    shared_->result.clear();
   }
   finish_search(generation, std::move(found), match_size_);
 }

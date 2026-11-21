@@ -181,7 +181,7 @@ class HexModel : public QAbstractTableModel {
   void set_stream_index(StreamIndexModel* model);
   [[nodiscard]] SelectionModel* selection() const { return selection_; }
   void set_selection(SelectionModel* selection);
-  [[nodiscard]] JobsModel* jobs() const { return jobs_; }
+  [[nodiscard]] JobsModel* jobs() const { return jobs_.data(); }
   void set_jobs(JobsModel* jobs);
   // The open file's bytes (nullptr clears).
   void setSource(std::shared_ptr<const ByteSource> source);
@@ -294,7 +294,7 @@ class HexModel : public QAbstractTableModel {
   [[nodiscard]] QString ascii_of_row(std::uint64_t row_offset) const;
   [[nodiscard]] QVariant byte_cell(std::uint64_t off, int role) const;
 
-  JobsModel* jobs_ = nullptr;
+  QPointer<JobsModel> jobs_;
   StreamIndexModel* stream_index_ = nullptr;
   SelectionModel* selection_ = nullptr;
   std::shared_ptr<const ByteSource> source_;
@@ -321,8 +321,16 @@ class HexModel : public QAbstractTableModel {
   quint64 search_generation_ = 0;
   quint64 search_job_ = 0;
   std::shared_ptr<std::atomic<bool>> search_cancel_;
-  std::mutex result_mutex_;
-  std::vector<std::uint64_t> result_;  // written by the job, taken on the GUI thread
+  // State shared with the search job, which may outlive the model: the job stores its matches here under the lock,
+  // tagged with its generation, and the destructor clears `alive` under the same lock.
+  struct SearchShared {
+    std::mutex mutex;
+    bool alive = true;
+    HexModel* model = nullptr;
+    quint64 result_generation = 0;
+    std::vector<std::uint64_t> result;
+  };
+  std::shared_ptr<SearchShared> shared_ = std::make_shared<SearchShared>();
 
   mutable QHash<std::uint64_t, Page> pages_;
   mutable QList<std::uint64_t> page_order_;

@@ -9,9 +9,12 @@
 
 #include <QSignalSpy>
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <thread>
 #include <vector>
 
 #include "models/hex_model.h"
@@ -319,4 +322,65 @@ TEST_CASE("Hex copies bytes as hex and as a C array", "[fast][gui][hex]") {
   model.setSource(std::make_shared<MemoryByteSource>(std::vector<std::uint8_t>{0x00, 0x00, 0x01, 0xAF}));
   REQUIRE(model.copyHex(0, 4) == QStringLiteral("00 00 01 AF"));
   REQUIRE(model.copyCArray(1, 3) == QStringLiteral("{ 0x00, 0x01, 0xAF }"));
+}
+
+namespace {
+
+// A source whose first read blocks until released, so a search job can be held while others run.
+struct GatedSource final : ovt::app::ByteSource {
+  std::vector<std::uint8_t> data;
+  mutable std::atomic<int> reads{0};
+  std::atomic<bool> released{false};
+  [[nodiscard]] std::uint64_t size() const override { return data.size(); }
+  [[nodiscard]] std::size_t read(std::uint64_t offset, std::uint8_t* dst, std::size_t len) const override {
+    if (reads.fetch_add(1) == 0) {
+      while (!released.load()) {
+        std::this_thread::sleep_for(1ms);
+      }
+    }
+    if (offset >= data.size()) {
+      return 0;
+    }
+    const std::size_t n = std::min<std::uint64_t>(len, data.size() - offset);
+    std::copy_n(data.begin() + static_cast<std::ptrdiff_t>(offset), n, dst);
+    return n;
+  }
+};
+
+}  // namespace
+
+TEST_CASE("Hex search: an older search finishing late never replaces a newer one's matches", "[fast][gui][hex]") {
+  JobsModel jobs(2);
+  HexModel model;
+  auto source = std::make_shared<GatedSource>();
+  source->data = {0x11, 0x22, 0x11, 0x22, 0x22};
+  const std::shared_ptr<GatedSource> gate = source;
+  model.setSource(std::move(source));
+  model.set_jobs(&jobs);
+  REQUIRE(model.search(QStringLiteral("11")).isEmpty());  // A: its job is held on the first read
+  REQUIRE(ovt::app::testing::spin_until([&] { return gate->reads.load() > 0; }, 5000ms));
+  REQUIRE(model.search(QStringLiteral("22")).isEmpty());  // B replaces A
+  REQUIRE(ovt::app::testing::spin_until([&] { return !model.searching(); }, 5000ms));
+  REQUIRE(model.matches() == std::vector<std::uint64_t>{1, 3, 4});
+  gate->released.store(true);
+  REQUIRE(ovt::app::testing::spin_until([&] { return jobs.activeCount() == 0; }, 5000ms));
+  QCoreApplication::processEvents();
+  REQUIRE(model.matches() == std::vector<std::uint64_t>{1, 3, 4});
+  REQUIRE_FALSE(model.searching());
+}
+
+TEST_CASE("Hex search: a model destroyed while its job runs is not touched by the job", "[fast][gui][hex]") {
+  JobsModel jobs(2);
+  auto source = std::make_shared<GatedSource>();
+  source->data = {0x11, 0x22, 0x11};
+  const std::shared_ptr<GatedSource> gate = source;
+  auto model = std::make_unique<HexModel>();
+  model->setSource(std::move(source));
+  model->set_jobs(&jobs);
+  REQUIRE(model->search(QStringLiteral("11")).isEmpty());
+  REQUIRE(ovt::app::testing::spin_until([&] { return gate->reads.load() > 0; }, 5000ms));
+  model.reset();
+  gate->released.store(true);
+  REQUIRE(ovt::app::testing::spin_until([&] { return jobs.activeCount() == 0; }, 5000ms));
+  QCoreApplication::processEvents();
 }
