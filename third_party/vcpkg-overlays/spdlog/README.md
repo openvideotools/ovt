@@ -14,9 +14,12 @@ archive (the same one the upstream port uses, same hash):
 - `patches/backport-3543-format-string-propagation.patch` is spdlog commit `d5af52d903ed69f96c7350155e94aeff248b31eb`
   (PR #3543, "Fix format_string propagation").
 
-The patches live in `patches/` so the repository's whitespace hooks leave them byte-exact. Both are exported with `git format-patch --full-index`, so author and message are kept; only the `Upstream-Status`, `SPDX-License-Identifier` and `Rationale` header lines required by `tools/check_patches.py` are added to the message. They are MIT-licensed like
-the rest of spdlog (copyright Gabi Melman and spdlog contributors); `REUSE.toml` annotates them. They apply cleanly
-to `v1.17.0`. `vcpkg.json` and `usage` are copied unchanged from the baseline.
+The patches live in `patches/` so the repository's whitespace hooks leave them byte-exact. Both are exported with
+`git format-patch --full-index`, so author and message are kept; only the `Upstream-Status`,
+`SPDX-License-Identifier` and `Rationale` header lines required by `tools/check_patches.py` are added to the
+message. They are MIT-licensed like the rest of spdlog (copyright Gabi Melman and spdlog contributors);
+`REUSE.toml` annotates them. They apply cleanly to `v1.17.0`. `vcpkg.json` and `usage` are copied unchanged from
+the baseline.
 
 Delete this overlay when the pinned baseline's spdlog port no longer needs the patches (a spdlog release that
 contains both commits) or no longer downloads them.
