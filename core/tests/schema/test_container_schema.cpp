@@ -67,6 +67,7 @@ const std::vector<std::string> kSpecTableList = {
     "Manifest",
     "SegmentRef",
     "DashHlsContext",
+    "DiagnosticRegistry",
     "ContainerRoot",
 };
 

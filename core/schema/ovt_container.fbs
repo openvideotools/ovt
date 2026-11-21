@@ -236,6 +236,14 @@ table DashHlsContext {
   fetched_at_unix:long;                            // metadata only (not part of any analysis record)
 }
 
+// ===================================== Diagnostics registry (chapter 8 §8.5, WI-1.235) =====================================
+
+/// The `CNT-*` diagnostic registry of chapter 8 §8.5 as `ovt_container_list_diagnostics` returns it (chapter 12 §12.3.7): one entry per
+/// row of `core/src/container/diag_codes.inc`, in file order, each code exactly once. `Diagnostic.message` is the message template
+/// (parameters in backticks, not substituted), `spec_ref` the spec reference (empty when none) and `span` is unset. Not a file root:
+/// finished without a file identifier (§6.1.1); `ovt_fb_to_json` reads it by the root type name.
+table DiagnosticRegistry { family:string /* "CNT" */; entries:[Diagnostic]; }
+
 // ===================================== Root =====================================
 
 /// File-level root written to the cache (`container.fb.zst`, §6.7) and emitted by `ovt probe -f fb`. Derived views are stored once per
