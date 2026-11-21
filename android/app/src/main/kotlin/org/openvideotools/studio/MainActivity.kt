@@ -179,17 +179,22 @@ class MainActivity : AppCompatActivity() {
      * After attachment the insets are never null.
      *
      * The window attaches after the first onResume, so Qt's own resume callback has already been missed: OvtQtResume
-     * sets the Qt application state to Active, which runs the actions Qt queued (root window, display metrics).
+     * sets the Qt application state to Active at once (Qt's start-up waits for UI-thread runnables that a Suspended
+     * state parks), which runs the actions Qt queued (display metrics).
+     *
+     * The view joins the hierarchy only once Qt's start-up actions have run (OvtQtResume.whenStartupActionsRan, after
+     * the native plugin is ready): attaching it queues QtView's createRootWindow, whose native side calls
+     * QMetaObject::invokeMethod(qApp, ...), a silent no-op while main() has not yet created the QGuiApplication. An
+     * early attach therefore lost the root window, and the QML root never loaded, whenever Qt started slowly (#581).
      */
     private fun addQtView(host: FrameLayout) {
         val view = QtQuickView(this, SHELL_QML, QT_APP_LIBRARY)
         qtView = view
         // A status change after onDestroy finds the native QQuickView gone (SIGSEGV in rootObject()): drop it.
-        view.setStatusChangeListener { status -> if (!isDestroyed && view === qtView) onShellStatus(status) }
-        host.addView(
-            qtView,
-            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
-        )
+        view.setStatusChangeListener { status ->
+            Log.i(TAG, "OVT: QML root status $status")
+            if (!isDestroyed && view === qtView) onShellStatus(status)
+        }
         // Otherwise Qt's ActivityLifecycleCallbacks set the state at the next onResume.
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) OvtQtResume.activityAlreadyResumed()
         OvtQtResume.whenStartupActionsRan {
@@ -198,9 +203,15 @@ class MainActivity : AppCompatActivity() {
                 finishWhenQtStarted = false
                 Log.i(TAG, "OVT: Qt started, finishing now")
                 super.finish()
+            } else if (!isFinishing && !isDestroyed) {
+                Log.i(TAG, "OVT: Qt started, attaching the QtQuickView")
+                host.addView(
+                    view,
+                    FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+                )
+                overlay?.bringToFront() // the WI-0.051 debug overlay stays above the Qt view
             }
         }
-        overlay?.bringToFront() // the WI-0.051 debug overlay stays above the Qt view
     }
 
     /** Called on the UI thread whenever the QML root's status changes (QtQmlStatusChangeListener). */
