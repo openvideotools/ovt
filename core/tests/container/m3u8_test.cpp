@@ -202,6 +202,11 @@ TEST_CASE("m3u8: short IV is left-padded and an odd digit count works", "[contai
   CHECK(iv[14] == 0x0A);
   CHECK(iv[15] == 0xBC);
   CHECK(std::all_of(iv.begin(), iv.begin() + 14, [](uint8_t b) { return b == 0; }));
+
+  const auto bad =
+      parse_text("#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"k\",IV=0xZZ\n#EXTINF:1,\na.ts\n#EXT-X-ENDLIST\n");
+  CHECK(bad.manifest.media.keys[0].iv.empty());
+  CHECK(has_diag(bad.manifest, DiagCode::CNT_HLS_0003));
 }
 
 TEST_CASE("m3u8: not a playlist", "[container][hls][fast]") {
@@ -268,6 +273,11 @@ TEST_CASE("m3u8: diagnostics for malformed input", "[container][hls][fast]") {
     const auto r = parse_text("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nv.m3u8\n#EXTINF:1,\na.ts\n");
     CHECK(has_diag(r.manifest, DiagCode::CNT_HLS_0009));
     CHECK(r.manifest.is_master);
+  }
+  SECTION("zero-length byte range is invalid") {
+    const auto r = parse_text("#EXTM3U\n#EXTINF:1,\n#EXT-X-BYTERANGE:0@10\na.ts\n#EXT-X-ENDLIST\n");
+    CHECK(has_diag(r.manifest, DiagCode::CNT_HLS_0003));
+    CHECK(r.manifest.media.segments[0].byte_range.length == 0);
   }
 }
 
