@@ -1,0 +1,97 @@
+// SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Platform values from Android (chapter 11 §11.5.2, §11.5.3; WI-A.451): the width the breakpoint table reads, the
+// presence of a pointer and the windowing mode. Built into Android builds only; platform.cpp has the no-op for the
+// other platforms.
+//
+// The width is `Configuration.screenWidthDp` of the Activity's Resources, which follows the window (split-screen,
+// freeform, desktop windowing). `DisplayMetrics` of the display would report the whole screen, so it is never used.
+// The Activity is not recreated on a resize (the manifest declares the configuration changes). The width is read here
+// once at start-up; after that MainActivity.onConfigurationChanged pushes Configuration.screenWidthDp into the QML
+// root (AndroidShell.qml `configurationWidthDp`), which calls Platform.refresh(widthDp), and this re-reads the
+// input devices and the windowing mode.
+
+// Built into Android builds only (app/CMakeLists.txt). The guard (the compiler's own macro) keeps the host-side
+// clang-tidy job, which sees every changed file under app/ but has no Android Qt headers, from parsing it.
+#if defined(__ANDROID__)
+
+#include <QCoreApplication>
+#include <QGuiApplication>
+#include <QJniEnvironment>
+#include <QJniObject>
+#include <QString>
+
+#include "platform/platform.h"
+
+namespace ovt::app {
+
+namespace {
+
+// android.view.InputDevice.SOURCE_MOUSE and SOURCE_STYLUS (SOURCE_CLASS_POINTER | 0x2000 / 0x4000 | ...); a source
+// "contains" a flag when the bits are all set (InputDevice.supportsSource).
+constexpr jint kSourceMouse = 0x00002002;
+constexpr jint kSourceStylus = 0x00004002;
+
+// Any attached pointer that hovers: a mouse (also a ChromeOS touchpad) or a stylus (§11.5.3).
+bool anyHoverDevice() {
+  const QJniObject ids = QJniObject::callStaticObjectMethod("android/view/InputDevice", "getDeviceIds", "()[I");
+  if (!ids.isValid()) {
+    return false;
+  }
+  QJniEnvironment env;
+  const auto array = static_cast<jintArray>(ids.object());
+  const jsize count = env->GetArrayLength(array);
+  jint* values = env->GetIntArrayElements(array, nullptr);
+  bool found = false;
+  for (jsize i = 0; i < count && !found; ++i) {
+    const QJniObject device = QJniObject::callStaticObjectMethod("android/view/InputDevice", "getDevice",
+                                                                 "(I)Landroid/view/InputDevice;", values[i]);
+    if (!device.isValid()) {
+      continue;
+    }
+    const jint sources = device.callMethod<jint>("getSources");
+    found = (sources & kSourceMouse) == kSourceMouse || (sources & kSourceStylus) == kSourceStylus;
+  }
+  env->ReleaseIntArrayElements(array, values, JNI_ABORT);
+  return found;
+}
+
+}  // namespace
+
+bool Platform::refreshFromAndroid(bool read_width) {
+  const QJniObject context = QNativeInterface::QAndroidApplication::context();
+  if (!context.isValid()) {
+    return false;
+  }
+  const QJniObject resources = context.callObjectMethod("getResources", "()Landroid/content/res/Resources;");
+  const QJniObject configuration =
+      resources.isValid() ? resources.callObjectMethod("getConfiguration", "()Landroid/content/res/Configuration;")
+                          : QJniObject();
+  bool ok = false;
+  if (read_width && configuration.isValid()) {
+    const jint width = configuration.getField<jint>("screenWidthDp");
+    if (width > 0) {
+      setWidthDp(width);
+      ok = true;
+    }
+  }
+  if (read_width) {
+    // For the emulator record (test_android_breakpoints.py prints it on failure): the start-up width read and the Qt
+    // application state (2, Inactive, is normal at this point).
+    qInfo("OVT: Platform read widthDp=%d ok=%d appState=%d", static_cast<int>(width_dp_), ok ? 1 : 0,
+          static_cast<int>(QGuiApplication::applicationState()));
+  }
+  setHasHover(anyHoverDevice());
+  // Activity.isInMultiWindowMode() (API 24): split-screen, freeform and desktop windowing all report true. An
+  // application Context has no such method; the call then leaves a pending exception that is cleared.
+  const bool multi_window = context.callMethod<jboolean>("isInMultiWindowMode") != JNI_FALSE;
+  QJniEnvironment env;
+  static_cast<void>(env.checkAndClearExceptions());
+  setWindowingMode(multi_window ? QStringLiteral("multiWindow") : QStringLiteral("fullscreen"));
+  return ok;
+}
+
+}  // namespace ovt::app
+
+#endif  // __ANDROID__

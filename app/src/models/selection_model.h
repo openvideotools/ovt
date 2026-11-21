@@ -206,19 +206,9 @@ class SelectionModel : public QObject {
   [[nodiscard]] bool lock_pixel_selection() const { return lock_pixel_; }
   void set_lock_pixel_selection(bool lock);
 
-  // §11.3.5, the normative RBSP→raw mapping: file offset of bit `bit_offset` of a unit (the bit within the byte is
-  // unchanged, bit_offset % 8). Exposed for the Hex panel and the tests.
-  [[nodiscard]] static std::uint64_t raw_offset_of_bit(const SelectionUnit& unit, std::uint64_t bit_offset);
-  // File bytes covered by a field: first byte of its first bit to the byte of its last bit, EPBs inside included.
-  [[nodiscard]] static ByteSpan field_bytes(const SelectionUnit& unit, BitSpan bits);
-
- Q_SIGNALS:
-  // One signal per applied change; `mask` is a bit set of Change values. The new state is already visible.
-  void changed(int mask);
-  void lockChanged();
-
- private:
-  struct State {
+  // The whole selection without its origin: what Android saves across Activity recreation (§11.5.7, WI-A.455,
+  // app/src/platform/android_state.cpp).
+  struct Snapshot {
     QString file_id;
     int track_index = 0;
     FrameId frame;
@@ -233,6 +223,26 @@ class SelectionModel : public QObject {
     QString field_path;
     QPoint probe{-1, -1};
     QRect selection_rect;
+  };
+
+  [[nodiscard]] Snapshot snapshot() const { return static_cast<const Snapshot&>(s_); }
+  // Puts back a saved selection as it was, with no derivation (the index may not be loaded yet, and the saved
+  // state is already consistent), and emits one `changed` for whatever differs.
+  void restore(const Snapshot& snapshot, const QString& origin);
+
+  // §11.3.5, the normative RBSP→raw mapping: file offset of bit `bit_offset` of a unit (the bit within the byte is
+  // unchanged, bit_offset % 8). Exposed for the Hex panel and the tests.
+  [[nodiscard]] static std::uint64_t raw_offset_of_bit(const SelectionUnit& unit, std::uint64_t bit_offset);
+  // File bytes covered by a field: first byte of its first bit to the byte of its last bit, EPBs inside included.
+  [[nodiscard]] static ByteSpan field_bytes(const SelectionUnit& unit, BitSpan bits);
+
+ Q_SIGNALS:
+  // One signal per applied change; `mask` is a bit set of Change values. The new state is already visible.
+  void changed(int mask);
+  void lockChanged();
+
+ private:
+  struct State : Snapshot {
     QString origin;
   };
 

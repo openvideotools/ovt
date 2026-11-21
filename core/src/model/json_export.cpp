@@ -250,13 +250,13 @@ void append_decimal(std::string& out, std::string_view text) {
 // The walk recurses along the object tree. The depth is bounded: every buffer passes the reflection verifier
 // (max_depth 64) before it is walked, nested buffers are verified the same way and at most kMaxNestedBuffers
 // deep. The width is bounded by the Budget.
-// NOLINTBEGIN(misc-no-recursion)
 class Printer {
  public:
   Printer(const reflection::Schema& schema, JsonOptions options, std::size_t input_size)
       : schema_(schema), options_(options), budget_(input_size) {}
 
   /// Verifies @p buffer as a finished buffer of @p object and appends its JSON object at @p indent.
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void buffer(const reflection::Object& object, ByteView buffer, int indent) {
     budget_.charge(buffer.size());
     // 8-byte aligned storage: a caller's span, or a nested buffer inside a [ubyte] vector, may be less aligned.
@@ -442,6 +442,7 @@ class Printer {
   }
 
   /// @p bytes starts at the struct (and reaches at least to its end: the verifier checked it).
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void structure(const reflection::Object& object, ByteView bytes, int indent) {
     out_ += '{';
     bool first = true;
@@ -464,6 +465,7 @@ class Printer {
 
   /// `[`, @p count elements written by @p element(i), `]`.
   template <class Element>
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void array(std::size_t count, int indent, Element&& element) {
     if (count == 0) {
       out_ += "[]";
@@ -491,6 +493,7 @@ class Printer {
     out_ += '"';
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void vector(const reflection::Object& object, const reflection::Field& field, const flatbuffers::Table& table,
               int indent) {
     const auto& type = deref(field.type());
@@ -512,6 +515,7 @@ class Printer {
       } else {
         const auto* tables = reinterpret_cast<const flatbuffers::Vector<flatbuffers::Offset<flatbuffers::Table>>*>(raw);
         budget_.charge(count * sizeof(flatbuffers::uoffset_t));
+        // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
         array(count, indent, [&](std::size_t i) {
           this->table(element, deref(tables->Get(static_cast<flatbuffers::uoffset_t>(i))), indent + kStep);
         });
@@ -556,6 +560,7 @@ class Printer {
     return fixed.empty() ? nullptr : detail::find_table(schema_, object, fixed);
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): bounded by the schema, the verifier depth and the nested-buffer limit
   void table(const reflection::Object& object, const flatbuffers::Table& table, int indent) {
     budget_.charge(2 * sizeof(flatbuffers::uoffset_t));
     out_ += '{';
@@ -626,7 +631,6 @@ class Printer {
     }
   }
 };
-// NOLINTEND(misc-no-recursion)
 
 }  // namespace
 

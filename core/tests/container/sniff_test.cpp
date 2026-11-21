@@ -205,7 +205,7 @@ TEST_CASE("ovt_container_open on a 7-byte file returns OVT_E_UNSUPPORTED", "[con
 }
 
 TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][fast]") {
-  // ISOBMFF keeps the stub reader until WI-1.201; the IVF reader has its own tests (ivf_test.cpp).
+  // The ISOBMFF reader (WI-1.204) has its own tests (lazy_test.cpp, box_walk_test.cpp); here only the handle plumbing.
   const TempFile f("stub.mp4", box(32, "ftyp", 64));
   ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
   ovt_Container* c = nullptr;
@@ -217,11 +217,24 @@ TEST_CASE("ovt_container_open: stub reader, tree and close", "[container][open][
   const ovt_Buffer tree = ovt_container_tree(c);
   CHECK(tree.data != nullptr);
   CHECK(tree.size > 0);
-  CHECK(ovt_container_expand(c, 0) == OVT_E_UNSUPPORTED);
+  CHECK(ovt_container_expand(c, 0) == OVT_OK);             // the `ftyp` box: nothing to expand
+  CHECK(ovt_container_expand(c, 8) == OVT_E_INVALID_ARG);  // no box starts there
   ovt_Buffer out{nullptr, 0};
-  CHECK(ovt_container_bytes(c, 0, 16, &out) == OVT_E_UNSUPPORTED);
+  CHECK(ovt_container_bytes(c, 0, 16, &out) == OVT_OK);  // the byte service (WI-1.234)
+  CHECK(out.size == 16);
+  delete[] out
+      .data;  // NOLINT(cppcoreguidelines-owning-memory): rule 3a buffers are new[]; ovt_buffer_free is not linked
   ovt_container_close(c);
   ovt_container_close(nullptr);  // no-op
+}
+
+TEST_CASE("ovt_container_open_format: a format without a reader yet keeps the stub", "[container][open][fast]") {
+  const TempFile f("stub.264", Bytes(64, 0x80));
+  ovt_File handle{ovt::io::RandomAccessFile::open(f.path())};
+  ovt_Container* c = nullptr;
+  REQUIRE(ovt_container_open_format(&handle, "annexb", nullptr, nullptr, &c) == OVT_OK);
+  CHECK(ovt_container_expand(c, 0) == OVT_E_UNSUPPORTED);
+  ovt_container_close(c);
 }
 
 TEST_CASE("ovt_container_open_format argument rules", "[container][open][fast]") {

@@ -162,6 +162,8 @@ TEST_CASE("kinds follow the §8.2.10 step 4 lists", "[container][registry][fast]
   CHECK(iso::lookup("avcC", ctx_of({"stsd", "avc1"}))->kind == iso::BoxKind::Leaf);
   CHECK(iso::lookup("avcC", ctx_of({"stsd", "avc1"}))->has_trailing_data_ok);
   CHECK(iso::lookup("hvc1", ctx_of({"stbl", "stsd"}))->kind == iso::BoxKind::ContainerWithPrefix);
+  CHECK(iso::lookup("hvc1", ctx_of({"stbl", "stsd"}))->decoder != nullptr);  // the stsd/* decoder, the row's kind
+  CHECK(iso::lookup("hint", ctx_of({"trak", "tref"}))->kind == iso::BoxKind::Leaf);
   CHECK(iso::lookup("tkhd", ctx_of({"trak"}))->known_flag_mask == 0x00000F);
 }
 
@@ -236,23 +238,23 @@ TEST_CASE("acceptance 3: an unknown fourcc has no row and the walk reports CNT-1
 }
 
 TEST_CASE("the walk reads FullBox version/flags from the registry", "[container][registry][fast]") {
-  // `mehd` (§8.8.2) is a FullBox with no hand decoder, so the walker's own fields are all it gets.
-  Bytes mehd_payload{1, 0, 0, 5};
-  mehd_payload.resize(12, 0);
+  // `trep` (§8.8.15) is a FullBox with no hand decoder, so the walker's own fields are all it gets.
+  Bytes trep_payload{0, 0, 0, 5};
+  trep_payload.resize(12, 0);
   const auto r =
       walk_bytes(cat({box("ftyp", Bytes(8, 'a')),
-                      box("moov", box("mvex", cat({box("mehd", mehd_payload), box("mehd", Bytes(2, 0))})))}));
+                      box("moov", box("mvex", cat({box("trep", trep_payload), box("trep", Bytes(2, 0))})))}));
   const BoxNodeT& mvex = *r.top_level[1]->children.at(0);
   REQUIRE(mvex.children.size() == 2);
-  const BoxNodeT& mehd = *mvex.children[0];
-  CHECK(mehd.version == 1);
-  CHECK(mehd.flags == 5);
-  REQUIRE(mehd.fields.size() == 2);
-  CHECK(mehd.fields[0]->name == "version");
-  CHECK(mehd.fields[1]->name == "flags");
-  CHECK(mehd.fields[1]->span->bit_offset() == 72);
-  REQUIRE(mehd.payload_span != nullptr);
-  CHECK(mehd.payload_span->offset() == mehd.file_span->offset() + 12);
+  const BoxNodeT& trep = *mvex.children[0];
+  CHECK(trep.version == 0);
+  CHECK(trep.flags == 5);
+  REQUIRE(trep.fields.size() == 2);
+  CHECK(trep.fields[0]->name == "version");
+  CHECK(trep.fields[1]->name == "flags");
+  CHECK(trep.fields[1]->span->bit_offset() == 72);
+  REQUIRE(trep.payload_span != nullptr);
+  CHECK(trep.payload_span->offset() == trep.file_span->offset() + 12);
   CHECK(has_code(*mvex.children[1], "CNT-0110"));  // a FullBox of 2 payload bytes
 }
 
@@ -283,7 +285,7 @@ TEST_CASE("a ContainerWithPrefix decoder sets where the children start", "[conta
   const Bytes entry = box("abcd", Bytes(4, 0));
   stsd_payload.insert(stsd_payload.end(), entry.begin(), entry.end());
   const auto r = walk_bytes(cat({box("ftyp", Bytes(8, 'a')), box("moov", box("udta", box("stsd", stsd_payload))),
-                                 box("udta", box("stsd", stsd_payload))}));
+                                 box("udta", box("avc1", stsd_payload))}));
   const BoxNodeT* stsd = child(*child(*r.top_level[1], "udta"), "stsd");
   REQUIRE(stsd != nullptr);
   CHECK(field(*stsd, "entry_count")->uvalue == 1);
@@ -291,9 +293,13 @@ TEST_CASE("a ContainerWithPrefix decoder sets where the children start", "[conta
   REQUIRE(stsd->children.size() == 1);
   CHECK(stsd->children[0]->fourcc == "abcd");
   CHECK(stsd->children[0]->file_span->offset() == stsd->file_span->offset() + 16);
-  // Without a decoder (no moov ancestor) the prefix length is unknown, so stsd stays a leaf.
-  const BoxNodeT* bare = child(*r.top_level[2], "stsd");
+  // A ContainerWithPrefix row without a decoder (a sample entry outside stsd) has an unknown prefix length, so it
+  // stays a leaf. (`stsd` itself has a "*" decoder since WI-1.206.)
+  const BoxNodeT* bare = child(*r.top_level[2], "avc1");
   REQUIRE(bare != nullptr);
+  CHECK(iso::lookup("avc1", ctx_of({"udta"}))->kind == iso::BoxKind::ContainerWithPrefix);
+  CHECK(iso::lookup("avc1", ctx_of({"udta"}))->decoder == nullptr);
   CHECK(bare->children.empty());
-  CHECK(bare->payload_span->length() == 16);
+  REQUIRE(bare->payload_span != nullptr);
+  CHECK(bare->payload_span->length() == stsd_payload.size());  // not a FullBox: the whole payload
 }

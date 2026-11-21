@@ -20,8 +20,11 @@
 
 #include <QtQml/qqmlregistration.h>
 #include <QColor>
+#include <QPoint>
 #include <QQuickRhiItem>
+#include <QRect>
 #include <QString>
+#include <QVariantList>
 
 #include <cstdint>
 #include <memory>
@@ -52,9 +55,34 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(int planeMode READ plane_mode WRITE set_plane_mode NOTIFY viewChanged)  // 0 YUV, 1 Y, 2 U, 3 V, 4 gray
   Q_PROPERTY(bool showCropped READ show_cropped WRITE set_show_cropped NOTIFY viewChanged)
   Q_PROPERTY(QColor backgroundColor READ background_color WRITE set_background_color NOTIFY viewChanged)
+  // The HDR fields of ViewState (§10.2.3), set from the HDR panel's Display tab (HdrView, WI-1.462). Enum values are
+  // the indices of render::ToneMap and render::GamutMap.
+  Q_PROPERTY(int toneMap READ tone_map WRITE set_tone_map NOTIFY viewChanged)
+  Q_PROPERTY(int gamutMap READ gamut_map WRITE set_gamut_map NOTIFY viewChanged)
+  Q_PROPERTY(double clipNits READ clip_nits WRITE set_clip_nits NOTIFY viewChanged)
+  Q_PROPERTY(double targetPeakOverride READ target_peak_override WRITE set_target_peak_override NOTIFY viewChanged)
+  Q_PROPERTY(bool falseColor READ false_color WRITE set_false_color NOTIFY viewChanged)
+  Q_PROPERTY(bool gamutClipOverlay READ gamut_clip_overlay WRITE set_gamut_clip_overlay NOTIFY viewChanged)
+  Q_PROPERTY(bool dither READ dither WRITE set_dither NOTIFY viewChanged)
+  // CompareMode (§10.2.4) from the panel's CompareController (WI-2.486): kind and split_axis are the enum indices.
+  // Kind::Single (0) or no slot-B picture shows picture A alone.
+  Q_PROPERTY(int compareKind READ compare_kind WRITE set_compare_kind NOTIFY compareChanged)
+  Q_PROPERTY(int splitAxis READ split_axis WRITE set_split_axis NOTIFY compareChanged)
+  Q_PROPERTY(double splitPosition READ split_position WRITE set_split_position NOTIFY compareChanged)
+  Q_PROPERTY(double overlayAlpha READ overlay_alpha WRITE set_overlay_alpha NOTIFY compareChanged)
+  Q_PROPERTY(int diffGain READ diff_gain WRITE set_diff_gain NOTIFY compareChanged)
+  Q_PROPERTY(bool diffFalseColour READ diff_false_colour WRITE set_diff_false_colour NOTIFY compareChanged)
+  Q_PROPERTY(int flickerPeriodMs READ flicker_period_ms WRITE set_flicker_period_ms NOTIFY compareChanged)
+  Q_PROPERTY(bool hasPictureB READ has_picture_b NOTIFY compareChanged)
   Q_PROPERTY(bool hasPicture READ has_picture NOTIFY pictureChanged)
   Q_PROPERTY(int pictureWidth READ picture_width NOTIFY pictureChanged)
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
+  // Picture::crop (conformance window / render_size, luma samples); a null rect when the picture has none.
+  Q_PROPERTY(QRect crop READ crop NOTIFY pictureChanged)
+  // The pinned probe and the selection rectangle (luma samples; (-1, -1) / empty = none), drawn by libplacebo's
+  // overlay passes (OverlayConfig.probe_x/y, selection_rect; chapter 10 §10.5.6 pass 12, WI-2.436, issue #650).
+  Q_PROPERTY(QPoint probe READ probe WRITE set_probe NOTIFY viewChanged)
+  Q_PROPERTY(QRect selectionRect READ selection_rect WRITE set_selection_rect NOTIFY viewChanged)
   // Renderer state for the status strip and the tests.
   Q_PROPERTY(QString interop READ interop NOTIFY statsChanged)
   Q_PROPERTY(QString lastError READ last_error NOTIFY statsChanged)
@@ -85,10 +113,60 @@ class PictureHost : public QQuickRhiItem {
   void set_show_cropped(bool on);
   [[nodiscard]] QColor background_color() const { return background_; }
   void set_background_color(const QColor& color);
+  [[nodiscard]] int tone_map() const noexcept { return tone_map_; }
+  void set_tone_map(int value) { set_view(tone_map_, value); }
+  [[nodiscard]] int gamut_map() const noexcept { return gamut_map_; }
+  void set_gamut_map(int value) { set_view(gamut_map_, value); }
+  [[nodiscard]] double clip_nits() const noexcept { return clip_nits_; }
+  void set_clip_nits(double value) { set_view(clip_nits_, value); }
+  [[nodiscard]] double target_peak_override() const noexcept { return target_peak_override_; }
+  void set_target_peak_override(double value) { set_view(target_peak_override_, value); }
+  [[nodiscard]] bool false_color() const noexcept { return false_color_; }
+  void set_false_color(bool on) { set_view(false_color_, on); }
+  [[nodiscard]] bool gamut_clip_overlay() const noexcept { return gamut_clip_overlay_; }
+  void set_gamut_clip_overlay(bool on) { set_view(gamut_clip_overlay_, on); }
+  [[nodiscard]] bool dither() const noexcept { return dither_; }
+  void set_dither(bool on) { set_view(dither_, on); }
+
+  [[nodiscard]] QPoint probe() const noexcept { return probe_; }
+  void set_probe(QPoint p) { set_view(probe_, p.x() >= 0 && p.y() >= 0 ? p : QPoint(-1, -1)); }
+  [[nodiscard]] QRect selection_rect() const noexcept { return selection_rect_; }
+  void set_selection_rect(QRect r) { set_view(selection_rect_, r.width() > 0 && r.height() > 0 ? r : QRect()); }
 
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
+
+  // ---- Compare (slot B) ------------------------------------------------------------------------------------------
+  [[nodiscard]] int compare_kind() const noexcept { return compare_kind_; }
+  void set_compare_kind(int kind);
+  [[nodiscard]] int split_axis() const noexcept { return split_axis_; }
+  void set_split_axis(int axis);
+  [[nodiscard]] double split_position() const noexcept { return split_position_; }
+  void set_split_position(double fraction);
+  [[nodiscard]] double overlay_alpha() const noexcept { return overlay_alpha_; }
+  void set_overlay_alpha(double alpha);
+  [[nodiscard]] int diff_gain() const noexcept { return diff_gain_; }
+  void set_diff_gain(int gain);
+  [[nodiscard]] bool diff_false_colour() const noexcept { return diff_false_colour_; }
+  void set_diff_false_colour(bool on);
+  [[nodiscard]] int flicker_period_ms() const noexcept { return flicker_period_ms_; }
+  void set_flicker_period_ms(int ms);
+  [[nodiscard]] bool has_picture_b() const noexcept { return frame_b_ != nullptr; }
+  [[nodiscard]] std::shared_ptr<const PictureFrame> picture_b() const { return frame_b_; }
+  // Slot B from a decoded picture (the reference file's frame); nullptr clears it.
+  void set_picture_b(std::shared_ptr<const PictureFrame> frame);
+  // "Set as B from memory": copies the shown picture into slot B under a new generation, so B keeps this frame while
+  // A moves on. False without a picture.
+  Q_INVOKABLE bool snapshotAsB();
+  // `X`: exchanges the pictures of slots A and B.
+  Q_INVOKABLE void swapAB();
+  Q_INVOKABLE void clearB();
   [[nodiscard]] int picture_width() const noexcept;
   [[nodiscard]] int picture_height() const noexcept;
+  [[nodiscard]] QRect crop() const;
+  // The [Y, U, V] code values of the picture at luma sample (x, y) (chroma: the sample covering it), for the Picture
+  // panel's read-out (WI-1.456); [] outside the picture or without one. Read from the CPU copy of the frame, so it
+  // works before VideoSurface::pick() exists (WI-2.435).
+  Q_INVOKABLE [[nodiscard]] QVariantList codeValues(int x, int y) const;
 
   [[nodiscard]] QString interop() const { return stats_.interop; }
   [[nodiscard]] QString last_error() const { return stats_.error; }
@@ -101,22 +179,55 @@ class PictureHost : public QQuickRhiItem {
 
  Q_SIGNALS:
   void viewChanged();
+  void compareChanged();
   void pictureChanged();
   void statsChanged();
 
  protected:
   QQuickRhiItemRenderer* createRenderer() override;
+  void timerEvent(QTimerEvent* event) override;
 
  private:
   friend class PictureHostRenderer;
 
+  template <typename T>
+  void set_view(T& field, T value) {
+    if (field == value) {
+      return;
+    }
+    field = value;
+    Q_EMIT viewChanged();
+    update();
+  }
+
+  void set_compare(int& field, int value);
+  void update_flicker_timer();
+
   std::shared_ptr<const PictureFrame> frame_;
+  std::shared_ptr<const PictureFrame> frame_b_;
+  int compare_kind_ = 0;
+  int split_axis_ = 0;
+  double split_position_ = 0.5;
+  double overlay_alpha_ = 0.5;
+  int diff_gain_ = 1;
+  bool diff_false_colour_ = false;
+  int flicker_period_ms_ = 500;
+  int flicker_timer_ = 0;
   double zoom_ = 0.0;
   double pan_x_ = 0.0;
   double pan_y_ = 0.0;
   int plane_mode_ = 0;
   bool show_cropped_ = true;
   QColor background_{0x20, 0x20, 0x20};  // ViewState::background_rgba default 0x202020FF
+  int tone_map_ = 0;                     // ToneMap::Auto
+  int gamut_map_ = 0;                    // GamutMap::Perceptual
+  double clip_nits_ = 1000.0;
+  double target_peak_override_ = 0.0;
+  bool false_color_ = false;
+  bool gamut_clip_overlay_ = false;
+  bool dither_ = true;
+  QPoint probe_{-1, -1};
+  QRect selection_rect_;
   PictureHostStats stats_;
 };
 

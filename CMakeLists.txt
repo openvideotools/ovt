@@ -57,7 +57,8 @@ endif()
 if(OVT_BUILD_GUI)
   add_subdirectory(app)
 endif()
-if(OVT_BUILD_PYTHON)
+if(OVT_BUILD_PYTHON OR OVT_BUILD_TESTS
+)# python/ registers the pure-Python model tests (WI-0.095); ovt_py needs OVT_BUILD_PYTHON
   add_subdirectory(python)
 endif()
 if(OVT_BUILD_TESTS)

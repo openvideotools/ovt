@@ -94,7 +94,7 @@ Each phase below states: theme, **entry criterion** (what must be true to start)
 | **M1.1** | Syntax parsers, container core, skeletons | weeks 1–2 | WI-1.108, WI-1.109, WI-1.110, WI-1.111, WI-1.112, WI-1.113, WI-1.114, WI-1.115, WI-1.116, WI-1.117, WI-1.118, WI-1.119, WI-1.120, WI-1.200, WI-1.201, WI-1.202, WI-1.203, WI-1.204, WI-1.225, WI-1.226, WI-1.227, WI-1.228, WI-1.229, WI-1.231, WI-1.237, WI-1.500, WI-1.501, WI-1.400, WI-1.401, WI-1.402, WI-1.413, WI-1.450, WI-1.466, WI-2.150 (re-phased) |
 | **M1.2** | Index, box decoders, demux, playback decode, surfaces | weeks 3–4 | WI-1.121, WI-1.122, WI-1.123, WI-1.124, WI-1.125, WI-1.129, WI-1.205, WI-1.206, WI-1.207, WI-1.208, WI-1.209, WI-1.210, WI-1.211, WI-1.212, WI-1.213, WI-1.214, WI-1.215, WI-1.216, WI-1.230, WI-2.169 (re-phased), WI-1.403, WI-1.404, WI-1.406, WI-1.407, WI-1.408, WI-1.411, WI-1.451, WI-1.452, WI-1.453 |
 | **M1.3** | Derived views, CLI subcommands, picture host, panels | weeks 5–6 | WI-1.130, WI-1.217, WI-1.218, WI-1.219, WI-1.220, WI-1.221, WI-1.222, WI-1.223, WI-1.224, WI-1.232, WI-1.233, WI-1.234, WI-1.235, WI-2.171 (re-phased), WI-2.172 (re-phased), WI-1.502, WI-1.503, WI-1.504, WI-1.505, WI-1.506, WI-1.507, WI-1.508, WI-1.509, WI-1.128 (sup.), WI-1.126, WI-1.127 (sup.), WI-1.405, WI-1.409, WI-1.410, WI-1.412, WI-1.415, WI-1.454, WI-1.455, WI-1.456, WI-1.457, WI-1.458, WI-1.459, WI-1.460, WI-1.570, WI-1.572, WI-1.573, WI-1.574 |
-| **M1.4** | HDR GUI, goldens, C API, phase-1 gate | weeks 7–8 | WI-1.461, WI-1.462, WI-1.463, WI-1.464, WI-1.465, WI-1.510, WI-1.511, WI-1.236, WI-1.238, WI-1.239, WI-1.414 (sup.), WI-1.571, WI-1.575, WI-1.576 |
+| **M1.4** | HDR GUI, goldens, C API, phase-1 gate | weeks 7–8 | WI-1.461, WI-1.462, WI-1.463, WI-1.463b, WI-1.464, WI-1.465, WI-1.510, WI-1.511, WI-1.236, WI-1.238, WI-1.239, WI-1.414 (sup.), WI-1.571, WI-1.575, WI-1.576 |
 
 ### 16.1.3 Phase 2 — Look inside blocks
 
@@ -373,7 +373,7 @@ Chapter 12 owns the `ovt` grammar (chapter 0 §0.10). Subcommand sources live in
 | `ovt hdr` | **WI-3.532** (ch 12) incl. sequence scan (`--frames A-B`, selector grammar of chapter 12 §12.1.2; per-frame and sequence MaxCLL/MaxFALL) and `core/src/color/hdr_measure.cpp` | **WI-4.457** (ch 10) reduced to `ovt render` (PNG dump via the GPU surface); the earlier `hdr-scan` subcommand name and `hdr_scan.schema.json` are dropped. GPU measurement (WI-4.452) feeds the GUI scopes; the CLI uses the CPU path. |
 | Python package | **WI-4.540** (skeleton), **WI-4.541** (analysis), **WI-4.542** (metrics) (ch 12) | **WI-0.095** (ch 06) owns `python/ovt/fb/` (generated) and `python/ovt/model.py`; WI-4.540 reuses it (no `ovt/_fb/` copy). **WI-4.310** (ch 09) superseded by WI-4.542. **WI-4.216** (ch 08) reduced to extending `python/ovt/_container.py` with the derived views and adding `--csv` to `ovt probe`. |
 | `ovt_Job`, `ovt::jobs::Pool`, `log` module | **WI-1.512** (ch 12) — expanded: no chapter 07 WI produces `jobs::Pool` or `core/src/log/`; WI-1.512 delivers both and is scheduled in **M0.2** | WI-1.125, WI-1.453, WI-3.300 depend on WI-1.512. |
-| C API headers | **WI-1.511** (ch 12) owns header text (§12.3) | **WI-1.130** (ch 07) implements `ovt_stream_unit_bytes`/`ovt_stream_unit_syntax` and must match §12.3; WI-1.511 depends on WI-1.130, WI-1.224, WI-1.234, WI-1.512. |
+| C API headers | **WI-1.511** (ch 12) owns header text (§12.3) | **WI-1.121** part c creates `core/include/ovt/index.h` with the §12.3.8 `ovt_Stream` block verbatim and implements open/close/codec/build_index/index (#642); **WI-1.130** (ch 07) implements `ovt_stream_unit_bytes`/`ovt_stream_unit_syntax` and must match §12.3; WI-1.511 depends on WI-1.130, WI-1.224, WI-1.234, WI-1.512. |
 | validation subcommand | — | Chapter 12 §12.2 has no `validate` subcommand. **WI-0.086** (ch 06) is reduced: no `cli/src/cmd/validate.cpp`; validation is exposed as `ovt index --validate` (WI-1.505) and `ovt analyze --validate` (WI-2.521); WI-0.086's acceptance tests run through `core/tests/model/test_validator.cpp`. **Spec fix applied in chapter 12 §12.2.4/§12.2.8** (`--validate` flag) and chapter 06 §6.9/WI-0.086. |
 | Plugin ABI header `analysis_decoder_v1.h` | **WI-2.150** (ch 07) writes it verbatim from chapter 0 §0.6.2 / chapter 7 §7.5.1 | No earlier WI publishes it; WI-2.150 is a phase-1 deliverable (§16.3.12). |
 
@@ -406,7 +406,7 @@ Chapter 0 §0.8 and chapter 13 place `io`, `BitReader`, logging and jobs in phas
 
 ### 16.3.12 Phase mismatch: plugin loading and playback decoders
 
-Chapter 0 §0.8 lists "playback decode (HW + SW)" in phase 1; chapter 7 numbered the playback decoder WI-2.171 (inside `ovt-plugin-ffmpeg`), which depends on WI-2.169 and WI-2.150. **Resolution: WI-2.150 (M1.1), WI-2.169 (M1.2), WI-2.171 (M1.3) and WI-2.172 (M1.3) are phase-1 deliverables; numbering kept.** The phase-1 gate requires WI-2.171's acceptance tests. WI-1.507 (`ovt dump`), WI-1.574 (MD5 suite) and WI-1.456 (Picture panel) depend on WI-2.171. Related: **WI-4.458** (Android display probe) is a track-A phase-1 deliverable (MA.1) because WI-A.404 needs it; **WI-0.053** (Android plugin store) is a phase-2 deliverable (MA.2); **WI-0.016** is absorbed into phase 4 (WI-4.104); **WI-1.463** delivers only the macOS NATIVE host in phase 1 (the Linux host is WI-4.450, phase 4).
+Chapter 0 §0.8 lists "playback decode (HW + SW)" in phase 1; chapter 7 numbered the playback decoder WI-2.171 (inside `ovt-plugin-ffmpeg`), which depends on WI-2.169 and WI-2.150. **Resolution: WI-2.150 (M1.1), WI-2.169 (M1.2), WI-2.171 (M1.3) and WI-2.172 (M1.3) are phase-1 deliverables; numbering kept.** The phase-1 gate requires WI-2.171's acceptance tests. WI-1.507 (`ovt dump`) and WI-1.574 (MD5 suite) depend on WI-2.171; WI-1.456 (Picture panel) delivers the `frameWanted` hook that WI-2.171 connects its decoder job to, so it does not depend on WI-2.171 (issue #650). Related: **WI-4.458** (Android display probe) is a track-A phase-1 deliverable (MA.1) because WI-A.404 needs it; **WI-0.053** (Android plugin store) is a phase-2 deliverable (MA.2); **WI-0.016** is absorbed into phase 4 (WI-4.104); **WI-1.463** delivers only the macOS NATIVE host in phase 1 (the Linux host is WI-4.450, phase 4).
 
 ### 16.3.13 Other binding decisions taken here
 
@@ -561,7 +561,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.201 | 8 §8.10 | Implement the ISOBMFF box header walk with spans and truncation handling | M | 1 | M1.1 | WI-1.200, WI-0.553 | FR-CNT-001, FR-CNT-101 |
 | WI-1.202 | 8 §8.10 | Implement `FieldBuilder`, `BoxContext` propagation and the decoder registration macro | M | 1 | M1.1 | WI-1.201 | — |
 | WI-1.203 | 8 §8.10 | Write `tools/gen_box_registry.py` and generate `box_registry.gen.cpp` | M | 1 | M1.1 | WI-1.202 | FR-CNT-003 |
-| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
+| WI-1.204 | 8 §8.10 | Implement lazy traversal, `ovt_container_expand` and `mfro`/`mfra` location (landed, PR #639; `PagedSpan` windowed reads moved to WI-1.209, #630) | M | 1 | M1.1 | WI-1.203 | FR-CNT-004, FR-GEN-011 |
 | WI-1.205 | 8 §8.10 | Hand decoders, group A (file and movie level) | M | 1 | M1.2 | WI-1.202 | FR-CNT-002 |
 | WI-1.206 | 8 §8.10 | Hand decoders, group B (`stsd` and sample entries) | M | 1 | M1.2 | WI-1.205 | FR-CNT-002 |
 | WI-1.207 | 8 §8.10 | Hand decoders, group C part 1 (codec configuration records) | L | 1 | M1.2 | WI-1.206, WI-1.108, WI-1.112, WI-1.116 | FR-CNT-002 |
@@ -591,7 +591,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.231 | 8 §8.10 | Implement the unit splitter (length-prefixed, Annex B, AV1 OBU) | S | 1 | M1.1 | WI-1.226, WI-1.227 | FR-CNT-007 |
 | WI-1.232 | 8 §8.10 | Implement track ↔ stream matching, `sample_index` mapping and `seek_to_sample` | S | 1 | M1.3 | WI-1.230, WI-1.231, WI-1.218, WI-1.219 | FR-CNT-103, FR-GEN-005 |
 | WI-1.233 | 8 §8.10 | Extract `codec_private` for plugin `create()` and integrate with the plugin host | S | 1 | M1.3 | WI-1.232, WI-2.150 | — |
-| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at`, `ovt_stream_unit_bytes` | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
+| WI-1.234 | 8 §8.10 | Implement the byte service: page cache, `ovt_container_bytes`, `ovt_container_box_at` and the unit-bytes path | S | 1 | M1.3 | WI-1.204, WI-1.231 | FR-CNT-104 |
 | WI-1.235 | 8 §8.10 | Add `ovt probe` container subcommand hooks (reduced, §16.3) | S | 1 | M1.3 | WI-1.224, WI-1.232, WI-1.234, WI-1.500 | — |
 | WI-1.236 | 8 §8.10 | Build the golden-test harness and oracle normalisers (reduced, §16.3) | M | 1 | M1.4 | WI-1.235 | — |
 | WI-1.237 | 8 §8.10 | Write corpus manifests, fetcher integration and licence tags (reduced, §16.3) | S | 1 | M1.1 | WI-0.551, WI-0.552 | — |
@@ -612,7 +612,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.412 | 10 §10.11 | PNG export (`HdrPng16`, `SdrPng8`, `ViewPng8`) | M | 1 | M1.3 | WI-1.403, WI-1.410 | FR-PLN-010 |
 | WI-1.413 | 10 §10.11 | Test pattern generator and measurement expectations | S | 1 | M1.1 | none | — |
 | WI-1.414 | 10 §10.11 | libplacebo/mpv parity test harness (superseded by WI-1.575; see chapter 16 §16.3) | S | 1 | M1.4 | WI-1.412, WI-1.413 | — |
-| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
+| WI-1.415 | 10 §10.11 | Render benchmarks (`bench_render_*`) and GPU timers (reduced, §16.3; landed as a partial in PR #625, GPU times deferred to #628) | S | 1 | M1.3 | WI-1.403, WI-0.560 | — |
 | WI-1.450 | 11 §11.10 | Application skeleton, RHI selection, `Platform` singleton, settings (reduced, §16.3) | M | 1 | M1.1 | WI-0.001, WI-0.018, WI-0.019 | FR-GUI-001, FR-GUI-002, FR-GUI-023, FR-GUI-025, NFR-008, NFR-021, NFR-025 |
 | WI-1.451 | 11 §11.10 | Dock manager (`SplitView`-based) with presets and serialisation | L | 1 | M1.2 | WI-1.450 | FR-GUI-001, FR-GUI-002 |
 | WI-1.452 | 11 §11.10 | `SelectionModel` and the derivation rules | M | 1 | M1.2 | WI-1.450, WI-0.083 | FR-GUI-004, FR-GUI-011, FR-GUI-101 |
@@ -626,7 +626,8 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.460 | 11 §11.10 | Container tree panel with derived tabs | L | 1 | M1.3 | WI-1.452, WI-1.218, WI-1.219, WI-1.220, WI-1.221, WI-1.223 | FR-GUI-013, FR-GUI-015 |
 | WI-1.461 | 11 §11.10 | Stream Info panel | S | 1 | M1.4 | WI-1.455, WI-1.460 | FR-BLK-021 |
 | WI-1.462 | 11 §11.10 | HDR panel skeleton (Metadata + Display tabs) and Display Capabilities panel | M | 1 | M1.4 | WI-1.456, WI-1.407, WI-1.411 | FR-GUI-016, FR-HDR-002, FR-HDR-005 |
-| WI-1.463 | 11 §11.10 | HDR output toggle and NATIVE-mode host (desktop) (reduced, §16.3) | M | 1 | M1.4 | WI-1.406, WI-1.456 | FR-HDR-007, FR-HDR-101 |
+| WI-1.463 | 11 §11.10 | HDR output toggle and NATIVE-mode host (desktop) (reduced, §16.3; HDR monitor window split to WI-1.463b) | M | 1 | M1.4 | WI-1.406, WI-1.456 | FR-HDR-007, FR-HDR-101 |
+| WI-1.463b | 11 §11.10 | HDR monitor window (split from WI-1.463, §16.2.6) | S | 1 | M1.4 | WI-1.463, WI-2.171 | FR-HDR-007, FR-HDR-101 |
 | WI-1.464 | 11 §11.10 | Welcome page, empty states, first-run banners | S | 1 | M1.4 | WI-1.454 | — |
 | WI-1.465 | 11 §11.10 | Interaction script runner, screenshot harness and CI wiring (reduced, §16.3) | M | 1 | M1.4 | WI-1.456, WI-0.568 | — |
 | WI-1.466 | 11 §11.10 | Keyboard map, Go to dialog, Preferences dialog | S | 1 | M1.1 | WI-1.450 | FR-GUI-006, FR-GUI-008, FR-GUI-023, FR-GUI-024, NFR-023, NFR-035 |
@@ -683,7 +684,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-2.434 | 10 §10.11 | MV arrow pass (vertex pulling) and intra direction strokes | L | 2 | M2.2 | WI-2.431 | FR-BLK-018 |
 | WI-2.435 | 10 §10.11 | Id buffer and `pick()` | M | 2 | M2.2 | WI-2.434 | FR-PLN-002 |
 | WI-2.436 | 10 §10.11 | Deblocking-edge, ref-index fill and selection/probe passes | S | 2 | M2.2 | WI-2.432 | — |
-| WI-2.437 | 10 §10.11 | GPU overlay cache and `set_overlays` lifecycle | S | 2 | M2.2 | WI-2.434 | FR-BLK-017, FR-BLK-018 |
+| WI-2.437 | 10 §10.11 | Overlay cache and `set_overlays` lifecycle | S | 2 | M2.2 | WI-2.434 | FR-BLK-017, FR-BLK-018 |
 | WI-2.438 | 10 §10.11 | Overlay performance benchmarks (`bench_overlay_*`) and budget enforcement (reduced, §16.3) | S | 2 | M2.3 | WI-2.434, WI-2.433, WI-2.432, WI-1.415 | FR-BLK-018, NFR-003 |
 | WI-2.439 | 10 §10.11 | Colour-blind-safe overlay palette and legend data export | S | 2 | M2.2 | WI-2.431 | FR-GUI-019, FR-GUI-020, NFR-023, NFR-024 |
 | WI-2.480 | 11 §11.10 | Analysis orchestration and `FrameAnalysisStore` | M | 2 | M2.1 | WI-2.150, WI-2.151, WI-2.152, WI-1.453 | FR-GUI-029, FR-PLN-005 |

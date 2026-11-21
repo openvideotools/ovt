@@ -114,8 +114,36 @@ endif()
 # image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
 target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
 target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1). The image goldens are tests/golden/render/plane_*.png
+# (png_io.h; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
+target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)
 target_compile_definitions(ovt_tests_render
                            PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
 
+# WI-2.439: colour tables, legend data, contrast/halo rule and colour-blind simulation (§10.5.2). CPU only.
+target_sources(ovt_tests_render PRIVATE test_overlay_legend.cpp test_overlay_contrast.cpp)
+
 # WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
 target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3), with the image golden synthetic_4k_grid.png. The 4K
+# partition-grid fixture is built in C++ (fixtures/make_grid.cpp), the twin of tools/gen_fixture_fb.py --kind grid.
+target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.cpp)
+
+# WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
+# render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
+target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
+
+# WI-2.437: overlay cache and set_overlays() lifecycle (§10.5.8). The cache cases need no GPU; one [vulkan] case checks
+# the re-upload skip and teardown with live handles.
+target_sources(ovt_tests_render PRIVATE test_overlay_cache.cpp)
+# WI-2.435: id buffer, readback and pick() (§10.5.7), probe colour math (§10.6.3).
+target_sources(ovt_tests_render PRIVATE test_pick.cpp)
+# WI-2.436: deblocking edges, reference-index fill and selection / probe / rectangle passes (§10.5.6 passes 3, 7, 10, 12),
+# goldens tests/golden/render/{deblock_edges,refidx_fill,selection}.png; fixture in fixtures/make_misc.cpp.
+target_sources(ovt_tests_render PRIVATE test_overlay_misc.cpp fixtures/make_misc.cpp)
+target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
+
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2). The transform tests are CPU
+# only; the grid golden is tests/golden/render/grid_zoom8.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_view_transform.cpp)

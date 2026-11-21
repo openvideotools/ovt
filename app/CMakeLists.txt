@@ -56,6 +56,10 @@ function(ovt_studio_add_qml_module target)
   set(app_dir "${CMAKE_CURRENT_FUNCTION_LIST_DIR}")
   set(qml_files
       "${app_dir}/qml/Main.qml"
+      "${app_dir}/qml/AppShell.qml"
+      "${app_dir}/qml/MainToolBar.qml"
+      "${app_dir}/qml/StatusBar.qml"
+      "${app_dir}/qml/AndroidShell.qml"
       "${app_dir}/qml/Actions.qml"
       "${app_dir}/qml/OvtMenu.qml"
       "${app_dir}/qml/OvtMenuBar.qml"
@@ -77,7 +81,9 @@ function(ovt_studio_add_qml_module target)
       "${app_dir}/qml/panels/TimelinePanel.qml"
       "${app_dir}/qml/panels/RefGraphPanel.qml"
       "${app_dir}/qml/panels/BookmarksPanel.qml"
-      "${app_dir}/qml/panels/PicturePanel.qml")
+      "${app_dir}/qml/panels/PicturePanel.qml"
+      "${app_dir}/qml/panels/HdrPanel.qml"
+      "${app_dir}/qml/panels/DisplayCapsPanel.qml")
   # PictureView.qml instantiates PictureHost, so it exists only where the type does (PicturePanel loads it by URL).
   set(picture_sources "")
   if(OVT_STUDIO_PICTURE_HOST)
@@ -85,16 +91,17 @@ function(ovt_studio_add_qml_module target)
     set(picture_sources "${app_dir}/src/picture_frame.h" "${app_dir}/src/picture_host.h"
                         "${app_dir}/src/picture_host.cpp")
   endif()
+  # Android reads its Configuration, input devices and windowing mode in platform_android.cpp (WI-A.451).
+  set(platform_sources "")
+  if(ANDROID)
+    set(platform_sources "${app_dir}/src/platform/platform_android.cpp")
+  endif()
   # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
-  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
+  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator CompactLayout)
     list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
   endforeach()
   if(NOT ANDROID)
     list(APPEND qml_files "${app_dir}/qml/dock/DockFloatingWindow.qml")
-  endif()
-  # The root item that QtQuickView loads on Android (WI-0.050), which cannot take the desktop ApplicationWindow.
-  if(ANDROID)
-    list(APPEND qml_files "${app_dir}/qml/AndroidShell.qml")
   endif()
   foreach(file IN LISTS qml_files)
     get_filename_component(alias "${file}" NAME)
@@ -123,6 +130,7 @@ function(ovt_studio_add_qml_module target)
     SOURCES
     "${app_dir}/src/platform/platform.h"
     "${app_dir}/src/platform/platform.cpp"
+    ${platform_sources}
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
     "${app_dir}/src/models/diagnostics_model.h"
@@ -165,6 +173,20 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/models/bookmarks_model.cpp"
     "${app_dir}/src/dock/dock_model.h"
     "${app_dir}/src/dock/dock_model.cpp"
+    "${app_dir}/src/picture_controller.h"
+    "${app_dir}/src/picture_controller.cpp"
+    "${app_dir}/src/platform/android_state.h"
+    "${app_dir}/src/platform/android_state.cpp"
+    "${app_dir}/src/compare_controller.h"
+    "${app_dir}/src/compare_controller.cpp"
+    "${app_dir}/src/render_stub.h"
+    "${app_dir}/src/render_stub.cpp"
+    "${app_dir}/src/models/hdr_metadata_model.h"
+    "${app_dir}/src/models/hdr_metadata_model.cpp"
+    "${app_dir}/src/models/hex_model.h"
+    "${app_dir}/src/models/hex_model.cpp"
+    # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
+    "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}
     RESOURCES
     "${app_dir}/resources/icons/ovt-studio.svg"
@@ -173,6 +195,8 @@ function(ovt_studio_add_qml_module target)
   # src/platform too: the generated type registration includes the headers by file name.
   target_include_directories(${target} PRIVATE "${app_dir}/src" "${app_dir}/src/platform" "${app_dir}/src/models"
                                                "${app_dir}/src/dock" "${app_dir}/src/items")
+  # core/src for syntax/common/h273_names.h only (see the source list).
+  target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   # ovt::core for ovt/jobs.h and ovt/log.h (the models use the exported C API only, see jobs_model.h).
   # ovt_schemas: ovt_model_generated.h and the FlatBuffers runtime for the index adapter (WI-1.455a; build tree only,
   # as for the core module objects).
@@ -210,6 +234,23 @@ add_dependencies(ovt_studio ovt_version_header)
 # Every user-visible product name derives from OVT_PRODUCT_NAME (chapter 15 §15.7.4).
 target_compile_definitions(ovt_studio PRIVATE "OVT_PRODUCT_NAME_VALUE=\"${OVT_PRODUCT_NAME}\"" QT_NO_KEYWORDS)
 ovt_set_license(ovt_studio "GPL-3.0-or-later")
+
+# The test IPC (chapter 14 §14.10.3, WI-1.465) is GPL app code for test lanes only: OVT_ENABLE_TEST_IPC is OFF by
+# default, so no preset and no packaging build (the macOS bundle, dist archives) contains it, and `--test-ipc` is not a
+# known option there. The `gui` CI job and local GUI test runs turn it on with -DOVT_ENABLE_TEST_IPC=ON. Even then
+# main.cpp starts the socket server only when the flag is given. Mouse and key events go through QTest, so Qt6::Test is
+# linked.
+option(OVT_ENABLE_TEST_IPC "Compile the test IPC server into ovt_studio (tests only, never for release)" OFF)
+if(OVT_ENABLE_TEST_IPC AND NOT OVT_BUILD_TESTS)
+  message(WARNING "OVT_ENABLE_TEST_IPC=ON needs OVT_BUILD_TESTS=ON: the test IPC is not built.")
+endif()
+if(OVT_ENABLE_TEST_IPC AND OVT_BUILD_TESTS AND NOT ANDROID)
+  find_package(Qt6 6.4 REQUIRED COMPONENTS Test)
+  target_sources(ovt_studio PRIVATE src/testipc/command_dispatch.h src/testipc/command_dispatch.cpp
+                                    src/testipc/test_ipc_server.h src/testipc/test_ipc_server.cpp)
+  target_link_libraries(ovt_studio PRIVATE Qt6::Test)
+  target_compile_definitions(ovt_studio PRIVATE OVT_ENABLE_TEST_IPC=1)
+endif()
 
 # Qt comes from tools/install_qt.py (aqtinstall, pinned in third_party/VERSIONS.md) or, for distro and
 # Flatpak builds, from the system; the licence manifest records it either way (chapter 15 §15.4). Walks the

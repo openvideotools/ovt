@@ -4,13 +4,13 @@
 // The one concrete VideoSurface (chapter 10 §10.1.3, §10.2.7). WI-1.400 is the skeleton: an OffscreenTexture target
 // on libplacebo's Vulkan backend (MoltenVK on macOS, the Vulkan loader on Linux), cleared to
 // ViewState.background_rgba by render(). WI-1.401 adds picture upload (slot A, §10.3.1) and draws it with a basic
-// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402. The full render parameters, target frames and
-// dithering (WI-1.403), the compare modes of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp),
-// overlays, measurements
-// (WI-4.452, render/src/measure/) and export arrive with their own work items; until then those entry points are
-// inert. WI-1.406 adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput
-// (src/platform/native_target.h), retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the
-// swapchain with the content's static HDR metadata on init and on source change (§10.3.6).
+// pl_render_image pass, with the §10.3.3 colour tables of WI-1.402; WI-1.408 adds the plane modes
+// (src/pipeline/plane_views.h). The full render parameters, target frames and dithering (WI-1.403), the compare modes
+// of slot B (WI-1.410), interop (WI-1.404, render/src/platform/offscreen.cpp), overlays, measurements (WI-4.452,
+// render/src/measure/) and export arrive with their own work items; until then those entry points are inert. WI-1.406
+// adds NATIVE targets: a libplacebo swapchain on the surface of a platform NativeOutput (src/platform/native_target.h),
+// retarget() EMBEDDED <-> NATIVE and the headroom poll of §10.4.1. WI-1.411 hints the swapchain with the content's
+// static HDR metadata on init and on source change (§10.3.6).
 
 #include <algorithm>
 #include <array>
@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <utility>
@@ -31,14 +32,20 @@
 #include <libplacebo/renderer.h>
 #include <libplacebo/vulkan.h>
 
+#include "../overlay/idbuffer.h"
+#include "../overlay/overlay_cache.h"
 #include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
+#include "color/cpu_convert.h"
 #include "measure/measure.h"
 #include "output_download.h"
 #include "ovt/render/video_surface.h"
 #include "pipeline/compare.h"
 #include "pipeline/frame_upload.h"
+#include "pipeline/plane_views.h"
 #include "pipeline/render_params.h"
+#include "pipeline/sample_grid.h"
+#include "pipeline/view_transform.h"
 #include "platform/native_target.h"
 #include "platform/offscreen.h"
 #include "vk_no_timestamps.h"
@@ -339,9 +346,13 @@ class VideoSurfaceImpl final : public VideoSurface {
       log_lines({error_});
     }
   }
-  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()"). WI-2.437: a set
+  // the builder made on a cache miss joins the overlay cache here and is shown through a handle; a handle that shares
+  // the arrays already on the GPU (a selection, probe or uniform change) only updates the configuration.
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
-    overlays_ = std::move(overlays);
+    // The previous set lives until the upload has compared against it, so a new set cannot reuse its address.
+    const std::unique_ptr<OverlaySet> previous = std::move(overlays_);
+    overlays_ = detail::adopt_into_cache(overlay_cache_, std::move(overlays));
     if (overlay_gpu_ == nullptr) {
       return;
     }
@@ -381,6 +392,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (measurer_.due()) {
       measurer_.run(slot_a_);
     }
+    end_ids(view);
     offscreen_.end_frame();  // submit and hand the texture to the host
   }
 
@@ -388,7 +400,67 @@ class VideoSurfaceImpl final : public VideoSurface {
     return native_ != nullptr ? ExternalTexture{} : offscreen_.describe(target_);  // a NATIVE target presents itself
   }
 
-  [[nodiscard]] Pick pick(int /*px*/, int /*py*/) const override { return Pick{}; }  // §10.5.7
+  // §10.5.7 / §10.6.3 (WI-2.435): CPU cell lookup, the id buffer of the last completed readback, and the code values
+  // of a 64x64-sample window converted on the CPU. Never waits for the GPU except to download a new window.
+  [[nodiscard]] Pick pick(int px, int py) const override {
+    Pick p;
+    if (!picked_view_ || !slot_a_.valid) {
+      return p;
+    }
+    // Inverse §10.2.3 view transform with the forward transform's whole-pixel rounding (WI-1.409): the sample picked is
+    // the one whose drawn device pixels contain (px, py), also at the edge pixels of a sample at zoom >= 1.
+    const detail::SampleIndex sample = detail::sample_at_device(last_view_, {target_.width, target_.height}, px, py);
+    if (sample.x < 0 || sample.y < 0 || std::cmp_greater_equal(sample.x, slot_a_.coded_width) ||
+        std::cmp_greater_equal(sample.y, slot_a_.coded_height)) {
+      return p;  // outside the coded picture
+    }
+    p.hit = true;
+    p.image_x = sample.x;
+    p.image_y = sample.y;
+    p.cell_x = p.image_x / 4;
+    p.cell_y = p.image_y / 4;
+    // WI-2.437: overlays_ is a cache handle, so the arrays are read through data().
+    const OverlaySet* shown = overlays_ != nullptr ? &overlays_->data() : nullptr;
+    if (shown != nullptr && std::cmp_less(p.cell_x, shown->cells_w) && std::cmp_less(p.cell_y, shown->cells_h) &&
+        !shown->cell_block_id.empty()) {
+      p.block_id =
+          shown->cell_block_id.at((static_cast<size_t>(p.cell_y) * shown->cells_w) + static_cast<size_t>(p.cell_x));
+    }
+    if (overlay_gpu_ != nullptr) {
+      const uint32_t id = overlay_gpu_->lookup_id(px, py);
+      if ((id & detail::kIdArrowBit) != 0) {  // arrows take precedence over blocks
+        p.mv_index = static_cast<int32_t>(id & ~detail::kIdArrowBit);
+      }
+    }
+    std::array<int32_t, 3> code{};
+    if (windows_a_.read(gpu_, slot_a_, p.image_x, p.image_y, code)) {
+      std::copy(code.begin(), code.end(), std::begin(p.code));
+      detail::ProbeLight light;
+      if (detail::code_to_light(code_color(slot_a_), code, light)) {
+        std::copy(light.rgb_linear.begin(), light.rgb_linear.end(), std::begin(p.rgb_linear));
+        p.nits_luminance = light.nits_luminance;
+        p.nits_maxrgb = light.nits_maxrgb;
+        p.pq_code = light.pq_code;
+        p.cie_x = light.cie_x;
+        p.cie_y = light.cie_y;
+      }
+    }
+    // SPEC-ASSUMPTION(#713): picture B is read at the same image position, whatever the compare layout.
+    if (mode_.kind != CompareMode::Kind::Single && slot_b_.valid &&
+        windows_b_.read(gpu_, slot_b_, p.image_x, p.image_y, code)) {
+      std::copy(code.begin(), code.end(), std::begin(p.code_b));
+    }
+    return p;
+  }
+
+  // Tests: the id readback and the probe windows.
+  bool wait_ids(uint64_t timeout_ns) { return overlay_gpu_ != nullptr && overlay_gpu_->ids().wait(timeout_ns); }
+  void set_id_region_mode(bool region) {
+    if (overlay_gpu_ != nullptr) {
+      overlay_gpu_->ids().set_region_mode(region);
+    }
+  }
+  [[nodiscard]] uint64_t window_downloads() const { return windows_a_.downloads(); }
 
   // §10.7.9: never blocks. SPEC-ASSUMPTION(#478): region_psnr (Difference) reduces the visible region of the last
   // render() here rather than in render(), so only a host that asks waits for the readback.
@@ -425,6 +497,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  detail::OverlayCache& overlay_cache() { return overlay_cache_; }
   void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
 
   // The `kind` scope texture of the newest measurement, downloaded (blocking).
@@ -510,6 +583,26 @@ class VideoSurfaceImpl final : public VideoSurface {
     }
   }
 
+  // The colour description the probe converts with: the §10.3.3 mapping the slot's frame already carries.
+  static detail::CodeColor code_color(const detail::FrameSlot& slot) {
+    detail::CodeColor c;
+    c.sys = slot.frame.repr.sys;
+    c.levels = slot.frame.repr.levels;
+    c.primaries = slot.frame.color.primaries;
+    c.transfer = slot.frame.color.transfer;
+    c.bit_depth = slot.bit_depth;
+    return c;
+  }
+
+  // After a render: keeps the view for pick() and reads back the id buffer the frame drew (§10.5.7).
+  void end_ids(const ViewState& view) {
+    last_view_ = view;
+    picked_view_ = true;
+    if (overlay_gpu_ != nullptr) {
+      overlay_gpu_->end_frame();
+    }
+  }
+
   // A frame over the whole of `tex` (the offscreen output or a compare intermediate) in the target's colour space.
   [[nodiscard]] struct pl_frame texture_frame(pl_tex tex) const {
     struct pl_frame frame = {};
@@ -541,8 +634,8 @@ class VideoSurfaceImpl final : public VideoSurface {
   void draw_slot(const detail::FrameSlot& slot, const ViewState& view, const detail::IRect& clip,
                  const detail::IRect& view_rect, struct pl_frame target, bool linear, bool offscreen,
                  bool with_overlays = false) {
-    struct pl_frame image = slot.frame;
     pl_rect2df src = detail::source_rect(slot, view.show_cropped);
+    const pl_rect2df src_full = src;  // the sample grid's luma-sample rectangle, before any scissor clip
     pl_rect2df dst = detail::map_into(src, view, view_rect);
     const pl_rect2df unclipped = dst;  // the picture rectangle the overlay layer is laid out on
     // A scissor narrower than the target clips both rectangles; the whole target is left to libplacebo's own clipping.
@@ -550,7 +643,14 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (!whole && !detail::clip_rects(src, dst, clip)) {
       return;
     }
-    image.crop = src;
+    // The view transform works in luma samples; plane modes U/V sample the chroma plane over the same picture area
+    // (WI-1.408, §10.6.1). They apply to every slot drawn here, so both sides of a compare view show the same plane.
+    struct pl_frame image = {};
+    std::string err = plane_views_.build_image(gpu_, slot, view, src, image);
+    if (!err.empty()) {
+      error_ = std::move(err);
+      return;
+    }
 
     if (linear) {
       target.color.transfer = PL_COLOR_TRC_LINEAR;
@@ -561,19 +661,38 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (linear) {
       target.repr.bits = pl_bit_encoding{};  // a float texture holds normalised values; no integer depth scaling
     }
+    struct pl_render_params params = params_.params();  // still points at params_'s members
+    // The overlay blend needs linear light, so raw_code_values (a pass-through of the stored codes) applies only to
+    // views drawn in the target's own encoding. SPEC-ASSUMPTION(#623): §10.6.1 does not say how plane modes combine
+    // with the §10.6.4 compare views.
+    ViewState plane_view = view;
+    plane_view.raw_code_values = view.raw_code_values && !linear;
+    plane_views_.apply(plane_view, image, params, target);
     // WI-2.431: the overlay layer, composited by libplacebo after the picture (§10.5, §10.5.6 step 1). It describes
     // slot A in the full viewport: drawn only where A is (Single, Flicker's A phase; SPEC-ASSUMPTION(#478)).
-    struct pl_overlay overlay = {};
+    // WI-1.409: the 1-px sample grid of R-ZOOM-4 goes first, under the overlay layer.
+    std::array<struct pl_overlay, 2> overlays = {};
+    int num_overlays = 0;
     std::string overlay_err;
-    if (with_overlays && overlay_gpu_ != nullptr &&
-        overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio, unclipped, overlay,
-                           overlay_err)) {
-      target.overlays = &overlay;
-      target.num_overlays = 1;
-    } else if (!overlay_err.empty()) {
+    if (with_overlays) {
+      if (sample_grid_.draw(gpu_, view, target_.width, target_.height, src_full, unclipped, overlays.at(0),
+                            overlay_err)) {
+        ++num_overlays;
+      }
+      if (overlay_gpu_ != nullptr && overlay_err.empty() &&
+          overlay_gpu_->draw(view, target_.width, target_.height, target_.device_pixel_ratio, unclipped,
+                             overlays.at(static_cast<size_t>(num_overlays)), overlay_err)) {
+        ++num_overlays;
+      }
+    }
+    if (!overlay_err.empty()) {
       error_ = "RND-0002 renderer init failed: overlays: " + overlay_err;
     }
-    if (!pl_render_image(renderer_, &image, &target, &params_.params())) {
+    if (num_overlays > 0) {
+      target.overlays = overlays.data();
+      target.num_overlays = num_overlays;
+    }
+    if (!pl_render_image(renderer_, &image, &target, &params)) {
       error_ = "RND-0002 renderer init failed: render: pl_render_image failed";
     }
   }
@@ -773,6 +892,7 @@ class VideoSurfaceImpl final : public VideoSurface {
     if (measurer_.due()) {  // §10.7.9, as in render()
       measurer_.run(slot_a_);
     }
+    end_ids(view);
     const bool submitted = pl_swapchain_submit_frame(sw_);
     offscreen_.end_frame();
     if (!submitted) {
@@ -989,9 +1109,12 @@ class VideoSurfaceImpl final : public VideoSurface {
   void destroy() {
     overlays_.reset();
     overlay_gpu_.reset();
+    overlay_cache_.clear();  // CPU arrays only; no GPU object outlives overlay_gpu_
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
+      plane_views_.destroy(gpu_);
+      sample_grid_.destroy(gpu_);
       detail::destroy_slot(gpu_, slot_b_);
     }
     compare_.destroy();
@@ -1027,12 +1150,19 @@ class VideoSurfaceImpl final : public VideoSurface {
   detail::IRect psnr_region_;
   std::array<float, 3> psnr_ = {-1.0F, -1.0F, -1.0F};
   detail::RenderParamSet params_;     // rebuilt for every render (§10.3.4)
+  detail::PlaneViews plane_views_;    // plane modes 1-4 (§10.6.1)
   detail::H273NoticeLog notice_log_;  // RND-0020/RND-0021 once per colour description (§10.3.3)
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
+  detail::OverlayCache overlay_cache_;  // WI-2.437; OverlayBuilder reaches it through detail::overlay_cache()
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
+  detail::SampleGridLayer sample_grid_;                   // WI-1.409
   detail::Measurer measurer_;                             // §10.7 (WI-4.452)
+  ViewState last_view_;                                   // the last render()'s view, for pick()
+  bool picked_view_ = false;                              // a render() has run
+  mutable detail::SampleWindows windows_a_;               // probe code-value windows of slots A and B (§10.5.7)
+  mutable detail::SampleWindows windows_b_;
   // NATIVE targets (WI-1.406): the platform object, its surface and libplacebo's swapchain on it.
   std::unique_ptr<detail::NativeOutput> native_;
   VkSurfaceKHR surf_ = VK_NULL_HANDLE;
@@ -1068,6 +1198,11 @@ void set_compare_clock(VideoSurface& surface, std::function<int64_t()> clock_ms)
   }
 }
 
+OverlayCache* overlay_cache(VideoSurface& surface) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr ? &impl->overlay_cache() : nullptr;
+}
+
 bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
   auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
   if (impl == nullptr) {
@@ -1089,6 +1224,23 @@ bool hold_readbacks(VideoSurface& surface, bool hold) {
 bool download_scope(VideoSurface& surface, ScopeKind kind, std::vector<uint16_t>& rgba16hf, int& width, int& height) {
   auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
   return impl != nullptr && impl->download_scope(kind, rgba16hf, width, height);
+}
+
+bool wait_id_readback(VideoSurface& surface, uint64_t timeout_ns) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr && impl->wait_ids(timeout_ns);
+}
+
+void set_id_region_mode(VideoSurface& surface, bool region) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  if (impl != nullptr) {
+    impl->set_id_region_mode(region);
+  }
+}
+
+uint64_t probe_window_downloads(const VideoSurface& surface) {
+  const auto* impl = dynamic_cast<const VideoSurfaceImpl*>(&surface);
+  return impl != nullptr ? impl->window_downloads() : 0;
 }
 
 bool slot_a_chroma_shift(const VideoSurface& surface, float& shift_x, float& shift_y) {
