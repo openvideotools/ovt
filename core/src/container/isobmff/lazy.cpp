@@ -58,6 +58,14 @@ std::vector<uint8_t> IsobmffReader::track_info(int track_index) const {
   return {bytes.begin(), bytes.end()};
 }
 
+size_t IsobmffReader::validate(ValidationLevel level) {
+  const size_t added = isobmff::validate(tree_.root, level);
+  if (added > 0) {
+    ++revision_;
+  }
+  return added;
+}
+
 ovt_status IsobmffReader::expand(uint64_t box_offset) {
   if (!offsets_.contains(box_offset)) {
     return OVT_E_INVALID_ARG;

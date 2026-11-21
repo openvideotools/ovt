@@ -24,6 +24,7 @@ target_sources(
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
           isobmff/tracks.cpp
+          isobmff/validate.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp

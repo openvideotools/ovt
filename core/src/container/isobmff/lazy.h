@@ -15,6 +15,7 @@
 
 #include "container/container.hpp"
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/validate.h"
 #include "ovt/cxx/io/random_access_file.hpp"
 #include "ovt_container_generated.h"
 
@@ -37,6 +38,10 @@ class IsobmffReader final : public Reader {
 
   // The `mfra` located through `mfro` (§8.2.4 rule 4) and confirmed by the walk; nullopt otherwise.
   [[nodiscard]] std::optional<uint64_t> mfra_offset() const noexcept { return mfra_offset_; }
+  // Runs the validation driver (§8.5, WI-1.224) over the tree as it is now and adds its findings to the boxes. A
+  // `moof` still waiting for expand() is not validated. Returns the number of diagnostics added; the tree revision
+  // moves when that is not zero. Idempotent.
+  size_t validate(ValidationLevel level);
   // Number of boxes still waiting for expand().
   [[nodiscard]] size_t unexpanded() const noexcept { return deferred_.size(); }
 
