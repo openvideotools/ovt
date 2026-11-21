@@ -17,6 +17,7 @@ add_executable(
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
   field_builder_test.cpp
+  hdr_summary_test.cpp
   ivf_test.cpp
   lazy_test.cpp
   m3u8_robustness_test.cpp

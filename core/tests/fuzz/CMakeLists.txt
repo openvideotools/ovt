@@ -47,6 +47,7 @@ ovt_add_fuzz_target(canonical fuzz_canonical.cpp) # WI-0.085: canonicalize / str
 ovt_add_fuzz_target(container_sniff fuzz_container_sniff.cpp)
 ovt_add_fuzz_target(isobmff_box_decoders fuzz_isobmff_box_decoders.cpp) # WI-1.205: ISOBMFF hand box decoders
 ovt_add_fuzz_target(isobmff_tree fuzz_isobmff_tree.cpp) # WI-1.204: ISOBMFF open + tree + expand of every box
+ovt_add_fuzz_target(isobmff_hdr_summary fuzz_isobmff_hdr_summary.cpp) # WI-1.223: HdrMetadata summary and probe
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(m3u8 fuzz_m3u8.cpp) # WI-4.209: the HLS M3U8 parser
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser

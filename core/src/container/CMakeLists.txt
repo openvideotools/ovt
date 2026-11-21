@@ -20,6 +20,7 @@ target_sources(
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
           isobmff/field_builder.cpp
+          isobmff/hdr_summary.cpp
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
           diagnostics.cpp
