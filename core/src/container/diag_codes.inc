@@ -154,6 +154,26 @@ X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
+// WI-1.219a (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
+X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
+X(CNT_4002, "CNT-4002", Warning,
+  "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
+X(CNT_4003, "CNT-4003", Warning,
+  "`trun` has both `first-sample-flags-present` and `sample-flags-present`", "14496-12 §8.8.8")
+X(CNT_4004, "CNT-4004", Warning, "`moof` not immediately followed by `mdat`", "23000-19 §7.3.2.3")
+X(CNT_4005, "CNT-4005", Error,
+  "no default sample duration/size/flags (neither `tfhd` nor `trex`) while `trun` omits them", "14496-12 §8.8.7")
+X(CNT_4006, "CNT-4006", Info, "implicit base data offsets with several `traf`s", "14496-12 §8.8.7")
+X(CNT_4007, "CNT-4007", Warning,
+  "first `trun` of a `traf` without `data_offset` and no `base_data_offset`", "14496-12 §8.8.8")
+X(CNT_4008, "CNT-4008", Info, "`tfdt` absent; DTS inferred by continuity", "14496-12 §8.8.12")
+X(CNT_4020, "CNT-4020", Warning, "`tfdt` discontinuity (gap or overlap vs previous fragment)", "14496-12 §8.8.12")
+X(CNT_4021, "CNT-4021", Error, "fragment sample outside its `mdat`", "14496-12 §8.8.8")
+X(CNT_4022, "CNT-4022", Info, "bytes in `mdat` not referenced by any `trun`", "")
+X(CNT_4035, "CNT-4035", Warning, "fragment `trun` sample count 0 and not `duration-is-empty`", "14496-12 §8.8.8")
+X(CNT_4036, "CNT-4036", Info, "`styp` brands differ between segments of one file", "14496-12 §8.16.2")
+X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", "23001-7 §7.1")
+
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
 X(CNT_DASH_0001, "CNT-DASH-0001", Info,

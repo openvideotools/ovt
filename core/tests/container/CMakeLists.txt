@@ -18,6 +18,7 @@ add_executable(
   decoders_sample_tables_test.cpp
   diag_coverage_test.cpp
   field_builder_test.cpp
+  fragments_test.cpp
   ivf_test.cpp
   lazy_test.cpp
   m3u8_robustness_test.cpp
