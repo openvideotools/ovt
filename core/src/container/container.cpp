@@ -18,6 +18,8 @@
 #include <span>
 #include <vector>
 
+#include "api/buffer.hpp"
+#include "container/diagnostics.h"
 #include "container/isobmff/lazy.h"
 #include "container/ivf.hpp"
 #include "container/mpegts/ts_packets.hpp"
@@ -288,9 +290,35 @@ OVT_API ovt_status ovt_container_validate(ovt_Container* container, ovt_Buffer* 
 }
 
 OVT_API ovt_status ovt_container_list_diagnostics(ovt_Buffer* out) {
-  // The DiagnosticRegistry table is not in ovt_container.fbs yet (#138); the data source is all_diagnostics().
-  // SPEC-ASSUMPTION(#763): stays unsupported until the table lands (schema change, owner approval).
-  return out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;
+  if (out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  try {
+    // One DiagnosticRegistry entry per diag_codes.inc row, in file order (WI-1.235 step 2, #763). The message is
+    // the template and `span` stays unset: the registry describes codes, not findings. No file identifier (§6.1.1).
+    flatbuffers::FlatBufferBuilder fbb;
+    std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> entries;
+    const std::span<const ovt::container::DiagInfo> all = ovt::container::all_diagnostics();
+    entries.reserve(all.size());
+    for (const ovt::container::DiagInfo& d : all) {
+      const auto code = fbb.CreateString(d.code.data(), d.code.size());
+      const auto message = fbb.CreateString(d.message.data(), d.message.size());
+      const auto spec_ref = fbb.CreateString(d.spec_ref.data(), d.spec_ref.size());
+      ovt::fb::DiagnosticBuilder b(fbb);
+      b.add_severity(static_cast<ovt::fb::Severity>(d.severity));
+      b.add_code(code);
+      b.add_message(message);
+      b.add_spec_ref(spec_ref);
+      entries.push_back(b.Finish());
+    }
+    const auto family = fbb.CreateString("CNT");
+    const auto vec = fbb.CreateVector(entries);
+    fbb.Finish(ovt::fb::CreateDiagnosticRegistry(fbb, family, vec));
+    return ovt::api::make_buffer(fbb.GetBufferPointer(), fbb.GetSize(), out);
+  } catch (...) {
+    return ovt::container::status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_container_segment_for_offset(ovt_Container* container, uint64_t offset, ovt_Buffer* out_json) {

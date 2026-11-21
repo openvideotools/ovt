@@ -26,7 +26,7 @@
 | Schema file | `root_type` | `file_identifier` | Other root tables and their identifier (passed explicitly to `Finish()`) |
 |---|---|---|---|
 | `ovt_model.fbs` | `FrameAnalysis` | `"OVTA"` | `StreamIndex` → `"OVTI"`, standalone `SyntaxNode` → `"OVTS"`, `CliEnvelope` → `"OVTE"`, `PluginList` → `"OVTP"` (CLI report tables, §6.3 end; chapter 12) |
-| `ovt_container.fbs` | `ContainerRoot` | `"OVTC"` | — (`ContainerTree` is nested in `ContainerRoot.tree`; §6.4) |
+| `ovt_container.fbs` | `ContainerRoot` | `"OVTC"` | `DiagnosticRegistry` → no identifier (the out-buffer of `ovt_container_list_diagnostics`, chapter 12 §12.3.7; §6.4). `ContainerTree` is nested in `ContainerRoot.tree` (§6.4) |
 | `ovt_metrics.fbs` | `MetricsReport` | `"OVTR"` | `MetricsResult` → `"OVTM"` |
 
 Codec extension tables nested in `Block.ext`, `FrameAnalysis.filter_params` and `FrameInfo.ref_state` are complete FlatBuffers **without** a file identifier; the sibling `*_type` string names the root table. All buffers are written **size-prefixed** (`FinishSizePrefixed`) when stored in the cache or streamed on stdout, and **not** size-prefixed when passed through the C ABI (`ovt_Buffer` carries the size).
@@ -1245,6 +1245,14 @@ table DashHlsContext {
   fetched_at_unix:long;                            // metadata only (not part of any analysis record)
 }
 
+// ===================================== Diagnostics registry (chapter 8 §8.5, WI-1.235) =====================================
+
+/// The `CNT-*` diagnostic registry of chapter 8 §8.5 as `ovt_container_list_diagnostics` returns it (chapter 12 §12.3.7): one entry per
+/// row of `core/src/container/diag_codes.inc`, in file order, each code exactly once. `Diagnostic.message` is the message template
+/// (parameters in backticks, not substituted), `spec_ref` the spec reference (empty when none) and `span` is unset. Not a file root:
+/// finished without a file identifier (§6.1.1); `ovt_fb_to_json` reads it by the root type name.
+table DiagnosticRegistry { family:string /* "CNT" */; entries:[Diagnostic]; }
+
 // ===================================== Root =====================================
 
 /// File-level root written to the cache (`container.fb.zst`, §6.7) and emitted by `ovt probe -f fb`. Derived views are stored once per
@@ -1274,7 +1282,7 @@ file_identifier "OVTC";
 file_extension "fc";
 ```
 
-**Table list (for `tools/check_schema_in_spec.py`, WI-0.081):** `Field`, `BoxNode`, `ContainerTree`, `HandlerType` (enum), `CodecPrivate`, `TrackReference`, `TrackInfo`, `GroupMembership`, `SampleTable`, `EditSegment`, `EditList`, `TrunInfo`, `TrafInfo`, `FragmentInfo`, `SidxRef`, `SidxInfo`, `FragmentTimeline`, `SubsampleRange`, `SampleEncryption`, `PsshInfo`, `EncryptionInfo`, `HdrKind` (enum), `HdrSignal`, `HdrMetadata`, `RawVideoFormat`, `ItemReference`, `ItemInfo`, `TsPcrPoint`, `TsPtsPoint`, `TsPidBitrate`, `TsTiming`, `TsCheck`, `TsReport`, `ManifestSegment`, `ManifestEncryption`, `ManifestRepresentation`, `ManifestAdaptationSet`, `ManifestPeriod`, `Manifest`, `SegmentRef`, `DashHlsContext`, `ContainerRoot`.
+**Table list (for `tools/check_schema_in_spec.py`, WI-0.081):** `Field`, `BoxNode`, `ContainerTree`, `HandlerType` (enum), `CodecPrivate`, `TrackReference`, `TrackInfo`, `GroupMembership`, `SampleTable`, `EditSegment`, `EditList`, `TrunInfo`, `TrafInfo`, `FragmentInfo`, `SidxRef`, `SidxInfo`, `FragmentTimeline`, `SubsampleRange`, `SampleEncryption`, `PsshInfo`, `EncryptionInfo`, `HdrKind` (enum), `HdrSignal`, `HdrMetadata`, `RawVideoFormat`, `ItemReference`, `ItemInfo`, `TsPcrPoint`, `TsPtsPoint`, `TsPidBitrate`, `TsTiming`, `TsCheck`, `TsReport`, `ManifestSegment`, `ManifestEncryption`, `ManifestRepresentation`, `ManifestAdaptationSet`, `ManifestPeriod`, `Manifest`, `SegmentRef`, `DashHlsContext`, `DiagnosticRegistry`, `ContainerRoot`.
 
 Notes for implementers: (1) `SampleTable` is SoA like `CellGrid` so a 1-hour file (≈ 216 000 samples) costs ≈ 9 MB uncompressed; (2) `ContainerTree.tracks` remains the list consumed by `ovt_stream_open` (`TrackInfo.index`); `ContainerRoot` adds file-level data and the derived views without touching the verbatim §0.5.5 tables; (3) the derived views are **not** nested inside `TrackInfo` so that `ovt_container_track_info` stays cheap and each view can be built lazily and cached separately (chapter 8 §8.4); (4) the codec configuration record is exposed raw (`CodecPrivate.bytes`) — its parsed fields are `Field` children of the `avcC`/`hvcC`/`av1C` `BoxNode` in the tree (chapter 8 §8.3 group C), not a second copy; (5) `HdrMetadata.color` is a struct image, not a FlatBuffers table, so that render and metrics consume the identical 44-byte `ovt_ColorDescription` (§0.5.6 with the leading `struct_size`, D4) everywhere (OI-02).
 

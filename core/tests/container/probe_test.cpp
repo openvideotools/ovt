@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the core functions behind `ovt probe` (chapter 08 WI-1.235): ovt_container_expand_all, the hex helper of
-// the byte service (`--bytes OFFSET:LEN`) and the diagnostics registry the dump reads.
+// the byte service (`--bytes OFFSET:LEN`) and the diagnostics registry dump (ovt_container_list_diagnostics,
+// WI-1.235b).
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -226,6 +227,68 @@ TEST_CASE("probe: every registry code appears exactly once with a severity", "[c
     CHECK_FALSE(d.message.empty());
   }
   CHECK_FALSE(seen.empty());
-  // The "≥ 150 codes" bound of WI-1.235 AT2 is not asserted here: the registry holds the codes of the work items
-  // merged so far (see the PR description); the C function that returns it is a spec question.
+}
+
+namespace {
+
+// Releases a rule-3a buffer: ovt_buffer_free() lives in the shared library, which these tests do not link
+// (api/buffer.cpp allocates with new[]).
+struct Released {
+  ovt_Buffer b{nullptr, 0};
+  Released() = default;
+  Released(const Released&) = delete;
+  Released& operator=(const Released&) = delete;
+  ~Released() { delete[] b.data; }  // NOLINT(cppcoreguidelines-owning-memory): rule 3a buffers are new[]
+};
+
+}  // namespace
+
+// WI-1.235 AT2 as restated by #763: the buffer lists every code of diag_codes.inc exactly once, with severity and
+// spec reference; the count equals the registry size (the "≥ 150" figure is checked when the last container work
+// item has merged).
+TEST_CASE("probe: ovt_container_list_diagnostics lists every registry code once with severity and spec reference",
+          "[container][probe][fast]") {
+  Released out;
+  REQUIRE(ovt_container_list_diagnostics(&out.b) == OVT_OK);
+  REQUIRE(out.b.data != nullptr);
+  REQUIRE(out.b.size > 0);
+  flatbuffers::Verifier v(out.b.data, out.b.size);
+  REQUIRE(v.VerifyBuffer<ovt::fb::DiagnosticRegistry>(nullptr));  // not size-prefixed, no file identifier
+  const auto* reg = flatbuffers::GetRoot<ovt::fb::DiagnosticRegistry>(out.b.data);
+  REQUIRE(reg->family() != nullptr);
+  CHECK(reg->family()->string_view() == "CNT");
+  REQUIRE(reg->entries() != nullptr);
+
+  const std::span<const ovt::container::DiagInfo> all = ovt::container::all_diagnostics();
+  REQUIRE(reg->entries()->size() == all.size());
+  std::set<std::string_view> seen;
+  size_t i = 0;
+  for (const ovt::fb::Diagnostic* d : *reg->entries()) {
+    REQUIRE(d->code() != nullptr);
+    REQUIRE(d->message() != nullptr);
+    REQUIRE(d->spec_ref() != nullptr);
+    CHECK(seen.insert(d->code()->string_view()).second);  // each code exactly once
+    CHECK(d->code()->string_view() == all[i].code);       // diag_codes.inc order
+    CHECK(static_cast<uint8_t>(d->severity()) == static_cast<uint8_t>(all[i].severity));
+    CHECK(d->message()->string_view() == all[i].message);
+    CHECK(d->spec_ref()->string_view() == all[i].spec_ref);
+    CHECK(d->span() == nullptr);  // a registry row is not a finding
+    ++i;
+  }
+  CHECK(seen.size() == all.size());
+  // The data behind CNT-0007 (the lazy marker every expand_all test relies on) is reachable through the C route.
+  CHECK(seen.contains("CNT-0007"));
+}
+
+TEST_CASE("probe: ovt_container_list_diagnostics is deterministic and rejects a null out", "[container][probe][fast]") {
+  CHECK(ovt_container_list_diagnostics(nullptr) == OVT_E_INVALID_ARG);
+  Released a;
+  Released b;
+  REQUIRE(ovt_container_list_diagnostics(&a.b) == OVT_OK);
+  REQUIRE(ovt_container_list_diagnostics(&b.b) == OVT_OK);
+  REQUIRE(a.b.size == b.b.size);
+  CHECK(
+      std::equal(a.b.data, a.b.data + a.b.size, b.b.data));  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+  // A NUL follows the data (api/buffer.cpp), as for every rule-3a buffer.
+  CHECK(a.b.data[a.b.size] == 0);  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
 }
