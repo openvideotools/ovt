@@ -5,7 +5,8 @@
 // through an in-memory RandomAccessFile: ovt_container_open, ovt_container_tree, then ovt_container_expand on every
 // box of the tree. Invariants, each an abort when violated: no exception escapes; open returns a documented status;
 // every tree buffer verifies; expand of an offset taken from the tree returns OVT_OK; box spans stay inside the file;
-// an expansion that completes leaves a tree that still verifies. The number of expansions is capped so one input
+// an expansion that completes leaves a tree that still verifies; the validation driver (WI-1.224) runs over a fresh
+// walk of the input without throwing, and a second run adds nothing. The number of expansions is capped so one input
 // stays fast.
 
 #include <flatbuffers/flatbuffers.h>
@@ -17,6 +18,8 @@
 #include <span>
 #include <vector>
 
+#include "container/isobmff/box_walk.h"
+#include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/container.h"
@@ -79,6 +82,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       require(ovt_container_expand(c, off) == OVT_OK);
     }
     ovt_container_close(c);
+    // The validation driver over the complete walk: idempotent, whatever the bytes.
+    const ovt::io::MemoryFile file{std::span<const uint8_t>(data, size)};
+    auto walked = ovt::container::isobmff::walk(file);
+    using ovt::container::isobmff::ValidationLevel;
+    ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Standard);
+    require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();
   }

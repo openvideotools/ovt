@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
 
 namespace ovt::container {
@@ -35,6 +36,9 @@ enum class DiagCode : uint16_t {
 [[nodiscard]] const DiagInfo& diag(DiagCode code) noexcept;
 // nullptr for a code that is not in the registry.
 [[nodiscard]] const DiagInfo* diag(std::string_view code) noexcept;
+// The registry as RFC 4180 CSV, one line per code in diag_codes.inc order after a header line
+// `code,severity,message,spec_ref`; the text of `ovt probe --list-diagnostics -f csv` (chapter 12 §12.2.2, WI-1.224).
+[[nodiscard]] std::string diagnostics_csv();
 
 }  // namespace ovt::container
 

@@ -92,6 +92,21 @@ X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
 // WI-1.206 (stsd and sample entries, §8.3.2).
 X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+X(CNT_1003, "CNT-1003", Warning, "unknown FullBox version", "per box")
+X(CNT_1005, "CNT-1005", Info, "unparsed trailing bytes after the last field", "per box")
+X(CNT_1011, "CNT-1011", Error,
+  "required box missing: `mvhd` in `moov`; `tkhd`, `mdia` in `trak`; `mdhd`, `hdlr`, `minf` in `mdia`; `stbl`, `dinf` in `minf`; `stsd`, `stts`, `stsc`, `stsz|stz2`, `stco|co64` in `stbl` (unless `cmfc`/fragment-only with empty stbl, where `stts/stsc/stsz/stco` must still exist with 0 entries); `mfhd` in `moof`; `tfhd` in `traf`; message names the box and parent", "14496-12 §8.x \"Mandatory: Yes\"")
+X(CNT_1012, "CNT-1012", Error,
+  "duplicate box where exactly one is allowed (`mvhd`, `tkhd`, `mdhd`, `hdlr`, `stsd`, `stts`, `stsz`, `stco`/`co64`, `tfhd`, `tfdt`, `mehd`, `ftyp`) or duplicate `track_ID`", "14496-12 §8.x \"Quantity: Exactly one\"")
+X(CNT_1013, "CNT-1013", Warning,
+  "box in a parent where the registry does not allow it (`allowed_parents` non-empty and mismatch); e.g. `colr` in `stbl`, `elst` outside `edts`, `stss` in `traf`", "conformance JSON")
+X(CNT_1014, "CNT-1014", Error,
+  "box size does not match its fields: payload ends before the fields' declared count (`entry_count` × entry size > payload)", "per box")
+X(CNT_1015, "CNT-1015", Warning,
+  "box size larger than fields + known children by more than 0 bytes **and** box is one of the fixed-size boxes (`tkhd`, `mdhd`, `mvhd`, `vmhd`, `smhd`, `btrt`, `pasp`, `clli`, `mdcv`, `tfdt`, `mfhd`, `mehd`, `trex`)", "per box")
+X(CNT_1024, "CNT-1024", Info,
+  "`tkhd.matrix` is neither identity nor a 90°/180°/270° rotation; `TrackInfo.rotation = 0`", "14496-12 §8.3.2")
+X(CNT_1032, "CNT-1032", Warning, "`mdhd.timescale == 0` or `mvhd.timescale == 0`", "14496-12 §8.4.2")
 
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
@@ -122,6 +137,11 @@ X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6
 X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
 X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
 X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
+X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
+X(CNT_4002, "CNT-4002", Warning,
+  "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
+X(CNT_4003, "CNT-4003", Warning,
+  "`trun` has both `first-sample-flags-present` and `sample-flags-present`", "14496-12 §8.8.8")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
