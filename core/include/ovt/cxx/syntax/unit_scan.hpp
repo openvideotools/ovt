@@ -49,6 +49,7 @@ struct ScannedUnit {
   ByteRange prefix_span;                                // start code with its zero bytes, or the length field(s);
                                                         // length 0 (at file_offset) when the unit has none
   int64_t container_sample_index = kNoContainerSample;  // sample the unit came from, or kNoContainerSample
+  bool temporal_unit_start = false;                     // scan_obu_annexb(): first OBU of a temporal_unit()
 };
 
 // A non-fatal scanner finding. Severity is the one of the code's §7.9 registry row: IO-0001, SYN-GEN-0105,
@@ -111,7 +112,8 @@ void scan_obu_low_overhead(std::span<const uint8_t> data, uint64_t data_file_off
 // fields before an OBU form its prefix_span, so the first OBU of a temporal unit carries temporal_unit_size,
 // frame_unit_size and obu_length. A length that overruns its enclosing unit is SYN-GEN-0105 (truncated); a
 // length field cut off by the end of its enclosing unit is reported with the BitReader's BR code and ends the
-// scan. Zero-length OBUs are not reported; their obu_length joins the next unit's prefix_span.
+// scan. Zero-length OBUs are not reported; their obu_length joins the next unit's prefix_span. The first OBU
+// reported after a temporal_unit_size has temporal_unit_start set (WI-1.124, the SYN-AV1-0032 check).
 void scan_obu_annexb(std::span<const uint8_t> data, uint64_t data_file_offset, int64_t container_sample_index,
                      const UnitCallback& cb, const DiagnosticCallback& diag = {});
 

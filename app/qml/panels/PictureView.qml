@@ -30,6 +30,11 @@ Item {
         panY: view.controller ? view.controller.panY : 0
         planeMode: view.controller ? view.controller.planeMode : 0
         showCropped: view.controller ? view.controller.showCropped : true
+        // The pinned probe and the selection rectangle (the one being dragged, else the committed one) are drawn by
+        // the renderer's overlay passes (chapter 10 §10.5.6 pass 12, WI-2.436, issue #650).
+        probe: view.controller && view.controller.hasPicture ? view.controller.probe : Qt.point(-1, -1)
+        selectionRect: !view.controller ? Qt.rect(0, 0, 0, 0)
+                       : (view.controller.dragRect.width > 0 ? view.controller.dragRect : view.controller.selectionRect)
         // The HDR fields of the ViewState come from the HDR panel's Display tab (WI-1.462).
         toneMap: HdrView.toneMap
         gamutMap: HdrView.gamutMap

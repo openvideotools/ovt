@@ -115,6 +115,9 @@ constexpr auto kCases = std::to_array<Case>({
     {"tfhd", "traf", true},
     {"tfdt", "traf", true},
     {"trun", "traf", true},
+    {"vpcC", "vp09", true, "stsd"},
+    {"esds", "mp4a", true, "stsd"},
+    {"dOps", "Opus", false, "stsd"},
 });
 
 void require(bool ok) {

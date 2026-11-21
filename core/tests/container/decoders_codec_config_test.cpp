@@ -103,7 +103,8 @@ iso::BoxContext entry_ctx(std::string_view entry) {
   }
   c.ancestors.push_back(cc_of(entry));
   c.sample_entry = cc_of(entry);
-  c.handler_type = cc_of("vide");
+  const bool audio = entry == "mp4a" || entry == "Opus";
+  c.handler_type = cc_of(audio ? "soun" : "vide");
   return c;
 }
 
@@ -126,8 +127,23 @@ Decoded run(std::string_view type, const Bytes& payload, std::string_view entry)
     return d;
   }
   d.found = true;
-  ovt::BitReader br(payload);
-  iso::FieldBuilder fb(d.node, 0, br, 64);
+  size_t skip = 0;
+  if (e->is_fullbox && payload.size() >= 4) {  // the walker reads version/flags (§8.2.3 step 2.11)
+    d.node.version = payload[0];
+    d.node.flags = static_cast<int32_t>((uint32_t{payload[1]} << 16U) | (uint32_t{payload[2]} << 8U) | payload[3]);
+    auto add = [&](std::string_view name, uint64_t v, uint64_t bit, uint32_t len) {
+      auto f = std::make_unique<FieldT>();
+      f->name = std::string(name);
+      f->uvalue = v;
+      f->span = std::make_unique<ovt::fb::BitSpan>(bit, len);
+      d.node.fields.push_back(std::move(f));
+    };
+    add("version", payload[0], 64, 8);
+    add("flags", static_cast<uint32_t>(d.node.flags), 72, 24);
+    skip = 4;
+  }
+  ovt::BitReader br(std::span<const uint8_t>(payload).subspan(skip));
+  iso::FieldBuilder fb(d.node, 0, br, 64U + 8U * skip);
   d.outcome = iso::run_decoder(*e->decoder, ctx, br, fb);
   return d;
 }
@@ -427,6 +443,131 @@ TEST_CASE("parse_parameter_set: one dispatcher for the three codecs", "[syntax][
   CHECK(obu.unit_type == 1);
   CHECK(obu.complete);
   CHECK(ovt::syntax::parse_parameter_set(Codec::VP9, hex("00")).tree.empty());
+}
+
+const BoxNodeT* find_box(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, std::string_view type);
+
+// ffmpeg libvpx-vp9 into MP4: vpcC version 1 (FullBox), profile 0, 8-bit, BT.709-less defaults (2 = unspecified).
+constexpr std::string_view kVpccVp9 = "01000000000a820202020000";
+// ffmpeg aac (recipe 75 tools): ES_Descriptor > DecoderConfigDescriptor (OTI 0x40) > DecoderSpecificInfo, SLConfig.
+constexpr std::string_view kEsdsAacLc =
+    "000000000380808025000100048080801740150000000001f4000001d9f90580808005119056e500068080800102";
+// ffmpeg libopus: dOps, two channels, pre-skip 312, 48 kHz, family 0.
+constexpr std::string_view kDopsStereo = "000201380000bb80000000";
+
+TEST_CASE("vpcC: version 1 fields with H.273 names; initialisation data for VP9 is CNT-1022",
+          "[container][decoders][codec_config]") {
+  const Decoded d = run("vpcC", hex(kVpccVp9), "vp09");
+  REQUIRE(d.found);
+  CHECK(field(d.node, "profile").uvalue == 0);
+  CHECK(field(d.node, "level").svalue == "1.0");
+  CHECK(field(d.node, "bitDepth").uvalue == 8);
+  CHECK(field(d.node, "chromaSubsampling").uvalue == 1);
+  CHECK(field(d.node, "codecIntializationDataSize").uvalue == 0);
+  CHECK(d.node.diagnostics.empty());
+  check_contiguous(d);
+  Bytes with_data = hex(kVpccVp9);
+  with_data[with_data.size() - 1] = 2;
+  with_data.insert(with_data.end(), {0xAA, 0xBB});
+  CHECK(has_code(run("vpcC", with_data, "vp09").node, "CNT-1022"));
+  Bytes v0 = hex(kVpccVp9);
+  v0[0] = 0;
+  CHECK(has_code(run("vpcC", v0, "vp09").node, "CNT-1003"));
+}
+
+TEST_CASE("vpcC colour names come from the shared H.273 table", "[container][decoders][codec_config]") {
+  Bytes rec = hex(kVpccVp9);
+  rec[7] = 9;   // colourPrimaries BT.2020
+  rec[8] = 16;  // transferCharacteristics PQ
+  rec[9] = 9;   // matrixCoefficients BT.2020 NCL
+  const Decoded d = run("vpcC", rec, "vp09");
+  CHECK_FALSE(field(d.node, "colourPrimaries").svalue.empty());
+  CHECK(field(d.node, "transferCharacteristics").svalue != field(d.node, "colourPrimaries").svalue);
+}
+
+// AT4 (payload from the recipe-75 tools; the corpus case below checks the file itself).
+TEST_CASE("esds of the recipe-75 encode: AAC LC, 48000 Hz, stereo", "[container][decoders][codec_config]") {
+  const Decoded d = run("esds", hex(kEsdsAacLc), "mp4a");
+  REQUIRE(d.found);
+  CHECK_FALSE(d.outcome.truncated);
+  const std::string dcd = "ES_Descriptor/DecoderConfigDescriptor";
+  CHECK(field(d.node, "ES_Descriptor/ES_ID").uvalue == 1);
+  CHECK(field(d.node, "ES_Descriptor/sizeOfInstance").uvalue == 0x80808025);
+  CHECK(field(d.node, "ES_Descriptor/sizeOfInstance").svalue == "37 bytes");
+  CHECK(field(d.node, dcd + "/objectTypeIndication").uvalue == 0x40);
+  CHECK(field(d.node, dcd + "/streamType").svalue == "AudioStream");
+  const std::string asc = dcd + "/DecoderSpecificInfo/AudioSpecificConfig";
+  CHECK(field(d.node, asc + "/audioObjectType").uvalue == 2);
+  CHECK(field(d.node, asc + "/audioObjectType").svalue == "AAC LC");
+  CHECK(field(d.node, asc + "/samplingFrequencyIndex").uvalue == 3);
+  CHECK(field(d.node, asc + "/samplingFrequencyIndex").svalue == "48000 Hz");
+  CHECK(field(d.node, asc + "/channelConfiguration").uvalue == 2);
+  CHECK(field(d.node, asc + "/GASpecificConfig/frameLengthFlag").uvalue == 0);
+  // The explicit SBR signalling is present with sbrPresentFlag 0: plain AAC LC, not HE-AAC.
+  CHECK(field(d.node, asc + "/syncExtension/extensionAudioObjectType").uvalue == 5);
+  CHECK(field(d.node, asc + "/syncExtension/sbrPresentFlag").uvalue == 0);
+  CHECK(field(d.node, asc).svalue.empty());
+  CHECK(field(d.node, "ES_Descriptor/SLConfigDescriptor/predefined").uvalue == 2);
+  CHECK(d.node.diagnostics.empty());
+  check_contiguous(d);
+}
+
+TEST_CASE("esds: HE-AAC by hierarchical and by backward-compatible signalling", "[container][decoders][codec_config]") {
+  // ffmpeg aac -profile:a aac_he writes audioObjectType 5 (explicit hierarchical signalling).
+  const std::string he = "000000000380808025000100048080801740150000000001f4000001dad20580808005299056e500068080800102";
+  const Decoded h = run("esds", hex(he), "mp4a");
+  const std::string asc = "ES_Descriptor/DecoderConfigDescriptor/DecoderSpecificInfo/AudioSpecificConfig";
+  CHECK(field(h.node, asc + "/audioObjectType").uvalue == 5);
+  CHECK(field(h.node, asc).svalue == "HE-AAC");
+  Bytes sbr = hex(kEsdsAacLc);
+  sbr[sbr.size() - 7] = 0x80;  // the byte after "56 e5" (syncExtensionType, extension AOT 5): sbrPresentFlag 1
+  const Decoded s = run("esds", sbr, "mp4a");
+  CHECK(field(s.node, asc + "/syncExtension/sbrPresentFlag").uvalue == 1);
+  CHECK(field(s.node, asc).svalue == "HE-AAC");
+}
+
+TEST_CASE("esds: a descriptor larger than its container is CNT-1014; unknown tags keep their bytes",
+          "[container][decoders][codec_config]") {
+  const Bytes big = cat({zeros(4), hex("037f0001")});  // ES_Descriptor claims 127 bytes, has 2
+  const Decoded d = run("esds", big, "mp4a");
+  CHECK(has_code(d.node, "CNT-1014"));
+  const Bytes unknown = cat({zeros(4), hex("4203aabbcc")});
+  const Decoded u = run("esds", unknown, "mp4a");
+  CHECK(field(u.node, "descriptor/data").bytes == hex("aabbcc"));
+  check_contiguous(u);
+}
+
+TEST_CASE("dOps: pre-skip, sample rate, gain and the channel mapping", "[container][decoders][codec_config]") {
+  const Decoded d = run("dOps", hex(kDopsStereo), "Opus");
+  REQUIRE(d.found);
+  CHECK(field(d.node, "OutputChannelCount").uvalue == 2);
+  CHECK(field(d.node, "PreSkip").uvalue == 312);
+  CHECK(field(d.node, "PreSkip").svalue == "6.5000 ms at 48 kHz");
+  CHECK(field(d.node, "InputSampleRate").svalue == "48000 Hz");
+  CHECK(field(d.node, "OutputGain").svalue == "0.00000 dB");
+  CHECK_FALSE(has_field(d.node, "StreamCount"));
+  check_contiguous(d);
+  const Bytes family1 = hex("000601380000bb80ffff010402000104020305");  // gain -1/256 dB, 6 channels
+  const Decoded m = run("dOps", family1, "Opus");
+  CHECK(field(m.node, "OutputGain").ivalue == -1);
+  CHECK(field(m.node, "StreamCount").uvalue == 4);
+  CHECK(field(m.node, "ChannelMapping").children.size() == 6);
+  check_contiguous(m);
+  CHECK(has_code(run("dOps", hex("01"), "Opus").node, "CNT-1003"));
+}
+
+// AT4 on the corpus file.
+TEST_CASE("AT4 on syn_m4a_aac_lc: audioObjectType 2, 48000 Hz, two channels",
+          "[container][decoders][codec_config][needs-corpus]") {
+  const std::filesystem::path path = ovt::test::corpus_or_skip("syn_m4a_aac_lc");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult walked = iso::walk(*file);
+  const BoxNodeT* esds = find_box(walked.top_level, "esds");
+  REQUIRE(esds != nullptr);
+  const std::string asc = "ES_Descriptor/DecoderConfigDescriptor/DecoderSpecificInfo/AudioSpecificConfig";
+  CHECK(field(*esds, asc + "/audioObjectType").uvalue == 2);
+  CHECK(field(*esds, asc + "/samplingFrequencyIndex").uvalue == 3);
+  CHECK(field(*esds, asc + "/channelConfiguration").uvalue == 2);
 }
 
 // ---- CodecPrivate (§8.3.3 step 6) through the walker ----

@@ -30,6 +30,7 @@
 #include "ovt/cxx/rbsp.hpp"
 #include "ovt_container_generated.h"
 #include "ovt_model_generated.h"
+#include "syntax/common/h273_names.h"
 #include "syntax/common/parameter_set.h"
 #include "syntax/common/syntax_node_buffer.h"
 
@@ -512,6 +513,391 @@ uint64_t decode_av1c(BoxContext& /*ctx*/, BitReader& br, FieldBuilder& fb) {
   return 0;
 }
 
+// ---- vpcC (VP Codec ISO Media File Format Binding §2.3) --------------------------------------------------------
+
+constexpr std::string_view kRefVpcc = "VP Codec ISO Media File Format Binding §2.3";
+
+std::string_view vp_chroma_name(uint64_t c) {
+  constexpr std::array<std::string_view, 4> kNames{"4:2:0 vertical", "4:2:0 colocated with luma (0,0)", "4:2:2",
+                                                   "4:4:4"};
+  return c < kNames.size() ? kNames.at(c) : std::string_view{};
+}
+
+uint64_t decode_vpcc(BoxContext& ctx, BitReader& /*br*/, FieldBuilder& fb) {
+  const SpecRefScope scope(fb, kRefVpcc);
+  if (const int v = fb.node().version; v != 1) {
+    fb.diag(Severity::Warning, "CNT-1003", "unknown vpcC version " + std::to_string(v) + "; record not decoded");
+    return 0;
+  }
+  fb.u8("profile");
+  const uint8_t level = fb.u8("level");
+  fb.derived(std::to_string(level / 10U) + "." + std::to_string(level % 10U));
+  fb.derived(std::to_string(fb.u("bitDepth", 4)) + "-bit");
+  fb.derived(vp_chroma_name(fb.u("chromaSubsampling", 3)));
+  fb.derived(fb.u("videoFullRangeFlag", 1) != 0 ? "full range" : "video range");
+  fb.derived(syntax::h273_colour_primaries_name(fb.u8("colourPrimaries")));
+  fb.derived(syntax::h273_transfer_characteristics_name(fb.u8("transferCharacteristics")));
+  fb.derived(syntax::h273_matrix_coefficients_name(fb.u8("matrixCoefficients")));
+  const uint16_t init_size = fb.u16("codecIntializationDataSize");
+  fb.bytes("codecIntializationData", init_size);
+  const std::string_view entry = sample_entry_of(ctx);
+  if (init_size != 0 && (entry == "vp08" || entry == "vp09")) {
+    fb.diag(Severity::Warning, "CNT-1022",
+            "codecIntializationDataSize is " + std::to_string(init_size) + " for " + std::string(entry));
+  }
+  return 0;
+}
+
+// ---- esds (14496-14 §6.7; 14496-1 §7.2.6.5-7.2.6.7) and AudioSpecificConfig (14496-3 §1.6.2.1) ----------------
+
+constexpr std::string_view kRefEsds = "ISO/IEC 14496-1:2010 §7.2.6";
+constexpr std::string_view kRefAsc = "ISO/IEC 14496-3:2019 §1.6.2.1";
+constexpr unsigned kMaxDescriptorDepth = 4;
+
+std::string_view oti_name(uint64_t oti) {
+  switch (oti) {
+    case 0x20:
+      return "MPEG-4 Visual";
+    case 0x21:
+      return "AVC";
+    case 0x40:
+      return "AAC (MPEG-4 Audio)";
+    case 0x60:
+    case 0x61:
+    case 0x62:
+    case 0x63:
+    case 0x64:
+    case 0x65:
+      return "MPEG-2 Visual";
+    case 0x66:
+    case 0x67:
+    case 0x68:
+      return "MPEG-2 AAC";
+    case 0x69:
+      return "MP3 (ISO/IEC 13818-3)";
+    case 0x6A:
+      return "MPEG-1 Visual";
+    case 0x6B:
+      return "MP3 (ISO/IEC 11172-3)";
+    case 0x6C:
+      return "JPEG";
+    case 0xA5:
+      return "AC-3";
+    case 0xA6:
+      return "E-AC-3";
+    case 0xAD:
+      return "Opus";
+    case 0xDD:
+      return "Vorbis";
+    default:
+      return {};
+  }
+}
+
+std::string_view stream_type_name(uint64_t t) {
+  constexpr std::array<std::string_view, 12> kNames{"forbidden",
+                                                    "ObjectDescriptorStream",
+                                                    "ClockReferenceStream",
+                                                    "SceneDescriptionStream",
+                                                    "VisualStream",
+                                                    "AudioStream",
+                                                    "MPEG7Stream",
+                                                    "IPMPStream",
+                                                    "ObjectContentInfoStream",
+                                                    "MPEGJStream",
+                                                    "Interaction Stream",
+                                                    "IPMPToolStream"};
+  return t < kNames.size() ? kNames.at(t) : std::string_view{};
+}
+
+std::string_view descriptor_name(uint64_t tag) {
+  switch (tag) {
+    case 0x03:
+      return "ES_Descriptor";
+    case 0x04:
+      return "DecoderConfigDescriptor";
+    case 0x05:
+      return "DecoderSpecificInfo";
+    case 0x06:
+      return "SLConfigDescriptor";
+    default:
+      return "descriptor";
+  }
+}
+
+std::string_view aot_name(uint64_t aot) {
+  switch (aot) {
+    case 1:
+      return "AAC Main";
+    case 2:
+      return "AAC LC";
+    case 3:
+      return "AAC SSR";
+    case 4:
+      return "AAC LTP";
+    case 5:
+      return "SBR";
+    case 6:
+      return "AAC Scalable";
+    case 29:
+      return "PS";
+    case 42:
+      return "USAC";
+    default:
+      return {};
+  }
+}
+
+constexpr std::array<uint32_t, 13> kSamplingFrequencies{96000, 88200, 64000, 48000, 44100, 32000, 24000,
+                                                        22050, 16000, 12000, 11025, 8000,  7350};
+
+// The descriptor and AAC readers below keep to the end of the enclosing descriptor (`end`, in reader bits).
+struct Bounded {
+  FieldBuilder& fb;
+  BitReader& br;
+  uint64_t end;
+  [[nodiscard]] uint64_t left() const { return end > br.bit_pos() ? end - br.bit_pos() : 0; }
+  [[nodiscard]] uint64_t peek(unsigned n) const {
+    if (left() < n) {
+      return ~uint64_t{0};
+    }
+    BitReader copy = br;
+    return copy.u(n);
+  }
+};
+
+uint64_t sampling_frequency(Bounded& b, std::string_view index_name, std::string_view value_name) {
+  const uint64_t index = b.fb.u(index_name, 4);
+  if (index == 15) {
+    const uint64_t hz = b.fb.u(value_name, 24);
+    b.fb.derived(std::to_string(hz) + " Hz");
+    return hz;
+  }
+  if (index < kSamplingFrequencies.size()) {
+    b.fb.derived(std::to_string(kSamplingFrequencies.at(index)) + " Hz");
+    return kSamplingFrequencies.at(index);
+  }
+  return 0;
+}
+
+uint64_t audio_object_type(Bounded& b, std::string_view name) {
+  uint64_t aot = b.fb.u(name, 5);
+  if (aot == 31) {
+    aot = 32 + b.fb.u(std::string(name) + "Ext", 6);
+  }
+  b.fb.derived(aot_name(aot));
+  return aot;
+}
+
+// GASpecificConfig (14496-3 §4.4.1) for the AAC object types; stops at a program_config_element (channelConfiguration
+// 0), which stays in the descriptor's remaining bytes.
+bool ga_specific_config(Bounded& b, uint64_t aot, uint64_t channels) {
+  constexpr std::array<uint64_t, 12> kGa{1, 2, 3, 4, 6, 7, 17, 19, 20, 21, 22, 23};
+  if (std::ranges::find(kGa, aot) == kGa.end() || channels == 0 || b.left() < 3) {
+    return false;
+  }
+  b.fb.group("GASpecificConfig");
+  b.fb.u("frameLengthFlag", 1);
+  if (b.fb.u("dependsOnCoreCoder", 1) != 0) {
+    b.fb.u("coreCoderDelay", 14);
+  }
+  const uint64_t extension = b.fb.u("extensionFlag", 1);
+  b.fb.end();
+  return extension == 0;
+}
+
+// The backward-compatible explicit SBR / PS signalling (14496-3 §1.6.5.2, syncExtensionType 0x2B7 and 0x548).
+std::string sync_extension(Bounded& b, uint64_t aot) {
+  if (aot == 5 || aot == 29 || b.peek(11) != 0x2B7) {
+    return {};
+  }
+  std::string profile;
+  b.fb.group("syncExtension");
+  b.fb.u("syncExtensionType", 11);
+  const uint64_t ext_aot = audio_object_type(b, "extensionAudioObjectType");
+  if (ext_aot == 5 && b.left() >= 1) {
+    if (b.fb.u("sbrPresentFlag", 1) != 0) {
+      profile = "HE-AAC";
+      sampling_frequency(b, "extensionSamplingFrequencyIndex", "extensionSamplingFrequency");
+      if (b.peek(11) == 0x548) {
+        b.fb.u("syncExtensionType", 11);
+        if (b.fb.u("psPresentFlag", 1) != 0) {
+          profile = "HE-AAC v2";
+        }
+      }
+    }
+  }
+  b.fb.end();
+  return profile;
+}
+
+void audio_specific_config(Bounded& b) {
+  b.fb.group("AudioSpecificConfig");
+  uint64_t aot = audio_object_type(b, "audioObjectType");
+  sampling_frequency(b, "samplingFrequencyIndex", "samplingFrequency");
+  const uint64_t channels = b.fb.u("channelConfiguration", 4);
+  constexpr std::array<std::string_view, 8> kLayouts{
+      "defined in the PCE", "mono", "stereo", "3.0", "4.0", "5.0", "5.1", "7.1"};
+  if (channels < kLayouts.size()) {
+    b.fb.derived(kLayouts.at(channels));
+  }
+  std::string profile;
+  if (aot == 5 || aot == 29) {  // explicit hierarchical signalling
+    profile = aot == 29 ? "HE-AAC v2" : "HE-AAC";
+    sampling_frequency(b, "extensionSamplingFrequencyIndex", "extensionSamplingFrequency");
+    aot = audio_object_type(b, "audioObjectType2");
+  }
+  if (ga_specific_config(b, aot, channels)) {
+    if (const std::string s = sync_extension(b, aot); !s.empty()) {
+      profile = s;
+    }
+  }
+  b.fb.end();
+  if (!profile.empty()) {
+    b.fb.derived(profile);
+  }
+}
+
+// Fills the remaining bits of a descriptor: a sub-byte run, then whole bytes.
+void rest_of_descriptor(Bounded& b, std::string_view name) {
+  if (const uint64_t odd = b.left() % 8U; odd != 0) {
+    b.fb.u("alignment_bits", static_cast<unsigned>(odd));
+  }
+  if (b.left() > 0) {
+    b.fb.bytes(name, b.left() / 8U);
+  }
+}
+
+// expandable size (14496-1 §8.3.3): up to four bytes, 7 bits each, the top bit says another byte follows.
+uint64_t expandable_size(Bounded& b) {
+  const std::span<const uint8_t> rest = b.br.remaining_bytes();
+  unsigned n = 0;
+  uint64_t size = 0;
+  for (; n < 4 && n < rest.size(); ++n) {
+    size = (size << 7U) | (rest[n] & 0x7FU);
+    if ((rest[n] & 0x80U) == 0) {
+      ++n;
+      break;
+    }
+  }
+  b.fb.u("sizeOfInstance", 8U * std::max(n, 1U));
+  b.fb.derived(std::to_string(size) + " bytes");
+  return size;
+}
+
+// Descriptors nest (ES_Descriptor > DecoderConfigDescriptor > DecoderSpecificInfo); kMaxDescriptorDepth bounds the
+// recursion.
+// NOLINTBEGIN(misc-no-recursion)
+void descriptor(Bounded& parent, uint64_t oti, unsigned depth);
+
+void descriptor_children(Bounded& b, uint64_t oti, unsigned depth) {
+  while (b.left() >= 16) {
+    descriptor(b, oti, depth + 1);
+  }
+  rest_of_descriptor(b, "trailing_bytes");
+}
+
+void es_descriptor(Bounded& b, unsigned depth) {
+  b.fb.u16("ES_ID");
+  const uint64_t dep = b.fb.u("streamDependenceFlag", 1);
+  const uint64_t url = b.fb.u("URL_Flag", 1);
+  const uint64_t ocr = b.fb.u("OCRstreamFlag", 1);
+  b.fb.u("streamPriority", 5);
+  if (dep != 0) {
+    b.fb.u16("dependsOn_ES_ID");
+  }
+  if (url != 0) {
+    b.fb.str_fixed("URLstring", b.fb.u8("URLlength"));
+  }
+  if (ocr != 0) {
+    b.fb.u16("OCR_ES_Id");
+  }
+  descriptor_children(b, 0, depth);
+}
+
+void decoder_config(Bounded& b, unsigned depth) {
+  const uint8_t oti = b.fb.u8("objectTypeIndication");
+  b.fb.derived(oti_name(oti));
+  b.fb.derived(stream_type_name(b.fb.u("streamType", 6)));
+  b.fb.u("upStream", 1);
+  b.fb.reserved(1, 1);
+  b.fb.u24("bufferSizeDB");
+  b.fb.u32("maxBitrate");
+  b.fb.u32("avgBitrate");
+  descriptor_children(b, oti, depth);
+}
+
+void descriptor(Bounded& parent, uint64_t oti, unsigned depth) {
+  FieldBuilder& fb = parent.fb;
+  const std::span<const uint8_t> peek = parent.br.remaining_bytes();
+  const uint64_t tag = peek.empty() ? 0 : peek[0];
+  fb.group(descriptor_name(tag));
+  fb.u8("tag");
+  Bounded self{fb, parent.br, parent.end};
+  const uint64_t size = expandable_size(self);
+  if (size * 8U > self.left()) {
+    fb.diag(Severity::Error, "CNT-1014",
+            std::string(descriptor_name(tag)) + " size " + std::to_string(size) + " exceeds its container");
+  } else {
+    self.end = parent.br.bit_pos() + size * 8U;
+  }
+  if (depth < kMaxDescriptorDepth && tag == 0x03) {
+    es_descriptor(self, depth);
+  } else if (depth < kMaxDescriptorDepth && tag == 0x04) {
+    decoder_config(self, depth);
+  } else if (tag == 0x05 && oti == 0x40 && self.left() >= 16) {
+    const SpecRefScope asc_ref(fb, kRefAsc);
+    audio_specific_config(self);
+    rest_of_descriptor(self, "remaining_bytes");
+  } else if (tag == 0x06 && self.left() >= 8) {
+    fb.u8("predefined");
+    rest_of_descriptor(self, "SLConfig_fields");
+  } else {
+    rest_of_descriptor(self, "data");
+  }
+  fb.end();
+}
+
+// NOLINTEND(misc-no-recursion)
+
+uint64_t decode_esds(BoxContext& /*ctx*/, BitReader& br, FieldBuilder& fb) {
+  const SpecRefScope scope(fb, kRefEsds);
+  Bounded b{fb, br, br.bit_pos() + br.bits_left()};
+  while (b.left() >= 16) {
+    descriptor(b, 0, 0);
+  }
+  rest_of_descriptor(b, "trailing_bytes");
+  return 0;
+}
+
+// ---- dOps (Encapsulation of Opus in ISO Base Media File Format §4.3.2) -----------------------------------------
+
+constexpr std::string_view kRefDops = "Encapsulation of Opus in ISO Base Media File Format §4.3.2";
+
+uint64_t decode_dops(BoxContext& /*ctx*/, BitReader& /*br*/, FieldBuilder& fb) {
+  const SpecRefScope scope(fb, kRefDops);
+  if (const uint8_t v = fb.u8("Version"); v != 0) {
+    fb.diag(Severity::Warning, "CNT-1003", "unknown dOps Version " + std::to_string(v) + "; record not decoded");
+    return 0;
+  }
+  const uint8_t channels = fb.u8("OutputChannelCount");
+  const uint16_t pre_skip = fb.u16("PreSkip");
+  fb.derived(std::to_string(pre_skip / 48.0).substr(0, 6) + " ms at 48 kHz");
+  fb.derived(std::to_string(fb.u32("InputSampleRate")) + " Hz");
+  const int16_t gain = fb.i16("OutputGain");
+  fb.derived(std::to_string(gain / 256.0).substr(0, 7) + " dB");
+  if (fb.u8("ChannelMappingFamily") != 0) {
+    fb.u8("StreamCount");
+    fb.u8("CoupledCount");
+    fb.array("ChannelMapping", channels);
+    for (uint32_t i = 0; i < channels; ++i) {
+      fb.u8("ChannelMapping[" + std::to_string(i) + "]");
+    }
+    fb.end();
+  }
+  return 0;
+}
+
 }  // namespace
 
 bool is_codec_config_fourcc(std::string_view fourcc) noexcept {
@@ -545,5 +931,8 @@ std::vector<fb::CodecPrivateT> codec_private_of(const io::RandomAccessFile& file
 OVT_BOX_DECODER("avcC", "*", &decode_avcc)
 OVT_BOX_DECODER("hvcC", "*", &decode_hvcc)
 OVT_BOX_DECODER("av1C", "*", &decode_av1c)
+OVT_BOX_DECODER("vpcC", "*", &decode_vpcc)
+OVT_BOX_DECODER("esds", "*", &decode_esds)
+OVT_BOX_DECODER("dOps", "*", &decode_dops)
 
 }  // namespace ovt::container::isobmff
