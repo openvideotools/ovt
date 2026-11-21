@@ -511,3 +511,18 @@ TEST_CASE("fragments: the sample bound truncates the expansion (CNT-2031)", "[co
   CHECK(has(b, "CNT-2031"));
   CHECK(has(b, "CNT-4021"));
 }
+
+TEST_CASE("fragments: another track's huge default-sized trun is not iterated", "[container][fragments]") {
+  // Reviewer C on #775: track 2's trun claims 0xFFFFFFFF samples and has no per-sample fields; building track 1
+  // computes its data end arithmetically instead of looping (and track 1, first in the moof, is unaffected).
+  TrafSpec a = at(0);
+  a.tfhd_flags = 0;
+  TrafSpec b = at(0);
+  b.track = 2;
+  b.tfhd_flags = 0;
+  b.samples = 0xFFFFFFFFU;
+  const Built r = build(cat({ftyp(), moov({1, 2}), fragment(1, {a, b}, 3 * kSize)}), 1);
+  REQUIRE(r.b.samples.count() == 3);
+  CHECK(r.b.samples.offset[0] == r.b.timeline.fragments[0]->mdat_offset + 8);
+  CHECK_FALSE(has(r.b, "CNT-4022"));  // the claimed run extends past the mdat end
+}

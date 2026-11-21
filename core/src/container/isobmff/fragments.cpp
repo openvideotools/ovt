@@ -575,11 +575,20 @@ class Builder {
     }
     const std::optional<uint64_t> first = first_offset(box, r, t, mine, st);
     if (!first) {
+      if (!mine) {
+        return;
+      }
       diag("CNT-2030", "64-bit overflow in the data offset of the trun at offset " + std::to_string(box.offset),
            box.offset);
       return;
     }
     info->first_sample_offset = *first;
+    if (!mine) {  // another track's trun only moves the data end (implicit base chain, CNT-4022)
+      const uint64_t end = foreign_end(r, *first, d.size.value_or(0));
+      fr.max_end = std::max(fr.max_end, end);
+      st.prev_end = end;
+      return;
+    }
     uint64_t pos = *first;
     for (uint32_t s = 0; s < r.count; ++s) {
       const TrunEntry e = entry(r, s);
@@ -588,7 +597,7 @@ class Builder {
       const bool first_flags = s == 0 && (r.flags & kFirstSampleFlags) != 0;
       const std::optional<uint32_t> flags = first_flags ? std::optional(r.first_flags) : e.flags ? e.flags : d.flags;
       st.missing_default = st.missing_default || (!e.duration && !d.duration) || (!e.size && !d.size) || !flags;
-      if (mine && !sample(pos, size, dur, flags.value_or(0), e.cts, d.sdi, fr, st)) {
+      if (!sample(pos, size, dur, flags.value_or(0), e.cts, d.sdi, fr, st)) {
         break;
       }
       info->duration_sum += dur;
@@ -601,9 +610,28 @@ class Builder {
     }
     info->size_sum = pos - *first;
     st.prev_end = pos;
-    if (mine) {
-      ti.truns.push_back(std::move(info));
+    ti.truns.push_back(std::move(info));
+  }
+
+  // The end of another track's trun data, without expanding its samples: arithmetic when the trun has no
+  // per-sample sizes (a 20-byte trun may claim 2^32 default-sized samples), else the sum of the written sizes,
+  // which the payload bounds. Saturates at UINT64_MAX.
+  uint64_t foreign_end(const Trun& r, uint64_t first, uint32_t default_size) {
+    uint64_t total = 0;
+    if ((r.flags & kSampleSize) == 0) {
+      if (__builtin_mul_overflow(uint64_t{r.count}, uint64_t{default_size}, &total)) {
+        return UINT64_MAX;
+      }
+    } else {
+      for (uint32_t s = 0; s < r.count; ++s) {
+        if (s % kCancelEvery == 0) {
+          cancel_.throw_if_requested();
+        }
+        total += entry(r, s).size.value_or(0);  // ≤ 2^26 entries of ≤ 2^32: no overflow
+      }
     }
+    uint64_t end = 0;
+    return __builtin_add_overflow(first, total, &end) ? UINT64_MAX : end;
   }
 
   // Appends one sample of this track; false when the expansion stops (bound or overflow).
