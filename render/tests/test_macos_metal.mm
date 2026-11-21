@@ -120,3 +120,28 @@ TEST_CASE("render_test_macos_metal: a NATIVE target needs a CAMetalLayer", "[fas
   CHECK_FALSE(surface->init(t));
   CHECK(std::string(surface->last_error()).rfind("RND-0002 renderer init failed: target: ", 0) == 0);
 }
+
+// WI-1.463: the macOS PictureHost initialises its surface with Interop::MetalTexture (§10.2.2) and retargets that same
+// surface to the CAMetalLayer of its child window, then back.
+TEST_CASE("render_test_macos_metal: a MetalTexture surface retargets to NATIVE and back (WI-1.463)",
+          "[fast][render][vulkan]") {
+  DisplayTarget embedded;
+  embedded.width = 64;
+  embedded.height = 32;
+  embedded.interop = DisplayTarget::Interop::MetalTexture;
+  auto surface = layer_surface_or_skip(embedded);
+  CAMetalLayer* layer = sized_layer();
+  surface->retarget(layer_target(layer, Encoding::ScRgbLinear16F, true));
+  CHECK(std::string(surface->last_error()).empty());
+  CHECK(surface->active_encoding() == Encoding::ScRgbLinear16F);
+  CHECK(layer.wantsExtendedDynamicRangeContent);
+  surface->render(ViewState{});
+  CHECK(std::string(surface->last_error()).empty());
+
+  surface->retarget(embedded);
+  CHECK(std::string(surface->last_error()).empty());
+  CHECK(surface->active_encoding() == Encoding::Srgb8);
+  surface->render(ViewState{});
+  CHECK(surface->output_texture().interop == DisplayTarget::Interop::MetalTexture);
+  CHECK(surface->output_texture().width == 64);
+}
