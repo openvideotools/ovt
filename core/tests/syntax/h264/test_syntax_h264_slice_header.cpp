@@ -1462,6 +1462,11 @@ TEST_CASE("h264_aud_eos_filler", "[syntax][h264][fast]") {
     });
     CHECK(diag_codes(junk.tree.root()) == std::vector<std::string>{"SYN-H264-0033"});  // #551
     CHECK(find_node(junk.tree.root(), "trailing_data") != nullptr);
+    // The message carries the real trailing-byte count (0x12 0x34 = 2), not the count left after opaque_rest.
+    const auto* rbsp_node = find_node(junk.tree.root(), "end_of_seq_rbsp");
+    REQUIRE(rbsp_node != nullptr);
+    REQUIRE(rbsp_node->first_diag != nullptr);
+    CHECK(rbsp_node->first_diag->message == "end_of_seq_rbsp has 2 trailing bytes after the NAL unit header");
   }
   SECTION("filler data: the ff_byte run as one node") {
     h264::FillerData f;
