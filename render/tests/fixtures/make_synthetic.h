@@ -33,6 +33,17 @@ std::vector<uint8_t> make_synthetic(const SyntheticOptions& opts = {});
 
 int expected_qp(uint32_t cx, uint32_t cy);
 
+struct GridFixtureOptions {
+  uint32_t width = 3840;  // luma samples; 3840 x 2160 is the 4K fixture of §10.9.2 item 4
+  uint32_t height = 2160;
+  bool tus = false;        // each CU additionally gets four TU children (half its size): exercises TU culling
+  bool tiles_2x2 = false;  // four Tile partitions split at the picture centre (slice/tile boundary pass)
+};
+
+// C++ twin of `tools/gen_fixture_fb.py --kind grid` (synthetic_4k_grid.fb, §14.3.3; no corpus fetch): HEVC intra,
+// CTU 64 in raster order, CU size of CTU (cx, cy) 64 >> ((cx + cy) % 4), CUs > 8 crossing the picture edge split.
+std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
+
 // WI-2.434: the in-memory twin of `tools/gen_fixture_fb.py --kind mv` (render/tests/fixtures/synthetic_4k_mv.fb for
 // w x h = 3840 x 2160): one L0 MotionVector per 4x4 cell, ref 1, in the generator's order (64x64 superblocks in
 // raster order, cells in raster order inside each), forming a rotation about the picture centre:
@@ -40,6 +51,15 @@ int expected_qp(uint32_t cx, uint32_t cy);
 // Only the fields the arrow pass reads are written (grid size, pred, mv0, and the MotionVector list); the fixture file
 // is 45 MB and not in the fast corpora, so the tests fall back to this when it is absent.
 std::vector<uint8_t> make_synthetic_mv(uint32_t width, uint32_t height);
+
+// WI-2.436: a 128 x 96 HEVC frame (32 x 24 cells) for the deblocking, reference-index and selection passes:
+//   blocks      = 0 root, 1-4 CTUs 64 x 64 in raster order (clipped to the picture), 5-8 the 32 x 32 CUs of CTU 1;
+//                 block_id of a cell = the CU (5-8) inside CTU 1, else the CTU
+//   deblock_bs_v = 2 where cx % 8 == 0, 1 where cx % 2 == 0 (cx > 0), else 0, and 0 for rows 8 <= cy < 12 (a gap);
+//   deblock_bs_h = 2 where cy % 8 == 0, 1 where cy % 2 == 0 (cy > 0), else 0
+//   ref0 = (cx / 4 + 2 * (cy / 4)) % 8 for cy < 20, else -1;  ref1 = (cx / 4) % 8 for cy >= 20, else -1
+//   mvs  = [0] L0 at (0, 0, 16, 16), [1] L0 at (64, 32, 16, 16), [2] L1 at (96, 64, 32, 32)
+std::vector<uint8_t> make_misc_fixture();
 
 }  // namespace ovt::render::test
 

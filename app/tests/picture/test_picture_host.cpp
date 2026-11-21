@@ -32,12 +32,15 @@
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPoint>
 #include <QQuickRenderControl>
 #include <QQuickRenderTarget>
 #include <QQuickWindow>
+#include <QRect>
 #include <QSGRendererInterface>
 #include <QSize>
 #include <QString>
+#include <QVariantList>
 
 #include <array>
 #include <cmath>
@@ -364,4 +367,76 @@ TEST_CASE("picture_host_resize_once_per_size_without_flicker", "[fast][gui]") {
     CHECK(harness.host().stats().surface_height == size.height());
   }
   CHECK(harness.host().last_error().isEmpty());
+}
+
+// WI-1.456: the Picture panel's read-out and crop come from the frame the host shows, without the GPU.
+// Catch2's REQUIRE/CHECK expand to branches; the test itself is straight-line.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+TEST_CASE("picture_host_code_values_and_crop", "[fast][gui]") {
+  if (app_or_null() == nullptr) {
+    SKIP("no X display (run under xvfb-run)");
+  }
+  ovt_ColorDescription color{};
+  color.bit_depth = 10;
+  color.chroma_format = 1;  // 4:2:0
+  const std::shared_ptr<PictureFrame> frame = ovt::app::make_picture_frame(64, 36, color);
+  REQUIRE(frame != nullptr);
+  frame->set(0, 13, 7, 700);
+  frame->set(1, 6, 3, 300);  // chroma sample covering luma (12..13, 6..7)
+  frame->set(2, 6, 3, 1023);
+  frame->picture.crop = ovt::fb::Rect(0, 0, 64, 34);
+  ovt::app::PictureHost host;
+  CHECK(host.codeValues(0, 0).isEmpty());
+  CHECK(host.crop().isNull());
+  host.set_picture(frame);
+  CHECK(host.codeValues(13, 7) == QVariantList{700, 300, 1023});
+  CHECK(host.codeValues(12, 6) == QVariantList{0, 300, 1023});
+  CHECK(host.codeValues(64, 0).isEmpty());
+  CHECK(host.codeValues(-1, 0).isEmpty());
+  CHECK(host.crop() == QRect(0, 0, 64, 34));
+}
+
+// WI-2.436 (issue #650): the pinned probe and the selection rectangle reach the surface as OverlayConfig.probe_x/y
+// and selection_rect, and its overlay passes draw them (§10.5.2 rows 17 and 18) where the QML markers used to be.
+// Catch2's REQUIRE/CHECK expand to branches; the test itself is straight-line.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+TEST_CASE("picture_host_draws_probe_crosshair_and_selection_rect", "[fast][gui]") {
+  if (app_or_null() == nullptr) {
+    SKIP("no X display (run under xvfb-run)");
+  }
+  const std::shared_ptr<PictureFrame> frame = sdr709_ramp_frame0();
+  const int w = static_cast<int>(frame->picture.coded_width);
+  const int h = static_cast<int>(frame->picture.coded_height);
+  Harness harness;
+  REQUIRE(harness.init(QSize(w, h)).empty());  // fit at the picture's size: one device pixel per luma sample
+  harness.host().set_dither(false);            // the unmarked pixels are compared exactly
+  harness.host().set_picture(frame);
+  const auto at = [&](const std::vector<std::uint8_t>& px, int x, int y) {
+    const std::size_t i =
+        ((static_cast<std::size_t>(y) * static_cast<std::size_t>(w)) + static_cast<std::size_t>(x)) * 4;
+    return std::array<int, 3>{px.at(i), px.at(i + 1), px.at(i + 2)};
+  };
+  const auto is_probe_red = [](const std::array<int, 3>& c) { return c[0] > 240 && c[1] < 90 && c[2] < 80; };
+  const auto is_rect_cyan = [](const std::array<int, 3>& c) { return c[0] < 90 && c[1] > 180 && c[2] > 180; };
+  const std::vector<std::uint8_t> plain = harness.frame();
+  CHECK_FALSE(is_probe_red(at(plain, 100, 900)));
+
+  harness.host().set_probe(QPoint(100, 50));
+  harness.host().set_selection_rect(QRect(400, 300, 200, 100));
+  static_cast<void>(harness.frame());
+  const std::vector<std::uint8_t> marked = harness.frame();
+  INFO("error '" << harness.host().last_error().toStdString() << "'");
+  REQUIRE(harness.host().last_error().isEmpty());
+  CHECK(is_probe_red(at(marked, 100, 900)));             // the vertical line through sample x = 100, down the picture
+  CHECK(is_probe_red(at(marked, 1500, 50)));             // the horizontal line through y = 50
+  CHECK(is_rect_cyan(at(marked, 400, 350)));             // the rectangle's left border
+  CHECK(is_rect_cyan(at(marked, 450, 399)));             // its bottom border
+  CHECK(at(marked, 1000, 700) == at(plain, 1000, 700));  // elsewhere the picture is unchanged
+
+  harness.host().set_probe(QPoint(-1, -1));
+  harness.host().set_selection_rect(QRect());
+  static_cast<void>(harness.frame());
+  const std::vector<std::uint8_t> cleared = harness.frame();
+  CHECK_FALSE(is_probe_red(at(cleared, 100, 900)));
+  CHECK(at(cleared, 400, 350) == at(plain, 400, 350));
 }

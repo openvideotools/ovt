@@ -73,7 +73,11 @@ void PictureController::setPicture(int coded_width, int coded_height, const QRec
   coded_h_ = coded_height;
   crop_ = valid_crop;
   Q_EMIT pictureChanged();
-  if (new_size || fit_) {
+  if (pending_view_ && has_picture()) {
+    const ViewSnapshot view = *pending_view_;
+    pending_view_.reset();
+    restoreView(view);
+  } else if (new_size || fit_) {
     fit_ = true;
     refit();
   } else {
@@ -283,6 +287,34 @@ void PictureController::set_show_cropped(bool on) {
     Q_EMIT viewChanged();
     clamp_pan();
   }
+}
+
+// ---- Saved state --------------------------------------------------------------------------------------------------
+
+PictureController::ViewSnapshot PictureController::viewSnapshot() const {
+  return {fit_, zoom_, pan_x_, pan_y_, plane_mode_, stage_, show_cropped_};
+}
+
+void PictureController::restoreView(const ViewSnapshot& view) {
+  set_plane_mode(view.plane_mode);
+  set_stage(view.stage);
+  set_show_cropped(view.show_cropped);
+  if (!has_picture()) {
+    pending_view_ = view;
+    return;
+  }
+  pending_view_.reset();
+  if (view.fit) {
+    const bool was_fit = fit_;
+    fit_ = true;
+    refit();
+    if (!was_fit) {
+      Q_EMIT viewChanged();
+    }
+  } else {
+    apply(view.zoom, view.pan_x, view.pan_y);
+  }
+  update_readout();
 }
 
 // ---- Probe and selection rectangle --------------------------------------------------------------------------------

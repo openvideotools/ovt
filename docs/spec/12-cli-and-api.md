@@ -662,9 +662,9 @@ ovt verify clip.obu --plugin aom --against dav1d --tolerance 0 --stop-on-first
 |---|---|
 | `ovt cache list` | One row per (entry, kind present): `key,kind (index\|analysis\|metrics),source_path_basename,size_bytes,created (ISO 8601),last_used` with that kind's bytes; the kinds map to entry files as chapter 06 WI-0.092 states (`index` = `index.fb`, `container.fb.zst`; `analysis` = `frames/`, `planes/`, `reports/*` except `metrics`; `metrics` = `maps/`, `metrics/`, `reports/metrics.fb.zst`; `meta.json` belongs to no kind). Timestamps live in cache metadata only (§0.7 rule 5) — therefore `cache list` output is exempt from FR-CLI-004 and says so in `--help`. |
 | `ovt cache stats` | Totals, entry count, limit (`--max-size` setting), hit/miss counters since the process started (`CacheReport.hits`/`misses` are process-lifetime lookup counters; `cache.json` persists none). |
-| `ovt cache clear [--kind k] [--older-than <days>] [--source <path>]` | Delete entries. Without filters: everything (asks for confirmation on a TTY unless `--yes`). `--kind k` deletes only that kind's files from matching closed entries and updates `meta.json` (`index_complete=false`, or `plugins=[]`/`planes_cached=false`); an entry left with only `meta.json` is removed whole. Entries open through any handle of this process are skipped and reported. `--source <path>` is `OVT_E_UNSUPPORTED` (exit 4) until the §6.2.8 source hasher exists (WI-1.121). |
+| `ovt cache clear [--kind k] [--older-than <days>] [--source <path>]` | Delete entries. Every `clear`, with or without filters, needs `--yes` or a TTY answer `y`; without a TTY and without `--yes` it exits 2 (`CLI-0001`, "clear needs --yes when stdin is not a terminal") (#673). Without filters: everything. `--kind k` deletes only that kind's files from matching closed entries and updates `meta.json` (`index_complete=false`, or `plugins=[]`/`planes_cached=false`); an entry left with only `meta.json` is removed whole. Entries open through any handle of this process are skipped and reported. `--source <path>` is `OVT_E_UNSUPPORTED` (exit 4) until the §6.2.8 source hasher exists (WI-1.121). |
 | `ovt cache path` | Print the resolved cache directory. |
-| `ovt cache import <path>` | Import stored records into the cache for their `source_hash`: `path` is a `.json` export (reverse of the JSON exporter, chapter 06 §6.8.1 and WI-0.088 — the round-trip MUST be byte-identical), a `.fa`/`.fa.zst` `FrameAnalysis`, an `.index.fb` `StreamIndex` or a directory of them. Records whose `schema_version` or `source_hash` do not match an existing entry create a new entry. `result` = `CacheReport` restricted to the touched entries. Exit 5 when a record fails `ovt_validate_*` (§12.3.8). |
+| `ovt cache import <path>` | Import stored records into the cache for their `source_hash`: `path` is a `.json` export (reverse of the JSON exporter, chapter 06 §6.8.1 and WI-0.088 — the round-trip MUST be byte-identical), a `.fa`/`.fa.zst` `FrameAnalysis`, an `.index.fb` `StreamIndex` or a directory of them. A `.json` file is either the §12.2.0 envelope (the entry is named by `input.source_hash`, the record is `result`) or a bare root-table export. A `StreamIndex` always uses its own `source_hash`; a bare `FrameAnalysis` (JSON or `.fa`) takes it from the first `PlaneRef.blob_id` prefix, else exit 2 (`CLI-0001`, "FrameAnalysis has no source_hash; import the `ovt analyze -f json` envelope") (#673). Records whose `schema_version` or `source_hash` do not match an existing entry create a new entry. `result` = `CacheReport` restricted to the touched entries. Exit 5 when a record fails `ovt_validate_*` (§12.3.8). |
 | `ovt cache stats --max-size` | (setting) `--max-size <GiB>` on `stats`/`clear` sets the cap persistently in `cache.json` (default 20 GiB desktop, 2 GiB Android; chapter 06 §6.7.4). |
 
 **Output.** `result` = `CacheReport`.
@@ -995,10 +995,16 @@ ovt_status ovt_syntax_trace(const uint8_t* syntax_node_fb, size_t len, ovt_Buffe
 ovt_status ovt_syntax_to_json(const uint8_t* fb, size_t len, const char* root_type /*"SyntaxNode","StreamIndex",...*/, int pretty, ovt_Buffer* out_text);
 ovt_status ovt_fb_to_json(const uint8_t* fb, size_t len, const char* root_type, int pretty, ovt_Buffer* out_text);        /* generic: any root table */
 ovt_status ovt_json_to_fb(const char* json, const char* root_type, ovt_Buffer* out_fb);
+/* root_type is a table name with or without the "ovt.fb." prefix, looked up in the model, container and metrics schemas in that order; unknown →
+   OVT_E_INVALID_ARG, text the importer rejects → OVT_E_CORRUPT (reason in the debug log until ovt_last_error carries a Diagnostic). out_fb is the
+   canonical, not size-prefixed buffer of ovt::model::from_json. ovt_fb_to_json writes RFC 8259 text (strict_numbers = true) with a NUL past size.
+   Both are declared in ovt/syntax.h, created with these two functions only; ovt_syntax_* arrive with their WIs (#674). */
 
 typedef struct ovt_Stream ovt_Stream;
 ovt_status ovt_stream_open(ovt_Container*, int track_index, ovt_Stream** out);
 uint8_t    ovt_stream_codec(const ovt_Stream*);                                  /* ovt.fb.Codec */
+typedef enum ovt_IndexFlags { OVT_INDEX_ALLOW_PARTIAL = 1 } ovt_IndexFlags;    /* stream options for build_index (#710) */
+ovt_status ovt_stream_set_index_flags(ovt_Stream*, uint32_t flags);              /* ovt_IndexFlags bits; applies to the next build_index; chapter 07 §7.4.6 */
 ovt_status ovt_stream_build_index(ovt_Stream*, ovt_Job* job, ovt_Buffer* out_index /* StreamIndex, caller-owned */);  /* uses/updates cache */
 ovt_Buffer ovt_stream_index(ovt_Stream*);                                        /* last built StreamIndex; by-value → handle-owned (rule 3b, D4); .data == NULL before build_index */
 ovt_status ovt_stream_index_summary(ovt_Stream*, ovt_Buffer* out /* IndexSummary */);
@@ -1015,7 +1021,10 @@ ovt_status ovt_stream_min_cvs_units(ovt_Stream*, int decode_index, int with_sei,
 void       ovt_stream_close(ovt_Stream*);
 
 /* ovt/validate.h — chapter 06 §6.9 rules (WI-0.086 implements; this is the exported signature). Violations come back as a
-   DiagnosticList with code "MDL-VAL-0nnn" (message begins with "V-nnn"; severity per rule), path in FlatBuffers locator syntax ("grid.qp[1234]"). */
+   DiagnosticList with code "MDL-VAL-0nnn" (the three digits of V-nnn), severity as the validator reports it, message "V-nnn: <rule message>" followed
+   by " (at <path>)" when the path is not empty (FlatBuffers locator syntax, "grid.qp[1234]"), spec_ref "chapter 06 §6.9", no span. Both return
+   OVT_OK whenever the arguments are valid; the findings, V-001 included, are the list (empty = valid). OVT_E_INVALID_ARG only for a NULL pointer,
+   a codec_override outside -1..ovt.fb.Codec or out == NULL (#674). */
 ovt_status ovt_validate_frame_analysis(const uint8_t* fb, size_t len, const uint8_t* expected_source_hash /*nullable, 32 bytes*/, int codec_override /*-1 none, else ovt.fb.Codec*/, ovt_Buffer* out /* DiagnosticList */);
 ovt_status ovt_validate_stream_index(const uint8_t* fb, size_t len, ovt_Buffer* out /* DiagnosticList */);
 
@@ -1452,10 +1461,10 @@ Phase numbering follows §0.8. "CLI skeleton" items are prerequisites for every 
 **Depends on:** WI-1.500.
 **Produces:** `tools/fbs_to_jsonschema.py`, `docs/spec/schemas/ovt-cli-1.schema.json`, `docs/spec/schemas/<Table>.schema.json`, CMake custom target `ovt_json_schema` (and `ovt_json_schema_check`), test `cli/tests/test_schema_validate.py`.
 **Interface:** §12.1.4 JSON mapping rules.
-**Steps:** 1. Run `flatc --jsonschema` for each `.fbs`; 2. post-process: enums as string names, `ulong`/`long` as `oneOf[integer,string]`, `[ubyte]` as `array` of `integer` (the hash-like fields of §12.1.4 as hex `string`), floats allowing the strings `nan`/`inf`/`-inf`, each of the five nested fields as `oneOf` over its extension tables checked against the sibling `*_type` (the §12.1.4 printer rules), a permissive `result` (`object` or `array`) for `info`, `stats`, `compare`, `hrd` and `models` until their chapters fix a table; 3. write the envelope schema referencing per-command result schemas; 4. add a Python test (`check-jsonschema` package) validating `ovt info/probe/syntax/frames/index` outputs for every mini-corpus file.
+**Steps:** 1. Run `flatc --jsonschema` for each `.fbs`; 2. post-process: enums as string names, `ulong`/`long` as `oneOf[integer,string]`, `[ubyte]` as `array` of `integer` (the hash-like fields of §12.1.4 as hex `string`), floats allowing the strings `nan`/`inf`/`-inf`, each of the five nested fields as `anyOf` over its extension tables plus the plain byte-array form, pinned to the exact table by an `if`/`then`/`else` on the sibling `*_type` (the §12.1.4 printer rules; not `oneOf`, because extension tables without required fields let one object match several candidates, PR #668), a permissive `result` (`object` or `array`) for `info`, `stats`, `compare`, `hrd` and `models` until their chapters fix a table; 3. write the envelope schema referencing per-command result schemas; 4. add a Python test (`check-jsonschema` package) validating `ovt info/probe/syntax/frames/index` outputs for every mini-corpus file.
 **Acceptance tests:** 1. Given every MP4 of the `fast` corpus subset (chapter 14 §14.2.4), When `ovt probe f -f json` is piped into `check-jsonschema` (pinned in `tools/requirements.txt`, which this WI extends) with the schema `docs/spec/schemas/ovt-cli-1.schema.json`, Then the output validates (the test `cli/tests/test_schema_validate.py::test_ovt_json_output_validates_over_fast_mp4_corpus` runs `probe`, `info`, `syntax`, `frames` and `index` over those files and skips a command that exits 2 with `CLI-0001` because its WI has not merged; each of WI-1.502 to WI-1.506 is covered by this test as soon as its command exists, with no new dependency edge). 2. Given a change to `ovt_model.fbs` without regenerating, When the CI target `ovt_json_schema_check` builds, Then CI target `ovt_json_schema_check` fails with a diff.
 **Size:** S.
-**Notes / pitfalls:** `flatc --jsonschema` emits `integer` for 64-bit; override. Keep the generated files committed so the docs site needs no build step.
+**Notes / pitfalls:** `flatc --jsonschema` emits `integer` for 64-bit; override. Keep the generated files committed so the docs site needs no build step. **Status:** landed in WI-1.501; regenerated for the settled JSON forms (#285, #493) in PR #668: `[ubyte]` as integer arrays, the hash-like fields as lowercase hex, nested tables in place under their own key (no `*_decoded`, no `null`), `bool` also accepting an integer 2 to 255, and `Block.ext` candidates `AvcSubMb` and `HevcCtu`.
 ### WI-1.502 — `ovt info`
 **Goal:** Implement §12.2.1.
 **Depends on:** WI-1.500, WI-1.217 (`TrackInfo`), WI-1.121 (index), WI-1.223 (HDR metadata view).
@@ -1521,10 +1530,10 @@ Phase numbering follows §0.8. "CLI skeleton" items are prerequisites for every 
 **Notes / pitfalls:** For HEVC, CRA with leading RASL pictures: when the target lies in RASL frames after a CRA, use the previous RAP. AV1 `show_existing_frame` targets need the referenced frame's chain.
 ### WI-1.509 — `ovt cache`
 **Goal:** Implement §12.2.13 including `ovt cache import`.
-**Depends on:** WI-1.500, WI-0.091, WI-0.092 (cache), WI-0.088 (JSON importer).
+**Depends on:** WI-1.500, WI-0.091, WI-0.092 (cache), WI-0.088 (JSON importer), the C entry points `ovt_json_to_fb` / `ovt_validate_*` of #674 (`import` only).
 **Produces:** `cli/src/cmd/cache.cpp`, tests.
 **Interface:** `ovt_cache_*`, `CacheReport`.
-**Steps:** 1. `list/stats/clear/path` subcommands; 2. confirmation prompt on TTY; 3. filters; 4. `import`: detect record kind by extension/magic, JSON → FlatBuffer via `ovt_json_to_fb`, validate with `ovt_validate_*`, write through `ovt_cache_entry`/`ovt_cache_put_*` (§12.3.14).
+**Steps:** 1. `list/stats/clear/path` subcommands; 2. confirmation prompt on TTY; 3. filters; 4. `import`: detect record kind by extension/magic, JSON → FlatBuffer via `ovt_json_to_fb`, validate with `ovt_validate_*`, write through `ovt_cache_entry`/`ovt_cache_put_*` (§12.3.14); the entry's `source_hash` comes from the envelope, the `StreamIndex` or the first `PlaneRef.blob_id` (#673). `list/stats/clear/path` ship complete; `import` sits behind the internal seam `cli/src/cmd/record_io.h` until the #674 C entry points land.
 **Acceptance tests:** 1. Given an indexed file, When `ovt cache list -f csv`, Then one `index` row. 2. Given `ovt cache clear --yes`, When it runs, Then `stats` shows 0 entries. 3. Given `tiny16_hevc.fa` exported with `ovt analyze --validate -f json`, When `ovt cache import tiny16_hevc.json` runs and the frame is read back with `ovt_cache_get_frame`, Then the bytes equal the original `.fa` (round-trip byte-identical).
 **Size:** S.
 **Notes / pitfalls:** `import` must validate the JSON against the schema before writing into the cache (a bad import would poison every later read); `clear` requires `--yes` or a TTY confirmation. Report sizes in GiB consistently with the D5 caps (20 GiB desktop / 2 GiB Android).

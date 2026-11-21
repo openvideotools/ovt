@@ -30,7 +30,16 @@ add_executable(
   models/test_bookmarks_model.cpp
   models/test_sample_streams.cpp
   models/test_picture_controller.cpp
+  models/test_compare_controller.cpp
+  models/test_hdr_metadata_model.cpp
+  models/test_android_state.cpp
+  ../src/platform/android_state.cpp
+  models/test_hex_model.cpp
   ../src/picture_controller.cpp
+  ../src/compare_controller.cpp
+  ../src/models/hdr_metadata_model.cpp
+  ../src/models/hex_model.cpp
+  ../../core/src/syntax/common/h273_names.cpp
   ../src/settings.cpp
   ../src/keymap.cpp
   ../src/goto_parser.cpp
@@ -61,7 +70,7 @@ qt_add_resources(
   FILES
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/settings.schema.json"
   "${PROJECT_SOURCE_DIR}/docs/spec/schemas/ovtproj.schema.json")
-target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models .)
+target_include_directories(ovt_tests_app_models PRIVATE ../src ../src/platform models . ../../core/src)
 target_link_libraries(
   ovt_tests_app_models
   PRIVATE Qt6::Core
@@ -77,6 +86,22 @@ target_compile_definitions(ovt_tests_app_models PRIVATE QT_NO_KEYWORDS)
 ovt_set_license(ovt_tests_app_models "GPL-3.0-or-later")
 _ovt_studio_describe_qt(ovt_tests_app_models)
 ovt_catch_discover_tests(ovt_tests_app_models EXTRA_LABELS gui)
+
+# ---- Test IPC (WI-1.465): the command dispatch and the socket server against a small QML scene -----------------
+# Only with OVT_ENABLE_TEST_IPC (app/CMakeLists.txt). Its own executable: it needs a QGuiApplication on the offscreen platform, the model tests a QCoreApplication.
+if(OVT_ENABLE_TEST_IPC)
+  add_executable(ovt_tests_app_testipc testipc/test_test_ipc.cpp ../src/testipc/command_dispatch.cpp
+                                       ../src/testipc/test_ipc_server.cpp)
+  set_target_properties(ovt_tests_app_testipc PROPERTIES AUTOMOC ON)
+  target_include_directories(ovt_tests_app_testipc PRIVATE ../src)
+  target_link_libraries(ovt_tests_app_testipc PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Test ovt::flags
+                                                      ${Catch2_TARGET})
+  target_compile_definitions(ovt_tests_app_testipc PRIVATE QT_NO_KEYWORDS)
+  ovt_set_license(ovt_tests_app_testipc "GPL-3.0-or-later")
+  _ovt_studio_describe_qt(ovt_tests_app_testipc)
+  ovt_catch_discover_tests(ovt_tests_app_testipc EXTRA_LABELS gui ENVIRONMENT_MODIFICATION
+                           "QT_QPA_PLATFORM=set:offscreen")
+endif()
 
 # ---- QML: tst_main.qml runs against the same module as the application ---------------------------------------
 qt_add_executable(ovt_tests_app_qml MANUAL_FINALIZATION qml/tst_main.cpp)
@@ -96,7 +121,8 @@ set_tests_properties(ovt_tests_app_qml PROPERTIES LABELS "fast;gui" TIMEOUT 60 E
 # under xvfb-run where it exists and skips (Catch2 exit code 4) without a display; macOS renders Metal on the
 # offscreen platform. Built only where the item is (OVT_STUDIO_PICTURE_HOST, app/CMakeLists.txt).
 if(OVT_STUDIO_PICTURE_HOST)
-  add_executable(ovt_tests_app_picture picture/test_picture_host.cpp ../src/picture_host.cpp ../src/picture_host.h)
+  add_executable(ovt_tests_app_picture picture/test_picture_host.cpp ../src/picture_host.cpp ../src/picture_host.h
+                                       ../src/render_stub.cpp)
   set_target_properties(ovt_tests_app_picture PROPERTIES AUTOMOC ON)
   ovt_studio_add_picture_shaders(ovt_tests_app_picture)
   target_include_directories(ovt_tests_app_picture PRIVATE ../src "${PROJECT_SOURCE_DIR}/render/src")
@@ -132,7 +158,7 @@ if(Python3_Interpreter_FOUND)
     add_test(
       NAME gui_scripts_pytest
       COMMAND "${Python3_EXECUTABLE}" -m pytest -q -p no:cacheprovider "${CMAKE_CURRENT_SOURCE_DIR}/scripts"
-              --ovt-studio-screenshots "$<TARGET_FILE:ovt_studio_screenshots>"
+              --ovt-studio-screenshots "$<TARGET_FILE:ovt_studio_screenshots>" --ovt-studio "$<TARGET_FILE:ovt_studio>"
       WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
     set_tests_properties(gui_scripts_pytest PROPERTIES LABELS "fast;gui" TIMEOUT 120)
   else()

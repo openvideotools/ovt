@@ -90,8 +90,38 @@ X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "Q
 X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
 X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
+// WI-1.206 (stsd and sample entries, §8.3.2).
+X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
+
+// WI-1.208 (group C part 2: colour, HDR and Dolby Vision boxes, §8.3.3).
+X(CNT_1023, "CNT-1023", Warning, "`clap` yields non-integral or out-of-range aperture", "14496-12 §12.1.4")
+X(CNT_5002, "CNT-5002", Warning, "QuickTime `nclc` colr in non-`qt` file", "QTFF")
+X(CNT_5020, "CNT-5020", Warning, "`dvcC` used for profile ≥ 8 or `dvvC` for ≤ 7", "DV-ISOBMFF §2.2")
+
+// WI-1.207 (codec configuration records, §8.3.3).
+X(CNT_1020, "CNT-1020", Info, "`avc3`/`avc4` sample entry carries SPS/PPS in `avcC` (allowed, but in-band is the point)",
+  "14496-15 §5.4")
+X(CNT_1021, "CNT-1021", Error, "`av1C.configOBUs` contains an OBU other than sequence header / metadata",
+  "AV1-ISOBMFF §2.3.4")
+X(CNT_1022, "CNT-1022", Warning, "`vpcC.codecIntializationDataSize` ≠ 0 for VP8/VP9", "VP-ISOBMFF §2.3")
+
+// WI-1.209 (sample tables, §8.3.4 and §8.4.1; the box-level checks of the group D decoders).
+X(CNT_2001, "CNT-2001", Warning, "`stts.sample_delta == 0` for a non-last sample", "14496-12 §8.6.1.2")
+X(CNT_2002, "CNT-2002", Warning, "`ctts` v0 offset ≥ 2^31 treated as negative", "14496-12 §8.6.1.3")
+X(CNT_2003, "CNT-2003", Error, "`stsc.first_chunk` not starting at 1 / not increasing / > chunk count", "14496-12 §8.7.4")
+X(CNT_2004, "CNT-2004", Error, "`sample_description_index` 0 or > `stsd.entry_count`", "14496-12 §8.7.4")
+X(CNT_2005, "CNT-2005", Error, "sample count mismatch `stts` vs `stsz`/`stz2`", "14496-12 §8.6.1.2")
+X(CNT_2006, "CNT-2006", Error, "`stz2.field_size ∉ {4,8,16}`", "14496-12 §8.7.3.3")
+X(CNT_2007, "CNT-2007", Error, "chunk/sample byte range beyond end of file", "14496-12 §8.7.5")
+X(CNT_2008, "CNT-2008", Error, "both `stco` and `co64` present", "14496-12 §8.7.5")
+X(CNT_2009, "CNT-2009", Error, "`stss` sample number out of range or not increasing", "14496-12 §8.6.2")
+X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6.4")
+X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
+X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
+X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")

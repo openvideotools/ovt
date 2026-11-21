@@ -13,6 +13,10 @@ add_library(ovt::render ALIAS ovt_render)
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 # WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1).
+target_sources(ovt_render PRIVATE src/pipeline/plane_views.cpp)
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2).
+target_sources(ovt_render PRIVATE src/pipeline/view_transform.cpp src/pipeline/sample_grid.cpp)
 # WI-1.410: compare modes (§10.2.4, §10.6.4); src/shaders/diff.glsl is embedded by the WI-2.431 loop below.
 target_sources(ovt_render PRIVATE src/pipeline/compare.cpp src/pipeline/compare_convert.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
@@ -66,9 +70,19 @@ endif()
 # WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
 # The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
 target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
-# WI-2.434a: MV arrow and intra stroke instances, CPU side (§10.5.1, §10.5.4); the GPU pass follows in WI-2.434b.
-target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp)
-foreach(shader IN ITEMS diff fill hatch heatmap)
+# WI-2.439: overlay colour tables (kOverlayColors, kOverlayColorsCvd), halo rule and legend data (§10.5.2).
+target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
+# WI-2.434: MV arrow and intra stroke instances (2.434a) and passes 8-9 by vertex pulling (2.434b, §10.5.4).
+target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3).
+target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+# WI-2.437: overlay cache (LRU of 8 built OverlaySets per surface, §10.5.8) and the set_overlays() lifecycle.
+target_sources(ovt_render PRIVATE src/overlay/overlay_cache.cpp)
+# WI-2.435: id buffer, readback and probe windows (§10.5.7) and the probe's CPU colour math (§10.6.3).
+target_sources(ovt_render PRIVATE src/overlay/idbuffer.cpp src/color/cpu_convert.cpp)
+# WI-2.436: deblocking edges (cell pass 7, src/shaders/deblock.glsl) and the selection / probe / rectangle marks (§10.5.6).
+target_sources(ovt_render PRIVATE src/overlay/pass_misc.cpp)
+foreach(shader IN ITEMS arrows deblock diff fill hatch heatmap lines)
   set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
   file(READ "${shader_src}" OVT_SHADER_TEXT)
