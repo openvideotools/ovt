@@ -24,6 +24,7 @@ target_sources(
           isobmff/paged_span.cpp
           diagnostics.cpp
           format_sniff.cpp
+          hex_dump.cpp
           ivf.cpp
           mpegts/descriptors.cpp
           mpegts/pes.cpp
