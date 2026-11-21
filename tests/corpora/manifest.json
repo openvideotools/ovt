@@ -21107,6 +21107,186 @@
       }
     },
     {
+      "id": "syn_mp4_broken_missing_stsd",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "missing_stsd.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1011"
+        ]
+      },
+      "sha256": "1c0990abcead96fea7ce2bddeb43d110f416377fdda08d2305d52120afbc04cf",
+      "size_bytes": 19713,
+      "files": {
+        "missing_stsd.mp4": "1c0990abcead96fea7ce2bddeb43d110f416377fdda08d2305d52120afbc04cf"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_dup_stts",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "dup_stts.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1012"
+        ]
+      },
+      "sha256": "fe48c956676fde2ac0365a1288baea4768c58dfae76b9cf774139aefc4897e87",
+      "size_bytes": 19889,
+      "files": {
+        "dup_stts.mp4": "fe48c956676fde2ac0365a1288baea4768c58dfae76b9cf774139aefc4897e87"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_elst_in_moov",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "elst_in_moov.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1013"
+        ]
+      },
+      "sha256": "e5c63c7ed3de00d53d855f1f932b1a8c6f8c66ab044841daaff5d8eb788096e9",
+      "size_bytes": 19893,
+      "files": {
+        "elst_in_moov.mp4": "e5c63c7ed3de00d53d855f1f932b1a8c6f8c66ab044841daaff5d8eb788096e9"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_stts_count_overflow",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "stts_count_overflow.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1014"
+        ]
+      },
+      "sha256": "21031864120cab73561caf189a6052a9e1851d81b8cd869f941badc0885f79fb",
+      "size_bytes": 19865,
+      "files": {
+        "stts_count_overflow.mp4": "21031864120cab73561caf189a6052a9e1851d81b8cd869f941badc0885f79fb"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_tkhd_padded",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "tkhd_padded.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1015"
+        ]
+      },
+      "sha256": "1e40b5cdeb1909ef6515f1ba66f0cddfa1d6c0736fb5273ecd61e2806394ba73",
+      "size_bytes": 19869,
+      "files": {
+        "tkhd_padded.mp4": "1e40b5cdeb1909ef6515f1ba66f0cddfa1d6c0736fb5273ecd61e2806394ba73"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_traf_no_tfhd",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "traf_no_tfhd.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1011"
+        ]
+      },
+      "sha256": "124480b7de7f4df8fe341752d1f68bbe19f4f5cf9f2423cfd761ba4a47988dca",
+      "size_bytes": 20177,
+      "files": {
+        "traf_no_tfhd.mp4": "124480b7de7f4df8fe341752d1f68bbe19f4f5cf9f2423cfd761ba4a47988dca"
+      }
+    },
+    {
       "id": "syn_av1_globalmotion",
       "source": "syn",
       "kind": "stream",
