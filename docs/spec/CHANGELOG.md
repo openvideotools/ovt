@@ -4,11 +4,11 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc48 — 2026-11-21
 
-MINOR-level (FlatBuffers schema, additive): WI-1.235b (the second part of WI-1.235) folds in the accepted answer of `spec-question` #763. One additive table in `ovt_container.fbs`; no field renumbering, no public C header, plugin ABI or CLI grammar change (the signature of `ovt_container_list_diagnostics` is unchanged, it stops returning `OVT_E_UNSUPPORTED`). Numbered after the pending rc46 (#607) and rc47 (#691) schema amendments.
+MINOR-level (FlatBuffers schema, additive): WI-1.235 (part b) folds in the accepted answer of `spec-question` #763. One additive table in `ovt_container.fbs`; no field renumbering, no public C header, plugin ABI or CLI grammar change (the signature of `ovt_container_list_diagnostics` is unchanged, it stops returning `OVT_E_UNSUPPORTED`). Numbered after the pending rc46 (#607) and rc47 (#691) schema amendments.
 
-- 6 §6.1.1, §6.4 — `table DiagnosticRegistry { family:string; entries:[Diagnostic]; }` before `ContainerRoot`: the `CNT-*` registry of chapter 08 §8.5, one `Diagnostic` per `diag_codes.inc` row in file order (message template as `message`, spec reference as `spec_ref`, `span` unset), finished without a file identifier and not size-prefixed across the C ABI; the §6.4 table list gains the name — WI-1.235b (#763)
-- 8 WI-1.200 Interface, WI-1.235 AT2 — `ovt_container_list_diagnostics` returns that table; AT2 restated as "every code of `diag_codes.inc` exactly once, in file order, with severity, message template and spec reference, count equal to the registry size" (the earlier "≥ 150 codes" figure assumed the complete §8.5 table; completeness is WI-1.234 AT1, checked when the last container work item has merged) — WI-1.235b (#763)
-- 12 §12.2.2 cross-reference, 16 §16.3.8 `ovt probe` row — `--list-diagnostics` is that C function; the row's "test 3" wording follows AT2 — WI-1.235b (#763)
+- 6 §6.1.1, §6.4 — `table DiagnosticRegistry { family:string; entries:[Diagnostic]; }` before `ContainerRoot`: the `CNT-*` registry of chapter 08 §8.5, one `Diagnostic` per `diag_codes.inc` row in file order (message template as `message`, spec reference as `spec_ref`, `span` unset), finished without a file identifier and not size-prefixed across the C ABI; the §6.4 table list gains the name — WI-1.235 (part b) (#763)
+- 8 WI-1.200 Interface, WI-1.235 AT2 — `ovt_container_list_diagnostics` returns that table; AT2 restated as "every code of `diag_codes.inc` exactly once, in file order, with severity, message template and spec reference, count equal to the registry size" (the earlier "≥ 150 codes" figure assumed the complete §8.5 table; completeness is WI-1.234 AT1, checked when the last container work item has merged) — WI-1.235 (part b) (#763)
+- 12 §12.2.2 cross-reference, 16 §16.3.8 `ovt probe` row — `--list-diagnostics` is that C function; the row's "test 3" wording follows AT2 — WI-1.235 (part b) (#763)
 
 ## 1.0.0-rc45 — 2026-11-17
 
