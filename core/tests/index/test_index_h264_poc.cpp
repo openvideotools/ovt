@@ -213,6 +213,15 @@ TEST_CASE("h264_frame_boundary: prefix NAL, redundant pictures, partitions and e
   CHECK(after.role == idx::UnitRole::FirstSlice);
   CHECK(after.rules.empty());
   CHECK(after.picture_index == 2);
+  // End of sequence, then a PPS: the PPS starts the next access unit (it must not be held back as a change inside the
+  // closed picture; fuzz-nightly h264_index crash 4e2718fa, 2026-11-19), and the slice does not report it again.
+  CHECK(fb.on_non_vcl(make_nal(10, 0)).role == idx::UnitRole::Following);
+  CHECK(fb.on_non_vcl(make_nal(8, 3)).starts_access_unit);
+  CHECK_FALSE(fb.on_non_vcl(make_nal(7, 3)).starts_access_unit);
+  const auto next = fb.on_slice(p, make_slice(1), 0);
+  CHECK(next.role == idx::UnitRole::FirstSlice);
+  CHECK_FALSE(next.starts_access_unit);
+  CHECK(next.picture_index == 3);
 }
 
 TEST_CASE("h264_frame_boundary: complementary field pairs", "[index][h264][fast]") {

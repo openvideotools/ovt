@@ -26,9 +26,12 @@ BoundaryDecision FrameBoundary::on_non_vcl(const syntax::h264::NalHeader& nal) {
   const uint32_t t = nal.nal_unit_type;
   if (rule10_type(t)) {
     d.role = UnitRole::Preceding;
-    if (picture_open_ && !au_started_) {
+    // After an end of sequence / stream the picture is closed, but its access unit is still being collected: the
+    // first rule-10 unit starts the next one, so a parameter set there is not taken as part of the old picture.
+    if ((picture_open_ || after_end_of_seq_) && !au_started_) {
       d.starts_access_unit = true;
       au_started_ = true;
+      after_end_of_seq_ = false;
     }
     rule10_since_vcl_ = picture_open_;
     return d;
@@ -42,6 +45,7 @@ BoundaryDecision FrameBoundary::on_non_vcl(const syntax::h264::NalHeader& nal) {
     picture_open_ = false;
     rule10_since_vcl_ = false;
     au_started_ = false;
+    after_end_of_seq_ = true;
     last_ = {};
   }
   return d;
@@ -138,6 +142,7 @@ BoundaryDecision FrameBoundary::on_slice(const syntax::h264::NalHeader& nal, con
   picture_open_ = true;
   rule10_since_vcl_ = false;
   au_started_ = false;
+  after_end_of_seq_ = false;
   return d;
 }
 
