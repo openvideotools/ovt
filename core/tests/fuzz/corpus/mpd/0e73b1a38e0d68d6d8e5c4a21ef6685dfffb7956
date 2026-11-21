@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+ine audio set with r = -1, two periods). No»»»»»»t a copy of any
+     third-party manifest. -->
+<MPD xmlns="urlive:2011">
+  <BaseURL>htOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO1OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO$tps:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentTyp““““““““““““““““““““““““““““e="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" pe="video/mp4">
+      <Representation id="v_480" bant="480" codecs="avc1.64001e">
+     ype="video" mimeType="video/n="init'$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

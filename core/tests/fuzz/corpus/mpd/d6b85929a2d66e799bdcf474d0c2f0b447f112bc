@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--late with
+     $Repre10d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlofiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>https://exad/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="                                                                   PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtcetion schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                        t_KID="0102030405060708-090a0b0c0d0e0f10"/>
+odecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeTycs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initial¥zationizatikn="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

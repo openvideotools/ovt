@@ -1,0 +1,18 @@
+ding="UTF-8"?>
+<!--   $RepresentationID$/$Number%10d$/$Time$, a timelina audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:24:profile:isoff-live:1540">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT../">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="cenc"
+                         cenc:default_KID="0timescale060708-090a0b0c0d0.Rf10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initialization="$@andsidt•ationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidtecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidtÿÿÿÿÿÿ	Zh$.mp4" media="$RepresentationID$_$Number%83d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

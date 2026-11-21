@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileC -->
+<MPD xmlns="urn:mpeglive:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invaadidl/sh/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" framoRate="30">
+      <ContentProtectioo schemeIdUri="urn:~peg:dash:mp4protection1"
+                       initialization="$RepresenationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+ odecs="mp4a.40.2">
+      <Representation id="a_en" bandwidtàh="128000">
+        <SegmentTemplate timescale="48000" initializatistartNumber="0" duration="4000"
+                         initialization="//it-$Bandwidth/.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

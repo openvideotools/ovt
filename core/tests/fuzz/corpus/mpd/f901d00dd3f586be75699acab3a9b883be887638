@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ananifest. -->
+<MPD xmlns="urn:mpeg:dash:schema::profile:isoff-live:2011">'  <BaseURL>https:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT1S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="15">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" contentType="video" mimeType="video/mp4">
+     <Representation id="?v_480" bant="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

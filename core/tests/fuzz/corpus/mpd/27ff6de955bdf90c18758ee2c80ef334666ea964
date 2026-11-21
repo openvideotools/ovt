@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopod -->
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:m:sentationDurime="PT2S" profiles="urn:mpeg:dash:profileve:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sQtatart="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kontentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:m0102030405060708-090a0b0c0d0e0f10"/>          initialization="$Repres
+          </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,16 @@
+<?xml timescaleversion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 1013 The Open Video Tools -- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-demand-stylembernifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="0" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp3protectig-$Number%05d$.m4s"/>
+      <Representation id="v_1081200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidtÿ$.mp4" media="$RepresentationID$_$»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»Number%03d$_$Tim:$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

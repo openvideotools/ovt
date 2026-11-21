@@ -1,0 +1,4 @@
+<?xmncoäiTF-8"?>
+!!+- SP-party manifest. -->z<MPD xmlns="urnhema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     initialangtionionDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:iEsoff-live:2011">Â  <BaseURL>httpe.invalid/dash/pkg/</BaseURL>
+  <Period id="`p5" stacrt="PT0S" duration="PT4a
