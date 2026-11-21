@@ -232,6 +232,8 @@ class DisplayCapsModel : public QAbstractListModel {
   QML_SINGLETON
   Q_PROPERTY(bool hdrCapable READ hdr_capable NOTIFY capsChanged)
   Q_PROPERTY(bool hdrActive READ hdr_active NOTIFY capsChanged)
+  // The current EDR headroom (§10.4.5 `headroom`, 1.0 = SDR): the NATIVE host's DisplayTarget.headroom (WI-1.463).
+  Q_PROPERTY(double headroom READ headroom NOTIFY capsChanged)
   // Why the display is not HDR capable ("display has no EDR headroom", "X11 session", …); empty when capable.
   Q_PROPERTY(QString reason READ reason NOTIFY capsChanged)
   // FR-GUI-016 status-bar text: "SDR", "HDR headroom 4.0×" or "PQ pass-through".
@@ -275,6 +277,7 @@ class DisplayCapsModel : public QAbstractListModel {
 
   [[nodiscard]] bool hdr_capable() const noexcept { return info_.hdr_capable; }
   [[nodiscard]] bool hdr_active() const noexcept { return info_.hdr_active; }
+  [[nodiscard]] double headroom() const noexcept { return static_cast<double>(info_.headroom); }
   [[nodiscard]] QString reason() const { return info_.hdr_capable ? QString() : info_.reason; }
   [[nodiscard]] QString status_text() const;
   [[nodiscard]] bool probing() const noexcept { return probing_; }
