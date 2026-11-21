@@ -495,14 +495,6 @@ std::string golden_structure(const nlohmann::json& unit, const GstMap& map) {
   return {};
 }
 
-// True when `golden` is `ovt` followed by zeros only: GStreamer's fixed-size arrays hold the coded entries first and
-// zero-fill the rest (SPEC-ASSUMPTION(#603), the zero-fill rule of gst_compare()).
-bool zero_extended(const std::vector<int64_t>& ovt, const std::vector<int64_t>& golden) {
-  return golden.size() >= ovt.size() && std::equal(ovt.begin(), ovt.end(), golden.begin()) &&
-         std::all_of(golden.begin() + static_cast<std::ptrdiff_t>(ovt.size()), golden.end(),
-                     [](int64_t x) { return x == 0; });
-}
-
 template <class Note>
 void compare_unit(const std::string& unit_key, const std::string& structure, const nlohmann::json& golden,
                   const ParsedUnit& u, const GstMap& map, const Note& note) {
@@ -533,7 +525,7 @@ void compare_unit(const std::string& unit_key, const std::string& structure, con
         note(
             fmt::format("golden unit {} {}: {} = {} | OVT has no {}", unit_key, structure, raw_key, join(values), key));
       }
-    } else if (!zero_extended(it->second, values)) {
+    } else if (it->second != values) {
       note(fmt::format("golden unit {} {}: {} = {} | OVT {} = {}", unit_key, structure, raw_key, join(values), key,
                        join(it->second)));
     }

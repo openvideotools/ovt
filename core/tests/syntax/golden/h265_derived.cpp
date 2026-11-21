@@ -29,6 +29,9 @@ constexpr size_t kSubLayers = 6;  // sub_layer_* of profile_tier_level
 constexpr size_t kCpbs = 32;      // sublayer_hrd_params entries
 constexpr size_t kRpsPics = 16;   // DeltaPocS0 / S1 per set
 constexpr size_t kCompatibilityFlags = 32;
+constexpr size_t kOrderingRows = 8;  // sps/vps_max_dec_pic_buffering_minus1 etc. (GST_H265_MAX_SUB_LAYERS)
+constexpr size_t kHrdSubLayers = 7;  // per-sub-layer arrays of GstH265HRDParams
+constexpr size_t kSpsRpsSets = 65;   // GstH265SPS short_term_ref_pic_set[]
 
 void put(ParsedUnit& u, const std::string& key, std::vector<int64_t> values) {
   u.derived[key] = std::move(values);
@@ -46,13 +49,13 @@ std::vector<int64_t> rows(size_t count, size_t width, const T& source, F value) 
 }
 
 void put_ptl(ParsedUnit& u, const h265::ProfileTierLevel& ptl, unsigned max_sub_layers_minus1) {
-  // sub_layer_*[i] for i < max_sub_layers_minus1, zero where the sub-layer signals nothing.
+  // sub_layer_*[i] for i < max_sub_layers_minus1, zero where the sub-layer signals nothing and in GStreamer's unused
+  // rows (its arrays always hold kSubLayers entries).
   const size_t n = std::min<size_t>(max_sub_layers_minus1, kSubLayers);
   const auto per_layer = [&](const std::string& key, auto value) {
-    std::vector<int64_t> v;
-    v.reserve(n);
+    std::vector<int64_t> v(kSubLayers, 0);
     for (size_t i = 0; i < n; ++i) {
-      v.push_back(value(i));
+      v.at(i) = value(i);
     }
     put(u, key, std::move(v));
   };
@@ -74,8 +77,8 @@ void put_ptl(ParsedUnit& u, const h265::ProfileTierLevel& ptl, unsigned max_sub_
   per_layer("sub_layer_frame_only_constraint_flag",
             [&](size_t i) { return profile(i) != nullptr ? profile(i)->frame_only_constraint_flag : false; });
   put(u, "sub_layer_profile_compatibility_flag",
-      rows(n, kCompatibilityFlags, ptl, [&](const auto&, size_t i, size_t j) {
-        return profile(i) != nullptr ? int64_t{profile(i)->profile_compatibility_flag.at(j)} : 0;
+      rows(kSubLayers, kCompatibilityFlags, ptl, [&](const auto&, size_t i, size_t j) {
+        return i < n && profile(i) != nullptr ? int64_t{profile(i)->profile_compatibility_flag.at(j)} : 0;
       }));
 }
 
@@ -93,6 +96,9 @@ void put_ordering(ParsedUnit& u, const std::array<h265::SubLayerOrderingInfo, 7>
     reorder.push_back(o.max_num_reorder_pics);
     latency.push_back(o.max_latency_increase_plus1);
   }
+  dpb.resize(kOrderingRows, 0);
+  reorder.resize(kOrderingRows, 0);
+  latency.resize(kOrderingRows, 0);
   put(u, "max_dec_pic_buffering_minus1", std::move(dpb));
   put(u, "max_num_reorder_pics", std::move(reorder));
   put(u, "max_latency_increase_plus1", std::move(latency));
@@ -101,9 +107,9 @@ void put_ordering(ParsedUnit& u, const std::array<h265::SubLayerOrderingInfo, 7>
 void put_hrd(ParsedUnit& u, const h265::HrdParameters& h) {
   const size_t n = size_t{h.max_num_sub_layers_minus1} + 1;
   const auto per_layer = [&](const std::string& key, auto value) {
-    std::vector<int64_t> v;
-    for (size_t i = 0; i < n && i < h.sub_layer.size(); ++i) {
-      v.push_back(value(h.sub_layer.at(i)));
+    std::vector<int64_t> v(kHrdSubLayers, 0);
+    for (size_t i = 0; i < n && i < h.sub_layer.size() && i < kHrdSubLayers; ++i) {
+      v.at(i) = value(h.sub_layer.at(i));
     }
     put(u, key, std::move(v));
   };
@@ -117,7 +123,10 @@ void put_hrd(ParsedUnit& u, const h265::HrdParameters& h) {
   put(u, "dpb_output_delay_length_minus1", {h.dpb_output_delay_length_minus1});
   // GStreamer keeps one sublayer_hrd_params() row per sub-layer: the VCL one when present, else the NAL one.
   const auto cpb = [&](const std::string& key, auto value) {
-    put(u, key, rows(n, kCpbs, h, [&](const h265::HrdParameters& hrd, size_t i, size_t j) -> int64_t {
+    put(u, key, rows(kHrdSubLayers, kCpbs, h, [&](const h265::HrdParameters& hrd, size_t i, size_t j) -> int64_t {
+          if (i >= n || i >= hrd.sub_layer.size()) {
+            return 0;
+          }
           const auto& s = hrd.sub_layer.at(i);
           const auto& p = hrd.vcl_hrd_parameters_present_flag ? s.vcl : s.nal;
           return j < p.cpb.size() ? int64_t{value(p.cpb.at(j))} : 0;
@@ -133,7 +142,7 @@ void put_hrd(ParsedUnit& u, const h265::HrdParameters& h) {
 // The st_ref_pic_set() arrays of GStreamer's struct for `sets` (one entry per set, DeltaPocS0/S1 and
 // UsedByCurrPicS0/S1 one row of kRpsPics per set).
 void put_st_rps(ParsedUnit& u, const std::vector<const h265::StRefPicSet*>& sets,
-                const std::vector<h265::StRefPicSet>& sps_sets) {
+                const std::vector<h265::StRefPicSet>& sps_sets, size_t slots) {
   std::vector<int64_t> pred;
   std::vector<int64_t> delta_idx;
   std::vector<int64_t> sign;
@@ -167,6 +176,13 @@ void put_st_rps(ParsedUnit& u, const std::vector<const h265::StRefPicSet*>& sets
     if (sets[i]->inter_ref_pic_set_prediction_flag && sets[i]->RefRpsIdx < sps_sets.size()) {
       num_ref[i] = sps_sets[sets[i]->RefRpsIdx].NumDeltaPocs;
     }
+  }
+  // GStreamer's struct holds `slots` sets; the ones the stream does not code stay zero.
+  for (auto* v : {&pred, &delta_idx, &sign, &abs_delta, &neg, &pos, &num, &num_ref}) {
+    v->resize(slots, 0);
+  }
+  for (auto* v : {&s0, &s1, &u0, &u1}) {
+    v->resize(slots * kRpsPics, 0);
   }
   put(u, "inter_ref_pic_set_prediction_flag", std::move(pred));
   put(u, "delta_idx_minus1", std::move(delta_idx));
@@ -268,7 +284,7 @@ void add_h265_sps_derived(const h265::Sps& sps, ParsedUnit& u) {
   for (const auto& s : sps.st_ref_pic_set) {
     sets.push_back(&s);
   }
-  put_st_rps(u, sets, sps.st_ref_pic_set);
+  put_st_rps(u, sets, sps.st_ref_pic_set, kSpsRpsSets);
   if (sps.scaling_list_enabled_flag) {
     put_scaling(u, sps.scaling_list);
   }
@@ -292,6 +308,10 @@ void add_h265_sps_derived(const h265::Sps& sps, ParsedUnit& u) {
 void add_h265_pps_derived(const h265::Pps& pps, const h265::Sps* sps, ParsedUnit& u) {
   put(u, "uniform_spacing_flag", {flag(pps.uniform_spacing_flag)});
   put(u, "loop_filter_across_tiles_enabled_flag", {flag(pps.loop_filter_across_tiles_enabled_flag)});
+  // GStreamer holds all six chroma QP offset list entries, zero past chroma_qp_offset_list_len_minus1.
+  const auto& rext = pps.range_extension;
+  put(u, "cb_qp_offset_list", {rext.cb_qp_offset_list.begin(), rext.cb_qp_offset_list.end()});
+  put(u, "cr_qp_offset_list", {rext.cr_qp_offset_list.begin(), rext.cr_qp_offset_list.end()});
   if (sps != nullptr && pps.tiles_enabled_flag) {
     // With uniform spacing GStreamer stores the column widths and row heights of §6.5.1 (6-3, 6-4).
     const h265::ActivePps a = h265::activate_pps(pps, *sps);
@@ -340,7 +360,7 @@ void add_h265_slice_derived(const h265::SliceSegmentHeader& sh, const h265::Acti
     }
   }
   if (active != nullptr && !sh.short_term_ref_pic_set_sps_flag) {
-    put_st_rps(u, {&sh.st_ref_pic_set}, active->sps->st_ref_pic_set);
+    put_st_rps(u, {&sh.st_ref_pic_set}, active->sps->st_ref_pic_set, 1);
   }
   if (sh.pred_weight_table) {
     put_pwt(u, *sh.pred_weight_table, sh.slice_type == h265::kSliceB);
