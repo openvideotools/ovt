@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of the FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a), with the fragment samples checked against the
+// Tests of the FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a/b), with the fragment samples checked against the
 // MP4Box `-dts` goldens of the container-smoke corpus.
 
 #include <catch2/catch_test_macros.hpp>
@@ -393,6 +393,78 @@ TEST_CASE("fragments: saio resolution against senc (CNT-6005)", "[container][fra
   CHECK(has(probe.b, "CNT-6005"));
 }
 
+namespace {
+
+// A sidx (v0, reference_ID kTrack) in front of `frags`, one media reference per fragment.
+Bytes sidx_for(const std::vector<Bytes>& frags, int32_t size_delta, int32_t dur_delta, bool sap) {
+  Bytes refs;
+  for (const Bytes& f : frags) {
+    refs = cat({refs, be(static_cast<uint32_t>(static_cast<int64_t>(f.size()) + size_delta), 4),
+                be(static_cast<uint64_t>(int64_t{3 * kDur} + dur_delta), 4), be(sap ? 0x90000000U : 0U, 4)});
+  }
+  return box(
+      "sidx",
+      full(0, 0, cat({be(kTrack, 4), be(kTimescale, 4), be(0, 4), be(0, 4), be(0, 2), be(frags.size(), 2), refs})));
+}
+
+}  // namespace
+
+TEST_CASE("fragments: sidx references match the fragments they cover", "[container][fragments][sidx]") {
+  std::vector<Bytes> frags;
+  frags.reserve(3);
+  for (uint32_t k = 0; k < 3; ++k) {
+    frags.push_back(fragment(k + 1, {at(3 * kDur * k)}, 3 * kSize));
+  }
+  const Bytes head = cat({ftyp(), moov({kTrack})});
+  const auto file = [&](const Bytes& sidx) { return cat({head, sidx, frags[0], frags[1], frags[2]}); };
+  SECTION("consistent sidx: no CNT-4030 / CNT-4032 and actual_size == referenced_size") {
+    const Built r = build(file(sidx_for(frags, 0, 0, true)));
+    CHECK(codes(r.b).empty());
+    REQUIRE(r.b.timeline.sidx.size() == 1);
+    const auto& s = *r.b.timeline.sidx[0];
+    REQUIRE(s.refs.size() == 3);
+    for (size_t k = 0; k < 3; ++k) {
+      CHECK(s.refs[k]->actual_size == static_cast<int64_t>(s.refs[k]->referenced_size));
+      CHECK(s.refs[k]->actual_duration == static_cast<int64_t>(s.refs[k]->subsegment_duration));
+      CHECK(s.refs[k]->abs_offset == r.b.timeline.fragments[k]->moof_offset);
+      CHECK(r.b.timeline.fragments[k]->sidx_reference_index == static_cast<int32_t>(k));
+    }
+  }
+  SECTION("wrong sizes and durations") {
+    const Built r = build(file(sidx_for(frags, 4, 10, false)));
+    CHECK(has(r.b, "CNT-4030"));
+    CHECK(has(r.b, "CNT-4032"));
+  }
+  SECTION("SAP claimed on a non-sync first sample (CNT-4034)") {
+    std::vector<Bytes> ns;
+    TrafSpec t = at(0);
+    t.trun_flags = 0x1;  // no first_sample_flags: trex flags say non-sync
+    ns.push_back(fragment(1, {t}, 3 * kSize));
+    const Built r = build(cat({head, sidx_for(ns, 0, 0, true), ns[0]}));
+    REQUIRE(codes(r.b) == std::vector<std::string>{"CNT-4034"});
+  }
+}
+
+TEST_CASE("fragments: mfra / tfra / mfro cross-checks", "[container][fragments][mfra]") {
+  const Bytes head = cat({ftyp(), moov({kTrack})});
+  const Bytes f0 = fragment(1, {at(0)}, 3 * kSize);
+  const Bytes f1 = fragment(2, {at(120)}, 3 * kSize);
+  const auto mfra = [&](uint64_t moof1, uint64_t time1, int32_t mfro_delta) {
+    const Bytes tfra = box("tfra", full(0, 0,
+                                        cat({be(kTrack, 4), be(0, 4), be(2, 4),             //
+                                             be(0, 4), be(head.size(), 4), Bytes{1, 1, 1},  //
+                                             be(time1, 4), be(moof1, 4), Bytes{1, 1, 1}})));
+    const uint64_t size = 8 + tfra.size() + 16;
+    return box("mfra", cat({tfra, box("mfro", full(0, 0, be(size + static_cast<uint64_t>(mfro_delta), 4)))}));
+  };
+  const uint64_t moof1 = head.size() + f0.size();
+  CHECK(codes(build(cat({head, f0, f1, mfra(moof1, 120, 0)})).b).empty());
+  const Built bad = build(cat({head, f0, f1, mfra(moof1 + 1, 120, 0)}));
+  CHECK(codes(bad.b) == std::vector<std::string>{"CNT-4010"});
+  CHECK(has(build(cat({head, f0, f1, mfra(moof1, 121, 0)})).b, "CNT-4010"));
+  CHECK(has(build(cat({head, f0, f1, mfra(moof1, 120, 4)})).b, "CNT-4011"));
+}
+
 TEST_CASE("fragments: header-only (lazy) moofs give the same timeline", "[container][fragments][lazy]") {
   // More than kEagerMoofLimit moofs: the lazy walk keeps only their mfhd, the builder reads the rest itself.
   const Bytes bytes = stream(iso::kEagerMoofLimit + 6);
@@ -514,4 +586,22 @@ TEST_CASE("fragments: another track's huge default-sized trun is not iterated", 
   REQUIRE(r.b.samples.count() == 3);
   CHECK(r.b.samples.offset[0] == r.b.timeline.fragments[0]->mdat_offset + 8);
   CHECK_FALSE(has(r.b, "CNT-4022"));  // the claimed run extends past the mdat end
+}
+
+TEST_CASE("dashif_sidx_m4s: every sidx reference matches its fragments",
+          "[container][fragments][sidx][slow][needs-corpus]") {
+  // Acceptance test 2.
+  const auto path = ovt::test::corpus_or_skip("dashif_sidx_m4s");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult w = iso::walk(*file, nullptr);
+  const iso::FragmentTrackInput in = iso::fragment_track_input(*file, w.top_level, 1);
+  const iso::FragmentBuild b = iso::build_fragments(*file, w.top_level, in, ovt::jobs::Cancel::never());
+  CHECK_FALSE(has(b, "CNT-4030"));
+  CHECK_FALSE(has(b, "CNT-4032"));
+  REQUIRE_FALSE(b.timeline.sidx.empty());
+  for (const auto& s : b.timeline.sidx) {
+    for (const auto& r : s->refs) {
+      CHECK(r->actual_size == static_cast<int64_t>(r->referenced_size));
+    }
+  }
 }
