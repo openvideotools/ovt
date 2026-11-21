@@ -108,7 +108,20 @@ jobs:
       # the commit pinned in third_party/VERSIONS.md.
       - name: Configure
         if: steps.diff.outputs.run == 'true'
-        run: cmake --preset "$PRESET" -DOVT_BUILD_PLUGIN_HM=ON
+        run: |
+          # The vcpkg install inside configure downloads port sources from github.com, which answers hosted runners
+          # with 403/503 now and then (run 44924179526: 503 on a fmt patch; 44923916553: 403 on Catch2). vcpkg then
+          # fails, CMake reports the missing Ninja/compiler as a consequence. Retry with backoff: packages that
+          # built are in the vcpkg binary cache (files provider, readwrite), so each attempt resumes where the last
+          # one stopped.
+          for attempt in 1 2 3 4; do
+            if cmake --preset "$PRESET" -DOVT_BUILD_PLUGIN_HM=ON; then exit 0; fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "::warning::configure failed (attempt $attempt of 4); retrying in $((attempt * 60)) s"
+              sleep $((attempt * 60))
+            fi
+          done
+          exit 1
 
       # The configure step is enough for the file API reply.
       - name: Every OVT target links ovt::flags

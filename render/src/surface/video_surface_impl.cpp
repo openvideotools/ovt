@@ -209,7 +209,9 @@ class VideoSurfaceImpl final : public VideoSurface {
 
   // Switches between EMBEDDED (OffscreenTexture) and NATIVE targets, or updates the current one (size, format,
   // encoding, headroom), on the same pl_gpu: uploaded pictures and overlays are kept (§10.2.7). An OffscreenTexture
-  // target keeps the interop of init(); a NATIVE target needs the surface's own Vulkan device.
+  // target keeps the interop of init(); a NATIVE target needs the surface's own Vulkan device. A switch of target or
+  // encoding starts with no error, so that last_error() afterwards tells whether it worked (the PictureHost of
+  // WI-1.463 goes back to EMBEDDED on RND-0002); a headroom or size update keeps RND-0040.
   void retarget(const DisplayTarget& target) override {
     if (gpu_ == nullptr) {
       fail("retarget", "surface is not initialised");
@@ -224,6 +226,7 @@ class VideoSurfaceImpl final : public VideoSurface {
         fail("retarget", "an OffscreenTexture target keeps the interop of init()");
         return;
       }
+      error_.clear();
       close_native();
       target_ = target;
       active_ = detail::target_encoding(target_);
@@ -238,19 +241,25 @@ class VideoSurfaceImpl final : public VideoSurface {
       const bool size_changed = target.width != target_.width || target.height != target_.height;
       target_ = target;
       if (encoding_changed) {
+        error_.clear();
         open_native();  // a new swapchain: libplacebo reads the surface formats only when it creates one
       } else if (size_changed) {
         resize_swapchain();
       }
       return;
     }
+    error_.clear();
     const detail::NativeProvider& provider = detail::native_provider();
     if (provider.create == nullptr) {
       fail("retarget", "no NATIVE target of this kind on this platform");
       return;
     }
-    if (vk_ == nullptr || offscreen_.interop() != DisplayTarget::Interop::None) {
-      fail("retarget", "a NATIVE target needs a surface initialised with Interop::None");
+    // SPEC-ASSUMPTION(#702): the swapchain presents from the surface's own Vulkan device: Interop::None (tests, CLI)
+    // and MetalTexture (the macOS PictureHost, whose NATIVE mode is WI-1.463) render on it; a host's shared device or
+    // GL context does not.
+    const DisplayTarget::Interop own = offscreen_.interop();
+    if (vk_ == nullptr || (own != DisplayTarget::Interop::None && own != DisplayTarget::Interop::MetalTexture)) {
+      fail("retarget", "a NATIVE target needs a surface on its own Vulkan device (Interop::None or MetalTexture)");
       return;
     }
     std::string why;
