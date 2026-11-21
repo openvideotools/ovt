@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -443,6 +444,63 @@ TEST_CASE("fragments: sidx references match the fragments they cover", "[contain
     const Built r = build(cat({head, sidx_for(ns, 0, 0, true), ns[0]}));
     REQUIRE(codes(r.b) == std::vector<std::string>{"CNT-4034"});
   }
+}
+
+TEST_CASE("fragments: many sidx references over many moofs stay near-linear", "[container][fragments][sidx]") {
+  // 40 sidx boxes × 4000 references over 4000 moofs: the old linear scans did ~10⁹ steps here.
+  constexpr size_t kFrags = 4000;
+  constexpr size_t kSidx = 40;
+  std::vector<Bytes> frags;
+  frags.reserve(kFrags);
+  for (size_t k = 0; k < kFrags; ++k) {
+    frags.push_back(fragment(static_cast<uint32_t>(k + 1), {at(3 * kDur * k)}, 3 * kSize));
+  }
+  Bytes refs;
+  for (const Bytes& f : frags) {
+    for (const Bytes& field : {be(f.size(), 4), be(3 * kDur, 4), be(0x90000000U, 4)}) {
+      refs.insert(refs.end(), field.begin(), field.end());
+    }
+  }
+  Bytes bytes = cat({ftyp(), moov({kTrack})});
+  for (size_t i = 0; i < kSidx; ++i) {
+    // Each sidx skips the sidx boxes after it (first_offset; a v0 sidx is 32 bytes + references), so all of them
+    // reference the same fragments.
+    const uint64_t skip = (kSidx - 1 - i) * (32 + refs.size());
+    const Bytes s =
+        box("sidx",
+            full(0, 0, cat({be(kTrack, 4), be(kTimescale, 4), be(0, 4), be(skip, 4), be(0, 2), be(kFrags, 2), refs})));
+    bytes.insert(bytes.end(), s.begin(), s.end());
+  }
+  for (const Bytes& f : frags) {
+    bytes.insert(bytes.end(), f.begin(), f.end());
+  }
+  const auto t0 = std::chrono::steady_clock::now();
+  const Built r = build(bytes);
+  const auto elapsed = std::chrono::steady_clock::now() - t0;
+  CHECK(codes(r.b).empty());
+  REQUIRE(r.b.timeline.sidx.size() == kSidx);
+  REQUIRE(r.b.timeline.fragments.size() == kFrags);
+  // The last sidx in file order wins the fragment's reference index.
+  CHECK(r.b.timeline.fragments[0]->sidx_reference_index == static_cast<int32_t>((kSidx - 1) * kFrags));
+  CHECK(r.b.timeline.fragments[kFrags - 1]->sidx_reference_index == static_cast<int32_t>(kSidx * kFrags - 1));
+  CHECK(elapsed < std::chrono::seconds(10));  // the quadratic version took ~24 s in a debug build, this one < 1 s
+}
+
+TEST_CASE("fragments: a sidx whose offsets overflow is CNT-4030", "[container][fragments][sidx]") {
+  const Bytes head = cat({ftyp(), moov({kTrack})});
+  const Bytes f0 = fragment(1, {at(0)}, 3 * kSize);
+  const Bytes refs = cat({be(f0.size(), 4), be(3 * kDur, 4), be(0, 4), be(16, 4), be(3 * kDur, 4), be(0, 4)});
+  const Bytes s = box(
+      "sidx",
+      full(1, 0, cat({be(kTrack, 4), be(kTimescale, 4), be(0, 8), be(UINT64_MAX - 100, 8), be(0, 2), be(2, 2), refs})));
+  const Built r = build(cat({head, s, f0}));
+  REQUIRE(r.b.timeline.sidx.size() == 1);
+  const auto& info = *r.b.timeline.sidx[0];
+  REQUIRE(info.refs.size() == 2);
+  CHECK(info.refs[0]->actual_size == -1);
+  CHECK(info.refs[1]->actual_size == -1);
+  CHECK(message(r.b, "CNT-4030").find("overflows") != std::string::npos);
+  CHECK(r.b.timeline.fragments[0]->sidx_reference_index == -1);
 }
 
 TEST_CASE("fragments: mfra / tfra / mfro cross-checks", "[container][fragments][mfra]") {

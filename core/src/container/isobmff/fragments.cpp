@@ -11,12 +11,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -385,6 +389,8 @@ class Builder {
         styp.reset();
       }
     }
+    build_duration_prefix();
+    min_cts_.assign(out_.timeline.fragments.size(), std::nullopt);
     for (const Hdr& h : top_) {
       if (h.type == "sidx") {
         sidx(h);
@@ -392,6 +398,7 @@ class Builder {
         mfra(h);
       }
     }
+    apply_ref_ranges();
     return std::move(out_);
   }
 
@@ -783,22 +790,43 @@ class Builder {
     }
   }
 
+  // One unit of cross-check work: the sidx / tfra checks loop over untrusted counts, so they poll `cancel`.
+  void tick() {
+    if (++work_ % kCancelEvery == 0) {
+      cancel_.throw_if_requested();
+    }
+  }
+
   // The box-aligned extent of top-level boxes starting at `begin` and covering [begin, end): its size, or −1 when
-  // no top-level box starts at `begin`.
+  // no top-level box starts at `begin`. `top_` is in file order, so both ends are binary searches.
   [[nodiscard]] int64_t extent(uint64_t begin, uint64_t end) const {
-    const auto it = std::ranges::find_if(top_, [&](const Hdr& h) { return h.offset == begin; });
-    if (it == top_.end()) {
+    const auto by_offset = [](const Hdr& h) { return h.offset; };
+    const auto it = std::ranges::lower_bound(top_, begin, {}, by_offset);
+    if (it == top_.end() || it->offset != begin) {
       return -1;
     }
-    uint64_t stop = begin;
-    for (auto j = it; j != top_.end() && j->offset < end; ++j) {
-      stop = j->end();
+    const auto last = std::ranges::lower_bound(it, top_.end(), end, {}, by_offset);
+    return last == it ? 0 : static_cast<int64_t>(std::prev(last)->end() - begin);
+  }
+
+  // Prefix sums of the trun durations of every fragment (CNT-4032 in O(1) per reference). Unsigned, so a crafted
+  // sum wraps instead of overflowing; the difference of two prefixes is still the range sum modulo 2^64.
+  void build_duration_prefix() {
+    dur_prefix_.assign(1, 0);
+    for (const auto& f : out_.timeline.fragments) {
+      uint64_t d = dur_prefix_.back();
+      for (const auto& t : f->trafs) {
+        for (const auto& tr : t->truns) {
+          d += tr->duration_sum;
+        }
+      }
+      dur_prefix_.push_back(d);
     }
-    return static_cast<int64_t>(stop - begin);
   }
 
   // §8.4.3 step 3.
   void sidx(const Hdr& box) {
+    cancel_.throw_if_requested();
     SidxBox s = parse_sidx(payload(file_, box));
     if (!s.ok || s.reference_id != in_.track_id) {
       return;
@@ -816,11 +844,26 @@ class Builder {
     info->timescale = s.timescale;
     info->earliest_presentation_time = s.ept;
     info->first_offset = s.first_offset;
-    uint64_t abs = box.end() + s.first_offset;
+    uint64_t abs = 0;
+    bool wrapped = __builtin_add_overflow(box.end(), s.first_offset, &abs);
     for (size_t k = 0; k < s.refs.size(); ++k) {
+      tick();
       fb::SidxRefT& r = *s.refs[k];
+      uint64_t end = 0;
+      wrapped = wrapped || __builtin_add_overflow(abs, uint64_t{r.referenced_size}, &end);
+      if (wrapped) {  // the offsets leave the 64-bit range: this and the remaining references cover nothing
+        diag("CNT-4030",
+             "sidx reference " + std::to_string(k) + ": offset overflows (first_offset " +
+                 std::to_string(s.first_offset) + ")",
+             box.offset);
+        for (; k < s.refs.size(); ++k) {
+          s.refs[k]->actual_size = -1;
+          info->refs.push_back(std::move(s.refs[k]));
+        }
+        break;
+      }
       r.abs_offset = abs;
-      r.abs_end = abs + r.referenced_size;
+      r.abs_end = end;
       r.actual_size = extent(r.abs_offset, r.abs_end);
       if (r.actual_size != int64_t{r.referenced_size}) {
         diag("CNT-4030",
@@ -829,34 +872,42 @@ class Builder {
              box.offset);
       }
       check_ref(r, k, k == 0 ? std::optional(s.ept) : std::nullopt, same_scale, box.offset);
-      abs = r.abs_end;
+      abs = end;
       info->refs.push_back(std::move(s.refs[k]));
     }
     out_.timeline.sidx.push_back(std::move(info));
   }
 
-  // Duration, EPT and SAP checks of one sidx reference against the fragments it covers.
+  // The smallest CTS of a fragment's samples, computed once per fragment.
+  int64_t min_cts(size_t f) {
+    if (!min_cts_[f]) {
+      const size_t s0 = frag_first_sample_[f];
+      const size_t s1 = f + 1 < frag_first_sample_.size() ? frag_first_sample_[f + 1] : out_.samples.count();
+      int64_t m = kInt64Max;
+      for (size_t i = s0; i < s1; ++i) {
+        tick();
+        m = std::min(m, out_.samples.dts[i] + out_.samples.cts_offset[i]);
+      }
+      min_cts_[f] = m;
+    }
+    return min_cts_[f].value_or(kInt64Max);
+  }
+
+  // Duration, EPT and SAP checks of one sidx reference against the fragments it covers. The fragments are in file
+  // order, so the covered ones are a binary-searched range [lo, hi).
   void check_ref(fb::SidxRefT& r, size_t k, std::optional<uint64_t> ept, bool same_scale, uint64_t at) {
     const int32_t global = ref_count_++;
-    std::optional<size_t> first;
-    int64_t dur = 0;
-    for (auto& f : out_.timeline.fragments) {
-      if (f->moof_offset < r.abs_offset || f->moof_offset >= r.abs_end) {
-        continue;
-      }
-      first = first.value_or(f->index);
-      if (r.reference_type == 0) {  // a media reference; a type-1 reference covers the sidx it points at
-        f->sidx_reference_index = global;
-      }
-      for (const auto& t : f->trafs) {
-        for (const auto& tr : t->truns) {
-          dur += static_cast<int64_t>(tr->duration_sum);
-        }
-      }
-    }
-    if (!first) {
+    const auto& frags = out_.timeline.fragments;
+    const auto by_offset = [](const auto& f) { return f->moof_offset; };
+    const auto lo = static_cast<size_t>(std::ranges::lower_bound(frags, r.abs_offset, {}, by_offset) - frags.begin());
+    const auto hi = static_cast<size_t>(std::ranges::lower_bound(frags, r.abs_end, {}, by_offset) - frags.begin());
+    if (lo >= hi) {
       return;
     }
+    if (r.reference_type == 0) {  // a media reference; a type-1 reference covers the sidx it points at
+      ref_ranges_.emplace_back(lo, hi, global);
+    }
+    const auto dur = static_cast<int64_t>(dur_prefix_[hi] - dur_prefix_[lo]);
     r.actual_duration = dur;
     const std::string ref = "sidx reference " + std::to_string(k) + " at offset " + std::to_string(r.abs_offset);
     if (same_scale && dur != int64_t{r.subsegment_duration}) {
@@ -865,21 +916,40 @@ class Builder {
                std::to_string(dur) + " (delta " + std::to_string(int64_t{r.subsegment_duration} - dur) + ")",
            at);
     }
-    const size_t s0 = frag_first_sample_[*first];
-    const size_t s1 = *first + 1 < frag_first_sample_.size() ? frag_first_sample_[*first + 1] : out_.samples.count();
+    const size_t s0 = frag_first_sample_[lo];
+    const size_t s1 = lo + 1 < frag_first_sample_.size() ? frag_first_sample_[lo + 1] : out_.samples.count();
     if (s0 >= s1) {
       return;
     }
     if (r.reference_type == 0 && r.starts_with_sap && !out_.samples.is_sync(s0)) {
       diag("CNT-4034", ref + ": starts_with_SAP but the first sample is non-sync", at);
     }
-    int64_t min_cts = kInt64Max;
-    for (size_t i = s0; i < s1; ++i) {
-      min_cts = std::min(min_cts, out_.samples.dts[i] + out_.samples.cts_offset[i]);
-    }
-    if (ept && same_scale && static_cast<int64_t>(*ept) != min_cts) {
+    if (ept && same_scale && static_cast<int64_t>(*ept) != min_cts(lo)) {
       diag("CNT-4033",
-           "sidx earliest_presentation_time " + std::to_string(*ept) + " ≠ first CTS " + std::to_string(min_cts), at);
+           "sidx earliest_presentation_time " + std::to_string(*ept) + " ≠ first CTS " + std::to_string(min_cts(lo)),
+           at);
+    }
+  }
+
+  // FragmentInfo.sidx_reference_index of the media references, the last one in file order winning (as if assigned
+  // in turn). Applied backwards with a skip list, so each fragment is written once however the ranges overlap.
+  void apply_ref_ranges() {
+    auto& frags = out_.timeline.fragments;
+    std::vector<size_t> next(frags.size() + 1);
+    std::iota(next.begin(), next.end(), size_t{0});
+    const auto find = [&](size_t i) {
+      while (next[i] != i) {
+        next[i] = next[next[i]];
+        i = next[i];
+      }
+      return i;
+    };
+    for (const auto& [lo, hi, global] : std::ranges::reverse_view(ref_ranges_)) {
+      tick();
+      for (size_t i = find(lo); i < hi; i = find(i)) {
+        frags[i]->sidx_reference_index = global;
+        next[i] = i + 1;
+      }
     }
   }
 
@@ -904,6 +974,7 @@ class Builder {
       uint64_t bad = 0;
       std::string first;
       for (size_t e = 0; e < entries.size(); ++e) {
+        tick();
         const std::string why = check_tfra(entries[e]);
         if (!why.empty() && bad++ == 0) {
           first = "entry " + std::to_string(e) + ": " + why;
@@ -916,9 +987,11 @@ class Builder {
   }
 
   [[nodiscard]] std::string check_tfra(const TfraEntry& e) const {
-    const auto loc = std::ranges::find_if(
-        locs_, [&](const TrafLoc& l) { return l.moof_offset == e.moof_offset && l.traf_number == e.traf; });
-    if (loc == locs_.end()) {
+    // locs_ is in file order: sorted by (moof_offset, traf_number).
+    using Key = std::pair<uint64_t, uint64_t>;
+    const auto loc = std::ranges::lower_bound(locs_, Key{e.moof_offset, e.traf}, {},
+                                              [](const TrafLoc& l) { return Key{l.moof_offset, l.traf_number}; });
+    if (loc == locs_.end() || loc->moof_offset != e.moof_offset || loc->traf_number != e.traf) {
       return "moof_offset " + std::to_string(e.moof_offset) + " traf " + std::to_string(e.traf) +
              " is no traf of this track";
     }
@@ -942,6 +1015,10 @@ class Builder {
   fb::FragmentInfoT* current_ = nullptr;
   std::vector<size_t> frag_first_sample_;  // first sample index of each fragment
   std::vector<TrafLoc> locs_;
+  std::vector<uint64_t> dur_prefix_;                             // trun duration prefix sums by fragment
+  std::vector<std::optional<int64_t>> min_cts_;                  // min_cts() cache by fragment
+  std::vector<std::tuple<size_t, size_t, int32_t>> ref_ranges_;  // media reference fragment ranges [lo, hi)
+  uint64_t work_ = 0;                                            // tick() counter
   int32_t ref_count_ = 0;
   std::optional<int64_t> expected_dts_;
   int64_t dts_ = 0;
