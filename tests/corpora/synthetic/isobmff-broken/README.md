@@ -6,8 +6,8 @@ Small ISOBMFF files (about 20 KiB each, 450 KiB in all) with one deliberate defe
 `core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
 in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the last six, with
 a defect in the box rules of chapter 8 §8.5, are used by `core/tests/container/diag_coverage_test.cpp` (WI-1.224a).
-Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change; regenerate a file with the command in the table (the output is
-byte-for-byte reproducible).
+Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change;
+regenerate a file with the command in the table (the output is byte-for-byte reproducible).
 
 | File | `tools/make_broken.py` arguments | Expected code |
 |---|---|---|
