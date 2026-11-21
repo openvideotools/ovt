@@ -25,7 +25,7 @@ All tests passed (6 assertions in 1 test case)
 
 Nightly on the PR branch (head 1cec190, 2026-11-21, `corpora-linux`, ubuntu-22.04, GCC 13, `OVT_REQUIRE_CORPORA=1`,
 the manifest's recipe-23 stream generated in the oracle image):
-https://github.com/openvideotools/ovt/actions/runs/44926771714/job/136914466390. Result: **pass** (AT3 is not among
+<https://github.com/openvideotools/ovt/actions/runs/44926771714/job/136914466390>. Result: **pass** (AT3 is not among
 the failed or skipped tests; the `hdr` label ran 2 tests: AT3 passed, AT2 failed as below).
 
 ## Test 2: `hdr_hlg_bt2020` is HLG
