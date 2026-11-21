@@ -490,7 +490,9 @@ TEST_CASE("group E fields match the MP4Box goldens of the container-smoke corpus
           "[container][decoders][moof][golden][needs-corpus]") {
   for (const std::string_view id : {"mpegff_10_fragments", "mpegff_a4_tone_fragmented",
                                     "mpegff_fragment_random_access_2", "mpegff_video_cenc_roll_frag1s"}) {
-    CHECK(compare_with_golden(id) > 0);
+    // Outside CHECK: a missing corpus file SKIPs the test case, and a SKIP inside a CHECK expression is a failure.
+    const size_t compared = compare_with_golden(id);
+    CHECK(compared > 0);
   }
 }
 
