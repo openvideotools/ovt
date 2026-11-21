@@ -32,6 +32,8 @@ add_executable(
   models/test_picture_controller.cpp
   models/test_compare_controller.cpp
   models/test_hdr_metadata_model.cpp
+  models/test_android_state.cpp
+  ../src/platform/android_state.cpp
   models/test_hex_model.cpp
   ../src/picture_controller.cpp
   ../src/compare_controller.cpp

@@ -9,6 +9,7 @@ import android.content.pm.ApplicationInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import android.view.Display
 import android.view.KeyEvent
@@ -16,12 +17,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.FrameLayout
+import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.doOnAttach
 import androidx.lifecycle.Lifecycle
 import org.qtproject.qt.android.OvtQtResume
 import org.qtproject.qt.android.QtQmlStatus
 import org.qtproject.qt.android.QtQuickView
+import org.qtproject.qt.android.QtSignalListener
 import java.util.function.Consumer
 
 /**
@@ -33,6 +36,11 @@ import java.util.function.Consumer
  * The open file is not owned here: [OvtSession] keeps the core handles for the life of the process, and every
  * instance of this Activity binds to it in [onCreate] (WI-A.450, chapter 11 §11.5.7), so a recreated Activity shows
  * the same file without opening or indexing it again.
+ *
+ * What the user looks at (project files, selection, ViewState, layout, panel state) lives in the QML engine, which
+ * every QtQuickView builds afresh. It goes into the saved instance state as one JSON document (WI-A.455, §11.5.7;
+ * app/src/platform/android_state.cpp): the QML root publishes it after every change and this Activity keeps the latest
+ * one, so [onSaveInstanceState] only copies a string and never waits on the Qt thread.
  */
 class MainActivity : AppCompatActivity() {
     private lateinit var hdrSurface: HdrSurfaceView
@@ -67,10 +75,38 @@ class MainActivity : AppCompatActivity() {
     private var keepQtAlive = false
 
     /** True once the QML root is READY: QtQuickView.setProperty needs the root (WI-A.451). */
+    @Volatile
     private var shellReady = false
+
+    /**
+     * The GUI state to save (WI-A.455): the saved instance state this Activity was created with until the QML root
+     * publishes its own, then the latest the root published. Written by the Qt signal listener, read on the UI thread.
+     */
+    @Volatile
+    private var uiState: String? = null
+
+    /** The saved state still to hand to the QML root once it is READY, or null when there is none. */
+    private var pendingRestore: String? = null
+
+    /** True when this instance was created with a saved GUI state. */
+    private var createdWithState = false
+
+    /** True once this instance's QML root has published its state (after taking the saved one). */
+    @Volatile
+    private var publishedState = false
+
+    /** uptimeMillis of onCreate when a saved state is being restored (for the record of WI-A.455 AT1), else 0. */
+    @Volatile
+    private var restoreStartedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // WI-A.455: the GUI state of the Activity this one replaces; kept as the state to save until the QML root has
+        // taken it and published its own, so a second recreation before that loses nothing.
+        pendingRestore = savedInstanceState?.getString(KEY_UI_STATE)
+        uiState = pendingRestore
+        createdWithState = pendingRestore != null
+        if (createdWithState) restoreStartedAt = SystemClock.uptimeMillis()
         setContentView(R.layout.activity_main)
         val host = findViewById<FrameLayout>(R.id.ovt_host)
 
@@ -174,6 +210,7 @@ class MainActivity : AppCompatActivity() {
                 exposeShellTitle()
                 shellReady = true
                 pushWindowWidth(resources.configuration) // a resize while the QML loaded
+                bindUiState()
             }
             QtQmlStatus.ERROR -> Log.e(TAG, "OVT-FATAL: the QML root $SHELL_QML failed to load")
             else -> Unit
@@ -209,6 +246,69 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         Log.i(TAG, "OVT: QML root ready, title '$title'")
+    }
+
+    /**
+     * WI-A.455 (§11.5.7): listens to the root's `uiStateSaved(json)` and hands it the saved state. The root publishes
+     * nothing until `restoredState` is set, so this is set even when there is nothing to restore ("{}").
+     */
+    private fun bindUiState() {
+        qtView.connectSignalListener(
+            SHELL_STATE_SIGNAL,
+            String::class.java,
+            QtSignalListener<String> { _, json -> onUiStateSaved(json) },
+        )
+        val restore = pendingRestore
+        pendingRestore = null
+        Log.i(TAG, "OVT: restoring saved GUI state: ${restore?.length ?: 0} chars")
+        qtView.setProperty(SHELL_RESTORE_PROPERTY, restore ?: NO_SAVED_STATE)
+    }
+
+    /** Called by Qt (any thread) with the state the QML root published. */
+    private fun onUiStateSaved(json: String?) {
+        if (json.isNullOrEmpty()) return
+        uiState = json
+        publishedState = true
+        val started = restoreStartedAt
+        if (started != 0L) {
+            restoreStartedAt = 0L
+            Log.i(TAG, "OVT: GUI state restored ${SystemClock.uptimeMillis() - started} ms after onCreate")
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        val state = uiState ?: return
+        if (state.length > MAX_UI_STATE_CHARS) {
+            Log.w(TAG, "OVT: GUI state of ${state.length} chars not saved (over $MAX_UI_STATE_CHARS)")
+            return
+        }
+        outState.putString(KEY_UI_STATE, state)
+    }
+
+    /** Test hook (StateRestoreTest): the GUI state that onSaveInstanceState would save now. */
+    @VisibleForTesting
+    internal val savedUiState: String?
+        get() = uiState
+
+    /** Test hook (StateRestoreTest): true once the QML root is READY and has been handed the saved state. */
+    @VisibleForTesting
+    internal val isShellReady: Boolean
+        get() = shellReady
+
+    /**
+     * Test hook (StateRestoreTest): true when this instance was created from a saved GUI state and its own QML root has
+     * published since, so [savedUiState] is what the new engine shows rather than the Bundle's copy.
+     */
+    @VisibleForTesting
+    internal val restoredFromBundle: Boolean
+        get() = createdWithState && publishedState
+
+    /** Test hook (StateRestoreTest): applies a GUI state to the live QML root, as a restore does. */
+    @VisibleForTesting
+    internal fun applyUiStateForTest(json: String) {
+        check(shellReady) { "the QML root is not READY" }
+        qtView.setProperty(SHELL_RESTORE_PROPERTY, json)
     }
 
     override fun onStart() {
@@ -360,5 +460,24 @@ class MainActivity : AppCompatActivity() {
 
         /** Root property of AndroidShell.qml taking Configuration.screenWidthDp (WI-A.451). */
         const val SHELL_WIDTH_PROPERTY = "configurationWidthDp"
+
+        /** Root signal of AndroidShell.qml carrying the GUI state as JSON after each change (WI-A.455). */
+        const val SHELL_STATE_SIGNAL = "uiStateSaved"
+
+        /** Root property of AndroidShell.qml taking the saved GUI state, or [NO_SAVED_STATE] (WI-A.455). */
+        const val SHELL_RESTORE_PROPERTY = "restoredState"
+
+        /** What [SHELL_RESTORE_PROPERTY] gets when there is nothing to restore. */
+        const val NO_SAVED_STATE = "{}"
+
+        /** Bundle key of the GUI state JSON (§11.5.7). */
+        const val KEY_UI_STATE = "org.openvideotools.studio.UI_STATE"
+
+        /**
+         * §11.5.7: the saved state is at most 100 KB (AndroidState::kMaxBytes, UTF-8). A char is at least one UTF-8
+         * byte, so a longer string is over the limit whatever it holds; this only guards the Bundle (a Binder
+         * transaction is about 1 MB for the whole process).
+         */
+        const val MAX_UI_STATE_CHARS = 100 * 1024
     }
 }

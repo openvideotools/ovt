@@ -317,64 +317,6 @@ Rectangle {
             text: qsTr("This build cannot show pictures: it needs Qt 6.7 or later and the renderer.")
         }
 
-        // SPEC-ASSUMPTION(#650): the probe crosshair and the selection rectangle belong to libovt-render
-        // (OverlayLayer::Probe / SelectionRect, chapter 10 §10.5.2 rows 17–18, WI-2.436, phase 2). Until that pass
-        // exists the panel draws these two thin markers as items, in the §10.5.2 colours; WI-2.436 removes them and
-        // passes OverlayConfig.probe_x/y and selection_rect instead. Video and block overlays stay in the renderer.
-        Item {
-            id: markers
-
-            objectName: "pictureMarkers"
-            anchors.fill: parent
-            // The renderer's mapping (PictureController::devicePoint), written out over the controller's
-            // properties so that the bindings track zoom and pan (a comma expression's dependencies are not
-            // tracked by compiled bindings on every Qt version).
-            function devX(ix) {
-                return ((ix - controller.panX) * controller.zoom + controller.viewportWidth / 2) / canvas.dpr
-            }
-            function devY(iy) {
-                return ((iy - controller.panY) * controller.zoom + controller.viewportHeight / 2) / canvas.dpr
-            }
-            readonly property bool hasProbe: controller.hasPicture && controller.probe.x >= 0
-            readonly property rect shownRect: controller.dragRect.width > 0 ? controller.dragRect
-                                                                             : controller.selectionRect
-
-            Rectangle {
-                objectName: "probeCrosshairH"
-                visible: markers.hasProbe
-                color: "#FF4136"
-                x: 0
-                width: parent.width
-                height: 1
-                y: markers.hasProbe ? Math.floor(markers.devY(controller.probe.y + 0.5)) : 0
-            }
-            Rectangle {
-                objectName: "probeCrosshairV"
-                visible: markers.hasProbe
-                color: "#FF4136"
-                y: 0
-                height: parent.height
-                width: 1
-                x: markers.hasProbe ? Math.floor(markers.devX(controller.probe.x + 0.5)) : 0
-            }
-            Rectangle {
-                id: rectMarker
-
-                objectName: "selectionRectMarker"
-                readonly property real x0: markers.devX(markers.shownRect.x)
-                readonly property real y0: markers.devY(markers.shownRect.y)
-
-                visible: markers.shownRect.width > 0 && markers.shownRect.height > 0
-                x: x0
-                y: y0
-                width: markers.devX(markers.shownRect.x + markers.shownRect.width) - x0
-                height: markers.devY(markers.shownRect.y + markers.shownRect.height) - y0
-                color: "#3339CCCC"
-                border.color: "#39CCCC"
-                border.width: 1
-            }
-        }
-
         // The gesture table of §11.4.4 for the mouse. Touch (pinch, long-press) is WI-A.450's.
         MouseArea {
             id: input
