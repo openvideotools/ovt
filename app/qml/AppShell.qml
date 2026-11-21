@@ -139,7 +139,7 @@ Item {
             actions: actions
             panelComponents: ({"picture": pictureComponent, "diagnostics": diagnosticsComponent,
                                "bookmarks": bookmarksComponent, "hdr": hdrComponent,
-                               "display_caps": displayCapsComponent})
+                               "display_caps": displayCapsComponent, "hex": hexComponent})
         }
     }
 
@@ -176,5 +176,14 @@ Item {
         id: displayCapsComponent
 
         DisplayCapsPanel {}
+    }
+
+    // The Hex panel (§11.3.5, WI-1.458): bytes with bands, the selected field's bits, Go to and the byte search.
+    Component {
+        id: hexComponent
+
+        HexPanel {
+            shellActions: actions
+        }
     }
 }
