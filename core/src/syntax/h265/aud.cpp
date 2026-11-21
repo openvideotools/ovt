@@ -25,12 +25,13 @@ BitSpan parse_empty_rbsp(BitReader& br, SyntaxBuilder& b, std::string_view name,
   const auto start = br.mark();
   auto scope = b.scoped(name, spec_ref);
   if (br.bits_left() > 0) {
-    // SPEC-ASSUMPTION(#662): Info SYN-H265-0033 "%s has %d trailing bytes after the NAL unit header", the H.265
-    // counterpart of SYN-H264-0033 (§7.3.4 row 20, #551); the bytes are kept as the opaque node `trailing_data`.
+    // Chapter 7 §7.3.5 row 15 and §7.9 (rc40, #662): Info SYN-H265-0033 "%s has %d trailing bytes after the NAL unit
+    // header", the H.265 counterpart of SYN-H264-0033; the bytes are kept as the opaque node `trailing_data`. The
+    // count is taken before opaque_rest() consumes the remainder.
+    const uint64_t trailing_bytes = (br.bits_left() + 7) / 8;
     b.opaque_rest("trailing_data");
     b.diag(Severity::Info, kTrailingBytesCode,
-           fmt::format("{} has {} trailing bytes after the NAL unit header", name, (br.bits_left() + 7) / 8), spec_ref,
-           true);
+           fmt::format("{} has {} trailing bytes after the NAL unit header", name, trailing_bytes), spec_ref, true);
   }
   return br.span_since(start);
 }

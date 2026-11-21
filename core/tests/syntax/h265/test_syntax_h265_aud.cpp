@@ -66,6 +66,19 @@ void collect_diags(const SyntaxNodeData* n, std::vector<std::string>& codes) {
   }
 }
 
+std::vector<std::string> diag_messages(const SyntaxNodeData* n) {
+  std::vector<std::string> out;
+  for (const auto* d = n->first_diag; d != nullptr; d = d->next) {
+    out.emplace_back(d->message);
+  }
+  for (const SyntaxNodeData* c = n->first_child; c != nullptr; c = c->next_sibling) {
+    for (auto& m : diag_messages(c)) {
+      out.push_back(std::move(m));
+    }
+  }
+  return out;
+}
+
 std::vector<std::string> diag_codes(const SyntaxNodeBuffer& tree) {
   std::vector<std::string> codes;
   if (tree.root() != nullptr) {
@@ -172,13 +185,15 @@ TEST_CASE("h265_eos_eob_unit", "[syntax][h265][fast]") {
     CHECK(find_node(eob_tree.root(), "end_of_bitstream_rbsp") != nullptr);
     CHECK(diag_codes(eob_tree).empty());
   }
-  SECTION("bytes after the header: Info SYN-H265-0033 and the opaque trailing_data node (#662)") {
+  SECTION("bytes after the header: Info SYN-H265-0033 with the byte count, and the opaque trailing_data node") {
     SyntaxNodeBuffer tree;
     const BitSpan eos = parse_nal(
         from_hex("48011234"),
         [](BitReader& br, SyntaxBuilder& b, const h265::NalHeader&) { return h265::parse_end_of_seq(br, b); }, &tree);
     CHECK(eos.bit_length == 16);
     CHECK(diag_codes(tree) == std::vector<std::string>{"SYN-H265-0033"});
+    CHECK(diag_messages(tree.root()) ==
+          std::vector<std::string>{"end_of_seq_rbsp has 2 trailing bytes after the NAL unit header"});
     const auto* junk = find_node(tree.root(), "trailing_data");
     REQUIRE(junk != nullptr);
     CHECK(junk->span.bit_offset == 16);
@@ -189,6 +204,8 @@ TEST_CASE("h265_eos_eob_unit", "[syntax][h265][fast]") {
         [](BitReader& br, SyntaxBuilder& b, const h265::NalHeader&) { return h265::parse_end_of_bitstream(br, b); },
         &eob_tree);
     CHECK(diag_codes(eob_tree) == std::vector<std::string>{"SYN-H265-0033"});
+    CHECK(diag_messages(eob_tree.root()) ==
+          std::vector<std::string>{"end_of_bitstream_rbsp has 1 trailing bytes after the NAL unit header"});
   }
 }
 
