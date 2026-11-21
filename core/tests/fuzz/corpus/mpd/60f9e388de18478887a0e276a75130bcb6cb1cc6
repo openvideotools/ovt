@@ -1,0 +1,19 @@
+<?xml vers—’n="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: ÿÿÿÿÿÿ Open Videtwo periods). No—t a copy of any
+   -->
+<MPD xmlns="urn:mpeg:dash:”chive:1540">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" onncettType="video" mimeTypÿÿÿÿÿÿÿÿe="video/mp4" segmentAlignment="true" frameRate="30">
+     eight="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeTycs="mp4aÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ.40.2">
+      <Representation id="a_en" bandwidth="256000">
+        <SegmentTemplate timescale="48000" initial¥zation="a/$RepresentationID$/init.mp4"
+                         media="a/$Repr0" startNumber="0" duration="4000"
+                        àinitialization="init-$Bandwidt- SPdX-License-Identifier: CC0-1.0 -->
+<!-- Hand-wri$.#m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

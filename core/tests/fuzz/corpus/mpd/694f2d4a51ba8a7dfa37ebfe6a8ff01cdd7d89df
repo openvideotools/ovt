@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SegmSPDX-FileCopyrightText: 20;6 The$Representati   third-party manifest. -->
+<MPD xmlns="0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>https:///.ample.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="P">
+0TS4    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cen-090a0b0c0d0e0f10"/>
+ecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeTycs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48-Identifier: CC0-1.0 -->
+<!-- Hand-wri$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

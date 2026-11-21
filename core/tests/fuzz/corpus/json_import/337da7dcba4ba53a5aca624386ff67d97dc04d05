@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "plugin_id": "ovt-plugin-de265",
+  "plugi_flag": 1,
+      "dpb_fullness_after": 1,
+      "sps_max_dec_pic_buffering_minus1": 4,
+      "sps_max_num_reorder_pics": 2,
+      "spsum_reorder_pics": 2,
+      "sps_max_latency_increase_plus1": 0
+    -1,
+     tt -e

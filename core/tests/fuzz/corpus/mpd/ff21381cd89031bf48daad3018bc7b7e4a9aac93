@@ -1,0 +1,11 @@
+<?xml vercodšng="UTF-8"?>
+<!-- SPDX-FileCopyrightTýxtRepresentation= -0, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn$:mpeg:dasS" minBufferTime="PT">
+  <BaseURL>http/:ÿsÿÿÿÿÿ\.invalid/./dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet segmentAlignment="true" frameRate="30">
+     ééé                  cenc:dD="0102030405060707-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30001" duration="1200tionID$/seg-$Number%05d$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>
