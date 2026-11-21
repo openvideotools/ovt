@@ -11,6 +11,10 @@ Subject: [PATCH] Fix deprecated copy constructor usage of fmt::format_string
 * Fix usage of std::basic_format_string
 
 * remove spdlog::to_string_view()
+
+Upstream-Status: Accepted [spdlog master, commit 1685e694c5cd8328280c48f8b94b1281c17c6fee]
+SPDX-License-Identifier: MIT
+Rationale: the deprecated fmt::format_string copy construction is inside spdlog headers; no public API of the pinned port avoids it. Vendored from the vcpkg spdlog port, which downloads it from github.com (HTTP 503).
 ---
  include/spdlog/common.h          | 32 ----------------
  include/spdlog/logger.h          | 64 +++++++++++++++++++++++++++++++-

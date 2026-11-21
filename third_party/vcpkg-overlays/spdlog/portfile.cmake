@@ -17,8 +17,8 @@ vcpkg_from_github(
   HEAD_REF
   v1.x
   PATCHES
-  backport-3541-fmt-format-string-copy.patch
-  backport-3543-format-string-propagation.patch)
+  patches/backport-3541-fmt-format-string-copy.patch
+  patches/backport-3543-format-string-propagation.patch)
 
 vcpkg_check_features(
   OUT_FEATURE_OPTIONS

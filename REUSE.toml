@@ -239,9 +239,9 @@ SPDX-FileCopyrightText = "2015-2021 the original authors of Gradle"
 SPDX-License-Identifier = "Apache-2.0"
 
 # Upstream spdlog commits vendored as patches in the spdlog overlay port (third_party/vcpkg-overlays/spdlog/README.md).
-# They are verbatim `git format-patch` output, so they cannot carry a header; spdlog is MIT.
+# They are `git format-patch` output with a header added to the commit message; spdlog is MIT.
 [[annotations]]
-path = ["third_party/vcpkg-overlays/spdlog/*.patch"]
+path = ["third_party/vcpkg-overlays/spdlog/patches/*.patch"]
 SPDX-FileCopyrightText = "2016-present Gabi Melman and spdlog contributors"
 SPDX-License-Identifier = "MIT"
 

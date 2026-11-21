@@ -3,6 +3,10 @@ From: Yancey <135342560+Yancey2023@users.noreply.github.com>
 Date: Mon, 23 Feb 2026 23:16:21 +0800
 Subject: [PATCH] Fix format_string propagation (#3543)
 
+
+Upstream-Status: Accepted [spdlog master, commit d5af52d903ed69f96c7350155e94aeff248b31eb]
+SPDX-License-Identifier: MIT
+Rationale: spdlog 1.17.0 itself needs the fix; it lives in spdlog headers and cannot be worked around from outside. Vendored from the vcpkg spdlog port, which downloads it from github.com (HTTP 503).
 ---
  include/spdlog/logger.h | 66 +++++------------------------------------
  include/spdlog/spdlog.h | 64 ---------------------------------------
