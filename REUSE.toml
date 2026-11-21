@@ -237,3 +237,16 @@ SPDX-License-Identifier = "LGPL-2.1-or-later"
 path = "android/gradle/wrapper/gradle-wrapper.jar"
 SPDX-FileCopyrightText = "2015-2021 the original authors of Gradle"
 SPDX-License-Identifier = "Apache-2.0"
+
+# Upstream spdlog commits vendored as patches in the spdlog overlay port (third_party/vcpkg-overlays/spdlog/README.md).
+# They are verbatim `git format-patch` output, so they cannot carry a header; spdlog is MIT.
+[[annotations]]
+path = ["third_party/vcpkg-overlays/spdlog/*.patch"]
+SPDX-FileCopyrightText = "2016-present Gabi Melman and spdlog contributors"
+SPDX-License-Identifier = "MIT"
+
+# vcpkg's own port files (manifest, usage) copied unchanged from the pinned baseline; MIT (microsoft/vcpkg).
+[[annotations]]
+path = ["third_party/vcpkg-overlays/spdlog/usage", "third_party/vcpkg-overlays/spdlog/vcpkg.json"]
+SPDX-FileCopyrightText = "Microsoft Corporation and contributors"
+SPDX-License-Identifier = "MIT"
