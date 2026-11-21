@@ -146,7 +146,8 @@ if grep -q 'FATAL EXCEPTION' "$out/logcat.txt"; then fail "logcat contains a FAT
 # The debuggerd banner "Fatal signal 6 (SIGABRT), code -1, fault addr ... in tid T (comm), pid P (comm)" names the
 # process by pid; its tombstone header ">>> <package> <<<" names it in full. The kernel comm is cut to 15 characters,
 # so neither is matched by name.
-app_pids="$app_pids $(adb shell pidof "$PKG" | tr -d '\r')"
+now_pids="$(adb shell pidof "$PKG" | tr -d '\r' || true)" # pidof exits 1 once the app is gone
+app_pids="$app_pids $now_pids"
 for pid in $app_pids; do
   if grep -Eq "Fatal signal .* pid $pid " "$out/logcat.txt"; then fail "native crash of the app (pid $pid)"; fi
 done
