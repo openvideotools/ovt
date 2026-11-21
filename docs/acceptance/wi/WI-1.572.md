@@ -69,11 +69,15 @@ rc=0
 ## Part b (#665): Mini run of the 36 synthetic HEVC tests
 
 - Command: `OVT_REQUIRE_CORPORA=1 ctest --preset macos-arm64-debug -R 'syntax_golden_h265_.*syn_' --output-on-failure`
-- Machine: Mac Mini, Apple M4, macOS 15.8.2. Corpora generated with `tests/corpora/synthetic/generate.py --check` in the oracle image.
+- Machine: Mac Mini, Apple M4, macOS 15.8.2. Corpora generated with
+  `tests/corpora/synthetic/generate.py --check` in the oracle image.
 - Commit: 9118052. Date: 2026-11-21 (20261121T231330Z).
-- Result: 25 of 36 pass. The 11 failures (`syntax_golden_h265_trace_headers_syn_h265_*`) all differ only in 5 `user_data_payload_byte` values of x265's version-info SEI (`cpuid=`). The committed goldens were made from streams encoded on another CPU. Tracked in #780 (recipes need `info=0`, then re-pin the manifest and regenerate the goldens); this record is redone after #780 lands.
+- Result: 25 of 36 pass. The 11 failures (`syntax_golden_h265_trace_headers_syn_h265_*`) differ only in 5
+  `user_data_payload_byte` values of x265's version-info SEI (`cpuid=`): the committed goldens were made from
+  streams encoded on another CPU. Tracked in #780 (recipes need `info=0`, then re-pin the manifest and regenerate
+  the goldens); this record is redone after #780 lands.
 
-```
+```text
 WI-1.572b (#665) syn H.265 syntax goldens, 20261121T231330Z. Mac Mini, Apple M4, macOS 15.8.2. Branch claude/project-thread-qejsqt at 9118052, macos-arm64-debug. Nothing pushed.
 
 RESULT: 25 of 36 pass, 11 fail. Every failure is the same 5 bytes of x265's version-info SEI. That's an environment difference, not a parser bug.
@@ -267,16 +271,16 @@ syntax_golden    =   5.91 sec*proc (36 tests)
 Total Test time (real) =   4.09 sec
 
 The following tests FAILED:
-	1367 - syntax_golden_h265_trace_headers_syn_h265_amp_sao_on (Failed) fast golden needs_corpus syntax_golden
-	1370 - syntax_golden_h265_trace_headers_syn_h265_gop60_1080p (Failed) fast golden needs_corpus syntax_golden
-	1371 - syntax_golden_h265_trace_headers_syn_h265_hdr10plus (Failed) fast golden needs_corpus syntax_golden
-	1372 - syntax_golden_h265_trace_headers_syn_h265_hrd_cbr (Failed) fast golden needs_corpus syntax_golden
-	1373 - syntax_golden_h265_trace_headers_syn_h265_hrd_vbr (Failed) fast golden needs_corpus syntax_golden
-	1374 - syntax_golden_h265_trace_headers_syn_h265_main10_hev1 (Failed) fast golden needs_corpus syntax_golden
-	1375 - syntax_golden_h265_trace_headers_syn_h265_main10_pq_hdr (Failed) fast golden needs_corpus syntax_golden
-	1376 - syntax_golden_h265_trace_headers_syn_h265_multi_pps (Failed) fast golden needs_corpus syntax_golden
-	1377 - syntax_golden_h265_trace_headers_syn_h265_pq_colr_only (Failed) fast golden needs_corpus syntax_golden
-	1378 - syntax_golden_h265_trace_headers_syn_h265_pq_sei_only (Failed) fast golden needs_corpus syntax_golden
-	1379 - syntax_golden_h265_trace_headers_syn_h265_sei_unknown_200 (Failed) fast golden needs_corpus syntax_golden
+    1367 - syntax_golden_h265_trace_headers_syn_h265_amp_sao_on (Failed) fast golden needs_corpus syntax_golden
+    1370 - syntax_golden_h265_trace_headers_syn_h265_gop60_1080p (Failed) fast golden needs_corpus syntax_golden
+    1371 - syntax_golden_h265_trace_headers_syn_h265_hdr10plus (Failed) fast golden needs_corpus syntax_golden
+    1372 - syntax_golden_h265_trace_headers_syn_h265_hrd_cbr (Failed) fast golden needs_corpus syntax_golden
+    1373 - syntax_golden_h265_trace_headers_syn_h265_hrd_vbr (Failed) fast golden needs_corpus syntax_golden
+    1374 - syntax_golden_h265_trace_headers_syn_h265_main10_hev1 (Failed) fast golden needs_corpus syntax_golden
+    1375 - syntax_golden_h265_trace_headers_syn_h265_main10_pq_hdr (Failed) fast golden needs_corpus syntax_golden
+    1376 - syntax_golden_h265_trace_headers_syn_h265_multi_pps (Failed) fast golden needs_corpus syntax_golden
+    1377 - syntax_golden_h265_trace_headers_syn_h265_pq_colr_only (Failed) fast golden needs_corpus syntax_golden
+    1378 - syntax_golden_h265_trace_headers_syn_h265_pq_sei_only (Failed) fast golden needs_corpus syntax_golden
+    1379 - syntax_golden_h265_trace_headers_syn_h265_sei_unknown_200 (Failed) fast golden needs_corpus syntax_golden
 Errors while running CTest
 ```
