@@ -56,6 +56,9 @@ struct BuilderOptions {
   /// §7.4.6 lazy EPB stripping: raw bytes stripped per step for a VCL unit parsed without a tree (the stripped
   /// prefix doubles while the header runs past it). 2 KiB; tests lower it to exercise the retry.
   size_t lazy_strip_chunk = size_t{2} << 10U;
+  /// §7.4.6 memory: the number of units (and frames) to reserve records and index memory for up front, so that
+  /// neither grows while the stream is fed; a hint, any count works. 0 = the defaults.
+  size_t expected_units = 0;
   /// AV1 (WI-1.124, §7.3.6 row 1 drop rule, §7.4.3 last row): the selected operating point, an index into the
   /// sequence header's operating_points[]; frames outside it are indexed with shown = false and Info SYN-AV1-0002.
   /// 0 is OVT's default; a value beyond operating_points_cnt_minus_1 selects 0.
@@ -90,15 +93,17 @@ class StreamIndexBuilder {
   void add_scan_diagnostic(const syntax::ScanDiagnostic& d);
 
   /// §7.4.2 S8–S10: closes the open frame, assigns the display order and the fallback time base, and returns
-  /// the finished StreamIndex buffer (root table ovt.fb.StreamIndex, no file identifier). Deterministic
-  /// (§0.7.5): the same units give the same bytes. Call once; add_unit() must not be called afterwards.
-  [[nodiscard]] std::vector<uint8_t> finish(std::span<const uint8_t, 32> source_hash);
+  /// the finished StreamIndex buffer (root table ovt.fb.StreamIndex, no file identifier): the very buffer the
+  /// index was built in, handed over without a copy (§7.4.6 memory; data() and size() give the bytes).
+  /// Deterministic (§0.7.5): the same units give the same bytes. Call once; add_unit() must not be called
+  /// afterwards.
+  [[nodiscard]] flatbuffers::DetachedBuffer finish(std::span<const uint8_t, 32> source_hash);
 
   /// §7.4.6 partial index (WI-1.125): the StreamIndex of the units and frames that are complete so far, with Warning
   /// SYN-GEN-0103 "index truncated at unit N", where N is the first unit left out (the first unit of the open
   /// frame, or of the non-VCL units pending before it). The builder keeps its state: add_unit() may go on and
   /// finish() still returns the index of the whole stream, byte-identical to an uninterrupted run.
-  [[nodiscard]] std::vector<uint8_t> finish_partial(std::span<const uint8_t, 32> source_hash);
+  [[nodiscard]] flatbuffers::DetachedBuffer finish_partial(std::span<const uint8_t, 32> source_hash);
 
   /// Number of units added so far.
   [[nodiscard]] uint32_t unit_count() const noexcept;

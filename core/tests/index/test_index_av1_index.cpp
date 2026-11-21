@@ -195,7 +195,8 @@ Bytes index_section5(std::span<const uint8_t> stream, uint8_t operating_point = 
       stream, 0, ovt::syntax::kNoContainerSample, ovt::syntax::ObuSpanKind::Section5Stream,
       [&b](const ovt::syntax::ScannedUnit& u) { b.add_unit(input_of(u)); },
       [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
-  return b.finish(kHash);
+  const flatbuffers::DetachedBuffer out = b.finish(kHash);
+  return Bytes(out.data(), out.data() + out.size());
 }
 
 // Indexes an Annex B OBU stream as ovt_stream_build_index() does (av1_annexb, temporal_unit_start from the scanner).
@@ -206,7 +207,8 @@ Bytes index_annexb(std::span<const uint8_t> stream) {
   ovt::syntax::scan_obu_annexb(
       stream, 0, ovt::syntax::kNoContainerSample, [&b](const ovt::syntax::ScannedUnit& u) { b.add_unit(input_of(u)); },
       [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
-  return b.finish(kHash);
+  const flatbuffers::DetachedBuffer out = b.finish(kHash);
+  return Bytes(out.data(), out.data() + out.size());
 }
 
 // ovt_stream_build_index() over an in-memory .obu file (the container module detects the framing).

@@ -249,7 +249,89 @@ flatbuffers::Offset<fb::SyntaxNode> build_node(flatbuffers::FlatBufferBuilder& f
   return b.Finish();
 }
 
+std::string_view view(const flatbuffers::String* s) noexcept {
+  return s == nullptr ? std::string_view{} : s->string_view();
+}
+
 }  // namespace
+
+// Mirrors build_node step for step over a stored tree; absent fields read as the empty values build_node skips.
+// NOLINTNEXTLINE(misc-no-recursion)
+flatbuffers::Offset<fb::SyntaxNode> copy_syntax_node(flatbuffers::FlatBufferBuilder& fbb, const fb::SyntaxNode& n) {
+  std::vector<flatbuffers::Offset<fb::SyntaxNode>> children;
+  if (n.children() != nullptr) {
+    children.reserve(n.children()->size());
+    for (const fb::SyntaxNode* c : *n.children()) {
+      children.push_back(copy_syntax_node(fbb, *c));
+    }
+  }
+  std::vector<flatbuffers::Offset<fb::Diagnostic>> diags;
+  if (n.diagnostics() != nullptr) {
+    diags.reserve(n.diagnostics()->size());
+    for (const fb::Diagnostic* d : *n.diagnostics()) {
+      const auto code = shared(fbb, view(d->code()));
+      const auto message = unique(fbb, view(d->message()));
+      const auto spec_ref = shared(fbb, view(d->spec_ref()));
+      const fb::BitSpan span = d->span() != nullptr ? *d->span() : fb::BitSpan(0, 0);
+      diags.push_back(fb::CreateDiagnostic(fbb, d->severity(), code, message, &span, spec_ref));
+    }
+  }
+
+  const std::string_view name = view(n.name());
+  const auto name_off = fbb.CreateSharedString(name.data(), name.size());  // required, even when empty
+  const auto descriptor = shared(fbb, view(n.descriptor()));
+  flatbuffers::Offset<flatbuffers::Vector<uint8_t>> bytes = 0;
+  if (n.bytes() != nullptr && !n.bytes()->empty()) {
+    bytes = fbb.CreateVector(n.bytes()->data(), n.bytes()->size());
+  }
+  const auto svalue = unique(fbb, view(n.svalue()));
+  const auto enum_name = shared(fbb, view(n.enum_name()));
+  const auto derived = unique(fbb, view(n.derived()));
+  const auto spec_ref = shared(fbb, view(n.spec_ref()));
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fb::SyntaxNode>>> children_vec = 0;
+  if (!children.empty()) {
+    children_vec = fbb.CreateVector(children);
+  }
+  flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fb::Diagnostic>>> diags_vec = 0;
+  if (!diags.empty()) {
+    diags_vec = fbb.CreateVector(diags);
+  }
+
+  const fb::BitSpan span = n.span() != nullptr ? *n.span() : fb::BitSpan(0, 0);
+  fb::SyntaxNodeBuilder b(fbb);
+  b.add_name(name_off);
+  if (!descriptor.IsNull()) {
+    b.add_descriptor(descriptor);
+  }
+  b.add_kind(n.kind());
+  b.add_uvalue(n.uvalue());
+  b.add_ivalue(n.ivalue());
+  b.add_bvalue(n.bvalue());
+  if (!bytes.IsNull()) {
+    b.add_bytes(bytes);
+  }
+  if (!svalue.IsNull()) {
+    b.add_svalue(svalue);
+  }
+  if (!enum_name.IsNull()) {
+    b.add_enum_name(enum_name);
+  }
+  if (!derived.IsNull()) {
+    b.add_derived(derived);
+  }
+  b.add_span(&span);
+  if (!spec_ref.IsNull()) {
+    b.add_spec_ref(spec_ref);
+  }
+  if (!children_vec.IsNull()) {
+    b.add_children(children_vec);
+  }
+  b.add_array_index(n.array_index());
+  if (!diags_vec.IsNull()) {
+    b.add_diagnostics(diags_vec);
+  }
+  return b.Finish();
+}
 
 flatbuffers::Offset<fb::SyntaxNode> SyntaxNodeBuffer::to_flatbuffer(flatbuffers::FlatBufferBuilder& fbb) const {
   if (!state_) {

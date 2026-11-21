@@ -61,8 +61,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     ovt::syntax::scan_annexb(stream, 0, ovt::syntax::kNoContainerSample, on_unit, on_diag);
   }
   const std::array<uint8_t, 32> hash{};
-  const std::vector<uint8_t> index = builder.finish(hash);
-  if (!ovt::model::validate_stream_index(index).empty()) {
+  const flatbuffers::DetachedBuffer index = builder.finish(hash);
+  if (!ovt::model::validate_stream_index({index.data(), index.size()}).empty()) {
     std::abort();
   }
   return 0;

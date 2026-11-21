@@ -70,7 +70,8 @@ Bytes index_obu(std::span<const uint8_t> stream) {
       stream, 0, ovt::syntax::kNoContainerSample, ovt::syntax::ObuSpanKind::Section5Stream,
       [&b](const ovt::syntax::ScannedUnit& u) { b.add_unit(input_of(u)); },
       [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
-  return b.finish(kHash);
+  const flatbuffers::DetachedBuffer out = b.finish(kHash);
+  return {out.data(), out.data() + out.size()};
 }
 
 // Indexes an IVF file: one sample per IVF frame, pts = dts = the IVF timestamp in scale / rate seconds (chapter 6
@@ -102,7 +103,8 @@ Bytes index_ivf(const std::filesystem::path& path, size_t cut = 0) {
         [&b, &timing](const ovt::syntax::ScannedUnit& u) { b.add_unit(input_of(u, &timing)); },
         [&b](const ovt::syntax::ScanDiagnostic& d) { b.add_scan_diagnostic(d); });
   }
-  return b.finish(kHash);
+  const flatbuffers::DetachedBuffer out = b.finish(kHash);
+  return {out.data(), out.data() + out.size()};
 }
 
 const fb::StreamIndex& root(const Bytes& index) {

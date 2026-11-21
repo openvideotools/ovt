@@ -42,8 +42,8 @@ struct UnitRec {
   uint8_t layer_id = 0;
   uint8_t temporal_id = 0;
   std::vector<uint32_t> epb_positions;
-  int32_t frame = -1;  // decode index of the owning frame
-  syntax::SyntaxNodeBuffer header;
+  int32_t frame = -1;                          // decode index of the owning frame
+  flatbuffers::Offset<fb::SyntaxNode> header;  // the recorded tree inside BuilderCore::index(); 0 = none
   int32_t sample_index = -1;
   std::vector<DiagRec> diagnostics;
   bool parameter_set = false;        // listed in StreamIndex.parameter_sets
@@ -93,6 +93,21 @@ struct FrameRec {
   std::array<std::vector<RefSlotRec>, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice
 };
 
+/// The memory of the index under construction: uninitialised blocks, so that only the pages the builder has
+/// written are resident (§7.4.6), unlike the zero-filled vectors of a std::vector-backed block. FlatBufferBuilder
+/// writes back to front and copies only the bytes in use when it grows. The builder owns the allocator and
+/// hands it over with the buffer when the index is released (BuilderCore::index(), S10).
+class IndexAllocator final : public flatbuffers::Allocator {
+ public:
+  uint8_t* allocate(size_t size) override {
+    return new uint8_t[size];  // NOLINT(cppcoreguidelines-owning-memory): make_unique would zero-fill (touch) every
+                               // page
+  }
+  void deallocate(uint8_t* p, size_t /*size*/) override {
+    delete[] p;  // NOLINT(cppcoreguidelines-owning-memory)
+  }
+};
+
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:
 /// pts = display_index * ticks_per_frame in timebase_num / timebase_den seconds.
 struct StreamTiming {
@@ -104,6 +119,12 @@ struct StreamTiming {
 /// The codec-independent state of §7.4.2 S0: units, frames, the open frame and the pending non-VCL units.
 class BuilderCore {
  public:
+  /// `index_reserve` bytes of index memory are reserved up front (untouched, so free until written): a build
+  /// that outgrows it copies the bytes so far into a larger block once per growth step.
+  explicit BuilderCore(size_t index_reserve = kDefaultIndexReserve)
+      : index_(index_reserve, new IndexAllocator, /*own_allocator=*/true) {}
+  static constexpr size_t kDefaultIndexReserve = size_t{1} << 20U;
+
   std::vector<UnitRec> units;
   std::vector<FrameRec> frames;        // finished frames, decode order
   std::vector<DiagRec> diagnostics;    // StreamIndex.diagnostics
@@ -130,6 +151,18 @@ class BuilderCore {
   /// The first unit that is not part of a finished frame: the first pending non-VCL unit, else the first unit of
   /// the open frame, else units.size(). Everything before it belongs to complete frames or to no frame.
   [[nodiscard]] uint32_t first_open_unit() const noexcept;
+  /// The parsed tree of `unit`, written into index() at once so that its arena is freed while the stream is fed
+  /// (§7.4.6: the memory of the index is its bytes, not its trees). An empty tree stores nothing.
+  void store_tree(uint32_t unit, syntax::SyntaxNodeBuffer tree, std::string_view root_name);
+  /// The index under construction. The recorded trees are already in it (UnitRec::header is their offset);
+  /// S10 appends the records, finishes it and releases the buffer, after which the core is spent.
+  [[nodiscard]] flatbuffers::FlatBufferBuilder& index() noexcept { return index_; }
+  [[nodiscard]] size_t index_bytes() const noexcept { return index_.GetSize(); }
+  /// A copy of `unit`'s recorded tree in `dst` (0 when none is recorded), in the same order and with the same
+  /// string sharing as index() holds it.
+  [[nodiscard]] flatbuffers::Offset<fb::SyntaxNode> copy_tree(flatbuffers::FlatBufferBuilder& dst, uint32_t unit) const;
+  /// `unit`'s recorded tree as a standalone SyntaxNode FlatBuffer; empty when none is recorded.
+  [[nodiscard]] std::vector<uint8_t> tree_bytes(uint32_t unit) const;
 
   [[nodiscard]] bool frame_open() const noexcept { return open_.has_value(); }
   /// The open frame, or null when none is open.
@@ -153,6 +186,7 @@ class BuilderCore {
   std::optional<FrameRec> open_;
   std::vector<uint32_t> pending_;
   int32_t next_decode_index_ = 0;
+  flatbuffers::FlatBufferBuilder index_;
 };
 
 /// §7.4.2 S3, S4 and S6 for one codec.

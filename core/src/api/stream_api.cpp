@@ -49,6 +49,8 @@ constexpr uint32_t kCheckEveryUnits = 256;            // §7.4.6: check_cancel e
 constexpr std::chrono::milliseconds kCheckEvery{50};  // ... or 50 ms
 constexpr uint32_t kClockEveryUnits = 16;             // how often the 50 ms rule looks at the clock
 constexpr uint32_t kKnownIndexFlags = OVT_INDEX_ALLOW_PARTIAL;
+constexpr uint64_t kBytesPerUnitGuess = 4096;         // records reserved per file byte before the build
+constexpr uint64_t kMaxReserve = uint64_t{4} << 20U;  // ... at most 4 Mi records
 
 namespace fb = ovt::fb;
 namespace idx = ovt::index;
@@ -231,7 +233,8 @@ void feed_ivf(const RandomAccessFile& file, Driver& driver) {
 // §7.4.2 S1–S10 over the stream's units, under `cancel`. A cancellation throws ovt::Cancelled unless
 // OVT_INDEX_ALLOW_PARTIAL is set: then the partial index comes back and the builder stays on the stream for the
 // next call to resume from (§7.4.6). A build that runs to the end drops any such state.
-std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& sink) {
+flatbuffers::DetachedBuffer build(ovt_Stream& stream, ovt::jobs::Cancel& cancel,
+                                  const ovt::jobs::Pool::ProgressSink& sink) {
   const RandomAccessFile& file = *stream.container->file->file;
   std::unique_ptr<ovt::api::ResumeState> resume = std::move(stream.resume);
   if (!resume) {
@@ -239,6 +242,10 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
     idx::BuilderOptions options;
     options.codec = stream.codec;
     options.lazy_after_frames = stream.lazy_after_frames;
+    // §7.4.6 memory: records and index memory are reserved once, for one unit per 4 KiB of file (an untouched
+    // reservation costs no resident memory; a stream of smaller units just grows them).
+    options.expected_units =
+        static_cast<size_t>(std::min<uint64_t>(file.size() / kBytesPerUnitGuess, kMaxReserve)) + 64;
     options.av1_annexb = stream.framing == Framing::ObuAnnexB;
     resume->builder = std::make_unique<idx::StreamIndexBuilder>(options);
   }
@@ -276,7 +283,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
     if ((stream.index_flags & OVT_INDEX_ALLOW_PARTIAL) == 0) {
       throw;
     }
-    std::vector<uint8_t> partial = builder.finish_partial(idx::source_hash(file));
+    flatbuffers::DetachedBuffer partial = builder.finish_partial(idx::source_hash(file));
     resume->units_fed = builder.unit_count();
     resume->scan_complete = driver.scan_complete();
     stream.resume = std::move(resume);
@@ -286,7 +293,7 @@ std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const 
 }
 
 // Installs a freshly built index on the stream and hands the caller its copy.
-ovt_status install(ovt_Stream& stream, std::vector<uint8_t> index, ovt_Buffer* out_index) {
+ovt_status install(ovt_Stream& stream, flatbuffers::DetachedBuffer index, ovt_Buffer* out_index) {
   const ovt_status st = ovt::api::make_buffer(index.data(), index.size(), out_index);
   if (st != OVT_OK) {
     return st;
