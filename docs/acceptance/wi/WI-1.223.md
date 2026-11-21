@@ -23,8 +23,18 @@ $ OVT_CORPORA_DIR=corpora ovt_tests_container "AT3: syn_h265_main10_pq_hdr_misma
 All tests passed (6 assertions in 1 test case)
 ```
 
+Nightly on the PR branch (head 1cec190, 2026-11-21, `corpora-linux`, ubuntu-22.04, GCC 13, `OVT_REQUIRE_CORPORA=1`,
+the manifest's recipe-23 stream generated in the oracle image):
+https://github.com/openvideotools/ovt/actions/runs/44926771714/job/136914466390. Result: **pass** (AT3 is not among
+the failed or skipped tests; the `hdr` label ran 2 tests: AT3 passed, AT2 failed as below).
+
 ## Test 2: `hdr_hlg_bt2020` is HLG
 
-Automated: `AT2: hdr_hlg_bt2020 is HLG` (`[container][hdr][needs-corpus]`). The entry is `manual_download`
-(nightly only, #517), so it skips here and in the PR lane. The same rule on synthetic bytes: `colr nclx 9/18/9 is
-HLG at box level` (fast lane).
+Automated: `AT2: hdr_hlg_bt2020 is HLG` (`[container][hdr][needs-corpus][slow]`). The same rule on synthetic bytes:
+`colr nclx 9/18/9 is HLG at box level` (fast lane, passes).
+
+**Status: pending real asset.** The entry is `manual_download` and `unverified` with no known URL (#517), so no
+fetcher can get it. In the nightly run above, AT2 failed with the asset missing, which `OVT_REQUIRE_CORPORA=1`
+reports as a failure. The other 13 failures in that job also fail on main's scheduled nightly of the same day
+(run 44893316029). Per the coordinator's ruling (2026-11-21), part a merges with AT2 recorded as pending. The record
+of the real `hdr_hlg_bt2020` comes from the first nightly after the BBC R&D HLG clip is placed in the corpora by hand.
