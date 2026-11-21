@@ -32,7 +32,8 @@ using Bytes = std::vector<uint8_t>;
 
 void put(Bytes& b, uint64_t v, int nbytes) {
   for (int s = (nbytes - 1) * 8; s >= 0; s -= 8) {
-    b.push_back(static_cast<uint8_t>(v >> static_cast<unsigned>(s)));
+    b.push_back(s >= 64 ? uint8_t{0}
+                        : static_cast<uint8_t>(v >> static_cast<unsigned>(s)));  // wider than 8 bytes: zero pad
   }
 }
 void put_str(Bytes& b, std::string_view s) {
