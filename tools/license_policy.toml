@@ -17,7 +17,7 @@ patterns = [
 # Most-permissive-first ordering used to resolve SPDX `OR` expressions (algorithm step 1).
 # An `OR` alternative whose id is not in this list cannot be chosen; if no alternative is listed -> E-UNKNOWN.
 permissiveness = [
-  "0BSD", "Unlicense", "CC0-1.0", "WTFPL", "MIT-0", "MIT", "ISC", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear",
+  "0BSD", "Unlicense", "CC0-1.0", "WTFPL", "MIT-0", "MIT", "curl", "ISC", "BSD-2-Clause", "BSD-3-Clause", "BSD-3-Clause-Clear",
   "BSD-2-Clause-Patent", "Zlib", "libpng-2.0", "BSL-1.0", "NCSA", "Beerware", "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception", "MPL-2.0",
   "LGPL-2.1-or-later", "LGPL-2.1-only", "LGPL-3.0-or-later", "LGPL-3.0-only",
@@ -30,7 +30,7 @@ permissiveness = [
 
 [allow.any]                 # permitted in any directory/target
 ids = [
-  "MIT", "MIT-0", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent", "ISC", "Zlib", "libpng-2.0", "BSL-1.0",
+  "MIT", "MIT-0", "curl", "BSD-2-Clause", "BSD-3-Clause", "BSD-2-Clause-Patent", "ISC", "Zlib", "libpng-2.0", "BSL-1.0",
   "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "MPL-2.0", "CC0-1.0", "Unlicense", "0BSD",
   # WTFPL (zimg): permissive, not OSI-approved; some corporate scanners flag it. Allowed by owner decision.
   "WTFPL",

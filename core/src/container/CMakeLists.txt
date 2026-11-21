@@ -36,8 +36,12 @@ target_sources(
           page_cache.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp
+          virtual_file/fetcher.cpp
+          virtual_file/http_fetcher.cpp
           virtual_file/m3u8.cpp
           virtual_file/mpd.cpp
+          virtual_file/segment_cache.cpp
+          virtual_file/virtual_file.cpp
           y4m.cpp)
 # ovt_schemas orders the build after flatc and puts ovt_container_generated.h on the include path.
 target_link_libraries(ovt_core_objects PRIVATE ovt_schemas)
@@ -45,3 +49,6 @@ target_link_libraries(ovt_core_objects PRIVATE ovt_schemas)
 target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${nlohmann_json_TARGET}>")
 # The DASH MPD parser (WI-4.208) reads XML with pugixml (MIT); the target is found in core/CMakeLists.txt.
 target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${pugixml_TARGET}>")
+# The HTTP(S) fetcher of the DASH/HLS virtual file (WI-4.210) uses libcurl (curl licence).
+target_link_libraries(ovt_core_objects PRIVATE "$<BUILD_INTERFACE:${CURL_TARGET}>")
+target_compile_definitions(ovt_core_objects PRIVATE OVT_HAVE_CURL=1)

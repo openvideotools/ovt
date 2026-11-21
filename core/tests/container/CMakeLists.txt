@@ -39,6 +39,7 @@ add_executable(
   tr101290_test.cpp
   ts_packets_robustness_test.cpp
   ts_packets_test.cpp
+  virtual_file_test.cpp
   y4m_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(
