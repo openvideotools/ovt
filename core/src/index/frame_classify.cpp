@@ -32,7 +32,7 @@ fb::FrameType av1_frame_type(syntax::av1::FrameType t) noexcept {
 
 }  // namespace
 
-void classify_av1(FrameRec& f, const Av1FrameRecord& r, const syntax::av1::SequenceHeader& seq,
+void classify_av1(FrameRec& f, RefArena& refs, const Av1FrameRecord& r, const syntax::av1::SequenceHeader& seq,
                   uint32_t current_frame_id) {
   f.type = av1_frame_type(r.type);
   f.shown = r.shown;
@@ -49,13 +49,13 @@ void classify_av1(FrameRec& f, const Av1FrameRecord& r, const syntax::av1::Seque
   f.bit_depth_chroma = r.state.BitDepth;
   f.frame_num = seq.frame_id_numbers_present_flag ? to_i32(current_frame_id) : -1;
   // §7.4.4 (WI-1.124): declared_refs in LAST..ALTREF order; dpb_after the 8 slots, -1 for an empty one.
-  f.declared_refs.clear();
+  f.declared_refs = ArenaRange{static_cast<uint32_t>(refs.ints.size()), static_cast<uint32_t>(r.declared_refs.size())};
   for (const int64_t d : r.declared_refs) {
-    f.declared_refs.push_back(to_i32(static_cast<uint64_t>(d)));
+    refs.ints.push_back(to_i32(static_cast<uint64_t>(d)));
   }
-  f.dpb_after.clear();
+  f.dpb_after = ArenaRange{static_cast<uint32_t>(refs.ints.size()), static_cast<uint32_t>(r.dpb_after.size())};
   for (const int64_t d : r.dpb_after) {
-    f.dpb_after.push_back(d >= 0 ? to_i32(static_cast<uint64_t>(d)) : -1);
+    refs.ints.push_back(d >= 0 ? to_i32(static_cast<uint64_t>(d)) : -1);
   }
 }
 

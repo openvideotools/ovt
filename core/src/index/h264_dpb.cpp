@@ -100,13 +100,30 @@ struct Current {
   int32_t poc = 0;
 };
 
-// A list entry during construction: a field (or frame) of stores_[store]; store -1 is "no reference picture".
-struct Ref {
-  int32_t store = -1;
-  Parity parity = Parity::Frame;
-  friend bool operator==(const Ref&, const Ref&) = default;
-};
+using Ref = ListRef;
 using List = std::vector<Ref>;
+
+// Stable sort of the store indices `v` by `less`. std::stable_sort allocates a temporary buffer on every call, which
+// the index hot path (§7.4.6) cannot afford; the vectors here hold at most max_num_ref_frames entries (16) in a
+// conforming stream, so a stable insertion sort does it without memory. A corrupt stream may hold many more
+// long-term frame stores: past kInsertionSortMax the allocating library sort takes over.
+constexpr size_t kInsertionSortMax = 64;
+
+template <typename Less>
+void stable_sort_indices(std::vector<int32_t>& v, Less less) {
+  if (v.size() > kInsertionSortMax) {
+    std::stable_sort(v.begin(), v.end(), less);
+    return;
+  }
+  for (size_t i = 1; i < v.size(); ++i) {
+    const int32_t x = v[i];
+    size_t j = i;
+    for (; j > 0 && less(x, v[j - 1]); --j) {
+      v[j] = v[j - 1];
+    }
+    v[j] = x;
+  }
+}
 
 int64_t pic_num(const Store& s, Parity p, const Current& c) noexcept {
   return c.field ? 2 * s.frame_num_wrap + (p == c.parity ? 1 : 0) : s.frame_num_wrap;
@@ -190,33 +207,28 @@ class ListBuilder {
  public:
   ListBuilder(const std::vector<Store>& stores, const Current& cur) : stores_(stores), cur_(cur) {}
 
-  // Indices of the stores that `keep` selects, in insertion order (stable sorts then give a deterministic order
-  // for equal keys, which a conforming stream does not have).
+  // Indices of the stores that `keep` selects into `out`, in insertion order (stable sorts then give a
+  // deterministic order for equal keys, which a conforming stream does not have).
   template <typename Pred>
-  [[nodiscard]] std::vector<int32_t> select(Pred keep) const {
-    std::vector<int32_t> out;
+  void select(Pred keep, std::vector<int32_t>& out) const {
+    out.clear();
     for (size_t i = 0; i < stores_.size(); ++i) {
       if (keep(stores_[i])) {
         out.push_back(static_cast<int32_t>(i));
       }
     }
-    return out;
   }
 
-  // Frames of `order` as frame entries.
-  [[nodiscard]] static List frames(const std::vector<int32_t>& order) {
-    List out;
-    out.reserve(order.size());
+  // Appends the frames of `order` as frame entries.
+  static void frames(const std::vector<int32_t>& order, List& out) {
     for (const int32_t i : order) {
       out.push_back(Ref{i, Parity::Frame});
     }
-    return out;
   }
 
-  // §8.2.4.2.5: fields taken alternately from the ordered frame list, same parity first; when one parity runs
-  // out, the remaining fields of the other parity follow in list order.
-  [[nodiscard]] List alternate(const std::vector<int32_t>& order, Mark m) const {
-    List out;
+  // §8.2.4.2.5: appends fields taken alternately from the ordered frame list, same parity first; when one parity
+  // runs out, the remaining fields of the other parity follow in list order.
+  void alternate(const std::vector<int32_t>& order, Mark m, List& out) const {
     const Parity same = cur_.parity;
     const Parity other = opposite(same);
     size_t i_same = 0;
@@ -238,68 +250,62 @@ class ListBuilder {
         }
       }
     }
-    return out;
   }
 
-  // §8.2.4.2.1 / 8.2.4.2.2 (P and SP slices).
-  [[nodiscard]] List p_list() const {
-    if (!cur_.field) {
-      std::vector<int32_t> st = select([](const Store& s) { return both_are(s, Mark::Short); });
-      std::stable_sort(st.begin(), st.end(),
-                       [&](int32_t a, int32_t b) { return store(a).frame_num_wrap > store(b).frame_num_wrap; });
-      std::vector<int32_t> lt = select([](const Store& s) { return both_are(s, Mark::Long); });
-      sort_long_term(lt);
-      List out = frames(st);
-      const List l = frames(lt);
-      out.insert(out.end(), l.begin(), l.end());
-      return out;
+  // The frames (or fields) of `order` under the current picture's structure.
+  void append(const std::vector<int32_t>& order, Mark m, List& out) const {
+    if (cur_.field) {
+      alternate(order, m, out);
+    } else {
+      frames(order, out);
     }
-    std::vector<int32_t> st = select([](const Store& s) { return any_is(s, Mark::Short); });
-    std::stable_sort(st.begin(), st.end(),
-                     [&](int32_t a, int32_t b) { return store(a).frame_num_wrap > store(b).frame_num_wrap; });
-    std::vector<int32_t> lt = select([](const Store& s) { return any_is(s, Mark::Long); });
-    sort_long_term(lt);
-    List out = alternate(st, Mark::Short);
-    const List l = alternate(lt, Mark::Long);
-    out.insert(out.end(), l.begin(), l.end());
-    return out;
   }
 
-  // §8.2.4.2.3 / 8.2.4.2.4 (B slices). Non-existing frames have no order count and are left out.
-  [[nodiscard]] std::array<List, 2> b_lists() const {
+  // §8.2.4.2.1 / 8.2.4.2.2 (P and SP slices) into `out`.
+  void p_list(ListScratch& sc, List& out) const {
     const bool fld = cur_.field;
-    const std::vector<int32_t> st = select(
-        [fld](const Store& s) { return !s.non_existing && (fld ? any_is(s, Mark::Short) : both_are(s, Mark::Short)); });
+    select([fld](const Store& s) { return fld ? any_is(s, Mark::Short) : both_are(s, Mark::Short); }, sc.st);
+    stable_sort_indices(sc.st, [&](int32_t a, int32_t b) { return store(a).frame_num_wrap > store(b).frame_num_wrap; });
+    select([fld](const Store& s) { return fld ? any_is(s, Mark::Long) : both_are(s, Mark::Long); }, sc.lt);
+    sort_long_term(sc.lt);
+    out.clear();
+    append(sc.st, Mark::Short, out);
+    append(sc.lt, Mark::Long, out);
+  }
+
+  // §8.2.4.2.3 / 8.2.4.2.4 (B slices) into `out`. Non-existing frames have no order count and are left out.
+  void b_lists(ListScratch& sc, std::array<List, 2>& out) const {
+    const bool fld = cur_.field;
+    select(
+        [fld](const Store& s) { return !s.non_existing && (fld ? any_is(s, Mark::Short) : both_are(s, Mark::Short)); },
+        sc.st);
     const auto poc_of = [&](int32_t i) { return fld ? short_term_poc(store(i)) : frame_poc(store(i)); };
     // Frames: "less than" (a reference frame never has the current POC); fields: "less than or equal" (the first
     // field of the current frame may).
     const auto before = [&](int32_t i) { return fld ? poc_of(i) <= cur_.poc : poc_of(i) < cur_.poc; };
-    std::vector<int32_t> lo;
-    std::vector<int32_t> hi;
-    for (const int32_t i : st) {
-      (before(i) ? lo : hi).push_back(i);
+    sc.lo.clear();
+    sc.hi.clear();
+    for (const int32_t i : sc.st) {
+      (before(i) ? sc.lo : sc.hi).push_back(i);
     }
-    std::stable_sort(lo.begin(), lo.end(), [&](int32_t a, int32_t b) { return poc_of(a) > poc_of(b); });
-    std::stable_sort(hi.begin(), hi.end(), [&](int32_t a, int32_t b) { return poc_of(a) < poc_of(b); });
-    std::vector<int32_t> order0 = lo;
-    order0.insert(order0.end(), hi.begin(), hi.end());
-    std::vector<int32_t> order1 = hi;
-    order1.insert(order1.end(), lo.begin(), lo.end());
-    std::vector<int32_t> lt =
-        select([fld](const Store& s) { return fld ? any_is(s, Mark::Long) : both_are(s, Mark::Long); });
-    sort_long_term(lt);
-    std::array<List, 2> out;
-    out[0] = fld ? alternate(order0, Mark::Short) : frames(order0);
-    out[1] = fld ? alternate(order1, Mark::Short) : frames(order1);
-    const List l = fld ? alternate(lt, Mark::Long) : frames(lt);
-    for (List& x : out) {
-      x.insert(x.end(), l.begin(), l.end());
+    stable_sort_indices(sc.lo, [&](int32_t a, int32_t b) { return poc_of(a) > poc_of(b); });
+    stable_sort_indices(sc.hi, [&](int32_t a, int32_t b) { return poc_of(a) < poc_of(b); });
+    sc.order0.assign(sc.lo.begin(), sc.lo.end());
+    sc.order0.insert(sc.order0.end(), sc.hi.begin(), sc.hi.end());
+    sc.order1.assign(sc.hi.begin(), sc.hi.end());
+    sc.order1.insert(sc.order1.end(), sc.lo.begin(), sc.lo.end());
+    select([fld](const Store& s) { return fld ? any_is(s, Mark::Long) : both_are(s, Mark::Long); }, sc.lt);
+    sort_long_term(sc.lt);
+    const std::array<const std::vector<int32_t>*, 2> orders{&sc.order0, &sc.order1};
+    for (size_t x = 0; x < 2; ++x) {
+      out[x].clear();
+      append(*orders[x], Mark::Short, out[x]);
+      append(sc.lt, Mark::Long, out[x]);
     }
     // When RefPicList1 has more than one entry and equals RefPicList0, its first two entries are switched.
     if (out[1].size() > 1 && out[1] == out[0]) {
       std::swap(out[1][0], out[1][1]);
     }
-    return out;
   }
 
   // §8.2.4.3.1 / 8.2.4.3.2 on `list` (num_ref_idx_lX_active_minus1 + 2 entries, the last a scratch slot).
@@ -336,8 +342,8 @@ class ListBuilder {
   [[nodiscard]] const Store& store(int32_t i) const { return stores_[static_cast<size_t>(i)]; }
 
   void sort_long_term(std::vector<int32_t>& v) const {
-    std::stable_sort(v.begin(), v.end(),
-                     [&](int32_t a, int32_t b) { return store(a).long_term_frame_idx < store(b).long_term_frame_idx; });
+    stable_sort_indices(
+        v, [&](int32_t a, int32_t b) { return store(a).long_term_frame_idx < store(b).long_term_frame_idx; });
   }
 
   const std::vector<Store>& stores_;
@@ -345,15 +351,16 @@ class ListBuilder {
 };
 
 // §8.2.4.2 initial lists and §8.2.4.3 modification of the first slice.
-void build_lists(const std::vector<Store>& stores, const Current& cur, const SliceHeader& sh, DpbStepResult& out) {
+void build_lists(const std::vector<Store>& stores, const Current& cur, const SliceHeader& sh, ListScratch& sc,
+                 DpbStepResult& out) {
   const ListBuilder lb(stores, cur);
-  std::array<List, 2> lists;
+  std::array<List, 2>& lists = sc.lists;
   const uint32_t t = sh.slice_type_mod5;
   const size_t num_lists = (t == kSliceI || t == kSliceSI) ? 0 : (t == kSliceB ? 2 : 1);
   if (num_lists == 1) {
-    lists[0] = lb.p_list();
+    lb.p_list(sc, lists[0]);
   } else if (num_lists == 2) {
-    lists = lb.b_lists();
+    lb.b_lists(sc, lists);
   }
   const syntax::h264::RefPicListModification& mod = sh.ref_pic_list_modification;
   const std::array<uint32_t, 2> active_minus1{sh.num_ref_idx_l0_active_minus1, sh.num_ref_idx_l1_active_minus1};
@@ -362,6 +369,7 @@ void build_lists(const std::vector<Store>& stores, const Current& cur, const Sli
   for (size_t x = 0; x < num_lists; ++x) {
     const size_t active = std::min<size_t>(size_t{active_minus1[x]} + 1, syntax::h264::kMaxRefIdx);
     List& list = lists[x];
+    list.reserve(syntax::h264::kMaxRefIdx + 2);  // the insert of eq. 8-37 needs one entry beyond the scratch slot
     list.resize(active + 1);  // truncated, padded with "no reference picture", plus the scratch slot of eq. 8-37
     if (modify[x] && !mod.mvc) {
       lb.modify(list, *ops[x], out);
@@ -387,9 +395,15 @@ void build_lists(const std::vector<Store>& stores, const Current& cur, const Sli
 
 }  // namespace
 
-DpbStepResult Dpb::step(int32_t decode_index, const NalHeader& nal, const SliceHeader& sh, const Sps& sps,
-                        const PocResult& poc, int32_t second_field_of) {
-  DpbStepResult out;
+const DpbStepResult& Dpb::step(int32_t decode_index, const NalHeader& nal, const SliceHeader& sh, const Sps& sps,
+                               const PocResult& poc, int32_t second_field_of) {
+  DpbStepResult& out = result_;
+  for (std::vector<RefPic>& l : out.ref_pic_list) {
+    l.clear();
+  }
+  out.declared_refs.clear();
+  out.dpb_after.clear();
+  out.diagnostics.clear();
   const Current cur = current_of(sh, sps, poc.poc);
   // The frame store of the first field when this picture completes a complementary field pair.
   int32_t pair_store = -1;
@@ -405,7 +419,7 @@ DpbStepResult Dpb::step(int32_t decode_index, const NalHeader& nal, const SliceH
     fill_gap(sh, sps, out);
   }
   wrap_frame_nums(stores_, sh.frame_num, std::max<uint32_t>(sps.MaxFrameNum, 1));
-  build_lists(stores_, cur, sh, out);
+  build_lists(stores_, cur, sh, scratch_, out);
 
   // §8.2.5 marking, for reference pictures only.
   if (nal.nal_ref_idc != 0) {

@@ -246,7 +246,7 @@ class Av1Dispatch final : public CodecDispatch {
                      : int16_t{0};
         },
         [&core, unit](const IndexDiagnostic& d) { report(core, unit, d); });
-    classify_av1(f, r, *seq_, fh.current_frame_id);
+    classify_av1(f, core.refs, r, *seq_, fh.current_frame_id);
     core.finish_frame();
     open_header_.reset();
   }

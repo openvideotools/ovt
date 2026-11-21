@@ -61,6 +61,33 @@ struct RefSlotRec {
   bool long_term = false;
 };
 
+/// A run of entries in a RefArena.
+struct ArenaRange {
+  uint32_t begin = 0;
+  uint32_t size = 0;
+};
+
+/// The per-frame reference data of all frames (declared_refs, dpb_after, the H.264 reference lists), kept in two
+/// shared vectors instead of four vectors per FrameRec: a frame costs no heap allocation of its own once the arena
+/// has grown (§7.4.6 audit), and the FrameRec shrinks by four vector headers. A range is written once, while its
+/// frame is open; the arena only ever grows.
+struct RefArena {
+  std::vector<int32_t> ints;
+  std::vector<RefSlotRec> slots;
+
+  ArenaRange add(std::span<const int32_t> v) {
+    const ArenaRange r{static_cast<uint32_t>(ints.size()), static_cast<uint32_t>(v.size())};
+    ints.insert(ints.end(), v.begin(), v.end());
+    return r;
+  }
+  [[nodiscard]] std::span<const int32_t> get(ArenaRange r) const noexcept {
+    return std::span<const int32_t>(ints).subspan(r.begin, r.size);
+  }
+  [[nodiscard]] std::span<const RefSlotRec> get_slots(ArenaRange r) const noexcept {
+    return std::span<const RefSlotRec>(slots).subspan(r.begin, r.size);
+  }
+};
+
 /// One ovt.fb.FrameInfo in the making, plus what S9 needs and the schema does not carry.
 struct FrameRec {
   int32_t decode_index = 0;
@@ -82,15 +109,15 @@ struct FrameRec {
   uint8_t bit_depth_luma = 8;
   uint8_t bit_depth_chroma = 8;
   int16_t qp_base = 0;
-  std::vector<int32_t> declared_refs;  // §7.4.4; empty where the codec's DPB model is not wired in yet
-  std::vector<int32_t> dpb_after;      // AV1: the 8 slots, -1 for an empty slot
+  ArenaRange declared_refs;  // §7.4.4 (RefArena::ints); empty where the codec's DPB model is not wired in yet
+  ArenaRange dpb_after;      // RefArena::ints; AV1: the 8 slots, -1 for an empty slot
   int32_t frame_num = -1;
   uint16_t slice_count = 0;
   // ---- S9 inputs (not serialised) ----
   uint32_t sequence = 0;         // H.26x: ordinal of the coded video sequence the picture belongs to
   int32_t second_field_of = -1;  // H.264: decode index of the first field of the complementary pair
   // ---- §7.4.4 private per-frame references (not serialised) ----
-  std::array<std::vector<RefSlotRec>, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice
+  std::array<ArenaRange, 2> ref_lists;  // H.264: RefPicList0 / RefPicList1 of the first slice (RefArena::slots)
 };
 
 /// Elementary-stream timing of chapter 6 §6.2.6, taken from the first parameter set that carries it:
@@ -106,6 +133,7 @@ class BuilderCore {
  public:
   std::vector<UnitRec> units;
   std::vector<FrameRec> frames;        // finished frames, decode order
+  RefArena refs;                       // the reference data of `frames` and of the open frame
   std::vector<DiagRec> diagnostics;    // StreamIndex.diagnostics
   std::optional<StreamTiming> timing;  // set by the codec dispatch
   uint32_t lazy_after_frames = 10000;  // BuilderOptions.lazy_after_frames

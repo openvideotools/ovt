@@ -256,8 +256,8 @@ class H265Dispatch final : public CodecDispatch {
     // §7.4.4 on the first slice segment of the picture; the diagnostics (SYN-H265-0102) go on that unit.
     h265::DpbStepResult step = dpb_.step(f.decode_index, h, sh, *act->sps, *act->pps, poc);
     h265::FrameRefs refs = h265::frame_refs(step, f.decode_index);
-    f.declared_refs = std::move(refs.declared_refs);
-    f.dpb_after = std::move(refs.dpb_after);
+    f.declared_refs = core.refs.add(refs.declared_refs);
+    f.dpb_after = core.refs.add(refs.dpb_after);
     for (h265::IndexDiagnostic& d : step.diagnostics) {
       core.unit_diagnostic(unit, DiagRec{d.severity, std::move(d.code), std::move(d.message), BitSpan{0, 0}});
     }

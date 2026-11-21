@@ -315,16 +315,18 @@ class H264Dispatch final : public CodecDispatch {
     last_picture_ = bd.picture_index;
     last_frame_ = f.decode_index;
     // §7.4.4: declared_refs and dpb_after from the first slice.
-    h264::DpbStepResult refs = dpb_.step(f.decode_index, h, sh, *act.sps, poc, f.second_field_of);
-    f.declared_refs = std::move(refs.declared_refs);
-    f.dpb_after = std::move(refs.dpb_after);
+    const h264::DpbStepResult& refs = dpb_.step(f.decode_index, h, sh, *act.sps, poc, f.second_field_of);
+    f.declared_refs = core.refs.add(refs.declared_refs);
+    f.dpb_after = core.refs.add(refs.dpb_after);
     for (size_t x = 0; x < refs.ref_pic_list.size(); ++x) {
+      f.ref_lists[x] =
+          ArenaRange{static_cast<uint32_t>(core.refs.slots.size()), static_cast<uint32_t>(refs.ref_pic_list[x].size())};
       for (const h264::RefPic& r : refs.ref_pic_list[x]) {
-        f.ref_lists[x].push_back(RefSlotRec{r.decode_index, r.poc, structure_of(r.parity), r.long_term});
+        core.refs.slots.push_back(RefSlotRec{r.decode_index, r.poc, structure_of(r.parity), r.long_term});
       }
     }
-    for (h264::IndexDiagnostic& d : refs.diagnostics) {
-      core.unit_diagnostic(unit, DiagRec{d.severity, std::move(d.code), std::move(d.message), BitSpan{0, 0}});
+    for (const h264::IndexDiagnostic& d : refs.diagnostics) {
+      core.unit_diagnostic(unit, DiagRec{d.severity, d.code, d.message, BitSpan{0, 0}});
     }
     first_lists_ = ListParams::of(sh);
     lists_differ_ = false;
