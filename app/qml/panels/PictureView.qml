@@ -19,6 +19,8 @@ Item {
 
     // Set by PicturePanel when loaded; null leaves the host on its defaults (fit, YUV).
     property PictureController controller: null
+    // The panel's CompareController (WI-2.486); null leaves the host on Single.
+    property CompareController compare: null
     readonly property alias host: host
 
     PictureHost {
@@ -32,6 +34,11 @@ Item {
         panY: view.controller ? view.controller.panY : 0
         planeMode: view.controller ? view.controller.planeMode : 0
         showCropped: view.controller ? view.controller.showCropped : true
+        // The pinned probe and the selection rectangle (the one being dragged, else the committed one) are drawn by
+        // the renderer's overlay passes (chapter 10 §10.5.6 pass 12, WI-2.436, issue #650).
+        probe: view.controller && view.controller.hasPicture ? view.controller.probe : Qt.point(-1, -1)
+        selectionRect: !view.controller ? Qt.rect(0, 0, 0, 0)
+                       : (view.controller.dragRect.width > 0 ? view.controller.dragRect : view.controller.selectionRect)
         // The HDR fields of the ViewState come from the HDR panel's Display tab (WI-1.462).
         toneMap: HdrView.toneMap
         gamutMap: HdrView.gamutMap
@@ -41,6 +48,14 @@ Item {
         gamutClipOverlay: HdrView.gamutClipOverlay
         dither: HdrView.dither
         nativeHost: nativeHost
+
+        compareKind: view.compare ? view.compare.kind : 0
+        splitAxis: view.compare ? view.compare.splitAxis : 0
+        splitPosition: view.compare ? view.compare.splitPosition : 0.5
+        overlayAlpha: view.compare ? view.compare.overlayAlpha : 0.5
+        diffGain: view.compare ? view.compare.diffGain : 1
+        diffFalseColour: view.compare ? view.compare.diffFalseColour : false
+        flickerPeriodMs: view.compare ? view.compare.flickerPeriodMs : 500
 
         onPictureChanged: view.pushPicture()
         // The Display Capabilities panel and the status bar show the encoding in use ("Srgb8" while EMBEDDED).
@@ -56,6 +71,19 @@ Item {
         hdrCapable: DisplayCaps.hdrCapable
         headroom: DisplayCaps.headroom
         encoding: HdrView.macEncoding
+    }
+
+    // The controller asks, the host does: snapshot A into slot B, swap, clear.
+    Connections {
+        target: view.compare
+        ignoreUnknownSignals: true
+
+        function onSnapshotRequested() { view.compare.snapshotTaken(host.snapshotAsB()) }
+        function onSwapRequested() { host.swapAB() }
+        function onBChanged() {
+            if (view.compare.bSource === "none")
+                host.clearB()
+        }
     }
 
     function pushPicture() {

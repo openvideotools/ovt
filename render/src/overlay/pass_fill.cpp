@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Cell passes 2-4 of chapter 10 §10.5.6 (WI-2.431): heatmap, prediction / reference-index fill and skip hatch, each a
-// full-viewport quad whose fragment shader maps its device pixel back to a 4x4 cell (§10.5.1 "Cell attribute textures
-// are indexed by image position") and reads the cell textures with texelFetch.
+// Cell passes 2-4 and 7 of chapter 10 §10.5.6 (WI-2.431, WI-2.436): heatmap, prediction / reference-index fill, skip
+// hatch and deblocking edges, each a full-viewport quad whose fragment shader maps its device pixel back to a 4x4 cell
+// (§10.5.1 "Cell attribute textures are indexed by image position") and reads the cell textures with texelFetch.
 
 #include "overlay/pass_fill.h"
 
@@ -15,6 +15,7 @@
 
 #include <libplacebo/gpu.h>
 
+#include "shaders/deblock_glsl.h"
 #include "shaders/fill_glsl.h"
 #include "shaders/hatch_glsl.h"
 #include "shaders/heatmap_glsl.h"
@@ -25,7 +26,19 @@ namespace {
 struct PassSpec {
   const char* body;
   std::array<const char*, 3> samplers;  // GLSL declarations, binding = index; nullptr = unused
+  bool id_output = false;               // writes a uint id unblended instead of blending a colour
 };
+
+// The id-only run of the fill pass (§10.5.6): block_id + 1 per cell; the 0xFFFFFFFF "no block" wraps to 0 = no id.
+constexpr const char* kBlockIdBody = R"glsl(
+void main() {
+  ivec2 cell;
+  if (!ovt_cell(cell)) {
+    discard;
+  }
+  out_id = texelFetch(block_ids, cell, 0).r + 1u;
+}
+)glsl";
 
 PassSpec spec_of(CellPass pass) {
   switch (pass) {
@@ -35,6 +48,10 @@ PassSpec spec_of(CellPass pass) {
       return {shaders::kFill, {"usampler2D cells", "sampler2D palette", nullptr}};
     case CellPass::Hatch:
       return {shaders::kHatch, {"usampler2D cells", "sampler2D palette", nullptr}};
+    case CellPass::BlockId:
+      return {kBlockIdBody, {"usampler2D block_ids", nullptr, nullptr}, true};
+    case CellPass::Deblock:
+      return {shaders::kDeblock, {"usampler2D edges", "sampler2D palette", "sampler2D halo"}};
   }
   return {shaders::kFill, {nullptr, nullptr, nullptr}};
 }
@@ -53,8 +70,6 @@ layout(std430, push_constant) uniform PushC {
   uint layers;
   ivec2 cells;
 } pc;
-
-layout(location = 0) out vec4 out_color;
 
 bool ovt_cell(out ivec2 cell) {
   vec2 p = gl_FragCoord.xy;  // pixel centre, origin top-left
@@ -86,6 +101,7 @@ std::string fragment_source(const PassSpec& spec) {
     }
   }
   src += kPrelude;
+  src += spec.id_output ? "layout(location = 0) out uint out_id;\n" : "layout(location = 0) out vec4 out_color;\n";
   src += spec.body;
   return src;
 }
@@ -143,7 +159,7 @@ pl_pass create_pass(pl_gpu gpu, CellPass pass, pl_fmt target_format, std::string
   params.vertex_stride = 2 * sizeof(float);
   params.vertex_shader = kVertexShader;
   params.target_format = target_format;
-  params.blend_params = &blend;
+  params.blend_params = spec.id_output ? nullptr : &blend;  // integer targets cannot blend
   params.load_target = true;
   pl_pass p = pl_pass_create(gpu, &params);
   if (p == nullptr) {

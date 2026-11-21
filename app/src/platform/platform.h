@@ -22,7 +22,13 @@ class Platform : public QObject {
   Q_PROPERTY(bool isAndroid READ isAndroid CONSTANT)
   Q_PROPERTY(bool isMacOS READ isMacOS CONSTANT)
   Q_PROPERTY(bool isLinux READ isLinux CONSTANT)
-  Q_PROPERTY(bool hasHover READ hasHover CONSTANT)
+  // Touch devices have no hover (§11.4.4); on Android a mouse or stylus (InputDevice sources) turns it on (§11.5.3).
+  Q_PROPERTY(bool hasHover READ hasHover NOTIFY hasHoverChanged)
+  // Width of the window in dp (Configuration.screenWidthDp on Android, §11.5.2): the input of the breakpoint table.
+  // Writable so that tests can stand in for the platform.
+  Q_PROPERTY(double widthDp READ widthDp WRITE setWidthDp NOTIFY widthDpChanged)
+  // "fullscreen", "multiWindow" (split-screen, desktop windowing) or "desktop": how the window is hosted.
+  Q_PROPERTY(QString windowingMode READ windowingMode WRITE setWindowingMode NOTIFY windowingModeChanged)
   // True when this process started without a settings.json: the first run of a fresh profile (§11.8).
   Q_PROPERTY(bool isFirstRun READ isFirstRun CONSTANT)
   Q_PROPERTY(QString configDir READ configDir CONSTANT)
@@ -33,13 +39,35 @@ class Platform : public QObject {
   Q_PROPERTY(bool pictureHostAvailable READ pictureHostAvailable CONSTANT)
 
  public:
-  Platform() = default;
+  Platform();
+  ~Platform() override;
 
   static bool isAndroid();
   static bool isMacOS();
   static bool isLinux();
-  // Touch devices have no hover (§11.4.4).
-  static bool hasHover();
+  [[nodiscard]] bool hasHover() const { return has_hover_; }
+  [[nodiscard]] double widthDp() const { return width_dp_; }
+  [[nodiscard]] QString windowingMode() const { return windowing_mode_; }
+  void setHasHover(bool value);
+  void setWidthDp(double value);
+  void setWindowingMode(const QString& value);
+
+  // The layout class of §11.5.2 for a width: "three" (>= 1200 dp), "two" (840-1199), "vertical" (600-839) and
+  // "single" (< 600). Layouts switch on these names (CompactLayout.qml).
+  Q_INVOKABLE static QString layoutClassForWidth(double width_dp);
+
+  // Takes the window width in dp when it is positive. On Android it also re-reads the input devices and the windowing
+  // mode, and with no width it re-reads Configuration.screenWidthDp (platform_android.cpp). The Android shell calls
+  // it with the Activity's Configuration.screenWidthDp each time MainActivity.onConfigurationChanged pushes one
+  // (AndroidShell.qml `configurationWidthDp`): a resize recreates no Activity and is not otherwise seen in time.
+  Q_INVOKABLE void refresh(double window_width_dp = 0);
+
+ Q_SIGNALS:
+  void hasHoverChanged();
+  void widthDpChanged();
+  void windowingModeChanged();
+
+ public:
   // Decided on the first call (main.cpp makes it before anything can write settings.json) and constant after.
   static bool isFirstRun();
 
@@ -67,6 +95,15 @@ class Platform : public QObject {
   // before the first window. Order of precedence: QSG_RHI_BACKEND / QT_QUICK_BACKEND (Qt's own, left alone),
   // OVT_RHI, the software scene graph on the offscreen platform, the per-platform default.
   static void selectGraphicsApi();
+
+ private:
+  // Android: Configuration.screenWidthDp of the Activity (when `read_width`), the input devices and the multi-window
+  // state (platform_android.cpp). Elsewhere a no-op that returns false.
+  bool refreshFromAndroid(bool read_width);
+
+  bool has_hover_ = false;
+  double width_dp_ = 1280;  // desktop default: the three-pane layout
+  QString windowing_mode_;
 };
 
 }  // namespace ovt::app

@@ -4,11 +4,13 @@
 // ovt/index.h entry points (chapter 12 §12.3.8, WI-1.121): ovt_stream_open() / ovt_stream_close(),
 // ovt_stream_codec(), ovt_stream_build_index(), ovt_stream_index() and ovt_stream_rap_before(). The stream reads
 // its units straight from the container's file: an Annex B byte stream (H.264, H.265), a Section 5 or Annex B OBU
-// stream, or IVF frames (AV1). The other functions of the block return OVT_E_UNSUPPORTED or -1 until their work
-// items land (the WI-1.121 Produces line of chapter 7, issue #642).
+// stream, or IVF frames (AV1). WI-1.125 runs the build under its ovt_Job (§7.4.6: cancellation, progress, the partial
+// index of OVT_INDEX_ALLOW_PARTIAL) and adds ovt_stream_unit_syntax() (§7.4.5). The other functions of the block
+// return OVT_E_UNSUPPORTED or -1 until their work items land (the WI-1.121 Produces line of chapter 7, issue #642).
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -20,38 +22,33 @@
 #include <vector>
 
 #include "api/buffer.hpp"
+#include "api/stream_internal.hpp"
 #include "container/container.hpp"
 #include "container/format.hpp"
 #include "container/ivf.hpp"
 #include "container/obu.hpp"
-#include "index/rap_map.h"
+#include "index/lazy_syntax.h"
 #include "index/source_hash.h"
 #include "io/ovt_file.hpp"
-#include "ovt/cxx/index/stream_index_builder.hpp"
+#include "jobs/job_internal.hpp"
+#include "ovt/cxx/cancel.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt/cxx/syntax/unit_scan.hpp"
 #include "ovt/index.h"
 #include "ovt_model_generated.h"
 
 namespace {
 
-enum class Framing : uint8_t { AnnexB, ObuSection5, ObuAnnexB, Ivf };
+using ovt::api::Framing;
 
 constexpr uint32_t kFourccAv01 = 0x31305641;        // "AV01", first byte in the low byte
 constexpr size_t kSniffWindow = size_t{64} << 10U;  // parameter sets are looked for in the first 64 KiB
 
-}  // namespace
-
-struct ovt_Stream {
-  ovt_Container* container = nullptr;  // not owned; outlives the stream
-  ovt::fb::Codec codec = ovt::fb::Codec::Unknown;
-  Framing framing = Framing::AnnexB;
-  std::vector<uint8_t> index;  // the last built StreamIndex (ovt_stream_index())
-  ovt::index::RapMap raps;     // §7.4.2 S11
-  bool built = false;
-};
-
-namespace {
+constexpr uint32_t kCheckEveryUnits = 256;            // §7.4.6: check_cancel every 256 units ...
+constexpr std::chrono::milliseconds kCheckEvery{50};  // ... or 50 ms
+constexpr uint32_t kClockEveryUnits = 16;             // how often the 50 ms rule looks at the clock
+constexpr uint32_t kKnownIndexFlags = OVT_INDEX_ALLOW_PARTIAL;
 
 namespace fb = ovt::fb;
 namespace idx = ovt::index;
@@ -140,12 +137,69 @@ idx::UnitInput input_of(const syn::ScannedUnit& u, const idx::SampleTiming* timi
   in.prefix_span = u.prefix_span;
   in.sample_index = u.container_sample_index;
   in.timing = timing;
+  in.temporal_unit_start = u.temporal_unit_start;
   return in;
 }
 
+// The §7.4.6 loop control around the builder: skips the units an earlier partial build already indexed, checks
+// the cancel token every 256 units or 50 ms and reports progress in bytes of the file.
+class Driver {
+ public:
+  Driver(idx::StreamIndexBuilder& builder, uint32_t skip, uint64_t total, ovt::jobs::Cancel& cancel,
+         const ovt::jobs::Pool::ProgressSink& sink)
+      : builder_(builder), skip_(skip), total_(total), cancel_(cancel), sink_(sink), last_(Clock::now()) {}
+
+  void on_unit(const syn::ScannedUnit& u, const idx::SampleTiming* timing) {
+    if (skip_ > 0) {
+      --skip_;
+      return;
+    }
+    builder_.add_unit(input_of(u, timing));
+    ++count_;
+    if (count_ % kCheckEveryUnits == 0 || (count_ % kClockEveryUnits == 0 && Clock::now() - last_ >= kCheckEvery)) {
+      check(u.file_offset);
+    }
+  }
+  // A scan diagnostic. The cancelled pass reported every diagnostic up to its last unit (the throw happens inside
+  // on_unit, after add_unit), so the resumed pass drops those of the units it skips.
+  void on_diag(const syn::ScanDiagnostic& d) {
+    if (skip_ == 0) {
+      builder_.add_scan_diagnostic(d);
+    }
+  }
+
+  // After the scan: the last chance to observe a cancellation before the index is finished.
+  void end() {
+    scan_complete_ = true;
+    cancel_.throw_if_requested();
+    sink_(ovt::jobs::Progress{total_, total_, "index"});
+  }
+
+  // Whether the scan ran to the end (a cancellation observed in end() leaves nothing to rescan).
+  [[nodiscard]] bool scan_complete() const noexcept { return scan_complete_; }
+
+ private:
+  using Clock = std::chrono::steady_clock;
+
+  void check(uint64_t done) {
+    cancel_.throw_if_requested();
+    sink_(ovt::jobs::Progress{done, total_, "index"});
+    last_ = Clock::now();
+  }
+
+  idx::StreamIndexBuilder& builder_;
+  uint32_t skip_;
+  uint64_t total_;
+  ovt::jobs::Cancel& cancel_;
+  const ovt::jobs::Pool::ProgressSink& sink_;
+  Clock::time_point last_;
+  uint32_t count_ = 0;
+  bool scan_complete_ = false;
+};
+
 // IVF: one sample per frame, pts = dts = the frame's timestamp in scale / rate seconds (chapter 6 §6.2.6). A
 // frame cut off by the end of the file is IO-0001; the OBUs that are complete are still indexed.
-void feed_ivf(const RandomAccessFile& file, idx::StreamIndexBuilder& builder) {
+void feed_ivf(const RandomAccessFile& file, Driver& driver) {
   const auto ivf = ovt::container::ivf::parse(file);
   if (!ivf) {
     return;
@@ -154,55 +208,94 @@ void feed_ivf(const RandomAccessFile& file, idx::StreamIndexBuilder& builder) {
   const ovt::container::ivf::Header& h = ivf->header;
   const bool timed = h.timebase_numerator != 0 && h.timebase_denominator != 0 && h.timebase_numerator <= kMax &&
                      h.timebase_denominator <= kMax;
-  const auto on_diag = [&builder](const syn::ScanDiagnostic& d) { builder.add_scan_diagnostic(d); };
+  const auto on_diag = [&driver](const syn::ScanDiagnostic& d) { driver.on_diag(d); };
   for (size_t i = 0; i < ivf->frames.size(); ++i) {
     const ovt::container::ivf::Frame& fr = ivf->frames[i];
     const auto ts = static_cast<int64_t>(std::min<uint64_t>(fr.timestamp, std::numeric_limits<int64_t>::max()));
     const idx::SampleTiming timing{ts, ts, static_cast<int32_t>(h.timebase_numerator),
                                    static_cast<int32_t>(h.timebase_denominator)};
     if (fr.size < fr.declared_size) {
-      builder.add_scan_diagnostic({"IO-0001",
-                                   "unexpected end of file at offset " + std::to_string(file.size()) + " (" +
-                                       std::to_string(fr.declared_size) + " bytes requested)",
-                                   fr.header_offset});
+      driver.on_diag({"IO-0001",
+                      "unexpected end of file at offset " + std::to_string(file.size()) + " (" +
+                          std::to_string(fr.declared_size) + " bytes requested)",
+                      fr.header_offset});
     }
     const auto payload = file.view(fr.payload_offset(), fr.size);
     syn::scan_obu_low_overhead(
         payload.bytes, fr.payload_offset(), static_cast<int64_t>(i), syn::ObuSpanKind::LengthDelimited,
-        [&builder, &timing, timed](const syn::ScannedUnit& u) {
-          builder.add_unit(input_of(u, timed ? &timing : nullptr));
-        },
+        [&driver, &timing, timed](const syn::ScannedUnit& u) { driver.on_unit(u, timed ? &timing : nullptr); },
         on_diag);
   }
 }
 
-// §7.4.2 S1–S10 over the stream's units.
-std::vector<uint8_t> build(const ovt_Stream& stream) {
+// §7.4.2 S1–S10 over the stream's units, under `cancel`. A cancellation throws ovt::Cancelled unless
+// OVT_INDEX_ALLOW_PARTIAL is set: then the partial index comes back and the builder stays on the stream for the
+// next call to resume from (§7.4.6). A build that runs to the end drops any such state.
+std::vector<uint8_t> build(ovt_Stream& stream, ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& sink) {
   const RandomAccessFile& file = *stream.container->file->file;
-  idx::StreamIndexBuilder builder(idx::BuilderOptions{stream.codec});
-  const auto on_unit = [&builder](const syn::ScannedUnit& u) { builder.add_unit(input_of(u, nullptr)); };
-  const auto on_diag = [&builder](const syn::ScanDiagnostic& d) { builder.add_scan_diagnostic(d); };
-  switch (stream.framing) {
-    case Framing::AnnexB:
-      syn::scan_annexb(file, on_unit, on_diag);
-      break;
-    case Framing::ObuSection5:
-    case Framing::ObuAnnexB: {
-      // One view of the whole stream: an OBU stream beyond what RandomAccessFile can view (2 GiB) is an IoError.
-      const auto all = file.view(0, static_cast<size_t>(std::min<uint64_t>(file.size(), SIZE_MAX)));
-      if (stream.framing == Framing::ObuAnnexB) {
-        syn::scan_obu_annexb(all.bytes, 0, syn::kNoContainerSample, on_unit, on_diag);
-      } else {
-        syn::scan_obu_low_overhead(all.bytes, 0, syn::kNoContainerSample, syn::ObuSpanKind::Section5Stream, on_unit,
-                                   on_diag);
-      }
-      break;
+  std::unique_ptr<ovt::api::ResumeState> resume = std::move(stream.resume);
+  if (!resume) {
+    resume = std::make_unique<ovt::api::ResumeState>();
+    idx::BuilderOptions options;
+    options.codec = stream.codec;
+    options.lazy_after_frames = stream.lazy_after_frames;
+    options.av1_annexb = stream.framing == Framing::ObuAnnexB;
+    resume->builder = std::make_unique<idx::StreamIndexBuilder>(options);
+  }
+  idx::StreamIndexBuilder& builder = *resume->builder;
+  Driver driver(builder, resume->units_fed, file.size(), cancel, sink);
+  const auto on_unit = [&driver](const syn::ScannedUnit& u) { driver.on_unit(u, nullptr); };
+  const auto on_diag = [&driver](const syn::ScanDiagnostic& d) { driver.on_diag(d); };
+  try {
+    if (resume->scan_complete) {
+      driver.end();
+      return builder.finish(idx::source_hash(file));
     }
-    case Framing::Ivf:
-      feed_ivf(file, builder);
-      break;
+    switch (stream.framing) {
+      case Framing::AnnexB:
+        syn::scan_annexb(file, on_unit, on_diag);
+        break;
+      case Framing::ObuSection5:
+      case Framing::ObuAnnexB: {
+        // One view of the whole stream: an OBU stream beyond what RandomAccessFile can view (2 GiB) is an IoError.
+        const auto all = file.view(0, static_cast<size_t>(std::min<uint64_t>(file.size(), SIZE_MAX)));
+        if (stream.framing == Framing::ObuAnnexB) {
+          syn::scan_obu_annexb(all.bytes, 0, syn::kNoContainerSample, on_unit, on_diag);
+        } else {
+          syn::scan_obu_low_overhead(all.bytes, 0, syn::kNoContainerSample, syn::ObuSpanKind::Section5Stream, on_unit,
+                                     on_diag);
+        }
+        break;
+      }
+      case Framing::Ivf:
+        feed_ivf(file, driver);
+        break;
+    }
+    driver.end();
+  } catch (const ovt::Cancelled&) {
+    if ((stream.index_flags & OVT_INDEX_ALLOW_PARTIAL) == 0) {
+      throw;
+    }
+    std::vector<uint8_t> partial = builder.finish_partial(idx::source_hash(file));
+    resume->units_fed = builder.unit_count();
+    resume->scan_complete = driver.scan_complete();
+    stream.resume = std::move(resume);
+    return partial;
   }
   return builder.finish(idx::source_hash(file));
+}
+
+// Installs a freshly built index on the stream and hands the caller its copy.
+ovt_status install(ovt_Stream& stream, std::vector<uint8_t> index, ovt_Buffer* out_index) {
+  const ovt_status st = ovt::api::make_buffer(index.data(), index.size(), out_index);
+  if (st != OVT_OK) {
+    return st;
+  }
+  idx::RapMap raps(*flatbuffers::GetRoot<fb::StreamIndex>(index.data()));
+  stream.index = std::move(index);
+  stream.raps = std::move(raps);
+  stream.built = true;
+  return OVT_OK;
 }
 
 }  // namespace
@@ -235,28 +328,32 @@ OVT_API uint8_t ovt_stream_codec(const ovt_Stream* stream) {
   return stream == nullptr ? uint8_t{0} : static_cast<uint8_t>(stream->codec);
 }
 
+OVT_API ovt_status ovt_stream_set_index_flags(ovt_Stream* stream, uint32_t flags) {
+  if (stream == nullptr || (flags & ~kKnownIndexFlags) != 0) {
+    return OVT_E_INVALID_ARG;
+  }
+  stream->index_flags = flags;
+  return OVT_OK;
+}
+
 OVT_API ovt_status ovt_stream_build_index(ovt_Stream* stream, ovt_Job* job, ovt_Buffer* out_index) {
-  (void)job;  // cancellation, progress and the partial index are WI-1.125's
   if (out_index != nullptr) {
     *out_index = ovt_Buffer{nullptr, 0};
   }
   if (stream == nullptr || out_index == nullptr) {
     return OVT_E_INVALID_ARG;
   }
-  try {
-    std::vector<uint8_t> index = build(*stream);
-    const ovt_status st = ovt::api::make_buffer(index.data(), index.size(), out_index);
-    if (st != OVT_OK) {
-      return st;
+  // jobs::run maps ovt::Cancelled to OVT_E_CANCELLED, std::bad_alloc to OVT_E_NOMEM and anything else to
+  // OVT_E_INTERNAL; the stream's own errors keep their codes.
+  return ovt::jobs::run(job, "index", [&](ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& sink) {
+    try {
+      return install(*stream, build(*stream, cancel, sink), out_index);
+    } catch (const ovt::io::IoError& e) {
+      return e.code;
+    } catch (const idx::UnsupportedCodec&) {
+      return OVT_E_UNSUPPORTED;
     }
-    idx::RapMap raps(*flatbuffers::GetRoot<fb::StreamIndex>(index.data()));
-    stream->index = std::move(index);
-    stream->raps = std::move(raps);
-    stream->built = true;
-    return OVT_OK;
-  } catch (...) {
-    return status_of_current_exception();
-  }
+  });
 }
 
 OVT_API ovt_Buffer ovt_stream_index(ovt_Stream* stream) {
@@ -279,8 +376,22 @@ OVT_API ovt_status ovt_stream_unit_bytes(ovt_Stream* stream, uint32_t unit_index
 }
 
 OVT_API ovt_status ovt_stream_unit_syntax(ovt_Stream* stream, uint32_t unit_index, ovt_Buffer* out) {
-  (void)unit_index;
-  return stream == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.130
+  if (out != nullptr) {
+    *out = ovt_Buffer{nullptr, 0};
+  }
+  if (stream == nullptr || out == nullptr || !stream->built) {
+    return OVT_E_INVALID_ARG;
+  }
+  try {
+    const fb::StreamIndex& index = *flatbuffers::GetRoot<fb::StreamIndex>(stream->index.data());
+    if (index.units() == nullptr || unit_index >= index.units()->size()) {
+      return OVT_E_INVALID_ARG;
+    }
+    const std::vector<uint8_t> tree = idx::reparse_unit_syntax(index, *stream->container->file->file, unit_index);
+    return tree.empty() ? OVT_OK : ovt::api::make_buffer(tree.data(), tree.size(), out);
+  } catch (...) {
+    return status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_stream_frame_info(ovt_Stream* stream, int decode_index, ovt_Buffer* out) {

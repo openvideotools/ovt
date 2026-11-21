@@ -109,8 +109,13 @@ function(ovt_studio_add_qml_module target)
     set(picture_sources "${app_dir}/src/picture_frame.h" "${app_dir}/src/picture_host.h"
                         "${app_dir}/src/picture_host.cpp")
   endif()
+  # Android reads its Configuration, input devices and windowing mode in platform_android.cpp (WI-A.451).
+  set(platform_sources "")
+  if(ANDROID)
+    set(platform_sources "${app_dir}/src/platform/platform_android.cpp")
+  endif()
   # The dock manager (WI-1.451). Floating windows are compiled out of Android builds, not just hidden (§11.5.2).
-  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator)
+  foreach(name IN ITEMS DockWorkspace DockArea DockGroup DockTabBar DockDropIndicator CompactLayout)
     list(APPEND qml_files "${app_dir}/qml/dock/${name}.qml")
   endforeach()
   if(NOT ANDROID)
@@ -143,6 +148,7 @@ function(ovt_studio_add_qml_module target)
     SOURCES
     "${app_dir}/src/platform/platform.h"
     "${app_dir}/src/platform/platform.cpp"
+    ${platform_sources}
     "${app_dir}/src/settings.h"
     "${app_dir}/src/settings.cpp"
     "${app_dir}/src/models/diagnostics_model.h"
@@ -187,12 +193,18 @@ function(ovt_studio_add_qml_module target)
     "${app_dir}/src/dock/dock_model.cpp"
     "${app_dir}/src/picture_controller.h"
     "${app_dir}/src/picture_controller.cpp"
+    "${app_dir}/src/platform/android_state.h"
+    "${app_dir}/src/platform/android_state.cpp"
+    "${app_dir}/src/compare_controller.h"
+    "${app_dir}/src/compare_controller.cpp"
     "${app_dir}/src/render_stub.h"
     "${app_dir}/src/render_stub.cpp"
     "${app_dir}/src/models/hdr_metadata_model.h"
     "${app_dir}/src/models/hdr_metadata_model.cpp"
     "${app_dir}/src/native_surface_host.h"
     "${app_dir}/src/native_surface_host.cpp"
+    "${app_dir}/src/models/hex_model.h"
+    "${app_dir}/src/models/hex_model.cpp"
     # H.273 code point names for the HDR panel: the core's table (internal to libovt-core, so compiled in here).
     "${PROJECT_SOURCE_DIR}/core/src/syntax/common/h273_names.cpp"
     ${picture_sources}

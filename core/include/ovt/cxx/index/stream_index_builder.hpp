@@ -8,9 +8,9 @@
 // display order. C++ helper header (D22): semi-public, no ABI promise, never included from a C header.
 //
 // WI-1.121 is split per chapter 16 §16.2.6. Part a (this header, the codec-independent core, AV1 and the display
-// order) leaves H.264 / H.265 dispatch to part b and the RAP map, source hash and C API to part c. The DPB
-// models are stubs in every part: FrameInfo.declared_refs and dpb_after stay empty until WI-1.122, WI-1.123 and
-// WI-1.124 fill them.
+// order) leaves H.264 / H.265 dispatch to part b and the RAP map, source hash and C API to part c. WI-1.124 fills
+// FrameInfo.declared_refs and dpb_after for AV1 (the slot model of §7.4.4) and adds the operating point and the
+// Annex B temporal-unit check; the H.264 and H.265 DPB models arrive with WI-1.122 and WI-1.123.
 
 #ifndef OVT_CXX_INDEX_STREAM_INDEX_BUILDER_HPP
 #define OVT_CXX_INDEX_STREAM_INDEX_BUILDER_HPP
@@ -42,10 +42,28 @@ struct UnitInput {
   syntax::ByteRange prefix_span;                      // Unit.prefix_span
   int64_t sample_index = syntax::kNoContainerSample;  // Unit.sample_index
   const SampleTiming* timing = nullptr;               // null for an elementary stream (chapter 6 §6.2.6)
+  bool temporal_unit_start = false;  // AV1 Annex B: the unit is the first OBU of a temporal_unit() (ScannedUnit)
 };
 
 struct BuilderOptions {
   fb::Codec codec = fb::Codec::Unknown;
+  /// §7.4.5 (WI-1.125): VCL units of frames with a decode index at or beyond this count are parsed with recording
+  /// off (values only, Unit.header null); non-VCL units always keep their tree. 0 records no VCL tree at all.
+  uint32_t lazy_after_frames = 10000;
+  /// Re-parse mode of ovt_stream_unit_syntax (WI-1.125): when >= 0, only the unit with this builder index records a
+  /// tree, whatever `lazy_after_frames` says; every other unit is parsed for its values. -1 = normal indexing.
+  int64_t record_only_unit = -1;
+  /// §7.4.6 lazy EPB stripping: raw bytes stripped per step for a VCL unit parsed without a tree (the stripped
+  /// prefix doubles while the header runs past it). 2 KiB; tests lower it to exercise the retry.
+  size_t lazy_strip_chunk = size_t{2} << 10U;
+  /// AV1 (WI-1.124, §7.3.6 row 1 drop rule, §7.4.3 last row): the selected operating point, an index into the
+  /// sequence header's operating_points[]; frames outside it are indexed with shown = false and Info SYN-AV1-0002.
+  /// 0 is OVT's default; a value beyond operating_points_cnt_minus_1 selects 0.
+  // SPEC-ASSUMPTION(#731): the option lives here; the C API and the CLI keep operating point 0.
+  uint8_t av1_operating_point = 0;
+  /// AV1 (WI-1.124, §7.3.9): the units come from an Annex B length-delimited stream, so every
+  /// UnitInput.temporal_unit_start must coincide with a temporal delimiter (Warning SYN-AV1-0032 otherwise).
+  bool av1_annexb = false;
 };
 
 /// Thrown by the constructor for a codec the index has no dispatch for.
@@ -75,6 +93,19 @@ class StreamIndexBuilder {
   /// the finished StreamIndex buffer (root table ovt.fb.StreamIndex, no file identifier). Deterministic
   /// (§0.7.5): the same units give the same bytes. Call once; add_unit() must not be called afterwards.
   [[nodiscard]] std::vector<uint8_t> finish(std::span<const uint8_t, 32> source_hash);
+
+  /// §7.4.6 partial index (WI-1.125): the StreamIndex of the units and frames that are complete so far, with Warning
+  /// SYN-GEN-0103 "index truncated at unit N", where N is the first unit left out (the first unit of the open
+  /// frame, or of the non-VCL units pending before it). The builder keeps its state: add_unit() may go on and
+  /// finish() still returns the index of the whole stream, byte-identical to an uninterrupted run.
+  [[nodiscard]] std::vector<uint8_t> finish_partial(std::span<const uint8_t, 32> source_hash);
+
+  /// Number of units added so far.
+  [[nodiscard]] uint32_t unit_count() const noexcept;
+
+  /// The recorded header tree of unit `unit` as a standalone SyntaxNode FlatBuffer (root table, no file
+  /// identifier); empty when nothing was recorded for it (lazy VCL unit, or an unparsed unit without diagnostics).
+  [[nodiscard]] std::vector<uint8_t> unit_syntax(uint32_t unit) const;
 
  private:
   struct Impl;

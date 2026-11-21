@@ -794,7 +794,7 @@ All targets live in `core/tests/fuzz/fuzz_<name>.cpp` (backbone §0.4) and build
 
 ### 14.7.2 Corpus seeding
 
-`tools/fuzz_seed.py --target <t>` regenerates seeds from the local corpus cache: extracts units per type (`--max-per-type 3`, `--max-bytes 65536`), minimises with `build/linux-x64-fuzz/fuzz/ovt_fuzz_<t> -merge=1 corpus_new core/tests/fuzz/corpus/<t>`, and commits only the merged set (≤ 2 MiB per target) under `core/tests/fuzz/corpus/<t>/`. Argon streams (nightly) are the richest seed source for AV1 and are merged nightly into a **non-committed** corpus stored in the CI cache (`fuzz-corpus-<target>`), which the smoke job restores.
+`tools/fuzz_seed.py --target <t>` regenerates seeds from the local corpus cache: extracts units per type (`--max-per-type 3`, `--max-bytes 65536`), minimises with `build/linux-x64-fuzz/fuzz/ovt_fuzz_<t> -merge=1 corpus_new core/tests/fuzz/corpus/<t>`, and commits only the merged set (≤ 2 MiB per target) under `core/tests/fuzz/corpus/<t>/`; a committed seed MUST be OVT-generated (`--make-streams` recipes, WI-1.129) or cut from a corpus entry whose licence allows redistribution under the repository's REUSE annotation, never from the ITU-T or AOM conformance vectors (#742). Argon streams (nightly) are the richest seed source for AV1 and are merged nightly into a **non-committed** corpus stored in the CI cache (`fuzz-corpus-<target>`), which the smoke job restores.
 
 ### 14.7.3 CI smoke
 
@@ -1327,7 +1327,7 @@ All WIs follow the §0.1 template. Sizes: S ≤ 1 day, M ≤ 3 days, L ≤ 1 wee
 **Produces:** `app/tests/qml/tst_{ContainerTreeModel,SyntaxTreeModel,HexViewModel,TimelineModel,HdrMetadataModel,Shortcuts}.qml`, reference screenshots under `app/tests/screenshots/<platform>/`, `app/tests/scripts/test_{open_click_field_hex,timeline_scrub,hdr_panel}.py`.
 **Interface:** §14.10.1 test list, §14.10.2 scenes, §14.10.3 scripts 1, 2 and 5 over the test IPC of WI-1.465.
 **Steps:** 1. QML model tests with fixture data. 2. Screenshot scenes (both themes). 3. Scripts 1, 2, 5. 4. CI wiring in the `gui` job of `ci.yml` (owned by WI-1.465 / chapter 13).
-**Acceptance tests:** 1. Given `QT_QPA_PLATFORM=offscreen` on Linux and macOS, When `ctest -R qmltests` runs, Then all tests pass. 2. Given the reference images, When the screenshot job runs, Then all scenes pass `imgdiff --mode ui`. 3. Given `jctvc_AMP_A_Samsung_7`, When script 1 runs, Then the highlighted bit span equals the `trace_headers` golden span for `pic_width_in_luma_samples`.
+**Acceptance tests:** 1. Given `QT_QPA_PLATFORM=offscreen` on Linux and macOS, When `ctest -R qmltests` runs, Then all tests pass. 2. Given the reference images, When the screenshot job runs, Then all scenes pass `imgdiff --mode ui`. 3. Given `jctvc_AMP_A_Samsung_7`, When script 1 runs, Then the highlighted bit span equals the `trace_headers` golden span for `pic_width_in_luma_samples`; and scripts 2 and 5 pass against the real `ovt-studio` through the WI-1.465 test-IPC server (moved here from WI-1.465 AT1, #690).
 **Size:** L.
 **Notes / pitfalls:** `tst_Shortcuts.qml` reads the §11.4.3 table (chapter 11) as its expected list — the single keyboard map.
 

@@ -9,6 +9,11 @@
 // (POC_A_Bossen_3, RPS_A_docomo_5, NUT_A_ericsson_5: their LSBs and RPS are in `trace_headers`).
 // The [needs-corpus] cases run the whole chain (unit scan, parsers, ActiveSets, FrameBoundary, PocState, Dpb)
 // over the conformance streams and skip when the corpus is absent.
+//
+// WI-1.123 runs the same models through the StreamIndex builder: FrameInfo.declared_refs / dpb_after, the RASL
+// skip bitmap of the RAP map, the conformance window and the picture after an end of sequence. The always-run cases
+// use the x265 open-GOP seed of the index_builder fuzz target, as written and edited (EOS inserted, CRA turned into
+// a BLA).
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -28,7 +33,10 @@
 
 #include "hm_poc_expected.h"
 #include "index/h265_index.h"
+#include "index/rap_map.h"
 #include "ovt/cxx/bitreader.hpp"
+#include "ovt/cxx/index/stream_index_builder.hpp"
+#include "ovt/cxx/model/validator.hpp"
 #include "ovt/cxx/rbsp.hpp"
 #include "ovt/cxx/syntax/h265/active_sets.hpp"
 #include "ovt/cxx/syntax/h265/nal_header.hpp"
@@ -39,6 +47,7 @@
 #include "ovt/cxx/syntax/h265/vps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
 #include "ovt/cxx/syntax/unit_scan.hpp"
+#include "ovt_model_generated.h"
 #include "test_support/corpus.h"
 
 namespace {
@@ -977,4 +986,349 @@ TEST_CASE("h265_rap_bitmap: RAP_B_Bossen_2 flags RASL pictures and the CRA", "[i
   CHECK(cras >= 1);
   CHECK(rasl >= 1);
   CHECK(c.error_count() == 0);
+}
+
+// ---- WI-1.123: the DPB model through the StreamIndex builder ------------------------------------------------------
+
+namespace {
+
+namespace fb = ovt::fb;
+using Bytes = std::vector<uint8_t>;
+
+Bytes read_bytes(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  REQUIRE(in.good());
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+// The x265 open-GOP seed of the index_builder fuzz target without its selector byte. Decode order:
+// IDR P B B | CRA RASL RASL P B B P B; the two RASL pictures reference the P picture before the CRA.
+Bytes open_gop() {
+  Bytes b = read_bytes(std::filesystem::path(OVT_INDEX_BUILDER_SEEDS) / "seed_3_h265_open_gop.bin");
+  REQUIRE(b.size() > 1);
+  b.erase(b.begin());
+  return b;
+}
+
+// Byte offsets of the start codes (00 00 01) of an Annex B stream.
+std::vector<size_t> start_codes(const Bytes& b) {
+  std::vector<size_t> out;
+  for (size_t i = 0; i + 2 < b.size(); ++i) {
+    if (b[i] == 0 && b[i + 1] == 0 && b[i + 2] == 1) {
+      out.push_back(i);
+    }
+  }
+  return out;
+}
+
+// Offset of the NAL header of the first unit of type `type` in `b`.
+size_t first_unit_of_type(const Bytes& b, unsigned type) {
+  for (const size_t sc : start_codes(b)) {
+    if (sc + 3 < b.size() && ((b[sc + 3] >> 1U) & 0x3FU) == type) {
+      return sc + 3;
+    }
+  }
+  FAIL("no unit of type " << type);
+  return 0;
+}
+
+// Indexes an Annex B H.265 stream with the builder and checks the V-031 rules on the result.
+Bytes index_h265(std::span<const uint8_t> stream) {
+  ovt::index::StreamIndexBuilder b(ovt::index::BuilderOptions{fb::Codec::H265});
+  ovt::syntax::scan_annexb(stream, 0, ovt::syntax::kNoContainerSample, [&b](const ovt::syntax::ScannedUnit& u) {
+    ovt::index::UnitInput in;
+    in.file_offset = u.file_offset;
+    in.bytes = u.bytes;
+    in.prefix_span = u.prefix_span;
+    in.sample_index = u.container_sample_index;
+    b.add_unit(in);
+  });
+  Bytes index = b.finish(std::array<uint8_t, 32>{});
+  for (const auto& v : ovt::model::validate_stream_index(index)) {
+    FAIL_CHECK(v.rule << ": " << v.message << " at " << v.path);
+  }
+  return index;
+}
+
+const fb::StreamIndex& root_of(const Bytes& index) {
+  return *flatbuffers::GetRoot<fb::StreamIndex>(index.data());
+}
+
+Ints to_ints(const flatbuffers::Vector<int32_t>* v) {
+  return v == nullptr ? Ints{} : Ints(v->begin(), v->end());
+}
+
+// nal_unit_type of the first VCL unit of frame `f`.
+unsigned vcl_type(const fb::StreamIndex& si, const fb::FrameInfo& f) {
+  for (const uint32_t u : *f.units()) {
+    if (si.units()->Get(u)->type() < 32) {
+      return si.units()->Get(u)->type();
+    }
+  }
+  return 64;
+}
+
+bool is_rasl(const fb::StreamIndex& si, const fb::FrameInfo& f) {
+  const unsigned t = vcl_type(si, f);
+  return t == 8 || t == 9;
+}
+
+// The POCs of the frames `refs` names.
+Ints pocs_of(const fb::StreamIndex& si, const Ints& refs) {
+  Ints out;
+  for (const int32_t r : refs) {
+    out.push_back(static_cast<int32_t>(si.frames()->Get(static_cast<uint32_t>(r))->poc()));
+  }
+  return out;
+}
+
+// Diagnostics of the index with `code` and `severity`.
+size_t count_diag(const fb::StreamIndex& si, std::string_view code, fb::Severity severity) {
+  size_t n = 0;
+  if (si.diagnostics() != nullptr) {
+    for (const auto* d : *si.diagnostics()) {
+      n += d->code()->string_view() == code && d->severity() == severity ? 1U : 0U;
+    }
+  }
+  return n;
+}
+
+// The builder's declared_refs / dpb_after equal those of the Chain over the same bytes (the current picture left
+// out of declared_refs, #733).
+void check_builder_matches_chain(const Bytes& stream) {
+  const Bytes index = index_h265(stream);
+  const fb::StreamIndex& si = root_of(index);
+  Chain c;
+  ovt::syntax::scan_annexb(std::span<const uint8_t>(stream), 0, ovt::syntax::kNoContainerSample,
+                           [&c](const ovt::syntax::ScannedUnit& u) {
+                             if (u.bytes.size() >= 2) {
+                               c.add(u.bytes);
+                             }
+                           });
+  REQUIRE(si.frames()->size() == c.pictures.size());
+  for (const Chain::Picture& p : c.pictures) {
+    CAPTURE(p.decode_index);
+    const fb::FrameInfo& f = *si.frames()->Get(static_cast<uint32_t>(p.decode_index));
+    Ints declared = p.d.declared_refs;
+    std::erase(declared, p.decode_index);
+    CHECK(to_ints(f.declared_refs()) == declared);
+    CHECK(to_ints(f.dpb_after()) == p.d.dpb_after);
+    CHECK(f.poc() == p.pr.poc);
+  }
+}
+
+}  // namespace
+
+TEST_CASE("h265_index_dpb: declared_refs and dpb_after of an open GOP through the builder", "[index][h265][fast]") {
+  const Bytes stream = open_gop();
+  const Bytes index = index_h265(stream);
+  const fb::StreamIndex& si = root_of(index);
+  REQUIRE(si.frames()->size() == 12);
+  const fb::FrameInfo& idr = *si.frames()->Get(0);
+  CHECK(to_ints(idr.declared_refs()).empty());
+  CHECK(to_ints(idr.dpb_after()) == Ints{0});
+  for (uint32_t d = 1; d < 12; ++d) {
+    CAPTURE(d);
+    const fb::FrameInfo& f = *si.frames()->Get(d);
+    const Ints dpb = to_ints(f.dpb_after());
+    // Every picture is a reference picture once decoded (§7.4.4), and refers only to earlier pictures it keeps.
+    CHECK(std::ranges::find(dpb, static_cast<int32_t>(d)) != dpb.end());
+    CHECK(std::ranges::is_sorted(dpb));
+    for (const int32_t r : to_ints(f.declared_refs())) {
+      CHECK(r < static_cast<int32_t>(d));
+      const Ints before = to_ints(si.frames()->Get(d - 1)->dpb_after());
+      CHECK(std::ranges::find(before, r) != before.end());
+    }
+    if (f.type() != fb::FrameType::I) {
+      CHECK_FALSE(to_ints(f.declared_refs()).empty());
+    }
+  }
+  // A mid-stream CRA keeps the pictures before it: its RASL pictures reference the P picture before it.
+  const fb::FrameInfo& cra = *si.frames()->Get(4);
+  REQUIRE(vcl_type(si, cra) == 21);
+  CHECK(to_ints(cra.dpb_after()).size() > 1);
+  for (uint32_t d = 5; d <= 6; ++d) {
+    CAPTURE(d);
+    const fb::FrameInfo& rasl = *si.frames()->Get(d);
+    REQUIRE(is_rasl(si, rasl));
+    CHECK(rasl.shown());
+    const Ints refs = to_ints(rasl.declared_refs());
+    CHECK(std::ranges::any_of(refs, [](int32_t r) { return r < 4; }));
+  }
+  CHECK(count_diag(si, "SYN-H265-0102", fb::Severity::Error) == 0);
+  check_builder_matches_chain(stream);
+}
+
+// AT3 without the corpus (#734): an end of sequence NAL before the CRA gives it NoRaslOutputFlag = 1, so its POC MSB
+// is 0, the pictures before it leave the DPB and its RASL pictures are not output; their missing references are
+// Info, not Error. A BLA_W_LP in place of the CRA does the same, and the RAP map skips its RASL pictures too.
+TEST_CASE("h265_index_dpb: the picture after an end of sequence, and a BLA", "[index][h265][fast]") {
+  const Bytes plain = open_gop();
+  const size_t cra_at = first_unit_of_type(plain, 21);
+  Bytes eos = plain;
+  // 00 00 01 | nal_unit_type 36 (EOS_NUT), layer 0, TemporalId 0, inserted before the CRA's start code.
+  const std::array<uint8_t, 5> eos_nal = {0x00, 0x00, 0x01, 0x48, 0x01};
+  eos.insert(eos.begin() + static_cast<std::ptrdiff_t>(cra_at - 3), eos_nal.begin(), eos_nal.end());
+  Bytes bla = plain;
+  bla[cra_at] = static_cast<uint8_t>((16U << 1U) | (bla[cra_at] & 0x81U));  // BLA_W_LP
+
+  for (const auto& [name, stream] : {std::pair{"eos", &eos}, std::pair{"bla", &bla}}) {
+    SECTION(name) {
+      const Bytes index = index_h265(*stream);
+      const fb::StreamIndex& si = root_of(index);
+      REQUIRE(si.frames()->size() == 12);
+      const fb::FrameInfo& rap = *si.frames()->Get(4);
+      CHECK(rap.is_rap());
+      // POC MSB 0: the POC is the slice_pic_order_cnt_lsb of the plain stream's CRA, which follows POCs 0..3.
+      const Bytes plain_index = index_h265(plain);
+      const int64_t cra_poc = root_of(plain_index).frames()->Get(4)->poc();
+      CHECK(rap.poc() == cra_poc);
+      CHECK(to_ints(rap.dpb_after()) == Ints{4});
+      CHECK(to_ints(rap.declared_refs()).empty());
+      const ovt::index::RapMap raps(si);
+      for (uint32_t d = 5; d <= 6; ++d) {
+        CAPTURE(d);
+        const fb::FrameInfo& rasl = *si.frames()->Get(d);
+        CHECK_FALSE(rasl.shown());
+        CHECK(std::ranges::none_of(to_ints(rasl.declared_refs()), [](int32_t r) { return r < 4; }));
+        CHECK(raps.skip_when_starting_at_rap(d));
+      }
+      CHECK_FALSE(raps.skip_when_starting_at_rap(7));
+      CHECK(count_diag(si, "SYN-H265-0102", fb::Severity::Error) == 0);
+      CHECK(count_diag(si, "SYN-H265-0102", fb::Severity::Info) > 0);
+      check_builder_matches_chain(*stream);
+    }
+  }
+}
+
+namespace {
+
+// AT1: indexes the whole stream with the builder and compares every picture HM decoded with HM's record. HM does
+// not decode the RASL pictures of a CRA with NoRaslOutputFlag = 1; in the index those are the RASL frames that are
+// not shown. declared_refs resolved to POCs equals RefPicList0 ∪ RefPicList1 of HM (unique, L0 first).
+void check_index_against_hm(std::string_view id, std::string_view hm_text) {
+  const Bytes stream = read_bytes(ovt::test::corpus_or_skip(id));
+  const Bytes index = index_h265(stream);
+  const fb::StreamIndex& si = root_of(index);
+  const std::vector<HmPicture> hm = parse_hm(hm_text);
+  std::vector<const fb::FrameInfo*> ours;
+  for (const fb::FrameInfo* f : *si.frames()) {
+    if (!is_rasl(si, *f) || f->shown()) {
+      ours.push_back(f);
+    }
+  }
+  REQUIRE(ours.size() == hm.size());
+  for (size_t i = 0; i < hm.size(); ++i) {
+    CAPTURE(id, i);
+    const fb::FrameInfo& f = *ours[i];
+    CHECK(f.poc() == hm[i].poc);
+    CHECK(vcl_type(si, f) == hm[i].nut);
+    CHECK(f.temporal_id() == hm[i].tid);
+    Ints expected;
+    for (const Ints* list : {&hm[i].l0, &hm[i].l1}) {
+      for (const int32_t poc : *list) {
+        if (std::ranges::find(expected, poc) == expected.end()) {
+          expected.push_back(poc);
+        }
+      }
+    }
+    CHECK(pocs_of(si, to_ints(f.declared_refs())) == expected);
+  }
+  CHECK(count_diag(si, "SYN-H265-0102", fb::Severity::Error) == 0);
+}
+
+}  // namespace
+
+// WI-1.123 AT1: h265_refpiclist_vs_hm through the full builder, on the HEVC_v1 streams with an HM record.
+TEST_CASE("h265_refpiclist_vs_hm: the builder's declared_refs equal HM's RefPicLists",
+          "[index][h265][fast][needs-corpus]") {
+  namespace e = ovt::test::h265;
+  SECTION("POC_A_Bossen_3") {
+    check_index_against_hm("jctvc_POC_A_Bossen_3", e::kHm_POC_A_Bossen_3);
+  }
+  SECTION("RPS_A_docomo_5") {
+    check_index_against_hm("jctvc_RPS_A_docomo_5", e::kHm_RPS_A_docomo_5);
+  }
+  SECTION("RPS_B_qualcomm_5") {
+    check_index_against_hm("jctvc_RPS_B_qualcomm_5", e::kHm_RPS_B_qualcomm_5);
+  }
+  SECTION("RPS_C_ericsson_5") {
+    check_index_against_hm("jctvc_RPS_C_ericsson_5", e::kHm_RPS_C_ericsson_5);
+  }
+  SECTION("RPS_D_ericsson_6") {
+    check_index_against_hm("jctvc_RPS_D_ericsson_6", e::kHm_RPS_D_ericsson_6);
+  }
+  SECTION("RPS_E_qualcomm_5") {
+    check_index_against_hm("jctvc_RPS_E_qualcomm_5", e::kHm_RPS_E_qualcomm_5);
+  }
+  SECTION("RPS_F_docomo_2") {
+    check_index_against_hm("jctvc_RPS_F_docomo_2", e::kHm_RPS_F_docomo_2);
+  }
+  SECTION("RAP_B_Bossen_2") {
+    check_index_against_hm("jctvc_RAP_B_Bossen_2", e::kHm_RAP_B_Bossen_2);
+  }
+  SECTION("NUT_A_ericsson_5") {
+    check_index_against_hm("jctvc_NUT_A_ericsson_5", e::kHm_NUT_A_ericsson_5);
+  }
+}
+
+// WI-1.123 AT2: CONFWIN_A_Sony_1 (416x240 4:2:0, conf_win offsets 1/1/1/1 in chroma units, from its trace_headers
+// golden) has crop {2, 2, 412, 236} in luma samples on every frame.
+TEST_CASE("h265_index_crop: CONFWIN_A_Sony_1 crop is the conformance window in luma samples",
+          "[index][h265][fast][needs-corpus]") {
+  const Bytes index = index_h265(read_bytes(ovt::test::corpus_or_skip("jctvc_CONFWIN_A_Sony_1")));
+  const fb::StreamIndex& si = root_of(index);
+  REQUIRE_FALSE(si.frames()->empty());
+  for (const fb::FrameInfo* f : *si.frames()) {
+    CAPTURE(f->id()->decode_index());
+    CHECK(f->coded_size()->w() == 416);
+    CHECK(f->coded_size()->h() == 240);
+    CHECK(f->crop()->x() == 2);
+    CHECK(f->crop()->y() == 2);
+    CHECK(f->crop()->w() == 412);
+    CHECK(f->crop()->h() == 236);
+  }
+}
+
+// WI-1.123 AT3 (#734: the EOS is in RAP_B_Bossen_2; RAP_A_docomo_6 has none): the IRAP picture after the end of
+// sequence NAL has NoRaslOutputFlag = 1, so its POC MSB is 0, the DPB holds only it, and its RASL pictures are not
+// shown and skipped by the RAP map. The stream-start CRA of RAP_A_docomo_6 behaves the same.
+TEST_CASE("h265_index_eos: the picture after an end of sequence starts afresh", "[index][h265][fast][needs-corpus]") {
+  for (const std::string_view id : {"jctvc_RAP_B_Bossen_2", "jctvc_RAP_A_docomo_6"}) {
+    CAPTURE(id);
+    const Bytes index = index_h265(read_bytes(ovt::test::corpus_or_skip(id)));
+    const fb::StreamIndex& si = root_of(index);
+    const ovt::index::RapMap raps(si);
+    // The frames that start a coded video sequence with NoRaslOutputFlag = 1: the first, and each IRAP whose
+    // preceding frame ends with an end of sequence (or bitstream) unit.
+    std::vector<uint32_t> fresh = {0};
+    for (uint32_t d = 1; d < si.frames()->size(); ++d) {
+      const auto& prev_units = *si.frames()->Get(d - 1)->units();
+      const unsigned last = si.units()->Get(prev_units[prev_units.size() - 1])->type();
+      if (last == 36 || last == 37) {  // EOS_NUT, EOB_NUT
+        fresh.push_back(d);
+      }
+    }
+    if (id == "jctvc_RAP_B_Bossen_2") {
+      CHECK(fresh.size() >= 2);
+    }
+    for (const uint32_t d : fresh) {
+      CAPTURE(d);
+      const fb::FrameInfo& f = *si.frames()->Get(d);
+      REQUIRE(f.is_rap());
+      // POC MSB 0: 0 <= POC < MaxPicOrderCntLsb (at most 2^16).
+      CHECK(f.poc() >= 0);
+      CHECK(f.poc() < 65536);
+      CHECK(to_ints(f.dpb_after()) == Ints{static_cast<int32_t>(d)});
+      for (uint32_t r = d + 1; r < si.frames()->size() && !si.frames()->Get(r)->is_rap(); ++r) {
+        const fb::FrameInfo& lead = *si.frames()->Get(r);
+        if (is_rasl(si, lead)) {
+          CAPTURE(r);
+          CHECK_FALSE(lead.shown());
+          CHECK(raps.skip_when_starting_at_rap(r));
+        }
+      }
+    }
+    CHECK(count_diag(si, "SYN-H265-0102", fb::Severity::Error) == 0);
+  }
 }
