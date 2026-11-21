@@ -5,7 +5,10 @@
 // Invariants, each an abort when violated: no exception escapes; the walk is deterministic; every counted packet
 // lies inside the file on the stride grid of its run; the per-PID packet counts add up to the packet count; the
 // diagnostics list stays capped; the tree can be built and expanding the root until nothing changes terminates;
-// decode_packet never reads past the span it is given.
+// decode_packet never reads past the span it is given. PES (WI-4.206a): decode_pes_header never reads past its span;
+// every PES lies inside the packet range and its reread payload is never longer than its size; the sample tables
+// can be built and agree with the PES list. Timing (WI-4.206b): every packet has its PID recorded, the PCR points
+// lie inside the packet range in order, and the TsTiming table can be built and lists one point per PES.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -28,6 +31,61 @@ void require(bool ok) {
   }
 }
 
+// PES packets and sample tables (WI-4.206a).
+void check_pes(const ovt::io::MemoryFile& file, const ts::File& a, const ts::File& b,
+               const ovt::container::Reader& reader, size_t size) {
+  require(a.pes.size() == b.pes.size());
+  require(reader.track_count() == static_cast<int>(a.pes.size()));
+  for (size_t i = 0; i < a.pes.size(); ++i) {
+    const ts::PesStream& s = a.pes[i];
+    require(!s.packets.empty() && s.packets.size() == b.pes[i].packets.size());
+    for (size_t j = 0; j < s.packets.size(); ++j) {
+      const ts::PesPacket& p = s.packets[j];
+      require(p.first_packet <= p.last_packet && p.last_packet < a.packet_count && p.offset <= size);
+      require(p.pts < static_cast<int64_t>(ts::kTimestampWrap) && p.dts < static_cast<int64_t>(ts::kTimestampWrap));
+      if (j < 64) {
+        require(ts::read_pes_payload(file, a, s.pid, p).size() <= p.size);
+      }
+    }
+    const auto table = reader.sample_table(static_cast<int>(i), 0, 0);
+    require(flatbuffers::GetRoot<ovt::fb::SampleTable>(table.data())->count() == s.packets.size());
+  }
+}
+
+// The timing table (WI-4.206b).
+void check_timing(const ts::File& a, const ovt::container::Reader& reader) {
+  require(a.timing.packet_pid.size() == a.packet_count);
+  for (const ts::PcrStream& s : a.timing.pcr) {
+    for (size_t j = 0; j < s.points.size(); ++j) {
+      require(s.points[j].packet_index < a.packet_count && s.points[j].pcr < ts::kPcrWrap);
+      require(j == 0 || s.points[j].packet_index > s.points[j - 1].packet_index);
+    }
+  }
+  size_t pes_total = 0;
+  for (const ts::PesStream& s : a.pes) {
+    pes_total += s.packets.size();
+  }
+  const auto timing = reader.ts_timing();
+  const auto* tt = flatbuffers::GetRoot<ovt::fb::TsTiming>(timing.data());
+  require(tt->pts_dts()->size() == pes_total && tt->packet_size() == a.geometry.stride);
+  require(tt->bitrate_per_pid()->size() <= a.pids.size() * ts::kBitrateWindowsMs.size());
+}
+
+// The TR 101 290 report (WI-4.207): a verifiable table of 14 checks whose first occurrences lie inside the file.
+void check_report(const ts::File& a, const ovt::container::Reader& reader, size_t size) {
+  const auto bytes = reader.ts_report();
+  flatbuffers::Verifier verifier(bytes.data(), bytes.size());
+  require(verifier.VerifyBuffer<ovt::fb::TsReport>(nullptr));
+  const auto* r = flatbuffers::GetRoot<ovt::fb::TsReport>(bytes.data());
+  require(r->packets() == a.packet_count && r->checks()->size() == 14);
+  for (const auto* c : *r->checks()) {
+    require(c->count() > 0 || (c->first_offset() == 0 && c->first_packet_index() == 0));
+    require(c->first_packet_index() < a.packet_count && c->first_offset() <= size);
+  }
+  require(r->diagnostics()->size() <= ts::kMaxDiagnostics);
+  require(bytes == reader.ts_report());
+}
+
 }  // namespace
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
@@ -35,6 +93,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     // decode_packet on every prefix length of the head of the input (the sanitizers check the bounds).
     for (size_t n = 0; n <= 200 && n <= size; ++n) {
       (void)ts::decode_packet(std::span<const uint8_t>(data, n));
+    }
+
+    ts::PesHeader pes_header;
+    for (size_t n = 0; n <= ts::kMaxPesHeader + 8 && n <= size; ++n) {
+      (void)ts::decode_pes_header(std::span<const uint8_t>(data, n), pes_header);
     }
 
     const ovt::io::MemoryFile file(std::span<const uint8_t>(data, size));
@@ -84,6 +147,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     require(a->psi.sections.size() <= ts::kMaxSections && a->psi.programs.size() <= 1024);
     require(a->psi.section_count == b->psi.section_count && a->psi.crc_errors == b->psi.crc_errors);
     require(reader->expand(a->packet_offset(0)) == OVT_OK);
+
+    check_pes(file, *a, *b, *reader, size);
+    check_timing(*a, *reader);
+    check_report(*a, *reader, size);
   } catch (...) {
     std::abort();
   }

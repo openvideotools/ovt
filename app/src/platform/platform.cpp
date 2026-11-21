@@ -48,9 +48,73 @@ bool Platform::isLinux() {
 #endif
 }
 
-bool Platform::hasHover() {
-  return !isAndroid();
+Platform::Platform()
+    : has_hover_(!isAndroid()),
+      windowing_mode_(isAndroid() ? QStringLiteral("fullscreen") : QStringLiteral("desktop")) {
+  if (isAndroid()) {
+    // The start-up width. Later changes are pushed by MainActivity.onConfigurationChanged through AndroidShell.qml
+    // and refresh(), at the moment Android reports them (no polling), never from a QML item width, which is in
+    // device pixels on Android.
+    refreshFromAndroid(true);
+  }
 }
+
+Platform::~Platform() = default;
+
+void Platform::setHasHover(bool value) {
+  if (has_hover_ != value) {
+    has_hover_ = value;
+    Q_EMIT hasHoverChanged();
+  }
+}
+
+void Platform::setWidthDp(double value) {
+  if (value > 0 && width_dp_ != value) {
+    width_dp_ = value;
+    Q_EMIT widthDpChanged();
+  }
+}
+
+void Platform::setWindowingMode(const QString& value) {
+  if (windowing_mode_ != value) {
+    windowing_mode_ = value;
+    Q_EMIT windowingModeChanged();
+  }
+}
+
+QString Platform::layoutClassForWidth(double width_dp) {
+  // §11.5.2: smallest-width breakpoints.
+  if (width_dp >= 1200) {
+    return QStringLiteral("three");
+  }
+  if (width_dp >= 840) {
+    return QStringLiteral("two");
+  }
+  if (width_dp >= 600) {
+    return QStringLiteral("vertical");
+  }
+  return QStringLiteral("single");
+}
+
+void Platform::refresh(double window_width_dp) {
+  // On Android the width is Configuration.screenWidthDp (pushed by MainActivity, or read here when none is given),
+  // never a Qt item width: the QtQuickView content is sized in device pixels there (device pixel ratio 1 on the
+  // emulator).
+  if (isAndroid()) {
+    refreshFromAndroid(window_width_dp <= 0);
+  }
+  if (window_width_dp > 0) {
+    setWidthDp(window_width_dp);
+  }
+}
+
+#ifndef Q_OS_ANDROID
+// A member because the Android definition (platform_android.cpp) writes the properties.
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+bool Platform::refreshFromAndroid(bool /*read_width*/) {
+  return false;
+}
+#endif
 
 bool Platform::isFirstRun() {
   static const bool first_run = !QFileInfo::exists(settingsPath());
@@ -139,6 +203,14 @@ QString Platform::graphicsApiName(QSGRendererInterface::GraphicsApi api) {
     default:
       return QStringLiteral("unknown");
   }
+}
+
+bool Platform::pictureHostAvailable() {
+#if defined(OVT_HAVE_PICTURE_HOST)
+  return true;
+#else
+  return false;
+#endif
 }
 
 QString Platform::rhiBackend() {

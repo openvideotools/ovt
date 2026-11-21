@@ -33,6 +33,18 @@ std::string_view as_view(const FourCC& cc) {
   return {cc.data(), cc.size()};
 }
 
+// Is `parent` one of the comma-separated fourccs of a row's allowed_parents?
+bool lists_parent(std::string_view allowed, std::string_view parent) {
+  while (!allowed.empty()) {
+    const size_t comma = allowed.find(',');
+    if (allowed.substr(0, comma) == parent) {
+      return true;
+    }
+    allowed = comma == std::string_view::npos ? std::string_view{} : allowed.substr(comma + 1);
+  }
+  return false;
+}
+
 // Segments p[pi..) against ancestors a[ai..). A "*" segment takes zero or more ancestors. Depth <= 32 ancestors.
 // NOLINTNEXTLINE(misc-no-recursion)
 bool match_from(const std::vector<std::string_view>& p, size_t pi, const std::vector<FourCC>& a, size_t ai) {
@@ -76,23 +88,31 @@ unsigned score(const RegistryEntry& e, bool exact_fourcc) {
   return pattern_specificity(e.context_pattern) * 4U + (e.decoder != nullptr ? 2U : 0U) + (exact_fourcc ? 1U : 0U);
 }
 
-constexpr uint8_t kV01 = 0x03;
+// Binary search in a generated name table (sorted by the code bytes).
+std::string_view find_name(std::span<const RegistryName> table, std::string_view code) noexcept {
+  const auto it =
+      std::ranges::lower_bound(table, code, {}, [](const RegistryName& n) { return std::string_view(n.code); });
+  return (it != table.end() && std::string_view(it->code) == code) ? std::string_view(it->description)
+                                                                   : std::string_view{};
+}
 
-// clang-format off
-#define OVT_ENTRY(CC, PAT, KIND, FULL, VMASK, FMASK, TRAIL, REF, DESC, PARENTS) \
-  RegistryEntry{CC, PAT, BoxKind::KIND, FULL, VMASK, FMASK, TRAIL, REF, DESC, PARENTS, nullptr}
-constexpr auto kBase = std::to_array<RegistryEntry>({
-    OVT_ENTRY("moov", "*", Container, false, 0, 0, false, "ISO/IEC 14496-12:2022 §8.2.1", "Movie container", ""),
-    OVT_ENTRY("tkhd", "*", Leaf, true, kV01, 0x7, false, "ISO/IEC 14496-12:2022 §8.3.2", "Track header, overall information about the track", "trak"),
-    OVT_ENTRY("hdlr", "*/mdia", Leaf, true, 0x01, 0, false, "ISO/IEC 14496-12:2022 §8.4.3", "Handler reference for a track", "mdia"),
-    OVT_ENTRY("hdlr", "*/meta", Leaf, true, 0x01, 0, false, "ISO/IEC 14496-12:2022 §8.4.3", "Handler reference for metadata", "meta"),
-    OVT_ENTRY("stsd", "*", ContainerWithPrefix, true, 0x01, 0, false, "ISO/IEC 14496-12:2022 §8.5.2", "Sample descriptions", "stbl"),
-    OVT_ENTRY("colr", "*/stsd/*", Leaf, false, 0, 0, false, "ISO/IEC 14496-12:2022 §12.1.5", "Colour information", ""),
-    OVT_ENTRY("colr", "*/ipco", Leaf, false, 0, 0, false, "ISO/IEC 23008-12 §6.5.5", "Colour information (item property)", "ipco"),
-    OVT_ENTRY("meta", "*", ContainerWithPrefix, true, 0x01, 0, false, "ISO/IEC 14496-12:2022 §8.11.1", "Metadata container", ""),
-});
-#undef OVT_ENTRY
-// clang-format on
+// The most specific table row (no decoder) among `rows` whose allowed_parents names the innermost ancestor.
+const RegistryEntry* most_specific_listing(const std::vector<const RegistryEntry*>& rows,
+                                           const std::vector<FourCC>& ancestors) {
+  if (ancestors.empty()) {
+    return nullptr;
+  }
+  const std::string_view parent = as_view(ancestors.back());
+  const RegistryEntry* listed = nullptr;
+  for (const RegistryEntry* e : rows) {
+    if (e->decoder == nullptr && lists_parent(e->allowed_parents, parent) &&
+        context_matches(e->context_pattern, ancestors) &&
+        (listed == nullptr || pattern_specificity(e->context_pattern) > pattern_specificity(listed->context_pattern))) {
+      listed = e;
+    }
+  }
+  return listed;
+}
 
 }  // namespace
 
@@ -114,7 +134,12 @@ unsigned pattern_specificity(std::string_view pattern) noexcept {
 BoxRegistry::BoxRegistry(std::span<const RegistryEntry> base_entries) {
   for (const RegistryEntry& e : base_entries) {
     entries_.push_back(e);
-    by_fourcc_[e.fourcc].push_back(&entries_.back());
+    std::array<uint8_t, 16> uuid{};
+    if (parse_uuid(e.fourcc, uuid)) {
+      by_uuid_.emplace_back(uuid, &entries_.back());
+    } else {
+      by_fourcc_[e.fourcc].push_back(&entries_.back());
+    }
   }
 }
 
@@ -160,16 +185,36 @@ void BoxRegistry::join_decoder(const BoxDecoder* d) const {
   const bool is_parent_wild = !is_uuid && cc.size() > 2 && cc.ends_with("/*");
   const std::string key = is_uuid ? "uuid" : std::string(cc);
   RegistryEntry e{d->fourcc, d->context_pattern, BoxKind::Leaf, false, 0, 0, true, "", "", "", d};
-  const auto rows = by_fourcc_.find(key);
-  if (const RegistryEntry* base =
-          (rows == by_fourcc_.end() || is_parent_wild) ? nullptr : base_row_for(rows->second, *d);
-      base != nullptr) {
+  const RegistryEntry* base = nullptr;
+  if (is_uuid) {  // the generated row of the same usertype carries the metadata
+    const auto it = std::ranges::find_if(by_uuid_, [&](const auto& kv) { return kv.first == uuid; });
+    base = it == by_uuid_.end() ? nullptr : it->second;
+  } else if (const auto rows = by_fourcc_.find(key); rows != by_fourcc_.end() && !is_parent_wild) {
+    base = base_row_for(rows->second, *d);
+  }
+  if (base != nullptr) {
     e = *base;
     e.context_pattern = d->context_pattern;
     e.decoder = d;
   }
   entries_.push_back(e);
   const RegistryEntry* p = &entries_.back();
+  // SPEC-ASSUMPTION(#574): a "*" decoder also decorates every more specific table row of its fourcc, so a generated
+  // context row (higher specificity, no decoder) cannot hide it; each decorated copy keeps the row's pattern and
+  // metadata.
+  if (!is_uuid && !is_parent_wild && std::string_view(d->context_pattern) == "*") {
+    if (const auto rows = by_fourcc_.find(key); rows != by_fourcc_.end()) {
+      const std::vector<const RegistryEntry*> table_rows = rows->second;  // the loop appends to rows->second
+      for (const RegistryEntry* row : table_rows) {
+        if (row->decoder == nullptr && std::string_view(row->context_pattern) != "*") {
+          RegistryEntry copy = *row;
+          copy.decoder = d;
+          entries_.push_back(copy);
+          rows->second.push_back(&entries_.back());
+        }
+      }
+    }
+  }
   if (is_uuid) {
     by_uuid_.emplace_back(uuid, p);
   } else if (is_parent_wild) {
@@ -202,22 +247,48 @@ const RegistryEntry* BoxRegistry::lookup(std::string_view fourcc, const BoxConte
       }
     }
   };
+  const RegistryEntry* listed = nullptr;  // the most specific table row of this fourcc that names the parent
   if (auto it = by_fourcc_.find(fourcc); it != by_fourcc_.end()) {
     consider(it->second, true);
+    listed = most_specific_listing(it->second, ctx.ancestors);
   }
   if (!ctx.ancestors.empty()) {
     if (auto it = by_parent_.find(as_view(ctx.ancestors.back())); it != by_parent_.end()) {
+      const RegistryEntry* before = best;
       consider(it->second, false);
+      // SPEC-ASSUMPTION(#592): a "<parent>/*" decoder that wins over a table row listing that parent keeps the row's
+      // kind and metadata (an `hvc1` under `stsd` stays a ContainerWithPrefix FullBox-less sample entry).
+      if (best != before && best->decoder != nullptr && listed != nullptr) {
+        best = merged(*listed, *best);
+      }
     }
   }
   return best;
 }
 
+const RegistryEntry* BoxRegistry::merged(const RegistryEntry& row, const RegistryEntry& wildcard) const {
+  const auto key = std::make_pair(&row, wildcard.decoder);
+  if (const auto it = merged_.find(key); it != merged_.end()) {
+    return it->second;
+  }
+  RegistryEntry e = row;
+  e.context_pattern = wildcard.context_pattern;
+  e.decoder = wildcard.decoder;
+  entries_.push_back(e);
+  merged_.emplace(key, &entries_.back());
+  return &entries_.back();
+}
+
 const RegistryEntry* BoxRegistry::lookup_uuid(const std::array<uint8_t, 16>& usertype) const {
   const std::scoped_lock lock(mutex_);
   join_pending();
-  const auto it = std::ranges::find_if(by_uuid_, [&](const auto& kv) { return kv.first == usertype; });
-  return it == by_uuid_.end() ? nullptr : it->second;
+  const RegistryEntry* best = nullptr;  // a decoder row wins over the generated row of the same usertype
+  for (const auto& [id, e] : by_uuid_) {
+    if (id == usertype && (best == nullptr || (best->decoder == nullptr && e->decoder != nullptr))) {
+      best = e;
+    }
+  }
+  return best;
 }
 
 BoxRegistry& global_registry() {
@@ -226,7 +297,31 @@ BoxRegistry& global_registry() {
 }
 
 std::span<const RegistryEntry> generated_entries() noexcept {
-  return kBase;
+  return {&kEntries[0], kEntryCount};
+}
+std::span<const RegistryName> generated_brands() noexcept {
+  return {&kBrands[0], BrandsCount};
+}
+std::span<const RegistryName> generated_handlers() noexcept {
+  return {&kHandlers[0], HandlersCount};
+}
+std::span<const RegistryName> generated_item_types() noexcept {
+  return {&kItemTypes[0], ItemTypesCount};
+}
+std::span<const RegistryName> generated_schemes() noexcept {
+  return {&kSchemes[0], SchemesCount};
+}
+std::string_view brand_description(std::string_view code) noexcept {
+  return find_name(generated_brands(), code);
+}
+std::string_view handler_description(std::string_view code) noexcept {
+  return find_name(generated_handlers(), code);
+}
+std::string_view item_type_description(std::string_view code) noexcept {
+  return find_name(generated_item_types(), code);
+}
+std::string_view scheme_description(std::string_view code) noexcept {
+  return find_name(generated_schemes(), code);
 }
 
 const RegistryEntry* lookup(std::string_view fourcc, const BoxContext& ctx) {

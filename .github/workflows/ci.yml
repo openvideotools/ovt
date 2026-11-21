@@ -59,7 +59,7 @@ jobs:
           cat "$RUNNER_TEMP/changed.txt"
           # A file outside the list below (or an empty diff) means Android must build.
           if [ -s "$RUNNER_TEMP/changed.txt" ] && ! grep -qvE \
-              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image)\.yml$' \
+              '^(docs/|tests/golden/|tests/oracles/|tools/goldens/|core/tests/fuzz/corpus/)|^[^/]+\.md$|^\.github/workflows/(fuzz-smoke|static-analysis|abi|goldens-[a-z0-9]+|bootstrap-check|nightly|oracle-image|corpora-cache)\.yml$' \
               "$RUNNER_TEMP/changed.txt"; then
             echo "android=false" >> "$GITHUB_OUTPUT"
           else
@@ -167,6 +167,12 @@ jobs:
         run: |
           if [ -f tools/check_patches.py ]; then python -I tools/check_patches.py; else echo "::notice::WI-0.607; skipped"; fi
 
+      # WI-1.203 (chapter 08 §8.2.10 step 7): re-running the box registry generator must reproduce the committed
+      # box_registry.gen.cpp, REGISTRY_DIFF.md and INPUTS.sha256 byte for byte. It fetches the upstream snapshots at
+      # the commits pinned in tools/registry_inputs/INPUTS.sha256 and checks their hashes.
+      - name: registry-check
+        run: python -I tools/gen_box_registry.py --check
+
       - name: Rename dry run
         run: |
           if [ -f tools/rename_dry_run.sh ]; then tools/rename_dry_run.sh; else echo "::notice::WI-0.606; skipped"; fi
@@ -181,6 +187,10 @@ jobs:
 
       - name: Tests that cite slow streams carry [slow] (WI-0.552c)
         run: python -I tools/check_slow_labels.py
+
+      # FR-CNT-104 (chapter 08 §8.8, WI-1.234): the GUI and the Python package read file bytes only through the core.
+      - name: no_direct_file_access
+        run: python -I tools/lint_no_direct_file_access.py
 
       - name: Tool tests
         run: python -m pytest -q tools/tests
@@ -376,6 +386,47 @@ jobs:
           path: dist/ovt-macos-arm64.zip
           retention-days: 30
 
+  gui:
+    # chapter 14 §14.10 (WI-1.465): the GUI lane on Linux, offscreen and with the stub renderer for chrome tests. It builds
+    # only the GUI targets and runs `ctest -L gui`: the Catch2 model and test-IPC tests, the Qt Quick tests, the
+    # PictureHost test (xvfb + lavapipe), the --self-test, and the pytest lane of app/tests/scripts (screenshot harness,
+    # IPC client and the IPC server of the real application). The same tests also run inside build-linux-x64's full
+    # release test preset; this job reports the GUI result on its own and does not wait for that build. Same preset and
+    # triplet as build-linux-x64, so the vcpkg, third_party and ccache caches are shared. Linux-only, so it skips under
+    # the owner's OVT_HOSTED_RUNNERS=off switch.
+    if: vars.OVT_HOSTED_RUNNERS != 'off'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: ./.github/actions/setup-ovt
+        with:
+          preset: linux-x64-release
+          triplet: x64-linux-ovt
+          qt: "true"
+
+      # OVT_ENABLE_TEST_IPC is OFF in every preset (the release bundles never contain the test IPC); this job turns it on.
+      - name: Configure
+        run: cmake --preset linux-x64-release -DOVT_ENABLE_TEST_IPC=ON
+
+      - name: Build the GUI targets
+        run: >-
+          cmake --build --preset linux-x64-release --target ovt_studio ovt_studio_screenshots ovt_tests_app_models
+          ovt_tests_app_testipc ovt_tests_app_qml ovt_tests_app_picture
+
+      # QT_QPA_PLATFORM=offscreen is set by the tests themselves; ovt-studio runs with OVT_RENDER_STUB=1 (conftest.py).
+      - name: GUI tests (ctest -L gui)
+        run: ctest --preset linux-x64-release -L gui --output-junit "$PWD/build/linux-x64-release/junit-gui.xml"
+
+      - name: Upload JUnit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: junit-gui
+          path: build/linux-x64-release/junit-gui.xml
+          if-no-files-found: warn
+
   asan-ubsan:
     # chapter 13 §13.7.1 (WI-0.031): Clang 16 and the Linux sanitizer runtimes, so Linux-only; skipped when the
     # owner has switched hosted runners off. asan-ubsan-macos below covers the gap on the Mini meanwhile.
@@ -386,7 +437,7 @@ jobs:
       !cancelled() && vars.OVT_HOSTED_RUNNERS != 'off' &&
       (github.event_name != 'pull_request' || needs.build-linux-x64.result == 'success')
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
@@ -404,8 +455,34 @@ jobs:
 
       # configure + build with OVT_BUILD_GUI=OFF, then `ctest --preset sanitizers` (fast|golden under ASan+UBSan;
       # the deliberate canary test is excluded by the preset).
-      - name: Configure, build, test (sanitizers)
-        run: cmake --workflow --preset ci-linux-asan-ubsan
+      # The three steps below are what `cmake --workflow --preset ci-linux-asan-ubsan` runs (same presets), split so
+      # that a log shows which phase is slow and each phase has its own cap. 2026-11-17: with the ccache entry evicted
+      # (0 % hits, 3278 compiles) the single step took the whole 60 minutes and was cancelled with 124 of 1540 tests
+      # left, so the job cap below is 90 and the ccache is saved by a main run even when the job is cancelled.
+      - name: Configure (sanitizers)
+        run: cmake --preset linux-x64-asan-ubsan
+
+      - name: Build (sanitizers)
+        timeout-minutes: 55
+        run: cmake --build --preset linux-x64-asan-ubsan
+
+      - name: Test (sanitizers)
+        timeout-minutes: 30
+        run: ctest --preset sanitizers
+
+      - name: Slowest tests
+        if: always()
+        shell: bash
+        run: |
+          # Shows a test that hangs or crawls (2026-11-17: ovt_plugin_ffmpeg_hevc_tests was still running at the cap).
+          if [ -f build/sanitizers/junit.xml ]; then
+            python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          cases = [(float(c.get("time", 0)), c.get("name", "?")) for c in ET.parse("build/sanitizers/junit.xml").iter("testcase")]
+          for t, n in sorted(cases, reverse=True)[:15]:
+              print(f"{t:8.1f} s  {n}")
+          PY
+          fi
 
       - name: Upload JUnit
         if: always()

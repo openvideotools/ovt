@@ -12,12 +12,20 @@ ovt_find_package(CLI11 SPDX "BSD-3-Clause" TARGETS CLI11::CLI11 HEADER_ONLY)
 ovt_find_package(fmt SPDX "MIT" TARGETS fmt::fmt)
 ovt_find_package(flatbuffers SPDX "Apache-2.0" TARGETS flatbuffers::flatbuffers NAMES FlatBuffers)
 ovt_find_package(nlohmann_json SPDX "MIT" TARGETS nlohmann_json::nlohmann_json HEADER_ONLY)
+# `ovt cache import` reads .fa.zst records (WI-1.509). Same target choice as the core: PIC static with vcpkg.
+if(OVT_USE_VCPKG)
+  set(_ovt_zstd_targets zstd::libzstd_static zstd::libzstd)
+else()
+  set(_ovt_zstd_targets zstd::libzstd zstd::libzstd_shared zstd::libzstd_static)
+endif()
+ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS ${_ovt_zstd_targets})
+unset(_ovt_zstd_targets)
 
-add_library(ovt_cli_lib STATIC src/app.cpp src/output/json_writer.cpp src/output/fb_writer.cpp
+add_library(ovt_cli_lib STATIC src/app.cpp src/cmd/cache.cpp src/output/json_writer.cpp src/output/fb_writer.cpp
                                src/output/csv_writer.cpp src/output/text_writer.cpp)
 target_include_directories(ovt_cli_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${OVT_GENERATED_DIR}")
 target_link_libraries(ovt_cli_lib PUBLIC ovt::core ${CLI11_TARGET} ${fmt_TARGET} ${flatbuffers_TARGET}
-                      PRIVATE ovt::flags ovt_schemas ${nlohmann_json_TARGET})
+                      PRIVATE ovt::flags ovt_schemas ${nlohmann_json_TARGET} ${zstd_TARGET})
 target_compile_definitions(ovt_cli_lib PUBLIC "OVT_CLI_NAME_VALUE=\"${OVT_CLI_NAME}\""
                            PRIVATE "OVT_CLI_VERSION_VALUE=\"${PROJECT_VERSION}${OVT_VERSION_SUFFIX}\"")
 add_dependencies(ovt_cli_lib ovt_version_header)
@@ -68,7 +76,8 @@ ovt_set_license(ovt_cli "GPL-3.0-or-later")
 
 if(OVT_BUILD_TESTS)
   ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
+  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp
+                               $<TARGET_OBJECTS:ovt_cli_completions>)
   target_link_libraries(ovt_tests_cli PRIVATE ovt_cli_lib ovt::flags ovt_schemas ${nlohmann_json_TARGET}
                                               ${Catch2_TARGET})
   ovt_set_license(ovt_tests_cli "GPL-3.0-or-later")

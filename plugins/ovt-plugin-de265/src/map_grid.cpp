@@ -31,7 +31,8 @@ GridCells::GridCells(std::size_t n)
       cbf(n),
       deblock_bs_v(n),
       deblock_bs_h(n),
-      filter_idx(n) {}
+      filter_idx(n),
+      bits_x8(n) {}
 
 namespace {
 
@@ -216,6 +217,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   const auto bs_v = fbb.CreateVector(g.deblock_bs_v);
   const auto bs_h = fbb.CreateVector(g.deblock_bs_h);
   const auto filter_idx = fbb.CreateVector(g.filter_idx);
+  const auto bits_x8 = fbb.CreateVector(g.bits_x8);
   fb::CellGridBuilder b(fbb);
   b.add_cells_w(cells_w);
   b.add_cells_h(cells_h);
@@ -238,6 +240,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   b.add_deblock_bs_v(bs_v);
   b.add_deblock_bs_h(bs_h);
   b.add_filter_idx(filter_idx);
+  b.add_bits_x8(bits_x8);
   return b.Finish();
 }
 

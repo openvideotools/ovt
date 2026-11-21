@@ -75,10 +75,18 @@ target_sources(ovt_tests_render PRIVATE test_measure.cpp)
 # WI-4.454a: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
 target_sources(ovt_tests_render PRIVATE test_scopes.cpp)
 
+# WI-4.453: false-colour view, gamut-clip overlay, band fractions and gamut counts (§10.7.5, §10.7.8). The image goldens
+# live in tests/golden/render/ (§10.9.2 item 6; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
+target_sources(ovt_tests_render PRIVATE test_false_color.cpp)
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
 # WI-1.406: NATIVE targets (§10.4.1): encoding choice, CAMetalLayer table, headroom rule, and the swapchain path on a
 # headless surface (lavapipe; skipped without VK_EXT_headless_surface). On macOS, test_macos_metal.mm drives a real
 # CAMetalLayer through MoltenVK.
 target_sources(ovt_tests_render PRIVATE test_native_target.cpp)
+# WI-1.411: the swapchain hint carries the content's static HDR metadata (§10.3.6).
+target_sources(ovt_tests_render PRIVATE test_hint.cpp)
 if(APPLE)
   target_sources(ovt_tests_render PRIVATE test_macos_metal.mm)
   set_source_files_properties(test_macos_metal.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
@@ -86,3 +94,56 @@ if(APPLE)
   target_link_libraries(ovt_tests_render PRIVATE "-framework QuartzCore" "-framework Metal" "-framework CoreGraphics"
                                                  "-framework CoreFoundation")
 endif()
+
+# WI-1.407: display_probe() rules with a fake screen provider (§10.4.5); the platform stubs on other systems.
+target_sources(ovt_tests_render PRIVATE test_display_caps.cpp)
+
+# WI-1.406 step 5: the manual EDR tool for acceptance test 1 (needs a display; not registered with ctest).
+if(APPLE)
+  add_executable(ovt_manual_edr_pattern manual_edr_pattern.cpp manual_edr_window.mm)
+  set_source_files_properties(manual_edr_window.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+  set_target_properties(ovt_manual_edr_pattern PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
+  target_link_libraries(ovt_manual_edr_pattern PRIVATE ovt::render ovt::flags ${nlohmann_json_TARGET}
+                                                       "-framework AppKit" "-framework QuartzCore")
+  target_compile_definitions(ovt_manual_edr_pattern
+                             PRIVATE "OVT_PATTERNS_DIR=\"${PROJECT_SOURCE_DIR}/tests/corpora/patterns\"")
+  ovt_set_license(ovt_manual_edr_pattern "LGPL-2.1-or-later")
+endif()
+
+# WI-2.431: overlay layer, heatmap LUTs and the heatmap/fill/hatch passes (§10.5). The tests read render/luts/ and the
+# image golden tests/golden/render/heatmap_qp_viridis.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_overlay_layer.cpp)
+target_include_directories(ovt_tests_render PRIVATE "${PROJECT_SOURCE_DIR}/render")
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1). The image goldens are tests/golden/render/plane_*.png
+# (png_io.h; OVT_UPDATE_GOLDEN=1 rewrites them, never on CI).
+target_sources(ovt_tests_render PRIVATE test_plane_views.cpp)
+target_compile_definitions(ovt_tests_render
+                           PRIVATE "OVT_RENDER_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/tests/golden/render\"")
+
+# WI-2.439: colour tables, legend data, contrast/halo rule and colour-blind simulation (§10.5.2). CPU only.
+target_sources(ovt_tests_render PRIVATE test_overlay_legend.cpp test_overlay_contrast.cpp)
+
+# WI-1.410: compare modes (§10.2.4, §10.6.4), with the image goldens diff_gain8.png and split_v.png.
+target_sources(ovt_tests_render PRIVATE test_compare.cpp)
+
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3), with the image golden synthetic_4k_grid.png. The 4K
+# partition-grid fixture is built in C++ (fixtures/make_grid.cpp), the twin of tools/gen_fixture_fb.py --kind grid.
+target_sources(ovt_tests_render PRIVATE test_grid_lines.cpp fixtures/make_grid.cpp)
+
+# WI-2.434: MV arrow and intra stroke passes (§10.5.4), golden tests/golden/render/synthetic_4k_mv.png.gz. The input is
+# render/tests/fixtures/synthetic_4k_mv.fb when generate.py --fixtures has written it, else its in-memory twin.
+target_sources(ovt_tests_render PRIVATE test_overlay_arrows.cpp)
+
+# WI-2.437: overlay cache and set_overlays() lifecycle (§10.5.8). The cache cases need no GPU; one [vulkan] case checks
+# the re-upload skip and teardown with live handles.
+target_sources(ovt_tests_render PRIVATE test_overlay_cache.cpp)
+# WI-2.435: id buffer, readback and pick() (§10.5.7), probe colour math (§10.6.3).
+target_sources(ovt_tests_render PRIVATE test_pick.cpp)
+# WI-2.436: deblocking edges, reference-index fill and selection / probe / rectangle passes (§10.5.6 passes 3, 7, 10, 12),
+# goldens tests/golden/render/{deblock_edges,refidx_fill,selection}.png; fixture in fixtures/make_misc.cpp.
+target_sources(ovt_tests_render PRIVATE test_overlay_misc.cpp fixtures/make_misc.cpp)
+target_compile_definitions(ovt_tests_render PRIVATE "OVT_RENDER_FIXTURE_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/fixtures\"")
+
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2). The transform tests are CPU
+# only; the grid golden is tests/golden/render/grid_zoom8.png (OVT_UPDATE_GOLDEN=1 rewrites it, never on CI).
+target_sources(ovt_tests_render PRIVATE test_view_transform.cpp)

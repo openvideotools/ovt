@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.273 (07/2024) Tables 2, 3 and 4 names. The strings are OVT's own short labels of the referenced standards.
+// H.273 (07/2024) Tables 2, 3 and 4 names. The strings are OVT's own short labels of the referenced standards; the
+// PQ and HLG labels are the ones chapter 08 §8.2.5 and chapter 10 §10.3.3 print ("PQ (SMPTE ST 2084)").
 
 #include "syntax/common/h273_names.h"
 
@@ -60,9 +61,9 @@ std::string_view h273_transfer_characteristics_name(uint32_t code) noexcept {
       {13, "sRGB / IEC 61966-2-1"},
       {14, "BT.2020 (10-bit)"},
       {15, "BT.2020 (12-bit)"},
-      {16, "SMPTE ST 2084 (PQ)"},
+      {16, "PQ (SMPTE ST 2084)"},
       {17, "SMPTE ST 428-1"},
-      {18, "ARIB STD-B67 (HLG)"},
+      {18, "HLG (ARIB STD-B67)"},
   }};
   return lookup(kNames, code);
 }

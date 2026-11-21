@@ -13,20 +13,34 @@ add_library(ovt::render ALIAS ovt_render)
 target_sources(ovt_render PRIVATE src/pipeline/frame_upload.cpp)
 # WI-1.403: ViewState -> pl_render_params, target frames, dithering (§10.3.2, §10.3.4, §10.3.5).
 target_sources(ovt_render PRIVATE src/pipeline/render_params.cpp)
+# WI-1.408: plane modes Y/U/V/gray and raw code values (§10.6.1).
+target_sources(ovt_render PRIVATE src/pipeline/plane_views.cpp)
+# WI-1.409: view transform, zoom thresholds, sample grid and sample value (§10.2.3, §10.6.2).
+target_sources(ovt_render PRIVATE src/pipeline/view_transform.cpp src/pipeline/sample_grid.cpp)
+# WI-1.410: compare modes (§10.2.4, §10.6.4); src/shaders/diff.glsl is embedded by the WI-2.431 loop below.
+target_sources(ovt_render PRIVATE src/pipeline/compare.cpp src/pipeline/compare_convert.cpp)
 # libplacebo without timestamp queries (MoltenVK query-pool use-after-free, see the source).
 target_sources(ovt_render PRIVATE src/surface/vk_no_timestamps.cpp)
 # WI-1.404: offscreen interop export, one pl_gpu per §10.2.2 interop row (Metal texture, shared Vulkan device, GL).
 target_sources(ovt_render PRIVATE src/platform/offscreen.cpp)
 # WI-4.452: HDR measurements (§10.7.1-§10.7.4, §10.7.9). The GLSL of render/src/shaders/ is embedded as string
 # constants in a generated header (cmake/OvtEmbedShaders.cmake).
+# WI-4.453 adds the false-colour and gamut-clip views (§10.7.5, §10.7.8) on the same Q.
 target_sources(ovt_render PRIVATE src/measure/linear_pass.cpp src/measure/reduce.cpp src/measure/histogram.cpp
-                                  src/measure/measurer.cpp)
+                                  src/measure/measurer.cpp src/measure/false_color.cpp)
 # WI-4.454: waveform, vectorscope and CIE xy scope textures (§10.7.6-§10.7.7).
 target_sources(ovt_render PRIVATE src/measure/scopes.cpp src/measure/gamut_tables.cpp)
 include(OvtEmbedShaders)
 ovt_embed_shaders(
-  "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h" kShaderMeasurePrep src/shaders/measure_prep.frag
-  kShaderReduce8 src/shaders/reduce8.frag kShaderAccumulate src/shaders/accumulate.glsl)
+  "${CMAKE_CURRENT_BINARY_DIR}/generated/measure_shaders.h"
+  kShaderMeasurePrep
+  src/shaders/measure_prep.frag
+  kShaderReduce8
+  src/shaders/reduce8.frag
+  kShaderAccumulate
+  src/shaders/accumulate.glsl
+  kShaderFalseColor
+  src/shaders/false_color.frag)
 ovt_embed_shaders("${CMAKE_CURRENT_BINARY_DIR}/generated/scope_shaders.h" kShaderScopes src/shaders/scopes.glsl
                   kShaderScopeClear src/shaders/scope_clear.glsl kShaderScopeResolve src/shaders/scope_resolve.frag)
 target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -41,6 +55,50 @@ if(APPLE)
   set_target_properties(ovt_render PROPERTIES OBJCXX_STANDARD 20 OBJCXX_STANDARD_REQUIRED ON)
   target_link_libraries(ovt_render PRIVATE "-framework AppKit" "-framework QuartzCore" "-framework Metal")
 endif()
+
+# WI-1.407: display_probe() (§10.4.5). The rules are portable; one platform file queries the screen.
+target_sources(ovt_render PRIVATE src/platform/display_caps_rules.cpp)
+if(APPLE)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_macos.mm)
+  set_source_files_properties(src/platform/display_caps_macos.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+elseif(ANDROID)
+  target_sources(ovt_render PRIVATE src/platform/display_caps_android.cpp)
+else()
+  target_sources(ovt_render PRIVATE src/platform/display_caps_linux.cpp)
+endif()
+
+# WI-2.431: overlay layer, heatmap LUTs (render/luts/, tools/gen_luts.py) and the heatmap/fill/hatch passes (§10.5).
+# The GLSL bodies in src/shaders/ are embedded as raw strings in generated headers (shaders/<name>_glsl.h).
+target_sources(ovt_render PRIVATE src/overlay/overlay_layer.cpp src/overlay/pass_fill.cpp)
+# WI-2.439: overlay colour tables (kOverlayColors, kOverlayColorsCvd), halo rule and legend data (§10.5.2).
+target_sources(ovt_render PRIVATE src/overlay/overlay_colors.cpp)
+# WI-2.434: MV arrow and intra stroke instances (2.434a) and passes 8-9 by vertex pulling (2.434b, §10.5.4).
+target_sources(ovt_render PRIVATE src/overlay/arrow_instances.cpp src/overlay/pass_arrows.cpp)
+# WI-2.432: grid line pass with viewport/level culling (§10.5.3).
+target_sources(ovt_render PRIVATE src/overlay/pass_lines.cpp)
+# WI-2.437: overlay cache (LRU of 8 built OverlaySets per surface, §10.5.8) and the set_overlays() lifecycle.
+target_sources(ovt_render PRIVATE src/overlay/overlay_cache.cpp)
+# WI-2.435: id buffer, readback and probe windows (§10.5.7) and the probe's CPU colour math (§10.6.3).
+target_sources(ovt_render PRIVATE src/overlay/idbuffer.cpp src/color/cpu_convert.cpp)
+# WI-2.436: deblocking edges (cell pass 7, src/shaders/deblock.glsl) and the selection / probe / rectangle marks (§10.5.6).
+target_sources(ovt_render PRIVATE src/overlay/pass_misc.cpp)
+foreach(shader IN ITEMS arrows deblock diff fill hatch heatmap lines)
+  set(shader_src "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/${shader}.glsl")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${shader_src}")
+  file(READ "${shader_src}" OVT_SHADER_TEXT)
+  string(SUBSTRING "${shader}" 0 1 shader_head)
+  string(SUBSTRING "${shader}" 1 -1 shader_tail)
+  string(TOUPPER "${shader_head}" shader_head)
+  set(OVT_SHADER_SYMBOL "k${shader_head}${shader_tail}")
+  file(
+    CONFIGURE
+    OUTPUT
+    "${CMAKE_CURRENT_BINARY_DIR}/shaders/${shader}_glsl.h"
+    CONTENT
+    "// Generated by render/CMakeLists.txt from render/src/shaders/${shader}.glsl; do not edit.\n#pragma once\nnamespace ovt::render::shaders {\ninline constexpr const char* @OVT_SHADER_SYMBOL@ = R\"glsl(@OVT_SHADER_TEXT@)glsl\";\n}  // namespace ovt::render::shaders\n"
+    @ONLY)
+endforeach()
+target_include_directories(ovt_render PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}")
 
 target_include_directories(
   ovt_render PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"

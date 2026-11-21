@@ -185,7 +185,7 @@ Interop rules (one per platform, no alternatives in phase 1):
 |---|---|---|---|
 | macOS | Metal (Qt default) | `MetalTexture` | the surface creates the output `VkImage` itself with `VkExportMetalObjectCreateInfoEXT{METAL_TEXTURE}`, wraps it with `pl_vulkan_wrap` and obtains the `id<MTLTexture>` from `vkExportMetalObjectsEXT` (libplacebo v7.349.0 lists `PL_HANDLE_MTL_TEX` in its caps for import only, so `export_handle = PL_HANDLE_MTL_TEX` cannot work at the pin; the capability check is "the device exposes `vkExportMetalObjectsEXT`", #477); Qt wraps it via `QRhiTexture::createFrom({id<MTLTexture>, 0})` and samples on its own `MTLCommandQueue`, so `render()` ends with `pl_gpu_finish()` (one CPU wait per frame; an `MTLSharedEvent` is a WI-1.405 optimisation). Requires libplacebo built against MoltenVK ≥ 1.2.0; the handle type is declared in `libplacebo/gpu.h` (https://github.com/haasn/libplacebo/blob/master/src/include/libplacebo/gpu.h). |
 | Linux | Vulkan (forced via `QQuickWindow::setGraphicsApi(QSGRendererInterface::Vulkan)`) | `VulkanSharedDevice` | libplacebo imports Qt's device with `pl_vulkan_import()` (`libplacebo/vulkan.h`); the output `pl_tex` is wrapped by Qt via `QRhiTexture::createFrom({VkImage, layout})`. Synchronisation: both use the same `VkQueue`; the surface ends every render with `pl_gpu_flush()` and the host inserts a `QRhiResourceUpdateBatch` barrier; no cross-queue semaphores needed. |
-| Android (EMBEDDED) | OpenGL ES (Qt default) | `GlTexture` | libplacebo `pl_opengl_create()` on a context *shared* with Qt's (`EGL_KHR_create_context` share group; created by the shell, §10.4.3); output `pl_tex` wrapped by Qt via `QRhiTexture::createFrom({GLuint, 0})`; sync via a fence: GLES 3.0 core `glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE)` on the surface's context after `pl_gpu_flush()`, and `glWaitSync` on Qt's context before sampling (fence objects are shared across contexts of one share group); `eglCreateSyncKHR`/`eglWaitSyncKHR` (`EGL_KHR_fence_sync`, `EGL_KHR_wait_sync`) when the two contexts are not in one share group; `glFinish()` only as the last-resort fallback behind `OVT_RENDER_GL_FINISH=1`. |
+| Android (EMBEDDED) | OpenGL ES (Qt default) | `GlTexture` | libplacebo `pl_opengl_create()` on a context *shared* with Qt's (`EGL_KHR_create_context` share group; created by the shell, §10.4.3); output `pl_tex` wrapped by Qt via `QRhiTexture::createFrom({GLuint, 0})`; sync via a fence: GLES 3.0 core `glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE)` on the surface's context after `pl_gpu_flush()`, and `glWaitSync` on Qt's context before sampling (fence objects and texture names are shared across contexts of one share group, so `GlTexture` requires the share group; when the shared context cannot be created the host falls back to `Interop::None`, #725); `glFinish()` only as the last-resort fallback behind `OVT_RENDER_GL_FINISH=1`. |
 | Tests / CLI | none | `None` | CPU download via `pl_tex_download()`; the CLI and tests never share textures. |
 
 ### 10.2.3 `ViewState`, `ToneMap`, `GamutMap`
@@ -277,7 +277,8 @@ struct OverlayConfig {
   float mv_scale = 1.0f;                           // arrow length multiplier (MVs are drawn in luma samples × mv_scale)
   float mv_min_px = 2.0f;                          // arrows shorter than this on screen are drawn as 2×2 dots
   float line_px = 1.0f;                            // grid line width in device pixels (scaled by device_pixel_ratio)
-  uint32_t selected_block = 0xFFFFFFFFu; int32_t selected_mv = -1;
+  uint32_t selected_block = 0xFFFFFFFFu; int32_t selected_mv = -1;  // selected_mv outlines MotionVector.rect with row 15 (#746)
+  uint32_t hovered_block = 0xFFFFFFFFu;            // row-16 hover outline, drawn before the selection outline; set by the chapter 11 §11.3.2 hover wiring; draw-time uniform, not in the WI-2.437 cache key (#746)
   ovt::fb::Rect selection_rect{};                  // zero w/h = none
   int probe_x = -1, probe_y = -1;                  // image coordinates of the pixel probe; -1 none
 };
@@ -532,7 +533,7 @@ HDR10+ (ST 2094-40, `Picture.hdr10plus_payload`): parsed by `render/src/color/hd
 
 **Decision (binding, from the task brief):** the video surface uses **libplacebo → Vulkan → MoltenVK → CAMetalLayer**; Qt keeps its default Metal backend and an SDR swapchain. Qt's own `QRhiSwapChain::HDRExtendedSrgbLinear` is **not** used, because (a) it would make the whole QQuickWindow HDR and all QML chrome would need SDR-white scaling (Appendix B.4, QTBUG-134590), (b) libplacebo's MoltenVK path is the one mpv ships and tests (https://github.com/mpv-player/mpv/discussions/14138).
 
-Native target creation (app side, Chapter 11 §11.2.1): the Picture panel creates a child `QWindow` with `setSurfaceType(QSurface::MetalSurface)`, parented to the main `QQuickWindow`, geometry = panel rect in device-independent pixels. `app/src/platform/mac_layer.mm` obtains the layer:
+Native target creation (app side, Chapter 11 §11.2.1): the Picture panel creates a child `QWindow` with `setSurfaceType(QSurface::MetalSurface)`, parented to the main `QQuickWindow`, geometry = panel rect in device-independent pixels. `app/src/platform/mac_native_host.mm` (WI-1.463) obtains the layer:
 
 ```objc
 NSView* view = reinterpret_cast<NSView*>(window->winId());
@@ -668,10 +669,10 @@ All overlay passes are written with libplacebo's raw pass API (`pl_pass_create` 
 | **Partition (slice/tile) boundaries** | same line list (only `Slice` and `Tile` rects of `PartitionInfo` produce segments; `SliceSegment`, `TileGroup` and `Substream` are not spatial boundaries; shared edges emitted once), colour `GridPartition`, 2 px, dashed via fragment `fract()` on a distance attribute | ≤ 4 k vertices | frame |
 | **Pred-mode fill / skip hatch / ref-idx fill** | per-cell attribute texture `cells_w × cells_h` `RGBA8UI`: R = `PredKind`, G = `ref0+1`, B = `ref1+1`, A = flags (bit0 skip, bit1 merge, bit2 bi) | 960×540 × 4 B = 2 MB | frame |
 | **Heatmap** | per-cell `R16_UNORM` texture (value normalised to `heatmap_min..max`), plus 5 static 256×1 `RGBA8` LUT textures | 960×540 × 2 B = 1 MB | frame, heatmap source/range change |
-| **MV arrows** | instance texture `RGBA32F` + `RGBA32UI` pair, one texel per arrow: `{ox, oy, vx, vy}` (block centre and vector in luma samples) and `{color_idx \| flags<<8, id, 0, 0}`; 7 vertices per arrow (4 for the shaft quad, 3 for the head) | 518,400 texels × 32 B = 16.6 MB; 3.63 M vertices (`uint8` corner buffer 3.6 MB, static) | frame, `mv_scale` |
-| **Intra directions** | reuse arrow pass with a 2-vertex stroke template | ≤ 518 k | frame |
-| **Deblock edges** | line list from `deblock_bs_v/h`, colour by Bs (0 none, 1 weak, 2 strong) | ≤ 2 × cells × 2 vertices (24 MB worst case) → **only drawn when cells ≥ 8 device px**, i.e. ≤ 65 k edges per 1080p viewport | frame, zoom |
-| **Labels** | glyph instance texture `RGBA32F`: `{x, y, glyph_u, glyph_v}` + `RGBA8`: `{scale, color_idx, 0, 0}`; 6 vertices per glyph; glyph atlas `R8` 1024×1024 SDF (DejaVu Sans Mono, 95 ASCII glyphs + `→ ↑ ↓ ← − ·`, 48 px source, 8 px spread, generated by `tools/gen_sdf_atlas.py` into `render/fonts/dejavu_sans_mono_sdf.h`) | labels exist only when a cell is ≥ 24 device px: ≤ 80×45 = 3,600 cells visible at 1080p → ≤ 36 k glyphs (10 chars) | frame, zoom, pan, label content |
+| **MV arrows** | instance texture `RGBA32F` + `RGBA32UI` pair, one texel per arrow: `{ox, oy, vx, vy}` (block centre and vector in luma samples) and `{color_idx \| flags<<8, id, 0, 0}`; 9 vertices per arrow as a `PL_PRIM_TRIANGLE_LIST` without index buffer (6 for the shaft quad, 3 for the head; `pl_pass` has no line primitive, issue #645) | 518,400 texels × 32 B = 16.6 MB; 4.67 M vertices (`uint8` corner buffer 4.7 MB, static) | frame, `mv_scale` |
+| **Intra directions** | reuse arrow pass with the shaft quad of the arrow template (K = 9, head collapsed): one stroke per leaf `Block` whose cells share one `intra_mode_y`, else one per 4×4 cell (the rule of chapter 6 §6.8.2); a 1-device-px (× dpr) line through the region centre, 80 % of the region's shorter side long, colour row 20, no head, R-MV-1 visibility (cell ≥ 4 device px); angles: H.264 Table 8-2 (0 V, 1 H, 3 DDL, 4 DDR, 5 VR, 6 HD, 7 VL, 8 HU; 16/17 = Intra_16x16 V/H), H.265 Table 8-5 `intraPredAngle` (modes 2–17 horizontal `(−32, A)`, 18–34 vertical `(A, −32)`), AV1 `Mode_To_Angle` + `AngleDeltaY × 3°` from the `Av1Block` extension; DC, planar, plane, smooth, Paeth, PCM, palette and IntraBC draw nothing (issue #644) | ≤ 518 k | frame |
+| **Deblock edges** | cell pass over a per-cell `RG8UI` edge-class texture built from `deblock_bs_v/h` (R = class of the left edge, G = of the top edge; 0 none, 1 weak, 2 strong per the §10.5.2 rows 13/14 mapping; 2 B per cell, 1 MB at 4K) (#745) | bounded by viewport pixels, no per-zoom/pan rebuild → **only drawn when cells ≥ 8 device px**; bands pixel-snapped to round(dpr) px with the row-13 halo | frame |
+| **Labels** | glyph instance texture `RGBA32F`: `{x, y, glyph_u, glyph_v}` + `RGBA8`: `{scale, color_idx, 0, 0}`; 6 vertices per glyph; glyph atlas `R8` 1024 px wide × as tall as the glyphs need (1024×368 for the 101 glyphs: 22 columns × 5 rows of 45×73 cells; issue #648) SDF (DejaVu Sans Mono, 95 ASCII glyphs + `→ ↑ ↓ ← − ·`, 48 px source, 8 px spread, generated by `tools/gen_sdf_atlas.py` into `render/fonts/dejavu_sans_mono_sdf.h`) | labels exist only when a cell is ≥ 24 device px: ≤ 80×45 = 3,600 cells visible at 1080p → ≤ 36 k glyphs (10 chars) | frame, zoom, pan, label content |
 | **Selection / probe / rect** | ≤ 64 vertices immediate | — | every render |
 | **Id buffer** | `R32_UINT` drawable-size texture; cleared to 0 | 1920×1080 × 4 B = 8.3 MB | every render |
 
@@ -696,8 +697,8 @@ LUT generation (`tools/gen_luts.py`, run at build time, output checked in): `vir
 | 10 | Grid PU / sub-MB | `#00FFFF` A `0xB3` (1 px) |
 | 11 | Grid TU / TXB / transform 4×4-8×8 | `#FF00FF` A `0x99` (1 px) |
 | 12 | Slice / tile boundary | `#FF4136` A `0xFF` (2 px dashed 8/4) |
-| 13 | Deblock Bs = 1 | `#7FDBFF` A `0xCC` |
-| 14 | Deblock Bs = 2 | `#0074D9` A `0xFF` |
+| 13 | Deblock edge, weak: any non-zero `deblock_bs` value not in row 14 (H.264 bS 1–2, HEVC bS 1, AV1 filterSize 4/6/8; unknown codec: 1) (#745) | `#7FDBFF` A `0xCC` |
+| 14 | Deblock edge, strong: an intra block on either side or the codec's longest filter (H.264 bS 3–4, HEVC bS 2, AV1 filterSize 16; unknown codec: ≥ 2); 0 and 0xFF draw nothing (#745) | `#0074D9` A `0xFF` |
 | 15 | Selection outline | `#FFFFFF` A `0xFF` 2 px + outer `#000000` A `0xFF` 1 px |
 | 16 | Hover outline | `#FFD700` A `0xFF` 1 px |
 | 17 | Probe crosshair | `#FF4136` A `0xFF` 1 px |
@@ -710,7 +711,7 @@ LUT generation (`tools/gen_luts.py`, run at build time, output checked in): `vir
 | 31 | Frame type P | `#1E88E5` |
 | 32 | Frame type B | `#43A047` |
 
-These values are also the single source for the GUI legend and timeline (Chapter 11 §11.4.5 imports them via `ovt::render::kOverlayColors`). Colour-blind-safe variant (`kOverlayColorsCvd[]`): L0 `#E69F00`, L1 `#56B4E9`, bi `#CC79A7`, intra `#009E73` (Okabe-Ito); heatmaps default to viridis.
+These values are also the single source for the GUI legend and timeline (Chapter 11 §11.4.5 imports them via `ovt::render::kOverlayColors`). Colour-blind-safe variant (`kOverlayColorsCvd[]`): L0 `#E69F00`, L1 `#56B4E9`, bi `#0072B2`, intra `#009E73` (Okabe-Ito; bi is Okabe-Ito blue rather than `#CC79A7`, whose protanopia distance to L1 is ΔE2000 14.0 and fails WI-2.439 acceptance test 3 — with `#0072B2` the smallest pairwise distance over normal, protan and deutan vision is 17.9 and the colour holds ≥ 3:1 against both black and white, issue #632); row 20 (intra direction stroke) takes the intra role colour `#009E73` at alpha `0xFF` in the CVD table; heatmaps default to viridis. The 1-px halo of each row is a fixed property of the palette, not a per-frame setting: `kOverlayHalo[]` / `kOverlayHaloCvd[]` hold its RGBA (0 = no halo); the overlay passes read it and the contrast test checks it (issue #633).
 
 The colour tables and the legend helper are render-library symbols (WI-2.439), **not** part of the core C API of chapter 12 §12.3 (`core/include/ovt/*.h`); the GUI links `libovt-render` and includes this header directly:
 
@@ -719,15 +720,21 @@ The colour tables and the legend helper are render-library symbols (WI-2.439), *
 namespace ovt::render {
 extern const std::array<uint32_t, 33> kOverlayColors;     // RGBA (straight alpha), index = row of the table above
 extern const std::array<uint32_t, 33> kOverlayColorsCvd;  // colour-blind-safe variant; same indices
+extern const std::array<uint32_t, 33> kOverlayHalo;       // RGBA of the row's 1-px halo, 0 = none (issue #633)
+extern const std::array<uint32_t, 33> kOverlayHaloCvd;    // same for the colour-blind-safe palette
+enum class LegendShape : uint8_t { Fill, Line, Arrow, Hatch, Gradient, Text };  // swatch kind (chapter 11 §11.4.5)
+constexpr uint8_t kLegendNoColor = 0xFF;                  // color_index of a Gradient entry (bar drawn from cfg.lut)
 struct LegendEntry {
-  uint8_t      color_index;   // row of the table above
+  uint8_t      color_index;   // row of the table above, or kLegendNoColor
   uint32_t     rgba;          // from the active palette
   OverlayLayer layer;         // the layer bit this entry explains
   const char*  label_key;     // translation key, e.g. "legend.inter_l0"; the GUI runs it through qsTr
+  LegendShape  shape;         // issue #633
 };
 }  // namespace ovt::render
 
-/// Legend data for the GUI (chapter 11 §11.4.5). Fills `out` (capacity `cap`) with one entry per layer enabled in `cfg.layers`,
+/// Legend data for the GUI (chapter 11 §11.4.5). Fills `out` (capacity `cap`) with one entry per colour of each layer enabled in `cfg.layers`
+/// (a multi-colour layer such as PredFill, RefIdxFill, DeblockEdges or Selection gets one entry per colour, all carrying its layer bit; issue #633),
 /// in draw order (§10.5.6), from `kOverlayColorsCvd` when `cvd` is true; returns the number of entries needed (may exceed `cap`;
 /// call again with a larger buffer). `noexcept`; never allocates.
 size_t ovt_render_legend(const ovt::render::OverlayConfig& cfg, bool cvd, ovt::render::LegendEntry* out, size_t cap) noexcept;
@@ -760,7 +767,7 @@ Visibility rule R-MV-1: arrows are drawn only when `cell_px = 4 × zoom ≥ 4` (
 
 Heatmap value per cell `v ∈ [0, 1]` = `(x − min) / (max − min)` with the source column of `CellGrid`: `QP` (default range 0–51 for H.26x, 0–255 for AV1), `BitsX8` (`log2(1 + bits_x8/8)`, auto range), `MvMagnitude` (`sqrt(mv0_x² + mv0_y²)/16`, auto), `TxSize` (`tx_log2_w + tx_log2_h`, 4–12), `FilterIdx`, `RefIdx`, `IntraMode`, `MetricMap` (host-provided u16, e.g. per-block PSNR scaled to 0–65535 over the GUI's chosen range), `Custom`. The fragment shader: `color = texture(lut, v).rgb; alpha = cfg.heatmap_alpha` — cells with "not applicable" (−1 / 0xFF) get alpha 0.
 
-Labels (`LabelContent`): one string per **block** at the current cycle level (not per cell), centred in the block, font size = `clamp(cell_px / 2, 9, 18) × dpr`; drawn only when `block_px_min ≥ cfg.label_zoom_threshold` (24). Strings: `BlockSize` "16x8"; `PredMode` "I"/"P"/"B"/"S"(kip)/"IBC"; `QP` "27"; `Bits` "312b" (bits_x8/8); `MvValues` "L0 −12,+3" in **quarter-sample units for H.264/HEVC and eighth-sample for AV1** (codec-native display; conversion from the 1/16 storage is a shift); `IntraMode` codec-numbered with name where known ("DC", "PLANAR", "ANG 26", "D45_PRED"); `TxType` "DCT2", "DST7", "ADST_FLIPADST"; `RefIdx` "L0[0]"; `BlockId` decimal.
+Labels (`LabelContent`): one string per **block** (not per cell) — on the leaf blocks (those `CellGrid.block_id` names) until a later WI adds the cycle level to `OverlayConfig`, after which the GUI's level index (chapter 11 §11.3.9) selects CTU/CU/PU labels (issue #648) — centred in the block, font size = `clamp(cell_px / 2, 9, 18) × dpr`; drawn only when `block_px_min ≥ cfg.label_zoom_threshold` (24). Strings: `BlockSize` "16x8"; `PredMode` "I"/"P"/"B"/"S"(kip)/"IBC"; `QP` "27"; `Bits` "312b" (bits_x8/8); `MvValues` "L0 −12,+3" in **quarter-sample units for H.264/HEVC and eighth-sample for AV1** (codec-native display; conversion from the 1/16 storage is a shift); `IntraMode` codec-numbered with name where known ("DC", "PLANAR", "ANG 26", "D45_PRED"); `TxType` "DCT2", "DST7", "ADST_FLIPADST"; `RefIdx` "L0[0]"; `BlockId` decimal.
 
 ### 10.5.6 Draw order (ascending; later passes over earlier)
 
@@ -803,8 +810,8 @@ Id-buffer readback: after each `render()`, the surface issues `pl_tex_download` 
 | Plane upload (10-bit 4:2:0 as R16: 16.6 + 8.3 MB) | ≤ 2.0 ms | `pl_upload_plane` with persistent staging; skipped when `generation` unchanged |
 | libplacebo render (4K → 1080p viewport, bilinear, no peak detect) | ≤ 4.0 ms | `pl_render_image`; shader cache `pl_cache` saved to `~/.cache/ovt/plcache.bin` |
 | Cell attribute + heatmap textures (2 MB + 1 MB) | ≤ 0.5 ms | built on a worker thread, uploaded with `pl_tex_upload` |
-| MV instance textures (16.6 MB) | ≤ 3.0 ms build (4 threads, SoA → texel), ≤ 1.0 ms upload | built on worker threads in `OverlayBuilder::build()`; cached per (decode_index, mv_scale) in a GPU LRU of 8 frames |
-| Arrow pass (3.63 M vertices) | ≤ 3.0 ms | vertex pulling; off-screen instances collapsed |
+| MV instance textures (16.6 MB) | ≤ 3.0 ms build (4 threads, SoA → texel), ≤ 1.0 ms upload | built on worker threads in `OverlayBuilder::build()`; cached per (decode_index, frame fingerprint, config) in a per-surface LRU of 8 built sets of CPU arrays (#706) |
+| Arrow pass (4.67 M vertices, K = 9) | ≤ 3.0 ms | vertex pulling; off-screen instances collapsed |
 | Grid lines (≤ 0.46 M vertices) | ≤ 0.5 ms | viewport culling R-GRID-1 |
 | Labels (≤ 36 k glyphs) | ≤ 0.3 ms | SDF atlas |
 | Id buffer + readback | ≤ 1.0 ms | async |
@@ -830,7 +837,7 @@ Id-buffer readback: after each `render()`, the surface issues `pl_tex_download` 
 
 - R-ZOOM-1: `zoom ≥ 1.0` → nearest-neighbour (`pl_filter_nearest`); `zoom < 1.0` → `ViewState.downscale` filter. Chroma upsampling to luma resolution for display follows `chroma_upscale`.
 - R-ZOOM-2: zoom steps in the GUI are powers of two from 1/32 to 64 plus "fit"; the renderer accepts any positive double.
-- R-ZOOM-3: sample-value text appears when `zoom ≥ 24` (device px per luma sample) and `show_sample_values`: in plane modes 1–3 the value of that plane's sample (decimal, or hex with `0x` when the host sets `OverlayConfig.hex_values`) centred in each sample; in mode 0 the Y value only; at `zoom ≥ 48` in mode 0 three lines "Y/U/V" (U/V from the co-sited chroma sample). Text colour auto-contrasts: white with black outline over values < 50 % grey, black with white outline otherwise.
+- R-ZOOM-3: sample-value text appears when `zoom ≥ 24` (device px per luma sample) and `show_sample_values`: in plane modes 1–3 the value of that plane's sample (decimal; hex with `0x` once a public-header WI adds `OverlayConfig.hex_values` to §10.2.5 — until then the GUI's Dec|Hex toggle affects the panels but not the picture text, issue #648) centred in each sample; in mode 0 the Y value only; at `zoom ≥ 48` in mode 0 three lines "Y/U/V" (U/V from the co-sited chroma sample). Text colour auto-contrasts: white with black outline over values < 50 % grey, black with white outline otherwise.
 - R-ZOOM-4: a 1-px sample grid (`#808080` A `0x66`) is drawn at `zoom ≥ 8`.
 
 ### 10.6.3 Pixel probe output
@@ -848,6 +855,7 @@ All compare modes operate on **picture B resampled into A's coded grid** (identi
 - `Difference`: computed in the **code-value domain per plane**, before any colour conversion, in a custom `pl_shader`: with `a, b ∈ [0,1]` = `code / (2^bd − 1)` (B shifted to A's bit depth), per plane `d_p = |a_p − b_p|`. Output grey `g = clamp(gain × d, 0, 1)` — written **directly as the output code value** (`out = round(g × 255)` for 8-bit targets; no transfer function is applied, so 1 code value of difference at gain `G` shows as `round(G × 255 / (2^bd − 1))` grey) — where `d = d_Y` for `diff_plane = 0`, `d_U/d_V` for 1/2 (at chroma resolution, nearest), `max(d_Y, d_U, d_V)` for −1 (chroma sampled nearest to luma). `diff_signed`: `g = clamp(0.5 + gain × (a − b) / 2, 0, 1)` (mid-grey = equal). `diff_false_color`: `rgb = turbo(g)`. The result is presented as a full-range BT.709 sRGB SDR frame (no tone mapping): on `Srgb8` the grey is written as the code value; on `ScRgbLinear16F`, `Pq10` and `Hlg10` the same sRGB SDR value is converted to the target encoding with SDR white = 203 nits (BT.709 → BT.2020 for PQ/HLG), and dividers are SDR white in the target encoding (#478). The GUI shows the gain as "×N" and the implied threshold ("1 code value = N/1023 grey" etc.).
 - Status read-out: a reduction pass over the visible region computes `MSE_Y` (and U, V) → `PSNR_p = 10·log10((2^bd − 1)² / MSE_p)` in code values; the result is `Measurements.region_psnr[3]`. `render()` records the visible region; `measure()` runs the row-sum reduction and a small synchronous download (rows × 4 bytes per plane) only when the host asks (WI-4.452 may fold it into the asynchronous readback). Finite values are reported unclamped (they can exceed 99 dB); 99.0 is the documented stand-in for +inf, and a GUI that wants to say "identical" checks `MSE = 0`, not 99.0 (#478). This is a *display* convenience; authoritative metrics come from Chapter 9.
 - Overlays (§10.5) describe slot A in the full viewport, so they are drawn in `Single` and in `Flicker`'s A phase only (#478).
+- Plane modes (§10.6.1) apply to every slot drawn in `SideBySide`, `Split`, `Flicker` and the `Overlay` blend, so A and B show the same plane; `raw_code_values` applies only to views drawn in the target's own encoding and is ignored in the `Overlay` blend, which renders into the linear FP16 intermediate; `Difference` keeps its own `diff_plane` and ignores `plane_mode` (#623).
 
 Mismatch states: B has different chroma format or bit depth → B is converted (chroma: nearest; depth: shift) with a yellow "converted" badge supplied via `last_error() = "RND-0011 B converted: 4:2:2→4:2:0"`. Different sizes without `allow_scale_b` → `RND-0010`: `SideBySide`, `Split`, `Overlay` and `Flicker` show B at its own size with the shared zoom/pan; `Difference` shows a hatch and `region_psnr` stays −1 (#478).
 
@@ -926,16 +934,16 @@ Out-of-gamut flags (§10.7.2): convert linear content RGB to BT.709 RGB (3×3 vi
 enum class ExportKind : uint8_t {
   HdrPng16,        // 16-bit RGB PNG, BT.2020 primaries, PQ transfer, full range, cICP chunk (9,16,0,1); no overlays; crop applied; native resolution
   SdrPng8,         // 8-bit sRGB PNG, tone-mapped with the supplied ViewState (tone_map, gamut_map), native resolution, no overlays
-  ViewPng8,        // 8-bit sRGB PNG of the current viewport exactly as displayed (zoom, pan, overlays, compare), EMBEDDED-mode rendering
+  ViewPng8,        // 8-bit sRGB PNG of the current viewport exactly as displayed (zoom, pan, overlays, compare), EMBEDDED-mode rendering; colour type 6 (RGBA) when any texel's alpha is below 255, else colour type 2 (#637)
   ScopeWaveformPng, ScopeVectorscopePng, ScopeCiePng   // 8-bit RGB PNG of the scope textures: channel = round(255 * v / v_max), v = log2(1 + count), v_max over the image (#512); measures picture A synchronously
 };
 ```
 
-Rules: `HdrPng16` is produced by an offscreen `Rgb10A2`-equivalent render into an `RGBA16` UNORM texture with `target.color = {BT_2020, PQ}`, `repr.bits.color_depth = 16`, no dither, then written with **lodepng** (zlib licence, vendored `third_party/lodepng`) as colour type 2, bit depth 16, with a `cICP` chunk per the PNG Third Edition (W3C, https://www.w3.org/TR/png-3/#cICP-chunk) — values `colour_primaries = 9, transfer_function = 16, matrix_coefficients = 0, video_full_range_flag = 1`. For HLG sources `transfer_function = 18` and the data stays HLG-encoded (libplacebo target `HLG`). SDR sources exported as `HdrPng16` are written as 16-bit sRGB (`cICP 1,13,0,1`). `SdrPng8` uses the same path with an `RGBA8` sRGB target and `cICP 1,13,0,1`. File names default to `<stream>_<decode_index>_<display_index>_<kind>.png`.
+Rules: `HdrPng16` is produced by an offscreen `Rgb10A2`-equivalent render into an `RGBA16` UNORM texture with `target.color = {BT_2020, PQ}`, `repr.bits.color_depth = 16`, no dither, then written with **lodepng** (zlib licence, vendored `third_party/lodepng`) as colour type 2, bit depth 16, with a `cICP` chunk per the PNG Third Edition (W3C, https://www.w3.org/TR/png-3/#cICP-chunk) — values `colour_primaries = 9, transfer_function = 16, matrix_coefficients = 0, video_full_range_flag = 1`. For HLG sources `transfer_function = 18` and the data stays HLG-encoded (libplacebo target `HLG`). A PQ/HLG source also gets `mDCV` when it has mastering primaries and a mastering peak, and `cLLi` when it has MaxCLL (PNG Third Edition; both before `IDAT`; written through lodepng's native `cicp_*`, `mdcv_*` and `clli_*` `LodePNGInfo` fields, lodepng ≥ 20261102); SDR sources and `SdrPng8` get neither (issue #637). SDR sources exported as `HdrPng16` are written as 16-bit sRGB (`cICP 1,13,0,1`). `SdrPng8` uses the same path with an `RGBA8` sRGB target and `cICP 1,13,0,1`. `view_or_null == nullptr` means the `ViewState` of the last `render()` (the default `ViewState` before the first one); `HdrPng16` always forces 1:1, no dither and no tone mapping (PQ/HLG pass-through), `SdrPng8` forces 1:1 and keeps the view's `tone_map`, `gamut_map`, chroma upscaler and dither (issue #637). File names default to `<stream>_<decode_index>_<display_index>_<kind>.png`.
 
 Per-plane export (`PGM`, `Y4M`) is a **core** function (`ovt_picture_export_plane`, Chapter 12) operating on CPU planes: PGM `P5`, `maxval = 2^bd − 1`, 16-bit big-endian samples when `bd > 8`; Y4M with `C420jpeg/C420mpeg2/C420paldv/C422/C444` + `XYSCSS=` and `XCOLORRANGE=` tags. The renderer does not duplicate it; the GUI menu "Export plane…" calls core.
 
-Overlay-only export (`ViewPng8` with `background_rgba = 0x00000000` and the picture hidden via a `ViewState` flag `hide_picture`) produces a transparent PNG of the overlays for documentation.
+Overlay-only export (`ViewPng8` with `background_rgba = 0x00000000` and the picture hidden via a `ViewState` flag `hide_picture`) produces a transparent PNG of the overlays for documentation. `hide_picture` is not yet a `ViewState` member; adding it is a public-header change for a later WI, and until then `ViewPng8` writes RGBA whenever any texel is translucent (issue #637).
 
 ---
 
@@ -965,7 +973,7 @@ Overlay-only export (`ViewPng8` with `background_rgba = 0x00000000` and the pict
 
 ### 10.9.3 Performance tests
 
-Render benchmarks live in `tests/perf/render/` on the shared Google Benchmark harness of chapter 14 §14.9 (`bench_render_video_4k`, `bench_overlay_4k_mv_arrows`, `bench_overlay_build`, `bench_render_first_frame`; run by `tools/perf_run.py` on the self-hosted M1 and Android runners of chapter 14 §14.9.2, budgets in `tests/perf/budgets.json`). Fixtures: `synthetic_4k_mv.fb` (518,400 MVs), `synthetic_8k_mv.fb`, `real_4k_hevc_frame.fb` and `real_1080p_hevc_frame.fb` (from `ovt analyze` of corpus streams; chapter 14 §14.3.3), 300 frames each with a scripted pan/zoom path; each benchmark reports p50/p95/p99 CPU and GPU times per step of §10.5.8. Inputs and budgets of all four benchmarks (M1 and `pixel-tablet` rows) are defined only in chapter 14 §14.9.3 and `tests/perf/budgets.json` (D19); this chapter repeats no numbers. The per-pass GPU times of §10.5.8 are reported as benchmark counters, not gated.
+Render benchmarks live in `tests/perf/render/` on the shared Google Benchmark harness of chapter 14 §14.9 (`bench_render_video_4k`, `bench_overlay_4k_mv_arrows`, `bench_overlay_build`, `bench_render_first_frame`; run by `tools/perf_run.py` on the self-hosted M1 and Android runners of chapter 14 §14.9.2, budgets in `tests/perf/budgets.json`). Fixtures: `synthetic_4k_mv.fb` (518,400 MVs), `synthetic_8k_mv.fb`, `real_4k_hevc_frame.fb` and `real_1080p_hevc_frame.fb` (from `ovt analyze` of corpus streams; chapter 14 §14.3.3; they supply the coded size only, the rendered picture is a deterministic synthetic 10-bit PQ BT.2020 4:2:0 frame, issue #627), 300 frames each with a scripted pan/zoom path; each benchmark reports p50/p95/p99 CPU and GPU times per step of §10.5.8. Inputs and budgets of all four benchmarks (M1 and `pixel-tablet` rows) are defined only in chapter 14 §14.9.3 and `tests/perf/budgets.json` (D19); this chapter repeats no numbers. The per-pass GPU times of §10.5.8 are reported as benchmark counters, not gated.
 
 ### 10.9.4 Manual HDR checklist (release gate, `docs/dev/hdr-checklist.md`)
 
@@ -1063,7 +1071,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 ### WI-1.406 — macOS EDR native target (MoltenVK swapchain on CAMetalLayer)
 **Goal:** NATIVE mode on macOS with `ScRgbLinear16F` and "system PQ" options.
 **Depends on:** WI-1.403.
-**Produces:** `render/src/platform/macos_metal.mm`, `render/tests/manual_edr_pattern.cpp` (manual); the app-side glue `app/src/platform/mac_layer.mm` (child `QWindow(MetalSurface)` → `CAMetalLayer*`) is delivered by WI-1.463 (chapter 11) against the `DisplayTarget` contract of this WI.
+**Produces:** `render/src/platform/macos_metal.mm`, `render/tests/manual_edr_pattern.cpp` (manual); the app-side glue `app/src/platform/mac_native_host.mm` (child `QWindow(MetalSurface)` → `CAMetalLayer*`) is delivered by WI-1.463 (chapter 11) against the `DisplayTarget` contract of this WI.
 **Interface:** §10.4.1.
 **Steps:** 1. Child `QWindow(MetalSurface)` in the app; obtain `CAMetalLayer`. 2. Layer properties per §10.4.1; `vkCreateMetalSurfaceEXT`; `pl_vulkan_create_swapchain` with the HDR format pair; fallback to `B8G8R8A8 + SRGB_NONLINEAR`. 3. `retarget()` between EMBEDDED and NATIVE. 4. Headroom polling and `retarget` on change. 5. Manual tool renders `pq_patches_1000`.
 **Acceptance tests:** 1. Given an XDR display with HDR enabled, When NATIVE mode is entered, Then `active_encoding() == ScRgbLinear16F` and the 1000-nit patch is measured ≥ 4× the 203-nit patch luminance (colorimeter) or visibly brighter than UI white. 2. Given an SDR external display (a target whose `DisplayTarget.hdr_capable == false`, the field `display_probe()` fills, §10.2.2), When NATIVE requested, Then `init()` falls back to `Srgb8` without raising `RND-0040` (the `DisplayCaps.hdr_capable == false` half is WI-1.407 AT1, #470).
@@ -1125,10 +1133,10 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-1.403, WI-1.410.
 **Produces:** `render/src/export/png_export.cpp`, `third_party/lodepng/` (vendored, zlib licence recorded in `THIRD_PARTY_NOTICES.md`), `render/tests/test_export.cpp`.
 **Interface:** `ExportKind`.
-**Steps:** 1. Offscreen render per kind. 2. 16-bit PNG + `cICP` chunk via lodepng custom chunk API. 3. 8-bit PNGs. 4. Test: re-read PNG, verify `cICP` bytes and a patch value (1000-nit patch → PQ 16-bit code round(0.7518 × 65535) ± 32).
-**Acceptance tests:** 1. Given `pq_patches_1000.mp4`, When `HdrPng16`, Then the PNG has `cICP = 09 10 00 01` and the 1000-nit patch value is within ±32/65535 of 0.7518. 2. Given the same, When `SdrPng8` with BT2390, Then `tools/imgdiff.py --mode hdr-parity` against the mpv reference of chapter 14 §14.4.15 passes (p99 ΔE_ITP ≤ 1.0, mean ≤ 0.3; §10.9.2 item 3).
+**Steps:** 1. Offscreen render per kind. 2. 16-bit PNG + `cICP` (and `mDCV`/`cLLi` when the source carries them) through lodepng's native `LodePNGInfo` fields. 3. 8-bit PNGs (`ViewPng8` RGBA when translucent). 4. Test: re-read PNG, verify `cICP` bytes and a patch value (1000-nit patch → PQ 16-bit code round(0.7518 × 65535) ± 32); `SdrPng8` equals the on-screen `Srgb8` render; the BT.2390 export is reproducible (issue #637).
+**Acceptance tests:** 1. Given `pq_patches_1000.mp4`, When `HdrPng16`, Then the PNG has `cICP = 09 10 00 01` and the 1000-nit patch value is within ±32/65535 of 0.7518. 2. Given the same, When `SdrPng8` with BT2390, Then `tools/imgdiff.py --mode hdr-parity` against the mpv reference of chapter 14 §14.4.15 passes (p99 ΔE_ITP ≤ 1.0, mean ≤ 0.3; §10.9.2 item 3) — checked by the WI-1.575 parity suite, which exports through `SdrPng8` and produces those references (`tests/oracles/mpv_capture.py` depends on this WI); this WI ships the step 4 tests (issue #637).
 **Size:** M.
-**Notes / pitfalls:** lodepng writes `cICP` only through its custom-chunk API (`lodepng_chunk_create`) and the chunk must precede `PLTE`/`IDAT`; 16-bit samples are big-endian in PNG.
+**Notes / pitfalls:** lodepng 20261102 writes `cICP`, `mDCV` and `cLLi` from its native `LodePNGInfo` fields, before `IDAT` (no custom-chunk API needed; issue #637); 16-bit samples are big-endian in PNG. lodepng stays vendored under `third_party/lodepng/` (chapter 13 §13.3.1; issue #638).
 
 ### WI-1.413 — Test pattern generator and measurement expectations
 **Goal:** `tools/gen_hdr_patterns.py` and the `patterns` entries of the single corpora manifest for §10.9.2.
@@ -1157,10 +1165,10 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-1.403, WI-0.560.
 **Produces:** `tests/perf/render/bench_render_video.cpp` (`bench_render_video_4k`, `bench_render_first_frame`), budget rows in `tests/perf/budgets.json`.
 **Interface:** Google Benchmark flags of chapter 14 §14.9.1 plus `--fixture <fb> --frames N --viewport WxH`.
-**Steps:** 1. Synthetic 4K picture generator. 2. Scripted zoom/pan path. 3. `pl_timer` per step; p50/p95/p99 in the result JSON. 4. Budget rows.
+**Steps:** 1. Synthetic 4K picture generator (sized from `--fixture`'s `FrameInfo.coded_size`, issue #627). 2. Scripted zoom/pan path. 3. CPU wall-clock p50/p95/p99 per step in the result JSON; `pl_timer` per-pass GPU times deferred to issue #628 (`gpu_time: null` on every device while the Vulkan timestamp queries stay hidden, #304). 4. Budget rows.
 **Acceptance tests:** 1. Given the `m1-air-8gb` runner and the chapter 14 §14.9.3 input, When `bench_render_video_4k` runs, Then p95 meets its §14.9.3 budget. 2. Given the same runner, When `bench_render_first_frame` runs, Then `set_frame` → presented meets its §14.9.3 budget (warm and cold cache rows).
 **Size:** S.
-**Notes / pitfalls:** GPU timers (`pl_timer`) are unavailable on lavapipe — record CPU times only and mark the row `gpu_time: null`; never gate on a software device.
+**Notes / pitfalls:** GPU timers (`pl_timer`) are unavailable on lavapipe and, until issue #628, hidden on every device (#304) — record CPU times only and mark the row `gpu_time: null`; never gate on a software device. `bench_render_first_frame`: libovt-render has no on-disk shader cache, so `cold_ms` is the first `VideoSurface` creation in the process and `warm_ms` the median of later creations in the same process (PR #625). **Status:** landed as a partial in PR #625 with `gpu_time: null`; the per-pass GPU counters are the WI's only open item and are tracked in issue #628, not in a second WI.
 
 ### Phase 2 — Overlays, picking, labels
 
@@ -1190,7 +1198,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Produces:** `render/src/overlay/pass_lines.cpp`, `render/src/shaders/lines.glsl`, golden `synthetic_4k_grid.png`.
 **Interface:** `OverlayLayer::Grid*`, `GridPartition`.
 **Steps:** 1. Block-tree traversal with rect pruning. 2. Left/top-edge emission rule. 3. Vertex pulling of endpoints → quads; pixel snapping. 4. Dashed partition lines. 5. Rebuild triggers (zoom threshold, pan margin). 6. Vertex-count assertions.
-**Acceptance tests:** 1. Given the 4K fixture at fit zoom (0.5), When built, Then TU and PU levels emit 0 vertices and CTU emits 8160 × 8. 2. Given zoom 2 and a 1920×1080 viewport, When built, Then total vertices ≤ 480,000.
+**Acceptance tests:** 1. Given the 4K fixture at fit zoom (0.5), When built, Then TU and PU levels emit 0 vertices and CTU emits `2 × (2·N + C + R)` vertices (N = CTUs, C = CTU columns, R = CTU rows; block rects clipped to the coded picture), i.e. 8 348 vertices (4 174 lines) for the 64-px CTU fixture's 60 × 34 = 2 040 CTUs — the "8 vertices per block rect" of §10.5.1 is the upper bound before the left/top rule of §10.5.3 (issue #624). 2. Given zoom 2 and a 1920×1080 viewport, When built, Then total vertices ≤ 480,000.
 **Size:** M.
 **Notes / pitfalls:** emit each edge once (left/top rule, §10.5.3); dashed lines need the cumulative length in a vertex attribute, not `gl_FragCoord`, or the pattern jumps at zoom changes.
 
@@ -1199,8 +1207,8 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-2.431.
 **Produces:** `tools/gen_sdf_atlas.py` (Pillow + NumPy distance transform), `render/fonts/dejavu_sans_mono_sdf.h`, `render/src/overlay/pass_labels.cpp`, `render/src/shaders/sdf_text.glsl`, golden `labels_zoom32.png`.
 **Interface:** `LabelContent`, `label_zoom_threshold`.
-**Steps:** 1. Atlas generation (checked in; licence file for DejaVu). 2. Glyph instance texture builder with string formatting per §10.5.5. 3. SDF fragment shader with outline. 4. Auto-contrast for sample values. 5. Sample-value text at zoom ≥ 24 (moved here from WI-1.409). 6. Goldens.
-**Acceptance tests:** 1. Given `label_zoom_threshold = 24` and zoom 5 (cell = 20 px), When built, Then zero glyphs. 2. Given zoom 8 and `LabelContent::QP`, When rendered, Then one string per block and golden match. 3. Given zoom 32 on an 8-bit frame, When rendered, Then OCR-free golden match of `labels_zoom32.png` (sample-value text).
+**Steps:** 1. Atlas generation (checked in; licence file for DejaVu; 1024 px wide, height as needed, issue #648). 2. Glyph instance texture builder with string formatting per §10.5.5. 3. SDF fragment shader with outline. 4. Auto-contrast for sample values. 5. Sample-value text at zoom ≥ 24 (moved here from WI-1.409). 6. Goldens.
+**Acceptance tests:** 1. Given `label_zoom_threshold = 24` and zoom 5 (cell = 20 px), When built, Then zero glyphs. 2. Given zoom 8 and `LabelContent::QP`, When rendered, Then one string per leaf block (issue #648) and golden match. 3. Given zoom 32 on an 8-bit frame, When rendered, Then OCR-free golden match of `labels_zoom32.png` (sample-value text).
 **Size:** M.
 **Notes / pitfalls:** the SDF atlas is generated at build time from DejaVu Sans Mono (Bitstream Vera licence file committed next to it); SDF edge width must be scaled by `dpr` or text looks bold on HiDPI.
 
@@ -1209,8 +1217,8 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-2.431.
 **Produces:** `render/src/overlay/pass_arrows.cpp`, `render/src/shaders/arrows.glsl`, fixture `synthetic_4k_mv.fb`, golden `synthetic_4k_mv.png`.
 **Interface:** `OverlayLayer::MvL0/MvL1/MvBi/IntraDirs`, `mv_scale`, `mv_min_px`.
-**Steps:** 1. Instance texture pair builder (threads). 2. Static `uint8` corner buffer (grown on demand). 3. Vertex shader (shaft+head, dots, culling collapse). 4. Colour rules incl. flags. 5. Intra strokes as 2-vertex variant. 6. R-MV-1 and R-8K-1 culled builder.
-**Acceptance tests:** 1. Given 518,400 MVs, When rendered at zoom 1 on a 3840×2160 viewport on the M1 runner (test tagged `[.gpu]`, run only on the GPU runners of chapter 14 §14.9.2 and chapter 16 §16.5.3), Then the image golden-matches `synthetic_4k_mv.png` and the arrow-pass GPU time is reported as a benchmark counter (the frame budget is `bench_overlay_4k_mv_arrows`, chapter 14 §14.9.3). 2. Given an MV of (16, 0) (1 luma sample) at zoom 1, When rendered, Then it is drawn as a dot (`mv_min_px = 2`).
+**Steps:** 1. Instance texture pair builder (threads). 2. Static `uint8` corner buffer (grown on demand). 3. Vertex shader (shaft+head, dots, culling collapse). 4. Colour rules incl. flags. 5. Intra strokes as the head-collapsed shaft variant (§10.5.1 Intra directions row, issue #644). 6. R-MV-1 and R-8K-1 culled builder.
+**Acceptance tests:** 1. Given 518,400 MVs, When rendered at zoom 1 on a 3840×2160 viewport on the M1 runner (test tagged `[.gpu]`, run only on the GPU runners of chapter 14 §14.9.2 and chapter 16 §16.5.3), Then its central 1920×1080 golden-matches `synthetic_4k_mv.png` (the golden is the §10.9.2 item 4 viewport, 1920×1080 at dpr 1.0, centred on the 4K fixture at zoom 1, so the same view moved by whole pixels; the `[fast][vulkan]` test renders that viewport directly on lavapipe and MoltenVK; a full 4K PNG would be ≈ 25 MB in the tree) and the render is deterministic, and the arrow-pass time is reported as a benchmark counter `bench_overlay_4k_mv_arrows arrow_pass_ms=…` — until #304 lets `pl_timer` return values, the median over 21 runs of `render()` + readback wall time with arrows minus without; WI-2.438 owns the real benchmark (the frame budget is `bench_overlay_4k_mv_arrows`, chapter 14 §14.9.3; issue #645). 2. Given an MV of (16, 0) (1 luma sample) at zoom 1, When rendered, Then it is drawn as a dot (`mv_min_px = 2`).
 **Size:** L.
 **Notes / pitfalls:** vertex pulling needs `textureSize`-independent indexing (`gl_VertexID / 9` → instance, `% 9` → corner); degenerate triangles for culled instances must have all three vertices identical or some tilers still rasterise a sliver.
 
@@ -1229,20 +1237,20 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-2.432.
 **Produces:** `render/src/overlay/pass_misc.cpp`, goldens `deblock_edges.png`, `refidx_fill.png`, `selection.png`.
 **Interface:** `OverlayLayer::DeblockEdges/RefIdxFill/Selection/Probe/SelectionRect`, `selected_block`, `selected_mv`, `probe_x/y`, `selection_rect`.
-**Steps:** 1. Edge list from `deblock_bs_v/h` with the ≥ 8 px rule. 2. Ref fill via attribute G/B channels. 3. Selection outline (2 px white + 1 px black), hover, probe crosshair, rect. 4. Goldens.
+**Steps:** 1. Per-cell `RG8UI` edge-class texture from `deblock_bs_v/h` (`detail::deblock_edge_class`, §10.5.2 rows 13/14) with the ≥ 8 px rule (#745). 2. Ref fill via attribute G/B channels. 3. Selection outline (2 px white + 1 px black) for `selected_block` and for `selected_mv` (`MotionVector.rect`), probe crosshair, rect; the row-16 hover outline is drawn from `OverlayConfig.hovered_block`, which the §11.3.2 hover wiring in chapter 11 sets (#746); remove the interim Qt Quick crosshair/rectangle items of WI-1.456 and pass `OverlayConfig.probe_x/y` / `selection_rect` instead (issue #650). 4. Goldens.
 **Acceptance tests:** 1. Given a selected block, When rendered, Then its outline pixels are `#FFFFFF` with a `#000000` 1-px halo (golden). 2. Given zoom 1 (cell 4 px), When rendered, Then no deblock edges are drawn.
 **Size:** S.
 **Notes / pitfalls:** the selection outline is drawn in device pixels (2 px + 1 px halo) regardless of zoom; ref-index fills use the LUT indices 22–29 of §10.5.2, not the heatmap LUT.
 
-### WI-2.437 — GPU overlay cache and `set_overlays` lifecycle
-**Goal:** LRU of 8 built `OverlaySet`s keyed by (decode_index, config hash) to make overlay toggling ≤ 1 frame.
+### WI-2.437 — Overlay cache and `set_overlays` lifecycle
+**Goal:** Per-surface LRU of 8 built `OverlaySet`s (CPU arrays shared by handles; 256 MB desktop, 64 MB Android) keyed by (`decode_index`, 64-bit frame fingerprint, hash of the `OverlayConfig` fields that change built data, hash of the host's `custom_cells` when the heatmap reads them) to make overlay toggling ≤ 1 frame. The fingerprint covers `FrameInfo` `display_index`, `poc`, `pts`, `dts`, `size_bytes`, `type`, `coded_size`, `plugin_id`/`plugin_version`, grid size and the block/MV/partition counts, so another file or a re-analysis never hits a stale entry; the masked config is also compared field by field (#706).
 **Depends on:** WI-2.434.
 **Produces:** `render/src/overlay/overlay_cache.cpp`, `render/tests/test_overlay_cache.cpp`.
 **Interface:** `set_overlays`, `OverlaySet` opaque.
-**Steps:** 1. Hash `OverlayConfig` fields that affect GPU data (not selection/probe). 2. LRU with byte budget (256 MB desktop, 64 MB Android). 3. Eviction tests.
+**Steps:** 1. Frame fingerprint and hash of the `OverlayConfig` fields that affect built data (not selection/probe). 2. LRU of built CPU arrays with byte budget (256 MB desktop, 64 MB Android); `set_overlays()` uploads the GPU textures (≤ 1.0 ms, §10.5.8) and keeps them when the new handle shares arrays already on the GPU. 3. Eviction tests.
 **Acceptance tests:** 1. Given 10 frames built in sequence, When frame 1 is requested again, Then it is rebuilt (evicted) and frame 10 is a hit.
 **Size:** S.
-**Notes / pitfalls:** selection, probe and `selection_rect` are *not* part of the cache key (they are uniforms); `mv_scale` is, because the instance textures bake it in.
+**Notes / pitfalls:** draw-time uniforms are *not* part of the cache key: the selection/probe/selection-rect bits, `selected_block`, `selected_mv`, `selection_rect`, `probe_x/y`, `heatmap_alpha`, `lut`, `label_zoom_threshold`, `mv_min_px`, `line_px` (#706); `mv_scale` is, because the instance arrays bake it in.
 
 ### WI-2.438 — Overlay performance benchmarks (`bench_overlay_*`) and budget enforcement
 **Goal:** Extend WI-1.415 with overlay fixtures and the §10.5.8 step table.
@@ -1260,10 +1268,10 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-2.431.
 **Produces:** `render/include/ovt/render/overlay_colors.h` (`kOverlayColors`, `kOverlayColorsCvd`, `ovt_render_legend(OverlayConfig, out entries[])`), test.
 **Interface:** §10.5.2.
-**Steps:** 1. Tables. 2. Legend entries (name, RGBA, shape: fill/line/arrow/hatch) per enabled layer. 3. Contrast test (`render/tests/test_overlay_contrast.cpp`, criterion below). 4. CVD simulation check (deuteranopia/protanopia via the Machado 2009 matrices) that the CVD palette's L0/L1/bi/intra colours stay pairwise distinguishable (ΔE2000 ≥ 15 after simulation).
-**Acceptance tests:** 1. Given `layers = MvL0|MvL1|GridCU`, When legend requested, Then 3 entries in draw order with the table colours. 2. **Contrast:** Given the 12 golden frames of §10.9.2 rendered to `SdrPng8` without overlays, When for each frame the 10 % darkest and 10 % lightest luma pixels are averaged, Then every line/arrow/label colour of `kOverlayColors[]` and `kOverlayColorsCvd[]` (indices 1, 2, 3, 8–21) composited at its table alpha has WCAG 2.x contrast ≥ 3:1 against **at least one** of the two averages, and every colour that fails against either average is drawn with its 1-px `#000000`/`#FFFFFF` halo (indices 15 and 19 already do; the test asserts the halo rule is set for the others in `OverlayConfig` defaults). 3. Given the CVD simulation of step 4, When applied to `kOverlayColorsCvd[]`, Then all pairwise ΔE2000 ≥ 15.
+**Steps:** 1. Tables (colours and halos). 2. Legend entries (name, RGBA, `LegendShape`: Fill/Line/Arrow/Hatch, Gradient for the heatmap bar, Text for labels) per colour of each enabled layer. 3. Contrast test (`render/tests/test_overlay_contrast.cpp`, criterion below). 4. CVD simulation check (deuteranopia/protanopia via the Machado 2009 matrices) that the CVD palette's L0/L1/bi/intra colours stay pairwise distinguishable (ΔE2000 ≥ 15 after simulation).
+**Acceptance tests:** 1. Given `layers = MvL0|MvL1|GridCU`, When legend requested, Then 3 entries in draw order with the table colours. 2. **Contrast:** Given the `render-ref` frames of §10.9.2 (WI-1.575) rendered to `SdrPng8` without overlays — until they exist, the interim backgrounds are full-range black/white (0/255) and video-range black/white (16/235), the extremes any `SdrPng8` frame can reach (issue #634) — When for each frame the 10 % darkest and 10 % lightest luma pixels are averaged (compositing straight-alpha over in linear light, as libplacebo blends `pl_overlay`), Then every line/arrow/label colour of `kOverlayColors[]` and `kOverlayColorsCvd[]` (indices 1, 2, 3, 8–21) composited at its table alpha has WCAG 2.x contrast ≥ 3:1 against **at least one** of the two averages, and every colour that fails against either average has a non-zero 1-px `#000000`/`#FFFFFF` halo in `kOverlayHalo[]` / `kOverlayHaloCvd[]` (indices 15 and 19 already do; derived from the stricter 16/235 pair; issue #633). When WI-1.575 lands, the test adds the real frame averages and re-checks the "at least one" side (row 11 reaches only 4.0:1 on dark backgrounds). 3. Given the CVD simulation of step 4, When applied to `kOverlayColorsCvd[]`, Then all pairwise ΔE2000 ≥ 15.
 **Size:** S.
-**Notes / pitfalls:** no single colour can hold 3:1 against both black and white video content — the halo rule is what guarantees legibility; the CVD palette is colour-blind-*safe* only for the four coded roles (L0, L1, bi, intra); heatmaps rely on `viridis`/`cividis`, and the frame-type palette on the shape coding of FR-GUI-020 (chapter 11 §11.4.5).
+**Notes / pitfalls:** no single colour can hold 3:1 against both black and white video content — the halo rule is what guarantees legibility; the CVD palette is colour-blind-*safe* only for the four coded roles (L0, L1, bi, intra); heatmaps rely on `viridis`/`cividis`, and the frame-type palette on the shape coding of FR-GUI-020 (chapter 11 §11.4.5). `OverlayConfig` (§10.2.5) carries no palette switch in this WI: the fill passes use the standard palette, and a `bool cvd_palette` member is added by the overlay-pass WIs or the GUI WI that wires the `K` toggle (chapter 11 §11.4.5), so `ovt_render_legend` takes `cvd` explicitly (issue #633).
 
 ### Phase 4 — Linux Wayland HDR, HDR scopes, HDR10+/DV, exports
 
@@ -1408,7 +1416,7 @@ Conventions: all paths relative to the repository root; "render tests" = `ctest 
 **Depends on:** WI-1.404, WI-A.450.
 **Produces:** `android/app/src/main/cpp/gl_share.cpp`, `app/src/picture_host_android.cpp`.
 **Interface:** `Interop::GlTexture` (§10.2.2 Android row), fence rule of that row.
-**Steps:** 1. Obtain Qt's `EGLContext` via `QOpenGLContext::nativeInterface<QNativeInterface::QEGLContext>()`. 2. Create a shared context on the render thread. 3. `pl_opengl_create` with callbacks. 4. `glFenceSync`/`glWaitSync` in the share group (GLES 3.0 core), `EGL_KHR_fence_sync` across groups, `glFinish` only behind `OVT_RENDER_GL_FINISH=1`.
+**Steps:** 1. Obtain Qt's `EGLContext` via `QOpenGLContext::nativeInterface<QNativeInterface::QEGLContext>()`. 2. Create a shared context on the render thread. 3. `pl_opengl_create` on the shared context, which the host makes current around every `VideoSurface` call (`init`, `set_frame`, `render`, `resize`, destruction) and restores Qt's after; no make/release-current callbacks (they would need a `DisplayTarget` field; the NATIVE path of WI-A.401 owns its own context, §10.4.3) (#725). 4. `glFenceSync`/`glWaitSync` in the share group (GLES 3.0 core); if the shared context cannot be created the host falls back to `Interop::None` (CPU copy) as the Vulkan row does; `glFinish` only behind `OVT_RENDER_GL_FINISH=1`.
 **Acceptance tests:** 1. Given the emulator, When a frame is shown in EMBEDDED mode, Then the Qt item screenshot equals `SdrPng8` ≤ 0.1 % differing. 2. Given 300 frames with the fence path, When presented, Then no frame shows a partially rendered texture (checksum of each presented frame equals an offscreen render).
 **Size:** M.
 **Notes / pitfalls:** Qt's GLES context on Android is created on the render thread — create the shared context from that thread's `eglGetCurrentContext()` or `EGL_BAD_MATCH` follows.

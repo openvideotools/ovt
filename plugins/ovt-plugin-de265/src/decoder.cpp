@@ -205,6 +205,10 @@ ovt_status Decoder::create(const uint8_t* codec_private, size_t len, int threads
   de265_set_parameter_bool(ctx, DE265_DECODER_PARAM_BOOL_SEI_CHECK_HASH, 0);
   de265_set_parameter_int(ctx, DE265_DECODER_PARAM_ACCELERATION_CODE, de265_acceleration_AUTO);
   de265_set_image_allocation_functions(ctx, &g_allocation, nullptr);
+#ifdef OVT_DE265_INTERNALS
+  // Patch 0002 (WI-2.165): keep the PU/TU syntax and CU/CTB bit counts of every picture for map_blocks().
+  de265_internals_set_parameter_bool(ctx, DE265_INTERNALS_PARAM_KEEP_SYNTAX, 1);
+#endif
   if (threads > 0 && de265_isOK(de265_start_worker_threads(ctx, std::min(threads, kMaxThreads))) == 0) {
     return OVT_E_PLUGIN;
   }
@@ -557,6 +561,74 @@ void copy_cells(const de265_image* img, BlockData* d) {
   }
 }
 
+// The patch-0002 syntax of the picture (WI-2.165): PU/TU syntax per 4x4, CU bits per MinCb unit, CTB bits.
+void copy_syntax(const de265_image* img, BlockData* d) {
+  SyntaxData& s = d->syn;
+  if (de265_internals_has_syntax(img) == 0) {
+    return;  // has_syntax stays false
+  }
+  const std::size_t n = std::size_t{d->cells_w} * d->cells_h;
+  s.pu.resize(n);
+  s.tu.resize(n);
+  for (uint32_t y = 0; y < d->cells_h; ++y) {
+    for (uint32_t x = 0; x < d->cells_w; ++x) {
+      const std::size_t i = (std::size_t{y} * d->cells_w) + x;
+      const auto xi = static_cast<int>(x);
+      const auto yi = static_cast<int>(y);
+      de265_internals_pu_syntax pu{};
+      de265_internals_get_PU_syntax(img, xi, yi, &pu);
+      PuSyntax& p = s.pu[i];
+      p.kind = pu.kind;
+      p.merge_flag = pu.merge_flag;
+      p.merge_idx = pu.merge_idx;
+      p.inter_pred_idc = pu.inter_pred_idc;
+      p.ref_idx = {pu.ref_idx[0], pu.ref_idx[1]};
+      p.mvp_flag = {pu.mvp_lX_flag[0], pu.mvp_lX_flag[1]};
+      p.mvd_x = {pu.mvd_x[0], pu.mvd_x[1]};
+      p.mvd_y = {pu.mvd_y[0], pu.mvd_y[1]};
+      p.mvd_l1_zero = pu.mvd_l1_zero;
+      p.prev_intra_luma_pred_flag = pu.prev_intra_luma_pred_flag;
+      p.mpm_idx = pu.mpm_idx;
+      p.rem_intra_luma_pred_mode = pu.rem_intra_luma_pred_mode;
+      p.intra_chroma_pred_mode = pu.intra_chroma_pred_mode;
+      de265_internals_tu_syntax tu{};
+      de265_internals_get_TU_syntax(img, xi, yi, &tu);
+      TuSyntax& t = s.tu[i];
+      t.coded = tu.coded;
+      t.trafoDepth = tu.trafoDepth;
+      t.log2TrafoSize = tu.log2TrafoSize;
+      for (std::size_t c = 0; c < 3; ++c) {
+        t.cbf.at(c) = tu.cbf[c];                                          // NOLINT(*-constant-array-index)
+        t.transform_skip_flag.at(c) = tu.transform_skip_flag[c];          // NOLINT(*-constant-array-index)
+        t.explicit_rdpcm_flag.at(c) = tu.explicit_rdpcm_flag[c];          // NOLINT(*-constant-array-index)
+        t.explicit_rdpcm_dir_flag.at(c) = tu.explicit_rdpcm_dir_flag[c];  // NOLINT(*-constant-array-index)
+        t.last_sig_coeff_x.at(c) = tu.last_sig_coeff_x[c];                // NOLINT(*-constant-array-index)
+        t.last_sig_coeff_y.at(c) = tu.last_sig_coeff_y[c];                // NOLINT(*-constant-array-index)
+        t.nnz.at(c) = tu.nnz[c];                                          // NOLINT(*-constant-array-index)
+      }
+      t.cu_qp_delta_abs = tu.cu_qp_delta_abs;
+      t.cu_qp_delta_sign_flag = tu.cu_qp_delta_sign_flag;
+      t.cu_chroma_qp_offset_flag = tu.cu_chroma_qp_offset_flag;
+      t.cu_chroma_qp_offset_idx = tu.cu_chroma_qp_offset_idx;
+    }
+  }
+  s.cu_bits.resize(d->cb.size());
+  for (int y = 0; y < d->cbs_h; ++y) {
+    for (int x = 0; x < d->cbs_w; ++x) {
+      s.cu_bits[(static_cast<std::size_t>(y) * static_cast<std::size_t>(d->cbs_w)) + static_cast<std::size_t>(x)] =
+          de265_internals_get_CU_bits_x8(img, x, y);
+    }
+  }
+  s.ctb_bits.resize(static_cast<std::size_t>(d->ctbs_w) * static_cast<std::size_t>(d->ctbs_h));
+  for (int y = 0; y < d->ctbs_h; ++y) {
+    for (int x = 0; x < d->ctbs_w; ++x) {
+      s.ctb_bits[(static_cast<std::size_t>(y) * static_cast<std::size_t>(d->ctbs_w)) + static_cast<std::size_t>(x)] =
+          de265_internals_get_CTB_bits_x8(img, x, y);
+    }
+  }
+  s.has_syntax = true;
+}
+
 // Copies the block metadata map_blocks() needs (WI-2.164) before the picture goes back to libde265.
 void copy_blocks(const de265_image* img, const Frame& frame, BlockData* d) {
   int ctb_log2 = 0;
@@ -586,6 +658,7 @@ void copy_blocks(const de265_image* img, const Frame& frame, BlockData* d) {
   }
   copy_ctbs(img, d);
   copy_cells(img, d);
+  copy_syntax(img, d);
   d->slices.reserve(static_cast<std::size_t>(slices));
   for (int s = 0; s < slices; ++s) {
     d->slices.push_back(slice_header(img, s));

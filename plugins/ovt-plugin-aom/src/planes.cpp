@@ -124,16 +124,21 @@ std::string blob_id(int32_t decode_index, ovt::fb::PlaneStage stage, int plane) 
 void add_plane_refs(flatbuffers::FlatBufferBuilder& fbb, int32_t decode_index, const Picture& recon,
                     uint32_t plane_stage_mask, std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>* out,
                     std::map<std::string, PlaneView>* blobs) {
-  constexpr auto kRecon = ovt::fb::PlaneStage::Reconstruction;
-  if ((plane_stage_mask & (1U << static_cast<unsigned>(kRecon))) == 0 || recon.empty()) {
+  add_stage_plane_refs(fbb, decode_index, ovt::fb::PlaneStage::Reconstruction, recon, plane_stage_mask, out, blobs);
+}
+
+void add_stage_plane_refs(flatbuffers::FlatBufferBuilder& fbb, int32_t decode_index, ovt::fb::PlaneStage stage,
+                          const Picture& pic, uint32_t plane_stage_mask,
+                          std::vector<flatbuffers::Offset<ovt::fb::PlaneRef>>* out,
+                          std::map<std::string, PlaneView>* blobs) {
+  if ((plane_stage_mask & (1U << static_cast<unsigned>(stage))) == 0 || pic.empty()) {
     return;
   }
-  for (int p = 0; p < recon.num_planes; ++p) {
-    const PlaneView& v = recon.planes.at(static_cast<size_t>(p));
-    std::string id = blob_id(decode_index, kRecon, p);
-    out->push_back(ovt::fb::CreatePlaneRefDirect(fbb, kRecon, static_cast<uint8_t>(p), v.width, v.height,
-                                                 v.stride_bytes, v.bit_depth, v.sample_bytes, /*is_signed=*/false,
-                                                 id.c_str()));
+  for (int p = 0; p < pic.num_planes; ++p) {
+    const PlaneView& v = pic.planes.at(static_cast<size_t>(p));
+    std::string id = blob_id(decode_index, stage, p);
+    out->push_back(ovt::fb::CreatePlaneRefDirect(fbb, stage, static_cast<uint8_t>(p), v.width, v.height, v.stride_bytes,
+                                                 v.bit_depth, v.sample_bytes, /*is_signed=*/false, id.c_str()));
     blobs->emplace(std::move(id), v);
   }
 }

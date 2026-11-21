@@ -36,7 +36,7 @@ std::vector<std::array<int, 2>> reduction_chain(int width, int height) {
   return chain;
 }
 
-bool prep_pass(pl_dispatch dp, pl_gpu gpu, pl_tex m, enum pl_color_primaries primaries, pl_tex* q, std::string& err) {
+bool prep_pass(pl_dispatch dp, pl_gpu gpu, pl_tex m, const struct pl_color_space& source, pl_tex* q, std::string& err) {
   struct pl_tex_params tp = {};
   tp.w = m->params.w;
   tp.h = m->params.h;
@@ -49,8 +49,12 @@ bool prep_pass(pl_dispatch dp, pl_gpu gpu, pl_tex m, enum pl_color_primaries pri
   }
 
   // CIE Y of linear content RGB: the Y row of the primaries' RGB -> XYZ matrix (§10.6.3).
-  const pl_matrix3x3 rgb2xyz = pl_get_rgb2xyz_matrix(pl_raw_primaries_get(primaries));
+  const pl_matrix3x3 rgb2xyz = pl_get_rgb2xyz_matrix(pl_raw_primaries_get(source.primaries));
   const std::array<float, 3> luma = {rgb2xyz.m[1][0], rgb2xyz.m[1][1], rgb2xyz.m[1][2]};
+  // §10.7.8 (WI-4.453): content RGB -> BT.709 and Display P3 for the out-of-gamut flags.
+  const std::array<float, 9> to709 = gamut_matrix(source.primaries, PL_COLOR_PRIM_BT_709);
+  const std::array<float, 9> top3 = gamut_matrix(source.primaries, PL_COLOR_PRIM_DISPLAY_P3);
+  const float peak = gamut_peak(source);
 
   pl_shader sh = pl_dispatch_begin(dp);
   struct pl_shader_desc desc = {};
@@ -58,9 +62,15 @@ bool prep_pass(pl_dispatch dp, pl_gpu gpu, pl_tex m, enum pl_color_primaries pri
   desc.desc.type = PL_DESC_SAMPLED_TEX;
   desc.binding.object = m;
   desc.binding.sample_mode = PL_TEX_SAMPLE_NEAREST;
-  struct pl_shader_var var = {};
-  var.var = pl_var_vec3("ovt_luma");
-  var.data = luma.data();
+  std::array<struct pl_shader_var, 4> vars = {};
+  vars[0].var = pl_var_vec3("ovt_luma");
+  vars[0].data = luma.data();
+  vars[1].var = pl_var_mat3("ovt_to709");
+  vars[1].data = to709.data();
+  vars[2].var = pl_var_mat3("ovt_top3");
+  vars[2].data = top3.data();
+  vars[3].var = pl_var_float("ovt_peak");
+  vars[3].data = &peak;
   struct pl_custom_shader custom = {};
   custom.header = static_cast<const char*>(kShaderMeasurePrep);
   custom.body = "color = ovt_measure_prep();";
@@ -68,8 +78,8 @@ bool prep_pass(pl_dispatch dp, pl_gpu gpu, pl_tex m, enum pl_color_primaries pri
   custom.output = PL_SHADER_SIG_COLOR;
   custom.descriptors = &desc;
   custom.num_descriptors = 1;
-  custom.variables = &var;
-  custom.num_variables = 1;
+  custom.variables = vars.data();
+  custom.num_variables = static_cast<int>(vars.size());
   custom.output_w = tp.w;
   custom.output_h = tp.h;
   custom.description = "ovt measure_prep (§10.7.2)";

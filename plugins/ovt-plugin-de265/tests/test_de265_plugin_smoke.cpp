@@ -365,8 +365,8 @@ TEST_CASE("de265 plugin: caps and ABI table", "[fast][third_party]") {
   CHECK(std::string_view(caps->license) == "LGPL-3.0-or-later");
   CHECK(caps->plane_stages == 0x5FU);  // Reconstruction + the patch-0003 stages (WI-2.166, test_de265_planes.cpp)
 #ifdef OVT_DE265_INTERNALS
-  // WI-2.164: every grid vector but bits_x8 (patch 0002, WI-2.165).
-  CHECK(caps->grid_fields == (0xFFFFU & ~OVT_GRID_BITS_X8));
+  // WI-2.164 / WI-2.165: every grid vector, bits_x8 from patch 0002.
+  CHECK(caps->grid_fields == 0xFFFFU);
 #else
   CHECK(caps->grid_fields == 0U);  // a system libde265 has no block metadata
 #endif

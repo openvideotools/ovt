@@ -60,6 +60,7 @@ Rectangle {
                     id: drag
 
                     target: null
+                    enabled: bar.group.workspace.dragEnabled // off below 1200 dp (§11.5.2)
                     onActiveChanged: {
                         const indicator = bar.group.workspace.dropIndicator
                         if (active)
