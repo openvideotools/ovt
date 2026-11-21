@@ -222,6 +222,16 @@ TEST_CASE("h264_frame_boundary: prefix NAL, redundant pictures, partitions and e
   CHECK(next.role == idx::UnitRole::FirstSlice);
   CHECK_FALSE(next.starts_access_unit);
   CHECK(next.picture_index == 3);
+  // A redundant slice after an SPS that started the next access unit is a new picture (rule 10), not part of the open
+  // one, so a PPS that follows it starts the access unit after it (fuzz-nightly h264_index crash fca46b18).
+  CHECK(fb.on_non_vcl(make_nal(7, 3)).starts_access_unit);
+  auto redundant = make_slice(1);
+  redundant.redundant_pic_cnt = 1;
+  const auto late = fb.on_slice(p, redundant, 0);
+  CHECK(late.role == idx::UnitRole::FirstSlice);
+  CHECK(late.rules == std::vector<uint8_t>{10});
+  CHECK(late.picture_index == 4);
+  CHECK(fb.on_non_vcl(make_nal(8, 3)).starts_access_unit);
 }
 
 TEST_CASE("h264_frame_boundary: complementary field pairs", "[index][h264][fast]") {

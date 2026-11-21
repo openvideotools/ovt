@@ -78,8 +78,10 @@ BoundaryDecision FrameBoundary::on_slice(const syntax::h264::NalHeader& nal, con
   cur.idr_pic_id = sh.idr_pic_id;
 
   if (picture_open_) {
-    // A redundant coded picture belongs to its primary coded picture and is never compared (§7.4.1.2.4).
-    if (sh.redundant_pic_cnt > 0) {
+    // A redundant coded picture belongs to its primary coded picture and is never compared (§7.4.1.2.4), unless a
+    // rule-10 unit already started the next access unit: a redundant picture follows its primary picture inside one
+    // access unit, so after an AUD / SEI / SPS / PPS it cannot join the open picture (fuzz-nightly 2026-11-21, #767).
+    if (sh.redundant_pic_cnt > 0 && !rule10_since_vcl_) {
       d.role = UnitRole::RedundantSlice;
       d.picture_index = next_index_ - 1;
       return d;
