@@ -124,6 +124,8 @@ class Mapper {
   Mapper(const BlockData& d, const PictureFormat& fmt, GridCells& g, RefTable& refs)
       : d_(d), fmt_(fmt), g_(g), refs_(refs), syn_(syntax_of(d)), at_{d.cells_w} {}
 
+  [[nodiscard]] bool has_syntax() const { return syn_ != nullptr; }
+
   std::vector<OutBlock> blocks;
   struct Mv {
     uint32_t block_id;
@@ -750,12 +752,12 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
                               : static_cast<uint16_t>(d.slices.size() + static_cast<std::size_t>(d.ctb_tile[ctb]));
     mp.emit_ctu(rs, tile_idx, seg[slice].last_ts == d.ctb_addr_ts[ctb]);
   }
-  // The root's bits: Σ CTU bits (V-019), 0 = unknown when any CTU's are unknown.
+  // The root's bits: Σ CTU bits (V-019). With patch 0002 every CTU's bits are known, and a CTU of a few
+  // high-probability bins can round to 0, so 0 is a real value there; without it the root stays 0 (unknown).
   uint64_t total = 0;
-  bool known = !mp.blocks[0].children.empty();
+  const bool known = mp.has_syntax() && !mp.blocks[0].children.empty();
   for (const uint32_t c : mp.blocks[0].children) {
     total += mp.blocks[c].bits_x8;
-    known = known && mp.blocks[c].bits_x8 != 0;
   }
   mp.blocks[0].bits_x8 =
       known ? static_cast<uint32_t>(std::min<uint64_t>(total, std::numeric_limits<uint32_t>::max())) : 0;

@@ -5,6 +5,10 @@
 // whole canvas, drawing with the ViewState of the panel's PictureController, with the §11.8 empty-state sentence
 // while nothing is decoded and the renderer's error when it has one. Only part of the module where PictureHost exists
 // (app/CMakeLists.txt); PicturePanel.qml loads it by URL.
+//
+// NATIVE mode (WI-1.463, §11.2.1): the NativeSurfaceHost below puts a child window over the PictureHost while HDR
+// output is requested (HdrView.hdrOutput: View ▸ HDR output, Ctrl+H, the toolbar and HDR panel toggles) on an
+// HDR-capable display, and hides it while a popup is open over the picture (§11.5.5 item 3). The host follows it.
 
 import QtQuick
 import QtQuick.Controls
@@ -43,6 +47,7 @@ Item {
         falseColor: HdrView.falseColor
         gamutClipOverlay: HdrView.gamutClipOverlay
         dither: HdrView.dither
+        nativeHost: nativeHost
 
         compareKind: view.compare ? view.compare.kind : 0
         splitAxis: view.compare ? view.compare.splitAxis : 0
@@ -53,6 +58,19 @@ Item {
         flickerPeriodMs: view.compare ? view.compare.flickerPeriodMs : 500
 
         onPictureChanged: view.pushPicture()
+        // The Display Capabilities panel and the status bar show the encoding in use ("Srgb8" while EMBEDDED).
+        onOutputEncodingChanged: DisplayCaps.outputEncoding = host.outputEncoding
+    }
+
+    NativeSurfaceHost {
+        id: nativeHost
+
+        item: host
+        overlay: view.Overlay.overlay
+        requested: HdrView.hdrOutput
+        hdrCapable: DisplayCaps.hdrCapable
+        headroom: DisplayCaps.headroom
+        encoding: HdrView.macEncoding
     }
 
     // The controller asks, the host does: snapshot A into slot B, swap, clear.
