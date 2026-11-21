@@ -308,7 +308,7 @@ index 7c7d617..8857d26 100644
 +  snap->have_pre_sao = 1;
 +}
 diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
-index 46a5d93..d78c91f 100644
+index 05d8e94..739320d 100644
 --- a/libde265/de265_internals.h
 +++ b/libde265/de265_internals.h
 @@ -18,8 +18,9 @@
@@ -323,7 +323,7 @@ index 46a5d93..d78c91f 100644
   *
   * Built only with the CMake option DE265_INTERNALS=ON. Every function reads the metadata
   * that the decoder already keeps for a decoded picture (the image returned by
-@@ -262,6 +263,45 @@ LIBDE265_API void     de265_internals_get_TU_syntax(const struct de265_image*, i
+@@ -263,6 +264,45 @@ LIBDE265_API void     de265_internals_get_TU_syntax(const struct de265_image*, i
     0 where nothing was decoded or the picture has no syntax. */
  LIBDE265_API uint32_t de265_internals_get_CU_bits_x8(const struct de265_image*, int unit_x, int unit_y);
  LIBDE265_API uint32_t de265_internals_get_CTB_bits_x8(const struct de265_image*, int ctb_x, int ctb_y);

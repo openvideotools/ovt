@@ -3,10 +3,10 @@
 """Fixtures of the interaction scripts (chapter 14 section 14.10.3; WI-0.568).
 
 ``ipc`` launches ``ovt-studio --test-ipc <socket>`` and connects to the socket; ``studio(ipc)`` is the command set of
-14.10.3 on top of it. The server is WI-1.465; until it lands, a script that uses ``studio`` is skipped when the
-binary is not found, and the client is tested against a fake server (test_ipc_client.py).
+14.10.3 on top of it. The server is app/src/testipc (WI-1.465); a script that uses ``studio`` is skipped when the
+binary is not found, and the client is also tested against a fake server (test_ipc_client.py).
 
-Wire format (SPEC-ASSUMPTION(#353), to be implemented by WI-1.465): JSON lines
+Wire format (chapter 14 section 14.10.3, issue #353): JSON lines
 over a Unix domain socket (``QLocalServer`` on Linux and macOS). One request per line,
 ``{"id": <int>, "cmd": "<name>", "args": [<json>...]}``; one response per request, in order,
 ``{"id": <int>, "ok": true, "value": <json>}`` or ``{"id": <int>, "ok": false, "error": "<text>"}``.
@@ -171,6 +171,11 @@ def ovt_studio_exe(request: pytest.FixtureRequest) -> str:
         path = str(found[0]) if found else shutil.which("ovt-studio")
     if not path or not Path(path).exists():
         pytest.skip("ovt-studio not found (pass --ovt-studio or set OVT_STUDIO)")
+    # The test IPC is compiled in only with -DOVT_ENABLE_TEST_IPC=ON (WI-1.465); other builds lack the option.
+    env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
+    help_text = subprocess.run([path, "--help"], env=env, capture_output=True, text=True, timeout=60, check=False)
+    if "--test-ipc" not in help_text.stdout + help_text.stderr:
+        pytest.skip("ovt-studio was built without OVT_ENABLE_TEST_IPC")
     return path
 
 

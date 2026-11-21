@@ -12,6 +12,11 @@
 //   anything else   Interop::None: the surface renders on its own device and the renderer uploads a CPU copy (no
 //                   zero-copy row exists for it in phase 1; Android's GlTexture host is WI-A.403).
 //
+// NATIVE mode (WI-1.463, §10.1.2): with a NativeSurfaceHost attached, the renderer follows the host's target: it calls
+// VideoSurface::retarget() with the host's child-window target (macOS: the CAMetalLayer) and from then on renders and
+// presents there, drawing only the background into the item; when the host goes back to EMBEDDED it retargets to the
+// OffscreenTexture of the item's size. The surface and its uploaded frames are kept across both switches (§10.2.7).
+//
 // Video and overlays are never drawn with scene-graph primitives (FR-GUI-030). Requires Qt 6.7 (QQuickRhiItem); the
 // build compiles this file only then (app/CMakeLists.txt, OVT_HAVE_PICTURE_HOST).
 
@@ -20,12 +25,18 @@
 
 #include <QtQml/qqmlregistration.h>
 #include <QColor>
+#include <QMetaObject>
+#include <QPoint>
+#include <QPointer>
 #include <QQuickRhiItem>
+#include <QRect>
 #include <QString>
+#include <QVariantList>
 
 #include <cstdint>
 #include <memory>
 
+#include "native_surface_host.h"
 #include "picture_frame.h"
 
 namespace ovt::app {
@@ -33,11 +44,15 @@ namespace ovt::app {
 // What the renderer last reported to the item (copied in QQuickRhiItemRenderer::synchronize, when the GUI thread
 // is blocked).
 struct PictureHostStats {
-  QString interop;          // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
-  QString error;            // VideoSurface::last_error() or the renderer's own reason; "" when none
-  int surface_resizes = 0;  // VideoSurface::resize() calls since the surface was created
-  int frames_rendered = 0;  // render() calls that drew the surface's texture
-  int surface_width = 0;    // the OffscreenTexture target size in device pixels
+  QString interop;      // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
+  QString error;        // VideoSurface::last_error() or the renderer's own reason; "" when none
+  bool native = false;  // the surface presents to the NativeSurfaceHost's target (WI-1.463)
+  QString encoding;     // VideoSurface::active_encoding(): "Srgb8", "ScRgbLinear16F", "Pq10", "Hlg10"; "" before
+  std::uint64_t native_failed = 0;  // the host target generation whose retarget() to NATIVE failed; 0 = none
+  int native_frames = 0;            // NATIVE renders (presents) since the surface was created
+  int surface_resizes = 0;          // VideoSurface::resize() calls since the surface was created
+  int frames_rendered = 0;          // render() calls that drew the surface's texture
+  int surface_width = 0;            // the OffscreenTexture target size in device pixels
   int surface_height = 0;
 };
 
@@ -52,14 +67,44 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(int planeMode READ plane_mode WRITE set_plane_mode NOTIFY viewChanged)  // 0 YUV, 1 Y, 2 U, 3 V, 4 gray
   Q_PROPERTY(bool showCropped READ show_cropped WRITE set_show_cropped NOTIFY viewChanged)
   Q_PROPERTY(QColor backgroundColor READ background_color WRITE set_background_color NOTIFY viewChanged)
+  // The HDR fields of ViewState (§10.2.3), set from the HDR panel's Display tab (HdrView, WI-1.462). Enum values are
+  // the indices of render::ToneMap and render::GamutMap.
+  Q_PROPERTY(int toneMap READ tone_map WRITE set_tone_map NOTIFY viewChanged)
+  Q_PROPERTY(int gamutMap READ gamut_map WRITE set_gamut_map NOTIFY viewChanged)
+  Q_PROPERTY(double clipNits READ clip_nits WRITE set_clip_nits NOTIFY viewChanged)
+  Q_PROPERTY(double targetPeakOverride READ target_peak_override WRITE set_target_peak_override NOTIFY viewChanged)
+  Q_PROPERTY(bool falseColor READ false_color WRITE set_false_color NOTIFY viewChanged)
+  Q_PROPERTY(bool gamutClipOverlay READ gamut_clip_overlay WRITE set_gamut_clip_overlay NOTIFY viewChanged)
+  Q_PROPERTY(bool dither READ dither WRITE set_dither NOTIFY viewChanged)
+  // CompareMode (§10.2.4) from the panel's CompareController (WI-2.486): kind and split_axis are the enum indices.
+  // Kind::Single (0) or no slot-B picture shows picture A alone.
+  Q_PROPERTY(int compareKind READ compare_kind WRITE set_compare_kind NOTIFY compareChanged)
+  Q_PROPERTY(int splitAxis READ split_axis WRITE set_split_axis NOTIFY compareChanged)
+  Q_PROPERTY(double splitPosition READ split_position WRITE set_split_position NOTIFY compareChanged)
+  Q_PROPERTY(double overlayAlpha READ overlay_alpha WRITE set_overlay_alpha NOTIFY compareChanged)
+  Q_PROPERTY(int diffGain READ diff_gain WRITE set_diff_gain NOTIFY compareChanged)
+  Q_PROPERTY(bool diffFalseColour READ diff_false_colour WRITE set_diff_false_colour NOTIFY compareChanged)
+  Q_PROPERTY(int flickerPeriodMs READ flicker_period_ms WRITE set_flicker_period_ms NOTIFY compareChanged)
+  Q_PROPERTY(bool hasPictureB READ has_picture_b NOTIFY compareChanged)
   Q_PROPERTY(bool hasPicture READ has_picture NOTIFY pictureChanged)
   Q_PROPERTY(int pictureWidth READ picture_width NOTIFY pictureChanged)
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
+  // Picture::crop (conformance window / render_size, luma samples); a null rect when the picture has none.
+  Q_PROPERTY(QRect crop READ crop NOTIFY pictureChanged)
+  // The pinned probe and the selection rectangle (luma samples; (-1, -1) / empty = none), drawn by libplacebo's
+  // overlay passes (OverlayConfig.probe_x/y, selection_rect; chapter 10 §10.5.6 pass 12, WI-2.436, issue #650).
+  Q_PROPERTY(QPoint probe READ probe WRITE set_probe NOTIFY viewChanged)
+  Q_PROPERTY(QRect selectionRect READ selection_rect WRITE set_selection_rect NOTIFY viewChanged)
   // Renderer state for the status strip and the tests.
   Q_PROPERTY(QString interop READ interop NOTIFY statsChanged)
   Q_PROPERTY(QString lastError READ last_error NOTIFY statsChanged)
   Q_PROPERTY(int surfaceResizes READ surface_resizes NOTIFY statsChanged)
   Q_PROPERTY(int framesRendered READ frames_rendered NOTIFY statsChanged)
+  // NATIVE mode (WI-1.463): the host whose target the renderer follows (null = always EMBEDDED), whether the surface
+  // presents there now, and the surface's output encoding (DisplayCaps.outputEncoding, the status bar).
+  Q_PROPERTY(ovt::app::NativeSurfaceHost* nativeHost READ native_host WRITE set_native_host NOTIFY nativeHostChanged)
+  Q_PROPERTY(bool nativeActive READ native_active NOTIFY statsChanged)
+  Q_PROPERTY(QString outputEncoding READ output_encoding NOTIFY statsChanged)
 
  public:
   explicit PictureHost(QQuickItem* parent = nullptr);
@@ -85,15 +130,69 @@ class PictureHost : public QQuickRhiItem {
   void set_show_cropped(bool on);
   [[nodiscard]] QColor background_color() const { return background_; }
   void set_background_color(const QColor& color);
+  [[nodiscard]] int tone_map() const noexcept { return tone_map_; }
+  void set_tone_map(int value) { set_view(tone_map_, value); }
+  [[nodiscard]] int gamut_map() const noexcept { return gamut_map_; }
+  void set_gamut_map(int value) { set_view(gamut_map_, value); }
+  [[nodiscard]] double clip_nits() const noexcept { return clip_nits_; }
+  void set_clip_nits(double value) { set_view(clip_nits_, value); }
+  [[nodiscard]] double target_peak_override() const noexcept { return target_peak_override_; }
+  void set_target_peak_override(double value) { set_view(target_peak_override_, value); }
+  [[nodiscard]] bool false_color() const noexcept { return false_color_; }
+  void set_false_color(bool on) { set_view(false_color_, on); }
+  [[nodiscard]] bool gamut_clip_overlay() const noexcept { return gamut_clip_overlay_; }
+  void set_gamut_clip_overlay(bool on) { set_view(gamut_clip_overlay_, on); }
+  [[nodiscard]] bool dither() const noexcept { return dither_; }
+  void set_dither(bool on) { set_view(dither_, on); }
+
+  [[nodiscard]] QPoint probe() const noexcept { return probe_; }
+  void set_probe(QPoint p) { set_view(probe_, p.x() >= 0 && p.y() >= 0 ? p : QPoint(-1, -1)); }
+  [[nodiscard]] QRect selection_rect() const noexcept { return selection_rect_; }
+  void set_selection_rect(QRect r) { set_view(selection_rect_, r.width() > 0 && r.height() > 0 ? r : QRect()); }
 
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
+
+  // ---- Compare (slot B) ------------------------------------------------------------------------------------------
+  [[nodiscard]] int compare_kind() const noexcept { return compare_kind_; }
+  void set_compare_kind(int kind);
+  [[nodiscard]] int split_axis() const noexcept { return split_axis_; }
+  void set_split_axis(int axis);
+  [[nodiscard]] double split_position() const noexcept { return split_position_; }
+  void set_split_position(double fraction);
+  [[nodiscard]] double overlay_alpha() const noexcept { return overlay_alpha_; }
+  void set_overlay_alpha(double alpha);
+  [[nodiscard]] int diff_gain() const noexcept { return diff_gain_; }
+  void set_diff_gain(int gain);
+  [[nodiscard]] bool diff_false_colour() const noexcept { return diff_false_colour_; }
+  void set_diff_false_colour(bool on);
+  [[nodiscard]] int flicker_period_ms() const noexcept { return flicker_period_ms_; }
+  void set_flicker_period_ms(int ms);
+  [[nodiscard]] bool has_picture_b() const noexcept { return frame_b_ != nullptr; }
+  [[nodiscard]] std::shared_ptr<const PictureFrame> picture_b() const { return frame_b_; }
+  // Slot B from a decoded picture (the reference file's frame); nullptr clears it.
+  void set_picture_b(std::shared_ptr<const PictureFrame> frame);
+  // "Set as B from memory": copies the shown picture into slot B under a new generation, so B keeps this frame while
+  // A moves on. False without a picture.
+  Q_INVOKABLE bool snapshotAsB();
+  // `X`: exchanges the pictures of slots A and B.
+  Q_INVOKABLE void swapAB();
+  Q_INVOKABLE void clearB();
   [[nodiscard]] int picture_width() const noexcept;
   [[nodiscard]] int picture_height() const noexcept;
+  [[nodiscard]] QRect crop() const;
+  // The [Y, U, V] code values of the picture at luma sample (x, y) (chroma: the sample covering it), for the Picture
+  // panel's read-out (WI-1.456); [] outside the picture or without one. Read from the CPU copy of the frame, so it
+  // works before VideoSurface::pick() exists (WI-2.435).
+  Q_INVOKABLE [[nodiscard]] QVariantList codeValues(int x, int y) const;
 
   [[nodiscard]] QString interop() const { return stats_.interop; }
   [[nodiscard]] QString last_error() const { return stats_.error; }
   [[nodiscard]] int surface_resizes() const noexcept { return stats_.surface_resizes; }
   [[nodiscard]] int frames_rendered() const noexcept { return stats_.frames_rendered; }
+  [[nodiscard]] NativeSurfaceHost* native_host() const { return native_host_; }
+  void set_native_host(NativeSurfaceHost* host);
+  [[nodiscard]] bool native_active() const noexcept { return stats_.native; }
+  [[nodiscard]] QString output_encoding() const { return stats_.encoding; }
   [[nodiscard]] const PictureHostStats& stats() const noexcept { return stats_; }
 
   // Called by the renderer during synchronize() (GUI thread blocked); the change signal is queued to the GUI thread.
@@ -101,23 +200,60 @@ class PictureHost : public QQuickRhiItem {
 
  Q_SIGNALS:
   void viewChanged();
+  void compareChanged();
   void pictureChanged();
   void statsChanged();
+  void nativeHostChanged();
 
  protected:
   QQuickRhiItemRenderer* createRenderer() override;
+  void timerEvent(QTimerEvent* event) override;
 
  private:
   friend class PictureHostRenderer;
 
+  template <typename T>
+  void set_view(T& field, T value) {
+    if (field == value) {
+      return;
+    }
+    field = value;
+    Q_EMIT viewChanged();
+    update();
+  }
+
+  void set_compare(int& field, int value);
+  void update_flicker_timer();
+
   std::shared_ptr<const PictureFrame> frame_;
+  std::shared_ptr<const PictureFrame> frame_b_;
+  int compare_kind_ = 0;
+  int split_axis_ = 0;
+  double split_position_ = 0.5;
+  double overlay_alpha_ = 0.5;
+  int diff_gain_ = 1;
+  bool diff_false_colour_ = false;
+  int flicker_period_ms_ = 500;
+  int flicker_timer_ = 0;
   double zoom_ = 0.0;
   double pan_x_ = 0.0;
   double pan_y_ = 0.0;
   int plane_mode_ = 0;
   bool show_cropped_ = true;
   QColor background_{0x20, 0x20, 0x20};  // ViewState::background_rgba default 0x202020FF
+  int tone_map_ = 0;                     // ToneMap::Auto
+  int gamut_map_ = 0;                    // GamutMap::Perceptual
+  double clip_nits_ = 1000.0;
+  double target_peak_override_ = 0.0;
+  bool false_color_ = false;
+  bool gamut_clip_overlay_ = false;
+  bool dither_ = true;
+  QPoint probe_{-1, -1};
+  QRect selection_rect_;
   PictureHostStats stats_;
+  QPointer<NativeSurfaceHost> native_host_;
+  QMetaObject::Connection native_target_connection_;
+  QMetaObject::Connection native_refresh_connection_;
 };
 
 }  // namespace ovt::app

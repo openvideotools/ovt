@@ -20,14 +20,19 @@ QtObject {
 
     // Ids that do something so far: Quit, the three themes, Cancel all jobs (WI-1.453), the Jobs popover, Go to,
     // Preferences and the Keyboard map (WI-1.466), the dock actions (WI-1.451: presets, Reset Layout, Picture only,
-    // area toggles, focus panel N and tab cycling; the last two are handled by DockWorkspace through activated()).
+    // area toggles, focus panel N and tab cycling; the last two are handled by DockWorkspace through activated()), and
+    // the Picture panel's planes and zoom (WI-1.456, handled by PicturePanel through activated()), and HDR output
+    // (WI-1.463; enabled only on an HDR-capable display, see isEnabled()).
     readonly property var enabledIds: ["file.quit", "analysis.cancelAll", "view.theme.system", "view.theme.light", "view.theme.dark",
         "view.jobs", "navigate.addBookmark", "navigate.addComment", "navigate.nextBookmark", "navigate.previousBookmark", "edit.goTo", "edit.preferences", "help.keyboardMap",
         "view.layout.analyze", "view.layout.syntax", "view.layout.quality", "view.layout.hdr", "view.layout.compare",
         "view.resetLayout", "view.pictureOnly", "view.area.left", "view.area.right", "view.area.bottom",
         "view.nextTab", "view.previousTab", "view.focusPanel1", "view.focusPanel2", "view.focusPanel3",
         "view.focusPanel4", "view.focusPanel5", "view.focusPanel6", "view.focusPanel7", "view.focusPanel8",
-        "view.focusPanel9"]
+        "view.focusPanel9",
+        "view.plane.yuv", "view.plane.y", "view.plane.u", "view.plane.v", "view.plane.gray",
+        "view.zoom.in", "view.zoom.out", "view.zoom.fit", "view.zoom.100", "view.zoom.200", "view.zoom.400",
+        "view.hdrOutput"]
 
     readonly property var presetIds: ({"view.layout.analyze": "Analyze", "view.layout.syntax": "Syntax",
                                        "view.layout.quality": "Quality", "view.layout.hdr": "HDR",
@@ -50,6 +55,9 @@ QtObject {
         // Every panel but the Picture can be closed and re-opened (FR-GUI-001).
         if (id.indexOf("view.panels.") === 0)
             return id !== "view.panels.picture"
+        // NATIVE (HDR) output needs an HDR-capable display (R-ARCH-2, §11.2.4).
+        if (id === "view.hdrOutput")
+            return DisplayCaps.hdrCapable
         return enabledIds.indexOf(id) >= 0
     }
 
@@ -60,6 +68,8 @@ QtObject {
             return DockModel.openPanels.indexOf(id.substring("view.panels.".length)) >= 0
         if (id === "view.pictureOnly")
             return DockModel.pictureOnly
+        if (id === "view.hdrOutput")
+            return HdrView.hdrOutput && DisplayCaps.hdrCapable
         return false
     }
 
@@ -79,6 +89,8 @@ QtObject {
             DockModel.resetLayout()
         else if (id === "view.pictureOnly")
             DockModel.pictureOnly = !DockModel.pictureOnly
+        else if (id === "view.hdrOutput")
+            HdrView.hdrOutput = !HdrView.hdrOutput
         else if (id === "view.area.left")
             DockModel.leftVisible = !DockModel.leftVisible
         else if (id === "view.area.right")

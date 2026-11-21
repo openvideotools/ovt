@@ -38,6 +38,7 @@ CASES = [
     ("ffmpeg_mvs", "ffmpeg_mvs_h264.csv", [], "block-grid"),
     ("ffmpeg_mvs", "ffmpeg_qp_10bit.csv", ["--qp", "--bit-depth", "10"], "block-grid"),
     ("hm_grid", "hm_cu_dump_16x8.json", [], "block-grid"),
+    ("hm_grid", "hm_cu_dump_16x8.json", ["--syntax"], "block-grid"),
     ("aom_inspect", "aom_inspect_8x8.json", [], "block-grid"),
     ("mp4box_diso", "mp4box_diso_tiny.xml", [], "box-tree"),
     ("mp4box_diso", "mp4box_diso_frag.xml", [], "box-tree"),
@@ -227,6 +228,43 @@ def test_hm_grid_mapping() -> None:
     assert fields["mv0_x"][2] == -24 and fields["mv0_y"][2] == 12  # quarter-pel x4
     assert fields["intra_mode_y"][:4] == [26, 26, -1, -1]
     assert fields["cbf"][0] == 0b101 and fields["tx_log2_w"][0] == 3
+
+
+def test_hm_grid_syntax() -> None:
+    # WI-2.165: the prediction-unit syntax as signalled, -1 on cells that are not inter.
+    fields = normalise("hm_grid", "hm_cu_dump_16x8.json", "--syntax")["frames"][0]["fields"]
+    assert fields["inter"][:4] == [0, 0, 1, 1]
+    assert fields["merge_flag"][:4] == [-1, -1, 1, 1]
+    assert fields["merge_idx"][2] == 2 and fields["inter_dir"][2] == 1
+    assert fields["ref_idx_l0"][:4] == [-1, -1, 0, 0]
+    assert fields["merge_flag"][6] == 0 and fields["mvp_l0"][6] == 1  # AMVP
+    assert (fields["mvd_l0_x"][6], fields["mvd_l0_y"][6]) == (-2, 1)  # quarter samples as signalled
+    assert fields["cbf"][0] == 0b101 and fields["transform_skip_y"][0] == 1
+    assert set(fields) == {
+        "inter",
+        "merge_flag",
+        "merge_idx",
+        "inter_dir",
+        "ref_idx_l0",
+        "ref_idx_l1",
+        "mvp_l0",
+        "mvp_l1",
+        "mvd_l0_x",
+        "mvd_l0_y",
+        "mvd_l1_x",
+        "mvd_l1_y",
+        "cbf",
+        "transform_skip_y",
+    }
+
+
+def test_hm_grid_syntax_needs_the_pu_getters(tmp_path: Path) -> None:
+    doc = json.loads((FIX / "hm_cu_dump_16x8.json").read_text(encoding="utf-8"))
+    del doc["frames"][0]["cells"]["getMvd_L1_y"]
+    path = tmp_path / "x.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    assert run("hm_grid", str(path)).returncode == 0
+    assert run("hm_grid", "--syntax", str(path)).returncode == canon.EXIT_INPUT
 
 
 def test_hm_grid_refuses_unknown_getter(tmp_path: Path) -> None:

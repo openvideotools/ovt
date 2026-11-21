@@ -8,7 +8,11 @@
 #ifndef OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 #define OVT_RENDER_SRC_OVERLAY_OVERLAY_SET_IMPL_H
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
+#include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,6 +27,33 @@ struct PartitionLine {
   uint8_t kind = 0;                        // ovt::fb::PartitionKind of the first partition that owns the edge
   uint16_t partition = 0;                  // PartitionInfo.index of that partition
 };
+
+// Grid level slots of §10.5.3, in OverlayLayer bit order (GridTU = 1u << 3 ... GridCTU = 1u << 6).
+enum class GridLevel : uint8_t { TU = 0, PU = 1, CU = 2, CTU = 3, None = 0xFF };
+
+// Block tree node for the grid line pass (§10.5.3; the FrameAnalysis does not outlive build()): rect clipped to the
+// coded picture (luma samples), children grid_nodes[first_child .. first_child + child_count).
+struct GridNode {
+  int32_t x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // NOLINT(readability-isolate-declaration)
+  uint32_t first_child = 0;
+  uint32_t child_count = 0;
+  GridLevel level = GridLevel::None;
+};
+
+namespace detail {
+
+// Key of the WI-2.437 overlay cache (overlay_cache.h).
+struct OverlayCacheKey {
+  int32_t decode_index = -1;
+  uint64_t frame = 0;   // fingerprint of the FrameAnalysis beyond decode_index (another stream, a re-analysis)
+  uint64_t config = 0;  // overlay_config_hash()
+  uint64_t custom = 0;  // hash of the host's custom_cells when the build reads them, else 0
+  OverlayConfig gpu{};  // gpu_relevant_config(), compared field by field so a hash collision cannot alias two sets
+
+  [[nodiscard]] bool same_as(const OverlayCacheKey& o) const;
+};
+
+}  // namespace detail
 
 class OverlaySet {
  public:
@@ -48,8 +79,31 @@ class OverlaySet {
   std::vector<uint8_t> heat_valid;
   float heat_lo = 0, heat_hi = 0;  // NOLINT(readability-isolate-declaration): the range actually applied
 
+  // CellGrid.block_id (cells_w * cells_h, 0xFFFFFFFF = no block): pick()'s CPU cell lookup and the id-only fill pass
+  // (§10.5.6, §10.5.7; WI-2.435). Filled whatever the layers, so picking works with every overlay hidden; empty when
+  // the grid has no block_id column of that length.
+  std::vector<uint32_t> cell_block_id;
+
   // Slice and tile boundaries (§10.5.3), each edge once, in a deterministic order. Empty unless GridPartition is set.
   std::vector<PartitionLine> partition_lines;
+
+  // Grid block tree, node 0 = blocks[0]; empty unless a GridTU..GridCTU layer is set. grid_min_side: smallest
+  // unclipped block side per level (R-GRID-1), INT32_MAX when the level has no block.
+  std::vector<GridNode> grid_nodes;
+  std::array<int32_t, 4> grid_min_side{std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max(),
+                                       std::numeric_limits<int32_t>::max(), std::numeric_limits<int32_t>::max()};
+  int32_t picture_w = 0, picture_h = 0;  // NOLINT(readability-isolate-declaration): coded size, luma samples
+
+  // Deblocking edge classes per cell, RG8UI texels, cells_w * cells_h * 2 bytes (WI-2.436, §10.5.6 pass 7): R = the
+  // cell's left edge, G = its top edge; 0 = not filtered or unknown, 1 = weak (§10.5.2 row 13), 2 = strong (row 14),
+  // classified from CellGrid.deblock_bs_v/h by deblock_edge_class(). Empty unless DeblockEdges is set.
+  std::vector<uint8_t> deblock_edges;
+
+  // Rects (x0, y0, x1, y1, luma samples) of FrameAnalysis.blocks[i] and FrameAnalysis.mvs[i] for the selection
+  // outline (WI-2.436, §10.5.6 pass 10). Filled whatever the layers: selected_block and selected_mv are draw-time
+  // uniforms, not part of what a cached set was built for (WI-2.437). An entry with x1 <= x0 is not drawable.
+  std::vector<std::array<int32_t, 4>> block_rects;
+  std::vector<std::array<int32_t, 4>> mv_rects;
 
   // MV arrow and intra direction stroke instances (§10.5.1, §10.5.4; WI-2.434). Empty unless MvL0, MvL1, MvBi or
   // IntraDirs is set.
@@ -58,7 +112,36 @@ class OverlaySet {
   // Notes about input the builder could not use (a vector whose length differs from cells_w * cells_h, an
   // unusable grid). The build never fails on them: the affected data is left empty.
   std::vector<std::string> diagnostics;
+
+  // WI-2.437 overlay cache (overlay_cache.h). A handle handed out by the cache owns no arrays of its own: `shared`
+  // holds them and `config` is the configuration asked for (its uniforms may differ from shared->config). Readers
+  // of the arrays go through data().
+  std::shared_ptr<const OverlaySet> shared;
+  bool cache_tagged = false;  // a builder miss: set_overlays() adds the arrays to the surface's cache under cache_key
+  detail::OverlayCacheKey cache_key;
+
+  [[nodiscard]] const OverlaySet& data() const { return shared != nullptr ? *shared : *this; }
 };
+
+namespace detail {
+
+// The CPU side of OverlayBuilder::build (§10.11), which never touches the surface: the fuzz target of
+// core/tests/fuzz/fuzz_overlay_builder.cpp (issue #649) calls it without a VideoSurface. The buffer overload verifies
+// the untrusted FlatBuffer first and returns nullptr when it is rejected.
+std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells);
+std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells);
+// flatbuffers::Verifier over an untrusted FrameAnalysis buffer, with the table limit a dense 4K frame needs.
+bool verify_frame_analysis(const uint8_t* buf, size_t size);
+
+// WI-2.436: the §10.5.2 class of one CellGrid.deblock_bs_v/h value (chapter 6 §6.3: H.264 bS 0..4, HEVC bS 0..2, AV1
+// filter size 0/4/6/8/16, 0xFF unknown): 0 = nothing drawn, 1 = weak (row 13), 2 = strong (row 14).
+// The edges that touch an intra block are strong (H.264 bS 3 and 4, HEVC bS 2) and so is AV1's longest luma filter
+// (16); everything else filtered is weak (§10.5.2 rows 13/14, #745).
+OVT_RENDER_API uint8_t deblock_edge_class(IntraCodec codec, uint8_t value);
+
+}  // namespace detail
 
 }  // namespace ovt::render
 

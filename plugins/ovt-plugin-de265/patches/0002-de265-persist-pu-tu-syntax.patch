@@ -331,7 +331,7 @@ index bf14e73..7c7d617 100644
 +  return ((int64_t)(p - 1 - d->bitstream_start) * 8 + (7 - stop)) * 8;
 +}
 diff --git a/libde265/de265_internals.h b/libde265/de265_internals.h
-index 073dbc2..46a5d93 100644
+index 073dbc2..05d8e94 100644
 --- a/libde265/de265_internals.h
 +++ b/libde265/de265_internals.h
 @@ -18,7 +18,8 @@
@@ -344,7 +344,7 @@ index 073dbc2..46a5d93 100644
   *
   * Built only with the CMake option DE265_INTERNALS=ON. Every function reads the metadata
   * that the decoder already keeps for a decoded picture (the image returned by
-@@ -172,6 +173,96 @@ LIBDE265_API int      de265_internals_get_picture_poc(const struct de265_image*)
+@@ -172,6 +173,97 @@ LIBDE265_API int      de265_internals_get_picture_poc(const struct de265_image*)
  LIBDE265_API void     de265_internals_get_sps_sizes(const struct de265_image*, int* CtbLog2SizeY, int* MinCbLog2SizeY,
                                                      int* MinTbLog2SizeY, int* PicWidthInCtbsY, int* PicHeightInCtbsY);
  
@@ -398,8 +398,9 @@ index 073dbc2..46a5d93 100644
 +
 +/* The syntax of the transform unit (leaf of transform_tree(), H.265 7.3.8.8 and 7.3.8.10)
 +   covering a 4x4 unit. Per-component arrays are indexed Y, Cb, Cr. In 4:2:0 the chroma
-+   blocks of four 4x4 luma TUs are coded in the fourth one (blkIdx 3), so their chroma fields
-+   are filled there only. Elements not signalled in this TU hold 255. */
++   blocks of four 4x4 luma TUs are coded in the fourth one (blkIdx 3), so their chroma residual
++   fields are filled there only; cbf[1..2] of blkIdx 0..2 hold the value inherited from the 8x8
++   parent. Elements not signalled in this TU hold 255. */
 +typedef struct de265_internals_tu_syntax {
 +  uint8_t  coded;                     /* 1 when transform_unit() was read for the TU covering this 4x4 */
 +  uint8_t  trafoDepth;                /* depth in the transform tree (rqt depth) */

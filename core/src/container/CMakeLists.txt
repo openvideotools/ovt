@@ -8,13 +8,20 @@
 target_sources(
   ovt_core_objects
   PRIVATE annexb.cpp
+          byte_service.cpp
           container.cpp
           isobmff/box_registry.cpp
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
+          isobmff/decoders/fragment_boxes.cpp
+          isobmff/decoders/codec_config.cpp
+          isobmff/decoders/colour_hdr.cpp
           isobmff/decoders/movie.cpp
           isobmff/decoders/sample_entries.cpp
+          isobmff/decoders/sample_tables.cpp
           isobmff/field_builder.cpp
+          isobmff/lazy.cpp
+          isobmff/paged_span.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
@@ -26,6 +33,7 @@ target_sources(
           mpegts/ts_packets.cpp
           mxf_placeholder.cpp
           obu.cpp
+          page_cache.cpp
           pix_fmt_grammar.cpp
           rawyuv.cpp
           virtual_file/m3u8.cpp
