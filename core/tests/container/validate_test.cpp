@@ -54,19 +54,14 @@ Bytes cat(std::initializer_list<Bytes> parts) {
 
 // A progressive file with every box CNT-1011 asks for. `drop` names one child to leave out (the first match); `dup`
 // names one child to write twice; `extra_in_moov` is appended to `moov`.
-struct Variant {
-  std::string_view drop = {};
-  std::string_view dup = {};
-  Bytes extra_in_moov = {};
-  Bytes extra_top = {};
-};
-
-Bytes file_with(const Variant& v) {
+// Positional, with defaults, so a call names only what it changes.
+Bytes file_with(std::string_view drop = {}, std::string_view dup = {}, const Bytes& extra_in_moov = {},
+                const Bytes& extra_top = {}) {
   const auto keep = [&](std::string_view name, Bytes b) -> Bytes {
-    if (name == v.drop) {
+    if (name == drop) {
       return {};
     }
-    if (name == v.dup) {
+    if (name == dup) {
       return cat({b, b});
     }
     return b;
@@ -79,8 +74,8 @@ Bytes file_with(const Variant& v) {
       box("mdia",
           cat({keep("mdhd", box("mdhd", Bytes(24, 0))), keep("hdlr", box("hdlr", Bytes(28, 0))), keep("minf", minf)}));
   const Bytes trak = box("trak", cat({keep("tkhd", box("tkhd", Bytes(84, 0))), keep("mdia", mdia)}));
-  const Bytes moov = box("moov", cat({keep("mvhd", box("mvhd", Bytes(100, 0))), trak, v.extra_in_moov}));
-  return cat({keep("ftyp", box("ftyp", Bytes(16, 'a'))), moov, box("mdat", Bytes(40, 7)), v.extra_top});
+  const Bytes moov = box("moov", cat({keep("mvhd", box("mvhd", Bytes(100, 0))), trak, extra_in_moov}));
+  return cat({keep("ftyp", box("ftyp", Bytes(16, 'a'))), moov, box("mdat", Bytes(40, 7)), extra_top});
 }
 
 iso::WalkResult walk_bytes(const Bytes& data) {
@@ -126,7 +121,7 @@ Found validated(const Bytes& data) {
 }  // namespace
 
 TEST_CASE("a file with every required box has no CNT-1011..1013 finding", "[container][isobmff][validate][fast]") {
-  CHECK(validated(file_with({})).empty());
+  CHECK(validated(file_with()).empty());
 }
 
 TEST_CASE("each required box that is missing raises CNT-1011 on its parent", "[container][isobmff][validate][fast]") {
@@ -134,12 +129,22 @@ TEST_CASE("each required box that is missing raises CNT-1011 on its parent", "[c
     std::string_view drop;
     std::string_view parent;
   };
-  const Row rows[] = {{"mvhd", "moov"}, {"tkhd", "trak"}, {"mdia", "trak"}, {"mdhd", "mdia"}, {"hdlr", "mdia"},
-                      {"minf", "mdia"}, {"stbl", "minf"}, {"dinf", "minf"}, {"stsd", "stbl"}, {"stts", "stbl"},
-                      {"stsc", "stbl"}, {"stsz", "stbl"}, {"stco", "stbl"}};
+  const std::array<Row, 13> rows = {{{"mvhd", "moov"},
+                                     {"tkhd", "trak"},
+                                     {"mdia", "trak"},
+                                     {"mdhd", "mdia"},
+                                     {"hdlr", "mdia"},
+                                     {"minf", "mdia"},
+                                     {"stbl", "minf"},
+                                     {"dinf", "minf"},
+                                     {"stsd", "stbl"},
+                                     {"stts", "stbl"},
+                                     {"stsc", "stbl"},
+                                     {"stsz", "stbl"},
+                                     {"stco", "stbl"}}};
   for (const Row& row : rows) {
     CAPTURE(row.drop);
-    const Found f = validated(file_with({.drop = row.drop}));
+    const Found f = validated(file_with(row.drop));
     // Dropping `mdia` or `minf` also drops the boxes below it; those are not reported (nothing to be inside).
     REQUIRE(f.size() == 1);
     CHECK(f[0].first == "CNT-1011");
@@ -162,7 +167,7 @@ TEST_CASE("stz2 satisfies the stsz rule and co64 the stco rule", "[container][is
 TEST_CASE("a second single-instance box raises CNT-1012 on the second", "[container][isobmff][validate][fast]") {
   for (const std::string_view dup : {"mvhd", "tkhd", "mdhd", "hdlr", "stsd", "stts", "stsz", "stco", "ftyp"}) {
     CAPTURE(dup);
-    const Found f = validated(file_with({.dup = dup}));
+    const Found f = validated(file_with({}, dup));
     REQUIRE(f.size() == 1);
     CHECK(f[0].first == "CNT-1012");
     CHECK(f[0].second.find(dup) != std::string::npos);
@@ -179,13 +184,13 @@ TEST_CASE("a third copy raises CNT-1012 once, not twice", "[container][isobmff][
 
 TEST_CASE("a box in a parent the registry does not allow raises CNT-1013 on the box",
           "[container][isobmff][validate][fast]") {
-  const Found elst = validated(file_with({.extra_in_moov = box("elst", Bytes(8, 0))}));
+  const Found elst = validated(file_with({}, {}, box("elst", Bytes(8, 0))));
   REQUIRE(elst.size() == 1);
   CHECK(elst[0].first == "CNT-1013");
   CHECK(elst[0].second.find("elst") != std::string::npos);
   CHECK(elst[0].second.find("moov") != std::string::npos);
   // At the top level the parent is "file": `stss` belongs in `stbl` only.
-  const Found top = validated(file_with({.extra_top = box("stss", Bytes(8, 0))}));
+  const Found top = validated(file_with({}, {}, {}, box("stss", Bytes(8, 0))));
   REQUIRE(top.size() == 1);
   CHECK(top[0].first == "CNT-1013");
 }
@@ -193,13 +198,13 @@ TEST_CASE("a box in a parent the registry does not allow raises CNT-1013 on the 
 TEST_CASE("boxes the registry has no parent for are not reported", "[container][isobmff][validate][fast]") {
   // `free` and an unregistered fourcc have no allowed_parents; `uuid` is skipped.
   Bytes uuid_box = box("uuid", Bytes(16, 1));
-  CHECK(validated(file_with({.extra_in_moov = cat({box("free", Bytes(4, 0)), box("zzzz", Bytes(4, 0)), uuid_box}),
-                             .extra_top = box("free", Bytes(4, 0))}))
+  CHECK(validated(file_with({}, {}, cat({box("free", Bytes(4, 0)), box("zzzz", Bytes(4, 0)), uuid_box}),
+                            box("free", Bytes(4, 0))))
             .empty());
 }
 
 TEST_CASE("a subtree with a walk error is not checked for missing boxes", "[container][isobmff][validate][fast]") {
-  Bytes data = file_with({});
+  Bytes data = file_with();
   // Cut the file inside the moov: its children end early and a CNT-0108 sits on the cut box.
   data.resize(data.size() - 120);
   auto r = walk_bytes(data);
@@ -209,7 +214,7 @@ TEST_CASE("a subtree with a walk error is not checked for missing boxes", "[cont
 }
 
 TEST_CASE("validate is idempotent and counts what it adds", "[container][isobmff][validate][fast]") {
-  auto r = walk_bytes(file_with({.drop = "stsd", .extra_in_moov = box("elst", Bytes(8, 0))}));
+  auto r = walk_bytes(file_with("stsd", {}, box("elst", Bytes(8, 0))));
   const size_t first = iso::validate(r.top_level, iso::ValidationLevel::Standard);
   CHECK(first == 2);
   CHECK(iso::validate(r.top_level, iso::ValidationLevel::Standard) == 0);
@@ -218,7 +223,7 @@ TEST_CASE("validate is idempotent and counts what it adds", "[container][isobmff
 
 TEST_CASE("a diagnostic added by the driver carries the registry severity and the parent's header span",
           "[container][isobmff][validate][fast]") {
-  auto r = walk_bytes(file_with({.drop = "mvhd"}));
+  auto r = walk_bytes(file_with("mvhd"));
   iso::validate(r.top_level, iso::ValidationLevel::Standard);
   const BoxNodeT& moov = *r.top_level[1];
   const auto it = std::ranges::find_if(moov.diagnostics, [](const auto& d) { return d->code == "CNT-1011"; });
@@ -229,7 +234,7 @@ TEST_CASE("a diagnostic added by the driver carries the registry severity and th
 }
 
 TEST_CASE("the reader validates the tree it holds and bumps the revision", "[container][isobmff][validate][fast]") {
-  const Bytes data = file_with({.drop = "hdlr"});
+  const Bytes data = file_with("hdlr");
   const ovt::io::MemoryFile f(data);
   iso::IsobmffReader reader(f);
   REQUIRE(reader.open());
@@ -249,7 +254,7 @@ TEST_CASE("the diagnostic registry lists every code the reader can emit", "[cont
   CHECK(ovt::container::diag("CNT-1014")->severity == ovt::container::Severity::Error);
 }
 
-TEST_CASE("--list-diagnostics CSV has one line per code with severity and spec reference",
+TEST_CASE("list-diagnostics CSV has one line per code with severity and spec reference",
           "[container][validate][list_diagnostics][fast]") {
   const std::string csv = ovt::container::diagnostics_csv();
   // Split into records: a quoted field may hold a comma, but no registry text holds a newline.

@@ -111,40 +111,54 @@ bool parent_allowed(std::string_view fourcc, std::string_view parent) {
   return std::ranges::any_of(it->second, [&](std::string_view list) { return list.empty() || list_has(list, parent); });
 }
 
-// Checks the children of `n` (named `parent`; "file" for the top level) and recurses. Returns the number of findings
-// added below and including this level, and sets `damaged` when the subtree has a walk error.
+// CNT-1012 and CNT-1013 for the children of a box named `parent`; returns the findings added.
+size_t check_children(BoxNodes& children, std::string_view parent) {
+  size_t added = 0;
+  std::map<std::string_view, unsigned> seen;
+  for (auto& c : children) {
+    if (!c) {
+      continue;
+    }
+    if (c->fourcc != "uuid" && !parent_allowed(c->fourcc, parent)) {
+      added += add(*c, DiagCode::CNT_1013, c->fourcc + " is not allowed in " + std::string(parent)) ? 1U : 0U;
+    }
+    const bool single = std::ranges::find(kSingle, std::string_view(c->fourcc)) != kSingle.end() ||
+                        (parent == "file" && c->fourcc == "ftyp");
+    if (single && ++seen[c->fourcc] == 2) {
+      added += add(*c, DiagCode::CNT_1012, "duplicate " + c->fourcc + " in " + std::string(parent)) ? 1U : 0U;
+    }
+  }
+  return added;
+}
+
+// CNT-1011 for the box `self` named `parent`; returns the findings added.
+size_t check_required(BoxNodeT& self, std::string_view parent) {
+  size_t added = 0;
+  for (const Required& r : kRequired) {
+    if (r.parent == parent && !has_child(self, r.child)) {
+      const std::string message = "required box " + std::string(r.child) + " missing in " + std::string(parent);
+      added += add(self, DiagCode::CNT_1011, message) ? 1U : 0U;
+    }
+  }
+  return added;
+}
+
+// Checks the children of `self` (named `parent`; "file" and a null `self` for the top level) and recurses. Returns the
+// number of findings added at and below this level; `damaged` is set when the subtree has a walk error.
 // NOLINTNEXTLINE(misc-no-recursion): bounded by kMaxBoxDepth, which the walk enforces.
 size_t visit(BoxNodeT* self, BoxNodes& children, std::string_view parent, bool& damaged) {
-  size_t added = 0;
-  bool below_damaged = false;
-  std::map<std::string_view, unsigned> seen;
+  size_t added = check_children(children, parent);
+  damaged = self != nullptr && has_walk_error(*self);
   for (auto& c : children) {
     if (!c) {
       continue;
     }
     bool child_damaged = false;
     added += visit(c.get(), c->children, c->fourcc, child_damaged);
-    below_damaged = below_damaged || child_damaged || has_walk_error(*c);
-    if (c->fourcc != "uuid" && !parent_allowed(c->fourcc, parent)) {
-      added += add(*c, DiagCode::CNT_1013, c->fourcc + " is not allowed in " + std::string(parent)) ? 1U : 0U;
-    }
-    if (std::ranges::find(kSingle, std::string_view(c->fourcc)) != kSingle.end() ||
-        (parent == "file" && c->fourcc == "ftyp")) {
-      if (++seen[c->fourcc] == 2) {
-        added += add(*c, DiagCode::CNT_1012, "duplicate " + c->fourcc + " in " + std::string(parent)) ? 1U : 0U;
-      }
-    }
+    damaged = damaged || child_damaged || has_walk_error(*c);
   }
-  damaged = below_damaged || (self != nullptr && has_walk_error(*self));
   if (self != nullptr && !damaged) {
-    for (const Required& r : kRequired) {
-      if (r.parent == parent && !has_child(*self, r.child)) {
-        added += add(*self, DiagCode::CNT_1011,
-                     "required box " + std::string(r.child) + " missing in " + std::string(parent))
-                     ? 1U
-                     : 0U;
-      }
-    }
+    added += check_required(*self, parent);
   }
   return added;
 }
