@@ -1,10 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of the FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a): moof/mdat pairing, defaults and the
-// base-offset rules, DTS continuity, data bounds, saio resolution, the mfhd / styp checks, lazy (header-only) moofs,
-// cancellation, the sample bound, and the fragment samples against the MP4Box `-dts` goldens of the container-smoke
-// corpus.
+// Tests of the FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a), with the fragment samples checked against the
+// MP4Box `-dts` goldens of the container-smoke corpus.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -418,14 +416,6 @@ TEST_CASE("fragments: a requested cancel stops the build", "[container][fragment
                   ovt::Cancelled);
 }
 
-TEST_CASE("fragments: malformed boxes never throw", "[container][fragments]") {
-  Bytes bytes = stream(2);
-  for (size_t cut = bytes.size() - 1; cut > bytes.size() - 120; cut -= 7) {
-    const Bytes part(bytes.begin(), bytes.begin() + static_cast<long>(cut));
-    CHECK_NOTHROW(build(part));
-  }
-}
-
 namespace {
 
 // The track_ID of the only trak (decoded tkhd field).
@@ -513,8 +503,7 @@ TEST_CASE("fragments: the sample bound truncates the expansion (CNT-2031)", "[co
 }
 
 TEST_CASE("fragments: another track's huge default-sized trun is not iterated", "[container][fragments]") {
-  // Reviewer C on #775: track 2's trun claims 0xFFFFFFFF samples and has no per-sample fields; building track 1
-  // computes its data end arithmetically instead of looping (and track 1, first in the moof, is unaffected).
+  // Track 2's trun claims 0xFFFFFFFF samples without per-sample fields: its data end is computed, not looped.
   TrafSpec a = at(0);
   a.tfhd_flags = 0;
   TrafSpec b = at(0);

@@ -134,8 +134,7 @@ X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
-// WI-1.219a (fragment timeline, §8.4.3). CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders (§8.3.5),
-// CNT-6005 by the timeline's saio check (and later the CENC map, §8.4.4).
+// WI-1.219a (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
 X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
 X(CNT_4002, "CNT-4002", Warning,
   "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")

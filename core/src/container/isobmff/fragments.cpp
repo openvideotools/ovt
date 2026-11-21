@@ -613,9 +613,8 @@ class Builder {
     ti.truns.push_back(std::move(info));
   }
 
-  // The end of another track's trun data, without expanding its samples: arithmetic when the trun has no
-  // per-sample sizes (a 20-byte trun may claim 2^32 default-sized samples), else the sum of the written sizes,
-  // which the payload bounds. Saturates at UINT64_MAX.
+  // The end of another track's trun data without expanding it: count × default size, or the written sizes (which
+  // the payload bounds). Saturates at UINT64_MAX.
   uint64_t foreign_end(const Trun& r, uint64_t first, uint32_t default_size) {
     uint64_t total = 0;
     if ((r.flags & kSampleSize) == 0) {

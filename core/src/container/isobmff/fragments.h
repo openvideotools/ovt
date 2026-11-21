@@ -1,14 +1,11 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The fragment timeline of one track (chapter 08 §8.4.3, WI-1.219a): every `moof`/`mdat` pair, the `traf` defaults
-// and base-offset rules, the per-sample expansion of every `trun`, DTS continuity, data bounds, `saio` resolution and
-// the `mfhd` / `styp` checks (steps 1, 2 and 5). The `sidx` / `mfra` cross-checks (steps 3 and 4) are WI-1.219b; the
-// SampleTable append and ovt_container_fragments are WI-1.219c. Internal header (not installed).
+// The fragment timeline of one track (chapter 08 §8.4.3 steps 1, 2 and 5; WI-1.219a). The sidx / mfra cross-checks
+// are WI-1.219b; the SampleTable append and ovt_container_fragments are WI-1.219c. Internal header (not installed).
 //
-// The builder reads the box payloads it needs from the file, not from the BoxNode fields: the `trun` decoder
-// summarises large arrays (§8.2.5) and a lazily walked file has header-only `moof`s (§8.2.4), so neither the tree
-// nor ovt_container_expand is needed and the tree is not modified.
+// Box payloads are read from the file, not from BoxNode fields: the trun decoder summarises large arrays (§8.2.5) and
+// lazily walked moofs are header-only (§8.2.4), so the tree is neither expanded nor modified.
 
 #ifndef OVT_CONTAINER_ISOBMFF_FRAGMENTS_H
 #define OVT_CONTAINER_ISOBMFF_FRAGMENTS_H
