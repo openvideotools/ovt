@@ -32,6 +32,7 @@
 #include "ovt/cxx/syntax/h264/slice_header.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
 #include "ovt/cxx/syntax/h264/sps_ext.hpp"
+#include "ovt/cxx/syntax/h265/aud.hpp"
 #include "ovt/cxx/syntax/h265/nal_header.hpp"
 #include "ovt/cxx/syntax/h265/pps.hpp"
 #include "ovt/cxx/syntax/h265/sei.hpp"
@@ -822,10 +823,13 @@ std::vector<ParsedUnit> parse_h265(std::span<const std::span<const uint8_t>> uni
         auto p = std::make_unique<h265::Pps>(h265::parse_pps(br, b));
         add_h265_pps_derived(*p, sets.sps(p->pps_seq_parameter_set_id), unit);
         sets.put(std::move(p));
+      } else if (type == 35) {
+        (void)h265::parse_access_unit_delimiter(br, b);
+      } else if (type == 38) {
+        (void)h265::parse_filler_data(br, b);
       } else if (type == 39 || type == 40) {
         (void)h265::parse_sei_rbsp(br, b, h, sei_ctx);
       }
-      // AUD_NUT and FD_NUT: OVT has no parser for them yet (FR-SYN-005, WI-1.112); only the NAL header is kept.
     } catch (const ovt::ParseError& e) {
       unit.parse_error = true;
       unit.diagnostics.push_back({e.code, "Error", e.bit_offset, 0});
