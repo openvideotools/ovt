@@ -19,6 +19,7 @@
 #include <utility>
 #include <vector>
 
+#include "overlay/arrow_instances.h"
 #include "overlay/heatmap_source.h"
 #include "overlay/overlay_set_impl.h"
 #include "ovt/render/overlay_set.h"
@@ -31,6 +32,9 @@ constexpr unsigned kChunks = 4;             // WI-2.430 step 5
 constexpr uint32_t kAttrLayers = static_cast<uint32_t>(OverlayLayer::PredFill) |
                                  static_cast<uint32_t>(OverlayLayer::SkipHatch) |
                                  static_cast<uint32_t>(OverlayLayer::RefIdxFill);
+constexpr uint32_t kGridLayers =
+    static_cast<uint32_t>(OverlayLayer::GridTU) | static_cast<uint32_t>(OverlayLayer::GridPU) |
+    static_cast<uint32_t>(OverlayLayer::GridCU) | static_cast<uint32_t>(OverlayLayer::GridCTU);
 
 bool contains(std::string_view hay, std::string_view needle) {
   return hay.find(needle) != std::string_view::npos;
@@ -119,6 +123,73 @@ void build_attributes(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   });
 }
 
+// WI-2.435: the block id per cell for pick() and the id buffer, whatever the layers.
+void build_block_ids(const ovt::fb::CellGrid& grid, uint64_t cells, OverlaySet& set) {
+  if (const auto* ids = grid.block_id(); cells > 0 && ids != nullptr && ids->size() == cells) {
+    set.cell_block_id.assign(ids->begin(), ids->end());
+  }
+}
+
+// WI-2.436: the edge classes of pass 7 (§10.5.6), R = left edge, G = top edge of each cell; only with DeblockEdges
+// and a grid that some column backs (`backed`).
+void build_deblock_edges(const ovt::fb::FrameAnalysis& fa, bool backed, OverlaySet& set) {
+  if ((set.config.layers & static_cast<uint32_t>(OverlayLayer::DeblockEdges)) == 0 || !backed) {
+    return;
+  }
+  const ovt::fb::CellGrid& grid = *fa.grid();
+  const size_t cells = static_cast<size_t>(set.cells_w) * set.cells_h;
+  const auto* v = sized(grid.deblock_bs_v(), cells, "deblock_bs_v", set.diagnostics);
+  const auto* h = sized(grid.deblock_bs_h(), cells, "deblock_bs_h", set.diagnostics);
+  if (v == nullptr && h == nullptr) {
+    return;
+  }
+  const detail::IntraCodec codec = detail::intra_codec_of(fa);
+  set.deblock_edges.assign(cells * 2, 0);
+  for (size_t i = 0; i < cells; ++i) {
+    const auto idx = static_cast<flatbuffers::uoffset_t>(i);
+    set.deblock_edges[i * 2] = v != nullptr ? detail::deblock_edge_class(codec, v->Get(idx)) : 0;
+    set.deblock_edges[(i * 2) + 1] = h != nullptr ? detail::deblock_edge_class(codec, h->Get(idx)) : 0;
+  }
+}
+
+// x0, y0, x1, y1 of `r`; an empty rect (or one whose far edge does not fit int32) is {0, 0, 0, 0}.
+std::array<int32_t, 4> rect_edges(const ovt::fb::Rect* r) {
+  if (r == nullptr || r->w() <= 0 || r->h() <= 0 || int64_t{r->x()} + r->w() > INT32_MAX ||
+      int64_t{r->y()} + r->h() > INT32_MAX) {
+    return {0, 0, 0, 0};
+  }
+  return {r->x(), r->y(), r->x() + r->w(), r->y() + r->h()};
+}
+
+// WI-2.436: block and MV rects for the selection outline (pass 10), indexed like FrameAnalysis.blocks / mvs.
+void build_selection_rects(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
+  if (const auto* blocks = fa.blocks(); blocks != nullptr) {
+    set.block_rects.reserve(blocks->size());
+    for (const auto* b : *blocks) {
+      set.block_rects.push_back(rect_edges(b->rect()));
+    }
+  }
+  if (const auto* mvs = fa.mvs(); mvs != nullptr) {
+    set.mv_rects.reserve(mvs->size());
+    for (const auto* m : *mvs) {
+      set.mv_rects.push_back(rect_edges(m->rect()));
+    }
+  }
+}
+
+// True when at least one CellGrid vector has exactly `cells` entries. Every per-cell output costs O(cells) memory and
+// time, so a grid whose size no column backs (a few bytes claiming 30 M cells, issue #649) must not drive that work:
+// a usable column is physically in the buffer, which bounds the build by the input size.
+bool has_cell_column(const ovt::fb::CellGrid& g, size_t cells) {
+  const auto n = [](const auto* v) -> size_t { return v != nullptr ? v->size() : 0; };
+  const std::array<size_t, 20> sizes = {
+      n(g.block_id()),     n(g.partition_id()), n(g.pred()),         n(g.qp()),           n(g.intra_mode_y()),
+      n(g.intra_mode_c()), n(g.mv0_x()),        n(g.mv0_y()),        n(g.mv1_x()),        n(g.mv1_y()),
+      n(g.ref0()),         n(g.ref1()),         n(g.tx_log2_w()),    n(g.tx_log2_h()),    n(g.tx_type()),
+      n(g.cbf()),          n(g.bits_x8()),      n(g.deblock_bs_v()), n(g.deblock_bs_h()), n(g.filter_idx())};
+  return std::ranges::find(sizes, cells) != sizes.end();
+}
+
 void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   const auto* parts = fa.partitions();
   if (parts == nullptr) {
@@ -141,10 +212,17 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
     if (r.w() <= 0 || r.h() <= 0) {
       continue;
     }
+    // A rect whose far edge does not fit int32 is corrupt (no picture is 2^31 samples wide); it is skipped rather
+    // than overflowing (found by fuzz_overlay_builder, issue #649).
+    const int64_t x1_64 = int64_t{r.x()} + r.w();
+    const int64_t y1_64 = int64_t{r.y()} + r.h();
+    if (x1_64 > INT32_MAX || y1_64 > INT32_MAX) {
+      continue;
+    }
     const int32_t x0 = r.x();
     const int32_t y0 = r.y();
-    const int32_t x1 = x0 + r.w();
-    const int32_t y1 = y0 + r.h();
+    const auto x1 = static_cast<int32_t>(x1_64);
+    const auto y1 = static_cast<int32_t>(y1_64);
     const std::array<Key, 4> edges{Key{x0, y0, x1, y0}, Key{x0, y1, x1, y1}, Key{x0, y0, x0, y1}, Key{x1, y0, x1, y1}};
     for (const Key& e : edges) {
       if (seen.insert(e).second) {
@@ -155,16 +233,97 @@ void build_partition_lines(const ovt::fb::FrameAnalysis& fa, OverlaySet& set) {
   }
 }
 
+// §10.5.3 codec mapping, indexed by BlockKind {MB, SubMB, CTU, CU, PU, TU, SB, Block, TXB, Other}: H.264 MB -> CTU
+// slot, SubMB -> PU slot, transform blocks -> TU slot, no CU; AV1 SB -> CTU, Block -> CU, TXB -> TU, no PU.
+constexpr std::array<GridLevel, 10> kGridLevelOfKind = {GridLevel::CTU, GridLevel::PU,  GridLevel::CTU, GridLevel::CU,
+                                                        GridLevel::PU,  GridLevel::TU,  GridLevel::CTU, GridLevel::CU,
+                                                        GridLevel::TU,  GridLevel::None};
+
+GridLevel grid_level_of(ovt::fb::BlockKind kind) {
+  const auto k = static_cast<size_t>(kind);
+  return k < kGridLevelOfKind.size() ? kGridLevelOfKind.at(k) : GridLevel::None;
+}
+
+// The grid node of block `b`, its rect clipped to the coded picture; false when the clipped rect is empty. Records the
+// block's unclipped side in set.grid_min_side (R-GRID-1).
+bool clipped_node(const ovt::fb::Block& b, OverlaySet& set, GridNode& node) {
+  if (b.rect() == nullptr || b.rect()->w() <= 0 || b.rect()->h() <= 0) {
+    return false;
+  }
+  const ovt::fb::Rect& r = *b.rect();
+  node.x0 = std::max(r.x(), 0);
+  node.y0 = std::max(r.y(), 0);
+  node.x1 = static_cast<int32_t>(std::min<int64_t>(int64_t{r.x()} + r.w(), set.picture_w));
+  node.y1 = static_cast<int32_t>(std::min<int64_t>(int64_t{r.y()} + r.h(), set.picture_h));
+  if (node.x1 <= node.x0 || node.y1 <= node.y0) {
+    return false;
+  }
+  node.level = grid_level_of(b.kind());
+  if (node.level != GridLevel::None) {
+    int32_t& side = set.grid_min_side.at(static_cast<size_t>(node.level));
+    side = std::min({side, r.w(), r.h()});
+  }
+  return true;
+}
+
+// Flattens the block tree breadth-first so that every node's children are contiguous (WI-2.432 step 1). Children are
+// followed only by id, each block at most once (a malformed tree with cycles or shared children cannot loop), and a
+// node whose rect misses the coded picture is dropped with its subtree (FR-BLK-003: children lie inside the parent).
+void build_grid_tree(const ovt::fb::FrameAnalysis* fa, OverlaySet& set) {
+  if (fa == nullptr || (set.config.layers & kGridLayers) == 0) {
+    return;
+  }
+  const auto* blocks = fa->blocks();
+  if (blocks == nullptr || blocks->empty() || blocks->Get(0)->rect() == nullptr) {
+    set.diagnostics.emplace_back("FrameAnalysis has no block tree; grid lines are empty");
+    return;
+  }
+  const ovt::fb::Rect& root = *blocks->Get(0)->rect();
+  set.picture_w = std::max(root.w(), 0);
+  set.picture_h = std::max(root.h(), 0);
+  if (set.picture_w == 0 || set.picture_h == 0) {
+    set.diagnostics.emplace_back("blocks[0] has an empty rect; grid lines are empty");
+    return;
+  }
+  std::vector<bool> taken(blocks->size(), false);
+  std::vector<uint32_t> source;  // FrameAnalysis block id of grid_nodes[i]
+  taken[0] = true;
+  source.push_back(0);
+  set.grid_nodes.push_back({0, 0, set.picture_w, set.picture_h, 0, 0, GridLevel::None});
+  for (size_t n = 0; n < set.grid_nodes.size(); ++n) {
+    const auto* children = blocks->Get(source[n])->children();
+    set.grid_nodes[n].first_child = static_cast<uint32_t>(set.grid_nodes.size());
+    if (children == nullptr) {
+      continue;
+    }
+    for (const uint32_t id : *children) {
+      if (id >= blocks->size() || taken[id]) {
+        continue;
+      }
+      GridNode node;
+      if (!clipped_node(*blocks->Get(id), set, node)) {
+        continue;
+      }
+      taken[id] = true;
+      source.push_back(id);
+      set.grid_nodes.push_back(node);
+      ++set.grid_nodes[n].child_count;
+    }
+  }
+}
+
 }  // namespace
 
-OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+namespace detail {
 
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static): owner_ feeds the GPU upload of WI-2.431
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  (void)owner_;  // kept for the GPU upload of WI-2.431; the CPU side does not touch the surface
+std::unique_ptr<OverlaySet> build_overlay_set(const ovt::fb::FrameAnalysis* fa, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
   auto set = std::make_unique<OverlaySet>();
   set->config = cfg;
+  build_grid_tree(fa, *set);  // the grid lines need the block tree only, not the CellGrid
+  if (fa != nullptr) {
+    build_selection_rects(*fa, *set);
+  }
   if (fa == nullptr || fa->grid() == nullptr) {
     set->diagnostics.emplace_back("FrameAnalysis has no CellGrid; overlay data is empty");
     return set;
@@ -177,10 +336,23 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   } else {
     set->cells_w = grid.cells_w();
     set->cells_h = grid.cells_h();
-    if ((cfg.layers & kAttrLayers) != 0 && cells64 > 0) {
+    // A grid size alone (an MV-only frame) still sizes the arrow pass; the per-cell outputs need a backing column.
+    const bool backed = cells64 > 0 && has_cell_column(grid, static_cast<size_t>(cells64));
+    const bool host_heat =
+        custom_cells != nullptr && (cfg.heatmap == HeatmapSource::Custom || cfg.heatmap == HeatmapSource::MetricMap);
+    const bool want_attr = (cfg.layers & kAttrLayers) != 0;
+    const bool want_heat = cfg.heatmap != HeatmapSource::None;
+    if (cells64 > 0 && !backed && (want_attr || (want_heat && !host_heat))) {
+      set->diagnostics.emplace_back(
+          "CellGrid of " + std::to_string(grid.cells_w()) + "x" + std::to_string(grid.cells_h()) +
+          " cells has no per-cell vector of that length; cell attributes and heatmap are empty");
+    }
+    if (want_attr && backed) {
       build_attributes(*fa, *set);
     }
-    if (cfg.heatmap != HeatmapSource::None && cells64 > 0) {
+    build_block_ids(grid, cells64, *set);
+    build_deblock_edges(*fa, backed, *set);
+    if (want_heat && (backed || (cells64 > 0 && host_heat))) {
       detail::HeatmapResult h;
       if (detail::build_heatmap(grid, is_av1_frame(*fa), cfg, custom_cells, h, set->diagnostics)) {
         set->heatmap = std::move(h.values);
@@ -193,19 +365,49 @@ std::unique_ptr<OverlaySet> OverlayBuilder::build(const ovt::fb::FrameAnalysis* 
   if ((cfg.layers & static_cast<uint32_t>(OverlayLayer::GridPartition)) != 0) {
     build_partition_lines(*fa, *set);
   }
+  // WI-2.434: MV arrow and intra stroke instances (MotionVector list and CellGrid.intra_mode_y).
+  detail::build_arrow_instances(*fa, cfg, set->arrows, set->diagnostics);
   return set;
 }
 
-std::unique_ptr<OverlaySet> OverlayBuilder::build(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
-                                                  const uint16_t* custom_cells) {
-  if (buf == nullptr) {
+std::unique_ptr<OverlaySet> build_overlay_set(const uint8_t* buf, size_t size, const OverlayConfig& cfg,
+                                              const uint16_t* custom_cells) {
+  if (buf == nullptr || !verify_frame_analysis(buf, size)) {
     return nullptr;
   }
-  flatbuffers::Verifier verifier(buf, size);
-  if (!ovt::fb::VerifyFrameAnalysisBuffer(verifier)) {
-    return nullptr;
-  }
-  return build(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
+  return build_overlay_set(ovt::fb::GetFrameAnalysis(buf), cfg, custom_cells);
 }
+
+bool verify_frame_analysis(const uint8_t* buf, size_t size) {
+  // A dense 4K frame has a Block and a MotionVector per 4x4 cell (over a million tables, synthetic_4k_mv.fb); the
+  // default verifier limit of 1 M tables would reject it. kMaxCells bounds what the build uses anyway.
+  flatbuffers::Verifier::Options opts;
+  opts.max_tables = 4 * kMaxCells;
+  flatbuffers::Verifier verifier(buf, size, opts);
+  return ovt::fb::VerifyFrameAnalysisBuffer(verifier);
+}
+
+uint8_t deblock_edge_class(IntraCodec codec, uint8_t value) {
+  if (value == 0 || value == 0xFF) {
+    return 0;
+  }
+  switch (codec) {
+    case IntraCodec::H264:
+      return value >= 3 ? 2 : 1;  // bS 3 / 4: an intra macroblock on either side (8.7.2.1)
+    case IntraCodec::AV1:
+      return value >= 16 ? 2 : 1;  // filterSize 16: the 13-tap luma filter (7.14.6.4)
+    case IntraCodec::H265:
+    case IntraCodec::Unknown:
+      break;
+  }
+  return value >= 2 ? 2 : 1;  // HEVC bS 2: an intra block on either side (8.7.2.4)
+}
+
+}  // namespace detail
+
+OverlayBuilder::OverlayBuilder(VideoSurface& owner) : owner_(&owner) {}
+
+// The two build() overloads are in overlay_cache.cpp (WI-2.437), so that the fuzz target, which compiles this file
+// without a VideoSurface, does not need the surface's cache.
 
 }  // namespace ovt::render

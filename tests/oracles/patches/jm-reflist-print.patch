@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: The Open Video Tools contributors <noreply@ovt.dev>
+Date: Tue, 17 Nov 2026 00:00:00 +0000
+Subject: [PATCH] ldecod: print final RefPicList0/1 of each picture's first slice
+
+Scratch print for the h264_reflist_vs_jm goldens
+(tests/golden/h264/*.jm-reflist.txt.gz); see docs/acceptance/wi/WI-1.122.md.
+Not part of the oracle image build (tests/oracles/build_jm.sh).
+
+Upstream-Status: Inappropriate [OVT test-oracle scratch print, WI-1.122]
+SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
+SPDX-License-Identifier: LGPL-2.1-or-later
+Rationale: JM 19.0 has no option that prints the reference picture lists
+  (TRACE does not), so the WI-1.122 goldens need this local print.
+
+diff --git a/ldecod/src/image.c b/ldecod/src/image.c
+index b300919..84a0b8c 100644
+--- a/ldecod/src/image.c
++++ b/ldecod/src/image.c
+@@ -701,6 +701,47 @@ void init_slice(VideoParameters *p_Vid, Slice *currSlice)
+   reorder_lists (currSlice);
+ #endif
+ 
++  // OVT scratch print (WI-1.122 h264_reflist_vs_jm): final RefPicList0/1 after modification, first slice of each
++  // primary coded picture, base view only, truncated to num_ref_idx_lX_active; POCs are field POCs for fields.
++  {
++    static FILE *ovt_rl = NULL;
++    static int ovt_pic_index = 0;
++    const char *ovt_path = getenv("OVT_REFLIST_OUT");
++    if (ovt_path != NULL && currSlice->current_slice_nr == 0 && currSlice->redundant_pic_cnt == 0
++#if (MVC_EXTENSION_ENABLE)
++        && currSlice->view_id == 0
++#endif
++       )
++    {
++      int l, k;
++      if (ovt_rl == NULL)
++        ovt_rl = fopen(ovt_path, "w");
++      if (ovt_rl != NULL)
++      {
++        fprintf(ovt_rl, "%d %c poc=%d", ovt_pic_index++,
++                currSlice->structure == FRAME ? 'F' : (currSlice->structure == TOP_FIELD ? 'T' : 'B'), currSlice->ThisPOC);
++        for (l = 0; l < 2; ++l)
++        {
++          int n = (currSlice->slice_type == B_SLICE || (l == 0 && (currSlice->slice_type == P_SLICE || currSlice->slice_type == SP_SLICE)))
++                    ? currSlice->listXsize[l] : 0;
++          if (n > currSlice->num_ref_idx_active[l])
++            n = currSlice->num_ref_idx_active[l];
++          fprintf(ovt_rl, " L%d=", l);
++          for (k = 0; k < n; ++k)
++          {
++            StorablePicture *r = currSlice->listX[l][k];
++            if (r == NULL || r == p_Vid->no_reference_picture)
++              fprintf(ovt_rl, "%sna", k ? "," : "");
++            else
++              fprintf(ovt_rl, "%s%d%s", k ? "," : "", r->poc, r->non_existing ? "ne" : "");
++          }
++        }
++        fprintf(ovt_rl, "\n");
++        fflush(ovt_rl);
++      }
++    }
++  }
++
+   if (currSlice->structure==FRAME)
+   {
+     init_mbaff_lists(p_Vid, currSlice);

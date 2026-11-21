@@ -40,6 +40,20 @@ BufferingPeriod parse_buffering_period(SeiPayloadReader& r, const Sps& sps);
 /// Row 9. `sps` may be null: only the framing is kept then.
 PicTiming parse_pic_timing(SeiPayloadReader& r, const Sps* sps);
 
+// sei_picture.cpp
+RecoveryPoint parse_recovery_point(SeiPayloadReader& r);
+FramePackingArrangement parse_frame_packing_arrangement(SeiPayloadReader& r);
+DisplayOrientation parse_display_orientation(SeiPayloadReader& r);
+MasteringDisplayColourVolume parse_mastering_display_colour_volume(SeiPayloadReader& r);
+ContentLightLevelInfo parse_content_light_level_info(SeiPayloadReader& r);
+AlternativeTransferCharacteristics parse_alternative_transfer_characteristics(SeiPayloadReader& r);
+FilmGrainCharacteristics parse_film_grain_characteristics(SeiPayloadReader& r);
+ToneMappingInfo parse_tone_mapping_info(SeiPayloadReader& r);
+
+// sei_user_data.cpp
+UserDataRegisteredItuTT35 parse_user_data_registered_itu_t_t35(SeiPayloadReader& r);
+SeiUserDataUnregistered parse_user_data_unregistered_sei(SeiPayloadReader& r);
+
 }  // namespace ovt::syntax::h264::detail
 
 #endif  // OVT_SRC_SYNTAX_H264_SEI_INTERNAL_H

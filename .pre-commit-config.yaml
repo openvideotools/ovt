@@ -17,12 +17,13 @@ repos:
     hooks:
       - id: check-added-large-files
         args: [--maxkb=2048]          # corpora are never committed; goldens over 2 MB are stored gzip-compressed (§14.4)
-      # Patches stay byte-exact: a blank context line is a single space, and git apply needs it.
+      # Patches stay byte-exact: a blank context line is a single space, and git apply needs it. Fuzz seeds are
+      # binary inputs (.gitattributes) even when they happen to look like text: a fixed byte changes the seed.
       - id: end-of-file-fixer
-        exclude: (^|/)patches/.*\.patch$
+        exclude: (^|/)patches/.*\.patch$|^core/tests/fuzz/(corpus|regressions)/
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
-        exclude: (^|/)patches/.*\.patch$
+        exclude: (^|/)patches/.*\.patch$|^core/tests/fuzz/(corpus|regressions)/
 
   - repo: https://github.com/pre-commit/mirrors-clang-format
     rev: v19.1.6

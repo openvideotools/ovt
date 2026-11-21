@@ -31,7 +31,8 @@ GridCells::GridCells(std::size_t n)
       cbf(n),
       deblock_bs_v(n),
       deblock_bs_h(n),
-      filter_idx(n) {}
+      filter_idx(n),
+      bits_x8(n) {}
 
 namespace {
 
@@ -148,6 +149,7 @@ void fill_intra(GridCells& g, const BlockData& d, const PictureFormat& fmt, cons
 }
 
 void fill_motion(GridCells& g, const PbInfo& pb, std::size_t slice, std::size_t i, RefTable& refs) {
+  bool clamped = false;
   for (int l = 0; l < 2; ++l) {
     const auto ul = static_cast<std::size_t>(l);
     if (pb.predFlag.at(ul) == 0) {
@@ -161,6 +163,10 @@ void fill_motion(GridCells& g, const PbInfo& pb, std::size_t slice, std::size_t 
     (l == 0 ? g.ref0 : g.ref1)[i] = r;
     (l == 0 ? g.mv0_x : g.mv1_x)[i] = mv16(pb.mv_x.at(ul));
     (l == 0 ? g.mv0_y : g.mv1_y)[i] = mv16(pb.mv_y.at(ul));
+    clamped = clamped || mv16_clamps(pb.mv_x.at(ul)) || mv16_clamps(pb.mv_y.at(ul));
+  }
+  if (clamped) {
+    ++g.mv_clamped_cells;
   }
 }
 
@@ -211,6 +217,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   const auto bs_v = fbb.CreateVector(g.deblock_bs_v);
   const auto bs_h = fbb.CreateVector(g.deblock_bs_h);
   const auto filter_idx = fbb.CreateVector(g.filter_idx);
+  const auto bits_x8 = fbb.CreateVector(g.bits_x8);
   fb::CellGridBuilder b(fbb);
   b.add_cells_w(cells_w);
   b.add_cells_h(cells_h);
@@ -233,6 +240,7 @@ flatbuffers::Offset<fb::CellGrid> build_grid(flatbuffers::FlatBufferBuilder& fbb
   b.add_deblock_bs_v(bs_v);
   b.add_deblock_bs_h(bs_h);
   b.add_filter_idx(filter_idx);
+  b.add_bits_x8(bits_x8);
   return b.Finish();
 }
 

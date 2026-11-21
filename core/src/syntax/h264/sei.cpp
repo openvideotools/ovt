@@ -116,6 +116,36 @@ SeiRbsp parse_sei_rbsp(BitReader& br, SyntaxBuilder& b, SeiContext& ctx) {
             parse_into(m, b, m.name, [&] { return detail::parse_pic_timing(r, sps); });
             break;
           }
+          case 4:
+            parse_into(m, b, m.name, [&] { return detail::parse_user_data_registered_itu_t_t35(r); });
+            break;
+          case 5:
+            parse_into(m, b, m.name, [&] { return detail::parse_user_data_unregistered_sei(r); });
+            break;
+          case 6:
+            parse_into(m, b, m.name, [&] { return detail::parse_recovery_point(r); });
+            break;
+          case 19:
+            parse_into(m, b, m.name, [&] { return detail::parse_film_grain_characteristics(r); });
+            break;
+          case 23:
+            parse_into(m, b, m.name, [&] { return detail::parse_tone_mapping_info(r); });
+            break;
+          case 45:
+            parse_into(m, b, m.name, [&] { return detail::parse_frame_packing_arrangement(r); });
+            break;
+          case 47:
+            parse_into(m, b, m.name, [&] { return detail::parse_display_orientation(r); });
+            break;
+          case kMdcv:
+            parse_into(m, b, m.name, [&] { return detail::parse_mastering_display_colour_volume(r); });
+            break;
+          case kCll:
+            parse_into(m, b, m.name, [&] { return detail::parse_content_light_level_info(r); });
+            break;
+          case kAlternativeTransfer:
+            parse_into(m, b, m.name, [&] { return detail::parse_alternative_transfer_characteristics(r); });
+            break;
           default:  // row 18: the tree still shows what is present
             keep_as_bytes(r, m.name);
             break;

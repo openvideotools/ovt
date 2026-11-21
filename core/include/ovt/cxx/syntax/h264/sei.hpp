@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// H.264 SEI messages (Annex D): sei_rbsp() framing and the payload parsers of chapter 7 §7.3.4 rows 7–9 and 18
-// (WI-1.110a: buffering_period, pic_timing, every other payload kept as named Bytes; WI-1.110b adds rows 10–17 and the
-// film grain / tone mapping payloads). C++ helper header (D22): semi-public, no ABI promise, never included from a C
+// H.264 SEI messages (Annex D): sei_rbsp() framing and the payload parsers of chapter 7 §7.3.4 rows 7–18
+// (WI-1.110a: framing, buffering_period, pic_timing; WI-1.110b: the picture-level and user-data payloads of rows 10–17
+// plus film grain / tone mapping). C++ helper header (D22): semi-public, no ABI promise, never included from a C
 // header.
 //
 // The reader stands after the NAL header (parse_nal_header()). Every message becomes a node `sei_message[i]`
@@ -15,6 +15,7 @@
 #ifndef OVT_CXX_SYNTAX_H264_SEI_HPP
 #define OVT_CXX_SYNTAX_H264_SEI_HPP
 
+#include <array>
 #include <cstdint>
 #include <optional>
 #include <span>
@@ -71,8 +72,122 @@ struct PicTiming {
   std::vector<ClockTimestamp> clock_timestamps;
 };
 
+struct RecoveryPoint {  // D.1.8, type 6
+  uint32_t recovery_frame_cnt = 0;
+  bool exact_match_flag = false;
+  bool broken_link_flag = false;
+  uint32_t changing_slice_group_idc = 0;
+};
+
+struct UserDataRegisteredItuTT35 {  // D.1.6, type 4 (identification fields only; the payload stays in the tree)
+  uint8_t itu_t_t35_country_code = 0;
+  std::optional<uint8_t> itu_t_t35_country_code_extension_byte;
+  std::optional<uint16_t> itu_t_t35_terminal_provider_code;
+  std::optional<uint32_t> itu_t_t35_terminal_provider_oriented_code;
+  std::string enum_name;  // registry name (§7.3.11) or "T.35 provider …"
+  bool has_hdr10plus = false;
+  bool has_dolby_vision = false;
+  uint32_t payload_byte_count = 0;
+};
+
+struct SeiUserDataUnregistered {  // D.1.7, type 5
+  std::string uuid;               // canonical upper-case 8-4-4-4-12
+  std::string enum_name;          // "x264 options", … or "user data (UUID …)"
+  std::optional<std::string> text;
+  uint32_t payload_byte_count = 0;
+};
+
+struct FramePackingArrangement {  // D.1.26, type 45
+  uint32_t frame_packing_arrangement_id = 0;
+  bool cancel_flag = false;
+  uint32_t type = 0;
+  std::string_view type_name;  // Table D-8
+  bool quincunx_sampling_flag = false;
+  uint32_t content_interpretation_type = 0;
+  bool spatial_flipping_flag = false;
+  bool frame0_flipped_flag = false;
+  bool field_views_flag = false;
+  bool current_frame_is_frame0_flag = false;
+  bool frame0_self_contained_flag = false;
+  bool frame1_self_contained_flag = false;
+  std::array<uint32_t, 4> grid_position{};  // frame0 x, frame0 y, frame1 x, frame1 y
+  uint32_t reserved_byte = 0;
+  uint32_t repetition_period = 0;
+  bool extension_flag = false;
+};
+
+struct DisplayOrientation {  // D.1.27, type 47
+  bool cancel_flag = false;
+  bool hor_flip = false;
+  bool ver_flip = false;
+  uint32_t anticlockwise_rotation = 0;
+  double degrees = 0.0;  // anticlockwise_rotation * 360 / 65536
+  uint32_t repetition_period = 0;
+  bool extension_flag = false;
+};
+
+struct MasteringDisplayColourVolume {             // D.1.29, type 137
+  std::array<uint32_t, 3> display_primaries_x{};  // as coded: c = 0 green, 1 blue, 2 red
+  std::array<uint32_t, 3> display_primaries_y{};
+  uint32_t white_point_x = 0;
+  uint32_t white_point_y = 0;
+  uint32_t max_display_mastering_luminance = 0;  // 0.0001 cd/m²
+  uint32_t min_display_mastering_luminance = 0;
+  // ovt_ColorDescription order (R, G, B), units of 0.00002
+  std::array<uint32_t, 3> mdcv_primaries_x{};
+  std::array<uint32_t, 3> mdcv_primaries_y{};
+  std::string text;  // "R (0.708, 0.292) G (…) B (…) WP (…) max 1000 cd/m² min 0.0001 cd/m²"
+};
+
+struct ContentLightLevelInfo {  // D.1.30, type 144
+  uint32_t max_content_light_level = 0;
+  uint32_t max_pic_average_light_level = 0;
+};
+
+struct AlternativeTransferCharacteristics {  // D.1.31, type 147
+  uint32_t preferred_transfer_characteristics = 0;
+};
+
+struct FilmGrainComponent {
+  uint32_t num_intensity_intervals_minus1 = 0;
+  uint32_t num_model_values_minus1 = 0;
+  std::vector<uint32_t> intensity_interval_lower_bound;
+  std::vector<uint32_t> intensity_interval_upper_bound;
+  std::vector<int32_t> comp_model_value;  // (num_intensity_intervals_minus1+1) x (num_model_values_minus1+1)
+};
+
+struct FilmGrainCharacteristics {  // D.1.20, type 19
+  bool cancel_flag = false;
+  uint32_t film_grain_model_id = 0;
+  bool separate_colour_description_present_flag = false;
+  uint32_t bit_depth_luma_minus8 = 0;
+  uint32_t bit_depth_chroma_minus8 = 0;
+  bool full_range_flag = false;
+  uint32_t colour_primaries = 0;
+  uint32_t transfer_characteristics = 0;
+  uint32_t matrix_coefficients = 0;
+  uint32_t blending_mode_id = 0;
+  uint32_t log2_scale_factor = 0;
+  std::array<bool, 3> comp_model_present_flag{};
+  std::array<FilmGrainComponent, 3> comp;
+  uint32_t repetition_period = 0;
+};
+
+struct ToneMappingInfo {  // D.1.21, type 23
+  uint32_t tone_map_id = 0;
+  bool cancel_flag = false;
+  uint32_t repetition_period = 0;
+  uint32_t coded_data_bit_depth = 0;
+  uint32_t target_bit_depth = 0;
+  uint32_t tone_map_model_id = 0;
+  std::vector<uint32_t> values;  // model 0: min, max; 1: midpoint, width; 2: intervals; 3: coded/target pivot pairs
+};
+
 /// The parsed form of one message; std::monostate when the payload is kept as bytes.
-using SeiPayload = std::variant<std::monostate, BufferingPeriod, PicTiming>;
+using SeiPayload =
+    std::variant<std::monostate, BufferingPeriod, PicTiming, RecoveryPoint, UserDataRegisteredItuTT35,
+                 SeiUserDataUnregistered, FramePackingArrangement, DisplayOrientation, MasteringDisplayColourVolume,
+                 ContentLightLevelInfo, AlternativeTransferCharacteristics, FilmGrainCharacteristics, ToneMappingInfo>;
 
 struct SeiMessage {
   uint32_t payload_type = 0;

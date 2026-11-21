@@ -7696,8 +7696,13 @@
         "container-full"
       ],
       "expected": {
-        "format": "isobmff"
-      }
+        "format": "isobmff",
+        "demux": {
+          "packets": 216,
+          "error": "corrupt"
+        }
+      },
+      "note": "Refs #558: fragmented CENC with key rotation (6 moofs, sbgp/sgpd seig, 483 samples by trun). libavformat (6.1, pinned n7.1.1) delivers the first 3 fragments (216 packets), logs 'hit EOF while reading sub-sample encryption info' and then fails with AVERROR_INVALIDDATA; ffprobe stops there with exit 0. expected.demux pins that until FFmpeg reads the whole file (draft bug report: project patches/ffmpeg-cenc-seig-9436R.md)."
     },
     {
       "id": "mpegff_a1_foreman_qcif",
@@ -18550,6 +18555,29 @@
       "files": {
         "syn_h265_gop60_1080p.265": "a3ed3abf2717f3fe9f3106530a0ed1c85754613287d92983241c178c5f73e05d",
         "syn_h265_gop60_1080p.mp4": "db99c37b75126f6fb4f94c8226076f69be326b93df75a4a5ada4051cd18fd8d3"
+      }
+    },
+    {
+      "id": "syn_h265_gop60_1080p_nowpp",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "26",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "gop60",
+        "1080p",
+        "perf"
+      ],
+      "tags": [
+        "fast"
+      ],
+      "sha256": "0747ced1496db97e2c336445e30acb356a38eb943bf5e7230fff841ada6bf2d4",
+      "size_bytes": 7621847,
+      "files": {
+        "syn_h265_gop60_1080p_nowpp.mp4": "0747ced1496db97e2c336445e30acb356a38eb943bf5e7230fff841ada6bf2d4",
+        "syn_h265_gop60_1080p_nowpp.265": "de864256176422aca7c27a5146bec0de24c83940e129e2782a6f800c4d6053bb"
       }
     },
     {

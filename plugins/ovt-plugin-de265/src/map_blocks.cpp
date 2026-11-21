@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //
 // libde265 metadata -> Block tree (CTU -> CU -> PU / TU), MotionVector, RefSlot, partitions and HevcFilterParams
-// (chapter 07 §7.6.2 mapping table, rows available with patch 0001; WI-2.164 steps 1 to 5). The tree follows
+// (chapter 07 §7.6.2 mapping table; WI-2.164 steps 1 to 5, and the patch-0002 syntax and bit counts of WI-2.165 through
+// map_syntax.hpp). The tree follows
 // chapter 06 §6.3.2: CTUs in tile scan, CUs in z-scan within their CTU, and for each CU its PUs (partIdx order) then
 // its root TU with the nested transform tree.
 
@@ -78,6 +79,7 @@ struct OutBlock {
   bool skip = false;
   bool merge = false;
   int16_t qp = 0;
+  uint32_t bits_x8 = 0;  // 0 = unknown
   const char* ext_type = "";
   std::vector<uint8_t> ext;
 };
@@ -120,7 +122,7 @@ struct SegmentSpan {
 class Mapper {
  public:
   Mapper(const BlockData& d, const PictureFormat& fmt, GridCells& g, RefTable& refs)
-      : d_(d), fmt_(fmt), g_(g), refs_(refs) {}
+      : d_(d), fmt_(fmt), g_(g), refs_(refs), syn_(syntax_of(d)), at_{d.cells_w} {}
 
   std::vector<OutBlock> blocks;
   struct Mv {
@@ -130,6 +132,8 @@ class Mapper {
     fb::Rect rect;
     int16_t x;
     int16_t y;
+    std::array<int16_t, 2> mvd;
+    std::string predictor;
     uint16_t flags;
   };
   std::vector<Mv> mvs;
@@ -151,7 +155,8 @@ class Mapper {
     b.rect = {x0, y0, std::min(size, fmt_.coded_w - x0), std::min(size, fmt_.coded_h - y0)};
     b.level = 1;
     b.ext_type = "HevcCtu";
-    b.ext = hevc_ctu(rs, d_.ctb_addr_ts[ctb], d_.ctb_slice[ctb], tile_idx, end_of_segment);
+    b.bits_x8 = syn_ != nullptr ? syn_->ctb_bits[ctb] : 0;
+    b.ext = hevc_ctu(rs, d_.ctb_addr_ts[ctb], d_.ctb_slice[ctb], tile_idx, end_of_segment, b.bits_x8);
     const uint32_t id = add(std::move(b));
     quadtree(x0, y0, d_.ctb_log2, id);
   }
@@ -170,7 +175,21 @@ class Mapper {
   const PictureFormat& fmt_;
   GridCells& g_;
   RefTable& refs_;
+  const SyntaxData* syn_;  // patch 0002 data; null without it (or when its sizes do not match)
+  CellIndex at_;
   flatbuffers::FlatBufferBuilder ext_fbb_{256};
+
+  static const SyntaxData* syntax_of(const BlockData& d) {
+    const SyntaxData& s = d.syn;
+    const std::size_t cells = std::size_t{d.cells_w} * d.cells_h;
+    const bool ok = s.has_syntax && s.pu.size() == cells && s.tu.size() == cells && s.cu_bits.size() == d.cb.size() &&
+                    s.ctb_bits.size() == static_cast<std::size_t>(d.ctbs_w) * static_cast<std::size_t>(d.ctbs_h);
+    return ok ? &s : nullptr;
+  }
+  [[nodiscard]] std::size_t cb_index(int32_t x, int32_t y) const {
+    return static_cast<std::size_t>(y >> d_.min_cb_log2) * static_cast<std::size_t>(d_.cbs_w) +
+           static_cast<std::size_t>(x >> d_.min_cb_log2);
+  }
 
   [[nodiscard]] std::size_t cell(int32_t x, int32_t y) const {
     return static_cast<std::size_t>(y >> 2) * d_.cells_w + static_cast<std::size_t>(x >> 2);
@@ -193,7 +212,8 @@ class Mapper {
     return out;
   }
 
-  std::vector<uint8_t> hevc_ctu(int32_t rs, int32_t ts, uint16_t slice, uint16_t tile_idx, bool end_of_segment) {
+  std::vector<uint8_t> hevc_ctu(int32_t rs, int32_t ts, uint16_t slice, uint16_t tile_idx, bool end_of_segment,
+                                uint32_t bits) {
     const SaoInfo& sao = d_.sao[static_cast<std::size_t>(rs)];
     const SliceHeader* sh = slice < d_.slices.size() ? &d_.slices[slice] : nullptr;
     // SAO vectors: 3 entries when the slice applies SAO, empty otherwise (ovt_model.fbs HevcCtu).
@@ -218,6 +238,7 @@ class Mapper {
     b.add_slice_segment_idx(slice);
     b.add_tile_idx(tile_idx);
     b.add_end_of_slice_segment_flag(static_cast<uint8_t>(end_of_segment));
+    b.add_bit_count_x8(bits);
     if (sao_on) {
       b.add_SaoTypeIdx(type);
       b.add_SaoOffsetVal(offset);
@@ -269,11 +290,16 @@ class Mapper {
     const int32_t n = 1 << cu.log2;
     const bool skip = cu.pred == kPredSkip;
     const bool residual = cu.pred != kPredSkip && cu.pred != kPredPcm;
+    const bool intra = cu.pred == kPredIntra || cu.pred == kPredPcm;
     bool any_cbf = false;
     for (int32_t y = cu.y; y < cu.y + n; y += 4) {
       for (int32_t x = cu.x; x < cu.x + n; x += 4) {
         any_cbf = any_cbf || (d_.tu[cell(x, y)] & kTuNonzeroCoeff) != 0;
       }
+    }
+    CuSyntax cs;
+    if (syn_ != nullptr) {
+      cs = cu_syntax(*syn_, at_, CuShape{cu.x, cu.y, cu.log2, intra, skip, cu.cb->PartMode, fmt_.chroma_format});
     }
     OutBlock b;
     b.parent = static_cast<int32_t>(parent);
@@ -283,10 +309,14 @@ class Mapper {
     b.partition_type = cu.cb->PartMode;
     b.pred = cu.pred;
     b.skip = skip;
-    b.merge = skip;  // a skipped CU is merged; merge_flag of other CUs needs patch 0002
+    b.merge = skip || cs.all_merged;  // every PU merged (merge_flag needs patch 0002 for non-skipped CUs)
     b.qp = cu.cb->QP_Y;
+    b.bits_x8 = syn_ != nullptr ? syn_->cu_bits[cb_index(cu.x, cu.y)] : 0;
     b.ext_type = "HevcCu";
-    b.ext = hevc_cu(cu, any_cbf);
+    b.ext = hevc_cu(cu, any_cbf, cs, b.bits_x8);
+    if (syn_ != nullptr) {
+      spread_bits(g_.bits_x8, at_, d_.cells_h, cu.x, cu.y, n, b.bits_x8);
+    }
     const uint32_t id = add(std::move(b));
     for (int32_t y = cu.y; y < cu.y + n; y += 4) {
       for (int32_t x = cu.x; x < cu.x + n; x += 4) {
@@ -306,14 +336,18 @@ class Mapper {
     }
   }
 
-  std::vector<uint8_t> hevc_cu(const CuContext& cu, bool any_cbf) {
+  std::vector<uint8_t> hevc_cu(const CuContext& cu, bool any_cbf, const CuSyntax& cs, uint32_t bits) {
     const CbInfo& cb = *cu.cb;
     const bool intra = cu.pred == kPredIntra || cu.pred == kPredPcm;
     const SliceHeader* sh = cu.slice < d_.slices.size() ? &d_.slices[cu.slice] : nullptr;
     const bool i_slice = sh == nullptr || sh->slice_type == 2;
     flatbuffers::Offset<flatbuffers::Vector<uint8_t>> mode_c;
+    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> chroma_syntax;
     if (cu.pred == kPredIntra && fmt_.chroma_format != 0) {
       mode_c = ext_fbb_.CreateVector(std::vector<uint8_t>{d_.intra_c[cell(cu.x, cu.y)]});
+    }
+    if (cu.pred == kPredIntra && !cs.intra_chroma_pred_mode.empty()) {
+      chroma_syntax = ext_fbb_.CreateVector(cs.intra_chroma_pred_mode);
     }
     fb::HevcCuBuilder b(ext_fbb_);
     b.add_CtDepth(cb.ctDepth);
@@ -331,9 +365,11 @@ class Mapper {
     if (intra) {
       b.add_pcm_flag(cb.pcm_flag);
     }
-    // SPEC-ASSUMPTION(#461): rqt_root_cbf is known to be 1 when a luma TB has coefficients; otherwise unknown without
-    // patch 0002 (the chroma cbf flags are not kept), so it stays 255.
-    if (any_cbf && !intra) {
+    if (syn_ != nullptr) {  // patch 0002: the signalled syntax
+      add_cu_syntax(b, cs, chroma_syntax, bits);
+    } else if (any_cbf && !intra) {
+      // SPEC-ASSUMPTION(#461): without patch 0002, rqt_root_cbf is known to be 1 when a luma TB has coefficients and
+      // unknown otherwise (the chroma cbf flags are not kept), so it stays 255.
       b.add_rqt_root_cbf(1);
     }
     b.add_QpY(static_cast<int8_t>(cb.QP_Y));  // -QpBdOffsetY..51 fits int8
@@ -363,7 +399,8 @@ class Mapper {
     b.partition_type = part_idx;
     b.pred = cu.pred;
     b.skip = cu.pred == kPredSkip;
-    b.merge = b.skip;
+    const PuSyntax* ps = syn_ != nullptr && inter ? &syn_->pu[c] : nullptr;
+    b.merge = b.skip || (ps != nullptr && ps->merge_flag == 1);
     b.qp = cu.cb->QP_Y;
     b.ext_type = "HevcPu";
     b.ext = hevc_pu(cu, pb, c, part_idx, inter);
@@ -372,27 +409,35 @@ class Mapper {
     for (int l = 0; l < 2; ++l) {
       const auto ul = static_cast<std::size_t>(l);
       if (slot.at(ul) >= 0) {
-        mvs.push_back(
-            Mv{id, static_cast<uint8_t>(l), slot.at(ul), r, mv16(pb.mv_x.at(ul)), mv16(pb.mv_y.at(ul)), flags});
+        // Without patch 0002 the signalled difference and the predictor are unknown (chapter 07 §7.6.2).
+        mvs.push_back(Mv{id, static_cast<uint8_t>(l), slot.at(ul), r, mv16(pb.mv_x.at(ul)), mv16(pb.mv_y.at(ul)),
+                         ps != nullptr ? mvd16(*ps, l) : std::array<int16_t, 2>{kMvdUnavailable, kMvdUnavailable},
+                         ps != nullptr ? predictor(*ps, l) : std::string("?"), flags});
       }
     }
   }
 
   std::vector<uint8_t> hevc_pu(const CuContext& cu, const PbInfo& pb, std::size_t c, uint8_t part_idx, bool inter) {
+    const PuSyntax* ps = syn_ != nullptr ? &syn_->pu[c] : nullptr;
     fb::HevcPuBuilder b(ext_fbb_);
     b.add_partIdx(part_idx);
+    if (ps != nullptr) {
+      add_pu_syntax(b, *ps);
+    }
     if (cu.pred == kPredIntra && d_.intra_y[c] != kNotApplicable) {
       b.add_IntraPredModeY(d_.intra_y[c]);
     }
     if (!inter) {
       return finish(b);
     }
-    if (cu.pred == kPredSkip) {
+    if (cu.pred == kPredSkip && ps == nullptr) {
       b.add_merge_flag(1);
     }
     const bool l0 = pb.predFlag[0] != 0;
     const bool l1 = pb.predFlag[1] != 0;
-    if (l0 || l1) {
+    if (ps != nullptr && ps->merge_flag == 0 && ps->inter_pred_idc <= 2) {
+      b.add_inter_pred_idc(static_cast<fb::HevcInterPredIdc>(ps->inter_pred_idc));  // as signalled (Table 7-11)
+    } else if (l0 || l1) {  // merge: the value the merge candidate implies
       b.add_inter_pred_idc(l0 && l1 ? fb::HevcInterPredIdc::PRED_BI
                                     : (l0 ? fb::HevcInterPredIdc::PRED_L0 : fb::HevcInterPredIdc::PRED_L1));
     }
@@ -419,10 +464,13 @@ class Mapper {
   void tu_tree(const CuContext& cu, int32_t x, int32_t y, int32_t log2, int depth, uint8_t blk, uint32_t parent) {
     const uint8_t info = d_.tu[cell(x, y)];
     const bool split = log2 > 2 && depth <= kMaxTrafoDepth && (info & (1U << static_cast<unsigned>(depth))) != 0;
-    // SPEC-ASSUMPTION(#461): TU_FLAG_NONZERO_COEFF is cbf_luma (libde265 sets it for cIdx 0 only).
+    // SPEC-ASSUMPTION(#461): without patch 0002, TU_FLAG_NONZERO_COEFF is cbf_luma (libde265 sets it for cIdx 0 only).
     const bool cbf_luma = (info & kTuNonzeroCoeff) != 0;
     const bool bypass = cu.cb->cu_transquant_bypass != 0;
-    const bool dst = !split && cu.pred == kPredIntra && log2 == 2 && !bypass;
+    const bool intra = cu.pred == kPredIntra;
+    // Patch 0002: the transform_unit() syntax of this leaf (read at its origin).
+    const TuSyntax* ts = syn_ != nullptr && !split && syn_->tu[cell(x, y)].coded != 0 ? &syn_->tu[cell(x, y)] : nullptr;
+    const bool dst = !split && intra && log2 == 2 && !bypass;
     OutBlock b;
     b.parent = static_cast<int32_t>(parent);
     b.kind = fb::BlockKind::TU;
@@ -432,12 +480,21 @@ class Mapper {
     b.qp = cu.cb->QP_Y;
     b.ext_type = "HevcTu";
     {
+      TuVectors v;
+      if (ts != nullptr) {
+        // Outside 4:4:4 the chroma of four 4x4 luma TBs is coded with blkIdx 3 (H.265 7.3.8.10).
+        const bool chroma_here = log2 > 2 || fmt_.chroma_format == 3 || blk == 3;
+        v = tu_vectors(ext_fbb_, *ts, fmt_.chroma_format, chroma_here);
+      }
       fb::HevcTuBuilder t(ext_fbb_);
       t.add_trafoDepth(static_cast<uint8_t>(depth));
       t.add_log2TrafoSize(static_cast<uint8_t>(log2));
       t.add_blkIdx(blk);
       t.add_split_transform_flag(static_cast<uint8_t>(split));
-      if (!split) {
+      if (ts != nullptr) {
+        add_tu_syntax(t, *ts, v);
+        t.add_dst_used(static_cast<uint8_t>(dst_used(*ts, bypass, intra)));
+      } else if (!split) {
         t.add_cbf_luma(static_cast<uint8_t>(cbf_luma));
         // DST-VII is applied to 4x4 intra luma TBs with coefficients (H.265 8.6.4.2 trType = 1); transform skip
         // is not known without patch 0002.
@@ -454,15 +511,17 @@ class Mapper {
       tu_tree(cu, x + half, y + half, log2 - 1, depth + 1, 3, id);
       return;
     }
-    // CellGrid.tx_type (chapter 06 §6.3.1): 3 transquant bypass, 1 DST-VII (4x4 intra luma), else 0 (DCT-II).
-    const uint8_t type = bypass ? 3 : (dst ? 1 : 0);
+    // CellGrid.tx_type (chapter 06 §6.3.1): 3 transquant bypass, 2 transform skip (patch 0002), 1 DST-VII (4x4 intra
+    // luma), else 0 (DCT-II). CellGrid.cbf: bit 0 cbf_luma, bits 1/2 cbf_cb/cbf_cr with patch 0002.
+    const uint8_t type = ts != nullptr ? grid_tx_type(*ts, bypass, intra) : (bypass ? 3 : (dst ? 1 : 0));
+    const uint8_t cbf = ts != nullptr ? grid_cbf(*ts) : static_cast<uint8_t>(cbf_luma);
     const int32_t n = 1 << log2;
     for (int32_t yy = y; yy < y + n; yy += 4) {
       for (int32_t xx = x; xx < x + n; xx += 4) {
         const std::size_t i = cell(xx, yy);
         g_.tx_log2[i] = static_cast<uint8_t>(log2);
         g_.tx_type[i] = type;
-        g_.cbf[i] = static_cast<uint8_t>(cbf_luma);  // bit0 = cbf_luma; Cb/Cr flags need patch 0002
+        g_.cbf[i] = cbf;
       }
     }
   }
@@ -624,15 +683,14 @@ void serialise(flatbuffers::FlatBufferBuilder& fbb, const Mapper& mp, MappedBloc
     const OutBlock& b = mp.blocks[id];
     blocks.push_back(fb::CreateBlockDirect(fbb, static_cast<uint32_t>(id), b.parent, &b.children, b.kind, &b.rect,
                                            b.level, b.partition_type, static_cast<fb::PredKind>(b.pred), b.skip,
-                                           b.merge, b.qp, /*bits_x8=*/0, b.ext_type, b.ext.empty() ? nullptr : &b.ext));
+                                           b.merge, b.qp, b.bits_x8, b.ext_type, b.ext.empty() ? nullptr : &b.ext));
   }
   out->blocks = fbb.CreateVector(blocks);
   std::vector<flatbuffers::Offset<fb::MotionVector>> mvs;
   mvs.reserve(mp.mvs.size());
   for (const auto& m : mp.mvs) {
-    // predictor "?": merge_flag, merge_idx and mvp_lX_flag need patch 0002 (chapter 07 §7.6.2).
-    mvs.push_back(fb::CreateMotionVectorDirect(fbb, m.block_id, m.list, m.ref, &m.rect, m.x, m.y, kMvdUnavailable,
-                                               kMvdUnavailable, "?", m.flags));
+    mvs.push_back(fb::CreateMotionVectorDirect(fbb, m.block_id, m.list, m.ref, &m.rect, m.x, m.y, m.mvd[0], m.mvd[1],
+                                               m.predictor.c_str(), m.flags));
   }
   out->mvs = fbb.CreateVector(mvs);
 }
@@ -692,7 +750,17 @@ MappedBlocks map_blocks(flatbuffers::FlatBufferBuilder& fbb, const BlockData& d,
                               : static_cast<uint16_t>(d.slices.size() + static_cast<std::size_t>(d.ctb_tile[ctb]));
     mp.emit_ctu(rs, tile_idx, seg[slice].last_ts == d.ctb_addr_ts[ctb]);
   }
+  // The root's bits: Σ CTU bits (V-019), 0 = unknown when any CTU's are unknown.
+  uint64_t total = 0;
+  bool known = !mp.blocks[0].children.empty();
+  for (const uint32_t c : mp.blocks[0].children) {
+    total += mp.blocks[c].bits_x8;
+    known = known && mp.blocks[c].bits_x8 != 0;
+  }
+  mp.blocks[0].bits_x8 =
+      known ? static_cast<uint32_t>(std::min<uint64_t>(total, std::numeric_limits<uint32_t>::max())) : 0;
   fill_cells(g, d, fmt, refs);
+  out.mv_clamped_cells = g.mv_clamped_cells;
 
   const auto uncovered = std::count(g.block_id.begin(), g.block_id.end(), 0U);
   if (uncovered > 0) {

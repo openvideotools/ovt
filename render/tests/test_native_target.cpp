@@ -177,6 +177,7 @@ class HeadlessOutput final : public ovt::render::detail::NativeOutput {
     g_log.configured.push_back(encoding);
     g_log.widths.push_back(width);
   }
+  void set_content_metadata(const struct pl_hdr_metadata& /*hdr*/) override {}  // test_hint.cpp records it
   [[nodiscard]] float polled_headroom() const override { return g_log.headroom; }
 };
 

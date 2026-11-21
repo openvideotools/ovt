@@ -50,7 +50,7 @@ const ovt_AnalysisCaps kCaps = {
     kCodecH265,
     ovt::de265::kSupportedStageMask,  // plane_stages: Reconstruction, + the patch-0003 stages (WI-2.166)
 #ifdef OVT_DE265_INTERNALS
-    ovt::de265::kGridFields,  // grid_fields: every CellGrid vector but bits_x8 (patch 0002, WI-2.165)
+    ovt::de265::kGridFields,  // grid_fields: every CellGrid vector (bits_x8 from patch 0002, WI-2.165)
 #else
     0U,  // grid_fields: a system libde265 has no internals API, so no block data (OVT_SYSTEM_DE265)
 #endif
@@ -61,7 +61,7 @@ const ovt_AnalysisCaps kCaps = {
     "0.1.0+libde265." LIBDE265_VERSION,
     "LGPL-3.0-or-later",
     "HEVC Main / Main 10 / Main Still Picture via libde265 " LIBDE265_VERSION
-    " (OVT patches 0001, 0003); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
+    " (OVT patches 0001 to 0003); RExt, SCC and multi-layer streams: use ovt-plugin-hm",
 };
 
 std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint32_t plane_stage_mask) {
@@ -79,7 +79,7 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   }
 
   std::vector<flatbuffers::Offset<ovt::fb::Diagnostic>> diags;
-  diags.reserve(f.diagnostics.size() + mapped.warnings.size());
+  diags.reserve(f.diagnostics.size() + mapped.warnings.size() + 1);
   for (const ovt::de265::Diag& d : f.diagnostics) {
     diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(d.severity), d.code.c_str(),
                                                     d.message.c_str()));
@@ -88,6 +88,12 @@ std::unique_ptr<ovt_AnalysisDecoder::Pulled> build(ovt::de265::Frame frame, uint
   for (const std::string& w : mapped.warnings) {
     diags.push_back(
         ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning), "", w.c_str()));
+  }
+  if (mapped.mv_clamped_cells > 0) {  // chapter 06 §6.2.3: once per frame
+    const std::string msg =
+        "motion vector clamped to \u00b132767 (" + std::to_string(mapped.mv_clamped_cells) + " cells)";
+    diags.push_back(ovt::fb::CreateDiagnosticDirect(*fbb, static_cast<ovt::fb::Severity>(kSeverityWarning),
+                                                    "MDL-GEN-0003", msg.c_str()));
   }
   const auto diags_v = fbb->CreateVector(diags);
 

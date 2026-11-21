@@ -60,6 +60,15 @@ X(CNT_TS_1007, "CNT-TS-1007", Warning, "PID_error: PID `pid` referenced by PMT b
 X(CNT_TS_2001, "CNT-TS-2001", Warning,
   "Transport_error: `transport_error_indicator` set at packet `k`", "TR 101 290 §5.2.2 (2.1)")
 X(CNT_TS_2002, "CNT-TS-2002", Error, "CRC_error in `table` section on PID `pid`", "TR 101 290 §5.2.2 (2.2)")
+X(CNT_TS_2003, "CNT-TS-2003", Warning, "PCR_repetition_error: `D` ms between PCRs on PID `pid` (> 40 ms)",
+  "TR 101 290 §5.2.2 (2.3a)")
+X(CNT_TS_2004, "CNT-TS-2004", Warning,
+  "PCR_discontinuity_indicator_error: PCR jump `D` ms without `discontinuity_indicator` on PID `pid`",
+  "TR 101 290 §5.2.2 (2.3b)")
+X(CNT_TS_2005, "CNT-TS-2005", Info, "PCR_accuracy_error: `D` ns deviation on PID `pid` (> ±500 ns)",
+  "TR 101 290 §5.2.2 (2.4)")
+X(CNT_TS_2006, "CNT-TS-2006", Warning, "PTS_error: `D` ms between PTS on PID `pid` (> 700 ms)",
+  "TR 101 290 §5.2.2 (2.5)")
 X(CNT_TS_2007, "CNT-TS-2007", Warning, "CAT_error: scrambled packets present but no CAT (PID 1)",
   "TR 101 290 §5.2.2 (2.6)")
 
@@ -81,6 +90,39 @@ X(CNT_1006, "CNT-1006", Info, "QuickTime-style `meta` without version/flags", "Q
 X(CNT_1002, "CNT-1002", Error, "decoder hit end of box while reading field (truncated payload)", "")
 X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
+// WI-1.206 (stsd and sample entries, §8.3.2).
+X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+
+// WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
+X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
+
+// WI-1.208 (group C part 2: colour, HDR and Dolby Vision boxes, §8.3.3).
+X(CNT_1023, "CNT-1023", Warning, "`clap` yields non-integral or out-of-range aperture", "14496-12 §12.1.4")
+X(CNT_5002, "CNT-5002", Warning, "QuickTime `nclc` colr in non-`qt` file", "QTFF")
+X(CNT_5020, "CNT-5020", Warning, "`dvcC` used for profile ≥ 8 or `dvvC` for ≤ 7", "DV-ISOBMFF §2.2")
+
+// WI-1.207 (codec configuration records, §8.3.3).
+X(CNT_1020, "CNT-1020", Info, "`avc3`/`avc4` sample entry carries SPS/PPS in `avcC` (allowed, but in-band is the point)",
+  "14496-15 §5.4")
+X(CNT_1021, "CNT-1021", Error, "`av1C.configOBUs` contains an OBU other than sequence header / metadata",
+  "AV1-ISOBMFF §2.3.4")
+X(CNT_1022, "CNT-1022", Warning, "`vpcC.codecIntializationDataSize` ≠ 0 for VP8/VP9", "VP-ISOBMFF §2.3")
+
+// WI-1.209 (sample tables, §8.3.4 and §8.4.1; the box-level checks of the group D decoders).
+X(CNT_2001, "CNT-2001", Warning, "`stts.sample_delta == 0` for a non-last sample", "14496-12 §8.6.1.2")
+X(CNT_2002, "CNT-2002", Warning, "`ctts` v0 offset ≥ 2^31 treated as negative", "14496-12 §8.6.1.3")
+X(CNT_2003, "CNT-2003", Error, "`stsc.first_chunk` not starting at 1 / not increasing / > chunk count", "14496-12 §8.7.4")
+X(CNT_2004, "CNT-2004", Error, "`sample_description_index` 0 or > `stsd.entry_count`", "14496-12 §8.7.4")
+X(CNT_2005, "CNT-2005", Error, "sample count mismatch `stts` vs `stsz`/`stz2`", "14496-12 §8.6.1.2")
+X(CNT_2006, "CNT-2006", Error, "`stz2.field_size ∉ {4,8,16}`", "14496-12 §8.7.3.3")
+X(CNT_2007, "CNT-2007", Error, "chunk/sample byte range beyond end of file", "14496-12 §8.7.5")
+X(CNT_2008, "CNT-2008", Error, "both `stco` and `co64` present", "14496-12 §8.7.5")
+X(CNT_2009, "CNT-2009", Error, "`stss` sample number out of range or not increasing", "14496-12 §8.6.2")
+X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6.4")
+X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
+X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
+X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
+
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
 X(CNT_Y4M_0002, "CNT-Y4M-0002", Error, "Y4M `C` tag `value` unknown; open fails with `OVT_E_UNSUPPORTED`",
@@ -89,6 +131,8 @@ X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (fra
 
 // WI-1.229 (raw YUV opening, §8.6.6).
 X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole frame (ignored)", "")
+X(CNT_RAW_0002, "CNT-RAW-0002", Error,
+  "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
@@ -108,6 +152,29 @@ X(CNT_DASH_0007, "CNT-DASH-0007", Warning, "invalid attribute value `v` ignored"
 X(CNT_DASH_0008, "CNT-DASH-0008", Warning, "SegmentList `SegmentURL` count differs from its SegmentTimeline",
   "23009-1 §5.3.9.3")
 X(CNT_DASH_0009, "CNT-DASH-0009", Fatal, "not a well-formed MPD (XML error or no `MPD` root element)", "23009-1 §5.3.1")
+
+// WI-4.209 (HLS M3U8 parser, §8.10). SPEC-ASSUMPTION(#416): §8.5 has no HLS family (OI-16 defers the manifest-level
+// cross-checks); CNT-HLS-0001..0010 are the proposed parse-level rows.
+X(CNT_HLS_0001, "CNT-HLS-0001", Fatal, "not an HLS playlist (first line is not `#EXTM3U`)", "RFC 8216 §4.3.1.1")
+X(CNT_HLS_0002, "CNT-HLS-0002", Warning, "malformed attribute list in `tag`; the bad items are ignored",
+  "RFC 8216 §4.2")
+X(CNT_HLS_0003, "CNT-HLS-0003", Warning, "invalid attribute or tag value `v` ignored", "RFC 8216 §4.2")
+X(CNT_HLS_0004, "CNT-HLS-0004", Warning,
+  "`#EXT-X-BYTERANGE` without `@offset` does not follow a sub-range of the same resource; offset 0 assumed",
+  "RFC 8216 §4.3.2.2")
+X(CNT_HLS_0005, "CNT-HLS-0005", Warning, "oversized playlist cannot be fully expanded (segment cap)",
+  "RFC 8216 §4.3.2")
+X(CNT_HLS_0006, "CNT-HLS-0006", Warning,
+  "URI line without its `#EXTINF` / `#EXT-X-STREAM-INF`, or a tag without its URI line",
+  "RFC 8216 §4.3.2.1, §4.3.4.2")
+X(CNT_HLS_0007, "CNT-HLS-0007", Info, "no `#EXT-X-ENDLIST`: live playlist snapshotted as written",
+  "RFC 8216 §4.3.3.4")
+X(CNT_HLS_0008, "CNT-HLS-0008", Info, "encrypted segments (`METHOD`) are listed, never decrypted",
+  "RFC 8216 §4.3.2.4")
+X(CNT_HLS_0009, "CNT-HLS-0009", Warning, "playlist mixes master and media tags; treated as a master playlist",
+  "RFC 8216 §4.3.4")
+X(CNT_HLS_0010, "CNT-HLS-0010", Warning, "`#EXTINF` duration rounds above `#EXT-X-TARGETDURATION`",
+  "RFC 8216 §4.3.3.1")
 
 // WI-1.231 (unit splitter, §8.7.4). CNT-9001 is raised as a Warning for a zero-length NAL (§8.7.4 rule 1).
 X(CNT_9001, "CNT-9001", Error,

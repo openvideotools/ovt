@@ -35,23 +35,46 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: GCC 13 packages cache (Linux)
+      id: gcc13-cache
+      # The PPA's .debs that tools/ci/install-gcc13.sh installed on main, so other runs need neither the PPA nor
+      # Launchpad. Only refs/heads/main saves (the step after "Host packages (Linux)"), and every branch can read that.
+      # The script's hash names the package list; editing the script starts a new entry.
+      if: runner.os == 'Linux'
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ${{ runner.temp }}/ovt-gcc13-debs
+        key: gcc13-debs-${{ runner.os }}-${{ hashFiles('tools/ci/install-gcc13.sh') }}
+
     - name: Host packages (Linux)
+      id: host-packages
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        # GCC 13 is not in the ubuntu-22.04 archive (chapter 13 §13.1); take it from the toolchain PPA,
-        # like tools/bootstrap.sh prints for 22.04 hosts.
-        sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
-        sudo apt-get update -q
-        grep -v '^\s*#' tools/apt-packages.txt | xargs sudo apt-get install -y -q --no-install-recommends gcc-13 g++-13
+        # GCC 13 is not in the ubuntu-22.04 archive (chapter 13 §13.1); the script takes it from the toolchain PPA,
+        # like tools/bootstrap.sh prints for 22.04 hosts, and falls back to the PPA's files on Launchpad when the
+        # PPA host is down (503s for hours on 2026-11-17).
+        tools/ci/install-gcc13.sh "${RUNNER_TEMP}/ovt-gcc13-debs"
+        if [ -f "${RUNNER_TEMP}/ovt-gcc13-debs/complete" ]; then echo "gcc13-debs=complete" >> "$GITHUB_OUTPUT"; fi
+        grep -v '^\s*#' tools/apt-packages.txt |
+          xargs sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends
         # ffmpeg runs the corpora `post` steps (tools/fetch_corpora.py wrap_y4m / ffmpeg_trim_seconds, chapter 14 §14.2.4);
         # without it the fast-lane netflix_* entries are unavailable and the fetch fails. The raw-to-Y4M wrap and the
         # stream-copy trim do not depend on the FFmpeg version, so the archive's build is enough.
-        sudo apt-get install -y -q --no-install-recommends ffmpeg
+        sudo apt-get install -y -q -o Acquire::Retries=3 --no-install-recommends ffmpeg
         {
           echo "CC=gcc-13"
           echo "CXX=g++-13"
         } >> "$GITHUB_ENV"
+
+    - name: Save the GCC 13 packages cache (main only)
+      if: >-
+        runner.os == 'Linux' && github.ref == 'refs/heads/main' &&
+        steps.gcc13-cache.outputs.cache-hit != 'true' && steps.host-packages.outputs.gcc13-debs == 'complete'
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ${{ runner.temp }}/ovt-gcc13-debs
+        key: ${{ steps.gcc13-cache.outputs.cache-primary-key }}
 
     - name: Host tools (macOS)
       if: runner.os == 'macOS'
@@ -191,6 +214,15 @@ runs:
     # so they must not pile up: no timestamp suffix and a per-day key, so that the first main build of the day saves one
     # entry per preset and every later run of that day hits it exactly and saves nothing. Pull requests only restore
     # (the newest main entry through the prefix); their own entries were duplicates that no other branch can read.
+    # The three self-hosted macOS runners run as one user and used to share one CCACHE_DIR (~/.ccache, set in each
+    # runner's .env). Every job's ccache-action then extracted its tarball into the shared dir and rewrote the shared
+    # ccache.conf, so a read-only PR job made the cache read-only for the others and nothing was ever evicted.
+    # A directory beside the runner's own _work folder gives each runner its own cache. Hosted runners are untouched.
+    - name: ccache dir (per self-hosted runner)
+      if: runner.environment == 'self-hosted' && runner.os == 'macOS'
+      shell: bash
+      run: echo "CCACHE_DIR=$(dirname "$RUNNER_WORKSPACE")/.ccache" >> "$GITHUB_ENV"
+
     - name: ccache day
       id: ccacheday
       shell: bash
@@ -232,8 +264,13 @@ runs:
         echo "QT_ROOT_DIR=$root" >> "$GITHUB_ENV"
 
     - name: Corpora cache
+      id: corpora-cache
       if: inputs.corpora != 'none'
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      # Restore only. A cache saved by a pull_request run is scoped to refs/pull/<n>/merge, which no other PR can
+      # read, so every PR used to save its own ~300 MiB copy; those copies pushed the shared one out of the 10 GB
+      # repository cache and each run then fetched everything from itu.int again. Only refs/heads/main saves
+      # (the step after "Fetch corpora", and .github/workflows/corpora-cache.yml), and every branch can read that.
+      uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: build/corpora
         # The manifest hash names the exact set of files; a stale prefix is still useful because the fetcher keeps
@@ -255,11 +292,24 @@ runs:
           *) echo "::error::corpora must be none, fast or all (got $CORPORA_SET)"; exit 1 ;;
         esac
         mkdir -p build/corpora
+        # --retries 6: transient failures (HTTP 429/5xx, cut-off downloads) back off 5, 10, 20, 40, 60 s, so a
+        # short itu.int outage no longer fails the job.
         # shellcheck disable=SC2086
-        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter
+        python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --retries 6
         # shellcheck disable=SC2086
         python -I tools/fetch_corpora.py --cache-dir build/corpora $filter --verify-only
         echo "OVT_CORPORA_DIR=${GITHUB_WORKSPACE}/build/corpora" >> "$GITHUB_ENV"
+
+    - name: Save corpora cache (main only)
+      # Saved right after the verified fetch, not at job end, so a later build or test failure still keeps the
+      # corpora. Skipped on an exact hit: a cache key cannot be overwritten.
+      if: >-
+        inputs.corpora != 'none' && github.ref == 'refs/heads/main' &&
+        steps.corpora-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: build/corpora
+        key: ${{ steps.corpora-cache.outputs.cache-primary-key }}
 
     - name: ffmpeg 6.1 in a container (tools_pytest)
       if: inputs.ffmpeg-container == 'true' && runner.os == 'Linux'
