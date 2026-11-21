@@ -142,7 +142,7 @@ X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
-// WI-1.219a (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
+// WI-1.219a/b (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
 X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
 X(CNT_4002, "CNT-4002", Warning,
   "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
@@ -155,9 +155,16 @@ X(CNT_4006, "CNT-4006", Info, "implicit base data offsets with several `traf`s",
 X(CNT_4007, "CNT-4007", Warning,
   "first `trun` of a `traf` without `data_offset` and no `base_data_offset`", "14496-12 §8.8.8")
 X(CNT_4008, "CNT-4008", Info, "`tfdt` absent; DTS inferred by continuity", "14496-12 §8.8.12")
+X(CNT_4010, "CNT-4010", Error, "`tfra` entry does not point at a `moof` / wrong time", "14496-12 §8.8.10")
+X(CNT_4011, "CNT-4011", Error, "`mfro.size` ≠ `mfra` size", "14496-12 §8.8.11")
 X(CNT_4020, "CNT-4020", Warning, "`tfdt` discontinuity (gap or overlap vs previous fragment)", "14496-12 §8.8.12")
 X(CNT_4021, "CNT-4021", Error, "fragment sample outside its `mdat`", "14496-12 §8.8.8")
 X(CNT_4022, "CNT-4022", Info, "bytes in `mdat` not referenced by any `trun`", "")
+X(CNT_4030, "CNT-4030", Warning, "`sidx.referenced_size` ≠ actual bytes", "14496-12 §8.16.3")
+X(CNT_4031, "CNT-4031", Info, "`sidx.timescale` ≠ track timescale", "14496-12 §8.16.3")
+X(CNT_4032, "CNT-4032", Warning, "`sidx.subsegment_duration` ≠ Σ `trun` durations", "14496-12 §8.16.3")
+X(CNT_4033, "CNT-4033", Info, "`sidx.earliest_presentation_time` ≠ first CTS", "14496-12 §8.16.3")
+X(CNT_4034, "CNT-4034", Warning, "`starts_with_SAP` but first sample is non-sync", "14496-12 §8.16.3")
 X(CNT_4035, "CNT-4035", Warning, "fragment `trun` sample count 0 and not `duration-is-empty`", "14496-12 §8.8.8")
 X(CNT_4036, "CNT-4036", Info, "`styp` brands differ between segments of one file", "14496-12 §8.16.2")
 X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", "23001-7 §7.1")
