@@ -350,11 +350,8 @@ fb::Codec codec_of(std::string_view format, const EsInfo* es) {
   return fb::Codec::Unknown;
 }
 
-// 16.16 matrix entries a, b, c, d -> clockwise rotation, 0 when it is not one of the four rotations.
-uint16_t rotation_of(const std::vector<int32_t>& m) {
-  if (m.size() != 9) {
-    return 0;
-  }
+// 16.16 matrix entries a, b, c, d -> clockwise rotation; nullopt when it is not one of the four rotations.
+std::optional<uint16_t> rotation_of(const std::vector<int32_t>& m) {
   constexpr int32_t kOne = 0x10000;
   const std::array<int32_t, 4> abcd = {m[0], m[1], m[3], m[4]};
   if (abcd == std::array<int32_t, 4>{kOne, 0, 0, kOne}) {
@@ -369,7 +366,7 @@ uint16_t rotation_of(const std::vector<int32_t>& m) {
   if (abcd == std::array<int32_t, 4>{0, -kOne, kOne, 0}) {
     return 270;
   }
-  return 0;
+  return std::nullopt;
 }
 
 Nclx nclx_of(const io::RandomAccessFile& file, const Node& entry) {
@@ -598,7 +595,13 @@ void fill_tkhd(const Node& tkhd, fb::TrackInfoT& t) {
       t.matrix.push_back(static_cast<int32_t>(c->ivalue));
     }
   }
-  t.rotation = rotation_of(t.matrix);
+  if (t.matrix.size() == 9) {
+    const std::optional<uint16_t> rotation = rotation_of(t.matrix);
+    t.rotation = rotation.value_or(0);
+    if (!rotation.has_value()) {
+      t.diagnostics.push_back(make_diag("CNT-1024", "tkhd.matrix is not identity or a 90/180/270 degree rotation"));
+    }
+  }
 }
 
 void fill_references(const Node& tref, fb::TrackInfoT& t) {

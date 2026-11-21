@@ -8,18 +8,23 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 #include <flatbuffers/flatbuffers.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "container/diagnostics.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/container.h"
 #include "ovt_container_generated.h"
+#include "test_support/corpus.h"
 
 namespace {
 
@@ -257,6 +262,24 @@ bool has_code(const ovt::fb::TrackInfoT& t, std::string_view code) {
   return std::ranges::any_of(t.diagnostics, [&](const auto& d) { return d->code == code; });
 }
 
+const ovt::fb::DiagnosticT* find_diag(const ovt::fb::TrackInfoT& t, std::string_view code) {
+  const auto it = std::ranges::find_if(t.diagnostics, [&](const auto& d) { return d->code == code; });
+  return it == t.diagnostics.end() ? nullptr : it->get();
+}
+
+// Boxes named `fourcc` in the subtree of a tree node.
+size_t count_boxes(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::BoxNode>>* nodes, std::string_view fourcc) {
+  size_t n = 0;
+  if (nodes == nullptr) {
+    return n;
+  }
+  for (const auto* b : *nodes) {
+    n += b->fourcc()->string_view() == fourcc ? 1U : 0U;
+    n += count_boxes(b->children(), fourcc);
+  }
+  return n;
+}
+
 }  // namespace
 
 TEST_CASE("tracks: Dolby Vision HEVC entry keeps hvcC and dvvC in order", "[container][tracks][fast]") {
@@ -302,7 +325,32 @@ TEST_CASE("tracks: a duplicate track_ID gets CNT-1012 on the second track", "[co
   Opened o(data);
   REQUIRE(ovt_container_track_count(o.container) == 2);
   CHECK_FALSE(has_code(track_of(o.container, 0), "CNT-1012"));
-  CHECK(has_code(track_of(o.container, 1), "CNT-1012"));
+  const auto second = track_of(o.container, 1);
+  const auto* d = find_diag(second, "CNT-1012");
+  REQUIRE(d != nullptr);
+  CHECK(d->severity == ovt::fb::Severity::Error);  // §8.5
+  CHECK(d->spec_ref == ovt::container::diag("CNT-1012")->spec_ref);
+}
+
+TEST_CASE("tracks: a non-rotation tkhd.matrix gives rotation 0 and CNT-1024", "[container][tracks][fast]") {
+  const Bytes entry = visual_entry("avc1", 640, 360, {avcc()});
+  const Bytes scaled = tkhd(1, 3, {0x20000, 0, 0, 0x10000});  // 2x horizontal scale
+  const Bytes sheared = tkhd(2, 3, {0x10000, 0x8000, 0, 0x10000});
+  const Bytes rotated = tkhd(3, 3, {0, 0x10000, 0xFFFF0000U, 0});
+  const Bytes data =
+      mp4({trak(1, "vide", entry, 1, 30000, 90000, scaled), trak(2, "vide", entry, 1, 30000, 90000, sheared),
+           trak(3, "vide", entry, 1, 30000, 90000, rotated)});
+  Opened o(data);
+  for (const int i : {0, 1}) {
+    const auto t = track_of(o.container, i);
+    CHECK(t.rotation == 0);
+    const auto* d = find_diag(t, "CNT-1024");
+    REQUIRE(d != nullptr);
+    CHECK(d->severity == ovt::fb::Severity::Info);
+  }
+  const auto r = track_of(o.container, 2);
+  CHECK(r.rotation == 90);
+  CHECK_FALSE(has_code(r, "CNT-1024"));
 }
 
 TEST_CASE("tracks: tkhd, mdhd and stbl values", "[container][tracks][fast]") {
@@ -412,4 +460,98 @@ TEST_CASE("tracks: ovt_container_track_info returns the TrackInfo FlatBuffer", "
   CHECK(ovt_container_track_info(o.container, -1, &b) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_track_info(nullptr, 0, &b) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_track_info(o.container, 0, nullptr) == OVT_E_INVALID_ARG);
+}
+
+// ---- corpus (§8.1.3; WI-1.217 acceptance tests 1 and 2, step 5) ----
+
+TEST_CASE("tracks on syn_mp4_cenc: encv with original_format avc1 (AT2)", "[container][tracks][needs-corpus][fast]") {
+  const auto path = ovt::test::corpus_or_skip("syn_mp4_cenc");
+  ovt_File handle{ovt::io::RandomAccessFile::open(path.string())};
+  ovt_Container* c = nullptr;
+  REQUIRE(ovt_container_open(&handle, &c) == OVT_OK);
+  bool found = false;
+  for (int i = 0; i < ovt_container_track_count(c); ++i) {
+    const auto t = track_of(c, i);
+    if (t.handler == ovt::fb::HandlerType::Video) {
+      CHECK(t.is_encrypted);
+      CHECK(t.original_format == "avc1");
+      found = true;
+    }
+  }
+  CHECK(found);
+  ovt_container_close(c);
+}
+
+// SPEC-ASSUMPTION(#769): dv_p81.mp4 is the MP4Box `dv-profile=8.1` remux of hdr_hdr10plus_dv81 made by the corpus
+// fetcher's `post` step, which does not exist yet; until then the entry is the Matroska file and this test skips.
+TEST_CASE("tracks on dv_p81: hvc1 with hvcC then dvvC (AT1)", "[container][tracks][needs-corpus][fast]") {
+  const auto path = ovt::test::corpus_or_skip("hdr_hdr10plus_dv81");
+  ovt_File handle{ovt::io::RandomAccessFile::open(path.string())};
+  ovt_Container* c = nullptr;
+  REQUIRE(ovt_container_open(&handle, &c) == OVT_OK);
+  if (std::string(ovt_container_format(c)) != "isobmff") {
+    ovt_container_close(c);
+    SKIP("hdr_hdr10plus_dv81 is still the Matroska file; waiting for the #769 remux");
+  }
+  REQUIRE(ovt_container_track_count(c) >= 1);
+  const auto t = track_of(c, 0);
+  CHECK(t.codec == ovt::fb::Codec::H265);
+  CHECK(t.sample_entry_fourcc == "hvc1");
+  REQUIRE(t.codec_private.size() >= 2);
+  CHECK(t.codec_private[0]->fourcc == "hvcC");
+  CHECK(t.codec_private[1]->fourcc == "dvvC");
+  ovt_container_close(c);
+}
+
+TEST_CASE("tracks: every trak of every ISOBMFF corpus file yields a verified TrackInfo",
+          "[container][tracks][needs-corpus][fast]") {
+  std::ifstream in(std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/corpora/manifest.json");
+  REQUIRE(in);
+  const auto manifest = nlohmann::json::parse(in);
+  size_t checked = 0;
+  for (const auto& entry : manifest.at("entries")) {
+    const std::string id = entry.at("id");
+    const auto& containers = entry.value("containers", nlohmann::json::array());
+    bool iso = std::ranges::find(containers, "isobmff") != containers.end();
+    const auto files = entry.value("files", nlohmann::json::object());
+    for (const auto& [name, hash] : files.items()) {
+      (void)hash;
+      iso = iso || name.ends_with(".mp4") || name.ends_with(".m4a") || name.ends_with(".mov");
+    }
+    if (!iso) {
+      continue;
+    }
+    const auto path = ovt::test::corpus_path(id);
+    if (!path) {
+      if (ovt::test::require_corpora()) {
+        (void)ovt::test::corpus_or_skip(id);  // fails with "corpus file missing"
+      }
+      continue;
+    }
+    DYNAMIC_SECTION(id) {
+      ovt_File handle{ovt::io::RandomAccessFile::open(path->string())};
+      ovt_Container* c = nullptr;
+      if (ovt_container_open(&handle, &c) != OVT_OK) {
+        continue;  // not readable as a container (broken-file entries); the tree tests cover those
+      }
+      if (std::string(ovt_container_format(c)) == "isobmff") {
+        const ovt_Buffer tree = ovt_container_tree(c);
+        const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(tree.data);
+        const int count = ovt_container_track_count(c);
+        CHECK(static_cast<size_t>(count) == count_boxes(t->root(), "trak"));
+        for (int i = 0; i < count; ++i) {
+          ovt_Buffer b{};
+          REQUIRE(ovt_container_track_info(c, i, &b) == OVT_OK);
+          flatbuffers::Verifier v(b.data, b.size);
+          CHECK(v.VerifyBuffer<ovt::fb::TrackInfo>(nullptr));
+          delete[] b.data;  // §12.3.1 rule 3a
+        }
+        ++checked;
+      }
+      ovt_container_close(c);
+    }
+  }
+  if (checked == 0) {
+    SKIP("no ISOBMFF corpus file present");
+  }
 }
