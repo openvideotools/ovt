@@ -2,12 +2,17 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // AV1 dispatch of the StreamIndex builder (chapter 7 §7.4.2 S3–S6 and S8, WI-1.121): one OBU at a time through
-// the §7.3.6 parsers, the frame grouper of §7.3.9 and, when a frame ends, the slot step of §7.4.3.
+// the §7.3.6 parsers, the frame grouper of §7.3.9 and, when a frame ends, the slot step of §7.4.3. WI-1.124 adds
+// the selected operating point (§7.4.3 last row), the Annex B temporal-unit check (§7.3.9, SYN-AV1-0032) and
+// carries the slot step's declared_refs / dpb_after into the FrameInfo (§7.4.4).
 
 #include <fmt/format.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <optional>
+#include <string>
 #include <utility>
 
 #include "index/av1_frame_boundary.h"
@@ -26,7 +31,8 @@ namespace {
 
 using namespace syntax::av1;  // NOLINT(google-build-using-namespace): the §7.3.6 parsers
 
-constexpr std::string_view kDiagNoParameterSets = "SYN-GEN-0102";  // Warning, §7.4.7
+constexpr std::string_view kDiagNoParameterSets = "SYN-GEN-0102";      // Warning, §7.4.7
+constexpr std::string_view kDiagNotInOperatingPoint = "SYN-AV1-0002";  // Info, §7.3.6 row 1 / §7.4.3
 
 // timing_info() as the elementary-stream time base of chapter 6 §6.2.6: pts = display_index *
 // (num_ticks_per_picture_minus_1 + 1) with equal_picture_interval, else 1/1.
@@ -44,8 +50,19 @@ std::optional<StreamTiming> stream_timing(const SequenceHeader& seq) {
                       int64_t{t.num_ticks_per_picture_minus_1} + 1};
 }
 
+// AV1 §7.18 / §7.3.6 row 1: OperatingPointIdc of the selected operating point; one beyond the list selects 0.
+uint16_t selected_idc(const SequenceHeader& seq, uint8_t operating_point) noexcept {
+  if (seq.operating_points.empty()) {
+    return 0;
+  }
+  const size_t op = operating_point < seq.operating_points.size() ? operating_point : 0;
+  return seq.operating_points[op].operating_point_idc;
+}
+
 class Av1Dispatch final : public CodecDispatch {
  public:
+  Av1Dispatch(uint8_t operating_point, bool annexb) : grouper_(annexb), operating_point_(operating_point) {}
+
   void on_unit(BuilderCore& core, uint32_t unit, std::span<const uint8_t> bytes) override {
     // §7.4.5 (WI-1.125): frame, frame header and tile group OBUs are AV1's VCL units; the tree is recorded as
     // BuilderCore::record_full_tree says.
@@ -57,6 +74,7 @@ class Av1Dispatch final : public CodecDispatch {
     const bool starts = peek_type == ObuType::Frame || peek_type == ObuType::FrameHeader;
     sb.set_recording(core.record_full_tree(unit, vcl, starts));
     ObuEvent e;
+    e.annexb_temporal_unit_start = core.units[unit].temporal_unit_start;
     std::optional<FrameHeader> frame_header;
     bool parsed = false;
     try {
@@ -93,6 +111,7 @@ class Av1Dispatch final : public CodecDispatch {
         u.parameter_set = true;
         seq_ = parse_sequence_header(br, sb);
         slots_.set_sequence(seq_->enable_order_hint, seq_->OrderHintBits);
+        operating_point_idc_ = selected_idc(*seq_, operating_point_);
         if (!core.timing) {
           core.timing = stream_timing(*seq_);
         }
@@ -176,6 +195,13 @@ class Av1Dispatch final : public CodecDispatch {
       f.slice_count = e.tg_end ? 1 : 0;
       open_header_ = std::move(frame_header);
       open_unit_ = unit;
+      // §7.4.3 last row: a frame outside the selected operating point is indexed but not shown. The Info goes
+      // on the unit that starts the frame (SPEC-ASSUMPTION(#731): once per frame, not per OBU).
+      open_in_operating_point_ = obu_in_operating_point(e.header, operating_point_idc_);
+      if (!open_in_operating_point_) {
+        core.unit_diagnostic(unit, DiagRec{syntax::Severity::Info, std::string(kDiagNotInOperatingPoint),
+                                           "not in selected operating point", BitSpan{0, 0}});
+      }
     } else if (p.in_frame && core.frame_open()) {
       core.extend_frame(unit);
       if (e.header.type() == ObuType::TileGroup) {
@@ -208,6 +234,7 @@ class Av1Dispatch final : public CodecDispatch {
     h.ref_frame_idx = fh.ref_frame_idx;
     h.base_q_idx = fh.quantization_params.base_q_idx;
     h.state = fh.state;
+    h.in_operating_point = open_in_operating_point_;
     FrameRec& f = *open;
     const uint32_t unit = open_unit_;
     const Av1FrameRecord r = slots_.step(
@@ -241,20 +268,23 @@ class Av1Dispatch final : public CodecDispatch {
     return [&core, this](const IndexDiagnostic& d) { report(core, open_unit_, d); };
   }
 
-  // The Annex B temporal_unit_size check (SYN-AV1-0032) needs the scanner to say where temporal units start; it
-  // arrives with WI-1.124 ("Annex B temporal unit checks").
-  Av1FrameGrouper grouper_{false};
+  // Annex B: the scanner marks the first OBU of each temporal_unit() and the grouper checks it against the
+  // temporal delimiters (SYN-AV1-0032).
+  Av1FrameGrouper grouper_;
   Av1SlotModel slots_;
   std::optional<SequenceHeader> seq_;
   std::optional<FrameHeader> open_header_;  // the open frame's header: tile_info for its tile groups, S6 at its end
   uint32_t open_unit_ = 0;                  // the unit that started the open frame
+  bool open_in_operating_point_ = true;     // the open frame is in the selected operating point
+  uint8_t operating_point_ = 0;             // BuilderOptions.av1_operating_point
+  uint16_t operating_point_idc_ = 0;        // its OperatingPointIdc in the active sequence header (0 = all layers)
   bool warned_no_sequence_ = false;
 };
 
 }  // namespace
 
-std::unique_ptr<CodecDispatch> make_av1_dispatch() {
-  return std::make_unique<Av1Dispatch>();
+std::unique_ptr<CodecDispatch> make_av1_dispatch(uint8_t operating_point, bool annexb) {
+  return std::make_unique<Av1Dispatch>(operating_point, annexb);
 }
 
 }  // namespace ovt::index

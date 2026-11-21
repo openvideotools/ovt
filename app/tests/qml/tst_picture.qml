@@ -4,9 +4,10 @@
 // The Picture panel (chapter 11 §11.3.2): the WI-1.405 wiring (Welcome page without a file; with a file, the
 // PictureHost view where the build has it and the "cannot show pictures" sentence where it does not) and the
 // WI-1.456 input: wheel zoom about the cursor (AT1), Ctrl+click probe with its crosshair (AT2), keys 1–5 for the plane
-// mode (AT3), pan, the selection rectangle, Esc and the shell's actions. Runs on the offscreen platform; the picture
-// geometry is given to the controller directly (no decoder before WI-2.171). The rendering itself is tested in C++
-// (app/tests/picture, a real RHI), the controller's arithmetic in app/tests/models/test_picture_controller.cpp.
+// mode (AT3), pan, the selection rectangle, Esc and the shell's actions. The crosshair and the rectangle are drawn by
+// the renderer (WI-2.436). Runs on the offscreen platform; the picture geometry is given to the controller directly
+// (no decoder before WI-2.171). The rendering itself is tested in C++ (app/tests/picture, a real RHI), the
+// controller's arithmetic in app/tests/models/test_picture_controller.cpp.
 
 import QtQuick
 import QtQuick.Window
@@ -138,6 +139,8 @@ TestCase {
     }
 
     // AT2: Given a frame shown, When the picture is Ctrl+clicked, Then Selection.probe is set and the crosshair drawn.
+    // The crosshair is the renderer's overlay pass 12 (WI-2.436, issue #650): the panel hands the probe to the host,
+    // and app/tests/picture/test_picture_host.cpp checks the drawn pixels.
     function test_at2_ctrlClickPinsProbeAndDrawsCrosshair() {
         const panel = openPanel()
         const input = findByName(panel, "pictureInput")
@@ -148,25 +151,18 @@ TestCase {
         mouseClick(input, 250, 180, Qt.LeftButton, Qt.ControlModifier)
         compare(Selection.probe, expected)
         compare(Selection.origin, "picture")
-        const h = findByName(panel, "probeCrosshairH")
-        const v = findByName(panel, "probeCrosshairV")
-        verify(h.visible)
-        verify(v.visible)
-        compare(v.x, 250)
-        compare(h.y, 180)
-        // The crosshair is on screen in the §10.5.2 probe colour (#FF4136).
-        const canvas = findByName(panel, "pictureCanvas")
-        const image = grabImage(canvas)
-        const px = image.pixel(250, 40)
-        verify(px.r > 0.95 && px.g < 0.35 && px.b < 0.3, "crosshair pixel " + px)
-        // Panning keeps the probe on its sample: the crosshair moves with the picture.
+        compare(c.probe, expected)
+        verify(findByName(panel, "probeCrosshairH") === null)  // no scene-graph marker any more (FR-GUI-030)
+        if (Platform.pictureHostAvailable)
+            compare(panel.host.probe, expected)
+        // Panning keeps the probe on its sample.
         c.panBy(-30 * dpr, 0)
         compare(Selection.probe, expected)
-        compare(v.x, 220)
-        // Ctrl+click on the pinned sample unpins.
+        // Ctrl+click on the pinned sample (now 30 px further left) unpins.
         mouseClick(input, 220, 180, Qt.LeftButton, Qt.ControlModifier)
         compare(Selection.probe, Qt.point(-1, -1))
-        verify(!h.visible)
+        if (Platform.pictureHostAvailable)
+            compare(panel.host.probe, Qt.point(-1, -1))
     }
 
     // AT3: Given the Picture focused, When keys 1–5 are pressed, Then ViewState.plane_mode reads 0–4.
@@ -231,14 +227,16 @@ TestCase {
         compare(r.x % 4, 0)
         compare(r.y % 4, 0)
         compare(r.width % 4, 0)
-        verify(findByName(panel, "selectionRectMarker").visible)
+        if (Platform.pictureHostAvailable)
+            compare(panel.host.selectionRect, r)  // drawn by the renderer (WI-2.436)
         panel.stage.requestActivate()
         tryVerify(function () { return panel.stage.active })
         input.forceActiveFocus()
         tryVerify(function () { return input.activeFocus })
         keyClick(Qt.Key_Escape)
         compare(Selection.selectionRect.width, 0)
-        verify(!findByName(panel, "selectionRectMarker").visible)
+        if (Platform.pictureHostAvailable)
+            compare(panel.host.selectionRect.width, 0)
     }
 
     function test_hoverShowsReadout() {

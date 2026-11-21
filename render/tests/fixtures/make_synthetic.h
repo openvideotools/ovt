@@ -52,6 +52,15 @@ std::vector<uint8_t> make_grid_fixture(const GridFixtureOptions& opts = {});
 // is 45 MB and not in the fast corpora, so the tests fall back to this when it is absent.
 std::vector<uint8_t> make_synthetic_mv(uint32_t width, uint32_t height);
 
+// WI-2.436: a 128 x 96 HEVC frame (32 x 24 cells) for the deblocking, reference-index and selection passes:
+//   blocks      = 0 root, 1-4 CTUs 64 x 64 in raster order (clipped to the picture), 5-8 the 32 x 32 CUs of CTU 1;
+//                 block_id of a cell = the CU (5-8) inside CTU 1, else the CTU
+//   deblock_bs_v = 2 where cx % 8 == 0, 1 where cx % 2 == 0 (cx > 0), else 0, and 0 for rows 8 <= cy < 12 (a gap);
+//   deblock_bs_h = 2 where cy % 8 == 0, 1 where cy % 2 == 0 (cy > 0), else 0
+//   ref0 = (cx / 4 + 2 * (cy / 4)) % 8 for cy < 20, else -1;  ref1 = (cx / 4) % 8 for cy >= 20, else -1
+//   mvs  = [0] L0 at (0, 0, 16, 16), [1] L0 at (64, 32, 16, 16), [2] L1 at (96, 64, 32, 32)
+std::vector<uint8_t> make_misc_fixture();
+
 }  // namespace ovt::render::test
 
 #endif  // OVT_RENDER_TESTS_FIXTURES_MAKE_SYNTHETIC_H

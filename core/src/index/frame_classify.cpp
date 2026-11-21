@@ -48,6 +48,15 @@ void classify_av1(FrameRec& f, const Av1FrameRecord& r, const syntax::av1::Seque
   f.bit_depth_luma = r.state.BitDepth;
   f.bit_depth_chroma = r.state.BitDepth;
   f.frame_num = seq.frame_id_numbers_present_flag ? to_i32(current_frame_id) : -1;
+  // §7.4.4 (WI-1.124): declared_refs in LAST..ALTREF order; dpb_after the 8 slots, -1 for an empty one.
+  f.declared_refs.clear();
+  for (const int64_t d : r.declared_refs) {
+    f.declared_refs.push_back(to_i32(static_cast<uint64_t>(d)));
+  }
+  f.dpb_after.clear();
+  for (const int64_t d : r.dpb_after) {
+    f.dpb_after.push_back(d >= 0 ? to_i32(static_cast<uint64_t>(d)) : -1);
+  }
 }
 
 fb::FrameType h264_slice_frame_type(const syntax::h264::SliceHeader& sh) noexcept {

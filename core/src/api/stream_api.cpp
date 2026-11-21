@@ -139,6 +139,7 @@ idx::UnitInput input_of(const syn::ScannedUnit& u, const idx::SampleTiming* timi
   in.prefix_span = u.prefix_span;
   in.sample_index = u.container_sample_index;
   in.timing = timing;
+  in.temporal_unit_start = u.temporal_unit_start;
   return in;
 }
 
@@ -245,6 +246,7 @@ flatbuffers::DetachedBuffer build(ovt_Stream& stream, ovt::jobs::Cancel& cancel,
     // reservation costs no resident memory; a stream of smaller units just grows them).
     options.expected_units =
         static_cast<size_t>(std::min<uint64_t>(file.size() / kBytesPerUnitGuess, kMaxReserve)) + 64;
+    options.av1_annexb = stream.framing == Framing::ObuAnnexB;
     resume->builder = std::make_unique<idx::StreamIndexBuilder>(options);
   }
   idx::StreamIndexBuilder& builder = *resume->builder;

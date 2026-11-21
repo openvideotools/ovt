@@ -4,8 +4,8 @@
 // H.264 index models (chapter 7 §7.3.9, §7.3.10.1, WI-1.111): frame-boundary detection with the ten rules of
 // H.264 §7.4.1.2.4, complementary field pairing, and the picture order count state machine for pic_order_cnt_type 0,
 // 1 and 2 (H.264 §8.2.1) including memory_management_control_operation 5. They are plain state machines over the
-// parsed headers of WI-1.108/1.109 so that WI-1.121 can wire them into the StreamIndex builder. Module-internal, not
-// installed.
+// parsed headers of WI-1.108/1.109 so that WI-1.121 can wire them into the StreamIndex builder. WI-1.122 adds the
+// reference model of §7.4.4 (H.264 §8.2.4 reference lists, §8.2.5 marking). Module-internal, not installed.
 
 #pragma once
 
@@ -183,6 +183,73 @@ class PocState {
   // types 1, 2: values of the previous picture
   int64_t prev_frame_num_offset_ = 0;
   uint32_t prev_frame_num_ = 0;
+};
+
+// ---- DPB simulation (§7.4.4, H.264 §8.2.4 and §8.2.5), WI-1.122 ----------------------------------------------
+
+/// Field of a frame store: index 0 is the top field, 1 the bottom field.
+enum class Parity : uint8_t { Frame, Top, Bottom };
+
+/// One entry of RefPicList0 / RefPicList1.
+struct RefPic {
+  int32_t decode_index = -1;  // the frame store's decode index (its first field); -1 for a non-existing frame
+  Parity parity = Parity::Frame;
+  int32_t poc = 0;  // PicOrderCnt of the frame, or of the field for a field entry
+  bool long_term = false;
+  bool non_existing = false;  // a frame inferred for a frame_num gap (H.264 §8.2.5.2)
+};
+
+struct DpbStepResult {
+  /// The first slice's lists after modification, truncated to num_ref_idx_lX_active_minus1 + 1. An entry that is
+  /// "no reference picture" (list shorter than the active size, or a modification naming a missing picture) is left
+  /// out. Empty for I and SI slices (both lists) and for P and SP slices (list 1).
+  std::array<std::vector<RefPic>, 2> ref_pic_list;
+  std::vector<int32_t> declared_refs;  // unique decode indices of RefPicList0 then RefPicList1, non-existing dropped
+  std::vector<int32_t> dpb_after;      // decode indices of the reference frame stores after marking, ascending
+  std::vector<IndexDiagnostic> diagnostics;
+};
+
+class Dpb {
+ public:
+  /// Runs the §7.4.4 step for the picture `decode_index` whose first slice header is `sh` (unit header `nal`, active
+  /// SPS `sps`, order counts `poc` from PocState). `second_field_of` is the decode index of the first field when the
+  /// picture is the second field of a complementary field pair (FrameRec.second_field_of), else -1.
+  DpbStepResult step(int32_t decode_index, const syntax::h264::NalHeader& nal, const syntax::h264::SliceHeader& sh,
+                     const syntax::h264::Sps& sps, const PocResult& poc, int32_t second_field_of);
+
+  /// Frame stores holding at least one field marked "used for reference" (non-existing frames included).
+  [[nodiscard]] size_t reference_frames() const noexcept { return stores_.size(); }
+
+  enum class Mark : uint8_t { Unused, Short, Long };
+  struct FrameStore {
+    int32_t decode_index = -1;  // first field or frame; -1 for a non-existing frame
+    bool non_existing = false;
+    uint32_t frame_num = 0;  // FrameNum (0 after memory_management_control_operation 5)
+    int64_t frame_num_wrap = 0;
+    int32_t long_term_frame_idx = -1;
+    std::array<bool, 2> has{};  // the field was decoded into this store (top, bottom)
+    std::array<Mark, 2> mark{Mark::Unused, Mark::Unused};
+    std::array<int32_t, 2> poc{};  // TopFieldOrderCnt, BottomFieldOrderCnt
+  };
+
+ private:
+  struct CurrentMarking {
+    bool mmco5 = false;
+    bool long_term = false;
+    int32_t long_term_frame_idx = -1;
+  };
+  void fill_gap(const syntax::h264::SliceHeader& sh, const syntax::h264::Sps& sps, DpbStepResult& out);
+  bool trim(size_t limit, size_t keep);
+  void apply_mmco(const syntax::h264::MmcoOp& op, const syntax::h264::SliceHeader& sh, const syntax::h264::Sps& sps,
+                  size_t current, CurrentMarking& cm);
+  void mark_current(const syntax::h264::SliceHeader& sh, const syntax::h264::Sps& sps, const PocResult& poc,
+                    size_t current, DpbStepResult& out);
+  void drop_unused();
+
+  std::vector<FrameStore> stores_;        // reference frame stores, in insertion order
+  int32_t max_long_term_frame_idx_ = -1;  // MaxLongTermFrameIdx; -1 is "no long-term frame indices"
+  bool have_prev_ref_ = false;
+  uint32_t prev_ref_frame_num_ = 0;  // PrevRefFrameNum (H.264 §7.4.3)
 };
 
 }  // namespace ovt::index::h264

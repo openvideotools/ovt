@@ -20,6 +20,7 @@
 
 #include <QtQml/qqmlregistration.h>
 #include <QColor>
+#include <QPoint>
 #include <QQuickRhiItem>
 #include <QRect>
 #include <QString>
@@ -78,6 +79,10 @@ class PictureHost : public QQuickRhiItem {
   Q_PROPERTY(int pictureHeight READ picture_height NOTIFY pictureChanged)
   // Picture::crop (conformance window / render_size, luma samples); a null rect when the picture has none.
   Q_PROPERTY(QRect crop READ crop NOTIFY pictureChanged)
+  // The pinned probe and the selection rectangle (luma samples; (-1, -1) / empty = none), drawn by libplacebo's
+  // overlay passes (OverlayConfig.probe_x/y, selection_rect; chapter 10 §10.5.6 pass 12, WI-2.436, issue #650).
+  Q_PROPERTY(QPoint probe READ probe WRITE set_probe NOTIFY viewChanged)
+  Q_PROPERTY(QRect selectionRect READ selection_rect WRITE set_selection_rect NOTIFY viewChanged)
   // Renderer state for the status strip and the tests.
   Q_PROPERTY(QString interop READ interop NOTIFY statsChanged)
   Q_PROPERTY(QString lastError READ last_error NOTIFY statsChanged)
@@ -122,6 +127,11 @@ class PictureHost : public QQuickRhiItem {
   void set_gamut_clip_overlay(bool on) { set_view(gamut_clip_overlay_, on); }
   [[nodiscard]] bool dither() const noexcept { return dither_; }
   void set_dither(bool on) { set_view(dither_, on); }
+
+  [[nodiscard]] QPoint probe() const noexcept { return probe_; }
+  void set_probe(QPoint p) { set_view(probe_, p.x() >= 0 && p.y() >= 0 ? p : QPoint(-1, -1)); }
+  [[nodiscard]] QRect selection_rect() const noexcept { return selection_rect_; }
+  void set_selection_rect(QRect r) { set_view(selection_rect_, r.width() > 0 && r.height() > 0 ? r : QRect()); }
 
   [[nodiscard]] bool has_picture() const noexcept { return frame_ != nullptr; }
 
@@ -216,6 +226,8 @@ class PictureHost : public QQuickRhiItem {
   bool false_color_ = false;
   bool gamut_clip_overlay_ = false;
   bool dither_ = true;
+  QPoint probe_{-1, -1};
+  QRect selection_rect_;
   PictureHostStats stats_;
 };
 

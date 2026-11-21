@@ -31,8 +31,8 @@ struct CellPassConstants {
 static_assert(sizeof(CellPassConstants) == 56, "must match the std430 layout of the shader prelude");
 
 // BlockId is the id-only run of pass 3 (§10.5.6, WI-2.435): it writes block_id + 1 into the R32_UINT id buffer,
-// whether or not the fill layer is visible.
-enum class CellPass : uint8_t { Heatmap, Fill, Hatch, BlockId };
+// whether or not the fill layer is visible. Deblock is pass 7 (WI-2.436, render/src/shaders/deblock.glsl).
+enum class CellPass : uint8_t { Heatmap, Fill, Hatch, BlockId, Deblock };
 
 class CellPasses {
  public:
@@ -45,15 +45,15 @@ class CellPasses {
 
   // Blends one pass over all of `target` (straight-alpha output, "over" into a premultiplied layer). `textures` are
   // the pass's samplers in prelude order: Heatmap {heat, heat_valid, lut}; Fill and Hatch {cells, palette}; BlockId
-  // {block_ids} (R32UI CellGrid.block_id, written unblended into an r32u target). The pass
-  // is compiled on first use. Returns false with `err` set when the pass cannot be created.
+  // {block_ids} (R32UI CellGrid.block_id, written unblended into an r32u target); Deblock {edges, palette, halo}. The
+  // pass is compiled on first use. Returns false with `err` set when the pass cannot be created.
   bool run(pl_gpu gpu, CellPass pass, pl_tex target, const CellPassConstants& constants,
            std::initializer_list<pl_tex> textures, std::string& err);
 
   void destroy(pl_gpu gpu);
 
  private:
-  std::array<pl_pass, 4> passes_{};
+  std::array<pl_pass, 5> passes_{};
 };
 
 }  // namespace ovt::render::detail

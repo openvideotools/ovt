@@ -8,9 +8,9 @@
 // display order. C++ helper header (D22): semi-public, no ABI promise, never included from a C header.
 //
 // WI-1.121 is split per chapter 16 §16.2.6. Part a (this header, the codec-independent core, AV1 and the display
-// order) leaves H.264 / H.265 dispatch to part b and the RAP map, source hash and C API to part c. The DPB
-// models are stubs in every part: FrameInfo.declared_refs and dpb_after stay empty until WI-1.122, WI-1.123 and
-// WI-1.124 fill them.
+// order) leaves H.264 / H.265 dispatch to part b and the RAP map, source hash and C API to part c. WI-1.124 fills
+// FrameInfo.declared_refs and dpb_after for AV1 (the slot model of §7.4.4) and adds the operating point and the
+// Annex B temporal-unit check; the H.264 and H.265 DPB models arrive with WI-1.122 and WI-1.123.
 
 #ifndef OVT_CXX_INDEX_STREAM_INDEX_BUILDER_HPP
 #define OVT_CXX_INDEX_STREAM_INDEX_BUILDER_HPP
@@ -42,6 +42,7 @@ struct UnitInput {
   syntax::ByteRange prefix_span;                      // Unit.prefix_span
   int64_t sample_index = syntax::kNoContainerSample;  // Unit.sample_index
   const SampleTiming* timing = nullptr;               // null for an elementary stream (chapter 6 §6.2.6)
+  bool temporal_unit_start = false;  // AV1 Annex B: the unit is the first OBU of a temporal_unit() (ScannedUnit)
 };
 
 struct BuilderOptions {
@@ -58,6 +59,14 @@ struct BuilderOptions {
   /// §7.4.6 memory: the number of units (and frames) to reserve records and index memory for up front, so that
   /// neither grows while the stream is fed; a hint, any count works. 0 = the defaults.
   size_t expected_units = 0;
+  /// AV1 (WI-1.124, §7.3.6 row 1 drop rule, §7.4.3 last row): the selected operating point, an index into the
+  /// sequence header's operating_points[]; frames outside it are indexed with shown = false and Info SYN-AV1-0002.
+  /// 0 is OVT's default; a value beyond operating_points_cnt_minus_1 selects 0.
+  // SPEC-ASSUMPTION(#731): the option lives here; the C API and the CLI keep operating point 0.
+  uint8_t av1_operating_point = 0;
+  /// AV1 (WI-1.124, §7.3.9): the units come from an Annex B length-delimited stream, so every
+  /// UnitInput.temporal_unit_start must coincide with a temporal delimiter (Warning SYN-AV1-0032 otherwise).
+  bool av1_annexb = false;
 };
 
 /// Thrown by the constructor for a codec the index has no dispatch for.

@@ -268,8 +268,9 @@ TEST_CASE("index_builder_av1: alt-ref GOP with hidden frames and show_existing_f
   CHECK(key.bit_depth_luma() == 8);
   CHECK(key.slice_count() == 1);
   CHECK(key.frame_num() == -1);
-  CHECK(key.declared_refs() == nullptr);  // DPB models are stubs until WI-1.124
-  CHECK(key.dpb_after() == nullptr);
+  CHECK(key.declared_refs() == nullptr);  // intra: no references (§7.4.4)
+  REQUIRE(key.dpb_after() != nullptr);    // WI-1.124: a shown KEY frame refreshes every slot
+  CHECK(std::vector<int32_t>(key.dpb_after()->begin(), key.dpb_after()->end()) == std::vector<int32_t>(8, 0));
   // units of the key frame: temporal delimiter, sequence header, frame.
   REQUIRE(key.units()->size() == 3);
   CHECK(si.units()->Get(0)->type_name()->string_view() == "OBU_TEMPORAL_DELIMITER");

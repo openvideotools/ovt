@@ -33,6 +33,7 @@
 #include <libplacebo/vulkan.h>
 
 #include "../overlay/idbuffer.h"
+#include "../overlay/overlay_cache.h"
 #include "../overlay/overlay_layer.h"
 #include "../overlay/overlay_set_impl.h"
 #include "color/cpu_convert.h"
@@ -345,9 +346,13 @@ class VideoSurfaceImpl final : public VideoSurface {
       log_lines({error_});
     }
   }
-  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()").
+  // The CPU arrays of the set are uploaded here (§10.2.5: "GPU upload happens inside set_overlays()"). WI-2.437: a set
+  // the builder made on a cache miss joins the overlay cache here and is shown through a handle; a handle that shares
+  // the arrays already on the GPU (a selection, probe or uniform change) only updates the configuration.
   void set_overlays(std::unique_ptr<OverlaySet> overlays) override {
-    overlays_ = std::move(overlays);
+    // The previous set lives until the upload has compared against it, so a new set cannot reuse its address.
+    const std::unique_ptr<OverlaySet> previous = std::move(overlays_);
+    overlays_ = detail::adopt_into_cache(overlay_cache_, std::move(overlays));
     if (overlay_gpu_ == nullptr) {
       return;
     }
@@ -414,10 +419,12 @@ class VideoSurfaceImpl final : public VideoSurface {
     p.image_y = sample.y;
     p.cell_x = p.image_x / 4;
     p.cell_y = p.image_y / 4;
-    if (overlays_ != nullptr && std::cmp_less(p.cell_x, overlays_->cells_w) &&
-        std::cmp_less(p.cell_y, overlays_->cells_h) && !overlays_->cell_block_id.empty()) {
-      p.block_id = overlays_->cell_block_id.at((static_cast<size_t>(p.cell_y) * overlays_->cells_w) +
-                                               static_cast<size_t>(p.cell_x));
+    // WI-2.437: overlays_ is a cache handle, so the arrays are read through data().
+    const OverlaySet* shown = overlays_ != nullptr ? &overlays_->data() : nullptr;
+    if (shown != nullptr && std::cmp_less(p.cell_x, shown->cells_w) && std::cmp_less(p.cell_y, shown->cells_h) &&
+        !shown->cell_block_id.empty()) {
+      p.block_id =
+          shown->cell_block_id.at((static_cast<size_t>(p.cell_y) * shown->cells_w) + static_cast<size_t>(p.cell_x));
     }
     if (overlay_gpu_ != nullptr) {
       const uint32_t id = overlay_gpu_->lookup_id(px, py);
@@ -490,6 +497,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   }
 
   void set_scope_config(const detail::ScopeConfig& config) { measurer_.set_scope_config(config); }
+  detail::OverlayCache& overlay_cache() { return overlay_cache_; }
   void hold_readbacks(bool hold) { measurer_.hold_readbacks(hold); }
 
   // The `kind` scope texture of the newest measurement, downloaded (blocking).
@@ -1101,6 +1109,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   void destroy() {
     overlays_.reset();
     overlay_gpu_.reset();
+    overlay_cache_.clear();  // CPU arrays only; no GPU object outlives overlay_gpu_
     measurer_.destroy();
     if (gpu_ != nullptr) {
       detail::destroy_slot(gpu_, slot_a_);
@@ -1146,6 +1155,7 @@ class VideoSurfaceImpl final : public VideoSurface {
   DisplayTarget target_{};
   DisplayTarget::OutputEncoding active_ = DisplayTarget::OutputEncoding::Srgb8;
   std::unique_ptr<OverlaySet> overlays_;
+  detail::OverlayCache overlay_cache_;  // WI-2.437; OverlayBuilder reaches it through detail::overlay_cache()
   std::unique_ptr<detail::OverlayLayerGpu> overlay_gpu_;  // GPU side of overlays_ (WI-2.431)
   detail::SampleGridLayer sample_grid_;                   // WI-1.409
   detail::Measurer measurer_;                             // §10.7 (WI-4.452)
@@ -1186,6 +1196,11 @@ void set_compare_clock(VideoSurface& surface, std::function<int64_t()> clock_ms)
   if (impl != nullptr) {
     impl->set_clock(std::move(clock_ms));
   }
+}
+
+OverlayCache* overlay_cache(VideoSurface& surface) {
+  auto* impl = dynamic_cast<VideoSurfaceImpl*>(&surface);
+  return impl != nullptr ? &impl->overlay_cache() : nullptr;
 }
 
 bool set_scope_config(VideoSurface& surface, const ScopeConfig& config) {
