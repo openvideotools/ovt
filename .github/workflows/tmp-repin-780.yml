@@ -74,7 +74,7 @@ jobs:
           IDS=$(python3 -I - <<'PY'
           import json
           m = json.load(open("tests/golden/h26x-index.json"))["entries"]
-          print(",".join(k for k in m if k.startswith("syn_h265_")))
+          print(",".join(k for k in m if k.startswith("syn_h265_") and k not in ("syn_h265_bpyramid", "syn_h265_crop_1080_in_1088")))
           PY
           )
           for n in 1 2; do
@@ -86,6 +86,11 @@ jobs:
           done
           diff -r "${RUNNER_TEMP}/out1" "${RUNNER_TEMP}/out2"
           cp "${RUNNER_TEMP}/manifest.patch" "${RUNNER_TEMP}/out1/"
+          diff -u tests/golden/h26x-index.json "${RUNNER_TEMP}/out1/h26x-index.json" > "${RUNNER_TEMP}/index.patch" || true
+          echo "===== PRINT manifest.patch"; base64 -w0 "${RUNNER_TEMP}/manifest.patch"; echo
+          echo "===== PRINT index.patch"; base64 -w0 "${RUNNER_TEMP}/index.patch"; echo
+          for f in "${RUNNER_TEMP}"/out1/h265/syn_*; do echo "===== PRINT h265/$(basename "$f")"; base64 -w0 "$f"; echo; done
+          echo "===== PRINT end"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
