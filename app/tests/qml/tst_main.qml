@@ -103,4 +103,42 @@ TestCase {
         compare(overlays.itemAt(0).subMenu.count, 12)
         verify(!overlays.itemAt(0).subMenu.itemAt(0).enabled)
     }
+
+    // WI-1.463: View ▸ HDR output (Ctrl+H) and the toolbar toggle request NATIVE mode only on an HDR-capable display;
+    // the toolbar button is lit while the surface's encoding is an HDR one.
+    function test_hdrOutputAction() {
+        const window = createMain()
+        const actions = window.menuBar.actions
+        const button = findChild(window.header, "hdrOutputButton")
+        verify(button !== null)
+        DisplayCaps.setCaps({"hdr_capable": false, "reason": "display has no EDR headroom", "source": "NSScreen"})
+        verify(!actions.isEnabled("view.hdrOutput"))
+        verify(!button.enabled)
+        actions.trigger("view.hdrOutput")
+        verify(!HdrView.hdrOutput)
+
+        DisplayCaps.setCaps({"hdr_capable": true, "headroom": 4, "potential_headroom": 16, "source": "NSScreen"})
+        compare(DisplayCaps.headroom, 4)
+        verify(actions.isEnabled("view.hdrOutput"))
+        verify(button.enabled)
+        actions.trigger("view.hdrOutput")
+        verify(HdrView.hdrOutput)
+        verify(actions.isChecked("view.hdrOutput"))
+        verify(!button.checked)  // requested, but not NATIVE until the host reports an HDR encoding
+        DisplayCaps.outputEncoding = "ScRgbLinear16F"
+        verify(button.checked)
+        mouseClick(button)
+        verify(!HdrView.hdrOutput)
+        verify(button.checked)  // the binding survives the click: still lit until the host goes back to Srgb8
+        DisplayCaps.outputEncoding = "Srgb8"
+        verify(!button.checked)
+        actions.trigger("view.hdrOutput")
+        verify(HdrView.hdrOutput)
+        actions.trigger("view.hdrOutput")
+        verify(!HdrView.hdrOutput)
+
+        HdrView.reset()
+        DisplayCaps.setCaps({"hdr_capable": false, "reason": "", "source": "none"})
+        DisplayCaps.outputEncoding = "Srgb8"
+    }
 }
