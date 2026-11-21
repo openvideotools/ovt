@@ -24,7 +24,8 @@ ovt_set_license(ovt_tests_model "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_model)
 
 # WI-0.087: the public C headers it adds compile as C11 (chapter 12 §12.3.1 rule 1). A compile-only check.
-add_library(ovt_tests_model_c_api OBJECT c_api_decode_compile.c)
+# c_api_validate_compile.c does the same for ovt/validate.h and ovt/syntax.h (#673, #674).
+add_library(ovt_tests_model_c_api OBJECT c_api_decode_compile.c c_api_validate_compile.c)
 target_link_libraries(ovt_tests_model_c_api PRIVATE ovt::flags)
 target_include_directories(ovt_tests_model_c_api PRIVATE "${PROJECT_SOURCE_DIR}/core/include")
 set_target_properties(ovt_tests_model_c_api PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
@@ -123,3 +124,11 @@ if(Python3_Interpreter_FOUND)
   set_tests_properties(test_json_write_exports PROPERTIES LABELS "fast;unit" FIXTURES_SETUP ovt_json_exports)
   set_tests_properties(test_json_python_loads PROPERTIES LABELS "fast;unit" FIXTURES_REQUIRED ovt_json_exports)
 endif()
+
+# #673 / #674: ovt_json_to_fb, ovt_fb_to_json (ovt/syntax.h) and ovt_validate_* (ovt/validate.h) through the shared
+# library: the byte-identical JSON round trip of `ovt cache import` (WI-1.509 AT3) and the DiagnosticList form.
+add_executable(test_model_c_api test_model_c_api.cpp)
+target_link_libraries(test_model_c_api PRIVATE ovt::core ovt::flags ovt_schemas ${flatbuffers_TARGET} ${Catch2_TARGET})
+target_compile_definitions(test_model_c_api PRIVATE "OVT_GOLDEN_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/golden\"")
+ovt_set_license(test_model_c_api "LGPL-2.1-or-later")
+ovt_catch_discover_tests(test_model_c_api EXTRA_LABELS golden)

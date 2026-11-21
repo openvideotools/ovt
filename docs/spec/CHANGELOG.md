@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc47 — 2026-11-17
+
+MINOR-level: the accepted answer of `spec-question` issue #674 (found while adding the C entry points of #673 point 1). One additive FlatBuffers table in `ovt_model.fbs`; no field renumbering, no plugin ABI or CLI grammar change. Two new public C headers under `core/include/ovt/` (`validate.h`, `syntax.h`), reviewed on the implementing PR under the Fable reviewer's approval.
+
+- 6 §6.1.1, §6.3 — `table DiagnosticList { diagnostics:[Diagnostic]; }` appended to the CLI/API report tables, a secondary root table with identifier `"OVTD"`, the out-buffer of `ovt_validate_*`, `ovt_container_validate` and `ovt_BdResult.diagnostics` (not size-prefixed across the C ABI) — WI-0.086, WI-1.509 (#674)
+- 12 §12.3.8 `ovt/validate.h` comment — names the `DiagnosticList` table, its identifier and the no-size-prefix rule for the out-buffer; the Diagnostic form, the status semantics and the `ovt_fb_to_json` / `ovt_json_to_fb` lookup and status codes are pass 21's wording (rc41) — WI-0.086, WI-1.509 (#674)
+
 ## 1.0.0-rc45 — 2026-11-17
 
 PATCH-level: spec-amendment pass 25 folds in the accepted answers of `spec-question` issues #732/#733 and #734 from WI-1.123/WI-1.124 (PR #738), #731 from WI-1.124 (PR #740), #742 from WI-1.129, #745 and #746 from WI-2.436 (PR #747), #736 from WI-1.122 (PR #741), and aligns the pass-21 WI-1.211 text with the merged code of PR #692 (#670, #671). No FlatBuffers schema, plugin ABI, public C header or CLI grammar change; one new diagnostic code (`SYN-H264-0107`, Info). Four acceptance-test rewordings (#734 input, #731 operating point, #736 AT2 streams and AT3 synthetic gap stream).
