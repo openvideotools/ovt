@@ -137,11 +137,6 @@ X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6
 X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
 X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
 X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
-X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
-X(CNT_4002, "CNT-4002", Warning,
-  "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
-X(CNT_4003, "CNT-4003", Warning,
-  "`trun` has both `first-sample-flags-present` and `sample-flags-present`", "14496-12 §8.8.8")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
