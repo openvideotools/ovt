@@ -28,6 +28,8 @@ class IsobmffReader final : public Reader {
   [[nodiscard]] bool open();
 
   [[nodiscard]] std::vector<uint8_t> tree() const override;
+  [[nodiscard]] int track_count() const noexcept override { return static_cast<int>(tree_.tracks.size()); }
+  [[nodiscard]] std::vector<uint8_t> track_info(int track_index) const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
   ovt_status expand(uint64_t box_offset) override;
   // Bumped by each expand() that decodes a deferred box; a no-op expand leaves it, and the tree, unchanged.

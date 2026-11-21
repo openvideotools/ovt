@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/tracks.h"
 #include "ovt_container_generated.h"
 
 namespace ovt::container::isobmff {
@@ -31,6 +32,7 @@ bool IsobmffReader::open() {
   tree_.root = std::move(w.top_level);
   tree_.diagnostics = std::move(w.diagnostics);
   index(tree_.root);
+  tree_.tracks = build_tracks(file_, tree_.root);
   // The walk confirms the located `mfra`; when the top level disagrees, the walk wins.
   if (mfra && std::ranges::any_of(
                   tree_.root, [&](const auto& b) { return b->file_span->offset() == *mfra && b->fourcc == "mfra"; })) {
@@ -42,6 +44,16 @@ bool IsobmffReader::open() {
 std::vector<uint8_t> IsobmffReader::tree() const {
   flatbuffers::FlatBufferBuilder fbb;
   fbb.Finish(fb::ContainerTree::Pack(fbb, &tree_));
+  const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> IsobmffReader::track_info(int track_index) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  flatbuffers::FlatBufferBuilder fbb;
+  fbb.Finish(fb::TrackInfo::Pack(fbb, tree_.tracks[static_cast<size_t>(track_index)].get()));
   const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
   return {bytes.begin(), bytes.end()};
 }

@@ -50,6 +50,11 @@ class Reader {
     (void)count;
     return {};
   }
+  // TrackInfo FlatBuffer of one track (chapter 08 §8.1.3); empty when the reader has no such track.
+  [[nodiscard]] virtual std::vector<uint8_t> track_info(int track_index) const {
+    (void)track_index;
+    return {};
+  }
   // TsTiming FlatBuffer (MPEG-TS reader); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> ts_timing() const { return {}; }
   // TsReport FlatBuffer (TR 101 290 priority 1 and 2 checks, MPEG-TS reader); empty otherwise.

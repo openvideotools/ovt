@@ -22,6 +22,7 @@ target_sources(
           isobmff/field_builder.cpp
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
+          isobmff/tracks.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp
