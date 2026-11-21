@@ -133,7 +133,9 @@ fi
 # way a native crash ends it, and let the checks below find it.
 if [ "${OVT_SMOKE_PROBE:-}" = abort ]; then
   echo "== probe: SIGABRT to the app"
-  adb shell "kill -ABRT $(adb shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')" || true
+  probe_pid="$(adb shell pidof "$PKG" | tr -d '\r' | awk '{print $1}')"
+  # The shell user may not signal an app uid; run-as works because the APK is a debug build.
+  adb shell run-as "$PKG" kill -ABRT "$probe_pid" || fail "probe: could not send SIGABRT to pid '$probe_pid'"
   sleep 5
 fi
 
