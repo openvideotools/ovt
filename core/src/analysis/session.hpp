@@ -58,10 +58,26 @@ class SessionCache {
   virtual void store(uint32_t decode_index, std::span<const uint8_t> frame_analysis, uint32_t stage_mask) noexcept = 0;
 };
 
+// The opt-in per-frame check hook (WI-4.109): called by frame() with the target frame's FrameAnalysis after the
+// plugin's pull(), once the planes the caller requested are in the PictureStore. It appends the diagnostics it
+// raises (e.g. VER-0004 from PictureHashCheck, hash_check.hpp); the Session records them in diagnostics() and in
+// the returned FrameAnalysis. Implementations never throw.
+class FrameCheck {
+ public:
+  FrameCheck() = default;
+  FrameCheck(const FrameCheck&) = delete;
+  FrameCheck& operator=(const FrameCheck&) = delete;
+  FrameCheck(FrameCheck&&) = delete;
+  FrameCheck& operator=(FrameCheck&&) = delete;
+  virtual ~FrameCheck() = default;
+  virtual void check(int decode_index, const ovt::fb::FrameAnalysis& frame, std::vector<HostDiagnostic>& out) = 0;
+};
+
 struct SessionOptions {
   std::vector<uint8_t> codec_private;  // avcC/hvcC/av1C from the container; empty for elementary streams
   int threads = 0;                     // 0 = min(4, hardware threads) (2 on Android), §7.5.3 A3
   SessionCache* cache = nullptr;       // not owned; nullptr = no caching (--no-cache)
+  FrameCheck* frame_check = nullptr;   // not owned; nullptr = no per-frame conformance check (the default)
 };
 
 struct FrameRequest {

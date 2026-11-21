@@ -50,6 +50,12 @@ ovt_add_fuzz_target(isobmff_tree fuzz_isobmff_tree.cpp) # WI-1.204: ISOBMFF open
 ovt_add_fuzz_target(ivf fuzz_ivf.cpp)
 ovt_add_fuzz_target(m3u8 fuzz_m3u8.cpp) # WI-4.209: the HLS M3U8 parser
 ovt_add_fuzz_target(mpd fuzz_mpd.cpp) # WI-4.208: the DASH MPD parser
+# WI-4.109: the MD5 side-file parser and the D.3.19 plane hashes (hash_check.hpp includes the analysis session header).
+ovt_add_fuzz_target(md5_side_file fuzz_md5_side_file.cpp)
+target_include_directories(ovt_fuzz_md5_side_file_regress PRIVATE "${PROJECT_SOURCE_DIR}/core/src/analysis")
+if(TARGET ovt_fuzz_md5_side_file)
+  target_include_directories(ovt_fuzz_md5_side_file PRIVATE "${PROJECT_SOURCE_DIR}/core/src/analysis")
+endif()
 ovt_add_fuzz_target(mpegts fuzz_mpegts.cpp)
 ovt_add_fuzz_target(obu_split fuzz_obu_split.cpp)
 ovt_add_fuzz_target(rbsp fuzz_rbsp.cpp)
