@@ -1741,7 +1741,7 @@ All WIs use the §0.1.6 template. Oracle names refer to §7.7; corpus names to �
 **Depends on:** WI-1.125.
 **Produces:** `core/src/api/stream_api.cpp`, `core/include/ovt/index.h` (extends the header created by WI-1.121 part c with the implementations of `ovt_stream_unit_bytes` / `ovt_stream_unit_syntax`; declarations unchanged, issue #642), `core/tests/api/test_api_stream_api.cpp`.
 **Interface:** §0.6.1 `ovt_stream_unit_bytes`; §7.4.5 `ovt_stream_unit_syntax`.
-**Steps:** 1. Raw bytes via `RandomAccessFile::view`; RBSP via `rbsp_from_nal` (cached per unit for 64 units). 2. Error mapping. 3. Tests: bytes match `dd`-extracted ranges; RBSP equals the test-only reference EPB stripper of WI-1.104.
+**Steps:** 1. Raw bytes via `RandomAccessFile::view`; RBSP via `rbsp_from_nal` on each call; raw reads go through the container's `PageCache` (no per-unit RBSP cache, #762). 2. Error mapping. 3. Tests: bytes match `dd`-extracted ranges; RBSP equals the test-only reference EPB stripper of WI-1.104.
 **Acceptance tests:** 1. Given unit N, When `ovt_stream_unit_bytes` is called, Then `out_raw` equals the file bytes at `file_span` and `out_rbsp` equals `rbsp_from_nal(out_raw)`. 2. Given `unit_index >= units.size()`, When called, Then `OVT_E_INVALID_ARG`.
 **Size:** S.
 **Notes / pitfalls:** Out-parameter `ovt_Buffer`s are caller-owned and freed with `ovt_buffer_free` (D4, chapter 12 §12.3.1 rule 3a); the stream keeps no reference to them. **Overlap:** the header text of `core/include/ovt/index.h` is owned by WI-1.511 (chapter 12 §12.3); this WI implements the functions and must not diverge from §12.3. See chapter 16 §16.3.

@@ -5,8 +5,9 @@
 // ovt_stream_codec(), ovt_stream_build_index(), ovt_stream_index() and ovt_stream_rap_before(). The stream reads
 // its units straight from the container's file: an Annex B byte stream (H.264, H.265), a Section 5 or Annex B OBU
 // stream, or IVF frames (AV1). WI-1.125 runs the build under its ovt_Job (§7.4.6: cancellation, progress, the partial
-// index of OVT_INDEX_ALLOW_PARTIAL) and adds ovt_stream_unit_syntax() (§7.4.5). The other functions of the block
-// return OVT_E_UNSUPPORTED or -1 until their work items land (the WI-1.121 Produces line of chapter 7, issue #642).
+// index of OVT_INDEX_ALLOW_PARTIAL) and adds ovt_stream_unit_syntax() (§7.4.5); WI-1.130 adds ovt_stream_unit_bytes().
+// The other functions of the block return OVT_E_UNSUPPORTED or -1 until their work items land (the WI-1.121 Produces
+// line of chapter 7, issue #642).
 
 #include <algorithm>
 #include <array>
@@ -23,6 +24,7 @@
 
 #include "api/buffer.hpp"
 #include "api/stream_internal.hpp"
+#include "container/byte_service.h"
 #include "container/container.hpp"
 #include "container/format.hpp"
 #include "container/ivf.hpp"
@@ -369,10 +371,44 @@ OVT_API ovt_status ovt_stream_index_summary(ovt_Stream* stream, ovt_Buffer* out)
 
 OVT_API ovt_status ovt_stream_unit_bytes(ovt_Stream* stream, uint32_t unit_index, ovt_Buffer* out_raw,
                                          ovt_Buffer* out_rbsp) {
-  (void)unit_index;
-  (void)out_raw;
-  (void)out_rbsp;
-  return stream == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.130
+  if (out_raw != nullptr) {
+    *out_raw = ovt_Buffer{nullptr, 0};
+  }
+  if (out_rbsp != nullptr) {
+    *out_rbsp = ovt_Buffer{nullptr, 0};
+  }
+  if (stream == nullptr || !stream->built) {
+    return OVT_E_INVALID_ARG;
+  }
+  try {
+    const fb::StreamIndex& index = *flatbuffers::GetRoot<fb::StreamIndex>(stream->index.data());
+    if (index.units() == nullptr || unit_index >= index.units()->size()) {
+      return OVT_E_INVALID_ARG;
+    }
+    const fb::ByteSpan* span = index.units()->Get(unit_index)->file_span();
+    if (span == nullptr) {
+      return OVT_E_CORRUPT;
+    }
+    ovt::container::UnitCodec codec = ovt::container::UnitCodec::Other;
+    switch (stream->codec) {
+      case fb::Codec::H264:
+        codec = ovt::container::UnitCodec::H264;
+        break;
+      case fb::Codec::H265:
+        codec = ovt::container::UnitCodec::H265;
+        break;
+      case fb::Codec::AV1:
+        codec = ovt::container::UnitCodec::Av1;
+        break;
+      default:
+        break;
+    }
+    ovt::container::PageCache& cache = stream->container->bytes.cache(*stream->container->file->file);
+    // On failure read_unit_bytes leaves the buffers empty; nothing is retained by the stream (D4).
+    return ovt::container::read_unit_bytes(cache, codec, {span->offset(), span->length()}, out_raw, out_rbsp);
+  } catch (...) {
+    return status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_stream_unit_syntax(ovt_Stream* stream, uint32_t unit_index, ovt_Buffer* out) {
