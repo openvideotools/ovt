@@ -18,7 +18,9 @@ target_sources(
           isobmff/decoders/fragment_boxes.cpp
           isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp
+          isobmff/decoders/encryption.cpp
           isobmff/decoders/movie.cpp
+          isobmff/decoders/pssh_systems.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
           isobmff/field_builder.cpp
