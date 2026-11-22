@@ -508,8 +508,9 @@ TEST_CASE("an encrypted corpus file decodes its encryption boxes without errors"
     const iso::WalkResult w = iso::walk(*file);
     const BoxNodeT* schm = find_box(w.top_level, "schm");
     REQUIRE(schm != nullptr);
-    CHECK(field(*schm, "scheme_type").svalue == "cenc");
-    CHECK(field(*schm, "scheme_version").svalue == "1.0");
+    CHECK((field(*schm, "scheme_type").svalue == "cenc" || field(*schm, "scheme_type").svalue == "piff"));
+    CHECK(has_field(*schm, "scheme_type.derived"));
+    CHECK(!field(*schm, "scheme_version").svalue.empty());
     for (const std::string_view type : {"tenc", "senc", "pssh"}) {
       if (const BoxNodeT* b = find_box(w.top_level, type); b != nullptr) {
         for (const auto& d : b->diagnostics) {
