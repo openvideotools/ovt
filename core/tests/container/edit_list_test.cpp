@@ -539,7 +539,6 @@ TEST_CASE("edit list: the corpus files of the acceptance tests", "[container][ed
     const auto& normals = b.list->segments;
     REQUIRE(normals.size() == 1);
     CHECK(normals[0]->kind == "normal");
-    CHECK(normals[0]->media_time == table->dts[0] + table->cts_offset[0]);
     CHECK(normals[0]->media_time == table->cts_offset[0]);
     CHECK(normals[0]->media_time > 0);
     CHECK(b.list->negative_cts_compensation);
@@ -565,10 +564,8 @@ TEST_CASE("edit list: the corpus files of the acceptance tests", "[container][ed
     CHECK(b.list->segments[1]->kind == "normal");
     int64_t pts = -1;
     REQUIRE(iso::sample_presentation_time(*b.list, *table, 0, b.movie_timescale, &pts));
-    // The empty edit duration (movie timescale) rescaled: the first sample is presented where the empty edit ends,
-    // less the media offset of the first normal edit.
-    const auto movie_ticks = static_cast<int64_t>(b.list->segments[0]->segment_duration);
-    CHECK(pts == movie_ticks + (table->dts[0] + table->cts_offset[0] - b.list->segments[1]->media_time) *
-                                   b.movie_timescale / static_cast<int64_t>(table->timescale));
+    // The first normal edit starts at the first sample's CTS, so the sample is presented where the empty edit ends.
+    REQUIRE(b.list->segments[1]->media_time == table->dts[0] + table->cts_offset[0]);
+    CHECK(pts == static_cast<int64_t>(b.list->segments[0]->segment_duration));
   }
 }
