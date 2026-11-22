@@ -1046,7 +1046,7 @@ void compare_corpus_with_ffprobe(std::string_view id) {
   }
   // An unverified placeholder is skipped even under OVT_REQUIRE_CORPORA=1, as in the demuxer parity sweep.
   if (!ovt::test::corpus_path(id) && unverified_in_manifest(id)) {
-    SKIP(std::string(id) + " is unverified in the manifest (#517): tools/fetch_corpora.py cannot fetch it");
+    SKIP(std::string(id) + " is unverified in the manifest (#517); this half of AT1 is handed off to WI-1.237 (#798)");
   }
   const auto primary = ovt::test::corpus_or_skip(id);
   const TempDir tmp;
@@ -1066,7 +1066,8 @@ TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on syn_mp4_frag",
 
 TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on cta_cmaf_video_cmfv",
           "[container][fragments][ffprobe][slow][needs-corpus]") {
-  // Acceptance test 1 on cta_cmaf_video_cmfv (CTA WAVE).
+  // Acceptance test 1 on cta_cmaf_video_cmfv (CTA WAVE); handed off to WI-1.237 (cmaf_concat, #798) while the entry
+  // is unverified.
   compare_corpus_with_ffprobe("cta_cmaf_video_cmfv");
 }
 
