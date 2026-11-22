@@ -750,3 +750,27 @@ TEST_CASE("gpac_enc_cenc: a piff 1.1 and a cenc 1.0 scheme, tenc under the cenc 
   CHECK(field(*tenc[0], "default_KID").bytes.size() == 16);
   check_no_errors(w, {"schm", "tenc", "senc"});
 }
+
+TEST_CASE("bento4_widevine: the Widevine pssh names the system and its key_id equals tenc.default_KID",
+          "[container][decoders][cenc][needs-corpus]") {
+  // Recipe 68: syn_mp4_cenc_widevine (alias bento4_widevine.mp4), mp4encrypt --pssh Widevine.
+  const auto path = ovt::test::corpus_or_skip("syn_mp4_cenc_widevine");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult w = iso::walk(*file);
+  const auto pssh = all_boxes(w, "pssh");
+  REQUIRE(!pssh.empty());
+  const BoxNodeT* widevine = nullptr;
+  for (const BoxNodeT* p : pssh) {
+    if (field(*p, "SystemID").svalue == "Widevine") {
+      widevine = p;
+      break;
+    }
+  }
+  REQUIRE(widevine != nullptr);
+  const auto tenc = all_boxes(w, "tenc");
+  REQUIRE(!tenc.empty());
+  CHECK(field(*widevine, "Data/key_id[0]").bytes == field(*tenc[0], "default_KID").bytes);
+  CHECK(field(*widevine, "Data/key_id[0]").bytes == kKid);
+  CHECK(field(*widevine, "Data/content_id").svalue == "syn_mp4_cenc_widevine");
+  check_no_errors(w, {"pssh", "schm", "tenc", "senc"});
+}
