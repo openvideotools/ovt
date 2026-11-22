@@ -318,6 +318,20 @@ def test_post_step_without_ffmpeg_marks_entry_unavailable(
     assert not (tmp_path / "cache" / "trim" / ".ok").exists()
 
 
+def test_verify_only_with_post_tools_missing_reports_unavailable(
+    files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CI fetches, then verifies with --verify-only: an entry the fetch could not build here stays unavailable."""
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    with serve(files) as base:
+        e = entry("dv", files, "plain.bin", post={"mp4box_dv_remux": {"dv_profile": "8.1"}})
+        manifest = write_manifest(tmp_path / "m.json", [e], base)
+        assert run(manifest, tmp_path / "cache") == 0
+        assert run(manifest, tmp_path / "cache", "--verify-only") == 0
+        plain = write_manifest(tmp_path / "p.json", [entry("plain", files, "plain.bin")], base)
+        assert run(plain, tmp_path / "cache", "--verify-only") == 2  # no post step: a missing cache is still an error
+
+
 def fake_tool(bin_dir: Path, name: str, out_flag: str, log: Path) -> None:
     """A stand-in for ffmpeg / MP4Box / hdr10plus_tool: logs its arguments and writes the argument after out_flag
     (the last argument when out_flag is empty)."""

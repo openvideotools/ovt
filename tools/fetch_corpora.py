@@ -314,14 +314,27 @@ def extract_member(archive: Path, declared: str, member: str, dest_dir: Path) ->
     return target
 
 
+def post_tools(entry: dict[str, Any]) -> dict[str, str | None]:
+    """The tools the entry's ``post`` step runs, each mapped to its path (None when it is not on PATH)."""
+    post = entry.get("post", {})
+    names = ["ffmpeg"]
+    if "mp4box_dv_remux" in post:
+        names.append("MP4Box")
+        if "hdr10plus_inject" in post["mp4box_dv_remux"]:
+            names.append("hdr10plus_tool")
+    return {name: shutil.which(name) for name in names} if post else {}
+
+
+def missing_post_tools(entry: dict[str, Any]) -> list[str]:
+    return sorted(name for name, path in post_tools(entry).items() if path is None)
+
+
 def dv_remux(entry: dict[str, Any], src: Path, dest_dir: Path) -> Path | None:
     """The ``mp4box_dv_remux`` post step (WI-1.223, #769): the HEVC stream of a Matroska file, with HDR10+ metadata
     injected by ``hdr10plus_tool inject`` when the entry records a JSON for it, remuxed by MP4Box with a Dolby Vision
     configuration box. Returns ``<id>.mp4``, or None when ffmpeg, MP4Box or hdr10plus_tool is unavailable."""
     step = entry["post"]["mp4box_dv_remux"]
-    tools = {name: shutil.which(name) for name in ("ffmpeg", "MP4Box")}
-    if "hdr10plus_inject" in step:
-        tools["hdr10plus_tool"] = shutil.which("hdr10plus_tool")
+    tools = post_tools(entry)
     missing = sorted(name for name, path in tools.items() if path is None)
     if missing:
         log(f"warning: {entry['id']}: {', '.join(missing)} not found, post step skipped; entry unavailable")
@@ -413,6 +426,10 @@ def fetch_entry(entry: dict[str, Any], cache: Path, retries: int, verify_only: b
         write_aliases(entry, entry_dir, cache)
         return "cached"
     if verify_only:
+        if missing_post_tools(entry) and read_ok(entry_dir) is None:
+            # The fetch pass could not build this entry on this machine (a post-step tool is missing) and said so
+            # as 'unavailable'; verifying the absent cache is not a hash mismatch.
+            return "unavailable"
         raise HashMismatch(f"{entry['id']}: cache entry missing or does not match its recorded hashes")
     # A stale or damaged entry is rebuilt from scratch.
     shutil.rmtree(entry_dir, ignore_errors=True)
