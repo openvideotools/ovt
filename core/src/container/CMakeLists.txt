@@ -14,10 +14,13 @@ target_sources(
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
           isobmff/brands.cpp
+          isobmff/brands_samples.cpp
           isobmff/decoders/fragment_boxes.cpp
           isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp
+          isobmff/decoders/encryption.cpp
           isobmff/decoders/movie.cpp
+          isobmff/decoders/pssh_systems.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
           isobmff/edit_list.cpp

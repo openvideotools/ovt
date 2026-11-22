@@ -292,12 +292,27 @@ TEST_CASE("info: fast_start is false when mdat precedes moov", "[cli][info][fast
   CHECK(run_json({}, f).at("result").at("fast_start") == false);
 }
 
-TEST_CASE("info: unsupported colour and index views are omitted with an Info diagnostic", "[cli][info][fast]") {
+TEST_CASE("info: the colour view comes from the HDR metadata; a PQ colr gives transfer 16", "[cli][info][fast]") {
+  // WI-1.502 acceptance test 1 on a synthetic file (the corpus run on syn_h265_main10_pq_hdr.mp4 is recorded in
+  // docs/acceptance/wi/WI-1.502.md): colr nclx 9/16/9 on the video sample entry.
+  const Bytes colr = box("colr", cat({Bytes{'n', 'c', 'l', 'x', 0, 9, 0, 16, 0, 9, 0x80}}));
+  const Bytes moov =
+      box("moov", cat({mvhd(), trak(1, "vide", sample_entry("avc1", true, cat({avcc(), colr})), 30000, 30030, 30)}));
+  const TempFile f(cat({ftyp(), moov, box("mdat", Bytes(16, 0))}));
+  const json env = run_json({}, f);
+  const json& color = env.at("result").at("tracks")[0].at("color");
+  CHECK(color.at("transfer") == 16);
+  CHECK(color.at("primaries") == 9);
+  CHECK(color.at("full_range") == 1);
+  CHECK_FALSE(has_diag(env, "CLI-0012", "'tracks[].color' omitted"));
+}
+
+TEST_CASE("info: an unsupported index view is omitted with an Info diagnostic", "[cli][info][fast]") {
   const TempFile f(build_mp4(true, false));
   const json plain = run_json({}, f);
-  CHECK_FALSE(plain.at("result").at("tracks")[0].contains("color"));
+  CHECK(plain.at("result").at("tracks")[0].contains("color"));
   CHECK_FALSE(plain.at("result").contains("index_summary"));
-  CHECK(has_diag(plain, "CLI-0012", "'tracks[].color' omitted"));
+  CHECK_FALSE(has_diag(plain, "CLI-0012", "'tracks[].color' omitted"));
   CHECK(plain.at("status") == "OK");
   const json full = run_json({"--full"}, f);
   CHECK_FALSE(full.at("result").contains("index_summary"));

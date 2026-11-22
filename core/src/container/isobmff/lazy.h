@@ -17,8 +17,10 @@
 
 #include "container/container.hpp"
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/fragments.h"
 #include "container/isobmff/validate.h"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt_container_generated.h"
 
 namespace ovt::container::isobmff {
@@ -32,10 +34,16 @@ class IsobmffReader final : public Reader {
 
   [[nodiscard]] std::vector<uint8_t> tree() const override;
   [[nodiscard]] int track_count() const noexcept override { return static_cast<int>(tree_.tracks.size()); }
+  // TrackInfo with the fragment part of sample_count (Σ trun.sample_count, §8.1.3, #768) once the file has `moof`s.
   [[nodiscard]] std::vector<uint8_t> track_info(int track_index) const override;
-  // SampleTable FlatBuffer (§8.4.1 moov part, WI-1.218) of `count` samples from `first` (0 = all). The track's table is
-  // expanded once and kept; an unknown track yields an empty vector.
+  // SampleTable FlatBuffer (§8.4.1: moov part, WI-1.218, then the fragment part, WI-1.219c) of `count` samples from
+  // `first` (0 = all). The track's table is built once and kept; an unknown track yields an empty vector.
   [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override;
+  // FragmentTimeline FlatBuffer (§8.4.3, WI-1.219) of one track, built once and kept; a cancelled build keeps nothing.
+  [[nodiscard]] std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const override;
+  // HdrMetadata FlatBuffer (§8.4.6, WI-1.223): the box level plus the probe of the first sync samples of the track's
+  // SampleTable (default HdrProbeOptions). An unknown track yields an empty vector.
+  [[nodiscard]] std::vector<uint8_t> hdr_metadata(int track_index, jobs::Cancel& cancel) const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
   ovt_status expand(uint64_t box_offset) override;
   // Bumped by each expand() that decodes a deferred box; a no-op expand leaves it, and the tree, unchanged.
@@ -52,6 +60,13 @@ class IsobmffReader final : public Reader {
 
  private:
   void index(const BoxNodes& nodes);
+  // The fragment build of trak `ordinal`, built on first use. The caller holds tables_mutex_. `moov_table` is the
+  // track's moov SampleTable when the caller has it (else it is expanded here).
+  [[nodiscard]] FragmentBuild& fragment_build(size_t ordinal, const fb::SampleTableT* moov_table,
+                                              jobs::Cancel& cancel) const;
+  // The cached SampleTable of the trak at `ordinal` (moov part, then the fragment part when the file has `moof`s),
+  // built on first use; nullptr when there is no such trak. A cancelled build keeps nothing.
+  [[nodiscard]] std::shared_ptr<const fb::SampleTableT> table(size_t ordinal, jobs::Cancel& cancel) const;
 
   const io::RandomAccessFile& file_;
   fb::ContainerTreeT tree_;
@@ -61,6 +76,9 @@ class IsobmffReader final : public Reader {
   uint64_t revision_ = 0;
   mutable std::mutex tables_mutex_;
   mutable std::map<size_t, std::shared_ptr<const fb::SampleTableT>> tables_;  // by trak ordinal
+  // By trak ordinal. `samples` is moved into tables_ once the track's SampleTable is built; the timeline stays.
+  mutable std::map<size_t, std::unique_ptr<FragmentBuild>> fragments_;
+  bool has_moof_ = false;  // a top-level `moof` exists
 };
 
 // nullptr with *why = OVT_E_CORRUPT when the first bytes are not a box header (CNT-0006). Throws io::IoError on an I/O
