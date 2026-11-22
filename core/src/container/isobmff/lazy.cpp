@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
 #include "ovt_container_generated.h"
 
@@ -55,6 +56,30 @@ std::vector<uint8_t> IsobmffReader::track_info(int track_index) const {
   flatbuffers::FlatBufferBuilder fbb;
   fbb.Finish(fb::TrackInfo::Pack(fbb, tree_.tracks[static_cast<size_t>(track_index)].get()));
   const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first, uint32_t count) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const auto ordinal = static_cast<size_t>(track_index);
+  std::shared_ptr<const fb::SampleTableT> table;
+  {
+    const std::lock_guard lock(
+        tables_mutex_);  // held over the expansion: a second caller waits instead of repeating it
+    auto it = tables_.find(ordinal);
+    if (it == tables_.end()) {
+      const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal);
+      if (trak == nullptr) {
+        return {};
+      }
+      it = tables_.emplace(ordinal, expand_sample_table(file_, *trak, jobs::Cancel::never())).first;
+    }
+    table = it->second;
+  }
+  const flatbuffers::DetachedBuffer buf = serialise(*slice_sample_table(*table, first, count));
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
   return {bytes.begin(), bytes.end()};
 }
 

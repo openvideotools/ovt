@@ -33,6 +33,7 @@ add_executable(
   rawyuv_test.cpp
   registry_gen_test.cpp
   registry_lookup_test.cpp
+  sample_table_test.cpp
   sniff_test.cpp
   test_container_annexb.cpp
   test_container_ivf.cpp

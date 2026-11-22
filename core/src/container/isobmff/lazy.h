@@ -8,7 +8,9 @@
 #define OVT_CONTAINER_ISOBMFF_LAZY_H
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <unordered_set>
 #include <vector>
@@ -31,6 +33,9 @@ class IsobmffReader final : public Reader {
   [[nodiscard]] std::vector<uint8_t> tree() const override;
   [[nodiscard]] int track_count() const noexcept override { return static_cast<int>(tree_.tracks.size()); }
   [[nodiscard]] std::vector<uint8_t> track_info(int track_index) const override;
+  // SampleTable FlatBuffer (§8.4.1 moov part, WI-1.218) of `count` samples from `first` (0 = all). The track's table is
+  // expanded once and kept; an unknown track yields an empty vector.
+  [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
   ovt_status expand(uint64_t box_offset) override;
   // Bumped by each expand() that decodes a deferred box; a no-op expand leaves it, and the tree, unchanged.
@@ -54,6 +59,8 @@ class IsobmffReader final : public Reader {
   std::unordered_set<uint64_t> offsets_;  // file offset of every box in the tree
   std::optional<uint64_t> mfra_offset_;
   uint64_t revision_ = 0;
+  mutable std::mutex tables_mutex_;
+  mutable std::map<size_t, std::shared_ptr<const fb::SampleTableT>> tables_;  // by trak ordinal
 };
 
 // nullptr with *why = OVT_E_CORRUPT when the first bytes are not a box header (CNT-0006). Throws io::IoError on an I/O
