@@ -27,6 +27,12 @@ $ hdr10plus_tool inject -i regular.hevc -j tests/corpora/synthetic/hdr10plus_met
 Warning: mismatched lengths. video 259, HDR10+ JSON 60
 Metadata will be duplicated at the end to match video length
 $ MP4Box -for-test -add inj.hevc:dv-profile=8.1 -new hdr_hdr10plus_dv81.mp4
+$ sha256sum hdr_hdr10plus_dv81.mp4
+6a08680015655b675087e1a0ca13c3d33b6918812c811d50d48c60830e847387  hdr_hdr10plus_dv81.mp4
+$ python3 tools/fetch_corpora.py --ids hdr_hdr10plus_dv81 --cache-dir fc   # the post step itself: same bytes
+ok          hdr_hdr10plus_dv81
+$ sha256sum fc/hdr_hdr10plus_dv81/hdr_hdr10plus_dv81.mp4
+6a08680015655b675087e1a0ca13c3d33b6918812c811d50d48c60830e847387  fc/hdr_hdr10plus_dv81/hdr_hdr10plus_dv81.mp4
 $ OVT_CORPORA_DIR=corpora ovt_tests_container "AT1: hdr_hdr10plus_dv81*"
 All tests passed (9 assertions in 1 test case)
 $ ovt info -f json hdr_hdr10plus_dv81.mp4   # result.tracks[0].color
