@@ -191,6 +191,14 @@ X(CNT_6001, "CNT-6001", Error, "`senc` IV size unknown and not inferable", "2300
 X(CNT_6003, "CNT-6003", Error, "`tenc` IV size ∉ {0,8,16}", "23001-7 §8.2")
 X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
+// WI-1.221 (CENC per-sample map, §8.4.4). SPEC-ASSUMPTION(#808): CNT-6015 is the proposed row for a missing or truncated
+// per-sample record; the other codes are the spec rows.
+X(CNT_6002, "CNT-6002", Error, "subsample clear+protected ≠ sample size", "23001-7 §7.2")
+X(CNT_6006, "CNT-6006", Info, "encrypted track with all samples unprotected", "23001-7")
+X(CNT_6007, "CNT-6007", Warning, "subsample protects NAL length/header bytes", "23001-7 §9")
+X(CNT_6008, "CNT-6008", Info, "`cbcs` with per-sample IV", "23000-19 §8.2.2")
+X(CNT_6015, "CNT-6015", Warning, "per-sample encryption record missing or truncated", "23001-7 §7.2")
+
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
 X(CNT_DASH_0001, "CNT-DASH-0001", Info,

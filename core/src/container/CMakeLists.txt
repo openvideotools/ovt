@@ -14,6 +14,7 @@ target_sources(
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
           isobmff/brands.cpp
+          isobmff/cenc.cpp
           isobmff/decoders/fragment_boxes.cpp
           isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp

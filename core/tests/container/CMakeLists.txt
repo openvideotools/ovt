@@ -11,6 +11,7 @@ add_executable(
   brands_test.cpp
   byte_service_test.cpp
   c_api_test.cpp
+  cenc_test.cpp
   decoders_fragment_boxes_test.cpp
   decoders_codec_config_test.cpp
   decoders_colour_test.cpp

@@ -19,6 +19,7 @@
 
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/brands.h"
+#include "container/isobmff/cenc.h"
 #include "container/isobmff/fragments.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
@@ -80,24 +81,51 @@ std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first
   const auto ordinal = static_cast<size_t>(track_index);
   std::shared_ptr<const fb::SampleTableT> table;
   {
-    const std::lock_guard lock(
-        tables_mutex_);  // held over the expansion: a second caller waits instead of repeating it
-    auto it = tables_.find(ordinal);
-    if (it == tables_.end()) {
-      const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal);
-      if (trak == nullptr) {
-        return {};
-      }
-      std::unique_ptr<fb::SampleTableT> built = expand_sample_table(file_, *trak, jobs::Cancel::never());
-      if (has_moof_) {  // §8.4.1 fragment part
-        FragmentBuild& f = fragment_build(ordinal, built.get(), jobs::Cancel::never());
-        append_fragment_samples(*built, f.timeline, std::move(f.samples));
-      }
-      it = tables_.emplace(ordinal, std::move(built)).first;
-    }
-    table = it->second;
+    // Held over the expansion: a second caller waits instead of repeating it.
+    const std::lock_guard lock(tables_mutex_);
+    table = kept_table(ordinal);
+  }
+  if (!table) {
+    return {};
   }
   const flatbuffers::DetachedBuffer buf = serialise(*slice_sample_table(*table, first, count));
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::shared_ptr<const fb::SampleTableT> IsobmffReader::kept_table(size_t ordinal) const {
+  auto it = tables_.find(ordinal);
+  if (it == tables_.end()) {
+    const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal);
+    if (trak == nullptr) {
+      return nullptr;
+    }
+    std::unique_ptr<fb::SampleTableT> built = expand_sample_table(file_, *trak, jobs::Cancel::never());
+    if (has_moof_) {  // §8.4.1 fragment part
+      FragmentBuild& f = fragment_build(ordinal, built.get(), jobs::Cancel::never());
+      append_fragment_samples(*built, f.timeline, std::move(f.samples));
+    }
+    it = tables_.emplace(ordinal, std::move(built)).first;
+  }
+  return it->second;
+}
+
+std::vector<uint8_t> IsobmffReader::encryption(int track_index, uint64_t first, uint64_t count,
+                                               jobs::Cancel& cancel) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const auto ordinal = static_cast<size_t>(track_index);
+  std::shared_ptr<const fb::SampleTableT> table;
+  {
+    const std::lock_guard lock(tables_mutex_);
+    table = kept_table(ordinal);
+  }
+  if (!table) {
+    return {};
+  }
+  const flatbuffers::DetachedBuffer buf =
+      serialise(*build_encryption_map(file_, tree_.root, ordinal, *table, first, count, cancel));
   const std::span<const uint8_t> bytes(buf.data(), buf.size());
   return {bytes.begin(), bytes.end()};
 }

@@ -39,6 +39,9 @@ class IsobmffReader final : public Reader {
   // SampleTable FlatBuffer (§8.4.1: moov part, WI-1.218, then the fragment part, WI-1.219c) of `count` samples from
   // `first` (0 = all). The track's table is built once and kept; an unknown track yields an empty vector.
   [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override;
+  // EncryptionInfo FlatBuffer (§8.4.4, WI-1.221) with the records of `count` samples from `first` (0 = all).
+  [[nodiscard]] std::vector<uint8_t> encryption(int track_index, uint64_t first, uint64_t count,
+                                                jobs::Cancel& cancel) const override;
   // FragmentTimeline FlatBuffer (§8.4.3, WI-1.219) of one track, built once and kept; a cancelled build keeps nothing.
   [[nodiscard]] std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
@@ -57,6 +60,9 @@ class IsobmffReader final : public Reader {
 
  private:
   void index(const BoxNodes& nodes);
+  // The track's SampleTable with the fragment part, built once and kept. The caller holds tables_mutex_; nullptr
+  // when `ordinal` has no `trak`.
+  [[nodiscard]] std::shared_ptr<const fb::SampleTableT> kept_table(size_t ordinal) const;
   // The fragment build of trak `ordinal`, built on first use. The caller holds tables_mutex_. `moov_table` is the
   // track's moov SampleTable when the caller has it (else it is expanded here).
   [[nodiscard]] FragmentBuild& fragment_build(size_t ordinal, const fb::SampleTableT* moov_table,

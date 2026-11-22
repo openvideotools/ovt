@@ -106,6 +106,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       flatbuffers::Verifier fv(timeline.data, timeline.size);
       require(fv.VerifyBuffer<ovt::fb::FragmentTimeline>(nullptr));
       delete[] timeline.data;
+      // WI-1.221: the CENC map of every track (whole, then a slice) is a verified buffer.
+      for (const uint64_t first : {uint64_t{0}, uint64_t{3}}) {
+        ovt_Buffer enc{};
+        require(ovt_container_encryption(c, i, first, first == 0 ? 0 : 5, &enc) == OVT_OK);
+        flatbuffers::Verifier ev(enc.data, enc.size);
+        require(ev.VerifyBuffer<ovt::fb::EncryptionInfo>(nullptr));
+        delete[] enc.data;
+      }
     }
     ovt_container_close(c);
     // The validation driver over the complete walk: idempotent, whatever the bytes.
