@@ -565,3 +565,63 @@ TEST_CASE("every CTA WAVE cmfc file is clean at the Standard level",
     SKIP("no CTA WAVE cmfc file fetched: the real-asset run of WI-1.222 AT1 is handed to WI-1.237 (#802)");
   }
 }
+
+// ---- WI-1.222b: the Deep rows, on the files of tools/make_broken.py ------------------------------------------------
+
+namespace {
+
+Bytes broken_file(std::string_view name) {
+  const std::filesystem::path path =
+      std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/corpora/synthetic/isobmff-broken" / name;
+  std::ifstream in(path, std::ios::binary);
+  REQUIRE(in.good());
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+}  // namespace
+
+TEST_CASE("Deep: parameter sets inside avc1 samples raise CNT-7004", "[container][isobmff][brands][deep][fast]") {
+  const Bytes file = broken_file("syn_mp4_broken_avc1_inband_ps.mp4");
+  const auto deep = run(file, iso::ValidationLevel::Deep);
+  CHECK(has(codes(file, iso::ValidationLevel::Deep), "CNT-7004"));
+  // The first 8 sync samples are probed, an SPS and a PPS in each: 16 distinct findings at most, 16 here.
+  CHECK(std::ranges::count_if(deep, [](const auto& f) { return f.first == "CNT-7004"; }) == 16);
+  CHECK_FALSE(has(codes(file, iso::ValidationLevel::Standard), "CNT-7004"));
+  CHECK_FALSE(has(codes(file, iso::ValidationLevel::Quick), "CNT-7004"));
+}
+
+TEST_CASE("Deep: an OBU_TEMPORAL_DELIMITER inside an av01 sample raises CNT-7008",
+          "[container][isobmff][brands][deep][fast]") {
+  const Bytes file = broken_file("syn_mp4_broken_av01_td_in_sample.mp4");
+  const auto found = codes(file, iso::ValidationLevel::Deep);
+  CHECK(has(found, "CNT-7008"));
+  CHECK_FALSE(has(found, "CNT-7009"));
+  CHECK_FALSE(has(codes(file, iso::ValidationLevel::Standard), "CNT-7008"));
+}
+
+TEST_CASE("Deep: an unsized OBU that cannot end a sample raises CNT-7009", "[container][isobmff][brands][deep][fast]") {
+  const Bytes file = broken_file("syn_mp4_broken_av01_unsized_obu.mp4");
+  const auto found = codes(file, iso::ValidationLevel::Deep);
+  CHECK(has(found, "CNT-7009"));
+  CHECK_FALSE(has(found, "CNT-7008"));
+  CHECK_FALSE(has(codes(file, iso::ValidationLevel::Standard), "CNT-7009"));
+}
+
+TEST_CASE("Deep: files whose samples are clean raise none of CNT-7004, 7008, 7009",
+          "[container][isobmff][brands][deep][fast]") {
+  for (const char* name : {"moov_after_mdat.mp4", "syn_mp4_broken_hvc1_no_ps.mp4", "dup_stts.mp4"}) {
+    CAPTURE(name);
+    const auto found = codes(broken_file(name), iso::ValidationLevel::Deep);
+    CHECK_FALSE(has(found, "CNT-7004"));
+    CHECK_FALSE(has(found, "CNT-7008"));
+    CHECK_FALSE(has(found, "CNT-7009"));
+  }
+}
+
+TEST_CASE("Deep: a second run adds nothing", "[container][isobmff][brands][deep][fast]") {
+  const Bytes file = broken_file("syn_mp4_broken_avc1_inband_ps.mp4");
+  const ovt::io::MemoryFile f(file);
+  auto r = iso::walk(f);
+  CHECK(iso::check_brands(f, r.top_level, iso::ValidationLevel::Deep) > 0);
+  CHECK(iso::check_brands(f, r.top_level, iso::ValidationLevel::Deep) == 0);
+}

@@ -110,6 +110,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
     // The brand checks (WI-1.222) read hvcC, av1C, sidx and the like straight from the file: idempotent as well.
     ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Standard);
+    // Deep adds the sample-byte rows (WI-1.222b): the first run may find more, the second finds nothing new.
+    ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep);
     require(ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();

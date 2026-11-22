@@ -15,7 +15,11 @@ a real H.264 (or H.265) parameter set in its sample entry. Modes, one per file:
 * ``--box-size 7 --in moov``: a 7-byte box header inside ``moov`` before ``trak`` (``CNT-0106``);
 * ``--hvc1-strip-ps``: an ``hvc1`` sample entry whose ``hvcC`` has no VPS/SPS/PPS arrays (``CNT-7005``);
 * ``--cmfc-two-tracks``: a fragmented file branded ``cmfc`` with two video tracks (``CNT-7010``);
-* ``--msix-no-sidx``: a fragmented file branded ``msix`` without a ``sidx`` (``CNT-7031``).
+* ``--msix-no-sidx``: a fragmented file branded ``msix`` without a ``sidx`` (``CNT-7031``);
+* ``--avc1-inband-ps``: an ``avc1`` track whose samples carry an SPS and a PPS NAL unit (``CNT-7004``, Deep);
+* ``--av01-td-in-sample``: an ``av01`` track whose samples start with an ``OBU_TEMPORAL_DELIMITER`` (``CNT-7008``, Deep);
+* ``--av01-unsized-obu``: an ``av01`` track whose samples start with a sequence header OBU without ``obu_size``, so it
+  swallows the OBUs behind it (``CNT-7009``, Deep).
 
 WI-1.201 adds the box-header modes the walk of §8.2.3 is tested with (each file is the base file with one change):
 
@@ -72,8 +76,29 @@ def full(kind: bytes, version: int, flags: int, *body: bytes) -> bytes:
     return box(kind, struct.pack(">I", version << 24 | flags), *body)
 
 
-def sample_entry(hevc: bool, strip_ps: bool) -> bytes:
-    if hevc:
+def leb128(value: int) -> bytes:
+    out = bytearray()
+    while True:
+        byte = value & 0x7F
+        value >>= 7
+        out.append(byte | (0x80 if value else 0))
+        if not value:
+            return bytes(out)
+
+
+def obu(obu_type: int, payload: bytes, sized: bool = True) -> bytes:
+    """One AV1 OBU (AV1 §5.3): a header byte, then ``obu_size`` and the payload, or just the payload when unsized."""
+    header = obu_type << 3 | (2 if sized else 0)
+    return bytes([header]) + (leb128(len(payload)) if sized else b"") + payload
+
+
+AV1_SEQUENCE_HEADER = obu(1, bytes.fromhex("000000042a0bffff0f5fe0"))
+
+
+def sample_entry(hevc: bool, strip_ps: bool, av1: bool = False) -> bytes:
+    if av1:
+        config = box(b"av1C", bytes([0x81, 0x08, 0x0C, 0x00]), AV1_SEQUENCE_HEADER)
+    elif hevc:
         arrays = (
             []
             if strip_ps
@@ -98,7 +123,7 @@ def sample_entry(hevc: bool, strip_ps: bool) -> bytes:
         )
     visual = bytes(6) + struct.pack(">H", 1) + bytes(16) + struct.pack(">HHIIIH", W, H, 0x480000, 0x480000, 0, 1)
     visual += bytes(32) + struct.pack(">Hh", 0x18, -1)
-    return box(b"hvc1" if hevc else b"avc1", visual, config)
+    return box(b"av01" if av1 else b"hvc1" if hevc else b"avc1", visual, config)
 
 
 def trak(
@@ -108,6 +133,7 @@ def trak(
     strip_ps: bool = False,
     tkhd_extra: bytes = b"",
     stsd_box: bool = True,
+    av1: bool = False,
 ) -> bytes:
     tkhd = full(
         b"tkhd",
@@ -123,7 +149,7 @@ def trak(
     mdhd = full(b"mdhd", 0, 0, struct.pack(">IIIIHH", 0, 0, 30000, SAMPLES * 1000, 0x55C4, 0))
     hdlr = full(b"hdlr", 0, 0, b"\0\0\0\0vide", bytes(12), b"VideoHandler\0")
     dinf = box(b"dinf", full(b"dref", 0, 0, struct.pack(">I", 1), full(b"url ", 0, 1)))
-    stsd = full(b"stsd", 0, 0, struct.pack(">I", 1), sample_entry(hevc, strip_ps))
+    stsd = full(b"stsd", 0, 0, struct.pack(">I", 1), sample_entry(hevc, strip_ps, av1))
     minf = box(b"minf", full(b"vmhd", 0, 1, bytes(8)), dinf, box(b"stbl", *([stsd] if stsd_box else []), *stbl))
     return box(b"trak", tkhd, box(b"mdia", mdhd, hdlr, minf))
 
@@ -139,6 +165,20 @@ def mvhd(next_id: int) -> bytes:
         bytes(24),
         struct.pack(">I", next_id),
     )
+
+
+def sample_bytes(mode: str, n: int) -> bytes:
+    """One SAMPLE_SIZE-byte sample of the Deep-level modes (a NAL or OBU structure around filler)."""
+    filler = bytes((n * 13 + i) & 0x7F for i in range(SAMPLE_SIZE))
+    if mode == "avc1-inband-ps":  # 4-byte NAL lengths, as avcC says: SPS, PPS, then a slice NAL filling the sample
+        head = b"".join(struct.pack(">I", len(x)) + x for x in (AVC_SPS, AVC_PPS))
+        slice_len = SAMPLE_SIZE - len(head) - 4
+        return head + struct.pack(">I", slice_len) + bytes([0x65]) + filler[: slice_len - 1]
+    if mode == "av01-td-in-sample":  # a temporal delimiter before the frame OBU
+        td = obu(2, b"")
+        return td + obu(6, filler[: SAMPLE_SIZE - len(td) - 1 - len(leb128(SAMPLE_SIZE))])
+    # av01-unsized-obu: a sequence header with no obu_size runs to the end of the sample
+    return obu(1, filler[: SAMPLE_SIZE - 1], sized=False)
 
 
 def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> bytes:
@@ -182,6 +222,7 @@ def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> byte
                 strip_ps=True,
                 tkhd_extra=bytes(4) if mode == "tkhd-padded" else b"",
                 stsd_box=mode != "missing-stsd",
+                av1=mode in ("av01-td-in-sample", "av01-unsized-obu"),
             )
         )
         return box(b"moov", *body)
@@ -189,6 +230,8 @@ def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> byte
     data_start = len(ftyp) + (len(moov([0] * len(chunks))) if moov_first else 0) + 8
     offsets = [data_start + sum(chunks[:i]) * SAMPLE_SIZE for i in range(len(chunks))]
     mdat = box(b"mdat", bytes((i * 7) & 0xFF for i in range(SAMPLES * SAMPLE_SIZE)))
+    if mode in ("avc1-inband-ps", "av01-td-in-sample", "av01-unsized-obu"):
+        mdat = box(b"mdat", b"".join(sample_bytes(mode, n) for n in range(SAMPLES)))
     if mode == "stco-beyond-eof":
         offsets[-1] = data_start + len(mdat) + 4096
     return ftyp + moov(offsets) + mdat if moov_first else ftyp + mdat + moov(offsets)
@@ -274,6 +317,9 @@ def main(argv: list[str] | None = None) -> int:
         "hvc1-strip-ps",
         "cmfc-two-tracks",
         "msix-no-sidx",
+        "avc1-inband-ps",
+        "av01-td-in-sample",
+        "av01-unsized-obu",
         "missing-stsd",
         "traf-no-tfhd",
         "dup-stts",
@@ -329,6 +375,9 @@ def main(argv: list[str] | None = None) -> int:
                 "stsc_descending",
                 "ctts_v0_negative",
                 "hvc1_strip_ps",
+                "avc1_inband_ps",
+                "av01_td_in_sample",
+                "av01_unsized_obu",
                 "missing_stsd",
                 "dup_stts",
                 "elst_in_moov",
