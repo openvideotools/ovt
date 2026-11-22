@@ -185,7 +185,7 @@ struct TempFile {
     fs::create_directories(path);
     path /= name;
     std::ofstream f(path, std::ios::binary);
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));  // NOLINT
+    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
   }
   TempFile(const TempFile&) = delete;
   TempFile& operator=(const TempFile&) = delete;
