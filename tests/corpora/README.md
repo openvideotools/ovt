@@ -53,7 +53,7 @@ set.
 |---|---|---|---|
 | `container-smoke` | 20 files, one per feature: ISOBMFF (fragmented, CENC, HEVC `hev1`/`hvc1`, Dolby Vision CENC, H.264 UGC), HEIF, AV1 IVF, H.264 and H.265 Annex B. All also carry `fast`. | 6.5 MiB | `tools/fetch_corpora.py --tags container-smoke` |
 | `container-full` | every other verified ISOBMFF entry of the MPEG FileFormatConformance, Bento4 and GPAC sets | 162 files, 125 MiB | `tools/fetch_corpora.py --tags container-full` |
-| `isobmff-broken` | seven generated broken MP4 files (recipes 34 to 37 and 72, `tests/corpora/synthetic/recipes.json`); each names the codes the reader must emit | tiny, generated | `tests/corpora/synthetic/generate.py` |
+| `isobmff-broken` | thirteen generated broken MP4 files (recipes 34 to 37 and 72, `tests/corpora/synthetic/recipes.json`); each names the codes the reader must emit | tiny, generated | `tests/corpora/synthetic/generate.py` |
 
 Every entry of these tags has an `expected` object read by the container tests:
 

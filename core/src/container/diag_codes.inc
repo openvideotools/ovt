@@ -92,6 +92,21 @@ X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
 // WI-1.206 (stsd and sample entries, §8.3.2).
 X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+X(CNT_1003, "CNT-1003", Warning, "unknown FullBox version", "per box")
+X(CNT_1005, "CNT-1005", Info, "unparsed trailing bytes after the last field", "per box")
+X(CNT_1011, "CNT-1011", Error,
+  "required box missing: `mvhd` in `moov`; `tkhd`, `mdia` in `trak`; `mdhd`, `hdlr`, `minf` in `mdia`; `stbl`, `dinf` in `minf`; `stsd`, `stts`, `stsc`, `stsz|stz2`, `stco|co64` in `stbl` (unless `cmfc`/fragment-only with empty stbl, where `stts/stsc/stsz/stco` must still exist with 0 entries); `mfhd` in `moof`; `tfhd` in `traf`; message names the box and parent", "14496-12 §8.x \"Mandatory: Yes\"")
+X(CNT_1012, "CNT-1012", Error,
+  "duplicate box where exactly one is allowed (`mvhd`, `tkhd`, `mdhd`, `hdlr`, `stsd`, `stts`, `stsz`, `stco`/`co64`, `tfhd`, `tfdt`, `mehd`, `ftyp`) or duplicate `track_ID`", "14496-12 §8.x \"Quantity: Exactly one\"")
+X(CNT_1013, "CNT-1013", Warning,
+  "box in a parent where the registry does not allow it (`allowed_parents` non-empty and mismatch); e.g. `colr` in `stbl`, `elst` outside `edts`, `stss` in `traf`", "conformance JSON")
+X(CNT_1014, "CNT-1014", Error,
+  "box size does not match its fields: payload ends before the fields' declared count (`entry_count` × entry size > payload)", "per box")
+X(CNT_1015, "CNT-1015", Warning,
+  "box size larger than fields + known children by more than 0 bytes **and** box is one of the fixed-size boxes (`tkhd`, `mdhd`, `mvhd`, `vmhd`, `smhd`, `btrt`, `pasp`, `clli`, `mdcv`, `tfdt`, `mfhd`, `mehd`, `trex`)", "per box")
+X(CNT_1024, "CNT-1024", Info,
+  "`tkhd.matrix` is neither identity nor a 90°/180°/270° rotation; `TrackInfo.rotation = 0`", "14496-12 §8.3.2")
+X(CNT_1032, "CNT-1032", Warning, "`mdhd.timescale == 0` or `mvhd.timescale == 0`", "14496-12 §8.4.2")
 
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
@@ -133,6 +148,33 @@ X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (fra
 X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole frame (ignored)", "")
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
+
+// WI-1.219a/b (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
+X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
+X(CNT_4002, "CNT-4002", Warning,
+  "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
+X(CNT_4003, "CNT-4003", Warning,
+  "`trun` has both `first-sample-flags-present` and `sample-flags-present`", "14496-12 §8.8.8")
+X(CNT_4004, "CNT-4004", Warning, "`moof` not immediately followed by `mdat`", "23000-19 §7.3.2.3")
+X(CNT_4005, "CNT-4005", Error,
+  "no default sample duration/size/flags (neither `tfhd` nor `trex`) while `trun` omits them", "14496-12 §8.8.7")
+X(CNT_4006, "CNT-4006", Info, "implicit base data offsets with several `traf`s", "14496-12 §8.8.7")
+X(CNT_4007, "CNT-4007", Warning,
+  "first `trun` of a `traf` without `data_offset` and no `base_data_offset`", "14496-12 §8.8.8")
+X(CNT_4008, "CNT-4008", Info, "`tfdt` absent; DTS inferred by continuity", "14496-12 §8.8.12")
+X(CNT_4010, "CNT-4010", Error, "`tfra` entry does not point at a `moof` / wrong time", "14496-12 §8.8.10")
+X(CNT_4011, "CNT-4011", Error, "`mfro.size` ≠ `mfra` size", "14496-12 §8.8.11")
+X(CNT_4020, "CNT-4020", Warning, "`tfdt` discontinuity (gap or overlap vs previous fragment)", "14496-12 §8.8.12")
+X(CNT_4021, "CNT-4021", Error, "fragment sample outside its `mdat`", "14496-12 §8.8.8")
+X(CNT_4022, "CNT-4022", Info, "bytes in `mdat` not referenced by any `trun`", "")
+X(CNT_4030, "CNT-4030", Warning, "`sidx.referenced_size` ≠ actual bytes", "14496-12 §8.16.3")
+X(CNT_4031, "CNT-4031", Info, "`sidx.timescale` ≠ track timescale", "14496-12 §8.16.3")
+X(CNT_4032, "CNT-4032", Warning, "`sidx.subsegment_duration` ≠ Σ `trun` durations", "14496-12 §8.16.3")
+X(CNT_4033, "CNT-4033", Info, "`sidx.earliest_presentation_time` ≠ first CTS", "14496-12 §8.16.3")
+X(CNT_4034, "CNT-4034", Warning, "`starts_with_SAP` but first sample is non-sync", "14496-12 §8.16.3")
+X(CNT_4035, "CNT-4035", Warning, "fragment `trun` sample count 0 and not `duration-is-empty`", "14496-12 §8.8.8")
+X(CNT_4036, "CNT-4036", Info, "`styp` brands differ between segments of one file", "14496-12 §8.16.2")
+X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", "23001-7 §7.1")
 
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.

@@ -16,7 +16,9 @@ add_executable(
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
+  diag_coverage_test.cpp
   field_builder_test.cpp
+  fragments_test.cpp
   ivf_test.cpp
   lazy_test.cpp
   m3u8_robustness_test.cpp
@@ -39,6 +41,7 @@ add_executable(
   tr101290_test.cpp
   ts_packets_robustness_test.cpp
   ts_packets_test.cpp
+  validate_test.cpp
   y4m_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(
