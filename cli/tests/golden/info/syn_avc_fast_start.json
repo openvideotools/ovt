@@ -21,6 +21,17 @@
         "x": 0,
         "y": 0
       },
+      "color": {
+        "full_range": 0,
+        "has_dolby_vision": false,
+        "has_hdr10plus": false,
+        "matrix": 2,
+        "max_cll": 0,
+        "max_fall": 0,
+        "mdcv_max_luminance": 0,
+        "primaries": 2,
+        "transfer": 2
+      },
       "crop": {
         "h": 1080,
         "w": 1920,

@@ -16978,16 +16978,23 @@
         "h265"
       ],
       "containers": [
-        "matroska"
+        "isobmff"
       ],
       "tags": [
         "fast"
       ],
       "features": [
         "dolby-vision",
-        "dv-profile-8"
+        "dv-profile-8",
+        "hdr10plus"
       ],
-      "note": "SPEC-ASSUMPTION: dovi_tool assets/hevc_tests/regular.mkv is a Dolby Vision 8.1 HEVC clip; HDR10+ presence not verified"
+      "post": {
+        "mp4box_dv_remux": {
+          "dv_profile": "8.1",
+          "hdr10plus_inject": "tests/corpora/synthetic/hdr10plus_metadata.json"
+        }
+      },
+      "note": "Primary file: the MP4Box dv-profile=8.1 remux of the Matroska original (a WI-4.202 input). hdr10plus_tool extract finds no HDR10+ in regular.mkv (checked 2026-11-22, hdr10plus_tool 1.7.2), so the post step injects tests/corpora/synthetic/hdr10plus_metadata.json (60 frames, the last repeated to the 259 pictures) with hdr10plus_tool inject first (#769)"
     },
     {
       "id": "netflix_src01_hrc00_576x324",

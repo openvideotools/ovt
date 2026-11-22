@@ -1,26 +1,36 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of the HdrMetadata summary (chapter 08 §8.4.6, WI-1.223a): box-level collection, the classification rules
-// 3.1-3.7, the box-level mismatch rules and the ovt_ColorDescription image, on hand-assembled files and on the corpus
-// files of acceptance tests 2 and 3. Acceptance tests 1 and 4 need the sync-sample probe (WI-1.223b).
+// Tests of the HdrMetadata summary (chapter 08 §8.4.6, WI-1.223): box-level collection, the bounded sync-sample probe,
+// the classification rules 3.1-3.7, the mismatch rules, the ovt_ColorDescription image and ovt_container_hdr_metadata,
+// on hand-assembled files and on the corpus files of the acceptance tests.
 
 #include <flatbuffers/flatbuffers.h>
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/hdr_summary.h"
 #include "io/memory_file.hpp"
+#include "io/ovt_file.hpp"
+#include "ovt/container.h"
+#include "ovt/cxx/cancel.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
+#include "ovt/io.h"
+#include "ovt/jobs.h"
 #include "ovt_container_generated.h"
 #include "test_support/corpus.h"
 
@@ -452,6 +462,400 @@ TEST_CASE("malformed records are left out; non-video and encrypted tracks", "[co
   const Run audio = summarize(visual_entry("hvc1", {}), "soun");
   CHECK(signal(audio, "colr") == nullptr);
   CHECK_FALSE(has_diag(audio, "CNT-5007"));
+}
+
+// ---- step 2: the sync-sample probe ----
+
+struct Sei {
+  unsigned type;
+  Bytes payload;
+};
+
+Bytes sei_body(std::initializer_list<Sei> messages) {
+  Bytes b;
+  for (const Sei& m : messages) {
+    b.push_back(static_cast<uint8_t>(m.type));
+    b.push_back(static_cast<uint8_t>(m.payload.size()));
+    b.insert(b.end(), m.payload.begin(), m.payload.end());
+  }
+  b.push_back(0x80);
+  return b;
+}
+Bytes hevc_sei(std::initializer_list<Sei> messages) {
+  return with_epb(cat({Bytes{0x4E, 0x01}, sei_body(messages)}), 2);
+}
+Bytes avc_sei(std::initializer_list<Sei> messages) {
+  return with_epb(cat({Bytes{0x06}, sei_body(messages)}), 1);
+}
+
+// An HDR10+ T.35 message with one processing window (ST 2094-40, application_version 1).
+Bytes hdr10plus_payload() {
+  BitWriter w;
+  w.u(8, 0xB5).u(16, 0x003C).u(16, 0x0001);
+  w.u(8, 4).u(8, 1).u(2, 1).u(27, 4000).u(1, 0);
+  w.u(17, 1000).u(17, 2000).u(17, 3000).u(17, 1500);
+  w.u(4, 3).u(7, 1).u(17, 100).u(7, 50).u(17, 900).u(7, 99).u(17, 2800);
+  w.u(10, 25).u(1, 0).u(1, 0).u(1, 0);  // fraction_bright_pixels, no peak grid, no tone mapping, no saturation
+  return w.bytes();
+}
+
+const Bytes kRpu{0x7C, 0x01, 0x19, 0x08, 0x09, 0x00};  // nal_unit_type 62, nuh_layer_id 0
+const Bytes kIdr{0x26, 0x01, 0xAF, 0x09, 0x40};        // nal_unit_type 19
+
+Bytes length_prefixed(std::initializer_list<Bytes> units) {
+  Bytes b;
+  for (const Bytes& u : units) {
+    b = cat({b, be(u.size(), 4), u});
+  }
+  return b;
+}
+
+// A one-track file whose samples follow it in an mdat, and the SampleTable the probe reads them through.
+struct Probed {
+  Bytes bytes;
+  ovt::fb::SampleTableT table;
+};
+
+Probed probed(const Bytes& entry, const std::vector<Bytes>& samples, std::vector<bool> sync = {}) {
+  Probed p;
+  p.bytes = movie(entry);
+  Bytes mdat;
+  uint64_t at = p.bytes.size() + 8;
+  for (const Bytes& s : samples) {
+    p.table.offset.push_back(at);
+    p.table.size.push_back(static_cast<uint32_t>(s.size()));
+    at += s.size();
+    mdat = cat({mdat, s});
+  }
+  p.bytes = cat({p.bytes, box("mdat", mdat)});
+  p.table.count = samples.size();
+  p.table.is_sync = std::move(sync);
+  return p;
+}
+
+Run summarize(const ovt::io::RandomAccessFile& file, const ovt::fb::SampleTableT& table,
+              const iso::HdrProbeOptions& options = {}, const ovt::jobs::Cancel& cancel = ovt::jobs::Cancel::never()) {
+  const iso::WalkResult w = iso::walk(file);
+  const ovt::fb::BoxNodeT* trak = find(w.top_level, "trak");
+  REQUIRE(trak != nullptr);
+  Run r;
+  r.meta = iso::summarize_hdr(*trak, 1, table, file, options, cancel);
+  r.color = iso::color_from_image(r.meta.color);
+  return r;
+}
+
+Run summarize(const Probed& p, const iso::HdrProbeOptions& options = {}) {
+  const ovt::io::MemoryFile file(p.bytes);
+  return summarize(file, p.table, options);
+}
+
+TEST_CASE("AT1 shape: Dolby Vision 8.1 with HDR10+ T.35 and an RPU in sample 0", "[container][hdr]") {
+  const Bytes entry = visual_entry(
+      "hvc1", cat({hvcc(hevc_sps(9, 16, 9)), colr(9, 16, 9), mdcv_box(), clli_box(1000, 400), dovi_box("dvvC", 8, 1)}));
+  const Bytes s0 = length_prefixed({hevc_sei({{4, hdr10plus_payload()}}), kRpu, kIdr});
+  const Run r = summarize(probed(entry, {s0, length_prefixed({kRpu, kIdr})}));
+  CHECK(r.meta.kind == HdrKind::DolbyVision);
+  CHECK(r.meta.dv_profile == 8);
+  CHECK(r.meta.dv_rpu_present);
+  CHECK(r.color.has_hdr10plus == 1);
+  CHECK(r.color.has_dolby_vision == 1);
+  CHECK(r.meta.hdr10plus_application_version == 1);
+  CHECK(r.meta.hdr10plus_num_windows == 1);
+  CHECK(r.meta.probed_samples == 2);
+  const auto* rpu = signal(r, "nal_62_rpu");
+  REQUIRE(rpu != nullptr);
+  CHECK(rpu->sample_index == 0);
+  CHECK(rpu->unit_index == 1);
+  CHECK(rpu->box_offset == -1);
+  const auto* t35 = signal(r, "sei_t35_hdr10plus");
+  REQUIRE(t35 != nullptr);
+  CHECK(t35->sample_index == 0);
+  CHECK(t35->unit_index == 0);
+  CHECK_FALSE(has_diag(r, "CNT-5010"));
+  CHECK_FALSE(has_diag(r, "CNT-5011"));
+  CHECK_FALSE(r.meta.box_vs_bitstream_mismatch);
+
+  // Without the DV box the same samples are HDR10+.
+  const Run plus = summarize(probed(visual_entry("hvc1", cat({hvcc(hevc_sps(9, 16, 9)), colr(9, 16, 9)})),
+                                    {length_prefixed({hevc_sei({{4, hdr10plus_payload()}}), kIdr})}));
+  CHECK(plus.meta.kind == HdrKind::HDR10Plus);
+}
+
+TEST_CASE("SEI 137 / 144 differing from mdcv / clli raise CNT-5003 / CNT-5004; SEI alone gives HDR10",
+          "[container][hdr]") {
+  const Bytes entry =
+      visual_entry("hvc1", cat({hvcc(hevc_sps(9, 16, 9)), colr(9, 16, 9), mdcv_box(), clli_box(1000, 400)}));
+  const Bytes s0 =
+      length_prefixed({hevc_sei({{137, mdcv_payload(40'000'000, 50)}, {144, cll_payload(4000, 400)}}), kIdr});
+  const Run r = summarize(probed(entry, {s0}));
+  CHECK(has_diag(r, "CNT-5003"));
+  CHECK(has_diag(r, "CNT-5004"));
+  CHECK(r.meta.box_vs_bitstream_mismatch);
+  CHECK(r.color.mdcv_max_luminance == 10'000'000);  // the boxes win
+  CHECK(r.color.max_cll == 1000);
+  REQUIRE(signal(r, "sei_137") != nullptr);
+  CHECK(signal(r, "sei_137")->sample_index == 0);
+  REQUIRE(signal(r, "sei_144") != nullptr);
+
+  const Bytes same = length_prefixed({hevc_sei({{137, mdcv_payload()}, {144, cll_payload(1000, 400)}}), kIdr});
+  const Run ok = summarize(probed(entry, {same}));
+  CHECK_FALSE(ok.meta.box_vs_bitstream_mismatch);
+  CHECK(ok.meta.diagnostics.empty());
+
+  // H.264: SEI only, an in-band SPS-less stream; the SEI values fill the image.
+  const Bytes avcc = box("avcC", Bytes{1, 100, 0, 40, 0xFF, 0xE0, 0, 0xFD, 0xF8, 0xF8, 0});
+  const Run avc =
+      summarize(probed(visual_entry("avc1", cat({avcc, colr(9, 16, 9)})),
+                       {length_prefixed({avc_sei({{137, mdcv_payload()}, {144, cll_payload(800, 200)}})})}));
+  CHECK(avc.meta.kind == HdrKind::HDR10);
+  CHECK(avc.color.max_cll == 800);
+  CHECK(avc.color.mdcv_max_luminance == 10'000'000);
+}
+
+TEST_CASE("Dolby Vision from the bitstream: CNT-5010 and CNT-5011", "[container][hdr]") {
+  const Run no_box = summarize(probed(visual_entry("hvc1", colr(9, 16, 9)), {length_prefixed({kRpu, kIdr})}));
+  CHECK(no_box.meta.kind == HdrKind::DolbyVision);
+  CHECK(has_diag(no_box, "CNT-5010"));
+  CHECK(no_box.meta.dv_rpu_present);
+
+  const Run no_rpu =
+      summarize(probed(visual_entry("hvc1", cat({colr(9, 16, 9), dovi_box("dvvC", 8, 1)})), {length_prefixed({kIdr})}));
+  CHECK(no_rpu.meta.kind == HdrKind::DolbyVision);
+  CHECK(has_diag(no_rpu, "CNT-5011"));
+}
+
+TEST_CASE("AV1 metadata OBUs: HDR_CLL and HDR10+ T.35", "[container][hdr]") {
+  const Bytes entry = visual_entry("av01", cat({av1c(true, av1_seq_header(true, 9, 16, 9)), colr(9, 16, 9)}));
+  const Bytes cll = obu(5, cat({leb(1), cll_payload(600, 150), Bytes{0x80}}));
+  const Bytes t35 = obu(5, cat({leb(4), hdr10plus_payload(), Bytes{0x80}}));
+  const Run r = summarize(probed(entry, {cat({cll, t35, obu(6, Bytes{0x10, 0x00})})}));
+  CHECK(r.color.max_cll == 600);
+  REQUIRE(signal(r, "obu_metadata_1") != nullptr);
+  REQUIRE(signal(r, "obu_metadata_4") != nullptr);
+  CHECK(signal(r, "obu_metadata_4")->unit_index == 1);
+  CHECK(r.meta.kind == HdrKind::HDR10Plus);
+}
+
+TEST_CASE("the probe takes sync samples only, up to max_sync_samples and max_bytes, and stops on cancel",
+          "[container][hdr]") {
+  const Bytes entry = visual_entry("hvc1", cat({colr(9, 16, 9), dovi_box("dvvC", 8, 1)}));
+  const Probed p = probed(entry, {length_prefixed({kIdr}), length_prefixed({kRpu, kIdr}), length_prefixed({kIdr})},
+                          {true, false, true});
+  const Run r = summarize(p);
+  CHECK(r.meta.probed_samples == 2);
+  CHECK(has_diag(r, "CNT-5011"));  // the RPU sits in the non-sync sample 1
+
+  iso::HdrProbeOptions one;
+  one.max_sync_samples = 1;
+  CHECK(summarize(p, one).meta.probed_samples == 1);
+
+  iso::HdrProbeOptions small;
+  small.max_bytes = 10;  // the first sample is 9 bytes, the second sync sample would take the total to 18
+  CHECK(summarize(p, small).meta.probed_samples == 1);
+  small.allow_slow_scan = true;
+  CHECK(summarize(p, small).meta.probed_samples == 2);
+
+  const ovt::io::MemoryFile file(p.bytes);
+  ovt::jobs::Cancel cancel;
+  cancel.request();
+  CHECK_THROWS_AS(summarize(file, p.table, {}, cancel), ovt::Cancelled);
+}
+
+TEST_CASE("malformed samples end quietly; encrypted tracks are not probed", "[container][hdr]") {
+  // An SEI whose payload size runs past the NAL, a NAL length past the end of its sample, a sample past the end of the
+  // file.
+  const Bytes entry = visual_entry("hvc1", cat({hvcc(hevc_sps(9, 16, 9)), colr(9, 16, 9)}));
+  Probed p =
+      probed(entry, {length_prefixed({Bytes{0x4E, 0x01, 137, 60, 0x01, 0x80}, Bytes{0x7C}}), cat({be(1000, 4), kIdr})});
+  p.table.offset.push_back(p.bytes.size() + 100);
+  p.table.size.push_back(64);
+  p.table.count = 3;
+  Run r;
+  REQUIRE_NOTHROW(r = summarize(p));
+  CHECK(r.meta.kind == HdrKind::PQ_NoStatic);
+  CHECK(r.meta.probed_samples == 3);
+
+  const Bytes sinf = box("sinf", box("frma", str("hvc1")));
+  const Run enc = summarize(probed(visual_entry("encv", cat({colr(9, 16, 9), sinf})), {length_prefixed({kRpu})}));
+  CHECK(enc.meta.probed_samples == 0);
+  CHECK(enc.meta.kind == HdrKind::PQ_NoStatic);
+}
+
+// ---- ovt_container_hdr_metadata ----
+
+// A sparse file: the listed pieces are real, every other byte below `size` reads as zero. Counts the bytes served
+// (RandomAccessFile has no bytes_read(), #630).
+class SparseFile final : public ovt::io::RandomAccessFile {
+ public:
+  SparseFile(uint64_t size, std::map<uint64_t, Bytes> pieces)
+      : RandomAccessFile(ovt::io::FileInfo{size, 0, "sparse"}), pieces_(std::move(pieces)) {}
+
+  size_t read(uint64_t offset, size_t len, uint8_t* dst) const override {
+    if (offset >= size()) {
+      return 0;
+    }
+    const auto n = static_cast<size_t>(std::min<uint64_t>(len, size() - offset));
+    const std::span<uint8_t> out(dst, n);
+    std::fill(out.begin(), out.end(), uint8_t{0});
+    for (const auto& [at, bytes] : pieces_) {
+      const uint64_t lo = std::max<uint64_t>(at, offset);
+      const uint64_t hi = std::min<uint64_t>(at + bytes.size(), offset + n);
+      if (lo < hi) {
+        std::copy_n(bytes.begin() + static_cast<std::ptrdiff_t>(lo - at), hi - lo,
+                    out.begin() + static_cast<std::ptrdiff_t>(lo - offset));
+      }
+    }
+    bytes_read_ += n;
+    return n;
+  }
+  [[nodiscard]] Holder view(uint64_t offset, size_t len) const override {
+    auto buf = std::make_shared<Bytes>(len);
+    buf->resize(read(offset, len, buf->data()));
+    return Holder{buf, std::span<const uint8_t>(*buf)};
+  }
+  void advise(uint64_t /*offset*/, uint64_t /*len*/, Access /*a*/) const noexcept override {}
+  [[nodiscard]] bool is_mapped() const noexcept override { return false; }
+  [[nodiscard]] uint64_t bytes_read() const noexcept { return bytes_read_; }
+
+ private:
+  std::map<uint64_t, Bytes> pieces_;
+  mutable std::atomic<uint64_t> bytes_read_{0};
+};
+
+Bytes full_box(std::string_view type, const Bytes& payload) {
+  return box(type, cat({zeros(4), payload}));
+}
+
+// A complete one-track movie (tkhd, mdhd, hdlr, stbl) whose `count` samples of `size` bytes sit at `offsets`.
+Bytes complete_moov(const Bytes& entry, const std::vector<uint64_t>& offsets, uint32_t size) {
+  Bytes co64 = be(offsets.size(), 4);
+  for (const uint64_t o : offsets) {
+    co64 = cat({co64, be(o, 8)});
+  }
+  const Bytes stbl =
+      cat({full_box("stsd", cat({be(1, 4), entry})), full_box("stts", cat({be(1, 4), be(offsets.size(), 4), be(1, 4)})),
+           full_box("stsc", cat({be(1, 4), be(1, 4), be(1, 4), be(1, 4)})),
+           full_box("stsz", cat({be(size, 4), be(offsets.size(), 4)})), full_box("co64", co64)});
+  const Bytes tkhd = full_box("tkhd", cat({zeros(8), be(1, 4), zeros(4 + 4 + 8 + 8 + 36 + 8)}));
+  const Bytes mdhd = full_box("mdhd", cat({zeros(8), be(1000, 4), zeros(4), be(0x55C4, 2), zeros(2)}));
+  const Bytes hdlr = full_box("hdlr", cat({zeros(4), str("vide"), zeros(12), Bytes{0}}));
+  return box("moov", box("trak", cat({tkhd, box("mdia", cat({mdhd, hdlr, box("minf", box("stbl", stbl))}))})));
+}
+
+struct Opened {
+  ovt_File handle;
+  ovt_Container* container = nullptr;
+  explicit Opened(std::unique_ptr<ovt::io::RandomAccessFile> f) : handle{std::move(f)} {
+    REQUIRE(ovt_container_open(&handle, &container) == OVT_OK);
+  }
+  Opened(const Opened&) = delete;
+  Opened& operator=(const Opened&) = delete;
+  Opened(Opened&&) = delete;
+  Opened& operator=(Opened&&) = delete;
+  ~Opened() { ovt_container_close(container); }
+};
+
+// ovt_container_hdr_metadata on track `index`: the verified HdrMetadata and the colour struct.
+Run hdr_metadata(ovt_Container* c, int index = 0) {
+  ovt_Buffer b{};
+  Run r;
+  REQUIRE(ovt_container_hdr_metadata(c, index, nullptr, &b, &r.color) == OVT_OK);
+  flatbuffers::Verifier v(b.data, b.size);
+  REQUIRE(v.VerifyBuffer<ovt::fb::HdrMetadata>(nullptr));
+  flatbuffers::GetRoot<ovt::fb::HdrMetadata>(b.data)->UnPackTo(&r.meta);
+  delete[] b.data;  // §12.3.1 rule 3a
+  return r;
+}
+
+Run hdr_metadata_of(std::string_view corpus_id) {
+  const std::string path = ovt::test::corpus_or_skip(corpus_id).string();
+  ovt_File* f = nullptr;
+  REQUIRE(ovt_file_open(path.c_str(), &f) == OVT_OK);
+  ovt_Container* c = nullptr;
+  REQUIRE(ovt_container_open(f, &c) == OVT_OK);
+  const Run r = hdr_metadata(c);
+  ovt_container_close(c);
+  ovt_file_close(f);
+  return r;
+}
+
+TEST_CASE("AT4: a 2 GB file is probed with at most 16 MiB read", "[container][hdr]") {
+  constexpr uint64_t kGiB = uint64_t{1} << 30U;
+  constexpr uint32_t kSample = 5U << 20U;  // three 5 MiB sync samples fit the 16 MiB default, a fourth does not
+  const Bytes ftyp = box("ftyp", cat({str("isom"), zeros(4), str("isom")}));
+  const Bytes entry = visual_entry("hvc1", cat({hvcc(hevc_sps(9, 16, 9)), colr(9, 16, 9), dovi_box("dvvC", 8, 1)}));
+  const uint64_t moov_size = complete_moov(entry, std::vector<uint64_t>(8, 0), kSample).size();
+  const uint64_t mdat_at = ftyp.size() + moov_size;
+  std::vector<uint64_t> offsets;
+  offsets.reserve(8);
+  for (uint64_t i = 0; i < 8; ++i) {
+    offsets.push_back(mdat_at + 16 + i * (kGiB / 4));
+  }
+  const Bytes mdat_header = cat({be(1, 4), str("mdat"), be(2 * kGiB, 8)});
+  const Bytes s0 = length_prefixed({hevc_sei({{4, hdr10plus_payload()}}), kRpu, kIdr});
+  auto file = std::make_unique<SparseFile>(
+      mdat_at + 2 * kGiB,
+      std::map<uint64_t, Bytes>{
+          {0, cat({ftyp, complete_moov(entry, offsets, kSample)})}, {mdat_at, mdat_header}, {offsets[0], s0}});
+  const SparseFile* raw = file.get();
+  Opened o(std::move(file));
+  REQUIRE(ovt_container_track_count(o.container) == 1);
+  const uint64_t before = raw->bytes_read();
+  const Run r = hdr_metadata(o.container);
+  CHECK(raw->bytes_read() - before <= 16U << 20U);
+  CHECK(r.meta.probed_samples == 3);
+  CHECK(r.meta.track_id == 1);
+  CHECK(r.meta.kind == HdrKind::DolbyVision);
+  REQUIRE(signal(r, "nal_62_rpu") != nullptr);
+  CHECK(signal(r, "nal_62_rpu")->sample_index == 0);
+  CHECK(r.color.has_hdr10plus == 1);
+  CHECK(r.color.struct_size == sizeof(ovt_ColorDescription));
+}
+
+TEST_CASE("ovt_container_hdr_metadata: arguments, other formats and cancellation", "[container][hdr][c_api]") {
+  ovt_Buffer b{};
+  CHECK(ovt_container_hdr_metadata(nullptr, 0, nullptr, &b, nullptr) == OVT_E_INVALID_ARG);
+  const Bytes entry = visual_entry("hvc1", colr(9, 18, 9));
+  Opened o(std::make_unique<ovt::io::MemoryFile>(
+      cat({box("ftyp", cat({str("isom"), zeros(4), str("isom")})), complete_moov(entry, {}, 0)})));
+  CHECK(ovt_container_hdr_metadata(o.container, 0, nullptr, nullptr, nullptr) == OVT_E_INVALID_ARG);
+  CHECK(ovt_container_hdr_metadata(o.container, 1, nullptr, &b, nullptr) == OVT_E_INVALID_ARG);
+  CHECK(ovt_container_hdr_metadata(o.container, -1, nullptr, &b, nullptr) == OVT_E_INVALID_ARG);
+  CHECK(b.data == nullptr);
+  const Run r = hdr_metadata(o.container);  // out_color filled; no samples, so nothing is probed
+  CHECK(r.meta.kind == HdrKind::HLG);
+  CHECK(r.color.transfer == 18);
+  CHECK(r.meta.probed_samples == 0);
+  REQUIRE(ovt_container_hdr_metadata(o.container, 0, nullptr, &b, nullptr) == OVT_OK);  // out_color may be NULL
+  delete[] b.data;
+
+  ovt_Job* job = nullptr;
+  REQUIRE(ovt_job_create(&job) == OVT_OK);
+  ovt_job_cancel(job);
+  CHECK(ovt_container_hdr_metadata(o.container, 0, job, &b, nullptr) == OVT_E_CANCELLED);
+  ovt_job_free(job);
+}
+
+TEST_CASE("AT1: hdr_hdr10plus_dv81 is Dolby Vision 8.1 with HDR10+", "[container][hdr][needs-corpus]") {
+  const Run r = hdr_metadata_of("hdr_hdr10plus_dv81");
+  CHECK(r.meta.kind == HdrKind::DolbyVision);
+  CHECK(r.meta.dv_profile == 8);
+  CHECK(r.color.has_hdr10plus == 1);
+  const auto* rpu = signal(r, "nal_62_rpu");
+  REQUIRE(rpu != nullptr);
+  CHECK(rpu->sample_index == 0);
+  const auto* t35 = signal(r, "sei_t35_hdr10plus");
+  REQUIRE(t35 != nullptr);
+  CHECK(t35->sample_index == 0);
+}
+
+TEST_CASE("FR-CNT-102: syn_h265_main10_pq_hdr is HDR10 with MaxCLL 1000 / MaxFALL 400",
+          "[container][hdr][needs-corpus]") {
+  const Run r = hdr_metadata_of("syn_h265_main10_pq_hdr");
+  CHECK(r.meta.kind == HdrKind::HDR10);
+  CHECK(r.color.max_cll == 1000);
+  CHECK(r.color.max_fall == 400);
+  CHECK(r.color.transfer == 16);
 }
 
 }  // namespace
