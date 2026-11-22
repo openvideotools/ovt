@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// HdrMetadata summary (chapter 08 §8.4.6, WI-1.223a: steps 1, 3, 4 and 5; the sync-sample probe of step 2 is
-// WI-1.223b). Step 1 reads the boxes of the first sample entry again from the file (they are a few dozen bytes each)
-// rather than the decoded fields, so the summary does not depend on how the group C decoders name their fields; the
-// decoders have already reported what is malformed in them. The parameter sets of avcC / hvcC and the sequence header
-// of av1C go to the typed parsers of chapter 7 with recording off. Steps 3-5 classify, compare and fill the
-// ovt_ColorDescription image.
+// HdrMetadata summary (chapter 08 §8.4.6, WI-1.223). Step 1 reads the boxes of the first sample entry again from the
+// file (they are a few dozen bytes each) rather than the decoded fields, so the summary does not depend on how the
+// group C decoders name their fields; the decoders have already reported what is malformed in them. The parameter sets
+// of avcC / hvcC and the sequence header of av1C go to the typed parsers of chapter 7 with recording off. Step 2 splits
+// the first sync samples into units (§8.7.4) and hands the units that can carry HDR information to the same parsers.
+// Steps 3-5 classify, compare and fill the ovt_ColorDescription image.
 
 #include "container/isobmff/hdr_summary.h"
 
@@ -24,19 +24,24 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "container/diagnostics.h"
 #include "demux/unit_split.h"
 #include "ovt/cxx/bitreader.hpp"
 #include "ovt/cxx/rbsp.hpp"
+#include "ovt/cxx/syntax/av1/metadata.hpp"
 #include "ovt/cxx/syntax/av1/obu_header.hpp"
 #include "ovt/cxx/syntax/av1/sequence_header.hpp"
 #include "ovt/cxx/syntax/h264/nal_header.hpp"
+#include "ovt/cxx/syntax/h264/sei.hpp"
 #include "ovt/cxx/syntax/h264/sps.hpp"
 #include "ovt/cxx/syntax/h265/nal_header.hpp"
+#include "ovt/cxx/syntax/h265/sei.hpp"
 #include "ovt/cxx/syntax/h265/sps.hpp"
 #include "ovt/cxx/syntax/syntax_builder.hpp"
+#include "syntax/common/user_data_registry.h"
 
 namespace ovt::container::isobmff {
 
@@ -50,6 +55,26 @@ constexpr size_t kMaxConfigBytes = size_t{64} * 1024U;  // a configuration / col
 constexpr uint8_t kUnspecified = 2;                     // H.273 "unspecified" for primaries, transfer and matrix
 constexpr uint8_t kTransferPq = 16;
 constexpr uint8_t kTransferHlg = 18;
+constexpr uint8_t kHdr10PlusApplication = 4;
+
+enum class Codec : uint8_t { Unknown, H264, H265, AV1, VP9 };
+
+Codec codec_of(std::string_view fourcc) {
+  for (const std::string_view f : {"avc1", "avc2", "avc3", "avc4", "dvav", "dva1"}) {
+    if (fourcc == f) {
+      return Codec::H264;
+    }
+  }
+  for (const std::string_view f : {"hvc1", "hev1", "hvc2", "hev2", "dvh1", "dvhe"}) {
+    if (fourcc == f) {
+      return Codec::H265;
+    }
+  }
+  if (fourcc == "av01" || fourcc == "dav1") {
+    return Codec::AV1;
+  }
+  return fourcc == "vp09" ? Codec::VP9 : Codec::Unknown;
+}
 
 bool is_dolby_entry(std::string_view fourcc) {
   return fourcc == "dvh1" || fourcc == "dvhe" || fourcc == "dvav" || fourcc == "dva1" || fourcc == "dav1";
@@ -290,9 +315,11 @@ StreamColour colour_of(const syntax::av1::SequenceHeader& seq) {
 
 class Summary {
  public:
-  explicit Summary(const io::RandomAccessFile& file) : file_(file) {}
+  Summary(const io::RandomAccessFile& file, const HdrProbeOptions& options, const jobs::Cancel& cancel)
+      : file_(file), options_(options), cancel_(cancel) {}
 
   void boxes(const BoxNodeT& trak);
+  void probe(const fb::SampleTableT& samples);
   fb::HdrMetadataT finish(uint32_t track_id);
 
  private:
@@ -308,6 +335,16 @@ class Summary {
   void stream_colour(StreamColour s, int64_t box_offset, int64_t sample, int64_t unit);
   void sample_entry(const BoxNodeT& entry);
   void entry_child(const BoxNodeT& c);
+  // step 2
+  void probe_sample(int64_t sample, std::span<const uint8_t> bytes);
+  void unit_h265(int64_t sample, int64_t unit, std::span<const uint8_t> nal);
+  void unit_h264(int64_t sample, int64_t unit, std::span<const uint8_t> nal);
+  void unit_av1(int64_t sample, int64_t unit, std::span<const uint8_t> obu);
+  void sei_h265(int64_t sample, int64_t unit, std::span<const uint8_t> nal);
+  void sei_h264(int64_t sample, int64_t unit, std::span<const uint8_t> nal);
+  void t35(std::string_view carrier, int64_t sample, int64_t unit, std::span<const uint8_t> message);
+  void sei_mdcv(std::string_view source, int64_t sample, int64_t unit, const Mdcv& m);
+  void sei_cll(std::string_view source, int64_t sample, int64_t unit, const Cll& c);
   // steps 3-5
   void classify(Triple t);
   void mismatches(const Triple& t);
@@ -320,14 +357,21 @@ class Summary {
 
   void signal(std::string_view source, int64_t box_offset, int64_t sample, int64_t unit, bool present,
               std::string summary);
+  // Records a bitstream finding once per source (the first sample / unit it was seen in).
+  bool first(std::string_view source, int64_t sample, int64_t unit, std::string summary);
   void diag(DiagCode code, std::string message, uint64_t file_offset);
 
   const io::RandomAccessFile& file_;
+  const HdrProbeOptions& options_;
+  const jobs::Cancel& cancel_;
   fb::HdrMetadataT out_;
   std::set<std::string, std::less<>> seen_;
 
   std::string entry_;  // sample entry fourcc (original format for encv/resv)
+  Codec codec_ = Codec::Unknown;
   bool video_ = false;
+  bool encrypted_ = false;
+  uint8_t nal_length_size_ = 4;
   std::optional<Triple> colr_;
   bool colr_nclc_ = false;
   uint64_t colr_offset_ = 0;
@@ -336,8 +380,7 @@ class Summary {
   std::optional<Dovi> dovi_;
   std::optional<ConfigRecord> config_;
   std::optional<StreamColour> stream_;
-  // Bitstream findings of the sync-sample probe (step 2, WI-1.223b); unset until it lands, so the rules that read
-  // them (3.1 RPU, 3.2 HDR10+, 3.3 SEI 137, CNT-5003/5004/5010/5011) see box values only.
+  // Bitstream findings of the sync-sample probe (step 2); rules 3.1-3.3 and CNT-5003/5004/5010/5011 read them.
   std::optional<Mdcv> sei_mdcv_;
   std::optional<Cll> sei_cll_;
   bool hdr10plus_ = false;
@@ -355,6 +398,14 @@ void Summary::signal(std::string_view source, int64_t box_offset, int64_t sample
   s->present = present;
   s->summary = std::move(summary);
   out_.signals.push_back(std::move(s));
+}
+
+bool Summary::first(std::string_view source, int64_t sample, int64_t unit, std::string summary) {
+  if (!seen_.emplace(source).second) {
+    return false;
+  }
+  signal(source, -1, sample, unit, true, std::move(summary));
+  return true;
 }
 
 void Summary::diag(DiagCode code, std::string message, uint64_t file_offset) {
@@ -395,6 +446,7 @@ void Summary::boxes(const BoxNodeT& trak) {
 void Summary::sample_entry(const BoxNodeT& entry) {
   entry_ = entry.fourcc;
   if (entry_ == "encv" || entry_ == "resv") {
+    encrypted_ = entry_ == "encv";
     if (const BoxNodeT* frma = descend(entry, {"sinf", "frma"}); frma != nullptr) {
       const std::vector<uint8_t> p = payload(file_, *frma);
       if (p.size() >= 4) {
@@ -402,6 +454,7 @@ void Summary::sample_entry(const BoxNodeT& entry) {
       }
     }
   }
+  codec_ = codec_of(entry_);
   for (const auto& c : entry.children) {
     if (c) {
       entry_child(*c);
@@ -539,7 +592,8 @@ void Summary::avcc(const BoxNodeT& n) {
   br.skip_bits(8);  // configurationVersion
   r.profile_idc = static_cast<uint32_t>(br.u(8));
   br.skip_bits(8 + 8 + 6);  // profile_compatibility, AVCLevelIndication, reserved
-  br.skip_bits(2 + 3);      // lengthSizeMinusOne, reserved
+  nal_length_size_ = static_cast<uint8_t>(br.u(2) + 1U);
+  br.skip_bits(3);  // reserved
   const auto num_sps = static_cast<unsigned>(br.u(5));
   config_ = r;
   for (unsigned i = 0; i < num_sps; ++i) {
@@ -575,7 +629,8 @@ void Summary::hvcc(const BoxNodeT& n) {
   r.chroma_format = static_cast<uint8_t>(br.u(2));
   br.skip_bits(5);
   r.bit_depth_luma_minus8 = static_cast<uint8_t>(br.u(3));
-  br.skip_bits(5 + 3 + 16 + 2 + 3 + 1 + 2);  // bitDepthChromaMinus8 .. lengthSizeMinusOne
+  br.skip_bits(5 + 3 + 16 + 2 + 3 + 1);  // bitDepthChromaMinus8 .. temporalIdNested
+  nal_length_size_ = static_cast<uint8_t>(br.u(2) + 1U);
   config_ = r;
   const auto arrays = static_cast<unsigned>(br.u(8));
   for (unsigned a = 0; a < arrays; ++a) {
@@ -653,6 +708,233 @@ void Summary::vpcc(const BoxNodeT& n) {
   seen_.emplace("vpcC");
   signal("vpcC", static_cast<int64_t>(r.offset), -1, -1, true,
          fmt::format("{}{}, {}-bit", text(t), t.full_range ? " full range" : " limited range", r.vp_bit_depth));
+}
+
+// ---- step 2: bitstream probe -------------------------------------------------------------------------------------
+
+void Summary::probe(const fb::SampleTableT& samples) {
+  if (encrypted_ || (codec_ != Codec::H264 && codec_ != Codec::H265 && codec_ != Codec::AV1)) {
+    return;  // encrypted payloads and VP9 carry nothing the probe can read
+  }
+  const auto count = std::min<uint64_t>({samples.count, samples.offset.size(), samples.size.size()});
+  uint64_t budget = 0;
+  std::vector<uint8_t> bytes;
+  for (uint64_t i = 0; i < count && out_.probed_samples < options_.max_sync_samples; ++i) {
+    if (i < samples.is_sync.size() && !samples.is_sync[i]) {
+      continue;
+    }
+    const uint64_t size = samples.size[i];
+    // SPEC-ASSUMPTION(#790): stop before the sample that would take the bytes read over max_bytes.
+    if (!options_.allow_slow_scan && budget + size > options_.max_bytes) {
+      break;
+    }
+    cancel_.throw_if_requested();
+    const uint64_t offset = samples.offset[i];
+    const uint64_t readable = offset < file_.size() ? std::min(size, file_.size() - offset) : 0;
+    bytes.resize(static_cast<size_t>(readable));
+    bytes.resize(file_.read(offset, bytes.size(), bytes.data()));
+    budget += size;
+    ++out_.probed_samples;
+    probe_sample(static_cast<int64_t>(i), bytes);
+  }
+}
+
+void Summary::probe_sample(int64_t sample, std::span<const uint8_t> bytes) {
+  std::vector<uint8_t> scratch;
+  const demux::Framing framing = codec_ == Codec::AV1 ? demux::Framing::Av1Obu : demux::Framing::LengthPrefixed;
+  const demux::SplitResult split = demux::split_units(bytes, framing, nal_length_size_, scratch);
+  for (size_t i = 0; i < split.units.size(); ++i) {
+    const std::span<const uint8_t> unit = demux::unit_bytes(bytes, split, scratch, i);
+    try {
+      switch (codec_) {
+        case Codec::H265:
+          unit_h265(sample, static_cast<int64_t>(i), unit);
+          break;
+        case Codec::H264:
+          unit_h264(sample, static_cast<int64_t>(i), unit);
+          break;
+        default:
+          unit_av1(sample, static_cast<int64_t>(i), unit);
+          break;
+      }
+    } catch (const ParseError&) {
+      // A malformed unit ends its own probe; what was found before it stays.
+    }
+  }
+}
+
+void Summary::unit_h265(int64_t sample, int64_t unit, std::span<const uint8_t> nal) {
+  if (nal.size() < 2) {
+    return;
+  }
+  const unsigned type = (nal[0] >> 1U) & 0x3FU;
+  const unsigned layer = ((nal[0] & 1U) << 5U) | (nal[1] >> 3U);
+  switch (type) {
+    case 62:
+      if (layer == 0) {
+        rpu_ = true;
+        (void)first("nal_62_rpu", sample, unit, fmt::format("Dolby Vision RPU, {} bytes", nal.size()));
+      }
+      break;
+    case 63:
+      el_ = true;
+      (void)first("nal_63_el", sample, unit, fmt::format("Dolby Vision enhancement layer, {} bytes", nal.size()));
+      break;
+    case 33:
+      if (!stream_) {
+        if (auto c = sps_colour_h265(nal); c) {
+          stream_colour(std::move(*c), -1, sample, unit);
+        }
+      }
+      break;
+    case 39:
+    case 40:
+      sei_h265(sample, unit, nal);
+      break;
+    default:
+      break;
+  }
+}
+
+void Summary::unit_h264(int64_t sample, int64_t unit, std::span<const uint8_t> nal) {
+  if (nal.empty()) {
+    return;
+  }
+  const unsigned type = nal[0] & 0x1FU;
+  if (type == 28 && (entry_ == "dvav" || entry_ == "dva1")) {
+    rpu_ = true;
+    (void)first("nal_28_rpu", sample, unit, fmt::format("Dolby Vision RPU, {} bytes", nal.size()));
+  } else if (type == 7 && !stream_) {
+    if (auto c = sps_colour_h264(nal); c) {
+      stream_colour(std::move(*c), -1, sample, unit);
+    }
+  } else if (type == 6) {
+    sei_h264(sample, unit, nal);
+  }
+}
+
+void Summary::unit_av1(int64_t sample, int64_t unit, std::span<const uint8_t> obu) {
+  if (obu.empty()) {
+    return;
+  }
+  const auto type = static_cast<syntax::av1::ObuType>((obu[0] >> 3U) & 0xFU);
+  if (type != syntax::av1::ObuType::SequenceHeader && type != syntax::av1::ObuType::Metadata) {
+    return;
+  }
+  BitReader br(obu);
+  syntax::SyntaxBuilder b(br);
+  b.set_recording(false);
+  (void)syntax::av1::parse_obu_header(br, b);
+  if (type == syntax::av1::ObuType::SequenceHeader) {
+    if (!stream_) {
+      stream_colour(colour_of(syntax::av1::parse_sequence_header(br, b)), -1, sample, unit);
+    }
+    return;
+  }
+  const syntax::av1::Metadata m = syntax::av1::parse_metadata(br, b);
+  if (m.hdr_cll) {
+    sei_cll("obu_metadata_1", sample, unit, Cll{m.hdr_cll->max_cll, m.hdr_cll->max_fall});
+  } else if (m.hdr_mdcv) {
+    const auto& h = *m.hdr_mdcv;
+    sei_mdcv("obu_metadata_2", sample, unit,
+             make_mdcv({h.primary_chromaticity_x[0], h.primary_chromaticity_x[1], h.primary_chromaticity_x[2]},
+                       {h.primary_chromaticity_y[0], h.primary_chromaticity_y[1], h.primary_chromaticity_y[2]},
+                       h.white_point_chromaticity_x, h.white_point_chromaticity_y, h.luminance_max, h.luminance_min));
+  } else if (m.itut_t35) {
+    t35("obu_metadata_4", sample, unit, m.itut_t35->t35_message);
+  } else if (m.timecode) {
+    (void)first("obu_metadata_5", sample, unit, "timecode " + m.timecode->timecode_text);
+  }
+}
+
+void Summary::sei_mdcv(std::string_view source, int64_t sample, int64_t unit, const Mdcv& m) {
+  if (first(source, sample, unit, text(m)) && !sei_mdcv_) {
+    sei_mdcv_ = m;
+  }
+}
+
+void Summary::sei_cll(std::string_view source, int64_t sample, int64_t unit, const Cll& c) {
+  if (first(source, sample, unit, text(c)) && !sei_cll_) {
+    sei_cll_ = c;
+  }
+}
+
+template <class Mdcv265or264>
+Mdcv mdcv_of(const Mdcv265or264& s) {
+  return make_mdcv(s.display_primaries_x, s.display_primaries_y, s.white_point_x, s.white_point_y,
+                   s.max_display_mastering_luminance, s.min_display_mastering_luminance);
+}
+
+void Summary::sei_h265(int64_t sample, int64_t unit, std::span<const uint8_t> nal) {
+  namespace h265 = syntax::h265;
+  const Rbsp rbsp = rbsp_from_nal(nal);
+  BitReader br(rbsp.rbsp);
+  syntax::SyntaxBuilder b(br);
+  b.set_recording(false);
+  const h265::NalHeader h = h265::parse_nal_header(br, b);
+  h265::SeiContext ctx;
+  const h265::SeiRbsp sei = h265::parse_sei_rbsp(br, b, h, ctx);
+  for (const h265::SeiMessage& m : sei.messages) {
+    if (const auto* md = std::get_if<h265::MasteringDisplayColourVolume>(&m.payload); md != nullptr) {
+      sei_mdcv("sei_137", sample, unit, mdcv_of(*md));
+    } else if (const auto* cl = std::get_if<h265::ContentLightLevelInfo>(&m.payload); cl != nullptr) {
+      sei_cll("sei_144", sample, unit,
+              Cll{static_cast<uint16_t>(cl->max_content_light_level),
+                  static_cast<uint16_t>(cl->max_pic_average_light_level)});
+    } else if (m.payload_type == 4) {
+      t35("sei", sample, unit, sub(rbsp.rbsp, m.payload_span.bit_offset / 8U, m.payload_size));
+    }
+  }
+}
+
+void Summary::sei_h264(int64_t sample, int64_t unit, std::span<const uint8_t> nal) {
+  namespace h264 = syntax::h264;
+  const Rbsp rbsp = rbsp_from_nal(nal);
+  BitReader br(rbsp.rbsp);
+  syntax::SyntaxBuilder b(br);
+  b.set_recording(false);
+  (void)h264::parse_nal_header(br, b);
+  h264::SeiContext ctx;
+  const h264::SeiRbsp sei = h264::parse_sei_rbsp(br, b, ctx);
+  for (const h264::SeiMessage& m : sei.messages) {
+    if (const auto* md = std::get_if<h264::MasteringDisplayColourVolume>(&m.payload); md != nullptr) {
+      sei_mdcv("sei_137", sample, unit, mdcv_of(*md));
+    } else if (const auto* cl = std::get_if<h264::ContentLightLevelInfo>(&m.payload); cl != nullptr) {
+      sei_cll("sei_144", sample, unit,
+              Cll{static_cast<uint16_t>(cl->max_content_light_level),
+                  static_cast<uint16_t>(cl->max_pic_average_light_level)});
+    } else if (m.payload_type == 4) {
+      t35("sei", sample, unit, sub(rbsp.rbsp, m.payload_span.bit_offset / 8U, m.payload_size));
+    }
+  }
+}
+
+// HDR10+: country 0xB5, provider 0x003C, oriented code 0x0001, application_identifier 4 (§8.4.6 step 2). Dolby:
+// provider 0x003B; in an AV1 metadata OBU that is the Dolby Vision RPU.
+void Summary::t35(std::string_view carrier, int64_t sample, int64_t unit, std::span<const uint8_t> message) {
+  const bool av1 = carrier == "obu_metadata_4";
+  const syntax::T35Result r =
+      syntax::parse_t35(message, av1 ? syntax::T35Carrier::Av1Metadata : syntax::T35Carrier::Sei);
+  if (r.country_code != syntax::kT35CountryUs || !r.provider_code) {
+    return;
+  }
+  if (*r.provider_code == 0x003C && r.provider_oriented_code.value_or(0) == 0x0001 && r.hdr10plus &&
+      r.hdr10plus->application_identifier == kHdr10PlusApplication) {
+    const std::string summary = fmt::format("HDR10+ (ST 2094-40) application_version {}, num_windows {}",
+                                            r.hdr10plus->application_version, r.hdr10plus->num_windows);
+    if (first(av1 ? "obu_metadata_4" : "sei_t35_hdr10plus", sample, unit, summary) && !hdr10plus_) {
+      out_.hdr10plus_application_version = r.hdr10plus->application_version;
+      out_.hdr10plus_num_windows = r.hdr10plus->num_windows;
+    }
+    hdr10plus_ = true;
+  } else if (*r.provider_code == 0x003B) {
+    if (av1) {
+      rpu_ = true;
+      (void)first("obu_metadata_4_dolby", sample, unit, "Dolby Vision RPU in T.35");
+    } else {
+      (void)first("sei_t35_dolby", sample, unit, "Dolby T.35 (ST 2094-10)");
+    }
+  }
 }
 
 // ---- steps 3-5 ---------------------------------------------------------------------------------------------------
@@ -858,18 +1140,41 @@ fb::HdrMetadataT Summary::finish(uint32_t track_id) {
 
 }  // namespace
 
+namespace {
+
+flatbuffers::DetachedBuffer pack(const fb::HdrMetadataT& m) {
+  flatbuffers::FlatBufferBuilder fbb;
+  fbb.Finish(fb::HdrMetadata::Pack(fbb, &m));
+  return fbb.Release();
+}
+
+}  // namespace
+
 fb::HdrMetadataT summarize_hdr(const fb::BoxNodeT& trak, uint32_t track_id, const io::RandomAccessFile& file) {
-  Summary s(file);
+  const HdrProbeOptions options;
+  Summary s(file, options, jobs::Cancel::never());
   s.boxes(trak);
+  return s.finish(track_id);
+}
+
+fb::HdrMetadataT summarize_hdr(const fb::BoxNodeT& trak, uint32_t track_id, const fb::SampleTableT& samples,
+                               const io::RandomAccessFile& file, const HdrProbeOptions& options,
+                               const jobs::Cancel& cancel) {
+  Summary s(file, options, cancel);
+  s.boxes(trak);
+  s.probe(samples);
   return s.finish(track_id);
 }
 
 flatbuffers::DetachedBuffer build_hdr_metadata(const fb::BoxNodeT& trak, uint32_t track_id,
                                                const io::RandomAccessFile& file) {
-  const fb::HdrMetadataT m = summarize_hdr(trak, track_id, file);
-  flatbuffers::FlatBufferBuilder fbb;
-  fbb.Finish(fb::HdrMetadata::Pack(fbb, &m));
-  return fbb.Release();
+  return pack(summarize_hdr(trak, track_id, file));
+}
+
+flatbuffers::DetachedBuffer build_hdr_metadata(const fb::BoxNodeT& trak, uint32_t track_id,
+                                               const fb::SampleTableT& samples, const io::RandomAccessFile& file,
+                                               const HdrProbeOptions& options, const jobs::Cancel& cancel) {
+  return pack(summarize_hdr(trak, track_id, samples, file, options, cancel));
 }
 
 ovt_ColorDescription color_from_image(const std::vector<uint8_t>& image) noexcept {

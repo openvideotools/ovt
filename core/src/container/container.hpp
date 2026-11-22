@@ -73,6 +73,13 @@ class Reader {
     (void)track_index;
     return {};
   }
+  // HdrMetadata FlatBuffer of one track (chapter 08 §8.4.6); empty when unsupported. Throws ovt::Cancelled when
+  // `cancel` is requested and io::IoError on an I/O failure.
+  [[nodiscard]] virtual std::vector<uint8_t> hdr_metadata(int track_index, jobs::Cancel& cancel) const {
+    (void)track_index;
+    (void)cancel;
+    return {};
+  }
   // TsTiming FlatBuffer (MPEG-TS reader); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> ts_timing() const { return {}; }
   // TsReport FlatBuffer (TR 101 290 priority 1 and 2 checks, MPEG-TS reader); empty otherwise.

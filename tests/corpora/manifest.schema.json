@@ -63,6 +63,16 @@
           "minProperties": 1,
           "properties": {
             "ffmpeg_trim_seconds": { "type": "integer", "minimum": 1 },
+            "mp4box_dv_remux": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["dv_profile"],
+              "description": "WI-1.223 (#769): the HEVC stream, HDR10+ injected from this repository-relative JSON when hdr10plus_inject is given, remuxed by MP4Box -add <stream>:dv-profile=<dv_profile> into <id>.mp4",
+              "properties": {
+                "dv_profile": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?$" },
+                "hdr10plus_inject": { "$ref": "#/$defs/relpath" }
+              }
+            },
             "wrap_y4m": {
               "type": "object",
               "additionalProperties": false,

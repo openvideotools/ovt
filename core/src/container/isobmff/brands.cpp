@@ -695,6 +695,10 @@ size_t check_brands(const io::RandomAccessFile& file, BoxNodes& top_level, Valid
       row.run(r, brand);
     }
   }
+  if (level == ValidationLevel::Deep) {
+    r.added +=
+        check_brand_samples(file, top_level, options.cancel != nullptr ? *options.cancel : jobs::Cancel::never());
+  }
   // The `mp41`/`mp42` row (CNT-7002) runs on the sample entries, and the `msdh` row has no diagnostic code of its own.
   return r.added;
 }

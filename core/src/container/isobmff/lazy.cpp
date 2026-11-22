@@ -21,6 +21,7 @@
 #include "container/isobmff/brands.h"
 #include "container/isobmff/cenc.h"
 #include "container/isobmff/fragments.h"
+#include "container/isobmff/hdr_summary.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
 #include "ovt_container_generated.h"
@@ -74,40 +75,51 @@ std::vector<uint8_t> IsobmffReader::track_info(int track_index) const {
   return {bytes.begin(), bytes.end()};
 }
 
-std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first, uint32_t count) const {
-  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
-    return {};
-  }
-  const auto ordinal = static_cast<size_t>(track_index);
-  std::shared_ptr<const fb::SampleTableT> table;
-  {
-    // Held over the expansion: a second caller waits instead of repeating it.
-    const std::lock_guard lock(tables_mutex_);
-    table = kept_table(ordinal);
-  }
-  if (!table) {
-    return {};
-  }
-  const flatbuffers::DetachedBuffer buf = serialise(*slice_sample_table(*table, first, count));
-  const std::span<const uint8_t> bytes(buf.data(), buf.size());
-  return {bytes.begin(), bytes.end()};
-}
-
-std::shared_ptr<const fb::SampleTableT> IsobmffReader::kept_table(size_t ordinal) const {
+std::shared_ptr<const fb::SampleTableT> IsobmffReader::table(size_t ordinal, jobs::Cancel& cancel) const {
+  const std::lock_guard lock(tables_mutex_);  // held over the expansion: a second caller waits instead of repeating it
   auto it = tables_.find(ordinal);
   if (it == tables_.end()) {
     const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal);
     if (trak == nullptr) {
       return nullptr;
     }
-    std::unique_ptr<fb::SampleTableT> built = expand_sample_table(file_, *trak, jobs::Cancel::never());
+    std::unique_ptr<fb::SampleTableT> built = expand_sample_table(file_, *trak, cancel);
     if (has_moof_) {  // §8.4.1 fragment part
-      FragmentBuild& f = fragment_build(ordinal, built.get(), jobs::Cancel::never());
+      FragmentBuild& f = fragment_build(ordinal, built.get(), cancel);
       append_fragment_samples(*built, f.timeline, std::move(f.samples));
     }
     it = tables_.emplace(ordinal, std::move(built)).first;
   }
   return it->second;
+}
+
+std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first, uint32_t count) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const std::shared_ptr<const fb::SampleTableT> t = table(static_cast<size_t>(track_index), jobs::Cancel::never());
+  if (!t) {
+    return {};
+  }
+  const flatbuffers::DetachedBuffer buf = serialise(*slice_sample_table(*t, first, count));
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> IsobmffReader::hdr_metadata(int track_index, jobs::Cancel& cancel) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const auto ordinal = static_cast<size_t>(track_index);
+  const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal);
+  const std::shared_ptr<const fb::SampleTableT> t = table(ordinal, cancel);
+  if (trak == nullptr || !t) {
+    return {};
+  }
+  const flatbuffers::DetachedBuffer buf =
+      build_hdr_metadata(*trak, tree_.tracks[ordinal]->track_id, *t, file_, HdrProbeOptions{}, cancel);
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
+  return {bytes.begin(), bytes.end()};
 }
 
 std::vector<uint8_t> IsobmffReader::encryption(int track_index, uint64_t first, uint64_t count,
@@ -116,16 +128,12 @@ std::vector<uint8_t> IsobmffReader::encryption(int track_index, uint64_t first, 
     return {};
   }
   const auto ordinal = static_cast<size_t>(track_index);
-  std::shared_ptr<const fb::SampleTableT> table;
-  {
-    const std::lock_guard lock(tables_mutex_);
-    table = kept_table(ordinal);
-  }
-  if (!table) {
+  const std::shared_ptr<const fb::SampleTableT> t = table(ordinal, cancel);
+  if (!t) {
     return {};
   }
   const flatbuffers::DetachedBuffer buf =
-      serialise(*build_encryption_map(file_, tree_.root, ordinal, *table, first, count, cancel));
+      serialise(*build_encryption_map(file_, tree_.root, ordinal, *t, first, count, cancel));
   const std::span<const uint8_t> bytes(buf.data(), buf.size());
   return {bytes.begin(), bytes.end()};
 }

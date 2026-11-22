@@ -39,6 +39,13 @@ regenerate a file with the command in the table (the output is byte-for-byte rep
 | `syn_mp4_broken_cmfc_two_tracks.mp4` | `--cmfc-two-tracks` | `CNT-7010` |
 | `syn_mp4_broken_msix_without_sidx.mp4` | `--msix-no-sidx` | `CNT-7031` |
 | `syn_mp4_broken_hvc1_no_ps.mp4` | `--hvc1-strip-ps` | `CNT-7005` |
+| `syn_mp4_broken_avc1_inband_ps.mp4` | `--avc1-inband-ps` | `CNT-7004` (Deep) |
+| `syn_mp4_broken_av01_td_in_sample.mp4` | `--av01-td-in-sample` | `CNT-7008` (Deep) |
+| `syn_mp4_broken_av01_unsized_obu.mp4` | `--av01-unsized-obu` | `CNT-7009` (Deep) |
 
 The other truncation offsets and the 0/1/7/0xFFFFFFFF size words are exercised in memory by the test, which
 mutates a base file of its own, so the committed set stays small.
+
+The last three files (WI-1.222b) have real NAL and OBU structure in their samples and raise their code at the `Deep`
+level only; `core/tests/container/brands_test.cpp` checks them, and `diag_coverage_test.cpp` does not (it runs
+`Standard`). They have no manifest entry until the spec folds the acceptance test of #803.

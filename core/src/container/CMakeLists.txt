@@ -15,6 +15,7 @@ target_sources(
           isobmff/box_walk.cpp
           isobmff/brands.cpp
           isobmff/cenc.cpp
+          isobmff/brands_samples.cpp
           isobmff/decoders/fragment_boxes.cpp
           isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp
@@ -23,6 +24,7 @@ target_sources(
           isobmff/decoders/pssh_systems.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
+          isobmff/edit_list.cpp
           isobmff/field_builder.cpp
           isobmff/fragments.cpp
           isobmff/hdr_summary.cpp

@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "api/buffer.hpp"
+#include "container/isobmff/hdr_summary.h"
 #include "container/isobmff/lazy.h"
 #include "container/ivf.hpp"
 #include "container/mpegts/ts_packets.hpp"
@@ -329,10 +330,37 @@ OVT_API ovt_status ovt_container_encryption(ovt_Container* container, int track_
 
 OVT_API ovt_status ovt_container_hdr_metadata(ovt_Container* container, int track_index, ovt_Job* job, ovt_Buffer* out,
                                               ovt_ColorDescription* out_color) {
-  (void)track_index;
-  (void)job;
-  (void)out_color;
-  return container == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;
+  if (container == nullptr || out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  if (track_index < 0 || track_index >= container->reader->track_count()) {
+    return OVT_E_INVALID_ARG;
+  }
+  // jobs::run maps ovt::Cancelled to OVT_E_CANCELLED; I/O and allocation failures keep their codes here.
+  return ovt::jobs::run(job, "hdr_metadata", [&](ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink&) {
+    std::vector<uint8_t> meta;
+    try {
+      meta = container->reader->hdr_metadata(track_index, cancel);
+    } catch (const ovt::Cancelled&) {
+      throw;
+    } catch (...) {
+      return ovt::container::status_of_current_exception();
+    }
+    if (meta.empty()) {
+      return OVT_E_UNSUPPORTED;  // other formats: later
+    }
+    if (out_color != nullptr) {
+      const auto* m = flatbuffers::GetRoot<ovt::fb::HdrMetadata>(meta.data());
+      const std::vector<uint8_t> image =
+          m->color() != nullptr ? std::vector<uint8_t>(m->color()->begin(), m->color()->end()) : std::vector<uint8_t>{};
+      *out_color = ovt::container::isobmff::color_from_image(image);
+    }
+    return ovt::api::make_buffer(meta.data(), meta.size(), out);
+  });
 }
 
 OVT_API ovt_status ovt_container_items(ovt_Container* container, ovt_Buffer* out) {

@@ -7,7 +7,8 @@
 // every tree buffer verifies; every TrackInfo buffer verifies; expand of an offset taken from the tree returns OVT_OK;
 // box spans stay inside the file; an expansion that completes leaves a tree that still verifies; the validation driver
 // (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing; so do the brand
-// checks (WI-1.222). The number of expansions is capped so one input stays fast.
+// checks (WI-1.222). The number of expansions is capped so one input stays fast. Every track's SampleTable,
+// FragmentTimeline and HdrMetadata verify.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -20,10 +21,13 @@
 
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/brands.h"
+#include "container/isobmff/edit_list.h"
+#include "container/isobmff/sample_table.h"
 #include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/container.h"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt_container_generated.h"
 
 namespace {
@@ -114,6 +118,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         require(ev.VerifyBuffer<ovt::fb::EncryptionInfo>(nullptr));
         delete[] enc.data;
       }
+      // WI-1.223: the HdrMetadata of every track (box level and sync-sample probe) verifies, with a 44-byte image.
+      ovt_Buffer hdr{};
+      ovt_ColorDescription color{};
+      require(ovt_container_hdr_metadata(c, i, nullptr, &hdr, &color) == OVT_OK);
+      flatbuffers::Verifier hv(hdr.data, hdr.size);
+      require(hv.VerifyBuffer<ovt::fb::HdrMetadata>(nullptr));
+      require(color.struct_size == sizeof(ovt_ColorDescription));
+      delete[] hdr.data;
     }
     ovt_container_close(c);
     // The validation driver over the complete walk: idempotent, whatever the bytes.
@@ -122,8 +134,25 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     using ovt::container::isobmff::ValidationLevel;
     ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Standard);
     require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
+    // WI-1.220: the EditList of every track verifies, and presenting any sample never throws.
+    namespace iso = ovt::container::isobmff;
+    for (size_t t = 0; iso::find_trak(walked.top_level, t) != nullptr; ++t) {
+      const auto table =
+          iso::expand_sample_table(file, *iso::find_trak(walked.top_level, t), ovt::jobs::Cancel::never());
+      const iso::EditListBuild built =
+          iso::build_edit_list(file, walked.top_level, t, *table, ovt::jobs::Cancel::never());
+      const flatbuffers::DetachedBuffer buf = iso::serialise(*built.list);
+      flatbuffers::Verifier lv(buf.data(), buf.size());
+      require(lv.VerifyBuffer<ovt::fb::EditList>(nullptr));
+      int64_t pts = 0;
+      for (const uint64_t i : {uint64_t{0}, table->count / 2, table->count}) {
+        static_cast<void>(iso::sample_presentation_time(*built.list, *table, i, built.movie_timescale, &pts));
+      }
+    }
     // The brand checks (WI-1.222) read hvcC, av1C, sidx and the like straight from the file: idempotent as well.
     ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Standard);
+    // Deep adds the sample-byte rows (WI-1.222b): the first run may find more, the second finds nothing new.
+    ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep);
     require(ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();

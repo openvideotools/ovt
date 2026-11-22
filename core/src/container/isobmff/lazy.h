@@ -44,6 +44,9 @@ class IsobmffReader final : public Reader {
                                                 jobs::Cancel& cancel) const override;
   // FragmentTimeline FlatBuffer (§8.4.3, WI-1.219) of one track, built once and kept; a cancelled build keeps nothing.
   [[nodiscard]] std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const override;
+  // HdrMetadata FlatBuffer (§8.4.6, WI-1.223): the box level plus the probe of the first sync samples of the track's
+  // SampleTable (default HdrProbeOptions). An unknown track yields an empty vector.
+  [[nodiscard]] std::vector<uint8_t> hdr_metadata(int track_index, jobs::Cancel& cancel) const override;
   // §8.2.4 rule 6: OVT_E_INVALID_ARG when `box_offset` is no box; OK and a no-op for a box that is complete.
   ovt_status expand(uint64_t box_offset) override;
   // Bumped by each expand() that decodes a deferred box; a no-op expand leaves it, and the tree, unchanged.
@@ -60,13 +63,13 @@ class IsobmffReader final : public Reader {
 
  private:
   void index(const BoxNodes& nodes);
-  // The track's SampleTable with the fragment part, built once and kept. The caller holds tables_mutex_; nullptr
-  // when `ordinal` has no `trak`.
-  [[nodiscard]] std::shared_ptr<const fb::SampleTableT> kept_table(size_t ordinal) const;
   // The fragment build of trak `ordinal`, built on first use. The caller holds tables_mutex_. `moov_table` is the
   // track's moov SampleTable when the caller has it (else it is expanded here).
   [[nodiscard]] FragmentBuild& fragment_build(size_t ordinal, const fb::SampleTableT* moov_table,
                                               jobs::Cancel& cancel) const;
+  // The cached SampleTable of the trak at `ordinal` (moov part, then the fragment part when the file has `moof`s),
+  // built on first use; nullptr when there is no such trak. A cancelled build keeps nothing.
+  [[nodiscard]] std::shared_ptr<const fb::SampleTableT> table(size_t ordinal, jobs::Cancel& cancel) const;
 
   const io::RandomAccessFile& file_;
   fb::ContainerTreeT tree_;

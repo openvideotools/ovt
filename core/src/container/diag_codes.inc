@@ -158,6 +158,16 @@ X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
+// WI-1.220 (EditList and the elst <-> tfdt sanity check, §8.4.2).
+X(CNT_3001, "CNT-3001", Error, "edit starts beyond media duration", "14496-12 §8.6.6")
+X(CNT_3002, "CNT-3002", Warning, "edit exceeds media duration", "14496-12 §8.6.6")
+X(CNT_3003, "CNT-3003", Info, "`media_rate` not 0 or 1 (unsupported by most players)", "14496-12 §8.6.6")
+X(CNT_3004, "CNT-3004", Warning, "Σ `segment_duration` ≠ `tkhd.duration`", "14496-12 §8.6.6")
+X(CNT_3010, "CNT-3010", Warning, "`elst.media_time` inconsistent with first fragment `tfdt + cts_offset`",
+  "23000-19 §7.5.13")
+X(CNT_3011, "CNT-3011", Info, "presentation offset implied without `elst`", "")
+X(CNT_3012, "CNT-3012", Warning, "multi-segment `elst` in fragmented/CMAF file", "23000-19 §7.5.13")
+
 // WI-1.219a/b (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
 X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
 X(CNT_4002, "CNT-4002", Warning,
@@ -189,6 +199,8 @@ X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", 
 // `senc` IV size had to be inferred.
 X(CNT_6001, "CNT-6001", Error, "`senc` IV size unknown and not inferable", "23001-7 §7.2")
 X(CNT_6003, "CNT-6003", Error, "`tenc` IV size ∉ {0,8,16}", "23001-7 §8.2")
+X(CNT_6004, "CNT-6004", Error, "`pssh.DataSize` inconsistent with box size", "23001-7 §8.1")
+X(CNT_6009, "CNT-6009", Warning, "`pssh` with unknown SystemID", "")
 X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
 // WI-1.221 (CENC per-sample map, §8.4.4). SPEC-ASSUMPTION(#808): CNT-6015 is the proposed row for a missing or truncated
@@ -263,8 +275,7 @@ X(CNT_5012, "CNT-5012", Info, "PQ without static metadata", "")
 X(CNT_5021, "CNT-5021", Warning, "`dv_bl_signal_compatibility_id` contradicts `colr`", "DV-ISOBMFF §2.2")
 X(CNT_5022, "CNT-5022", Info, "sample entry `dvh1`/`dvhe` (non-cross-compatible) vs `hvc1`+`dvvC`", "DV-ISOBMFF §3")
 
-// WI-1.222 (brand and profile checks, §8.4.5). CNT-7004, CNT-7008 and CNT-7009 (sample bytes, Deep) and CNT-8011..8014
-// (MIAF item properties) come with the work items that read those bytes.
+// WI-1.222 (brand and profile checks, §8.4.5). CNT-8011..8014 (MIAF item properties) come with WI-4.213.
 X(CNT_7001, "CNT-7001", Warning,
   "`default-base-is-moof`/`tfdt` used but no `iso5`+/`cmfc`/`dash`/`msdh` brand declares them", "14496-12 Annex E")
 X(CNT_7002, "CNT-7002", Warning,
@@ -325,3 +336,10 @@ X(CNT_7050, "CNT-7050", Info,
   "iTunes brand (`M4A `/`M4V `/`M4P `/`M4B `) without `ilst`", "")
 X(CNT_8010, "CNT-8010", Error,
   "`mif1` file: `meta` lacks required child `box` (`hdlr == pict`, `pitm`, `iinf`, `iloc`, `iprp`)", "23008-12 §10")
+// WI-1.222b: the Deep rows that read sample bytes.
+X(CNT_7004, "CNT-7004", Warning,
+  "SPS/PPS NAL unit inside an `avc1` sample (parameter sets must be out of band)", "14496-15 §5.3.4")
+X(CNT_7008, "CNT-7008", Warning,
+  "sample `i` contains an `OBU_TEMPORAL_DELIMITER` (SHOULD be omitted)", "AV1-ISOBMFF §2.4")
+X(CNT_7009, "CNT-7009", Error,
+  "OBU `k` of sample `i` has `obu_has_size_field == 0` and is not the last OBU", "AV1-ISOBMFF §2.4")
