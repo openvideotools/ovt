@@ -39,6 +39,9 @@ class IsobmffReader final : public Reader {
   // SampleTable FlatBuffer (§8.4.1: moov part, WI-1.218, then the fragment part, WI-1.219c) of `count` samples from
   // `first` (0 = all). The track's table is built once and kept; an unknown track yields an empty vector.
   [[nodiscard]] std::vector<uint8_t> sample_table(int track_index, uint32_t first, uint32_t count) const override;
+  // EncryptionInfo FlatBuffer (§8.4.4, WI-1.221) with the records of `count` samples from `first` (0 = all).
+  [[nodiscard]] std::vector<uint8_t> encryption(int track_index, uint64_t first, uint64_t count,
+                                                jobs::Cancel& cancel) const override;
   // FragmentTimeline FlatBuffer (§8.4.3, WI-1.219) of one track, built once and kept; a cancelled build keeps nothing.
   [[nodiscard]] std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const override;
   // HdrMetadata FlatBuffer (§8.4.6, WI-1.223): the box level plus the probe of the first sync samples of the track's

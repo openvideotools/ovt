@@ -203,6 +203,13 @@ X(CNT_6004, "CNT-6004", Error, "`pssh.DataSize` inconsistent with box size", "23
 X(CNT_6009, "CNT-6009", Warning, "`pssh` with unknown SystemID", "")
 X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
+// WI-1.221 (CENC per-sample map, §8.4.4); CNT-6015 was added by the amendment of #808.
+X(CNT_6002, "CNT-6002", Error, "subsample clear+protected ≠ sample size", "23001-7 §7.2")
+X(CNT_6006, "CNT-6006", Info, "encrypted track with all samples unprotected", "23001-7")
+X(CNT_6007, "CNT-6007", Warning, "subsample protects NAL length/header bytes", "23001-7 §9")
+X(CNT_6008, "CNT-6008", Info, "`cbcs` with per-sample IV", "23000-19 §8.2.2")
+X(CNT_6015, "CNT-6015", Warning, "per-sample encryption record missing or truncated", "23001-7 §7.2")
+
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
 X(CNT_DASH_0001, "CNT-DASH-0001", Info,

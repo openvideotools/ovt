@@ -308,10 +308,24 @@ OVT_API ovt_status ovt_container_fragments(ovt_Container* container, int track_i
 
 OVT_API ovt_status ovt_container_encryption(ovt_Container* container, int track_index, uint64_t first, uint64_t count,
                                             ovt_Buffer* out) {
-  (void)track_index;
-  (void)first;
-  (void)count;
-  return container == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;
+  if (container == nullptr || out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  try {
+    if (track_index < 0 || track_index >= container->reader->track_count()) {
+      return OVT_E_INVALID_ARG;
+    }
+    const std::vector<uint8_t> info =
+        container->reader->encryption(track_index, first, count, ovt::jobs::Cancel::never());
+    return info.empty() ? OVT_E_UNSUPPORTED  // other formats: later
+                        : ovt::api::make_buffer(info.data(), info.size(), out);
+  } catch (...) {
+    return ovt::container::status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_container_hdr_metadata(ovt_Container* container, int track_index, ovt_Job* job, ovt_Buffer* out,

@@ -19,6 +19,7 @@
 
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/brands.h"
+#include "container/isobmff/cenc.h"
 #include "container/isobmff/fragments.h"
 #include "container/isobmff/hdr_summary.h"
 #include "container/isobmff/sample_table.h"
@@ -117,6 +118,22 @@ std::vector<uint8_t> IsobmffReader::hdr_metadata(int track_index, jobs::Cancel& 
   }
   const flatbuffers::DetachedBuffer buf =
       build_hdr_metadata(*trak, tree_.tracks[ordinal]->track_id, *t, file_, HdrProbeOptions{}, cancel);
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
+  return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> IsobmffReader::encryption(int track_index, uint64_t first, uint64_t count,
+                                               jobs::Cancel& cancel) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const auto ordinal = static_cast<size_t>(track_index);
+  const std::shared_ptr<const fb::SampleTableT> t = table(ordinal, cancel);
+  if (!t) {
+    return {};
+  }
+  const flatbuffers::DetachedBuffer buf =
+      serialise(*build_encryption_map(file_, tree_.root, ordinal, *t, first, count, cancel));
   const std::span<const uint8_t> bytes(buf.data(), buf.size());
   return {bytes.begin(), bytes.end()};
 }

@@ -58,6 +58,16 @@ class Reader {
     (void)cancel;
     return {};
   }
+  // EncryptionInfo FlatBuffer (chapter 08 §8.4.4) with the records of `count` samples from `first` (0 = all); empty
+  // when unsupported or the track does not exist. Throws ovt::Cancelled when `cancel` is requested.
+  [[nodiscard]] virtual std::vector<uint8_t> encryption(int track_index, uint64_t first, uint64_t count,
+                                                        jobs::Cancel& cancel) const {
+    (void)track_index;
+    (void)first;
+    (void)count;
+    (void)cancel;
+    return {};
+  }
   // TrackInfo FlatBuffer of one track (chapter 08 §8.1.3); empty when the reader has no such track.
   [[nodiscard]] virtual std::vector<uint8_t> track_info(int track_index) const {
     (void)track_index;
