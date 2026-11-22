@@ -149,6 +149,7 @@ struct Spec {
 Bytes mp4(const Spec& s) {
   const size_t n = s.cts_offsets.size();
   std::vector<std::vector<uint32_t>> ctts;
+  ctts.reserve(n);
   for (const uint32_t o : s.cts_offsets) {
     ctts.push_back({1, o});
   }
@@ -487,7 +488,7 @@ TEST_CASE("elst ↔ tfdt: CNT-3010 when media_time matches neither T0+C0 nor C0"
     iso::EditListBuild b = list_with({{"normal", 50000}});
     iso::check_elst_tfdt(b, f);
     REQUIRE(has(b, "CNT-3010"));
-    CHECK(b.list->diagnostics[0]->span->bit_offset() == 40U * 8U);
+    CHECK(b.list->diagnostics[0]->span->bit_offset() == uint64_t{40} * 8U);
   }
   SECTION("an inferred start (no tfdt) counts as T0") {
     iso::EditListBuild b = list_with({{"normal", 92000}});
