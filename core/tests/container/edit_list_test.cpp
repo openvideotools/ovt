@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -319,11 +320,11 @@ TEST_CASE("edit list: CNT-3001, CNT-3002 and CNT-3004", "[container][editlist][f
   s.mdhd_duration = 240;
   s.cts_offsets = kDelay;
   SECTION("starts beyond the media") {
-    s.elst_box = elst({{160, 240}});
+    s.elst_box = elst({{160, 320}});  // the composition end is 320
     CHECK(build_from(mp4(s)).has("CNT-3001"));
   }
   SECTION("exceeds the media") {
-    s.elst_box = elst({{200, 80}});  // ends at 280 > 240
+    s.elst_box = elst({{400, 80}});  // ends at 480 > 320
     const Built b = build_from(mp4(s));
     CHECK(b.has("CNT-3002"));
     CHECK(b.has("CNT-3004"));  // 200 != tkhd.duration 160
@@ -331,16 +332,23 @@ TEST_CASE("edit list: CNT-3001, CNT-3002 and CNT-3004", "[container][editlist][f
   }
   SECTION("less than one movie tick of rounding is not a finding") {
     s.movie_ts = 700;  // one movie tick = 2 track ticks (rounded up)
-    s.tkhd_duration = 113;
-    s.elst_box = elst({{113, 80}});  // ends at 80 + 161 = 241, 1 over 240
+    s.tkhd_duration = 169;
+    s.elst_box = elst({{169, 80}});  // ends at 80 + 241 = 321, 1 over 320
     CHECK_FALSE(build_from(mp4(s)).has("CNT-3002"));
-    s.tkhd_duration = 114;
-    s.elst_box = elst({{114, 80}});  // 242, 2 over
+    s.tkhd_duration = 170;
+    s.elst_box = elst({{170, 80}});  // 322, 2 over
     CHECK(build_from(mp4(s)).has("CNT-3002"));
   }
   SECTION("sum of the edits differs from tkhd.duration") {
     s.elst_box = elst({{100, 80}, {40, 80}});
     CHECK(build_from(mp4(s)).has("CNT-3004"));
+  }
+  SECTION("a delay-removing edit that keeps the full duration is clean (ffmpeg)") {
+    s.tkhd_duration = 240;
+    s.elst_box = elst({{240, 80}});  // ends at 320, the composition end
+    const Built b = build_from(mp4(s));
+    CHECK_FALSE(b.has("CNT-3002"));
+    CHECK_FALSE(b.has("CNT-3001"));
   }
   SECTION("a matching sum is clean") {
     s.elst_box = elst({{100, 80}, {60, 80}});
@@ -517,7 +525,10 @@ TEST_CASE("elst ↔ tfdt: CNT-3011 and CNT-3012", "[container][editlist][fast]")
 
 TEST_CASE("edit list: the corpus files of the acceptance tests", "[container][editlist][golden][needs-corpus]") {
   SECTION("syn_h264_weightedpred_ltr: the elst removes the B-frame delay") {
-    const auto path = ovt::test::corpus_or_skip("syn_h264_weightedpred_ltr");
+    // The entry also holds the .264 elementary stream: open the MP4 member explicitly.
+    auto path = ovt::test::corpus_or_skip("syn_h264_weightedpred_ltr");
+    path = path.parent_path() / "syn_h264_weightedpred_ltr.mp4";
+    REQUIRE(std::filesystem::exists(path));
     const auto file = ovt::io::RandomAccessFile::open(path.string());
     const iso::WalkResult w = iso::walk(*file);
     const ovt::fb::BoxNodeT* trak = iso::find_trak(w.top_level, 0);
@@ -529,6 +540,8 @@ TEST_CASE("edit list: the corpus files of the acceptance tests", "[container][ed
     REQUIRE(normals.size() == 1);
     CHECK(normals[0]->kind == "normal");
     CHECK(normals[0]->media_time == table->dts[0] + table->cts_offset[0]);
+    CHECK(normals[0]->media_time == table->cts_offset[0]);
+    CHECK(normals[0]->media_time > 0);
     CHECK(b.list->negative_cts_compensation);
     for (const auto& d : b.list->diagnostics) {
       INFO(d->code + ": " + d->message);
@@ -543,7 +556,7 @@ TEST_CASE("edit list: the corpus files of the acceptance tests", "[container][ed
     REQUIRE(trak != nullptr);
     const auto table = iso::expand_sample_table(*file, *trak, ovt::jobs::Cancel::never());
     const auto b = iso::build_edit_list(*file, w.top_level, 0, *table, ovt::jobs::Cancel::never());
-    REQUIRE(b.list->segments.size() >= 2);
+    REQUIRE(b.list->segments.size() == 2);
     for (const auto& d : b.list->diagnostics) {
       INFO(d->code + ": " + d->message);
       CHECK(d->severity != ovt::fb::Severity::Error);

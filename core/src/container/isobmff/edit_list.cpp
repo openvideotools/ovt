@@ -267,9 +267,21 @@ class Builder {
     // A track without mvhd falls back to the track timescale: the presentation time is then the media time.
     movie_ts_ = movie.timescale != 0 ? movie.timescale : track_ts_;
     out_.movie_timescale = movie_ts_;
-    media_duration_ = media.duration;  // track timescale, 0 = unknown
-    for (uint64_t i = 0; media_duration_ == 0 && i < table.duration.size() && i < table.count; ++i) {
-      media_duration_ = sat_add(media_duration_, table.duration[i]);
+    // The media end is the composition end max(CTS + duration): an edit that removes the composition delay starts at
+    // media_time == delay and (as written by ffmpeg) keeps the full duration, so it ends there, not at mdhd.duration.
+    // Without samples (fragmented movie) mdhd.duration, 0 = unknown.
+    mdhd_duration_ = media.duration;
+    media_duration_ = media.duration;
+    const auto n =
+        std::min<uint64_t>({table.count, table.dts.size(), table.cts_offset.size(), table.duration.size()});
+    if (n != 0) {
+      int64_t end = 0;
+      for (uint64_t i = 0; i < n; ++i) {
+        end = std::max(end, cts_of(table, i) > std::numeric_limits<int64_t>::max() - table.duration[i]
+                                ? std::numeric_limits<int64_t>::max()
+                                : cts_of(table, i) + int64_t{table.duration[i]});
+      }
+      media_duration_ = static_cast<uint64_t>(end);
     }
   }
 
@@ -292,7 +304,8 @@ class Builder {
   uint64_t tkhd_duration_ = 0;
   uint32_t track_ts_ = 0;
   uint32_t movie_ts_ = 0;
-  uint64_t media_duration_ = 0;
+  uint64_t media_duration_ = 0;  // composition end (or mdhd.duration), track timescale, 0 = unknown
+  uint64_t mdhd_duration_ = 0;
 
   void diag(std::string_view code, std::string message) { add_diag(list_, code, std::move(message), out_.diag_offset); }
 
@@ -300,7 +313,7 @@ class Builder {
   void implicit_segment() {
     uint64_t dur = tkhd_duration_;
     if (dur == 0 && track_ts_ != 0) {
-      const i128 rescaled = i128{media_duration_} * movie_ts_ / track_ts_;
+      const i128 rescaled = i128{mdhd_duration_ != 0 ? mdhd_duration_ : media_duration_} * movie_ts_ / track_ts_;
       dur = static_cast<uint64_t>(std::min<i128>(rescaled, std::numeric_limits<uint64_t>::max()));
     }
     auto seg = std::make_unique<fb::EditSegmentT>();
