@@ -24,10 +24,11 @@ using fb::BoxNodeT;
 constexpr unsigned kProbedSyncSamples = 8;            // §8.4.5: "the first 8 sync samples"
 constexpr uint64_t kMaxProbedSampleBytes = 1U << 22;  // a larger sample is cut here (the splitter reports it)
 
-constexpr unsigned kObuSequenceHeader = 1;
 constexpr unsigned kObuTemporalDelimiter = 2;
-constexpr unsigned kObuMetadata = 5;
-constexpr unsigned kObuPadding = 15;
+constexpr unsigned kObuFrameHeader = 3;
+constexpr unsigned kObuTileGroup = 4;
+constexpr unsigned kObuFrame = 6;
+constexpr unsigned kObuRedundantFrameHeader = 7;
 constexpr unsigned kNalSps = 7;
 constexpr unsigned kNalPps = 8;
 
@@ -78,13 +79,11 @@ void check_avc_sample(BoxNodeT& entry, uint64_t index, std::span<const uint8_t> 
 }
 
 // SPEC-ASSUMPTION(#804): an OBU without obu_size runs to the end of the sample, so "not the last OBU" cannot be
-// observed directly. The reading: an unsized OBU of a type that never ends a sample (sequence header, temporal
-// delimiter, metadata, padding) swallowed the OBUs behind it.
-// A sized OBU is the only kind that can be followed by another; an unsized one runs to the end of the sample. An
-// unsized OBU of a type that never ends a sample therefore swallowed the OBUs behind it.
-bool cannot_end_a_sample(unsigned obu_type) {
-  return obu_type == kObuSequenceHeader || obu_type == kObuTemporalDelimiter || obu_type == kObuMetadata ||
-         obu_type == kObuPadding;
+// observed directly. Ruling: an unsized OBU that is not frame data (types 3, 4, 6, 7 are) and has no frame-data OBU
+// before it swallowed the frame data behind it. An unsized padding or metadata OBU after a sized frame is legal.
+bool is_frame_data(unsigned obu_type) {
+  return obu_type == kObuFrameHeader || obu_type == kObuTileGroup || obu_type == kObuFrame ||
+         obu_type == kObuRedundantFrameHeader;
 }
 
 // CNT-7008 and CNT-7009 for one `av01` sample.
@@ -92,6 +91,7 @@ void check_av1_sample(BoxNodeT& entry, uint64_t index, std::span<const uint8_t> 
   std::vector<uint8_t> scratch;
   const demux::SplitResult split = demux::split_units(sample, demux::Framing::Av1Obu, 0, scratch);
   uint64_t k = 0;
+  bool seen_frame_data = false;
   for (const demux::UnitSpan& u : split.units) {
     if (u.offset_in_packet >= sample.size()) {
       continue;
@@ -105,13 +105,14 @@ void check_av1_sample(BoxNodeT& entry, uint64_t index, std::span<const uint8_t> 
                    ? 1U
                    : 0U;
     }
-    if (!sized && cannot_end_a_sample(type)) {
+    if (!sized && !is_frame_data(type) && !seen_frame_data) {
       added += add_finding(entry, DiagCode::CNT_7009,
                            "OBU " + std::to_string(k) + " (type " + std::to_string(type) + ") of sample " +
                                std::to_string(index) + " has obu_has_size_field == 0 and is not the last OBU")
                    ? 1U
                    : 0U;
     }
+    seen_frame_data = seen_frame_data || is_frame_data(type);
     ++k;
   }
 }

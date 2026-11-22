@@ -140,8 +140,10 @@ struct TrackSpec {
   Bytes entry;  // the one sample entry of stsd
   uint32_t stsz_count = 0;
   uint32_t stts_entries = 0;
-  Bytes extra_stbl;  // appended to stbl
-  Bytes edts;        // whole edts box, or empty
+  Bytes extra_stbl;           // appended to stbl
+  Bytes edts;                 // whole edts box, or empty
+  uint32_t sample_size = 0;   // stsz sample_size (constant-size samples)
+  uint32_t chunk_offset = 0;  // when not 0: one chunk of one sample at this file offset (stsc, stco)
 };
 
 Bytes trak(const TrackSpec& t) {
@@ -154,9 +156,12 @@ Bytes trak(const TrackSpec& t) {
     put32(stts_payload, 1);
     put32(stts_payload, 1);
   }
-  const Bytes stbl = box("stbl", cat({stsd, box("stts", stts_payload), box("stsc", full(0, 0, u32s({0}))),
-                                      box("stsz", full(0, 0, u32s({0, t.stsz_count}))),
-                                      box("stco", full(0, 0, u32s({0}))), t.extra_stbl}));
+  const Bytes stbl =
+      box("stbl", cat({stsd, box("stts", stts_payload),
+                       box("stsc", t.chunk_offset == 0 ? full(0, 0, u32s({0})) : full(0, 0, u32s({1, 1, 1, 1}))),
+                       box("stsz", full(0, 0, u32s({t.sample_size, t.stsz_count}))),
+                       box("stco", t.chunk_offset == 0 ? full(0, 0, u32s({0})) : full(0, 0, u32s({1, t.chunk_offset}))),
+                       t.extra_stbl}));
   const Bytes minf = box("minf", cat({box("dinf"), stbl}));
   const Bytes mdia =
       box("mdia", cat({box("mdhd", full(0, 0, u32s({0, 0, 90000, 0, 0x55C40000}))), box("hdlr", hdlr_payload), minf}));
@@ -624,4 +629,48 @@ TEST_CASE("Deep: a second run adds nothing", "[container][isobmff][brands][deep]
   auto r = iso::walk(f);
   CHECK(iso::check_brands(f, r.top_level, iso::ValidationLevel::Deep) > 0);
   CHECK(iso::check_brands(f, r.top_level, iso::ValidationLevel::Deep) == 0);
+}
+
+namespace {
+
+// A file with one av01 track of one constant-size sample made of `sample`, probed at the Deep level.
+Bytes av01_sample_file(const Bytes& sample) {
+  TrackSpec t;
+  t.entry = visual_entry("av01", av1c(1));
+  t.stsz_count = 1;
+  t.stts_entries = 1;
+  t.sample_size = static_cast<uint32_t>(sample.size());
+  const Bytes ftyp = types("isom", {"iso2"});
+  t.chunk_offset = 1;  // placeholder: the real offset needs the size of moov, which does not depend on its value
+  const Bytes probe = box("moov", cat({mvhd(), trak(t)}));
+  t.chunk_offset = static_cast<uint32_t>(ftyp.size() + probe.size() + 8);
+  return cat({ftyp, box("moov", cat({mvhd(), trak(t)})), box("mdat", sample)});
+}
+
+Bytes obu_bytes(unsigned type, const Bytes& payload, bool sized) {
+  Bytes b{static_cast<uint8_t>((type << 3U) | (sized ? 2U : 0U))};
+  if (sized) {
+    b.push_back(static_cast<uint8_t>(payload.size()));  // payloads here are shorter than 128 bytes
+  }
+  b.insert(b.end(), payload.begin(), payload.end());
+  return b;
+}
+
+}  // namespace
+
+TEST_CASE("Deep: CNT-7009 needs the unsized OBU to precede the frame data",
+          "[container][isobmff][brands][deep][fast]") {
+  const Bytes frame = obu_bytes(6, Bytes(20, 1), true);
+  const auto at_deep = [](const Bytes& sample) { return codes(av01_sample_file(sample), iso::ValidationLevel::Deep); };
+  // An unsized padding or metadata OBU after a sized frame is legal (it is the last OBU).
+  CHECK_FALSE(has(at_deep(cat({frame, obu_bytes(15, Bytes(8, 2), false)})), "CNT-7009"));
+  CHECK_FALSE(has(at_deep(cat({frame, obu_bytes(5, Bytes(8, 2), false)})), "CNT-7009"));
+  // An unsized frame OBU, last, is legal.
+  CHECK_FALSE(has(at_deep(obu_bytes(6, Bytes(20, 1), false)), "CNT-7009"));
+  // An unsized padding, metadata or sequence header OBU in front of the frame data swallowed it.
+  CHECK(has(at_deep(cat({obu_bytes(15, Bytes(8, 2), false), frame})), "CNT-7009"));
+  CHECK(has(at_deep(cat({obu_bytes(5, Bytes(8, 2), false), frame})), "CNT-7009"));
+  CHECK(has(at_deep(cat({obu_bytes(1, Bytes(8, 2), false), frame})), "CNT-7009"));
+  // The same sample is clean when every OBU is sized.
+  CHECK_FALSE(has(at_deep(cat({obu_bytes(15, Bytes(8, 2), true), frame})), "CNT-7009"));
 }
