@@ -100,6 +100,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         require(sv.VerifyBuffer<ovt::fb::SampleTable>(nullptr));
         delete[] table.data;
       }
+      // WI-1.219c: the FragmentTimeline of every track is a verified buffer.
+      ovt_Buffer timeline{};
+      require(ovt_container_fragments(c, i, nullptr, &timeline) == OVT_OK);
+      flatbuffers::Verifier fv(timeline.data, timeline.size);
+      require(fv.VerifyBuffer<ovt::fb::FragmentTimeline>(nullptr));
+      delete[] timeline.data;
     }
     ovt_container_close(c);
     // The validation driver over the complete walk: idempotent, whatever the bytes.

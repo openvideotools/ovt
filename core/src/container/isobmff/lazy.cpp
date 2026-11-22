@@ -9,6 +9,8 @@
 #include <flatbuffers/flatbuffers.h>
 
 #include <algorithm>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <unordered_set>
@@ -17,6 +19,7 @@
 
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/brands.h"
+#include "container/isobmff/fragments.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
 #include "ovt_container_generated.h"
@@ -35,6 +38,7 @@ bool IsobmffReader::open() {
   tree_.diagnostics = std::move(w.diagnostics);
   index(tree_.root);
   tree_.tracks = build_tracks(file_, tree_.root);
+  has_moof_ = std::ranges::any_of(tree_.root, [](const auto& b) { return b && b->fourcc == "moof"; });
   // The walk confirms the located `mfra`; when the top level disagrees, the walk wins.
   if (mfra && std::ranges::any_of(
                   tree_.root, [&](const auto& b) { return b->file_span->offset() == *mfra && b->fourcc == "mfra"; })) {
@@ -54,8 +58,17 @@ std::vector<uint8_t> IsobmffReader::track_info(int track_index) const {
   if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
     return {};
   }
+  const auto ordinal = static_cast<size_t>(track_index);
+  const fb::TrackInfoT* info = tree_.tracks[ordinal].get();
+  std::optional<fb::TrackInfoT> with_fragments;
+  if (has_moof_) {
+    const std::lock_guard lock(tables_mutex_);
+    with_fragments.emplace(*info);
+    with_fragments->sample_count += trun_sample_count(fragment_build(ordinal, nullptr, jobs::Cancel::never()).timeline);
+    info = &*with_fragments;
+  }
   flatbuffers::FlatBufferBuilder fbb;
-  fbb.Finish(fb::TrackInfo::Pack(fbb, tree_.tracks[static_cast<size_t>(track_index)].get()));
+  fbb.Finish(fb::TrackInfo::Pack(fbb, info));
   const std::span<const uint8_t> bytes(fbb.GetBufferPointer(), fbb.GetSize());
   return {bytes.begin(), bytes.end()};
 }
@@ -75,13 +88,51 @@ std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first
       if (trak == nullptr) {
         return {};
       }
-      it = tables_.emplace(ordinal, expand_sample_table(file_, *trak, jobs::Cancel::never())).first;
+      std::unique_ptr<fb::SampleTableT> built = expand_sample_table(file_, *trak, jobs::Cancel::never());
+      if (has_moof_) {  // §8.4.1 fragment part
+        FragmentBuild& f = fragment_build(ordinal, built.get(), jobs::Cancel::never());
+        append_fragment_samples(*built, f.timeline, std::move(f.samples));
+      }
+      it = tables_.emplace(ordinal, std::move(built)).first;
     }
     table = it->second;
   }
   const flatbuffers::DetachedBuffer buf = serialise(*slice_sample_table(*table, first, count));
   const std::span<const uint8_t> bytes(buf.data(), buf.size());
   return {bytes.begin(), bytes.end()};
+}
+
+std::vector<uint8_t> IsobmffReader::fragments(int track_index, jobs::Cancel& cancel) const {
+  if (track_index < 0 || static_cast<size_t>(track_index) >= tree_.tracks.size()) {
+    return {};
+  }
+  const std::lock_guard lock(tables_mutex_);
+  const flatbuffers::DetachedBuffer buf =
+      serialise(fragment_build(static_cast<size_t>(track_index), nullptr, cancel).timeline);
+  const std::span<const uint8_t> bytes(buf.data(), buf.size());
+  return {bytes.begin(), bytes.end()};
+}
+
+FragmentBuild& IsobmffReader::fragment_build(size_t ordinal, const fb::SampleTableT* moov_table,
+                                             jobs::Cancel& cancel) const {
+  if (const auto it = fragments_.find(ordinal); it != fragments_.end()) {
+    return *it->second;
+  }
+  // The continuation point needs the moov samples: the kept table (its leading moov part), else a fresh expansion.
+  std::unique_ptr<fb::SampleTableT> expanded;
+  if (moov_table == nullptr) {
+    if (const auto t = tables_.find(ordinal); t != tables_.end()) {
+      moov_table = t->second.get();
+    } else if (const fb::BoxNodeT* trak = find_trak(tree_.root, ordinal); trak != nullptr) {
+      expanded = expand_sample_table(file_, *trak, cancel);
+      moov_table = expanded.get();
+    }
+  }
+  const fb::SampleTableT empty;
+  const FragmentTrackInput in =
+      fragment_track_input(file_, tree_.root, *tree_.tracks[ordinal], moov_table != nullptr ? *moov_table : empty);
+  auto build = std::make_unique<FragmentBuild>(build_fragments(file_, tree_.root, in, cancel));
+  return *fragments_.emplace(ordinal, std::move(build)).first->second;
 }
 
 size_t IsobmffReader::validate(ValidationLevel level) {
