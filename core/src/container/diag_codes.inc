@@ -185,6 +185,12 @@ X(CNT_4035, "CNT-4035", Warning, "fragment `trun` sample count 0 and not `durati
 X(CNT_4036, "CNT-4036", Info, "`styp` brands differ between segments of one file", "14496-12 §8.16.2")
 X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", "23001-7 §7.1")
 
+// WI-1.213 (group H: encryption boxes, §8.3.8). SPEC-ASSUMPTION(#794): CNT-6011 is the Info the spec asks for when the
+// `senc` IV size had to be inferred.
+X(CNT_6001, "CNT-6001", Error, "`senc` IV size unknown and not inferable", "23001-7 §7.2")
+X(CNT_6003, "CNT-6003", Error, "`tenc` IV size ∉ {0,8,16}", "23001-7 §8.2")
+X(CNT_6011, "CNT-6011", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
+
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
 X(CNT_DASH_0001, "CNT-DASH-0001", Info,

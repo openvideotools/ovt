@@ -13,6 +13,7 @@ add_executable(
   decoders_fragment_boxes_test.cpp
   decoders_codec_config_test.cpp
   decoders_colour_test.cpp
+  decoders_encryption_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
