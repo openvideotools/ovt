@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// The fragment timeline of one track (chapter 08 §8.4.3 steps 1, 2 and 5; WI-1.219a). The sidx / mfra cross-checks
-// are WI-1.219b; the SampleTable append and ovt_container_fragments are WI-1.219c. Internal header (not installed).
+// The fragment timeline of one track (chapter 08 §8.4.3 steps 1-5; WI-1.219a, sidx / mfra cross-checks WI-1.219b).
+// The SampleTable append and ovt_container_fragments are WI-1.219c. Internal header (not installed).
 //
 // Box payloads are read from the file, not from BoxNode fields: the trun decoder summarises large arrays (§8.2.5) and
 // lazily walked moofs are header-only (§8.2.4), so the tree is neither expanded nor modified.
@@ -35,7 +35,7 @@ struct TrexDefaults {
   uint32_t flags = 0;
 };
 
-// What the builder needs from `moov`. WI-1.219b fills it from ParsedMovie / TrackInfo; fragment_track_input()
+// What the builder needs from `moov`. WI-1.219c fills it from ParsedMovie / TrackInfo; fragment_track_input()
 // reads it from the box tree until then.
 struct FragmentTrackInput {
   uint32_t track_id = 0;
@@ -73,7 +73,7 @@ struct FragmentBuild {
 [[nodiscard]] FragmentTrackInput fragment_track_input(const io::RandomAccessFile& file, const BoxNodes& top_level,
                                                       uint32_t track_id);
 
-// §8.4.3 steps 1, 2 and 5 for one track over the top-level boxes of the walk (file order). Never throws for malformed
+// §8.4.3 steps 1-5 for one track over the top-level boxes of the walk (file order). Never throws for malformed
 // input (all problems become diagnostics on the timeline); throws ovt::Cancelled when `cancel` is requested (checked
 // per `moof` and every 64 Ki samples) and io::IoError on an I/O failure. Deterministic.
 [[nodiscard]] FragmentBuild build_fragments(const io::RandomAccessFile& file, const BoxNodes& top_level,
