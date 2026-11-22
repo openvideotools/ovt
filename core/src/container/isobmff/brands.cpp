@@ -293,8 +293,8 @@ void check_entry_profiles(Run& r, BoxNodeT& entry, bool video) {
   if (in_band && r.has("cmf2")) {
     r.flag(entry, DiagCode::CNT_7022, str(cc) + " sample entry (parameter sets in-band) in a cmf2 file");
   }
-  if ((cc == "avc3" || cc == "hev1") && r.options.hls_context) {
-    r.flag(entry, DiagCode::CNT_7041, str(cc) + " sample entry in an HLS segment (Apple requires avc1/hvc1)");
+  if ((cc == "avc3" || cc == "hev1") && r.options.hls_context && r.has("cmfc")) {
+    r.flag(entry, DiagCode::CNT_7041, str(cc) + " sample entry in an HLS cmfc segment (Apple requires avc1/hvc1)");
   }
   if (r.has_any({"cmfc", "cmf2"}) && video) {
     if (child(entry, "colr") == nullptr) {

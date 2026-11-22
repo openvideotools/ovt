@@ -494,8 +494,8 @@ TEST_CASE("mif1 files need hdlr pict, pitm, iinf, iloc and iprp in meta", "[cont
 TEST_CASE("HLS context adds the Apple rows", "[container][isobmff][brands][fast]") {
   TrackSpec t;
   t.entry = visual_entry("hev1", hvcc({}));
-  const Bytes file =
-      cat({types("iso6", {"iso6"}), box("moov", cat({mvhd(), trak(t), mvex()})), moof(false, 0x020000), mdat()});
+  const Bytes file = cat(
+      {types("iso6", {"iso6", "cmfc"}), box("moov", cat({mvhd(), trak(t), mvex()})), moof(false, 0x020000), mdat()});
   CHECK_FALSE(has(codes(file), "CNT-7040"));
   CHECK_FALSE(has(codes(file), "CNT-7041"));
   iso::BrandOptions hls;
@@ -562,6 +562,6 @@ TEST_CASE("every CTA WAVE cmfc file is clean at the Standard level",
     ++checked;
   }
   if (checked == 0) {
-    SKIP("no CTA WAVE cmfc file fetched (tools/fetch_corpora.py --tags container-smoke)");
+    SKIP("no CTA WAVE cmfc file fetched: the real-asset run of WI-1.222 AT1 is handed to WI-1.237 (#802)");
   }
 }

@@ -96,8 +96,9 @@ TEST_CASE("diag_coverage: every committed isobmff-broken file emits the codes it
       ++checked;
     }
   }
-  CHECK(checked >= 9);  // the entries of recipe 72, committed under isobmff-broken/
-  for (const char* code : {"CNT-0106", "CNT-1011", "CNT-1012", "CNT-1013", "CNT-1014", "CNT-1015", "CNT-2003"}) {
+  CHECK(checked >= 12);  // the entries of recipe 72, committed under isobmff-broken/
+  for (const char* code : {"CNT-0106", "CNT-1011", "CNT-1012", "CNT-1013", "CNT-1014", "CNT-1015", "CNT-2003",
+                           "CNT-7005", "CNT-7010", "CNT-7031"}) {
     CHECK(covered.contains(code));
   }
 }

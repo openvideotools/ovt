@@ -5,7 +5,7 @@
 Small ISOBMFF files (about 20 KiB each, 450 KiB in all) with one deliberate defect in the box headers, used by
 `core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
 in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the last six, with
-a defect in the box rules of chapter 8 §8.5, are used by `core/tests/container/diag_coverage_test.cpp` (WI-1.224a).
+a defect in the box rules of chapter 8 §8.5, are used by `core/tests/container/diag_coverage_test.cpp` (WI-1.224a); the last three (recipes 35 to 37) are used by the same test for the brand checks (WI-1.222a).
 Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change;
 regenerate a file with the command in the table (the output is byte-for-byte reproducible).
 
@@ -34,6 +34,9 @@ regenerate a file with the command in the table (the output is byte-for-byte rep
 | `elst_in_moov.mp4` | `--elst-in-moov` | `CNT-1013` |
 | `stts_count_overflow.mp4` | `--stts-count-overflow` | `CNT-1014` |
 | `tkhd_padded.mp4` | `--tkhd-padded` | `CNT-1015` |
+| `syn_mp4_broken_cmfc_two_tracks.mp4` | `--cmfc-two-tracks` | `CNT-7010` |
+| `syn_mp4_broken_msix_without_sidx.mp4` | `--msix-no-sidx` | `CNT-7031` |
+| `syn_mp4_broken_hvc1_no_ps.mp4` | `--hvc1-strip-ps` | `CNT-7005` |
 
 The other truncation offsets and the 0/1/7/0xFFFFFFFF size words are exercised in memory by the test, which
 mutates a base file of its own, so the committed set stays small.
