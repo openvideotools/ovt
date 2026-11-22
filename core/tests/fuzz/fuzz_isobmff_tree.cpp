@@ -19,10 +19,13 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/edit_list.h"
+#include "container/isobmff/sample_table.h"
 #include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/container.h"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt_container_generated.h"
 
 namespace {
@@ -107,6 +110,21 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     using ovt::container::isobmff::ValidationLevel;
     ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Standard);
     require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
+    // WI-1.220: the EditList of every track verifies, and presenting any sample never throws.
+    namespace iso = ovt::container::isobmff;
+    for (size_t t = 0; iso::find_trak(walked.top_level, t) != nullptr; ++t) {
+      const auto table =
+          iso::expand_sample_table(file, *iso::find_trak(walked.top_level, t), ovt::jobs::Cancel::never());
+      const iso::EditListBuild built =
+          iso::build_edit_list(file, walked.top_level, t, *table, ovt::jobs::Cancel::never());
+      const flatbuffers::DetachedBuffer buf = iso::serialise(*built.list);
+      flatbuffers::Verifier lv(buf.data(), buf.size());
+      require(lv.VerifyBuffer<ovt::fb::EditList>(nullptr));
+      int64_t pts = 0;
+      for (const uint64_t i : {uint64_t{0}, table->count / 2, table->count}) {
+        static_cast<void>(iso::sample_presentation_time(*built.list, *table, i, built.movie_timescale, &pts));
+      }
+    }
   } catch (...) {
     std::abort();
   }

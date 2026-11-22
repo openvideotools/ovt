@@ -19,6 +19,7 @@ target_sources(
           isobmff/decoders/movie.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
+          isobmff/edit_list.cpp
           isobmff/field_builder.cpp
           isobmff/fragments.cpp
           isobmff/hdr_summary.cpp
