@@ -4,9 +4,9 @@
 // `ovt info` (chapter 12 §12.2.1, WI-1.502). Reads container headers only: the TrackInfo views of
 // ovt_container_track_info, the top-level box order (fast start), the ftyp brands and the colour view.
 //
-// SPEC-ASSUMPTION(#783, pass 27): (1) while ovt_container_hdr_metadata (WI-1.223b) or ovt_stream_index_summary
-// (WI-1.125) answers anything but OVT_OK, `tracks[].color` / `index_summary` are omitted and one Info diagnostic
-// (CLI-0012,
+// SPEC-ASSUMPTION(#783, pass 27): (1) while ovt_container_hdr_metadata (WI-1.223) or ovt_stream_index_summary
+// (WI-1.125) answers anything but OVT_OK for a track (a container format without the HDR view, or the index view not
+// built yet), `tracks[].color` / `index_summary` are omitted and one Info diagnostic (CLI-0012,
 // "'{field}' omitted: {reason}") names the field; the exit status stays 0. (2) chroma_format and the bit depths are not
 // in TrackInfo, so they are omitted until the index provides them. (3) input.source_hash is empty: the hash is
 // module-internal.
@@ -184,7 +184,7 @@ void collect_tracks(ovt_Container* c, const InfoArgs& args, Info& info, std::vec
   }
   if (color_missing) {
     diags.push_back(make_diag("Info", "CLI-0012",
-                              "'tracks[].color' omitted: the HDR metadata view is not supported by this build"));
+                              "'tracks[].color' omitted: the HDR metadata view is not available for this container"));
   }
 }
 
