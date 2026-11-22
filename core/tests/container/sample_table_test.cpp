@@ -563,12 +563,14 @@ TEST_CASE("sample table rows equal the MP4Box -dts goldens", "[container][sample
         rows[r.contains("track") ? r.at("track").get<uint32_t>() : tables.at(0)->track_id].push_back(&r);
       }
       for (const auto& t : tables) {
+        // A track MP4Box prints no row for (a header-only file) has no golden rows.
+        static const std::vector<const nlohmann::json*> kNone;
         const auto it = rows.find(t->track_id);
-        REQUIRE(it != rows.end());
+        const std::vector<const nlohmann::json*>& list = it == rows.end() ? kNone : it->second;
         // Fragment samples follow the moov samples of a track in the golden; the moov table is the prefix.
-        REQUIRE(t->count <= it->second.size());
+        REQUIRE(t->count <= list.size());
         for (uint64_t i = 0; i < t->count; ++i) {
-          const nlohmann::json& g = *it->second[i];
+          const nlohmann::json& g = *list[i];
           INFO(id + " track " + std::to_string(t->track_id) + " sample " + std::to_string(i));
           CHECK(t->offset[i] == g.at("offset").get<uint64_t>());
           CHECK(t->size[i] == g.at("size").get<uint32_t>());
