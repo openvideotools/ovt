@@ -116,6 +116,7 @@ Rules: codes 3–7 are chosen from the *first* error that aborted the command. S
 | `CLI-0009` | Error | `input '{path}': {reason}` | file missing, unreadable or not sniffable as any supported format (wraps `IO-*`/`CNT-*` library diagnostics for the top-level message) | 3 or 4 |
 | `CLI-0010` | Error | `refusing to write binary to a terminal; use -o` | `--format fb` with stdout a TTY and no `-o` (WI-1.500 step 4) | 2 |
 | `CLI-0011` | Error | `invalid value '{value}' in {variable}` | `OVT_FORMAT`, `OVT_THREADS` or `OVT_LOG_LEVEL` holds a value the matching option would reject | 2 |
+| `CLI-0012` | Info | `{view} is not available: {reason}` | `ovt info` when `ovt_container_hdr_metadata`/`ovt_stream_color` or `ovt_stream_index_summary` returns `OVT_E_UNSUPPORTED` because the owning WI (WI-1.223 part b, WI-1.125) has not merged; `{view}` is `tracks[n].color` or `index_summary` (§12.2.1, #783) | unchanged |
 
 ### 12.1.4 Output formats
 
@@ -273,7 +274,7 @@ Aliases accepted for compatibility with other chapters (same grammar, same outpu
 }
 ```
 
-`tracks[].color` is the JSON image of `ovt_ColorDescription` (§0.5.6); `index_summary` present only with `--full`.
+`tracks[].color` is the JSON image of `ovt_ColorDescription` (§0.5.6); `index_summary` present only with `--full`. Until `ovt_container_hdr_metadata`/`ovt_stream_color` (WI-1.223 part b) and `ovt_stream_index_summary` (WI-1.125) return data, `ovt info` omits `tracks[].color` (respectively `index_summary`) when the call returns `OVT_E_UNSUPPORTED` and emits one `CLI-0012` (Info, `{view} is not available: {reason}`) per missing view; the exit code stays 0. `chroma_format`, `bit_depth_luma` and `bit_depth_chroma` are not in `TrackInfo` (chapter 08 §8.1.3) and are omitted until the index provides them; `input.source_hash` is the empty string until a public C API accessor for the source hash exists (it is module-internal today) (#783).
 
 **Examples.**
 
@@ -1472,10 +1473,10 @@ Phase numbering follows §0.8. "CLI skeleton" items are prerequisites for every 
 **Depends on:** WI-1.500, WI-1.217 (`TrackInfo`), WI-1.121 (index), WI-1.223 (HDR metadata view).
 **Produces:** `cli/src/cmd/info.cpp`, `cli/tests/test_info.cpp`, golden files `cli/tests/golden/info/*.json`.
 **Interface:** §12.2.1 output JSON; `ovt_container_track_info`, `ovt_stream_color`, `ovt_stream_index_summary`.
-**Steps:** 1. Register subcommand and flags; 2. open file/container; collect tracks via `ovt_container_track_info`; 3. read `TrackInfo.codec_string` (rules: chapter 08 §8.1.3; e.g. `avc1.64001F`, `hvc1.2.4.L153.B0`, `av01.0.08M.10`); 4. with `--full`, build index via cache and attach summary; 5. text renderer; 6. golden tests over the mini corpus.
-**Acceptance tests:** 1. Given `syn_h265_main10_pq_hdr.mp4` (chapter 14 §14.3.3 recipe 10), When `ovt info -f json` runs, Then `result.tracks[0].color.transfer == 16`. 2. Given any 1-hour file, When `time ovt info f`, Then ≤ 200 ms. 3. Given `-f csv`, When `ovt info` runs with it, Then exit 2.
+**Steps:** 1. Register subcommand and flags; 2. open file/container; collect tracks via `ovt_container_track_info`; 3. read `TrackInfo.codec_string` (rules: chapter 08 §8.1.3; e.g. `avc1.64001F`, `hvc1.2.4.L153.B0`, `av01.0.08M.10`); 4. with `--full`, build index via cache and attach summary (`ovt_stream_index_summary`, WI-1.125; `OVT_E_UNSUPPORTED` → omit `index_summary` and raise `CLI-0012`), and read `tracks[].color` through `ovt_stream_color` (`OVT_E_UNSUPPORTED` → omit `color` and raise `CLI-0012`, #783); 5. text renderer; 6. golden tests over the mini corpus.
+**Acceptance tests:** 1. Given `syn_h265_main10_pq_hdr.mp4` (chapter 14 §14.3.3 recipe 10), When `ovt info -f json` runs, Then `result.tracks[0].color.transfer == 16` once `ovt_stream_color` returns data (the line is run and recorded by WI-1.223 part b, which implements `ovt_container_hdr_metadata`; until then the WI-1.502 test asserts that `tracks[0]` has no `color` and stderr carries `CLI-0012`, #783). 2. Given any 1-hour file, When `time ovt info f`, Then ≤ 200 ms. 3. Given `-f csv`, When `ovt info` runs with it, Then exit 2.
 **Size:** S.
-**Notes / pitfalls:** Do not touch `mdat`; `bitrate_bps` for fragmented files comes from `sidx`/`trun` sums, not from `mdat` size.
+**Notes / pitfalls:** Do not touch `mdat`; `bitrate_bps` for fragmented files comes from `sidx`/`trun` sums, not from `mdat` size. AT1 (`color`) and the `--full` `index_summary` are handed off to WI-1.223 part b (`ovt_container_hdr_metadata`) and WI-1.125 (`ovt_stream_index_summary`); WI-1.502 ships with the omit-plus-`CLI-0012` behaviour of §12.2.1 (coordinator ruling 2026-11-22, #783).
 ### WI-1.503 — `ovt probe`
 **Goal:** Implement §12.2.2 including `--expand`, `--samples`, `--fragments`, `--hdr`, `--edits`, `--enc`, `--brands`, `--bytes`, `--validate`/`--validate-level`, `--list-diagnostics`, `--demux-check`, flattened CSV and text tree (phase-4 flags `--representation`, `--tr101290` are wired by WI-4.210/WI-4.207).
 **Depends on:** WI-1.502, WI-1.204 (lazy expansion), WI-1.224 (validation driver), WI-1.235 (container probe hooks).
