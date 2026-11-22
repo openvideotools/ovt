@@ -24,6 +24,7 @@ target_sources(
           isobmff/hdr_summary.cpp
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
+          isobmff/sample_table.cpp
           isobmff/tracks.cpp
           isobmff/validate.cpp
           diagnostics.cpp

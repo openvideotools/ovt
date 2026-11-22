@@ -135,8 +135,17 @@ X(CNT_2008, "CNT-2008", Error, "both `stco` and `co64` present", "14496-12 §8.7
 X(CNT_2009, "CNT-2009", Error, "`stss` sample number out of range or not increasing", "14496-12 §8.6.2")
 X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6.4")
 X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
+X(CNT_2012, "CNT-2012", Warning,
+  "`cslg` hints inconsistent with `ctts`: compositionToDTSShift `S` < derived shift `D`, or least/greatest delta ≠ min/max `cts_offset` (informative box; CTS unchanged)",
+  "14496-12 §8.6.1.4")
 X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
+X(CNT_2014, "CNT-2014", Warning, "`stsc`/`stco` describe more samples than `stsz`", "14496-12 §8.7.4")
+X(CNT_2015, "CNT-2015", Error, "samples without a chunk", "14496-12 §8.7.4")
+X(CNT_2018, "CNT-2018", Info, "`sdtp` says I-picture but not in `stss` (open GOP)", "14496-12 §8.6.4")
 X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
+X(CNT_2021, "CNT-2021", Error, "`sbgp` index without matching `sgpd` entry", "14496-12 §8.9.2")
+X(CNT_2030, "CNT-2030", Error, "64-bit overflow while summing durations/offsets", "")
+X(CNT_2031, "CNT-2031", Error, "sample count > 50 000 000, table truncated", "")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")

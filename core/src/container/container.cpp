@@ -261,10 +261,23 @@ OVT_API ovt_status ovt_container_track_info(ovt_Container* container, int track_
 
 OVT_API ovt_status ovt_container_sample_table(ovt_Container* container, int track_index, uint32_t first, uint32_t count,
                                               ovt_Buffer* out) {
-  (void)track_index;
-  (void)first;
-  (void)count;
-  return container == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.2xx
+  if (container == nullptr || out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  try {
+    if (track_index < 0 || track_index >= container->reader->track_count()) {
+      return OVT_E_INVALID_ARG;
+    }
+    const std::vector<uint8_t> table = container->reader->sample_table(track_index, first, count);
+    return table.empty() ? OVT_E_UNSUPPORTED  // other formats: later
+                         : ovt::api::make_buffer(table.data(), table.size(), out);
+  } catch (...) {
+    return ovt::container::status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_container_fragments(ovt_Container* container, int track_index, ovt_Job* job, ovt_Buffer* out) {
