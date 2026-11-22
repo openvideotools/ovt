@@ -9,7 +9,7 @@
 //
 // SPEC-ASSUMPTION(#794): `tenc` also records its IV size in `ctx.enc_for_track` (keyed by track_ID) because the
 // `senc` of a `moof` never sees the context of `schi`; a `senc` without any known IV size infers it (8, 16, then 0
-// with subsamples) and raises Info CNT-6011.
+// with subsamples) and raises Info CNT-6014.
 
 #include <algorithm>
 #include <array>
@@ -378,7 +378,7 @@ uint64_t decode_senc(BoxContext& ctx, BitReader& br, FieldBuilder& fb) {
   }
   derived_sibling(fb, "Per_Sample_IV_Size", std::to_string(iv.size) + " (" + iv.source + ")");
   if (iv.source == "inferred") {
-    fb.diag(Severity::Info, "CNT-6011", "senc IV size " + std::to_string(iv.size) + " inferred from the box size");
+    fb.diag(Severity::Info, "CNT-6014", "senc IV size " + std::to_string(iv.size) + " inferred from the box size");
   }
   if (iv.size == 0 && !sub) {
     return 0;  // constant IV, no subsamples: the entries carry no bytes

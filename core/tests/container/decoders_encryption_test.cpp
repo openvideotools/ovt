@@ -319,13 +319,13 @@ TEST_CASE("senc reads the IV size of its track from the shared table", "[contain
   CHECK(d.node.diagnostics.empty());
 }
 
-TEST_CASE("senc infers the IV size when nothing is known (CNT-6011) and fails when it cannot (CNT-6001)",
+TEST_CASE("senc infers the IV size when nothing is known (CNT-6014) and fails when it cannot (CNT-6001)",
           "[container][decoders][cenc]") {
   iso::BoxContext ctx = ctx_in("traf");
   SECTION("8 bytes") {
     const Decoded d = run("senc", full(0, 0, cat({be(2, 4), filled(8, 1), filled(8, 2)})), ctx);
     CHECK(field(d.node, "Per_Sample_IV_Size").svalue == "8 (inferred)");
-    CHECK(has_code(d.node, "CNT-6011"));
+    CHECK(has_code(d.node, "CNT-6014"));
     CHECK(!has_code(d.node, "CNT-6001"));
   }
   SECTION("16 bytes with subsamples") {
@@ -439,7 +439,7 @@ TEST_CASE("the walk carries the tenc IV size from the moov to the senc of a moof
   REQUIRE(senc != nullptr);
   CHECK(field(*senc, "Per_Sample_IV_Size").svalue == "8 (tenc (track 3))");
   CHECK(!has_code(*senc, "CNT-6001"));
-  CHECK(!has_code(*senc, "CNT-6011"));
+  CHECK(!has_code(*senc, "CNT-6014"));
   CHECK(field(*senc, "subsample_totals").svalue == "2 subsamples, clear 32 bytes, protected 200 bytes");
   const BoxNodeT* frma = find_box(w.top_level, "frma");
   REQUIRE(frma != nullptr);
@@ -477,7 +477,7 @@ TEST_CASE("senc of a cbcs fragment (constant IV) has only subsample pairs whose 
   CHECK(sum_of(1) == "clear 40 + protected 160 = 200 bytes");
 }
 
-TEST_CASE("a fragment-only file without init segment infers the senc IV size (CNT-6011) or raises CNT-6001",
+TEST_CASE("a fragment-only file without init segment infers the senc IV size (CNT-6014) or raises CNT-6001",
           "[container][decoders][cenc]") {
   SECTION("inferred") {
     const Bytes senc_box = box("senc", full(0, 0, cat({be(2, 4), filled(8, 1), filled(8, 2)})));
@@ -486,7 +486,7 @@ TEST_CASE("a fragment-only file without init segment infers the senc IV size (CN
     const iso::WalkResult w = iso::walk(mem);
     const BoxNodeT* senc = find_box(w.top_level, "senc");
     REQUIRE(senc != nullptr);
-    CHECK(has_code(*senc, "CNT-6011"));
+    CHECK(has_code(*senc, "CNT-6014"));
     CHECK(field(*senc, "Per_Sample_IV_Size").svalue == "8 (inferred)");
   }
   SECTION("not inferable") {
