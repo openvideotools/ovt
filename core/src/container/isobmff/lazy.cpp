@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/brands.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
 #include "ovt_container_generated.h"
@@ -84,7 +85,8 @@ std::vector<uint8_t> IsobmffReader::sample_table(int track_index, uint32_t first
 }
 
 size_t IsobmffReader::validate(ValidationLevel level) {
-  const size_t added = isobmff::validate(tree_.root, level);
+  size_t added = isobmff::validate(tree_.root, level);
+  added += check_brands(file_, tree_.root, level);
   if (added > 0) {
     ++revision_;
   }

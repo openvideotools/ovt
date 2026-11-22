@@ -10,7 +10,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
+#include "container/diagnostics.h"
 #include "container/isobmff/box_walk.h"
 
 namespace ovt::container::isobmff {
@@ -24,6 +26,10 @@ enum class ValidationLevel : uint8_t { Quick, Standard, Deep };
 // parent's header). Idempotent: a finding already on the node, with the same code and message, is not added again.
 // A subtree with a walk error (CNT-0102..CNT-0110, CNT-0111) is not checked for missing boxes: its children are cut
 // short, so a missing box there is a consequence, not a finding. Returns the number of diagnostics added.
+// Appends the registry diagnostic `code` with `message` to `n` (span: its header). False, and nothing added, when the
+// node already holds the same code with the same message.
+bool add_finding(fb::BoxNodeT& n, DiagCode code, std::string message);
+
 size_t validate(BoxNodes& top_level, ValidationLevel level);
 
 }  // namespace ovt::container::isobmff
