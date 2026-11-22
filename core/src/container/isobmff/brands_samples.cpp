@@ -32,7 +32,9 @@ constexpr unsigned kObuRedundantFrameHeader = 7;
 constexpr unsigned kNalSps = 7;
 constexpr unsigned kNalPps = 8;
 
-const BoxNodeT* child(const BoxNodeT& n, std::string_view fourcc) {
+// The first child of `n` with this fourcc, or null. Const-preserving: a mutable parent yields a mutable child.
+template <typename Node>
+Node* child(Node& n, std::string_view fourcc) {
   const auto it = std::ranges::find_if(n.children, [&](const auto& c) { return c && c->fourcc == fourcc; });
   return it == n.children.end() ? nullptr : it->get();
 }
@@ -182,10 +184,10 @@ size_t check_brand_samples(const io::RandomAccessFile& file, BoxNodes& top_level
     if (!trak || trak->fourcc != "trak") {
       continue;
     }
-    const BoxNodeT* mdia = child(*trak, "mdia");
-    const BoxNodeT* minf = mdia == nullptr ? nullptr : child(*mdia, "minf");
-    const BoxNodeT* stbl = minf == nullptr ? nullptr : child(*minf, "stbl");
-    BoxNodeT* stsd = stbl == nullptr ? nullptr : const_cast<BoxNodeT*>(child(*stbl, "stsd"));  // NOLINT
+    BoxNodeT* mdia = child(*trak, "mdia");
+    BoxNodeT* minf = mdia == nullptr ? nullptr : child(*mdia, "minf");
+    BoxNodeT* stbl = minf == nullptr ? nullptr : child(*minf, "stbl");
+    BoxNodeT* stsd = stbl == nullptr ? nullptr : child(*stbl, "stsd");
     if (stsd != nullptr) {
       added += check_track(file, top_level, ordinal, *stsd, cancel);
     }
