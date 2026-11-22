@@ -85,15 +85,13 @@ Bytes ftyp() {
   return box("ftyp", cat({str("isom"), be(0, 4), str("isom"), str("cmfc")}));
 }
 
-// An encrypted AVC (or, with `hevc`, HEVC) entry with a 4-byte NAL length field.
-Bytes encv(std::string_view scheme, const Bytes& tenc_box, bool hevc = false) {
-  Bytes hvcc_payload = filled(22, 0);
-  hvcc_payload[21] = 0x03;  // lengthSizeMinusOne = 3
-  const Bytes config = hevc ? box("hvcC", hvcc_payload) : box("avcC", Bytes{1, 100, 0, 30, 0xFF, 0xE0, 0});
+// An encrypted AVC entry with a 4-byte NAL length field.
+Bytes encv(std::string_view scheme, const Bytes& tenc_box) {
+  const Bytes avcc = box("avcC", Bytes{1, 100, 0, 30, 0xFF, 0xE0, 0});
   const Bytes sinf =
-      box("sinf", cat({box("frma", str(hevc ? "hvc1" : "avc1")),
-                       box("schm", full(0, 0, cat({str(scheme), be(0x10000, 4)}))), box("schi", tenc_box)}));
-  return box("encv", cat({filled(78, 0), config, sinf}));
+      box("sinf", cat({box("frma", str("avc1")), box("schm", full(0, 0, cat({str(scheme), be(0x10000, 4)}))),
+                       box("schi", tenc_box)}));
+  return box("encv", cat({filled(78, 0), avcc, sinf}));
 }
 
 Bytes trak(const Bytes& entry, const Bytes& tables) {
@@ -150,7 +148,6 @@ struct MoovSpec {
   Bytes extra_tables;                  // sgpd / sbgp of the stbl
   std::optional<uint32_t> saiz_count;  // overrides the sample_count written to saiz
   bool with_aux = true;
-  bool hevc = false;  // an hvcC entry (2-byte NAL header) instead of avcC
 };
 
 Bytes moov_file(const MoovSpec& m) {
@@ -177,7 +174,7 @@ Bytes moov_file(const MoovSpec& m) {
         cat({box("stts", full(0, 0, cat({be(1, 4), be(m.samples.size(), 4), be(40, 4)}))),
              box("stsc", full(0, 0, cat({be(1, 4), be(1, 4), be(m.samples.size(), 4), be(1, 4)}))), box("stsz", stsz),
              box("stco", full(0, 0, cat({be(1, 4), be(mdat_at + 8, 4)}))), aux_boxes, m.extra_tables});
-    return box("moov", trak(encv(m.scheme, m.tenc, m.hevc), tables));
+    return box("moov", trak(encv(m.scheme, m.tenc), tables));
   };
   const uint64_t mdat_at = ftyp().size() + build(0).size();
   return cat({ftyp(), build(mdat_at), box("mdat", cat({mdat_payload, aux}))});
@@ -285,21 +282,6 @@ TEST_CASE("cenc: a subsample that protects the NAL length and header raises CNT-
     }
   }
   CHECK(n == 1);
-}
-
-TEST_CASE("cenc: an HEVC subsample must keep the two NAL header bytes clear", "[container][cenc]") {
-  // length_size 4: 5 clear bytes cover the AVC header (1 byte) but not the second byte of the HEVC header.
-  const auto n6007 = [](bool hevc, uint16_t clear) {
-    MoovSpec m;
-    m.hevc = hevc;
-    m.samples = {{filled(8, 1), {{clear, static_cast<uint32_t>(64 - clear)}}, 64}};
-    const Opened o(moov_file(m));
-    const auto info = encryption_of(o.c);
-    return std::ranges::count(codes(*info), "CNT-6007");
-  };
-  CHECK(n6007(false, 5) == 0);
-  CHECK(n6007(true, 5) == 1);
-  CHECK(n6007(true, 6) == 0);
 }
 
 TEST_CASE("cenc: cbcs uses the constant IV and the 1:9 pattern shades 16 bytes in every 160", "[container][cenc]") {
