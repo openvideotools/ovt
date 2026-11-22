@@ -9,7 +9,7 @@ are WI-1.503.
 | Given/When/Then | Test |
 |---|---|
 | AT1: a file with lazy boxes, `ovt_container_expand_all` → no `BoxNode` outside `mdat` carries `CNT-0007` | `probe: expand_all leaves no unexpanded box outside mdat` (200 fragments, so every `moof` starts deferred) |
-| AT2: the registry lists ≥ 150 codes, each once | **Not met.** `diag_codes.inc` holds 94 codes today and the C function is blocked on the schema table (spec question). `probe: every registry code appears exactly once with a severity` checks uniqueness only. |
+| AT2: the registry lists ≥ 150 codes, each once | **Not met.** `diag_codes.inc` holds 136 codes at 2ad0892 (94 when the PR was opened; later work items keep appending) and the C function is blocked on the schema table (spec question). `probe: every registry code appears exactly once with a severity` checks uniqueness only. |
 
 Command: `ovt_tests_container "probe*"` → all tests passed (334 assertions in 7 test cases). Determinism: `probe:
 expand_all is deterministic` compares two runs byte for byte.
