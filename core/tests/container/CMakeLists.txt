@@ -40,6 +40,7 @@ add_executable(
   mpegts_descriptors_sweep_test.cpp
   mpegts_pes_test.cpp
   tr101290_test.cpp
+  tracks_test.cpp
   ts_packets_robustness_test.cpp
   ts_packets_test.cpp
   validate_test.cpp
