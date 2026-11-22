@@ -483,7 +483,7 @@ TEST_CASE("tracks on syn_mp4_cenc: encv with original_format avc1 (AT2)", "[cont
   ovt_container_close(c);
 }
 
-// SPEC-ASSUMPTION(#769): dv_p81.mp4 is the MP4Box `dv-profile=8.1` remux of hdr_hdr10plus_dv81 made by the corpus
+// Spec (§14.3, pass 26, #769): dv_p81.mp4 is the MP4Box `dv-profile=8.1` remux of hdr_hdr10plus_dv81 made by the corpus
 // fetcher's `post` step, which does not exist yet; until then the entry is the Matroska file and this test skips.
 TEST_CASE("tracks on dv_p81: hvc1 with hvcC then dvvC (AT1)", "[container][tracks][needs-corpus][fast]") {
   const auto path = ovt::test::corpus_or_skip("hdr_hdr10plus_dv81");
