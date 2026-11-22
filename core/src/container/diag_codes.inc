@@ -158,6 +158,16 @@ X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
 
+// WI-1.220 (EditList and the elst <-> tfdt sanity check, §8.4.2).
+X(CNT_3001, "CNT-3001", Error, "edit starts beyond media duration", "14496-12 §8.6.6")
+X(CNT_3002, "CNT-3002", Warning, "edit exceeds media duration", "14496-12 §8.6.6")
+X(CNT_3003, "CNT-3003", Info, "`media_rate` not 0 or 1 (unsupported by most players)", "14496-12 §8.6.6")
+X(CNT_3004, "CNT-3004", Warning, "Σ `segment_duration` ≠ `tkhd.duration`", "14496-12 §8.6.6")
+X(CNT_3010, "CNT-3010", Warning, "`elst.media_time` inconsistent with first fragment `tfdt + cts_offset`",
+  "23000-19 §7.5.13")
+X(CNT_3011, "CNT-3011", Info, "presentation offset implied without `elst`", "")
+X(CNT_3012, "CNT-3012", Warning, "multi-segment `elst` in fragmented/CMAF file", "23000-19 §7.5.13")
+
 // WI-1.219a/b (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
 X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
 X(CNT_4002, "CNT-4002", Warning,
