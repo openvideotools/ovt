@@ -382,7 +382,10 @@ def verify_entry(entry: dict[str, Any], entry_dir: Path) -> bool:
     record = read_ok(entry_dir)
     if record is None or record.get("sha256") != entry.get("sha256"):
         return False
-    for name, digest in record.get("files", {}).items():
+    files = record.get("files", {})
+    if "post" in entry and files.get(record.get("primary", "")) == entry["sha256"]:
+        return False  # cached before the entry had its post step: the primary is still the download, not its product
+    for name, digest in files.items():
         path = entry_dir / name
         if not path.is_file() or sha256_file(path) != digest:
             return False

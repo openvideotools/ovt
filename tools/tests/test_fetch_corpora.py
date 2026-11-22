@@ -357,6 +357,28 @@ def test_dv_remux_post_step(files: Path, tmp_path: Path, monkeypatch: pytest.Mon
     assert "injected.hevc:dv-profile=8.1" in calls[2]
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX shebang scripts")
+def test_post_step_added_later_invalidates_the_cached_entry(
+    files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cache filled before the entry had a post step holds the download as primary: it is fetched again."""
+    with serve(files) as base:
+        plain = entry("dv", files, "plain.bin")
+        assert run(write_manifest(tmp_path / "m1.json", [plain], base), tmp_path / "cache") == 0
+        assert json.loads((tmp_path / "cache" / "dv" / ".ok").read_text(encoding="utf-8"))["primary"] == "plain.bin"
+        bin_dir, log = tmp_path / "bin", tmp_path / "tools.log"
+        monkeypatch.setenv("PATH", str(bin_dir))
+        fake_tool(bin_dir, "ffmpeg", "", log)
+        fake_tool(bin_dir, "MP4Box", "-new", log)
+        later = entry("dv", files, "plain.bin", post={"mp4box_dv_remux": {"dv_profile": "8.1"}})
+        manifest = write_manifest(tmp_path / "m2.json", [later], base)
+        assert run(manifest, tmp_path / "cache") == 0
+        assert json.loads((tmp_path / "cache" / "dv" / ".ok").read_text(encoding="utf-8"))["primary"] == "dv.mp4"
+        calls = len(log.read_text(encoding="utf-8").splitlines())
+        assert run(manifest, tmp_path / "cache") == 0  # now cached: no tool runs again
+        assert len(log.read_text(encoding="utf-8").splitlines()) == calls
+
+
 def test_cache_dir_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("OVT_CORPORA_DIR", str(tmp_path / "env"))
     assert fetch_corpora.cache_dir_for("x") == Path("x")
