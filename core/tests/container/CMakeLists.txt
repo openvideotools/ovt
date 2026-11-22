@@ -8,11 +8,13 @@ add_executable(
   ovt_tests_container
   annexb_test.cpp
   box_walk_test.cpp
+  brands_test.cpp
   byte_service_test.cpp
   c_api_test.cpp
   decoders_fragment_boxes_test.cpp
   decoders_codec_config_test.cpp
   decoders_colour_test.cpp
+  decoders_encryption_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
@@ -28,10 +30,12 @@ add_executable(
   mxf_placeholder_test.cpp
   obu_robustness_test.cpp
   obu_test.cpp
+  probe_test.cpp
   psi_test.cpp
   rawyuv_test.cpp
   registry_gen_test.cpp
   registry_lookup_test.cpp
+  sample_table_test.cpp
   sniff_test.cpp
   test_container_annexb.cpp
   test_container_ivf.cpp
