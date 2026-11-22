@@ -19,6 +19,7 @@ add_executable(
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
   diag_coverage_test.cpp
+  edit_list_test.cpp
   field_builder_test.cpp
   fragments_test.cpp
   hdr_summary_test.cpp
