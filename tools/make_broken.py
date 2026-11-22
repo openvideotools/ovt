@@ -31,6 +31,16 @@ WI-1.201 adds the box-header modes the walk of §8.2.3 is tested with (each file
 * ``--nonprintable``: a box with type ``00 00 00 01`` inside ``moov`` (``CNT-0109``);
 * ``--trailing N``: N stray bytes after the last top-level box (``CNT-0101``).
 
+WI-1.224a adds the box-rule modes of the validation driver (chapter 8 §8.5; each file is the base file, or the
+fragmented file for ``--traf-no-tfhd``, with one change):
+
+* ``--missing-stsd``: the ``stbl`` has no ``stsd`` (``CNT-1011``);
+* ``--traf-no-tfhd``: a ``traf`` without ``tfhd`` in a fragmented file (``CNT-1011``);
+* ``--dup-stts``: a second ``stts`` in ``stbl`` (``CNT-1012``);
+* ``--elst-in-moov``: an ``elst`` directly in ``moov`` instead of in ``edts`` (``CNT-1013``);
+* ``--stts-count-overflow``: ``stts.entry_count`` 1000000 with one entry in the box (``CNT-1014``);
+* ``--tkhd-padded``: four bytes after the last field of ``tkhd`` (``CNT-1015``).
+
 Exit 0 ok, 2 usage.
 """
 
@@ -91,7 +101,14 @@ def sample_entry(hevc: bool, strip_ps: bool) -> bytes:
     return box(b"hvc1" if hevc else b"avc1", visual, config)
 
 
-def trak(track_id: int, stbl: list[bytes], hevc: bool = False, strip_ps: bool = False) -> bytes:
+def trak(
+    track_id: int,
+    stbl: list[bytes],
+    hevc: bool = False,
+    strip_ps: bool = False,
+    tkhd_extra: bytes = b"",
+    stsd_box: bool = True,
+) -> bytes:
     tkhd = full(
         b"tkhd",
         0,
@@ -101,12 +118,13 @@ def trak(track_id: int, stbl: list[bytes], hevc: bool = False, strip_ps: bool = 
         struct.pack(">hhhH", 0, 0, 0, 0),
         struct.pack(">9I", 0x10000, 0, 0, 0, 0x10000, 0, 0, 0, 0x40000000),
         struct.pack(">II", W << 16, H << 16),
+        tkhd_extra,
     )
     mdhd = full(b"mdhd", 0, 0, struct.pack(">IIIIHH", 0, 0, 30000, SAMPLES * 1000, 0x55C4, 0))
     hdlr = full(b"hdlr", 0, 0, b"\0\0\0\0vide", bytes(12), b"VideoHandler\0")
     dinf = box(b"dinf", full(b"dref", 0, 0, struct.pack(">I", 1), full(b"url ", 0, 1)))
     stsd = full(b"stsd", 0, 0, struct.pack(">I", 1), sample_entry(hevc, strip_ps))
-    minf = box(b"minf", full(b"vmhd", 0, 1, bytes(8)), dinf, box(b"stbl", stsd, *stbl))
+    minf = box(b"minf", full(b"vmhd", 0, 1, bytes(8)), dinf, box(b"stbl", *([stsd] if stsd_box else []), *stbl))
     return box(b"trak", tkhd, box(b"mdia", mdhd, hdlr, minf))
 
 
@@ -131,6 +149,8 @@ def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> byte
     ftyp = box(b"ftyp", b"isom", struct.pack(">I", 0x200), b"isomiso2avc1mp41")
     chunks = [10, 10, 10]  # samples per chunk
     stts = full(b"stts", 0, 0, struct.pack(">III", 1, SAMPLES, 1000))
+    if mode == "stts-count-overflow":
+        stts = full(b"stts", 0, 0, struct.pack(">III", 1000000, SAMPLES, 1000))
     stsz = full(b"stsz", 0, 0, struct.pack(">II", SAMPLE_SIZE, SAMPLES))
     if mode == "stsc-descending":
         entries = [struct.pack(">III", c, 10, 1) for c in (1, 3, 2)]  # first_chunk 1, then 3 > 2: not increasing
@@ -152,7 +172,18 @@ def progressive(mode: str, inject: bytes = b"", moov_first: bool = True) -> byte
             body.append(struct.pack(">I", 7) + b"free")  # size 7 < 8: an impossible box header
         if inject:
             body.append(inject)
-        body.append(trak(1, [stts, *extra, stsc, stsz, stco], hevc=mode == "hvc1-strip-ps", strip_ps=True))
+        if mode == "elst-in-moov":
+            body.append(full(b"elst", 0, 0, struct.pack(">I", 1), struct.pack(">IiHH", SAMPLES * 1000 // 30, 0, 1, 0)))
+        body.append(
+            trak(
+                1,
+                [stts, *([stts] if mode == "dup-stts" else []), *extra, stsc, stsz, stco],
+                hevc=mode == "hvc1-strip-ps",
+                strip_ps=True,
+                tkhd_extra=bytes(4) if mode == "tkhd-padded" else b"",
+                stsd_box=mode != "missing-stsd",
+            )
+        )
         return box(b"moov", *body)
 
     data_start = len(ftyp) + (len(moov([0] * len(chunks))) if moov_first else 0) + 8
@@ -202,7 +233,7 @@ def walk_variant(args: argparse.Namespace) -> bytes:
     return base
 
 
-def fragmented(brand: bytes, tracks: int) -> bytes:
+def fragmented(brand: bytes, tracks: int, no_tfhd: bool = False) -> bytes:
     ftyp = box(b"ftyp", brand, struct.pack(">I", 0), b"iso6" + brand)
     empty = [full(k, 0, 0, struct.pack(">I", 0)) for k in (b"stts", b"stsc")] + [
         full(b"stsz", 0, 0, bytes(8)),
@@ -225,7 +256,7 @@ def fragmented(brand: bytes, tracks: int) -> bytes:
                 struct.pack(">Ii", n, data_offset),
                 *(struct.pack(">II", 1000, SAMPLE_SIZE) for _ in range(n)),
             )
-            trafs.append(box(b"traf", tfhd, tfdt, trun))
+            trafs.append(box(b"traf", *([] if no_tfhd else [tfhd]), tfdt, trun))
         return box(b"moof", full(b"mfhd", 0, 0, struct.pack(">I", 1)), *trafs)
 
     first = moof(0)
@@ -243,6 +274,12 @@ def main(argv: list[str] | None = None) -> int:
         "hvc1-strip-ps",
         "cmfc-two-tracks",
         "msix-no-sidx",
+        "missing-stsd",
+        "traf-no-tfhd",
+        "dup-stts",
+        "elst-in-moov",
+        "stts-count-overflow",
+        "tkhd-padded",
     ):
         mode.add_argument(f"--{flag}", action="store_true")
     mode.add_argument("--box-size", type=lambda v: int(v, 0), choices=(0, 1, 7, 0xFFFFFFFF))
@@ -282,9 +319,23 @@ def main(argv: list[str] | None = None) -> int:
         data = fragmented(b"cmfc", 2)
     elif args.msix_no_sidx:
         data = fragmented(b"msix", 1)
+    elif args.traf_no_tfhd:
+        data = fragmented(b"iso6", 1, no_tfhd=True)
     else:
         flag = next(
-            f for f in ("stco_beyond_eof", "stsc_descending", "ctts_v0_negative", "hvc1_strip_ps") if getattr(args, f)
+            f
+            for f in (
+                "stco_beyond_eof",
+                "stsc_descending",
+                "ctts_v0_negative",
+                "hvc1_strip_ps",
+                "missing_stsd",
+                "dup_stts",
+                "elst_in_moov",
+                "stts_count_overflow",
+                "tkhd_padded",
+            )
+            if getattr(args, f)
         )
         data = progressive(flag.replace("_", "-"))
     args.output.write_bytes(data)

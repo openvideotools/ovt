@@ -92,6 +92,21 @@ X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
 // WI-1.206 (stsd and sample entries, §8.3.2).
 X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+X(CNT_1003, "CNT-1003", Warning, "unknown FullBox version", "per box")
+X(CNT_1005, "CNT-1005", Info, "unparsed trailing bytes after the last field", "per box")
+X(CNT_1011, "CNT-1011", Error,
+  "required box missing: `mvhd` in `moov`; `tkhd`, `mdia` in `trak`; `mdhd`, `hdlr`, `minf` in `mdia`; `stbl`, `dinf` in `minf`; `stsd`, `stts`, `stsc`, `stsz|stz2`, `stco|co64` in `stbl` (unless `cmfc`/fragment-only with empty stbl, where `stts/stsc/stsz/stco` must still exist with 0 entries); `mfhd` in `moof`; `tfhd` in `traf`; message names the box and parent", "14496-12 §8.x \"Mandatory: Yes\"")
+X(CNT_1012, "CNT-1012", Error,
+  "duplicate box where exactly one is allowed (`mvhd`, `tkhd`, `mdhd`, `hdlr`, `stsd`, `stts`, `stsz`, `stco`/`co64`, `tfhd`, `tfdt`, `mehd`, `ftyp`) or duplicate `track_ID`", "14496-12 §8.x \"Quantity: Exactly one\"")
+X(CNT_1013, "CNT-1013", Warning,
+  "box in a parent where the registry does not allow it (`allowed_parents` non-empty and mismatch); e.g. `colr` in `stbl`, `elst` outside `edts`, `stss` in `traf`", "conformance JSON")
+X(CNT_1014, "CNT-1014", Error,
+  "box size does not match its fields: payload ends before the fields' declared count (`entry_count` × entry size > payload)", "per box")
+X(CNT_1015, "CNT-1015", Warning,
+  "box size larger than fields + known children by more than 0 bytes **and** box is one of the fixed-size boxes (`tkhd`, `mdhd`, `mvhd`, `vmhd`, `smhd`, `btrt`, `pasp`, `clli`, `mdcv`, `tfdt`, `mfhd`, `mehd`, `trex`)", "per box")
+X(CNT_1024, "CNT-1024", Info,
+  "`tkhd.matrix` is neither identity nor a 90°/180°/270° rotation; `TrackInfo.rotation = 0`", "14496-12 §8.3.2")
+X(CNT_1032, "CNT-1032", Warning, "`mdhd.timescale == 0` or `mvhd.timescale == 0`", "14496-12 §8.4.2")
 
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
