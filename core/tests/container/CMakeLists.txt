@@ -19,6 +19,7 @@ add_executable(
   diag_coverage_test.cpp
   field_builder_test.cpp
   fragments_test.cpp
+  hdr_summary_test.cpp
   ivf_test.cpp
   lazy_test.cpp
   m3u8_robustness_test.cpp
