@@ -225,3 +225,17 @@ X(CNT_9001, "CNT-9001", Error,
 X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
   "14496-15 §4.3")
 X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")
+
+// WI-1.223 (HdrMetadata summary, §8.4.6).
+X(CNT_5001, "CNT-5001", Warning, "`colr` nclx differs from SPS VUI / AV1 `color_config`", "14496-12 §12.1.5")
+X(CNT_5003, "CNT-5003", Info, "`mdcv` differs from SEI 137", "ST 2086")
+X(CNT_5004, "CNT-5004", Info, "`clli` differs from SEI 144", "CTA-861.3")
+X(CNT_5005, "CNT-5005", Error, "`av1C` bit depth/chroma ≠ sequence header", "AV1-ISOBMFF §2.3")
+X(CNT_5006, "CNT-5006", Error, "`hvcC`/`avcC` profile/bit depth ≠ SPS", "14496-15")
+X(CNT_5007, "CNT-5007", Warning, "`colr` absent on a video track (SDR assumed)", "23000-19 §7.5.3")
+X(CNT_5008, "CNT-5008", Warning, "`transfer_characteristics == 2` (unspecified) with 10-bit BT.2020 content", "")
+X(CNT_5010, "CNT-5010", Warning, "DV RPU in bitstream, no `dvcC`/`dvvC`", "DV-ISOBMFF")
+X(CNT_5011, "CNT-5011", Warning, "`dvcC`/`dvvC` present, no RPU found in probed samples", "DV-ISOBMFF")
+X(CNT_5012, "CNT-5012", Info, "PQ without static metadata", "")
+X(CNT_5021, "CNT-5021", Warning, "`dv_bl_signal_compatibility_id` contradicts `colr`", "DV-ISOBMFF §2.2")
+X(CNT_5022, "CNT-5022", Info, "sample entry `dvh1`/`dvhe` (non-cross-compatible) vs `hvc1`+`dvvC`", "DV-ISOBMFF §3")
