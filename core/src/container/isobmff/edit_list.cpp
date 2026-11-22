@@ -272,8 +272,7 @@ class Builder {
     // Without samples (fragmented movie) mdhd.duration, 0 = unknown.
     mdhd_duration_ = media.duration;
     media_duration_ = media.duration;
-    const auto n =
-        std::min<uint64_t>({table.count, table.dts.size(), table.cts_offset.size(), table.duration.size()});
+    const auto n = std::min<uint64_t>({table.count, table.dts.size(), table.cts_offset.size(), table.duration.size()});
     if (n != 0) {
       int64_t end = 0;
       for (uint64_t i = 0; i < n; ++i) {
