@@ -39,6 +39,14 @@ struct TrackFragmentInfo {
   uint32_t timescale = 0;  // mdhd.timescale of the track, 0 = unknown
 };
 
+// What `tenc` tells the `senc` boxes of its track (chapter 08 §8.3.8, WI-1.213). SPEC-ASSUMPTION(#794): `tenc` is
+// decoded in the child context of `schi`, so `ctx.per_sample_iv_size` never reaches a `senc` in a `moof`; the value is
+// also kept in one map shared by every copy of the context, keyed by track_ID (the first `tenc` of a track wins).
+struct TrackEncryption {
+  uint8_t per_sample_iv_size = 0xFF;  // 0xFF = unknown
+  bool is_protected = false;
+};
+
 // What the `stbl` children tell each other (chapter 08 §8.3.4, WI-1.209): the counts the cross-box checks of
 // finish_sample_tables() need. A fresh state starts at every `trak` because the children of a box see a copy of its
 // context.
@@ -81,6 +89,7 @@ struct BoxContext {
   PagedSpan* payload_pages = nullptr;  // the whole payload of a box a windowed decoder reads; null outside the walker
   // null until the walk creates it (a test context without one simply keeps no track state)
   std::shared_ptr<std::map<uint32_t, TrackFragmentInfo>> trex_for_track;
+  std::shared_ptr<std::map<uint32_t, TrackEncryption>> enc_for_track;  // SPEC-ASSUMPTION(#794), as trex_for_track
   const fb::BoxNodeT* parent = nullptr;
 
   [[nodiscard]] bool in(std::string_view fourcc) const noexcept {
