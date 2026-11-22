@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/brands.h"
 #include "container/isobmff/fragments.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/tracks.h"
@@ -135,7 +136,8 @@ FragmentBuild& IsobmffReader::fragment_build(size_t ordinal, const fb::SampleTab
 }
 
 size_t IsobmffReader::validate(ValidationLevel level) {
-  const size_t added = isobmff::validate(tree_.root, level);
+  size_t added = isobmff::validate(tree_.root, level);
+  added += check_brands(file_, tree_.root, level);
   if (added > 0) {
     ++revision_;
   }
