@@ -75,12 +75,6 @@ const Bytes kKid = [] {
 Bytes tenc_v0(uint8_t is_protected, uint8_t iv_size) {
   return box("tenc", full(0, 0, cat({be(0, 2), be(is_protected, 1), be(iv_size, 1), kKid})));
 }
-Bytes tenc_cbcs(uint8_t crypt, uint8_t skip, const Bytes& constant_iv) {
-  return box("tenc", full(1, 0,
-                          cat({be(0, 1), be(static_cast<uint64_t>(crypt << 4U) | skip, 1), be(1, 1), be(0, 1), kKid,
-                               be(constant_iv.size(), 1), constant_iv})));
-}
-
 Bytes ftyp() {
   return box("ftyp", cat({str("isom"), be(0, 4), str("isom"), str("cmfc")}));
 }
