@@ -5,7 +5,7 @@
 // walk and the hand decoders built; the few payloads no decoder covers (`frma`, `colr` for the AV1 codec string) are
 // read straight from the file.
 //
-// SPEC-ASSUMPTION(#768): (1) `sample_count` counts the `moov` tables only; the `trun` part is added by WI-1.219.
+// Spec (§8.1.3, pass 26): (1) `sample_count` counts the `moov` tables only; the `trun` part is added by WI-1.219.
 // (2) Without a `btrt`, `bitrate_avg_bps` is derived only when `stsz` has one common sample size, and
 // `bitrate_max_bps` stays 0 until the SampleTable exists (WI-1.218). (3) A `dvcC`/`dvvC` entry gets the Dolby Vision
 // codec string (`dvh1.08.06`) instead of the HEVC form.
@@ -529,7 +529,7 @@ std::string codec_string_of(const io::RandomAccessFile& file, const Node& entry,
   return fmt_name == "mp4a" && es.oti.has_value() ? mp4a_string(es.oti.value(), es.aot) : fmt_name;
 }
 
-// btrt when present, else the average of a constant-size stsz (SPEC-ASSUMPTION(#768) above).
+// btrt when present, else the average of a constant-size stsz (see the header note above).
 void fill_bitrate(const Node& entry, uint64_t constant_size, fb::TrackInfoT& t) {
   if (const Node* btrt = child(entry, "btrt")) {
     t.bitrate_max_bps = static_cast<uint32_t>(uval(*btrt, "maxBitrate"));
