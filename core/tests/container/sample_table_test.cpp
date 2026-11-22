@@ -545,7 +545,7 @@ TEST_CASE("sample table: ovt_container_sample_table", "[container][sample_table]
 
 TEST_CASE("sample table rows equal the MP4Box -dts goldens", "[container][sample_table][golden][needs-corpus]") {
   const std::filesystem::path dir = std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/golden/isobmff";
-  size_t compared = 0;
+  size_t compared = 0;  // corpus files with a golden
   for (const auto& entry : std::filesystem::directory_iterator(dir)) {
     const std::string name = entry.path().filename().string();
     constexpr std::string_view suffix = ".mp4box-dts.json";
@@ -557,6 +557,7 @@ TEST_CASE("sample table rows equal the MP4Box -dts goldens", "[container][sample
     if (!path) {
       continue;
     }
+    ++compared;  // counted outside the section: Catch2 re-enters the test once per section
     DYNAMIC_SECTION(id) {
       const auto file = ovt::io::RandomAccessFile::open(path->string());
       const iso::WalkResult w = iso::walk(*file);
@@ -591,7 +592,6 @@ TEST_CASE("sample table rows equal the MP4Box -dts goldens", "[container][sample
           CHECK(t->dts[i] == g.at("dts").get<int64_t>());
           CHECK(t->dts[i] + t->cts_offset[i] == g.at("cts").get<int64_t>());
           CHECK(t->is_sync[i] == (g.at("sync").get<int>() != 0));
-          ++compared;
         }
       }
     }
