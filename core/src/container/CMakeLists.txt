@@ -21,8 +21,11 @@ target_sources(
           isobmff/decoders/sample_tables.cpp
           isobmff/field_builder.cpp
           isobmff/fragments.cpp
+          isobmff/hdr_summary.cpp
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
+          isobmff/tracks.cpp
+          isobmff/validate.cpp
           diagnostics.cpp
           format_sniff.cpp
           ivf.cpp

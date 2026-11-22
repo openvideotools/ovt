@@ -16,6 +16,7 @@
 #include <optional>
 #include <span>
 
+#include "api/buffer.hpp"
 #include "container/isobmff/lazy.h"
 #include "container/ivf.hpp"
 #include "container/mpegts/ts_packets.hpp"
@@ -239,8 +240,23 @@ OVT_API int ovt_container_track_count(const ovt_Container* container) {
 }
 
 OVT_API ovt_status ovt_container_track_info(ovt_Container* container, int track_index, ovt_Buffer* out) {
-  (void)track_index;
-  return container == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.217
+  if (container == nullptr || out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  try {
+    if (track_index < 0 || track_index >= container->reader->track_count()) {
+      return OVT_E_INVALID_ARG;
+    }
+    const std::vector<uint8_t> info = container->reader->track_info(track_index);
+    return info.empty() ? OVT_E_UNSUPPORTED
+                        : ovt::api::make_buffer(info.data(), info.size(), out);  // other formats: later
+  } catch (...) {
+    return ovt::container::status_of_current_exception();
+  }
 }
 
 OVT_API ovt_status ovt_container_sample_table(ovt_Container* container, int track_index, uint32_t first, uint32_t count,

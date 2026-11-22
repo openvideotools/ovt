@@ -44,10 +44,10 @@ struct UnitLocation {
   uint64_t length = 0;
 };
 
-// SPEC-ASSUMPTION(#683): this internal function is WI-1.234's share of ovt_stream_unit_bytes; WI-1.130 adds the public
-// declaration and calls it. PagedSpan is not produced here (moved to WI-1.209 by #630).
-// The body of ovt_stream_unit_bytes (backbone §0.6.1). `out_raw` receives the bytes as stored; an AV1 OBU stored
-// without obu_size is re-framed with obu_has_size_field = 1 and a leb128 size. `out_rbsp` receives the
+// WI-1.234's share of ovt_stream_unit_bytes; ovt_stream_unit_bytes (WI-1.130, core/src/api/stream_api.cpp) calls it
+// with the unit's file_span from the index (#683). PagedSpan is not produced here (moved to WI-1.209 by #630). The body
+// of ovt_stream_unit_bytes (backbone §0.6.1). `out_raw` receives the bytes as stored; an AV1 OBU stored without
+// obu_size is re-framed with obu_has_size_field = 1 and a leb128 size. `out_rbsp` receives the
 // emulation-prevention-free NAL for H.264/H.265 and an empty buffer for AV1 and other codecs. Either may be null.
 // Both are caller-owned (ovt_buffer_free). OVT_E_CORRUPT when the unit lies outside the file or is empty AV1 or
 // H.26x; OVT_E_IO / OVT_E_NOMEM from the reads and allocations. Never throws.

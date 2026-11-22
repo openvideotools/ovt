@@ -2,11 +2,12 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # isobmff-broken
 
-Small ISOBMFF files (about 20 KiB each, 260 KiB in all) with one deliberate defect in the box headers, used by
+Small ISOBMFF files (about 20 KiB each, 450 KiB in all) with one deliberate defect in the box headers, used by
 `core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
-in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209). Each is the base
-file of `tools/make_broken.py` with one change; regenerate a file with the command in the table (the output is
-byte-for-byte reproducible).
+in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the last six, with
+a defect in the box rules of chapter 8 §8.5, are used by `core/tests/container/diag_coverage_test.cpp` (WI-1.224a).
+Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change;
+regenerate a file with the command in the table (the output is byte-for-byte reproducible).
 
 | File | `tools/make_broken.py` arguments | Expected code |
 |---|---|---|
@@ -27,6 +28,12 @@ byte-for-byte reproducible).
 | `stsc_descending.mp4` | `--stsc-descending` | `CNT-2003` |
 | `ctts_v0_negative.mp4` | `--ctts-v0-negative` | `CNT-2002` |
 | `stco_beyond_eof.mp4` | `--stco-beyond-eof` | `CNT-2007` |
+| `missing_stsd.mp4` | `--missing-stsd` | `CNT-1011` |
+| `traf_no_tfhd.mp4` | `--traf-no-tfhd` | `CNT-1011` |
+| `dup_stts.mp4` | `--dup-stts` | `CNT-1012` |
+| `elst_in_moov.mp4` | `--elst-in-moov` | `CNT-1013` |
+| `stts_count_overflow.mp4` | `--stts-count-overflow` | `CNT-1014` |
+| `tkhd_padded.mp4` | `--tkhd-padded` | `CNT-1015` |
 
 The other truncation offsets and the 0/1/7/0xFFFFFFFF size words are exercised in memory by the test, which
 mutates a base file of its own, so the committed set stays small.

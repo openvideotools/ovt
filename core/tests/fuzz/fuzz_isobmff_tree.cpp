@@ -4,9 +4,10 @@
 // Fuzz target of the ISOBMFF tree (chapter 08 §8.2.3, §8.2.4 and §8.9.4, WI-1.204). The whole input is the file, read
 // through an in-memory RandomAccessFile: ovt_container_open, ovt_container_tree, then ovt_container_expand on every
 // box of the tree. Invariants, each an abort when violated: no exception escapes; open returns a documented status;
-// every tree buffer verifies; expand of an offset taken from the tree returns OVT_OK; box spans stay inside the file;
-// an expansion that completes leaves a tree that still verifies. The number of expansions is capped so one input
-// stays fast.
+// every tree buffer verifies; every TrackInfo buffer verifies; expand of an offset taken from the tree returns OVT_OK;
+// box spans stay inside the file; an expansion that completes leaves a tree that still verifies; the validation driver
+// (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing. The number of
+// expansions is capped so one input stays fast.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -17,6 +18,8 @@
 #include <span>
 #include <vector>
 
+#include "container/isobmff/box_walk.h"
+#include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
 #include "ovt/container.h"
@@ -78,7 +81,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     for (const uint64_t off : after) {
       require(ovt_container_expand(c, off) == OVT_OK);
     }
+    // WI-1.217: every track of the tree is also served as its own verified TrackInfo buffer.
+    const auto* tracks = verified_tree(c)->tracks();
+    const int count = ovt_container_track_count(c);
+    require(count == (tracks == nullptr ? 0 : static_cast<int>(tracks->size())));
+    for (int i = 0; i < count; ++i) {
+      ovt_Buffer b{};
+      require(ovt_container_track_info(c, i, &b) == OVT_OK);
+      flatbuffers::Verifier v(b.data, b.size);
+      require(v.VerifyBuffer<ovt::fb::TrackInfo>(nullptr));
+      delete[] b.data;  // §12.3.1 rule 3a: new[]-allocated; the fuzz targets do not link status.cpp
+    }
     ovt_container_close(c);
+    // The validation driver over the complete walk: idempotent, whatever the bytes.
+    const ovt::io::MemoryFile file{std::span<const uint8_t>(data, size)};
+    auto walked = ovt::container::isobmff::walk(file);
+    using ovt::container::isobmff::ValidationLevel;
+    ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Standard);
+    require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();
   }

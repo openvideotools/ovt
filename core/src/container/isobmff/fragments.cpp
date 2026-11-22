@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a). See fragments.h.
+// FragmentTimeline builder (chapter 08 §8.4.3, WI-1.219a/b). See fragments.h.
 
 #include "container/isobmff/fragments.h"
 
@@ -11,12 +11,16 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <limits>
 #include <memory>
+#include <numeric>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -253,6 +257,78 @@ std::vector<uint64_t> parse_saio(std::span<const uint8_t> p) {
   return out;
 }
 
+struct SidxBox {
+  bool ok = false;
+  uint32_t reference_id = 0;
+  uint32_t timescale = 0;
+  uint64_t ept = 0;
+  uint64_t first_offset = 0;
+  std::vector<std::unique_ptr<fb::SidxRefT>> refs;
+};
+
+SidxBox parse_sidx(std::span<const uint8_t> p) {
+  SidxBox s;
+  try {
+    BitReader br(p);
+    const bool wide = br.u(8) != 0;
+    br.skip_bits(24);
+    s.reference_id = u32(br);
+    s.timescale = u32(br);
+    s.ept = u32_or_64(br, wide);
+    s.first_offset = u32_or_64(br, wide);
+    br.skip_bits(16);
+    const auto n = static_cast<uint32_t>(br.u(16));
+    for (uint32_t i = 0; i < n; ++i) {
+      auto r = std::make_unique<fb::SidxRefT>();
+      r->reference_type = static_cast<uint8_t>(br.u(1));
+      r->referenced_size = static_cast<uint32_t>(br.u(31));
+      r->subsegment_duration = u32(br);
+      r->starts_with_sap = br.u(1) != 0;
+      r->sap_type = static_cast<uint8_t>(br.u(3));
+      r->sap_delta_time = static_cast<uint32_t>(br.u(28));
+      r->actual_size = -1;
+      r->actual_duration = -1;
+      s.refs.push_back(std::move(r));
+    }
+    s.ok = true;
+  } catch (const ParseError&) {
+    s.ok = !s.refs.empty();
+  }
+  return s;
+}
+
+struct TfraEntry {
+  uint64_t time = 0;
+  uint64_t moof_offset = 0;
+  uint64_t traf = 0, trun = 0, sample = 0;  // 1-based
+};
+
+std::pair<uint32_t, std::vector<TfraEntry>> parse_tfra(std::span<const uint8_t> p) {
+  std::pair<uint32_t, std::vector<TfraEntry>> out{0, {}};
+  try {
+    BitReader br(p);
+    const bool wide = br.u(8) == 1;
+    br.skip_bits(24);
+    out.first = u32(br);
+    br.skip_bits(26);
+    const auto traf_len = static_cast<unsigned>(br.u(2) + 1) * 8U;
+    const auto trun_len = static_cast<unsigned>(br.u(2) + 1) * 8U;
+    const auto sample_len = static_cast<unsigned>(br.u(2) + 1) * 8U;
+    const uint32_t n = u32(br);
+    for (uint32_t i = 0; i < n; ++i) {
+      TfraEntry e;
+      e.time = u32_or_64(br, wide);
+      e.moof_offset = u32_or_64(br, wide);
+      e.traf = br.u(traf_len);
+      e.trun = br.u(trun_len);
+      e.sample = br.u(sample_len);
+      out.second.push_back(e);
+    }
+  } catch (const ParseError&) {
+  }
+  return out;
+}
+
 std::optional<uint64_t> add_signed(uint64_t a, int64_t b) {
   uint64_t r = 0;
   if (b >= 0 ? __builtin_add_overflow(a, static_cast<uint64_t>(b), &r)
@@ -277,6 +353,13 @@ struct TrafRun {
   size_t traf_count = 0;
   uint64_t data_end = 0;  // end of the previous traf's sample data (implicit base, §8.4.3 2.2)
   uint64_t max_end = 0;   // largest sample end of the moof, all tracks (CNT-4022)
+};
+
+// Where the samples of one traf of this track went (tfra lookup).
+struct TrafLoc {
+  uint64_t moof_offset = 0;
+  uint32_t traf_number = 0;
+  std::vector<std::pair<size_t, uint32_t>> truns;  // first sample index, sample count
 };
 
 class Builder {
@@ -306,6 +389,16 @@ class Builder {
         styp.reset();
       }
     }
+    build_duration_prefix();
+    min_cts_.assign(out_.timeline.fragments.size(), std::nullopt);
+    for (const Hdr& h : top_) {
+      if (h.type == "sidx") {
+        sidx(h);
+      } else if (h.type == "mfra") {
+        mfra(h);
+      }
+    }
+    apply_ref_ranges();
     return std::move(out_);
   }
 
@@ -393,6 +486,7 @@ class Builder {
       last_seq_ = info->sequence_number;
     }
     current_ = info.get();
+    frag_first_sample_.push_back(out_.samples.count());
     for (const Hdr* t : trafs) {
       ++fr.traf_number;
       traf(*t, fr);
@@ -473,10 +567,11 @@ class Builder {
     if (mine) {
       start_dts(kids, *ti);
     }
+    TrafLoc loc{fr.moof->offset, fr.traf_number, {}};
     TrunState st{base, std::nullopt, false, 0, 0};
     for (const Hdr& k : kids) {
       if (k.type == "trun") {
-        trun(k, t, d, mine, st, *ti, fr);
+        trun(k, t, d, mine, st, *ti, loc, fr);
       }
     }
     fr.data_end = st.prev_end.value_or(base);
@@ -497,10 +592,11 @@ class Builder {
     }
     expected_dts_ = dts_;
     saio(kids, *ti);
+    locs_.push_back(std::move(loc));
     current_->trafs.push_back(std::move(ti));
   }
 
-  // §8.4.3 2.4 and 2.5. SPEC-ASSUMPTION(#774): "fragment k" in CNT-4020 is the 0-based FragmentInfo.index.
+  // §8.4.3 2.4 and 2.5 (CNT-4020 names the 0-based FragmentInfo.index).
   void start_dts(const std::vector<Hdr>& kids, fb::TrafInfoT& ti) {
     const Hdr* tfdt_box = first_of(kids, "tfdt");
     const std::optional<uint64_t> tfdt = tfdt_box != nullptr ? parse_tfdt(payload(file_, *tfdt_box)) : std::nullopt;
@@ -558,7 +654,7 @@ class Builder {
   }
 
   // §8.4.3 2.3, and 2.6 for this track's samples.
-  void trun(const Hdr& box, const Tfhd& t, const Defaults& d, bool mine, TrunState& st, fb::TrafInfoT& ti,
+  void trun(const Hdr& box, const Tfhd& t, const Defaults& d, bool mine, TrunState& st, fb::TrafInfoT& ti, TrafLoc& loc,
             TrafRun& fr) {
     const Trun r = parse_trun(payload(file_, box));
     auto info = std::make_unique<fb::TrunInfoT>();
@@ -589,6 +685,7 @@ class Builder {
       st.prev_end = end;
       return;
     }
+    const size_t first_index = out_.samples.count();
     uint64_t pos = *first;
     for (uint32_t s = 0; s < r.count; ++s) {
       const TrunEntry e = entry(r, s);
@@ -610,6 +707,7 @@ class Builder {
     }
     info->size_sum = pos - *first;
     st.prev_end = pos;
+    loc.truns.emplace_back(first_index, static_cast<uint32_t>(out_.samples.count() - first_index));
     ti.truns.push_back(std::move(info));
   }
 
@@ -681,8 +779,7 @@ class Builder {
       uint64_t r = 0;
       ti.saio_resolved.push_back(__builtin_add_overflow(ti.base_data_offset, off, &r) ? 0 : r);
     }
-    // SPEC-ASSUMPTION(#774): the aux data of a senc starts at its first IV, after the FullBox header and the u32
-    // sample_count.
+    // The aux data of a senc starts at its first IV, after the FullBox header and the u32 sample_count (§8.4.3 2.7).
     if (senc != nullptr && !ti.saio_resolved.empty() && ti.saio_resolved[0] != senc->payload() + 8) {
       diag("CNT-6005",
            "saio resolves to offset " + std::to_string(ti.saio_resolved[0]) +
@@ -693,12 +790,236 @@ class Builder {
     }
   }
 
+  // One unit of cross-check work: the sidx / tfra checks loop over untrusted counts, so they poll `cancel`.
+  void tick() {
+    if (++work_ % kCancelEvery == 0) {
+      cancel_.throw_if_requested();
+    }
+  }
+
+  // The box-aligned extent of top-level boxes starting at `begin` and covering [begin, end): its size, or −1 when
+  // no top-level box starts at `begin`. `top_` is in file order, so both ends are binary searches.
+  [[nodiscard]] int64_t extent(uint64_t begin, uint64_t end) const {
+    const auto by_offset = [](const Hdr& h) { return h.offset; };
+    const auto it = std::ranges::lower_bound(top_, begin, {}, by_offset);
+    if (it == top_.end() || it->offset != begin) {
+      return -1;
+    }
+    const auto last = std::ranges::lower_bound(it, top_.end(), end, {}, by_offset);
+    return last == it ? 0 : static_cast<int64_t>(std::prev(last)->end() - begin);
+  }
+
+  // Prefix sums of the trun durations of every fragment (CNT-4032 in O(1) per reference). Unsigned, so a crafted
+  // sum wraps instead of overflowing; the difference of two prefixes is still the range sum modulo 2^64.
+  void build_duration_prefix() {
+    dur_prefix_.assign(1, 0);
+    for (const auto& f : out_.timeline.fragments) {
+      uint64_t d = dur_prefix_.back();
+      for (const auto& t : f->trafs) {
+        for (const auto& tr : t->truns) {
+          d += tr->duration_sum;
+        }
+      }
+      dur_prefix_.push_back(d);
+    }
+  }
+
+  // §8.4.3 step 3.
+  void sidx(const Hdr& box) {
+    cancel_.throw_if_requested();
+    SidxBox s = parse_sidx(payload(file_, box));
+    if (!s.ok || s.reference_id != in_.track_id) {
+      return;
+    }
+    const bool same_scale = in_.timescale == 0 || s.timescale == in_.timescale;
+    if (!same_scale) {
+      diag("CNT-4031",
+           "sidx.timescale " + std::to_string(s.timescale) + " differs from the track timescale " +
+               std::to_string(in_.timescale),
+           box.offset);
+    }
+    auto info = std::make_unique<fb::SidxInfoT>();
+    info->sidx_offset = box.offset;
+    info->reference_id = s.reference_id;
+    info->timescale = s.timescale;
+    info->earliest_presentation_time = s.ept;
+    info->first_offset = s.first_offset;
+    uint64_t abs = 0;
+    bool wrapped = __builtin_add_overflow(box.end(), s.first_offset, &abs);
+    for (size_t k = 0; k < s.refs.size(); ++k) {
+      tick();
+      fb::SidxRefT& r = *s.refs[k];
+      uint64_t end = 0;
+      wrapped = wrapped || __builtin_add_overflow(abs, uint64_t{r.referenced_size}, &end);
+      if (wrapped) {  // the offsets leave the 64-bit range: this and the remaining references cover nothing
+        diag("CNT-4030",
+             "sidx reference " + std::to_string(k) + ": offset overflows (first_offset " +
+                 std::to_string(s.first_offset) + ")",
+             box.offset);
+        for (; k < s.refs.size(); ++k) {
+          s.refs[k]->actual_size = -1;
+          info->refs.push_back(std::move(s.refs[k]));
+        }
+        break;
+      }
+      r.abs_offset = abs;
+      r.abs_end = end;
+      r.actual_size = extent(r.abs_offset, r.abs_end);
+      if (r.actual_size != int64_t{r.referenced_size}) {
+        diag("CNT-4030",
+             "sidx reference " + std::to_string(k) + " at offset " + std::to_string(abs) + ": referenced_size " +
+                 std::to_string(r.referenced_size) + ", actual " + std::to_string(r.actual_size),
+             box.offset);
+      }
+      check_ref(r, k, k == 0 ? std::optional(s.ept) : std::nullopt, same_scale, box.offset);
+      abs = end;
+      info->refs.push_back(std::move(s.refs[k]));
+    }
+    out_.timeline.sidx.push_back(std::move(info));
+  }
+
+  // The smallest CTS of a fragment's samples, computed once per fragment.
+  int64_t min_cts(size_t f) {
+    if (!min_cts_[f]) {
+      const size_t s0 = frag_first_sample_[f];
+      const size_t s1 = f + 1 < frag_first_sample_.size() ? frag_first_sample_[f + 1] : out_.samples.count();
+      int64_t m = kInt64Max;
+      for (size_t i = s0; i < s1; ++i) {
+        tick();
+        m = std::min(m, out_.samples.dts[i] + out_.samples.cts_offset[i]);
+      }
+      min_cts_[f] = m;
+    }
+    return min_cts_[f].value_or(kInt64Max);
+  }
+
+  // Duration, EPT and SAP checks of one sidx reference against the fragments it covers. The fragments are in file
+  // order, so the covered ones are a binary-searched range [lo, hi).
+  void check_ref(fb::SidxRefT& r, size_t k, std::optional<uint64_t> ept, bool same_scale, uint64_t at) {
+    const int32_t global = ref_count_++;
+    const auto& frags = out_.timeline.fragments;
+    const auto by_offset = [](const auto& f) { return f->moof_offset; };
+    const auto lo = static_cast<size_t>(std::ranges::lower_bound(frags, r.abs_offset, {}, by_offset) - frags.begin());
+    const auto hi = static_cast<size_t>(std::ranges::lower_bound(frags, r.abs_end, {}, by_offset) - frags.begin());
+    if (lo >= hi) {
+      return;
+    }
+    if (r.reference_type == 0) {  // a media reference; a type-1 reference covers the sidx it points at
+      ref_ranges_.emplace_back(lo, hi, global);
+    }
+    const auto dur = static_cast<int64_t>(dur_prefix_[hi] - dur_prefix_[lo]);
+    r.actual_duration = dur;
+    const std::string ref = "sidx reference " + std::to_string(k) + " at offset " + std::to_string(r.abs_offset);
+    if (same_scale && dur != int64_t{r.subsegment_duration}) {
+      diag("CNT-4032",
+           ref + ": subsegment_duration " + std::to_string(r.subsegment_duration) + ", trun durations " +
+               std::to_string(dur) + " (delta " + std::to_string(int64_t{r.subsegment_duration} - dur) + ")",
+           at);
+    }
+    const size_t s0 = frag_first_sample_[lo];
+    const size_t s1 = lo + 1 < frag_first_sample_.size() ? frag_first_sample_[lo + 1] : out_.samples.count();
+    if (s0 >= s1) {
+      return;
+    }
+    if (r.reference_type == 0 && r.starts_with_sap && !out_.samples.is_sync(s0)) {
+      diag("CNT-4034", ref + ": starts_with_SAP but the first sample is non-sync", at);
+    }
+    if (ept && same_scale && static_cast<int64_t>(*ept) != min_cts(lo)) {
+      diag("CNT-4033",
+           "sidx earliest_presentation_time " + std::to_string(*ept) + " ≠ first CTS " + std::to_string(min_cts(lo)),
+           at);
+    }
+  }
+
+  // FragmentInfo.sidx_reference_index of the media references, the last one in file order winning (as if assigned
+  // in turn). Applied backwards with a skip list, so each fragment is written once however the ranges overlap.
+  void apply_ref_ranges() {
+    auto& frags = out_.timeline.fragments;
+    std::vector<size_t> next(frags.size() + 1);
+    std::iota(next.begin(), next.end(), size_t{0});
+    const auto find = [&](size_t i) {
+      while (next[i] != i) {
+        next[i] = next[next[i]];
+        i = next[i];
+      }
+      return i;
+    };
+    for (const auto& [lo, hi, global] : std::ranges::reverse_view(ref_ranges_)) {
+      tick();
+      for (size_t i = find(lo); i < hi; i = find(i)) {
+        frags[i]->sidx_reference_index = global;
+        next[i] = i + 1;
+      }
+    }
+  }
+
+  // §8.4.3 step 4.
+  void mfra(const Hdr& box) {
+    const std::vector<Hdr> kids = children(file_, box);
+    if (const Hdr* mfro = first_of(kids, "mfro"); mfro != nullptr) {
+      const std::optional<uint32_t> size = parse_u32_after_fullbox(payload(file_, *mfro));
+      if (size && *size != box.size) {
+        diag("CNT-4011", "mfro.size " + std::to_string(*size) + " ≠ mfra size " + std::to_string(box.size),
+             mfro->offset);
+      }
+    }
+    for (const Hdr& k : kids) {
+      if (k.type != "tfra") {
+        continue;
+      }
+      const auto [track, entries] = parse_tfra(payload(file_, k));
+      if (track != in_.track_id) {
+        continue;
+      }
+      uint64_t bad = 0;
+      std::string first;
+      for (size_t e = 0; e < entries.size(); ++e) {
+        tick();
+        const std::string why = check_tfra(entries[e]);
+        if (!why.empty() && bad++ == 0) {
+          first = "entry " + std::to_string(e) + ": " + why;
+        }
+      }
+      if (bad != 0) {
+        diag("CNT-4010", std::to_string(bad) + " tfra entries do not match the fragments (" + first + ")", k.offset);
+      }
+    }
+  }
+
+  [[nodiscard]] std::string check_tfra(const TfraEntry& e) const {
+    // locs_ is in file order: sorted by (moof_offset, traf_number).
+    using Key = std::pair<uint64_t, uint64_t>;
+    const auto loc = std::ranges::lower_bound(locs_, Key{e.moof_offset, e.traf}, {},
+                                              [](const TrafLoc& l) { return Key{l.moof_offset, l.traf_number}; });
+    if (loc == locs_.end() || loc->moof_offset != e.moof_offset || loc->traf_number != e.traf) {
+      return "moof_offset " + std::to_string(e.moof_offset) + " traf " + std::to_string(e.traf) +
+             " is no traf of this track";
+    }
+    if (e.trun == 0 || e.trun > loc->truns.size() || e.sample == 0 || e.sample > loc->truns[e.trun - 1].second) {
+      return "trun " + std::to_string(e.trun) + " sample " + std::to_string(e.sample) + " does not exist";
+    }
+    const size_t i = loc->truns[e.trun - 1].first + (e.sample - 1);
+    const int64_t dts = out_.samples.dts[i];
+    const auto time = static_cast<int64_t>(e.time);
+    if (time != dts && time != dts + out_.samples.cts_offset[i]) {
+      return "time " + std::to_string(e.time) + " ≠ DTS " + std::to_string(dts) + " / CTS";
+    }
+    return {};
+  }
+
   const io::RandomAccessFile& file_;
   const FragmentTrackInput& in_;
   jobs::Cancel& cancel_;
   std::vector<Hdr> top_;
   FragmentBuild out_;
   fb::FragmentInfoT* current_ = nullptr;
+  std::vector<size_t> frag_first_sample_;  // first sample index of each fragment
+  std::vector<TrafLoc> locs_;
+  std::vector<uint64_t> dur_prefix_;                             // trun duration prefix sums by fragment
+  std::vector<std::optional<int64_t>> min_cts_;                  // min_cts() cache by fragment
+  std::vector<std::tuple<size_t, size_t, int32_t>> ref_ranges_;  // media reference fragment ranges [lo, hi)
+  uint64_t work_ = 0;                                            // tick() counter
+  int32_t ref_count_ = 0;
   std::optional<int64_t> expected_dts_;
   int64_t dts_ = 0;
   std::optional<uint32_t> last_seq_;
