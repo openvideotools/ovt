@@ -203,8 +203,7 @@ X(CNT_6004, "CNT-6004", Error, "`pssh.DataSize` inconsistent with box size", "23
 X(CNT_6009, "CNT-6009", Warning, "`pssh` with unknown SystemID", "")
 X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
-// WI-1.221 (CENC per-sample map, §8.4.4). SPEC-ASSUMPTION(#808): CNT-6015 is the proposed row for a missing or truncated
-// per-sample record; the other codes are the spec rows.
+// WI-1.221 (CENC per-sample map, §8.4.4); CNT-6015 was added by the amendment of #808.
 X(CNT_6002, "CNT-6002", Error, "subsample clear+protected ≠ sample size", "23001-7 §7.2")
 X(CNT_6006, "CNT-6006", Info, "encrypted track with all samples unprotected", "23001-7")
 X(CNT_6007, "CNT-6007", Warning, "subsample protects NAL length/header bytes", "23001-7 §9")

@@ -48,7 +48,7 @@ inline constexpr uint64_t kMaxListedCencFindings = 16;
 // clear range. A protected sample without subsamples is one protected range over the whole sample. For the pattern
 // schemes (`cens`, `cbcs`: crypt_byte_block:skip_byte_block) the pattern restarts at each subsample's protected range
 // and only the crypt blocks of it are protected; a partial trailing block (< 16 bytes) is clear for `cbc1` and `cbcs`
-// and follows the pattern for `cenc` and `cens` (SPEC-ASSUMPTION(#808)).
+// and follows the pattern for `cenc` and `cens`  (§8.4.4 step 5, #808).
 [[nodiscard]] std::vector<syntax::ByteRange> sample_clear_protected_ranges(const fb::SampleEncryptionT& sample,
                                                                            uint64_t sample_offset,
                                                                            uint32_t sample_size);
