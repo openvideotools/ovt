@@ -500,24 +500,69 @@ TEST_CASE("a fragment-only file without init segment infers the senc IV size (CN
   }
 }
 
-TEST_CASE("an encrypted corpus file decodes its encryption boxes without errors",
-          "[container][decoders][cenc][needs-corpus]") {
-  for (const std::string_view id : {"mpegff_video_cenc_128iv", "gpac_enc_cenc"}) {
-    const auto path = ovt::test::corpus_or_skip(id);
-    const auto file = ovt::io::RandomAccessFile::open(path.string());
-    const iso::WalkResult w = iso::walk(*file);
-    const BoxNodeT* schm = find_box(w.top_level, "schm");
-    REQUIRE(schm != nullptr);
-    CHECK((field(*schm, "scheme_type").svalue == "cenc" || field(*schm, "scheme_type").svalue == "piff"));
-    CHECK(has_field(*schm, "scheme_type.derived"));
-    CHECK(!field(*schm, "scheme_version").svalue.empty());
-    for (const std::string_view type : {"tenc", "senc", "pssh"}) {
-      if (const BoxNodeT* b = find_box(w.top_level, type); b != nullptr) {
-        for (const auto& d : b->diagnostics) {
-          INFO(std::string(id) + " " + std::string(type) + ": " + d->code + " " + d->message);
-          CHECK(d->severity != ovt::fb::Severity::Error);
-        }
+namespace {
+
+void collect_boxes(const std::vector<std::unique_ptr<BoxNodeT>>& boxes, std::string_view type,
+                   std::vector<const BoxNodeT*>& out) {
+  for (const auto& b : boxes) {
+    if (b->fourcc == type) {
+      out.push_back(b.get());
+    }
+    collect_boxes(b->children, type, out);
+  }
+}
+
+std::vector<const BoxNodeT*> all_boxes(const iso::WalkResult& w, std::string_view type) {
+  std::vector<const BoxNodeT*> out;
+  collect_boxes(w.top_level, type, out);
+  return out;
+}
+
+void check_no_errors(const iso::WalkResult& w, std::initializer_list<std::string_view> types) {
+  for (const std::string_view type : types) {
+    for (const BoxNodeT* b : all_boxes(w, type)) {
+      for (const auto& d : b->diagnostics) {
+        INFO(std::string(type) + ": " + d->code + " " + d->message);
+        CHECK(d->severity != ovt::fb::Severity::Error);
       }
     }
   }
+}
+
+}  // namespace
+
+TEST_CASE("mpegff_video_cenc_128iv: cenc 1.0 scheme, tenc and a 16-byte-IV senc",
+          "[container][decoders][cenc][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("mpegff_video_cenc_128iv");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult w = iso::walk(*file);
+  const auto schm = all_boxes(w, "schm");
+  REQUIRE(!schm.empty());
+  CHECK(field(*schm[0], "scheme_type").svalue == "cenc");
+  CHECK(field(*schm[0], "scheme_type.derived").svalue == "AES-CTR");
+  CHECK(field(*schm[0], "scheme_version").svalue == "1.0");
+  CHECK(!all_boxes(w, "tenc").empty());
+  const auto senc = all_boxes(w, "senc");
+  REQUIRE(!senc.empty());
+  CHECK(field(*senc[0], "Per_Sample_IV_Size").svalue.starts_with("16 ("));
+  CHECK(!has_code(*senc[0], "CNT-6001"));
+  check_no_errors(w, {"schm", "tenc", "senc"});
+}
+
+TEST_CASE("gpac_enc_cenc: a piff 1.1 and a cenc 1.0 scheme, tenc under the cenc one",
+          "[container][decoders][cenc][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("gpac_enc_cenc");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult w = iso::walk(*file);
+  const auto schm = all_boxes(w, "schm");
+  REQUIRE(schm.size() == 2);
+  CHECK(field(*schm[0], "scheme_type").svalue == "piff");
+  CHECK(field(*schm[0], "scheme_version").svalue == "1.1");
+  CHECK(field(*schm[1], "scheme_type").svalue == "cenc");
+  CHECK(field(*schm[1], "scheme_type.derived").svalue == "AES-CTR");
+  CHECK(field(*schm[1], "scheme_version").svalue == "1.0");
+  const auto tenc = all_boxes(w, "tenc");
+  REQUIRE(tenc.size() == 1);
+  CHECK(field(*tenc[0], "default_KID").bytes.size() == 16);
+  check_no_errors(w, {"schm", "tenc", "senc"});
 }
