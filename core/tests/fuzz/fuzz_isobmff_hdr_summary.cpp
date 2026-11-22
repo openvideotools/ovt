@@ -3,8 +3,9 @@
 //
 // Fuzz target of the HdrMetadata summary (chapter 08 §8.4.6, WI-1.223). The whole input is the file: it is walked and
 // every `trak` is summarised, which re-reads its colour, Dolby Vision and configuration boxes and parses the parameter
-// sets / sequence header they carry. Invariants, each an abort when violated: no exception escapes; the serialised
-// HdrMetadata verifies; the colour image is 44 bytes.
+// sets / sequence header they carry, then probes two sync samples that cover the input (the whole file, then its second
+// half), so arbitrary bytes reach the unit splitter and the SEI / OBU metadata parsers. Invariants, each an abort when
+// violated: no exception escapes; the serialised HdrMetadata verifies; the colour image is 44 bytes.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -18,6 +19,7 @@
 #include "container/isobmff/box_walk.h"
 #include "container/isobmff/hdr_summary.h"
 #include "io/memory_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt_container_generated.h"
 
 namespace {
@@ -34,7 +36,13 @@ void require(bool ok) {
 void summarise_traks(const std::vector<std::unique_ptr<ovt::fb::BoxNodeT>>& nodes, const ovt::io::MemoryFile& file) {
   for (const auto& n : nodes) {
     if (n->fourcc == "trak") {
-      const flatbuffers::DetachedBuffer buf = iso::build_hdr_metadata(*n, 1, file);
+      ovt::fb::SampleTableT samples;
+      samples.count = 2;
+      samples.offset = {0, file.size() / 2};
+      samples.size = {static_cast<uint32_t>(file.size()), static_cast<uint32_t>(file.size() - file.size() / 2)};
+      samples.is_sync = {true, true};
+      const flatbuffers::DetachedBuffer buf =
+          iso::build_hdr_metadata(*n, 1, samples, file, iso::HdrProbeOptions{}, ovt::jobs::Cancel::never());
       flatbuffers::Verifier v(buf.data(), buf.size());
       require(v.VerifyBuffer<ovt::fb::HdrMetadata>(nullptr));
       const auto* m = flatbuffers::GetRoot<ovt::fb::HdrMetadata>(buf.data());
