@@ -509,6 +509,7 @@ TEST_CASE("sample table: slice and serialise", "[container][sample_table][fast]"
   CHECK(cut->is_sync == std::vector<bool>{false, true});
   CHECK(iso::slice_sample_table(*e.t, 0, 0)->count == 4);
   CHECK(iso::slice_sample_table(*e.t, 3, 100)->count == 1);
+  CHECK(iso::slice_sample_table(*e.t, 9, 0)->count == 0);
   const flatbuffers::DetachedBuffer buf = iso::serialise(*e.t);
   flatbuffers::Verifier v(buf.data(), buf.size());
   REQUIRE(v.VerifyBuffer<ovt::fb::SampleTable>(nullptr));
