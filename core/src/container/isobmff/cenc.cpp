@@ -104,7 +104,7 @@ std::optional<Hdr> read_hdr(const io::RandomAccessFile& file, uint64_t pos, uint
   const uint64_t size32 = c.u32();
   Hdr h{c.four(), pos, size32, 8};
   if (size32 == 1) {
-    if (end - pos < 16 || file.read(pos + 8, 8, b.data() + 8) != 8) {
+    if (end - pos < 16 || file.read(pos + 8, 8, std::span(b).subspan(8).data()) != 8) {
       return std::nullopt;
     }
     Cursor w(std::span<const uint8_t>(b).subspan(8, 8));
