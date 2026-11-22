@@ -51,22 +51,6 @@ bool has_diag(const BoxNodeT& n, std::string_view code, std::string_view message
   return std::ranges::any_of(n.diagnostics, [&](const auto& d) { return d->code == code && d->message == message; });
 }
 
-// Adds a finding unless the same one is already there; true when added.
-bool add(BoxNodeT& n, DiagCode code, std::string message) {
-  const DiagInfo& info = diag(code);
-  if (has_diag(n, info.code, message)) {
-    return false;
-  }
-  auto d = std::make_unique<fb::DiagnosticT>();
-  d->severity = static_cast<fb::Severity>(info.severity);
-  d->code = std::string(info.code);
-  d->message = std::move(message);
-  d->span = std::make_unique<fb::BitSpan>(0U, static_cast<uint32_t>(n.header_length) * 8U);
-  d->spec_ref = std::string(info.spec_ref);
-  n.diagnostics.push_back(std::move(d));
-  return true;
-}
-
 bool has_child(const BoxNodeT& n, std::string_view alternatives) {
   while (!alternatives.empty()) {
     const size_t bar = alternatives.find('|');
@@ -120,12 +104,12 @@ size_t check_children(BoxNodes& children, std::string_view parent) {
       continue;
     }
     if (c->fourcc != "uuid" && !parent_allowed(c->fourcc, parent)) {
-      added += add(*c, DiagCode::CNT_1013, c->fourcc + " is not allowed in " + std::string(parent)) ? 1U : 0U;
+      added += add_finding(*c, DiagCode::CNT_1013, c->fourcc + " is not allowed in " + std::string(parent)) ? 1U : 0U;
     }
     const bool single = std::ranges::find(kSingle, std::string_view(c->fourcc)) != kSingle.end() ||
                         (parent == "file" && c->fourcc == "ftyp");
     if (single && ++seen[c->fourcc] == 2) {
-      added += add(*c, DiagCode::CNT_1012, "duplicate " + c->fourcc + " in " + std::string(parent)) ? 1U : 0U;
+      added += add_finding(*c, DiagCode::CNT_1012, "duplicate " + c->fourcc + " in " + std::string(parent)) ? 1U : 0U;
     }
   }
   return added;
@@ -137,7 +121,7 @@ size_t check_required(BoxNodeT& self, std::string_view parent) {
   for (const Required& r : kRequired) {
     if (r.parent == parent && !has_child(self, r.child)) {
       const std::string message = "required box " + std::string(r.child) + " missing in " + std::string(parent);
-      added += add(self, DiagCode::CNT_1011, message) ? 1U : 0U;
+      added += add_finding(self, DiagCode::CNT_1011, message) ? 1U : 0U;
     }
   }
   return added;
@@ -164,6 +148,21 @@ size_t visit(BoxNodeT* self, BoxNodes& children, std::string_view parent, bool& 
 }
 
 }  // namespace
+
+bool add_finding(fb::BoxNodeT& n, DiagCode code, std::string message) {
+  const DiagInfo& info = diag(code);
+  if (has_diag(n, info.code, message)) {
+    return false;
+  }
+  auto d = std::make_unique<fb::DiagnosticT>();
+  d->severity = static_cast<fb::Severity>(info.severity);
+  d->code = std::string(info.code);
+  d->message = std::move(message);
+  d->span = std::make_unique<fb::BitSpan>(0U, static_cast<uint32_t>(n.header_length) * 8U);
+  d->spec_ref = std::string(info.spec_ref);
+  n.diagnostics.push_back(std::move(d));
+  return true;
+}
 
 size_t validate(BoxNodes& top_level, ValidationLevel level) {
   static_cast<void>(level);  // Quick, Standard and Deep run the same rules until WI-1.224b adds the sample-level ones
