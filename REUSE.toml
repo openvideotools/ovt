@@ -32,6 +32,12 @@ path = ["VERSION", ".gitattributes", ".gitignore", ".gitmodules", "**/.gitkeep"]
 SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
 SPDX-License-Identifier = "LGPL-2.1-or-later"
 
+# Go module files of the oracle helper tests/oracles/mp4ff_senc (WI-1.221): no comment syntax.
+[[annotations]]
+path = ["tests/oracles/mp4ff_senc/go.mod", "tests/oracles/mp4ff_senc/go.sum"]
+SPDX-FileCopyrightText = "2026 The Open Video Tools contributors"
+SPDX-License-Identifier = "LGPL-2.1-or-later"
+
 # Golden outputs other than JSON (text dumps, CSV, compressed blobs) are test data (tests/ licence).
 [[annotations]]
 path = ["tests/golden/**", "core/tests/golden/**", "**/tests/data/**"]
