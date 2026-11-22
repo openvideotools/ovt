@@ -11,3 +11,5 @@ issue or pull request would let us delete it.
 | Port | Why |
 |---|---|
 | `cli11` | header-only instead of the precompiled, uninstrumented `libCLI11.a` (ASan container-overflow; `cli11/README.md`) |
+| `spdlog` | the upstream port's two backport patches are vendored instead of downloaded from github.com (HTTP 503 on Android source rebuilds; `spdlog/README.md`) |
+| `fmt` | the upstream port's backport patch is vendored instead of downloaded from github.com (HTTP 503; `fmt/README.md`) |
