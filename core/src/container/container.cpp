@@ -9,12 +9,14 @@
 
 #include <flatbuffers/flatbuffers.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <new>
 #include <optional>
 #include <span>
+#include <vector>
 
 #include "api/buffer.hpp"
 #include "container/isobmff/lazy.h"
@@ -24,7 +26,9 @@
 #include "container/rawyuv.hpp"
 #include "container/y4m.hpp"
 #include "io/ovt_file.hpp"
+#include "jobs/job_internal.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 #include "ovt_container_generated.h"
 
 namespace ovt::container {
@@ -211,28 +215,25 @@ OVT_API ovt_status ovt_container_expand(ovt_Container* container, uint64_t box_o
   if (container == nullptr) {
     return OVT_E_INVALID_ARG;
   }
-  if (!container->reader) {
-    return OVT_E_UNSUPPORTED;
-  }
   try {
-    // Held across the reader's expand: ovt_container_box_at (thread-safe, §8.8) may serialise the reader's tree.
-    const std::lock_guard lock(container->bytes.tree_mutex());
-    const std::optional<uint64_t> before = container->reader->tree_revision();
-    const ovt_status st = container->reader->expand(box_offset);  // ISOBMFF: WI-1.204
-    // The tree is re-serialised on its next read, not here: a run of expands (fuzz_isobmff_tree expands every box)
-    // re-serialised the whole tree each time, quadratic in the number of boxes. A no-op expand leaves it as it is.
-    if (st == OVT_OK && (!before || container->reader->tree_revision() != before)) {
-      container->tree_stale = true;
-    }
-    return st;
+    return ovt::container::expand_box(*container, box_offset);
   } catch (...) {
     return ovt::container::status_of_current_exception();
   }
 }
 
 OVT_API ovt_status ovt_container_expand_all(ovt_Container* container, ovt_Job* job) {
-  (void)job;
-  return container == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;  // WI-1.204
+  if (container == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  // jobs::run maps ovt::Cancelled to OVT_E_CANCELLED and std::bad_alloc to OVT_E_NOMEM; the reader's own statuses
+  // keep their codes.
+  return ovt::jobs::run(job, "expand", [&](ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& sink) {
+    return ovt::container::expand_all(*container, cancel, sink);
+  });
 }
 
 OVT_API int ovt_container_track_count(const ovt_Container* container) {
@@ -304,6 +305,7 @@ OVT_API ovt_status ovt_container_validate(ovt_Container* container, ovt_Buffer* 
 
 OVT_API ovt_status ovt_container_list_diagnostics(ovt_Buffer* out) {
   // The DiagnosticRegistry table is not in ovt_container.fbs yet (#138); the data source is all_diagnostics().
+  // SPEC-ASSUMPTION(#763): stays unsupported until the table lands (schema change, owner approval).
   return out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;
 }
 
@@ -326,6 +328,92 @@ OVT_API void ovt_container_close(ovt_Container* container) {
 }  // extern "C"
 
 namespace ovt::container {
+
+ovt_status expand_box(ovt_Container& c, uint64_t box_offset) {
+  if (!c.reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  // Held across the reader's expand: ovt_container_box_at (thread-safe, §8.8) may serialise the reader's tree.
+  const std::lock_guard lock(c.bytes.tree_mutex());
+  const std::optional<uint64_t> before = c.reader->tree_revision();
+  const ovt_status st = c.reader->expand(box_offset);  // ISOBMFF: WI-1.204
+  // The tree is re-serialised on its next read, not here: a run of expands (fuzz_isobmff_tree expands every box)
+  // re-serialised the whole tree each time, quadratic in the number of boxes. A no-op expand leaves it as it is.
+  if (st == OVT_OK && (!before || c.reader->tree_revision() != before)) {
+    c.tree_stale = true;
+  }
+  return st;
+}
+
+namespace {
+
+// True when `n` carries the CNT-0007 "not yet expanded" diagnostic.
+bool is_unexpanded(const fb::BoxNode& n) {
+  if (n.diagnostics() == nullptr) {
+    return false;
+  }
+  return std::ranges::any_of(*n.diagnostics(), [](const fb::Diagnostic* d) {
+    return d->code() != nullptr && d->code()->string_view() == "CNT-0007";
+  });
+}
+
+// Offsets of every box of the current tree that is still unexpanded (carries CNT-0007), `mdat` excluded: its payload is
+// never walked (§8.2.4). Parents come before children; the walk is iterative so a deep tree cannot exhaust the stack.
+std::vector<uint64_t> unexpanded_offsets(ovt_Container& c) {
+  using Nodes = flatbuffers::Vector<flatbuffers::Offset<fb::BoxNode>>;
+  std::vector<uint64_t> out;
+  const std::lock_guard lock(c.bytes.tree_mutex());
+  refresh_tree(c);
+  if (c.tree.empty()) {
+    return out;
+  }
+  const auto* tree = flatbuffers::GetRoot<fb::ContainerTree>(c.tree.data());
+  std::vector<const Nodes*> stack;
+  if (tree->root() != nullptr) {
+    stack.push_back(tree->root());
+  }
+  while (!stack.empty()) {
+    const Nodes* nodes = stack.back();
+    stack.pop_back();
+    for (const fb::BoxNode* n : *nodes) {
+      if (n->fourcc() != nullptr && n->fourcc()->string_view() == "mdat") {
+        continue;
+      }
+      if (n->file_span() != nullptr && is_unexpanded(*n)) {
+        out.push_back(n->file_span()->offset());
+      }
+      if (n->children() != nullptr) {
+        stack.push_back(n->children());
+      }
+    }
+  }
+  return out;
+}
+
+}  // namespace
+
+ovt_status expand_all(ovt_Container& c, jobs::Cancel& cancel, const jobs::Pool::ProgressSink& sink) {
+  // Expanding a box can reveal new unexpanded boxes (a lazy IVF/Y4M root materialises its children in batches), so the
+  // walk repeats until a pass finds none. A pass that leaves the tree as it was (a reader that cannot expand, or one
+  // that keeps the marker) ends the loop instead of spinning.
+  uint64_t done = 0;
+  std::vector<uint64_t> previous;
+  for (;;) {
+    const std::vector<uint64_t> todo = unexpanded_offsets(c);
+    if (todo.empty() || todo == previous) {
+      return OVT_OK;
+    }
+    for (const uint64_t offset : todo) {
+      cancel.throw_if_requested();  // one box per check: a single expand is far below 50 ms
+      const ovt_status st = expand_box(c, offset);
+      if (st != OVT_OK) {
+        return st;
+      }
+      sink(jobs::Progress{++done, 0, "expand"});
+    }
+    previous = todo;
+  }
+}
 
 void refresh_tree(ovt_Container& c) {
   if (!c.tree_stale) {

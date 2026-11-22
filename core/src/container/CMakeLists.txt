@@ -28,6 +28,7 @@ target_sources(
           isobmff/validate.cpp
           diagnostics.cpp
           format_sniff.cpp
+          hex_dump.cpp
           ivf.cpp
           mpegts/descriptors.cpp
           mpegts/pes.cpp
