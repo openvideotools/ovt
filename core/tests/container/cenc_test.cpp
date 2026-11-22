@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
 // Tests of the CENC per-sample encryption map and the clear / protected ranges (chapter 08 §8.4.4, WI-1.221), on
-// synthetic files built in memory: `saio`/`saiz` aux data of a `moov` track, `senc` of a `moof` with `cenc` and `cbcs`
-// signalling, `seig` overrides, inference and the diagnostics.
+// synthetic files built in memory (`saio`/`saiz` aux data of a `moov` track, `cenc` and `cbcs` signalling, `seig`
+// overrides, the diagnostics) and, tagged [needs-corpus], on the real files of AT1 and AT2.
 
 #include <flatbuffers/flatbuffers.h>
 #include <catch2/catch_test_macros.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -24,6 +28,7 @@
 #include "ovt/container.h"
 #include "ovt/cxx/syntax/unit_scan.hpp"
 #include "ovt_container_generated.h"
+#include "test_support/corpus.h"
 
 namespace {
 
@@ -80,13 +85,15 @@ Bytes ftyp() {
   return box("ftyp", cat({str("isom"), be(0, 4), str("isom"), str("cmfc")}));
 }
 
-// An encrypted AVC entry with a 4-byte NAL length field.
-Bytes encv(std::string_view scheme, const Bytes& tenc_box) {
-  const Bytes avcc = box("avcC", Bytes{1, 100, 0, 30, 0xFF, 0xE0, 0});
+// An encrypted AVC (or, with `hevc`, HEVC) entry with a 4-byte NAL length field.
+Bytes encv(std::string_view scheme, const Bytes& tenc_box, bool hevc = false) {
+  Bytes hvcc_payload = filled(22, 0);
+  hvcc_payload[21] = 0x03;  // lengthSizeMinusOne = 3
+  const Bytes config = hevc ? box("hvcC", hvcc_payload) : box("avcC", Bytes{1, 100, 0, 30, 0xFF, 0xE0, 0});
   const Bytes sinf =
-      box("sinf", cat({box("frma", str("avc1")), box("schm", full(0, 0, cat({str(scheme), be(0x10000, 4)}))),
-                       box("schi", tenc_box)}));
-  return box("encv", cat({filled(78, 0), avcc, sinf}));
+      box("sinf", cat({box("frma", str(hevc ? "hvc1" : "avc1")),
+                       box("schm", full(0, 0, cat({str(scheme), be(0x10000, 4)}))), box("schi", tenc_box)}));
+  return box("encv", cat({filled(78, 0), config, sinf}));
 }
 
 Bytes trak(const Bytes& entry, const Bytes& tables) {
@@ -143,6 +150,7 @@ struct MoovSpec {
   Bytes extra_tables;                  // sgpd / sbgp of the stbl
   std::optional<uint32_t> saiz_count;  // overrides the sample_count written to saiz
   bool with_aux = true;
+  bool hevc = false;  // an hvcC entry (2-byte NAL header) instead of avcC
 };
 
 Bytes moov_file(const MoovSpec& m) {
@@ -169,7 +177,7 @@ Bytes moov_file(const MoovSpec& m) {
         cat({box("stts", full(0, 0, cat({be(1, 4), be(m.samples.size(), 4), be(40, 4)}))),
              box("stsc", full(0, 0, cat({be(1, 4), be(1, 4), be(m.samples.size(), 4), be(1, 4)}))), box("stsz", stsz),
              box("stco", full(0, 0, cat({be(1, 4), be(mdat_at + 8, 4)}))), aux_boxes, m.extra_tables});
-    return box("moov", trak(encv(m.scheme, m.tenc), tables));
+    return box("moov", trak(encv(m.scheme, m.tenc, m.hevc), tables));
   };
   const uint64_t mdat_at = ftyp().size() + build(0).size();
   return cat({ftyp(), build(mdat_at), box("mdat", cat({mdat_payload, aux}))});
@@ -277,6 +285,21 @@ TEST_CASE("cenc: a subsample that protects the NAL length and header raises CNT-
     }
   }
   CHECK(n == 1);
+}
+
+TEST_CASE("cenc: an HEVC subsample must keep the two NAL header bytes clear", "[container][cenc]") {
+  // length_size 4: 5 clear bytes cover the AVC header (1 byte) but not the second byte of the HEVC header.
+  const auto n6007 = [](bool hevc, uint16_t clear) {
+    MoovSpec m;
+    m.hevc = hevc;
+    m.samples = {{filled(8, 1), {{clear, static_cast<uint32_t>(64 - clear)}}, 64}};
+    const Opened o(moov_file(m));
+    const auto info = encryption_of(o.c);
+    return std::ranges::count(codes(*info), "CNT-6007");
+  };
+  CHECK(n6007(false, 5) == 0);
+  CHECK(n6007(true, 5) == 1);
+  CHECK(n6007(true, 6) == 0);
 }
 
 TEST_CASE("cenc: cbcs uses the constant IV and the 1:9 pattern shades 16 bytes in every 160", "[container][cenc]") {
@@ -459,4 +482,116 @@ TEST_CASE("cenc: ovt_container_encryption arguments", "[container][cenc][c_api]"
   CHECK(ovt_container_encryption(o.c, -1, 0, 0, &b) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_encryption(o.c, 0, 0, 0, nullptr) == OVT_E_INVALID_ARG);
   CHECK(ovt_container_encryption(nullptr, 0, 0, 0, &b) == OVT_E_INVALID_ARG);
+}
+
+// ---- the real files (AT1, AT2) --------------------------------------------------------------------------------
+
+namespace {
+
+Bytes read_file(const std::filesystem::path& path) {
+  std::ifstream in(path, std::ios::binary);
+  REQUIRE(in.good());
+  return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+}
+
+std::string hex_of(const std::vector<uint8_t>& v) {
+  static constexpr std::string_view kDigits = "0123456789abcdef";
+  std::string out;
+  out.reserve(v.size() * 2);
+  for (const uint8_t b : v) {
+    out.push_back(kDigits[b >> 4]);
+    out.push_back(kDigits[b & 15]);
+  }
+  return out;
+}
+
+std::unique_ptr<ovt::fb::SampleTableT> sample_table_of(ovt_Container* c) {
+  ovt_Buffer b{};
+  REQUIRE(ovt_container_sample_table(c, 0, 0, 0, &b) == OVT_OK);
+  auto table = std::unique_ptr<ovt::fb::SampleTableT>(flatbuffers::GetRoot<ovt::fb::SampleTable>(b.data)->UnPack());
+  delete[] b.data;
+  return table;
+}
+
+}  // namespace
+
+TEST_CASE("cenc: mpegff_video_cenc_128iv gives the IVs and subsamples of the mp4ff golden",
+          "[container][cenc][needs-corpus]") {
+  const auto path = ovt::test::corpus_or_skip("mpegff_video_cenc_128iv");
+  std::ifstream golden_in(std::filesystem::path(OVT_TEST_SOURCE_DIR) /
+                          "tests/golden/cenc/mpegff_video_cenc_128iv.mp4ff-senc.json");
+  REQUIRE(golden_in.good());
+  const auto golden = nlohmann::json::parse(golden_in);
+  const auto& golden_track = golden.at("tracks").at(0);
+  const auto& golden_samples = golden_track.at("samples");
+  REQUIRE(golden_samples.size() == 50);
+
+  const Opened o(read_file(path));
+  const auto table = sample_table_of(o.c);
+  // AT1 asks for samples 0..99; the file has 50, so the range is clamped.
+  const auto info = encryption_of(o.c, 0, 100);
+  CHECK(info->scheme_type == "cenc");
+  CHECK(info->default_iv_size == golden_track.at("per_sample_iv_size").get<int>());
+  CHECK(hex_of(info->default_kid) == golden_track.at("default_kid").get<std::string>());
+  REQUIRE(info->samples.size() == golden_samples.size());
+  REQUIRE(table->size.size() >= golden_samples.size());
+  for (size_t i = 0; i < golden_samples.size(); ++i) {
+    CAPTURE(i);
+    const auto& s = *info->samples[i];
+    const auto& g = golden_samples[i];
+    CHECK(s.is_protected);
+    CHECK(hex_of(s.iv) == g.at("iv").get<std::string>());
+    REQUIRE(s.subsamples.size() == g.at("subsamples").size());
+    for (size_t k = 0; k < s.subsamples.size(); ++k) {
+      CAPTURE(k);
+      CHECK(s.subsamples[k]->clear_bytes == g.at("subsamples")[k].at("clear").get<uint32_t>());
+      CHECK(s.subsamples[k]->protected_bytes == g.at("subsamples")[k].at("protected").get<uint32_t>());
+    }
+    CHECK(sum_of(s) == table->size[i]);  // Σ(clear + protected) == the sample size
+  }
+  for (const auto& d : info->diagnostics) {
+    INFO(d->code + ": " + d->message);
+    CHECK(d->severity != ovt::fb::Severity::Error);
+  }
+}
+
+TEST_CASE("cenc: syn_mp4_cenc_cbcs uses the constant IV and shades 16 of every 160 bytes",
+          "[container][cenc][needs-corpus]") {
+  // The entry's files sit side by side; the primary one is syn_mp4_elst.mp4 (recipe 20 (a)).
+  const auto primary = ovt::test::corpus_or_skip("syn_mp4_edit_list_frag_cenc");
+  const auto path = primary.parent_path() / "syn_mp4_cenc_cbcs.mp4";
+  if (!std::filesystem::is_regular_file(path)) {
+    INFO("corpus file missing: syn_mp4_cenc_cbcs.mp4");
+    CHECK_FALSE(ovt::test::require_corpora());
+    SKIP("syn_mp4_cenc_cbcs.mp4 is not in the corpus cache");
+  }
+  const Opened o(read_file(path));
+  const auto table = sample_table_of(o.c);
+  const auto info = encryption_of(o.c);
+  CHECK(info->scheme_type == "cbcs");
+  CHECK(info->pattern_crypt == 1);
+  CHECK(info->pattern_skip == 9);
+  REQUIRE(info->default_constant_iv.size() == 16);
+  REQUIRE(info->samples.size() == table->count);
+  size_t pattern_gaps = 0;
+  for (size_t i = 0; i < info->samples.size(); ++i) {
+    CAPTURE(i);
+    const auto& s = *info->samples[i];
+    REQUIRE(s.is_protected);
+    CHECK(s.iv == info->default_constant_iv);  // AT2: iv == tenc.default_constant_IV
+    CHECK(sum_of(s) == table->size[i]);
+    const auto ranges = iso::sample_clear_protected_ranges(s, table->offset[i], table->size[i]);
+    uint64_t at = table->offset[i];
+    for (size_t r = 0; r < ranges.size(); ++r) {
+      CHECK(ranges[r].offset == at);  // the ranges tile the sample
+      at += ranges[r].length;
+      if (r % 2 == 1) {
+        CHECK(ranges[r].length == 16);  // 16 encrypted bytes (a partial trailing block is clear for cbcs)
+      } else if (r >= 2 && r + 1 < ranges.size() && ranges[r].length == 144) {
+        ++pattern_gaps;  // 144 clear bytes between two crypt blocks of one protected span
+      }
+    }
+    CHECK(at == table->offset[i] + table->size[i]);
+  }
+  CHECK(pattern_gaps > 0);
 }

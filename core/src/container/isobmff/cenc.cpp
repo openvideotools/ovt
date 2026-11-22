@@ -219,6 +219,7 @@ struct EntryInfo {
   bool has_tenc = false;
   Params defaults;
   uint8_t nal_length_size = 0;  // avcC / hvcC lengthSizeMinusOne + 1; 0 for other codecs
+  uint8_t nal_header_size = 0;  // 1 for AVC, 2 for HEVC (the NAL unit header the clear bytes must cover)
 };
 
 EntryInfo read_entry(const io::RandomAccessFile& file, const fb::BoxNodeT& entry) {
@@ -226,9 +227,11 @@ EntryInfo read_entry(const io::RandomAccessFile& file, const fb::BoxNodeT& entry
   if (const fb::BoxNodeT* avcc = child(&entry, "avcC")) {
     const Bytes p = payload(file, avcc);
     e.nal_length_size = p.size() > 4 ? static_cast<uint8_t>((p[4] & 3U) + 1U) : 0;
+    e.nal_header_size = 1;
   } else if (const fb::BoxNodeT* hvcc = child(&entry, "hvcC")) {
     const Bytes p = payload(file, hvcc);
     e.nal_length_size = p.size() > 21 ? static_cast<uint8_t>((p[21] & 3U) + 1U) : 0;
+    e.nal_header_size = 2;
   }
   // A PIFF-signalled entry carries two `sinf` (piff and cenc); the CENC-family one is the one with the tenc.
   const fb::BoxNodeT* sinf = nullptr;
@@ -724,7 +727,8 @@ class Builder {
       const auto at = std::ranges::lower_bound(nals, start);
       const bool starts_nal = at != nals.end() && *at == start;
       const bool legal_zero = pattern && s->clear_bytes == 0;
-      if (starts_nal && s->clear_bytes < e->nal_length_size + 1U && !legal_zero) {
+      // SPEC-ASSUMPTION(#812): the clear bytes cover the length field and the whole NAL header (2 bytes for HEVC).
+      if (starts_nal && s->clear_bytes < e->nal_length_size + e->nal_header_size && !legal_zero) {
         diag("CNT-6007",
              "subsample protects NAL length/header bytes of NAL " + std::to_string(at - nals.begin()) + " of sample " +
                  std::to_string(i),
