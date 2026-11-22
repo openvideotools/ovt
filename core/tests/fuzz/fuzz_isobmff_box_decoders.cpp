@@ -126,6 +126,7 @@ constexpr auto kCases = std::to_array<Case>({
     {"schm", "sinf", true},
     {"tenc", "schi", true},
     {"senc", "traf", true},
+    {"pssh", "moov", true},
 });
 
 void require(bool ok) {

@@ -199,6 +199,8 @@ X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", 
 // `senc` IV size had to be inferred.
 X(CNT_6001, "CNT-6001", Error, "`senc` IV size unknown and not inferable", "23001-7 §7.2")
 X(CNT_6003, "CNT-6003", Error, "`tenc` IV size ∉ {0,8,16}", "23001-7 §8.2")
+X(CNT_6004, "CNT-6004", Error, "`pssh.DataSize` inconsistent with box size", "23001-7 §8.1")
+X(CNT_6009, "CNT-6009", Warning, "`pssh` with unknown SystemID", "")
 X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the

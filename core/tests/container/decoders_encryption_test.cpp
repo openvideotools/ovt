@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: LGPL-2.1-or-later
 //
-// Tests of the group H hand decoders (chapter 08 §8.3.8, WI-1.213a): frma/schm/tenc fields and the IV-size context,
-// senc with a known, a track-wide and an inferred IV size, and the walk of a whole encrypted file. The pssh tests
-// come with part b.
+// Tests of the group H hand decoders (chapter 08 §8.3.8, WI-1.213): frma/schm/tenc fields and the IV-size context,
+// pssh with the system table and the Widevine and PlayReady payload decoders, senc with a known, a track-wide and an
+// inferred IV size, and the walk of a whole encrypted file.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -21,6 +21,7 @@
 
 #include "container/isobmff/box_registry.h"
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/decoders/pb_lite.h"
 #include "container/isobmff/decoders/pssh_systems.h"
 #include "container/isobmff/field_builder.h"
 #include "io/memory_file.hpp"
@@ -41,6 +42,11 @@ Bytes be(uint64_t v, unsigned nbytes) {
   }
   return b;
 }
+Bytes le(uint64_t v, unsigned nbytes) {
+  Bytes b = be(v, nbytes);
+  std::ranges::reverse(b);
+  return b;
+}
 Bytes cat(std::initializer_list<Bytes> parts) {
   Bytes b;
   for (const Bytes& p : parts) {
@@ -59,6 +65,15 @@ Bytes full(uint8_t version, uint32_t flags, const Bytes& body) {
 }
 Bytes filled(size_t n, uint8_t v) {
   return Bytes(n, v);
+}
+
+Bytes utf16le(std::string_view s, bool bom = true) {
+  Bytes b = bom ? Bytes{0xFF, 0xFE} : Bytes{};
+  for (const char c : s) {
+    b.push_back(static_cast<uint8_t>(c));
+    b.push_back(0);
+  }
+  return b;
 }
 
 iso::FourCC cc_of(std::string_view s) {
@@ -156,6 +171,18 @@ bool has_code(const BoxNodeT& n, std::string_view code) {
 const Bytes kKid = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
 constexpr std::string_view kKidText = "01234567-89ab-cdef-0123-456789abcdef";
 
+const Bytes kWidevineId = {0xed, 0xef, 0x8b, 0xa9, 0x79, 0xd6, 0x4a, 0xce,
+                           0xa3, 0xc8, 0x27, 0xdc, 0xd5, 0x1d, 0x21, 0xed};
+const Bytes kPlayReadyId = {0x9a, 0x04, 0xf0, 0x79, 0x98, 0x40, 0x42, 0x86,
+                            0xab, 0x92, 0xe6, 0x5b, 0xe0, 0x88, 0x5f, 0x95};
+
+// tests/corpora/synthetic/widevine_pssh.bin: algorithm 1, one key_id, provider "ovt-test", content_id
+// "syn_mp4_cenc_widevine".
+Bytes widevine_data() {
+  return cat({Bytes{0x08, 0x01, 0x12, 0x10}, kKid, Bytes{0x1a, 0x08}, str("ovt-test"), Bytes{0x22, 0x15},
+              str("syn_mp4_cenc_widevine")});
+}
+
 Bytes tenc_v0(uint8_t is_protected, uint8_t iv_size, const Bytes& kid = kKid) {
   return full(0, 0, cat({be(0, 2), be(is_protected, 1), be(iv_size, 1), kid}));
 }
@@ -237,6 +264,163 @@ TEST_CASE("tenc rejects an IV size other than 0, 8 and 16 (CNT-6003)", "[contain
   CHECK(ctx.enc_for_track->empty());
   const Decoded unknown = run("tenc", full(3, 0, filled(20, 0)), ctx);
   CHECK(has_code(unknown.node, "CNT-1003"));
+}
+
+TEST_CASE("pssh v0: the system table names Widevine and the protobuf key_id equals the tenc KID",
+          "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const Bytes data = widevine_data();
+  const Decoded p = run("pssh", full(0, 0, cat({kWidevineId, be(data.size(), 4), data})), ctx);
+  CHECK(field(p.node, "SystemID").svalue == "Widevine");
+  CHECK(field(p.node, "DataSize").uvalue == data.size());
+  CHECK(field(p.node, "Data").bytes == data);
+  CHECK(field(p.node, "Data/algorithm").uvalue == 1);
+  CHECK(field(p.node, "Data/algorithm").svalue == "AESCTR");
+  CHECK(field(p.node, "Data/key_id[0]").bytes == kKid);
+  CHECK(field(p.node, "Data/key_id[0]").svalue == kKidText);
+  CHECK(field(p.node, "Data/provider").svalue == "ovt-test");
+  CHECK(field(p.node, "Data/content_id").svalue == "syn_mp4_cenc_widevine");
+  CHECK(p.node.diagnostics.empty());
+
+  iso::BoxContext schi = ctx_in("schi");
+  const Decoded t = run("tenc", tenc_v0(1, 8), schi);
+  CHECK(field(p.node, "Data/key_id[0]").bytes == field(t.node, "default_KID").bytes);
+  // The child spans lie inside the Data field.
+  const FieldT& dat = field(p.node, "Data");
+  const FieldT& kid = field(p.node, "Data/key_id[0]");
+  CHECK(kid.span->bit_offset() >= dat.span->bit_offset());
+  CHECK(kid.span->bit_offset() + kid.span->bit_length() <= dat.span->bit_offset() + dat.span->bit_length());
+  CHECK(kid.span->bit_length() == 128);
+}
+
+TEST_CASE("pssh Widevine data decodes repeated key_ids, policy, period index and scheme",
+          "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const Bytes kid2 = filled(16, 0x22);
+  // protection_scheme is a varint of the fourcc 'cbcs' = 0x63626373.
+  const Bytes scheme_varint = Bytes{0xF3, 0xC6, 0x89, 0x9B, 0x06};
+  const Bytes real =
+      cat({Bytes{0x12, 0x10}, kKid, Bytes{0x12, 0x10}, kid2, Bytes{0x32, 0x04}, str("pol1"), Bytes{0x38, 0x85, 0x01},
+           Bytes{0x42, 0x02, 0xAA, 0xBB}, Bytes{0x48}, scheme_varint, Bytes{0xA8, 0x06, 0x05}});
+  const Decoded p = run("pssh", full(0, 0, cat({kWidevineId, be(real.size(), 4), real})), ctx);
+  CHECK(field(p.node, "Data/key_id[0]").bytes == kKid);
+  CHECK(field(p.node, "Data/key_id[1]").bytes == kid2);
+  CHECK(field(p.node, "Data/policy").svalue == "pol1");
+  CHECK(field(p.node, "Data/crypto_period_index").uvalue == 133);
+  CHECK(field(p.node, "Data/grouped_license").bytes == Bytes{0xAA, 0xBB});
+  CHECK(field(p.node, "Data/protection_scheme").svalue == "cbcs");
+  // field 101 (unknown) varint
+  CHECK(field(p.node, "Data/field_101").uvalue == 5);
+}
+
+TEST_CASE("pssh v1 lists the KIDs; the box size is checked (CNT-6004); unknown systems warn (CNT-6009)",
+          "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const Bytes common = {0x10, 0x77, 0xef, 0xec, 0xc0, 0xb2, 0x4d, 0x02, 0xac, 0xe3, 0x3c, 0x1e, 0x52, 0xe2, 0xfb, 0x4b};
+  const Decoded ok = run("pssh", full(1, 0, cat({common, be(2, 4), kKid, filled(16, 0x33), be(0, 4)})), ctx);
+  CHECK(field(ok.node, "SystemID").svalue == "W3C Common PSSH (ClearKey)");
+  CHECK(field(ok.node, "KID_count").uvalue == 2);
+  CHECK(field(ok.node, "KIDs/KID[0]").svalue == kKidText);
+  CHECK(field(ok.node, "KIDs/KID[1]").bytes == filled(16, 0x33));
+  CHECK(ok.node.diagnostics.empty());
+
+  const Decoded big = run("pssh", full(0, 0, cat({kWidevineId, be(100, 4), filled(10, 0)})), ctx);
+  CHECK(has_code(big.node, "CNT-6004"));
+  CHECK(field(big.node, "Data").bytes.size() == 10);
+  const Decoded small = run("pssh", full(0, 0, cat({kWidevineId, be(2, 4), filled(10, 0)})), ctx);
+  CHECK(has_code(small.node, "CNT-6004"));
+  const Decoded kids = run("pssh", full(1, 0, cat({common, be(1000000, 4), filled(32, 0)})), ctx);
+  CHECK(has_code(kids.node, "CNT-6004"));
+
+  const Decoded unknown = run("pssh", full(0, 0, cat({filled(16, 0x99), be(0, 4)})), ctx);
+  CHECK(has_code(unknown.node, "CNT-6009"));
+  CHECK(field(unknown.node, "SystemID").svalue == "99999999-9999-9999-9999-999999999999");
+}
+
+TEST_CASE("pssh PlayReady: the object, its records and the WRMHEADER KID and LA_URL", "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  // KID bytes 00112233-4455-6677-8899-aabbccddeeff in CENC order; the GUID in the base64 has the first three
+  // groups little-endian: 33 22 11 00 55 44 77 66 88 99 aa bb cc dd ee ff -> "MyIRAFVEd2aImaq7zN3u/w==".
+  const std::string xml =
+      "<WRMHEADER xmlns=\"http://schemas.microsoft.com/DRM/2007/03/PlayReadyHeader\" version=\"4.0.0.0\"><DATA>"
+      "<PROTECTINFO><KEYLEN>16</KEYLEN><ALGID>AESCTR</ALGID></PROTECTINFO><KID>MyIRAFVEd2aImaq7zN3u/w==</KID>"
+      "<LA_URL>https://license.example.com/rightsmanager.asmx</LA_URL></DATA></WRMHEADER>";
+  const Bytes xml16 = utf16le(xml);
+  const Bytes record = cat({le(1, 2), le(xml16.size(), 2), xml16});
+  const Bytes object = cat({le(10 + record.size(), 4), le(1, 2), record});
+  const Decoded p = run("pssh", full(0, 0, cat({kPlayReadyId, be(object.size(), 4), object})), ctx);
+  CHECK(field(p.node, "SystemID").svalue == "PlayReady");
+  CHECK(field(p.node, "Data/record_count").uvalue == 1);
+  CHECK(field(p.node, "Data/record[0]/record_type").uvalue == 1);
+  CHECK(field(p.node, "Data/record[0]/record_value").svalue == xml);
+  CHECK(field(p.node, "Data/record[0]/KID[0]").svalue ==
+        "00112233-4455-6677-8899-aabbccddeeff (base64 MyIRAFVEd2aImaq7zN3u/w==)");
+  CHECK(field(p.node, "Data/record[0]/LA_URL").svalue == "https://license.example.com/rightsmanager.asmx");
+  CHECK(p.node.diagnostics.empty());
+}
+
+TEST_CASE("pssh PlayReady: WRMHEADER 4.1 KID attributes, no BOM, a second record, truncation",
+          "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const std::string xml =
+      "<WRMHEADER version=\"4.2.0.0\"><DATA><KIDS><KID ALGID=\"AESCBC\" VALUE=\"MyIRAFVEd2aImaq7zN3u/w==\"></KID>"
+      "<KID ALGID=\"AESCBC\" VALUE=\"AAAAAAAAAAAAAAAAAAAAAA==\"></KID></KIDS></DATA></WRMHEADER>";
+  const Bytes xml16 = utf16le(xml, false);
+  const Bytes rec1 = cat({le(1, 2), le(xml16.size(), 2), xml16});
+  const Bytes rec3 = cat({le(3, 2), le(3, 2), Bytes{1, 2, 3}});
+  const Bytes object = cat({le(10 + rec1.size() + rec3.size(), 4), le(2, 2), rec1, rec3});
+  const Decoded p = run("pssh", full(0, 0, cat({kPlayReadyId, be(object.size(), 4), object})), ctx);
+  CHECK(field(p.node, "Data/record[0]/KID[0]").svalue.starts_with("00112233-4455-6677-8899-aabbccddeeff"));
+  CHECK(field(p.node, "Data/record[0]/KID[1]").svalue.starts_with("00000000-0000-0000-0000-000000000000"));
+  CHECK(field(p.node, "Data/record[1]/record_type").svalue == "embedded license store");
+  CHECK(field(p.node, "Data/record[1]/record_value").bytes == Bytes{1, 2, 3});
+  CHECK(p.node.diagnostics.empty());
+
+  // A record that is longer than the object, and an object shorter than its header: Info only, no throw.
+  const Bytes cut = cat({le(30, 4), le(1, 2), le(1, 2), le(200, 2), Bytes{0, 0}});
+  const Decoded t = run("pssh", full(0, 0, cat({kPlayReadyId, be(cut.size(), 4), cut})), ctx);
+  CHECK(has_code(t.node, "CNT-1005"));
+  const Decoded tiny = run("pssh", full(0, 0, cat({kPlayReadyId, be(3, 4), Bytes{1, 2, 3}})), ctx);
+  CHECK(has_code(tiny.node, "CNT-1005"));
+}
+
+TEST_CASE("pssh Widevine data that is not protobuf keeps the fields before the error", "[container][decoders][cenc]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const Bytes data = cat({Bytes{0x08, 0x01}, Bytes{0x12, 0x40, 0x01}});  // key_id longer than the message
+  const Decoded p = run("pssh", full(0, 0, cat({kWidevineId, be(data.size(), 4), data})), ctx);
+  CHECK(field(p.node, "Data/algorithm").uvalue == 1);
+  CHECK(has_code(p.node, "CNT-1005"));
+  // A known field number with the wrong wire type is shown as an unknown field.
+  const Bytes wrong = cat({Bytes{0x0A, 0x01, 0x07}});  // field 1 as length-delimited
+  const Decoded w = run("pssh", full(0, 0, cat({kWidevineId, be(wrong.size(), 4), wrong})), ctx);
+  CHECK(!has_field(w.node, "Data/algorithm"));
+  CHECK(field(w.node, "Data/field_1").kind == ovt::fb::SyntaxValueKind::Bytes);
+}
+
+TEST_CASE("pb_lite reads the four wire types and stops on malformed input", "[container][decoders][cenc]") {
+  namespace pb = iso::pb;
+  const Bytes msg = cat({Bytes{0x08, 0x96, 0x01}, Bytes{0x11}, le(0x0102030405060708ULL, 8),
+                         Bytes{0x1A, 0x02, 'h', 'i'}, Bytes{0x25}, le(0xAABBCCDD, 4)});
+  pb::Reader r(msg);
+  pb::Field f;
+  REQUIRE(r.next(f));
+  CHECK((f.number == 1 && f.wire == pb::WireType::Varint && f.value == 150 && f.size == 2 && f.offset == 1));
+  REQUIRE(r.next(f));
+  CHECK((f.number == 2 && f.wire == pb::WireType::Fixed64 && f.value == 0x0102030405060708ULL));
+  REQUIRE(r.next(f));
+  CHECK((f.number == 3 && f.payload.size() == 2 && f.payload[0] == 'h'));
+  REQUIRE(r.next(f));
+  CHECK((f.number == 4 && f.wire == pb::WireType::Fixed32 && f.value == 0xAABBCCDD));
+  CHECK(!r.next(f));
+  CHECK(r.ok());
+
+  for (const Bytes& bad : {Bytes{0x08}, Bytes{0x08, 0x80}, Bytes{0x12, 0x05, 1}, Bytes{0x00, 0x01}, Bytes{0x0B},
+                           Bytes{0x09, 1, 2}, Bytes{0x0D, 1}, filled(11, 0x80)}) {
+    pb::Reader br(bad);
+    while (br.next(f)) {
+    }
+    CHECK(!br.ok());
+  }
 }
 
 TEST_CASE("the pssh system table names every system of §8.3.8", "[container][decoders][cenc]") {
@@ -565,4 +749,28 @@ TEST_CASE("gpac_enc_cenc: a piff 1.1 and a cenc 1.0 scheme, tenc under the cenc 
   REQUIRE(tenc.size() == 1);
   CHECK(field(*tenc[0], "default_KID").bytes.size() == 16);
   check_no_errors(w, {"schm", "tenc", "senc"});
+}
+
+TEST_CASE("bento4_widevine: the Widevine pssh names the system and its key_id equals tenc.default_KID",
+          "[container][decoders][cenc][needs-corpus]") {
+  // Recipe 68: syn_mp4_cenc_widevine (alias bento4_widevine.mp4), mp4encrypt --pssh Widevine.
+  const auto path = ovt::test::corpus_or_skip("syn_mp4_cenc_widevine");
+  const auto file = ovt::io::RandomAccessFile::open(path.string());
+  const iso::WalkResult w = iso::walk(*file);
+  const auto pssh = all_boxes(w, "pssh");
+  REQUIRE(!pssh.empty());
+  const BoxNodeT* widevine = nullptr;
+  for (const BoxNodeT* p : pssh) {
+    if (field(*p, "SystemID").svalue == "Widevine") {
+      widevine = p;
+      break;
+    }
+  }
+  REQUIRE(widevine != nullptr);
+  const auto tenc = all_boxes(w, "tenc");
+  REQUIRE(!tenc.empty());
+  CHECK(field(*widevine, "Data/key_id[0]").bytes == field(*tenc[0], "default_KID").bytes);
+  CHECK(field(*widevine, "Data/key_id[0]").bytes == kKid);
+  CHECK(field(*widevine, "Data/content_id").svalue == "syn_mp4_cenc_widevine");
+  check_no_errors(w, {"pssh", "schm", "tenc", "senc"});
 }
