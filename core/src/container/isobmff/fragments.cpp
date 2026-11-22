@@ -365,7 +365,13 @@ struct TrafLoc {
 class Builder {
  public:
   Builder(const io::RandomAccessFile& file, const BoxNodes& top, const FragmentTrackInput& in, jobs::Cancel& cancel)
-      : file_(file), in_(in), cancel_(cancel) {
+      : file_(file),
+        in_(in),
+        cancel_(cancel),
+        // SPEC-ASSUMPTION(#788): like a constant-size stsz, the fragment samples claim no more than one byte each
+        // of the file, so a few bytes of trun cannot expand to kMaxFragmentSamples (about 2 GB).
+        file_bound_(std::max<uint64_t>(file.size(), 1)),
+        limit_(std::min({in.max_samples, kMaxFragmentSamples, file_bound_})) {
     for (const auto& n : top) {
       if (n) {
         top_.push_back(hdr_of(*n));
@@ -567,6 +573,7 @@ class Builder {
     if (mine) {
       start_dts(kids, *ti);
     }
+    const size_t first_sample = out_.samples.count();
     TrafLoc loc{fr.moof->offset, fr.traf_number, {}};
     TrunState st{base, std::nullopt, false, 0, 0};
     for (const Hdr& k : kids) {
@@ -592,8 +599,68 @@ class Builder {
     }
     expected_dts_ = dts_;
     saio(kids, *ti);
+    sample_groups(kids, first_sample);
     locs_.push_back(std::move(loc));
     current_->trafs.push_back(std::move(ti));
+  }
+
+  // §8.4.1 fragment part: the traf's `sbgp` runs over its samples [first, count) (14496-12 §8.9.2). Entries past the
+  // traf's samples are ignored; a truncated box keeps the entries read so far.
+  void sample_groups(const std::vector<Hdr>& kids, size_t first) {
+    const size_t end = out_.samples.count();
+    for (const Hdr& k : kids) {
+      if (k.type != "sbgp") {
+        continue;
+      }
+      const std::vector<uint8_t> p = payload(file_, k);
+      try {
+        BitReader br(p);
+        const bool v1 = br.u(8) == 1;
+        br.skip_bits(24);
+        std::string type(4, ' ');
+        for (char& c : type) {
+          c = static_cast<char>(br.u(8));
+        }
+        const uint32_t param = v1 ? u32(br) : 0;
+        FragmentGroup& g = group_of(type, param, kids);
+        const uint32_t entries = u32(br);
+        size_t i = first;
+        for (uint32_t e = 0; e < entries && i < end; ++e) {
+          const uint32_t count = u32(br);
+          const uint32_t index = u32(br);
+          const size_t stop = std::min<size_t>(end, i + count);
+          for (; i < stop; ++i) {
+            tick();
+            if (index != 0) {
+              g.members.emplace_back(i, index);
+            }
+          }
+        }
+      } catch (const ParseError&) {
+      }
+    }
+  }
+
+  FragmentGroup& group_of(const std::string& type, uint32_t param, const std::vector<Hdr>& kids) {
+    auto& groups = out_.samples.groups;
+    auto it = std::ranges::find_if(
+        groups, [&](const FragmentGroup& g) { return g.grouping_type == type && g.grouping_type_parameter == param; });
+    if (it == groups.end()) {
+      groups.push_back(FragmentGroup{type, param, 0, {}});
+      it = std::prev(groups.end());
+    }
+    if (it->sgpd_offset == 0) {
+      for (const Hdr& k : kids) {
+        if (k.type == "sgpd") {
+          const std::vector<uint8_t> p = payload(file_, k);
+          if (p.size() >= 8 && std::equal(type.begin(), type.end(), p.begin() + 4)) {
+            it->sgpd_offset = k.offset;
+            break;
+          }
+        }
+      }
+    }
+    return *it;
   }
 
   // §8.4.3 2.4 and 2.5 (CNT-4020 names the 0-based FragmentInfo.index).
@@ -735,10 +802,13 @@ class Builder {
   bool sample(uint64_t offset, uint32_t size, uint32_t dur, uint32_t flags, int32_t cts, uint32_t sdi,
               const TrafRun& fr, TrunState& st) {
     FragmentSamples& o = out_.samples;
-    if (o.count() >= std::min(in_.max_samples, kMaxFragmentSamples)) {
+    if (o.count() >= limit_) {
       if (!cap_reported_) {
         cap_reported_ = true;
-        diag("CNT-2031", "more than " + std::to_string(o.count()) + " fragment samples; table truncated",
+        diag("CNT-2031",
+             "more than " + std::to_string(o.count()) + " fragment samples" +
+                 (limit_ == file_bound_ ? " in a file of " + std::to_string(file_bound_) + " bytes" : "") +
+                 "; table truncated",
              current_->moof_offset);
       }
       return false;
@@ -1026,6 +1096,8 @@ class Builder {
   std::optional<std::vector<uint8_t>> first_styp_;
   bool styp_reported_ = false;
   bool cap_reported_ = false;
+  uint64_t file_bound_;  // one byte per sample (#788)
+  uint64_t limit_;       // samples expanded at most
 };
 
 const fb::BoxNodeT* child(const fb::BoxNodeT& n, std::string_view type) {
@@ -1078,33 +1150,55 @@ void read_stbl(const io::RandomAccessFile& file, const fb::BoxNodeT* stbl, Fragm
   }
 }
 
+// Every `moov/mvex/trex`, by track_ID.
+std::map<uint32_t, TrexDefaults> read_trex(const io::RandomAccessFile& file, const fb::BoxNodeT& moov) {
+  std::map<uint32_t, TrexDefaults> out;
+  const fb::BoxNodeT* mvex = child(moov, "mvex");
+  if (mvex == nullptr) {
+    return out;
+  }
+  for (const auto& c : mvex->children) {
+    const std::vector<uint8_t> p = c && c->fourcc == "trex" ? node_payload(file, c.get()) : std::vector<uint8_t>{};
+    if (p.size() < 24) {
+      continue;
+    }
+    BitReader br(p);
+    br.skip_bits(32);
+    const uint32_t id = u32(br);
+    TrexDefaults& t = out[id];
+    t.sample_description_index = u32(br);
+    t.duration = u32(br);
+    t.size = u32(br);
+    t.flags = u32(br);
+  }
+  return out;
+}
+
+const fb::BoxNodeT* find_moov(const BoxNodes& top_level) {
+  const auto moov = std::ranges::find_if(top_level, [](const auto& n) { return n && n->fourcc == "moov"; });
+  return moov == top_level.end() ? nullptr : moov->get();
+}
+
+// Gives a column that is shorter than the `have` moov samples (empty: the moov part has no such box) `fill` there.
+template <typename T>
+void pad_column(std::vector<T>& col, size_t have, T fill) {
+  if (col.size() < have) {
+    col.resize(have, fill);
+  }
+}
+
 }  // namespace
 
 FragmentTrackInput fragment_track_input(const io::RandomAccessFile& file, const BoxNodes& top_level,
                                         uint32_t track_id) {
   FragmentTrackInput in;
   in.track_id = track_id;
-  const auto moov = std::ranges::find_if(top_level, [](const auto& n) { return n && n->fourcc == "moov"; });
-  if (moov == top_level.end()) {
+  const fb::BoxNodeT* moov = find_moov(top_level);
+  if (moov == nullptr) {
     return in;
   }
-  if (const fb::BoxNodeT* mvex = child(**moov, "mvex"); mvex != nullptr) {
-    for (const auto& c : mvex->children) {
-      const std::vector<uint8_t> p = c && c->fourcc == "trex" ? node_payload(file, c.get()) : std::vector<uint8_t>{};
-      if (p.size() < 24) {
-        continue;
-      }
-      BitReader br(p);
-      br.skip_bits(32);
-      const uint32_t id = u32(br);
-      TrexDefaults& t = in.trex[id];
-      t.sample_description_index = u32(br);
-      t.duration = u32(br);
-      t.size = u32(br);
-      t.flags = u32(br);
-    }
-  }
-  for (const auto& trak : (*moov)->children) {
+  in.trex = read_trex(file, *moov);
+  for (const auto& trak : moov->children) {
     if (!trak || trak->fourcc != "trak" ||
         u32_after_times(node_payload(file, child(*trak, "tkhd"))) != std::optional(track_id)) {
       continue;
@@ -1114,6 +1208,111 @@ FragmentTrackInput fragment_track_input(const io::RandomAccessFile& file, const 
     break;
   }
   return in;
+}
+
+FragmentTrackInput fragment_track_input(const io::RandomAccessFile& file, const BoxNodes& top_level,
+                                        const fb::TrackInfoT& track, const fb::SampleTableT& moov_table) {
+  FragmentTrackInput in;
+  in.track_id = track.track_id;
+  in.timescale = track.timescale;
+  if (const fb::BoxNodeT* moov = find_moov(top_level); moov != nullptr) {
+    in.trex = read_trex(file, *moov);
+  }
+  const auto& fi = moov_table.fragment_index;
+  const auto n = static_cast<size_t>(std::ranges::partition_point(fi, [](int32_t f) { return f < 0; }) - fi.begin());
+  const size_t moov_count = fi.empty() ? std::min<size_t>(moov_table.dts.size(), moov_table.duration.size()) : n;
+  in.has_moov_samples = moov_count > 0;
+  if (in.has_moov_samples) {
+    const int64_t end = moov_table.dts[moov_count - 1] + int64_t{moov_table.duration[moov_count - 1]};
+    in.moov_duration = static_cast<uint64_t>(std::max<int64_t>(0, end));
+  }
+  in.max_samples = kMaxFragmentSamples - std::min<uint64_t>(moov_count, kMaxFragmentSamples);
+  return in;
+}
+
+void append_fragment_samples(fb::SampleTableT& table, const fb::FragmentTimelineT& timeline,
+                             FragmentSamples&& samples) {
+  const size_t have = table.dts.size();
+  const size_t n = samples.count();
+  if (n == 0) {
+    return;
+  }
+  const auto add = [](auto& dst, const auto& src) { dst.insert(dst.end(), src.begin(), src.end()); };
+  add(table.dts, samples.dts);
+  add(table.cts_offset, samples.cts_offset);
+  add(table.duration, samples.duration);
+  add(table.offset, samples.offset);
+  add(table.size, samples.size);
+  pad_column(table.fragment_index, have, int32_t{-1});
+  add(table.fragment_index, samples.fragment_index);
+  pad_column(table.chunk_index, have, uint32_t{0});
+  table.chunk_index.resize(have + n, 0);
+  if (!table.is_partial_sync.empty()) {
+    table.is_partial_sync.resize(have + n, false);  // stps is a moov-only box
+  }
+  // sdtp packs is_leading..sample_has_redundancy (sample_flags bits 27..20) like the sdtp byte (14496-12 §8.8.3.1);
+  // a moov part without sdtp keeps 0 ("unknown" in every field).
+  pad_column(table.sdtp, have, uint8_t{0});
+  table.sdtp.reserve(have + n);
+  int32_t min_cts = 0;
+  bool any_priority = !table.degradation_priority.empty();
+  table.is_sync.reserve(have + n);
+  table.sample_description_index.reserve(have + n);
+  for (size_t i = 0; i < n; ++i) {
+    const uint32_t f = samples.flags[i];
+    table.is_sync.push_back(samples.is_sync(i));
+    table.sample_description_index.push_back(
+        static_cast<uint16_t>(std::min<uint32_t>(samples.sample_description_index[i], 0xFFFFU)));
+    table.sdtp.push_back(static_cast<uint8_t>((f >> 20U) & 0xFFU));
+    any_priority = any_priority || (f & 0xFFFFU) != 0;
+    min_cts = std::min(min_cts, samples.cts_offset[i]);
+  }
+  if (any_priority) {
+    pad_column(table.degradation_priority, have, uint16_t{0});
+    for (size_t i = 0; i < n; ++i) {
+      table.degradation_priority.push_back(static_cast<uint16_t>(samples.flags[i] & 0xFFFFU));
+    }
+  }
+  for (const FragmentGroup& fg : samples.groups) {
+    auto it = std::ranges::find_if(table.groups, [&](const auto& g) {
+      return g->grouping_type == fg.grouping_type && g->grouping_type_parameter == fg.grouping_type_parameter;
+    });
+    if (it == table.groups.end()) {
+      auto g = std::make_unique<fb::GroupMembershipT>();
+      g->grouping_type = fg.grouping_type;
+      g->grouping_type_parameter = fg.grouping_type_parameter;
+      g->sgpd_offset = fg.sgpd_offset;
+      table.groups.push_back(std::move(g));
+      it = std::prev(table.groups.end());
+    }
+    (*it)->description_index.resize(have + n, 0);
+    for (const auto& [i, index] : fg.members) {
+      (*it)->description_index[have + i] = index;
+    }
+  }
+  for (const auto& g : table.groups) {
+    g->description_index.resize(have + n, 0);
+  }
+  table.composition_to_dts_shift = std::max(table.composition_to_dts_shift, -int64_t{min_cts});
+  table.count = have + n;
+  for (const auto& d : timeline.diagnostics) {
+    if (d && d->code == "CNT-2031") {
+      table.diagnostics.push_back(std::make_unique<fb::DiagnosticT>(*d));
+    }
+  }
+  samples = FragmentSamples{};
+}
+
+uint64_t trun_sample_count(const fb::FragmentTimelineT& timeline) noexcept {
+  uint64_t n = 0;
+  for (const auto& f : timeline.fragments) {
+    for (const auto& t : f->trafs) {
+      for (const auto& tr : t->truns) {
+        n += tr->sample_count;
+      }
+    }
+  }
+  return n;
 }
 
 FragmentBuild build_fragments(const io::RandomAccessFile& file, const BoxNodes& top_level,

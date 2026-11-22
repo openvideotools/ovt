@@ -6,8 +6,9 @@
 // box of the tree. Invariants, each an abort when violated: no exception escapes; open returns a documented status;
 // every tree buffer verifies; every TrackInfo buffer verifies; expand of an offset taken from the tree returns OVT_OK;
 // box spans stay inside the file; an expansion that completes leaves a tree that still verifies; the validation driver
-// (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing. The number of
-// expansions is capped so one input stays fast. Every track's SampleTable and HdrMetadata verify.
+// (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing; so do the brand
+// checks (WI-1.222). The number of expansions is capped so one input stays fast. Every track's SampleTable,
+// FragmentTimeline and HdrMetadata verify.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -19,6 +20,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/brands.h"
 #include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
@@ -99,6 +101,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         require(sv.VerifyBuffer<ovt::fb::SampleTable>(nullptr));
         delete[] table.data;
       }
+      // WI-1.219c: the FragmentTimeline of every track is a verified buffer.
+      ovt_Buffer timeline{};
+      require(ovt_container_fragments(c, i, nullptr, &timeline) == OVT_OK);
+      flatbuffers::Verifier fv(timeline.data, timeline.size);
+      require(fv.VerifyBuffer<ovt::fb::FragmentTimeline>(nullptr));
+      delete[] timeline.data;
       // WI-1.223: the HdrMetadata of every track (box level and sync-sample probe) verifies, with a 44-byte image.
       ovt_Buffer hdr{};
       ovt_ColorDescription color{};
@@ -115,6 +123,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     using ovt::container::isobmff::ValidationLevel;
     ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Standard);
     require(ovt::container::isobmff::validate(walked.top_level, ValidationLevel::Deep) == 0);
+    // The brand checks (WI-1.222) read hvcC, av1C, sidx and the like straight from the file: idempotent as well.
+    ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Standard);
+    require(ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();
   }

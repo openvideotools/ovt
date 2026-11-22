@@ -283,9 +283,27 @@ OVT_API ovt_status ovt_container_sample_table(ovt_Container* container, int trac
 }
 
 OVT_API ovt_status ovt_container_fragments(ovt_Container* container, int track_index, ovt_Job* job, ovt_Buffer* out) {
-  (void)track_index;
-  (void)job;
-  return container == nullptr || out == nullptr ? OVT_E_INVALID_ARG : OVT_E_UNSUPPORTED;
+  if (container == nullptr || out == nullptr) {
+    return OVT_E_INVALID_ARG;
+  }
+  *out = ovt_Buffer{nullptr, 0};
+  if (!container->reader) {
+    return OVT_E_UNSUPPORTED;
+  }
+  if (track_index < 0 || track_index >= container->reader->track_count()) {
+    return OVT_E_INVALID_ARG;
+  }
+  // jobs::run maps ovt::Cancelled to OVT_E_CANCELLED and std::bad_alloc to OVT_E_NOMEM; an I/O error keeps its code.
+  return ovt::jobs::run(job, "fragments",
+                        [&](ovt::jobs::Cancel& cancel, const ovt::jobs::Pool::ProgressSink& /*sink*/) {
+                          try {
+                            const std::vector<uint8_t> timeline = container->reader->fragments(track_index, cancel);
+                            return timeline.empty() ? OVT_E_UNSUPPORTED  // other formats
+                                                    : ovt::api::make_buffer(timeline.data(), timeline.size(), out);
+                          } catch (const ovt::io::IoError& e) {
+                            return e.code;
+                          }
+                        });
 }
 
 OVT_API ovt_status ovt_container_encryption(ovt_Container* container, int track_index, uint64_t first, uint64_t count,

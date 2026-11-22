@@ -51,6 +51,13 @@ class Reader {
     (void)count;
     return {};
   }
+  // FragmentTimeline FlatBuffer of one track (chapter 08 §8.4.3); empty when unsupported. Throws ovt::Cancelled when
+  // `cancel` is requested.
+  [[nodiscard]] virtual std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const {
+    (void)track_index;
+    (void)cancel;
+    return {};
+  }
   // TrackInfo FlatBuffer of one track (chapter 08 §8.1.3); empty when the reader has no such track.
   [[nodiscard]] virtual std::vector<uint8_t> track_info(int track_index) const {
     (void)track_index;
