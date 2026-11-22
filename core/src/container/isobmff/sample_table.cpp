@@ -226,6 +226,13 @@ class Expander {
     uint64_t n = clamp_count(rd32(p, 8), box);
     if (fixed == 0) {
       n = std::min<uint64_t>(n, (p.size() - 12) / 4);
+    } else if (const uint64_t fits = file_.size() / fixed; n > fits) {
+      // SPEC-ASSUMPTION(#788): a constant-size table claims no more samples than the file can hold.
+      diag("CNT-2031",
+           "stsz claims " + std::to_string(n) + " samples of " + std::to_string(fixed) + " bytes, a file of " +
+               std::to_string(file_.size()) + " bytes holds at most " + std::to_string(fits) + "; table truncated",
+           offset_of(box));
+      n = fits;
     }
     count_ = n;
     t_->size.resize(n);
@@ -289,6 +296,7 @@ class Expander {
         }
         if (!checked_add(dts, r.value, dts) || dts > kInt64Max) {
           overflow_at(i + 1, box);  // sample i + 1 has no representable DTS
+          i = count_;               // the later runs add nothing
           break;
         }
       }

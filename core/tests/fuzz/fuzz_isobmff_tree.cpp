@@ -91,6 +91,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
       flatbuffers::Verifier v(b.data, b.size);
       require(v.VerifyBuffer<ovt::fb::TrackInfo>(nullptr));
       delete[] b.data;  // §12.3.1 rule 3a: new[]-allocated; the fuzz targets do not link status.cpp
+      // WI-1.218: the moov SampleTable of every track (whole, then a slice) is a verified buffer too.
+      for (const uint32_t first : {0U, 3U}) {
+        ovt_Buffer st{};
+        require(ovt_container_sample_table(c, i, first, first == 0 ? 0 : 5, &st) == OVT_OK);
+        flatbuffers::Verifier sv(st.data, st.size);
+        require(sv.VerifyBuffer<ovt::fb::SampleTable>(nullptr));
+        delete[] st.data;
+      }
     }
     ovt_container_close(c);
     // The validation driver over the complete walk: idempotent, whatever the bytes.

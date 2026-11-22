@@ -377,6 +377,17 @@ TEST_CASE("sample table: a claimed count above the bound is truncated (CNT-2031)
   CHECK(e.t->count == 3);
 }
 
+// SPEC-ASSUMPTION(#788): a constant-size stsz claims no more samples than the file can hold.
+TEST_CASE("sample table: a constant sample size is bounded by the file size", "[container][sample_table][fast]") {
+  const Expanded e = expand_boxes({table("stts", 0, {{50'000'000, 1}}), stsz(1000, {}, 50'000'000),
+                                   table("stsc", 0, {{1, 50'000'000, 1}}), co64({40})});
+  const auto* d = e.diag("CNT-2031");
+  REQUIRE(d != nullptr);
+  CHECK(d->message.find("holds at most") != std::string::npos);
+  CHECK(e.t->count < 5000);  // the file is a few KiB
+  CHECK(e.t->dts.size() == e.t->count);
+}
+
 TEST_CASE("sample table: stss, stps, sdtp and stdp", "[container][sample_table][fast]") {
   const std::vector<Bytes> base = {table("stts", 0, {{4, 1}}), stsz(1, {}, 4), table("stsc", 0, {{1, 4, 1}}),
                                    co64({40})};
@@ -568,7 +579,13 @@ TEST_CASE("sample table rows equal the MP4Box -dts goldens", "[container][sample
         const auto it = rows.find(t->track_id);
         const std::vector<const nlohmann::json*>& list = it == rows.end() ? kNone : it->second;
         // Fragment samples follow the moov samples of a track in the golden; the moov table is the prefix.
-        REQUIRE(t->count <= list.size());
+        // A file without a moof has no fragment samples: the table must match every row, not only a prefix.
+        const bool fragmented = std::ranges::any_of(w.top_level, [](const auto& n) { return n->fourcc == "moof"; });
+        if (fragmented) {
+          REQUIRE(t->count <= list.size());
+        } else {
+          REQUIRE(t->count == list.size());
+        }
         for (uint64_t i = 0; i < t->count; ++i) {
           const nlohmann::json& g = *list[i];
           INFO(id + " track " + std::to_string(t->track_id) + " sample " + std::to_string(i));
