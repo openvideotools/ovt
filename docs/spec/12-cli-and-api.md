@@ -321,6 +321,8 @@ moov   @24 +34567
     creation_time = 3786096823 ("2023-12-25T10:13:43Z")
 ```
 
+**Core functions behind the flags (chapter 08 WI-1.235).** `--expand all` is `ovt_container_expand_all` (a depth-first walk that expands every box carrying `CNT-0007` except `mdat`, checking its `ovt_Job` before each box). `--bytes OFFSET:LEN` prints the bytes returned by `ovt_container_bytes` in the layout of the internal `ovt::container::format_hex_dump`: 16 bytes per row, rows starting at `OFFSET` (not aligned), the offset in hex (at least 8 digits), two groups of 8 bytes, then the ASCII column between `|` with `.` for bytes outside `0x20..0x7e`, e.g. `00000000  66 74 79 70 69 73 6f 6d  00 00 02 00 69 73 6f 6d  |ftypisom....isom|`. `--list-diagnostics` reads `ovt::container::all_diagnostics()`; the C function `ovt_container_list_diagnostics` stays `OVT_E_UNSUPPORTED` until the `DiagnosticRegistry` table is added to `ovt_container.fbs`.
+
 **Examples.**
 
 ```

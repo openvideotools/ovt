@@ -28,6 +28,7 @@ add_executable(
   mxf_placeholder_test.cpp
   obu_robustness_test.cpp
   obu_test.cpp
+  probe_test.cpp
   psi_test.cpp
   rawyuv_test.cpp
   registry_gen_test.cpp

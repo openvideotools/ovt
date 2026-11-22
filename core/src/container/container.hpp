@@ -16,6 +16,7 @@
 #include "container/format.hpp"
 #include "ovt/container.h"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 
 namespace ovt::container {
 
@@ -80,6 +81,12 @@ namespace ovt::container {
 // Re-serialises the handle's tree when an expand marked it stale; a no-op otherwise. The caller holds
 // bytes.tree_mutex(). Throws what Reader::tree() throws (std::bad_alloc).
 void refresh_tree(ovt_Container& c);
+// ovt_container_expand without the C boundary: expands the box at `box_offset` under the tree lock and marks the tree
+// stale when the reader changed it. OVT_E_UNSUPPORTED without a reader. May throw (std::bad_alloc).
+ovt_status expand_box(ovt_Container& c, uint64_t box_offset);
+// Body of ovt_container_expand_all (WI-1.235): expands every box except `mdat` payloads, checking `cancel` before each
+// box (throws ovt::Cancelled) and reporting progress to `sink`. OVT_OK once no unexpanded box is left.
+ovt_status expand_all(ovt_Container& c, jobs::Cancel& cancel, const jobs::Pool::ProgressSink& sink);
 }  // namespace ovt::container
 
 struct ovt_Container {
