@@ -318,6 +318,45 @@ def test_post_step_without_ffmpeg_marks_entry_unavailable(
     assert not (tmp_path / "cache" / "trim" / ".ok").exists()
 
 
+def fake_tool(bin_dir: Path, name: str, out_flag: str, log: Path) -> None:
+    """A stand-in for ffmpeg / MP4Box / hdr10plus_tool: logs its arguments and writes the argument after out_flag
+    (the last argument when out_flag is empty)."""
+    bin_dir.mkdir(exist_ok=True)
+    script = bin_dir / name
+    script.write_text(
+        f"#!{sys.executable}\nimport sys\nargs = sys.argv[1:]\n"
+        f"open({str(log)!r}, 'a').write({name!r} + ' ' + ' '.join(args) + '\\n')\n"
+        f"out = args[args.index({out_flag!r}) + 1] if {out_flag!r} else args[-1]\n"
+        "open(out, 'wb').write(b'out')\n",
+        encoding="utf-8",
+    )
+    script.chmod(0o755)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX shebang scripts")
+def test_dv_remux_post_step(files: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bin_dir, log = tmp_path / "bin", tmp_path / "tools.log"
+    post = {
+        "mp4box_dv_remux": {"dv_profile": "8.1", "hdr10plus_inject": "tests/corpora/synthetic/hdr10plus_metadata.json"}
+    }
+    monkeypatch.setenv("PATH", str(bin_dir))
+    fake_tool(bin_dir, "ffmpeg", "", log)
+    fake_tool(bin_dir, "MP4Box", "-new", log)
+    with serve(files) as base:
+        manifest = write_manifest(tmp_path / "m.json", [entry("dv", files, "plain.bin", post=post)], base)
+        assert run(manifest, tmp_path / "cache") == 0  # hdr10plus_tool missing: the entry is unavailable
+        assert not (tmp_path / "cache" / "dv" / ".ok").exists()
+        fake_tool(bin_dir, "hdr10plus_tool", "-o", log)
+        assert run(manifest, tmp_path / "cache") == 0
+    record = json.loads((tmp_path / "cache" / "dv" / ".ok").read_text(encoding="utf-8"))
+    assert record["primary"] == "dv.mp4"
+    calls = log.read_text(encoding="utf-8").splitlines()
+    assert [c.split()[0] for c in calls] == ["ffmpeg", "hdr10plus_tool", "MP4Box"]
+    assert "hevc_mp4toannexb" in calls[0]
+    assert "hdr10plus_metadata.json" in calls[1]
+    assert "injected.hevc:dv-profile=8.1" in calls[2]
+
+
 def test_cache_dir_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setenv("OVT_CORPORA_DIR", str(tmp_path / "env"))
     assert fetch_corpora.cache_dir_for("x") == Path("x")

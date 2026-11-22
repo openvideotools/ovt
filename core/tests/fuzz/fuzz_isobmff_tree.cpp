@@ -7,7 +7,7 @@
 // every tree buffer verifies; every TrackInfo buffer verifies; expand of an offset taken from the tree returns OVT_OK;
 // box spans stay inside the file; an expansion that completes leaves a tree that still verifies; the validation driver
 // (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing. The number of
-// expansions is capped so one input stays fast.
+// expansions is capped so one input stays fast. Every track's SampleTable and HdrMetadata verify.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -99,6 +99,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         require(sv.VerifyBuffer<ovt::fb::SampleTable>(nullptr));
         delete[] table.data;
       }
+      // WI-1.223: the HdrMetadata of every track (box level and sync-sample probe) verifies, with a 44-byte image.
+      ovt_Buffer hdr{};
+      ovt_ColorDescription color{};
+      require(ovt_container_hdr_metadata(c, i, nullptr, &hdr, &color) == OVT_OK);
+      flatbuffers::Verifier hv(hdr.data, hdr.size);
+      require(hv.VerifyBuffer<ovt::fb::HdrMetadata>(nullptr));
+      require(color.struct_size == sizeof(ovt_ColorDescription));
+      delete[] hdr.data;
     }
     ovt_container_close(c);
     // The validation driver over the complete walk: idempotent, whatever the bytes.

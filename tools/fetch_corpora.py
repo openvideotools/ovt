@@ -314,9 +314,39 @@ def extract_member(archive: Path, declared: str, member: str, dest_dir: Path) ->
     return target
 
 
+def dv_remux(entry: dict[str, Any], src: Path, dest_dir: Path) -> Path | None:
+    """The ``mp4box_dv_remux`` post step (WI-1.223, #769): the HEVC stream of a Matroska file, with HDR10+ metadata
+    injected by ``hdr10plus_tool inject`` when the entry records a JSON for it, remuxed by MP4Box with a Dolby Vision
+    configuration box. Returns ``<id>.mp4``, or None when ffmpeg, MP4Box or hdr10plus_tool is unavailable."""
+    step = entry["post"]["mp4box_dv_remux"]
+    tools = {name: shutil.which(name) for name in ("ffmpeg", "MP4Box")}
+    if "hdr10plus_inject" in step:
+        tools["hdr10plus_tool"] = shutil.which("hdr10plus_tool")
+    missing = sorted(name for name, path in tools.items() if path is None)
+    if missing:
+        log(f"warning: {entry['id']}: {', '.join(missing)} not found, post step skipped; entry unavailable")
+        return None
+    with tempfile.TemporaryDirectory(prefix=".post-", dir=dest_dir) as tmp_name:
+        hevc = Path(tmp_name) / "stream.hevc"
+        subprocess.run([str(tools["ffmpeg"]), "-y", "-v", "error", "-i", str(src), "-map", "0:v:0", "-c", "copy",
+                        "-bsf:v", "hevc_mp4toannexb", "-f", "hevc", str(hevc)], check=True, timeout=600)  # fmt: skip
+        if "hdr10plus_inject" in step:
+            injected = Path(tmp_name) / "injected.hevc"
+            subprocess.run([str(tools["hdr10plus_tool"]), "inject", "-i", str(hevc),
+                            "-j", str(REPO_ROOT / step["hdr10plus_inject"]), "-o", str(injected)],
+                           check=True, timeout=600, stdout=subprocess.DEVNULL)  # fmt: skip
+            hevc = injected
+        out = dest_dir / f"{entry['id']}.mp4"
+        subprocess.run([str(tools["MP4Box"]), "-for-test", "-quiet", "-add", f"{hevc}:dv-profile={step['dv_profile']}",
+                        "-new", str(out)], check=True, timeout=600)  # fmt: skip
+    return out
+
+
 def run_post(entry: dict[str, Any], src: Path, dest_dir: Path) -> Path | None:
-    """Run the ``post`` steps. Returns the produced file or None when ffmpeg is unavailable."""
+    """Run the ``post`` steps. Returns the produced file or None when a tool the step needs is unavailable."""
     post = entry["post"]
+    if "mp4box_dv_remux" in post:
+        return dv_remux(entry, src, dest_dir)
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg is None:
         log(f"warning: {entry['id']}: ffmpeg not found, post step skipped; entry unavailable")
