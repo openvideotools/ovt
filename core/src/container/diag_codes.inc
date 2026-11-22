@@ -258,3 +258,66 @@ X(CNT_5011, "CNT-5011", Warning, "`dvcC`/`dvvC` present, no RPU found in probed 
 X(CNT_5012, "CNT-5012", Info, "PQ without static metadata", "")
 X(CNT_5021, "CNT-5021", Warning, "`dv_bl_signal_compatibility_id` contradicts `colr`", "DV-ISOBMFF §2.2")
 X(CNT_5022, "CNT-5022", Info, "sample entry `dvh1`/`dvhe` (non-cross-compatible) vs `hvc1`+`dvvC`", "DV-ISOBMFF §3")
+
+// WI-1.222 (brand and profile checks, §8.4.5). CNT-7004, CNT-7008 and CNT-7009 (sample bytes, Deep) and CNT-8011..8014
+// (MIAF item properties) come with the work items that read those bytes.
+X(CNT_7001, "CNT-7001", Warning,
+  "`default-base-is-moof`/`tfdt` used but no `iso5`+/`cmfc`/`dash`/`msdh` brand declares them", "14496-12 Annex E")
+X(CNT_7002, "CNT-7002", Warning,
+  "`mp42` file: `mp4a`/`mp4v` sample entry without `esds`", "14496-14 §5")
+X(CNT_7003, "CNT-7003", Error,
+  "`avc1`/`avc2` sample entry with `numOfSequenceParameterSets == 0`", "14496-15 §5.3.4")
+X(CNT_7005, "CNT-7005", Error,
+  "`hvc1` sample entry whose `hvcC` arrays lack VPS, SPS or PPS", "14496-15 §8.4.1")
+X(CNT_7006, "CNT-7006", Info,
+  "`hvc1` sample entry with `array_completeness == 0`", "14496-15 §8.3.3")
+X(CNT_7007, "CNT-7007", Error,
+  "`av1C.configOBUs` does not contain exactly one `OBU_SEQUENCE_HEADER`", "AV1-ISOBMFF §2.3.4")
+X(CNT_7010, "CNT-7010", Error,
+  "`cmfc` file with `N` `trak` boxes (exactly one required)", "23000-19 §7.3.2")
+X(CNT_7011, "CNT-7011", Error,
+  "`cmfc` file without `mvex`/`trex`", "23000-19 §7.3.2")
+X(CNT_7012, "CNT-7012", Info,
+  "`cmfc` file with `mvhd.duration ≠ 0` and no `mehd`", "23000-19 §7.3.2")
+X(CNT_7013, "CNT-7013", Error,
+  "`cmfc` file whose `stbl` tables are not empty (`box.entry_count == N`)", "23000-19 §7.3.2")
+X(CNT_7014, "CNT-7014", Error,
+  "`cmfc` `moof` `k` with `N` `traf` boxes (exactly one required)", "23000-19 §7.3.2")
+X(CNT_7015, "CNT-7015", Warning,
+  "`cmfc` `tfhd` of fragment `k` without `default-base-is-moof`", "23000-19 §7.3.2")
+X(CNT_7016, "CNT-7016", Error,
+  "`cmfc` `traf` of fragment `k` without `tfdt`", "23000-19 §7.3.2")
+X(CNT_7017, "CNT-7017", Info,
+  "`cmfc` file with `sdtp`/`stss` (not used by CMAF)", "23000-19 §7.3.2")
+X(CNT_7018, "CNT-7018", Warning,
+  "`cmfc` video sample entry without `colr`", "23000-19 §7.5.3")
+X(CNT_7019, "CNT-7019", Info,
+  "`cmfc` video sample entry without `btrt`", "23000-19 §7.5")
+X(CNT_7020, "CNT-7020", Warning,
+  "`cmf2` file with `elst.media_time > 0` (negative composition offsets expected instead)", "23000-19 §7.7")
+X(CNT_7021, "CNT-7021", Info,
+  "`cmf2` file with `cslg`", "23000-19 §7.7")
+X(CNT_7022, "CNT-7022", Info,
+  "`cmf2` file with in-band parameter-set entries (`avc3`/`hev1`)", "23000-19 §7.7")
+X(CNT_7023, "CNT-7023", Error,
+  "`cmfs` segment without a leading `styp`", "23000-19 §7.3.3")
+X(CNT_7024, "CNT-7024", Warning,
+  "`sidx` not at the segment start, or `cmfl` chunk with more than one `moof`", "23000-19 §7.3.3")
+X(CNT_7025, "CNT-7025", Warning,
+  "`emsg`/`prft` after the `moof` of a CMAF chunk", "23000-19 §7.3.3")
+X(CNT_7030, "CNT-7030", Error,
+  "`dash` brand but no `mvex`, or `stsz.sample_count > 0` (self-initialising segment expected)", "23009-1 §6")
+X(CNT_7031, "CNT-7031", Error,
+  "`msix` brand without `sidx`", "23009-1 §6.3.4")
+X(CNT_7032, "CNT-7032", Warning,
+  "`msix` file: `moof` at offset `o` not referenced by any `sidx`", "23009-1 §6.3.4")
+X(CNT_7033, "CNT-7033", Info,
+  "`lmsg` brand on a segment that is not the last", "23009-1 §6.3.4")
+X(CNT_7040, "CNT-7040", Error,
+  "HLS fMP4 segment without `tfdt`", "HLS Authoring Specification for Apple Devices")
+X(CNT_7041, "CNT-7041", Warning,
+  "HLS context with `hev1`/`avc3` sample entry (Apple requires `hvc1`/`avc1`)", "HLS Authoring Specification for Apple Devices")
+X(CNT_7050, "CNT-7050", Info,
+  "iTunes brand (`M4A `/`M4V `/`M4P `/`M4B `) without `ilst`", "")
+X(CNT_8010, "CNT-8010", Error,
+  "`mif1` file: `meta` lacks required child `box` (`hdlr == pict`, `pitm`, `iinf`, `iloc`, `iprp`)", "23008-12 §10")

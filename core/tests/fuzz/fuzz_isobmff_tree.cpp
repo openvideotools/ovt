@@ -6,8 +6,8 @@
 // box of the tree. Invariants, each an abort when violated: no exception escapes; open returns a documented status;
 // every tree buffer verifies; every TrackInfo buffer verifies; expand of an offset taken from the tree returns OVT_OK;
 // box spans stay inside the file; an expansion that completes leaves a tree that still verifies; the validation driver
-// (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing. The number of
-// expansions is capped so one input stays fast.
+// (WI-1.224) runs over a fresh walk of the input without throwing, and a second run adds nothing; so do the brand
+// checks (WI-1.222). The number of expansions is capped so one input stays fast.
 
 #include <flatbuffers/flatbuffers.h>
 
@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/brands.h"
 #include "container/isobmff/edit_list.h"
 #include "container/isobmff/sample_table.h"
 #include "container/isobmff/validate.h"
@@ -125,6 +126,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         static_cast<void>(iso::sample_presentation_time(*built.list, *table, i, built.movie_timescale, &pts));
       }
     }
+    // The brand checks (WI-1.222) read hvcC, av1C, sidx and the like straight from the file: idempotent as well.
+    ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Standard);
+    require(ovt::container::isobmff::check_brands(file, walked.top_level, ValidationLevel::Deep) == 0);
   } catch (...) {
     std::abort();
   }

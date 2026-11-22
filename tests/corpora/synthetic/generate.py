@@ -99,12 +99,12 @@ def wrap_step(es_file: str, muxer: str = "ffmpeg") -> dict[str, Any]:
     """The §14.3.3 MP4 wrapping step; raw Annex B input gets -framerate 30 (every source is 30 fps).
 
     ``muxer`` "MP4Box" reorders by POC and writes ctts plus an elst that removes the B-frame delay; ffmpeg has no PTS
-    for a raw elementary stream, so its remux keeps pts == dts and writes no ctts (WI-1.220 AT1)."""
-    out_name = Path(es_file).with_suffix(".mp4").name
-    if muxer == "MP4Box":
-        return {"cmd": ["MP4Box", "-for-test", "-add", f"{es_file}:fps=30", "-new", out_name]}
-    rate = ["-framerate", "30"] if Path(es_file).suffix in (".264", ".265") else []
+    for a raw elementary stream, so its remux keeps pts == dts and writes no ctts (WI-1.220 AT1).
+    SPEC-ASSUMPTION(#806): §14.3.3 names only ffmpeg; the "mp4_muxer" recipe key is the proposed exception."""
     out = Path(es_file).with_suffix(".mp4").name
+    if muxer == "MP4Box":
+        return {"cmd": ["MP4Box", "-for-test", "-add", f"{es_file}:fps=30", "-new", out]}
+    rate = ["-framerate", "30"] if Path(es_file).suffix in (".264", ".265") else []
     return {"cmd": ["ffmpeg", *rate, "-i", es_file, "-c", "copy", "-movflags", "+faststart", out]}
 
 
