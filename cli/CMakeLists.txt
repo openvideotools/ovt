@@ -21,8 +21,8 @@ endif()
 ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS ${_ovt_zstd_targets})
 unset(_ovt_zstd_targets)
 
-add_library(ovt_cli_lib STATIC src/app.cpp src/cmd/cache.cpp src/cmd/info.cpp src/output/json_writer.cpp src/output/fb_writer.cpp
-                               src/output/csv_writer.cpp src/output/text_writer.cpp)
+add_library(ovt_cli_lib STATIC src/app.cpp src/cmd/cache.cpp src/cmd/info.cpp src/output/json_writer.cpp
+                               src/output/fb_writer.cpp src/output/csv_writer.cpp src/output/text_writer.cpp)
 target_include_directories(ovt_cli_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${OVT_GENERATED_DIR}")
 target_link_libraries(ovt_cli_lib PUBLIC ovt::core ${CLI11_TARGET} ${fmt_TARGET} ${flatbuffers_TARGET}
                       PRIVATE ovt::flags ovt_schemas ${nlohmann_json_TARGET} ${zstd_TARGET})
@@ -76,11 +76,12 @@ ovt_set_license(ovt_cli "GPL-3.0-or-later")
 
 if(OVT_BUILD_TESTS)
   ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp tests/test_info.cpp
-                               $<TARGET_OBJECTS:ovt_cli_completions>)
+  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp
+                               tests/test_info.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
   target_link_libraries(ovt_tests_cli PRIVATE ovt_cli_lib ovt::flags ovt_schemas ${nlohmann_json_TARGET}
                                               ${Catch2_TARGET})
-  target_compile_definitions(ovt_tests_cli PRIVATE "OVT_CLI_TEST_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/golden\"")
+  target_compile_definitions(ovt_tests_cli
+                             PRIVATE "OVT_CLI_TEST_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/golden\"")
   ovt_set_license(ovt_tests_cli "GPL-3.0-or-later")
   ovt_catch_discover_tests(ovt_tests_cli)
 
