@@ -75,6 +75,12 @@ const Bytes kKid = [] {
 Bytes tenc_v0(uint8_t is_protected, uint8_t iv_size) {
   return box("tenc", full(0, 0, cat({be(0, 2), be(is_protected, 1), be(iv_size, 1), kKid})));
 }
+Bytes tenc_cbcs(uint8_t crypt, uint8_t skip, const Bytes& constant_iv) {
+  return box("tenc", full(1, 0,
+                          cat({be(0, 1), be(static_cast<uint64_t>(crypt << 4U) | skip, 1), be(1, 1), be(0, 1), kKid,
+                               be(constant_iv.size(), 1), constant_iv})));
+}
+
 Bytes ftyp() {
   return box("ftyp", cat({str("isom"), be(0, 4), str("isom"), str("cmfc")}));
 }
@@ -248,6 +254,35 @@ TEST_CASE("cenc: a subsample that protects the NAL length and header raises CNT-
     }
   }
   CHECK(n == 1);
+}
+
+TEST_CASE("cenc: cbcs uses the constant IV and the 1:9 pattern shades 16 bytes in every 160", "[container][cenc]") {
+  MoovSpec m;
+  m.scheme = "cbcs";
+  m.tenc = tenc_cbcs(1, 9, filled(16, 0x5A));
+  m.samples = {{{}, {{40, 360}}, 400}, {{}, {{0, 400}}, 400}};
+  const Opened o(moov_file(m));
+  const auto info = encryption_of(o.c);
+  CHECK(info->scheme_type == "cbcs");
+  CHECK(info->pattern_crypt == 1);
+  CHECK(info->pattern_skip == 9);
+  CHECK(info->default_constant_iv == filled(16, 0x5A));
+  REQUIRE(info->samples.size() == 2);
+  for (const auto& s : info->samples) {
+    CHECK(s->iv == filled(16, 0x5A));  // AT2
+    CHECK(s->crypt_byte_block == 1);
+    CHECK(s->skip_byte_block == 9);
+  }
+  const auto ranges = iso::sample_clear_protected_ranges(*info->samples[0], 1000, 400);
+  // clear 40, then 16 protected / 144 clear, 16 protected / 144 clear, 16 protected, 16 + 8 clear.
+  const std::vector<std::pair<uint64_t, uint64_t>> expected = {{1000, 40},  {1040, 16}, {1056, 144}, {1200, 16},
+                                                               {1216, 144}, {1360, 16}, {1376, 24}};
+  REQUIRE(ranges.size() == expected.size());
+  for (size_t i = 0; i < ranges.size(); ++i) {
+    CAPTURE(i);
+    CHECK(ranges[i].offset == expected[i].first);
+    CHECK(ranges[i].length == expected[i].second);
+  }
 }
 
 TEST_CASE("cenc: a seig entry of the stbl makes a sample unprotected", "[container][cenc]") {
