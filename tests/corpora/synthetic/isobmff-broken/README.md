@@ -4,8 +4,10 @@
 
 Small ISOBMFF files (about 20 KiB each, 450 KiB in all) with one deliberate defect in the box headers, used by
 `core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
-in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the last six, with
-a defect in the box rules of chapter 8 §8.5, are used by `core/tests/container/diag_coverage_test.cpp` (WI-1.224a); the last three (recipes 35 to 37) are used by the same test for the brand checks (WI-1.222a).
+in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the six
+before the `syn_mp4_broken_*` files, with a defect in the box rules of chapter 8 §8.5, are used by
+`core/tests/container/diag_coverage_test.cpp` (WI-1.224a); the three `syn_mp4_broken_*` files (recipes 35 to 37, a
+defect the brand checks of §8.4.5 find) are used by the same test (WI-1.222a).
 Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change;
 regenerate a file with the command in the table (the output is byte-for-byte reproducible).
 
