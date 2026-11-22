@@ -194,8 +194,6 @@ class Expander {
     truncate_to(sample);
   }
 
-  // ---- step 1 and 4: sample count and sizes ---------------------------------------------------------------------
-
   // False when the track has no `stsz`/`stz2` (no samples) or `stz2` has an unusable field size.
   bool read_sizes() {
     if (const fb::BoxNodeT* stsz = child(stbl_, "stsz"); stsz != nullptr) {
@@ -269,8 +267,6 @@ class Expander {
     return true;
   }
 
-  // ---- step 2: durations and DTS --------------------------------------------------------------------------------
-
   void expand_durations() {
     const fb::BoxNodeT* box = child(stbl_, "stts");
     const Bytes p = payload_min(file_, box, 8);
@@ -308,8 +304,6 @@ class Expander {
            offset_of(box));
     }
   }
-
-  // ---- step 3: composition offsets ------------------------------------------------------------------------------
 
   void expand_composition() {
     t_->cts_offset.assign(t_->size.size(), 0);
@@ -380,8 +374,6 @@ class Expander {
            offset_of(box));
     }
   }
-
-  // ---- step 5: chunk map and offsets ----------------------------------------------------------------------------
 
   [[nodiscard]] std::vector<ChunkEntry> read_stsc() const {
     const Bytes p = payload_min(file_, child(stbl_, "stsc"), 8);
@@ -486,8 +478,6 @@ class Expander {
     return true;
   }
 
-  // ---- step 6: offsets against the file --------------------------------------------------------------------------
-
   void check_file_bounds() {
     const uint64_t file_size = file_.size();
     const fb::BoxNodeT* box = child(stbl_, "stco") != nullptr ? child(stbl_, "stco") : child(stbl_, "co64");
@@ -509,8 +499,6 @@ class Expander {
       diag("CNT-2007", std::to_string(bad) + " samples in total extend past the end of the file", offset_of(box));
     }
   }
-
-  // ---- step 7: sync samples, sdtp, stdp, subs ---------------------------------------------------------------------
 
   // Marks the 1-based sample numbers of an stss/stps payload in `flags`; CNT-2009 for entries that are 0, past the
   // sample count or not increasing (they are ignored).
@@ -582,8 +570,6 @@ class Expander {
       }
     }
   }
-
-  // ---- step 8: sample groups --------------------------------------------------------------------------------------
 
   [[nodiscard]] const fb::BoxNodeT* find_sgpd(const std::string& grouping_type) const {
     for (const auto& c : stbl_->children) {
@@ -657,8 +643,6 @@ class Expander {
       }
     }
   }
-
-  // ---- step 9 -----------------------------------------------------------------------------------------------------
 
   void check_description_indexes() {
     const fb::BoxNodeT* stsd = child(stbl_, "stsd");
