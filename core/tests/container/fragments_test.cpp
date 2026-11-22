@@ -1025,22 +1025,49 @@ TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on generated fragment
   }
 }
 
-TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on the fragmented corpus sets",
-          "[container][fragments][ffprobe][slow][needs-corpus]") {
-  // Acceptance test 1 on syn_mp4_frag (recipe 30 = 20 (b)) and cta_cmaf_video_cmfv (CTA WAVE).
+namespace {
+
+// True when tests/corpora/manifest.json marks `id` unverified: tools/fetch_corpora.py cannot deliver it (#517).
+bool unverified_in_manifest(std::string_view id) {
+  std::ifstream mf(std::filesystem::path(OVT_TEST_SOURCE_DIR) / "tests/corpora/manifest.json");
+  const auto manifest = nlohmann::json::parse(mf);
+  for (const auto& e : manifest.at("entries")) {
+    if (e.at("id") == id) {
+      return e.value("unverified", false);
+    }
+  }
+  return false;
+}
+
+// AT1 on one corpus set: a single file, or a DASH set (its .mpd is the primary file) that is concatenated first.
+void compare_corpus_with_ffprobe(std::string_view id) {
   if (!on_path("ffprobe")) {
     SKIP("ffprobe is not available");
   }
-  for (const std::string_view id : {"syn_mp4_frag", "cta_cmaf_video_cmfv"}) {
-    DYNAMIC_SECTION(id) {
-      const auto primary = ovt::test::corpus_or_skip(id);
-      const TempDir tmp;
-      const std::filesystem::path file =
-          primary.extension() == ".mpd" ? concat_segments(primary.parent_path(), tmp.path) : primary;
-      REQUIRE_FALSE(file.empty());
-      CHECK(compare_with_ffprobe(file).second > 0);
-    }
+  // An unverified placeholder is skipped even under OVT_REQUIRE_CORPORA=1, as in the demuxer parity sweep.
+  if (!ovt::test::corpus_path(id) && unverified_in_manifest(id)) {
+    SKIP(std::string(id) + " is unverified in the manifest (#517): tools/fetch_corpora.py cannot fetch it");
   }
+  const auto primary = ovt::test::corpus_or_skip(id);
+  const TempDir tmp;
+  const std::filesystem::path file =
+      primary.extension() == ".mpd" ? concat_segments(primary.parent_path(), tmp.path) : primary;
+  REQUIRE_FALSE(file.empty());  // a DASH set needs its init segment
+  CHECK(compare_with_ffprobe(file).second > 0);
+}
+
+}  // namespace
+
+TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on syn_mp4_frag",
+          "[container][fragments][ffprobe][needs-corpus]") {
+  // Acceptance test 1 on syn_mp4_frag (recipe 30 = recipe 20 (b): seg_init.mp4 + seg_*.m4s).
+  compare_corpus_with_ffprobe("syn_mp4_frag");
+}
+
+TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on cta_cmaf_video_cmfv",
+          "[container][fragments][ffprobe][slow][needs-corpus]") {
+  // Acceptance test 1 on cta_cmaf_video_cmfv (CTA WAVE).
+  compare_corpus_with_ffprobe("cta_cmaf_video_cmfv");
 }
 
 TEST_CASE("fragments: traf sbgp memberships join the SampleTable groups", "[container][fragments][sample_table]") {
