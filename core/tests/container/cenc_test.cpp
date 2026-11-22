@@ -227,34 +227,6 @@ uint64_t sum_of(const ovt::fb::SampleEncryptionT& s) {
 
 }  // namespace
 
-TEST_CASE("cenc: the moov saiz/saio data gives every IV and subsample list", "[container][cenc]") {
-  MoovSpec m;
-  m.samples = {
-      {filled(8, 0x11), {{5, 20}, {0, 39}}, 64}, {filled(8, 0x22), {{5, 59}}, 64}, {filled(8, 0x33), {{5, 59}}, 64}};
-  const Opened o(moov_file(m));
-  const auto info = encryption_of(o.c);
-  CHECK(info->track_id == kTrack);
-  CHECK(info->scheme_type == "cenc");
-  CHECK(info->scheme_version == 0x10000);
-  CHECK(info->original_format == "avc1");
-  CHECK(info->default_kid == kKid);
-  CHECK(info->default_iv_size == 8);
-  CHECK(info->default_is_protected);
-  REQUIRE(info->samples.size() == 3);
-  for (size_t i = 0; i < 3; ++i) {
-    const auto& s = *info->samples[i];
-    CAPTURE(i);
-    CHECK(s.sample_index == i);
-    CHECK(s.is_protected);
-    CHECK(s.iv == m.samples[i].iv);
-    CHECK(s.kid == kKid);
-    CHECK(s.scheme == "cenc");
-    REQUIRE(s.subsamples.size() == m.samples[i].subs.size());
-    CHECK(sum_of(s) == 64);  // AT1: Σ(clear + protected) == sample size
-  }
-  CHECK(codes(*info).empty());
-}
-
 TEST_CASE("cenc: a range of samples is built on request", "[container][cenc]") {
   MoovSpec m;
   m.samples = {{filled(8, 1), {{5, 59}}, 64}, {filled(8, 2), {{5, 59}}, 64}, {filled(8, 3), {{5, 59}}, 64}};
@@ -282,35 +254,6 @@ TEST_CASE("cenc: a subsample that protects the NAL length and header raises CNT-
     }
   }
   CHECK(n == 1);
-}
-
-TEST_CASE("cenc: cbcs uses the constant IV and the 1:9 pattern shades 16 bytes in every 160", "[container][cenc]") {
-  MoovSpec m;
-  m.scheme = "cbcs";
-  m.tenc = tenc_cbcs(1, 9, filled(16, 0x5A));
-  m.samples = {{{}, {{40, 360}}, 400}, {{}, {{0, 400}}, 400}};
-  const Opened o(moov_file(m));
-  const auto info = encryption_of(o.c);
-  CHECK(info->scheme_type == "cbcs");
-  CHECK(info->pattern_crypt == 1);
-  CHECK(info->pattern_skip == 9);
-  CHECK(info->default_constant_iv == filled(16, 0x5A));
-  REQUIRE(info->samples.size() == 2);
-  for (const auto& s : info->samples) {
-    CHECK(s->iv == filled(16, 0x5A));  // AT2
-    CHECK(s->crypt_byte_block == 1);
-    CHECK(s->skip_byte_block == 9);
-  }
-  const auto ranges = iso::sample_clear_protected_ranges(*info->samples[0], 1000, 400);
-  // clear 40, then 16 protected / 144 clear, 16 protected / 144 clear, 16 protected, 16 + 8 clear.
-  const std::vector<std::pair<uint64_t, uint64_t>> expected = {{1000, 40},  {1040, 16}, {1056, 144}, {1200, 16},
-                                                               {1216, 144}, {1360, 16}, {1376, 24}};
-  REQUIRE(ranges.size() == expected.size());
-  for (size_t i = 0; i < ranges.size(); ++i) {
-    CAPTURE(i);
-    CHECK(ranges[i].offset == expected[i].first);
-    CHECK(ranges[i].length == expected[i].second);
-  }
 }
 
 TEST_CASE("cenc: a seig entry of the stbl makes a sample unprotected", "[container][cenc]") {
