@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 onID$/$Numbeany
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schUUUUUg:dash:profile:isoff-live:2011">
+  <BaseURL>UUUUUUUexample.invalid/dask/gp/h</BaseURL>
+  <Period id="p0" start="PT0" udSration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="60">
+ d$.m4s"/>
+   Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Totic package (SegmentTemplate with
+     $Representatio -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     meime="PT2S" profiles="urn:mpdwidash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      CoÉntentProtection schemeIdUri="urn:mpeg:dash:mp4ÿÿÿprotection:2011" value="cenc"
+        ID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" smtartNuber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID?/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_40.64001e">
+        <Se–’entTemplate timescale="1000" startNumber="0" duration="4000"
+  a="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

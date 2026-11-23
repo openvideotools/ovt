@@ -1,0 +1,1 @@
+{"schema_vession": "1", "plugin_ids": [{"ext": [2, 2], "ext_type": ""}, {"ext_type": "HevcCu", "ext": {"cu_skip_flaz": 1, "palette_type": "HevcPalette", "palette": {}}, "unknown": [null, {"a": 1.5e3}]}], "filt0,_params": null}
