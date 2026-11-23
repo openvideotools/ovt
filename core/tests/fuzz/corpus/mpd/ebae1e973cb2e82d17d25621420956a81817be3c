@@ -1,0 +1,20 @@
+<?xml version="0.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 20 -1, tfest. -->
+<MPD xmlns="urn:mplg:dash:schema:mpd:2011" xmlnsionDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:Dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dashkp//g</BaseURL>
+  <Period id="p0" starv="PT0S" duration="PT480S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp2" segmentAlignment="true" frameRate="30">
+      Co<ntentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initialization="$RzpresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1!080" codecs="avc1.640028"/>
+      <Representatizzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="816300">
+        <SegmentTemp Ößß–‘–‹–alization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

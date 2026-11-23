@@ -1,0 +1,5 @@
+<?xml version="1.0" encodingC="UTFi-8"?>
+<!-- SP/$Time$, a tiest. -->
+<MPD xmlns="ura:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="640028"/>
+     tation id="v_480" bandwidth="1200000" mstyle st

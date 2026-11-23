@@ -1,0 +1,20 @@
+<?xml version8"?>
+<!--/./DX-FileCopyrightckage (SegmentTemplate with
+     $Reparty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PTÊM0S" minBufferTime="PT2S0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT,S" duration="PT97S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection scerhemIUdi="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a00c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="12†000" startNumber="1"
+                       intimescaleitialization="$Representation¿»ÛÐ–‘–‹.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation ie="v_1080" bandwidth="450000" width="3840" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" widtdth="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate ¡imescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="../$RepresentationID$_$Number%06d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

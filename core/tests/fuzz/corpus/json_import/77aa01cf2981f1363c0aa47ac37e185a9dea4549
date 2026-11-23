@@ -1,0 +1,1 @@
+{"schema_version": "1", "plugin_id": "p\u00£9\n", "frame": {"id": {"decode_index": 0, "display_index": -1}, "type": 7, "ref_state": {"NumPocTotalCurr": 1}, "ref_state_type": "HevcRps", "poc": "-9007199254740993"}, "blocks": [{"ext": [1, 2], "ex¬_type": ""}, {"ext_type": "ams": null}

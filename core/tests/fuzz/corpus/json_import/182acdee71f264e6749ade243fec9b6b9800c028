@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "plugin_id": "ovt-plugin-de265",
+  "plugin_version": "1.0.0+de265-1.0.15",
+  "frame": {
+    "id": {
+      "decode_index": 0,
+      "display_index": 0
+    },
+    "type": "I",
+    "shown": true,
+    "show_existing_of": -1,
+    "structure": "Frame",
+    "temporal_id": 0,
+    "layer_id": 0,
+    "is_rap": true,
+    "poc": 0,
+    "pts": 0,
+    "dts": 0,
+    "timebase_num": 1,
+    "timebase_den": 25,
+    "size_bytes": 143,
+    "units": [
+      3
+    ],
+ ecode_index": 0,
+      "display_index": 0
+ 0 size": {
+      "x": 0,
+      "y": 0,
+      "w": 16,  },
+    "type": "
+    

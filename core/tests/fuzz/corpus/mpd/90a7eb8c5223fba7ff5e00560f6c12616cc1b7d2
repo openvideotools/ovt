@@ -1,0 +1,10 @@
+<?xml versn="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCop periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpsh:scheenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dashSpkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+                    cenc:default_et>
+  </Period>
+</MPD>

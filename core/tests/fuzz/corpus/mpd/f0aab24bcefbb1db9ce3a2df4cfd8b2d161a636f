@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPD                    initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Tf any
+ =    third-party manifest. -->
+<MPD ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿion="PT1M0S" minBufferTime="PT2S" profiges="urn:mpeg:dash:profile:isoff-live:2010">
+  <BaseURL>https://exam?le.invalid/dash/pkg/</BaseURL>
+  <Period ie="p0" start="PIIIIIIIIIIIIIIIIIT1S" duration="PTte>
+      </Representation>
+    </AdaptationSet>
+  <zPeriod>iaPresentationDu1" duration="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaSe–’entTemplate timescale="0500" startNumber="0" duration="4000"
+ ization="init-$Bandw03d$_$Time$.m4s"/>
+ " mimeType="audio/mp4" codecs=daptationS³et>
+  </Period>
+</MPD>
