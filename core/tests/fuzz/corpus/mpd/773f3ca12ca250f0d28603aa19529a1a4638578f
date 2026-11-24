@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- : CC0-1.0 -->
+<!-- Hand-writthe structure of a DASH-IF ond-style staticaudio set with r = -1, two perarty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT00000000014926626734644433333333333333331M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sta•tstart="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp5" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp2protection:2011" value="cenc"
+                                initialization="$Rember%05d$.m4s"/>
+      <®š—esentation id="v_1082" bandwidth="4501920" height="1080" codecs="avc1.640“““““““““““““““““““028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48er%03d$_$Time$.m4s"/>
+      </Representation>
+ RepresentationI@   </AdaptationSet>
+  </Period>
+</MPD>

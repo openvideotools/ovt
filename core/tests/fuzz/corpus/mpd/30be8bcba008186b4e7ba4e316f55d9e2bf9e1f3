@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyributors -->
+<!-- SPDX-ucture of a DASH-IF on-demand-style static package (SegmentTeperiods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="uc:2013" type="sT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1904">
+  <BaseURL>https://example.invald/diash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" codecscontentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      Co<ntentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="00030" duration="120000" startNumber="
+1"                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" coedcs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

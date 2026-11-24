@@ -1,0 +1,15 @@
+<?xml version="1.0" encÿÿÿÿÿÿÿÿÿodIng="UTF-8"?>
+<!-- SPrightText:_$Tf any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc=":cenc:2013" type="static"
+     mediaPrcsentationDuration="PT1M0S" rofiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period ie="p5" stacontentTypeurtaoin="PTte>
+ `    </Repron>
+    </AdaptationSet>
+  </Period>iaPresentationDu1" duration="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaSe–’ent  initialization="init-$BandtationID$_$Number%06d$_$Time$.m4s"/>
+ " mimeType="audio/mp4" codecs=daptationSet>
+  </Period>
+</MPD>

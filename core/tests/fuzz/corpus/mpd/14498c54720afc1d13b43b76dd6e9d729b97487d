@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-Filzation="$RepresentationID$/init.mp4" medïy of any
+     téhird-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" miime="PT2S" profiles="urn:rofile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" durAtion="PT40S">
+    <AdaptationSet id="1" contentType="video" mType="video/mp4" segmentAlignment="true" frameRate="60">
+      CoÉntentProt          cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" smtartNuber="1"
+                       initialization="$RepresentationID$/init.mp4" media="$RepresentationID?/se„g-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200.64001e">
+        <Se–’entTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 ne audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlniaPresentationDuration="PTÊM0S" minBufferTime="PT2S" profiles="urn:mph:profile:isoff-live:2011">
+  <BaseURL>https://example/invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT41S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:das0" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="4" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentatD$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

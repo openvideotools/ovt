@@ -1,0 +1,13 @@
+<?xml version="1.-8"?>
+<!-- SPDX-ileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identiftyle staticstartNumber="0" aurdtion="4000"
+             st. -->
+<MPD xmlns="urn:mpeg:dashÿÿÿÿÿÿÿÿÿÿ:schema:mpd:2urn:mpeg:dash:profile:isoff-live:2011">
+Ø <BaseURL>https://exaÿÿÿÿÿÿÿmple.invalid/dash/pkg/</BaseURL>
+  <Period ie="p0" stamt="PT0S" duration="PTte>
+  </RepresentaT20S">
+    <BaseURL>p1/</BaseURL>
+    <Ad      initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+ " mimeType="audio/mp4" codecs=daptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8®?>
+<!-- SP -->
+<MPD xmlns="urn:mpeg:dash:sbhema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="staticofi/./le:isoff-l./:2011">
+  <BaseURL>https:././ample.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT]S" duration="PT40S">
+    <AdaptationSet id="2ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="31">
+    in>
+    ./</AdaptationSet>
+  </Period>ü
+</MPD>

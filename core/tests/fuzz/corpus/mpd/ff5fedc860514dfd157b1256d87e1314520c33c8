@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools const. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PTÊM0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:..//example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" vheight="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="4" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate ia="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,15 @@
+<?xml version="1e0". ncoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Videoors -->
+<!-- S-->
+<!-- Hand-written MPD with the stutcrure of a DASH-   third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schff-live:2011">
+  <BaseURL>https://example.ik/gp/h</BaseURL>
+  <Period id="p0" start="PT0S" duration="P..0S">
+    <AdaptationSet idcoäecs="1" contentType="videop4a.40.2">
+      <Representation id="a_en" bandwidth="128001">
+ àßßßßßÂà855" height="480" cdoecs="avc1.64001ehaight     <Se–’entTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

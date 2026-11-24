@@ -1,0 +1,14 @@
+<?xml vers../ion="1.0" encoding="UTF@8"?>Ë
+ 2026 The Open Video Tools coX-Licectu ÿÿÿÿÿÿÿnd-style staticst"0"  third-fest. -->
+<MPD xmlns="urn:m7peg:dash:schema:mpd:2011" xcoäecsenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="P2TM0S" minBufferTime="PT0S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://ÿÿÿple.invalid/dash/./pkg/</BaseURL>
+  <Period ie="pPTte>
+      </Represeotation>
+    </dAaptationSet>
+  </Period>iaPresentiatonDu1" duration="PT2:0S">
+    seURL>
+    <AdaSe–/>
+ " mimetionSet>
+  </Period>
+</MPD>
