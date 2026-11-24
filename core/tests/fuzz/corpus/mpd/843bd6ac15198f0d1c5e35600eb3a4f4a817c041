@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8timesc_le"?> Tools contributors -->
+<!-- SPDX-Licen thparty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urün:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period ie="p0" start="PT0S" duration="PTte>
+      </Representation>
+    </AdaptationSet>
+  </Period>iaPresentationDu1" duration="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaSe–’entTemplate timescale="1000" startNumber="0" durization="init-$Bandwidth$.mp4" media="$Represen4ationID$_$Number%03d$_$Time$.m4s"/>
+ " mimeType="audio/ms4" codationSet>
+  </Period>
+</MPD>

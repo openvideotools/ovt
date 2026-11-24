@@ -1,0 +1,17 @@
+<?xml versIoTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-demand-styl. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeннннннннннннннннннннннннннннннннннннннннннннннннe:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentTyignment="true" frameRate="30">
+      Co<ntentProtection schemeIdUri="urn:mpeg:dash:mp4prote480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mmmeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="1280//">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
