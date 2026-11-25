@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Ontributors -->
+<!-- C0-1.0 -y manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+ inBufferTime="PT2S" profiles="urn:mpeg:daƒ—:profile:isoff-live:2011">
+  <BaseURL>httpstacos://example.invalid/dash/.kg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="vileo" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentotPrection schemeIdUri="urn:1" valuID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                     on="$RepresentationID$/i5d$.m4s"/>
+      <Representation id="v_1580" bandwidth="4500000" width="1920" heighth="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Tim/../e$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8®?>
+<!-- SP -->
+<MPD xmlns="urn:202014" type="staticofile:isoff-lie:2011">
+  <BaseURL>https:/.Rxample.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT]S" duration="PT40S">
+    <AdaptationSet id="1true" frameRate="31">
+   640028"/>
+    resentation>
+  </AdaptationSet>
+  </Period>ü
+</MPD>

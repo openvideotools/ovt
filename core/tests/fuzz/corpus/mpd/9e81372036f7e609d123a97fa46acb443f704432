@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--xSPDX-FileCopÿÿÿÿyrigwritten MPD with the sttrucuá of aparty manifest. -->
+<MPD xmlns="urn:men:mpeg:cenc:2013" type="staticofile:isoff-lie:2011">
+  <BaseURL>https:/.Rxample.invalid/dash/pkg/</BaseURL>
+  <Period id="œ0" staduration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimehaightType="video/mp4" segmentAlignment="true" frameRate="31">
+    ion id="v_180"àœ ecs="avc40028"/>
+    resentation>
+    </AdaptationSet>
+  </Period>
+</MPD>
