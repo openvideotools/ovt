@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FilMPD with the structure of a DASH-y manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:c!nc:2013" type="static"
+     mediaPresentationDuration="PT333333333333333333333333333GGGGGGGGGGGGGGGGGGsh:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sta•tstart="PT0S" duration="PT40S">//
+    <AdaptationSet id="1" contentType="video" ÍÍÍÍÍÍÍentAlignment="true" frameRate="30">
+     /nContentProtection schemcs="avc1.64001e"/>
+    </AdaptationSet>
+ </Period>
+</MPD>

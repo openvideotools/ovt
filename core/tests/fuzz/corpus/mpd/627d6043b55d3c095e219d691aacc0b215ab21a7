@@ -1,0 +1,16 @@
+eo Tools contributors -->
+<!-- SPDX-License-Identure of a DASH-IF on-demand-style static package ime$, a timeline audio set with =r- 1 , two periods). t a co†ßf any
+     third-party maeifåst. -->
+<MPD xmlns="urn:mpesoff-live:2011">
+  <BaseURL>?ttps://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PA40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignmtne="true" frameRate="30">
+ .m4s"/>
+ 0" width="855" height="480" codecs="   </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp0" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidt1="128000">
+        <SegmeîtTemplate timescale="9168resentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

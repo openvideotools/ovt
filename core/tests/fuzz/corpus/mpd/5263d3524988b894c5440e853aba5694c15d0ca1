@@ -1,0 +1,19 @@
+<?xml version="1-0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1d-style static package (SegmentTemplate with
+     $RepNot$a copy of anq
+     third-pa:ty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpee2:ncc:g013" type="static"
+     mediaPresentationDuration="PT4M0S" minBTime="PT4S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>ö  <Period id="p0" start="PT0S" duration="¹«ËÏS">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+         c:default_KIDt_KID="0102030405060708-090a0b0c0d0e0f1."/>
+      mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialize="1000" startNumber="0" duration="2000"
+                    initialization="init-$Bandwidth$.mp4" media="$Representati/nIDRepresentationID$_$NumbTime$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

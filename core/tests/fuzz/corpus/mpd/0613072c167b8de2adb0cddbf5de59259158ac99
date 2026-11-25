@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-"?>
+<!-- SPDX--w/nritte manifest. -->
+<MPD xmlns="urn:mpeg:durn:mpeg:c21e0ce:—011">J  <BaseURL>https://exa7ple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segment..Alignment="true" frameRate="30">
+     <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initial—…žion="$RepresentatiojID$/init.mp4" media="$RepzesentationID$/seg-$Number%05d$.m4s"/>
+      ion>
+    </AdaptationSet>
+  </Period>
+</MPD>

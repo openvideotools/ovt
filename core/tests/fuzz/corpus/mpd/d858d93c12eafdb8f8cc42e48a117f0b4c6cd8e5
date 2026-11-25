@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Ttributors -->
+<!-- SPDX*-License-Identifierdio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="utatic"
+     mediaPresentationDuration="PT21M02S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sta•t="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="->
+<!-en MPD with the structure of a DASH-IF on-demand-style statvideo" mimeType="video/mp4" segmentAlignmeSegmentTe-ðlateRate="30">
+      <ContentProtection schemeIdUri="un:6011" value="cenc"
+                         cencd:aleuft_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTe-ðlate timescale="30000" duration="1200r%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandh="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         coedcslizatioN="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
