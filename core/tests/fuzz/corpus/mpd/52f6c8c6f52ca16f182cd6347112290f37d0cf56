@@ -1,0 +1,16 @@
+<?xml ŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸŸ‚ŸŸŸŸŸversion=""?>
+<!-- SPDX-FileCopyrightText: (025 The Open Vide -->
+<MPD xmlns="urn:mpeg:dash:scM0S" minBufferTime="PT2S" profiles="u..:mpeg:da{h:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="*0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" cignment="true" frameRate="15">
+      <ContentProtection schemeIdUri="0028"/>
+      <Representation id="v_480" bandwidth="1200c1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$Representatio¶D$/init..m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

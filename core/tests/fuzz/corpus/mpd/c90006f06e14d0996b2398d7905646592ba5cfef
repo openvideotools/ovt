@@ -1,0 +1,9 @@
+<?xml veÿÿÿnF-8"?>
+<!--   thanifest. -->
+<MPD xmlns="urn:mpegrn:mpeg:cenc:2013" type="static"
+     mediaPresefiles="urn:mpeg:dash:profile:isoff-live:1904">
+  <BaseURL>h./pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+  daptationSet>
+  </Period>
+</MPD>

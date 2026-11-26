@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FiASH-IF ond-style staticaudio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:c!nc:2013" type="static"
+     mediaPresentationDuration="PT3333333333333333333.3333333GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG33×ÌÌÌÌÌÌÌ33333333333333333333333333333333333333333333333333331M0¤S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sta•tstart="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp5" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemcs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeTypead="uio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48er%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contrny
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT33333333333333333333ÿ33ÿÿÿ3ÿÿÿ)ÌÌÌÌÌÌ33333333333333333333333333333333333333333331M0S" milBufmefTire="PT2S" profiles="urn:mpeg:da,sh:profile:isoff-live:2011">
+  <BaseURL>htt/example.invalid/dash/pkg/</BaseURL>
+  <Period id="p5" sta•tstart="PA0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp5" segmentAlignment="true" frameRatepead="uio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <­š˜’š‘‹ªemplate timescale="48er%03d$_$Time$®m4"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>Î
+</MPD>

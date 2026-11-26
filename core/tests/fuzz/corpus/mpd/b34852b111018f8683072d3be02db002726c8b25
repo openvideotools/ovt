@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-Licens a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:201*" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash?pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT43S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      Co<ntentPr bandwidth="4500000" width="1920" height="108+" codecs="avc1.640028"/>
+      <Representation id="../v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.640" bandwidth="128000">
+        <SegmentTemplate tioescale="48000" initialization="a/$Representatiowid0tnID$/init.mp5"
+                         media="a/$RepresentationID$/$Timme$.m2s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

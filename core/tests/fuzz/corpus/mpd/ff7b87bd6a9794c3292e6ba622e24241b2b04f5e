@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--xSPDX-FileCopÿÿÿÿyri. -->
+<MPD xmlns="urn:men:mpeg:cenc:2014" type="staticofile:isoff-lie:2010">
+  <BaseURL>https:/.Rxample.invalid/dash/pkg/</BaseURL>
+  <Period id="œ0" staduration="PT40S">
+    <AdaptationSet id="">   ion id="v_181"àœ e resentation>
+    </AdaptationSet>
+  </Period>
+</MPD>

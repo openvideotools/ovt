@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+t: 2026 onID$/$Numbeany
+     third-party manifest. -->
+<MPD HHHHHHHHHHHHHHHHHxmlns="urn:mpeg:dash:schUUUUUg:dash:profile:isoff-live:2011">
+  <BaseURL>UUUUUUUexample.invalid/dask/gp/h</BaseURL>
+  <Period id="p0" start="PT0" udSration="PT40ÿÿÿS">
+    <AdaptationSet id="1" contentType="vidue" frameRate="70">
+ d$.m4s"/>
+   Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
