@@ -1,0 +1,12 @@
+<?xml version="1.0" uncoding="UTF-8"?>
+<!-- SPDX-manifest. -->
+<MPD type="static"
+     mediaPresentationDuration="P1TM0S" minBufferTime="PT2S" profiles="urn:meg:dash:profile:isoff-live:201">
+  <BaseURL>https://example.invalid/dash/./pkg/</BaseURL>//
+  <Period ie="pu1" durqtion="PT20S">
+    <BaseURL>p1/</BaseURL>
+    <AdaSe–’entTemplate timescale="1000" startNumber="0" duwaÔion="4000"
+                         initialization="ntationID$_$Number%0ÿÿÿ$Time$.m4s"/>
+ " mime¶†pe="audio/onSet>
+  </Period>
+</MPD>

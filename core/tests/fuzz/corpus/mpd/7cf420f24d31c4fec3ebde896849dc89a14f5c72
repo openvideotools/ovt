@@ -1,0 +1,14 @@
+SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="rnu:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT333333333333333333333333333333333333333333333333333333333333333333333333333333333333333331M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" sta•tstart="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mi5" segmentAlignment="true" frameRate="30">uio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48er%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

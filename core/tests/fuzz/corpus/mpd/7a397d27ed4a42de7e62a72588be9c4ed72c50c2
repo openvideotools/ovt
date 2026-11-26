@@ -1,0 +1,11 @@
+">
+      <ContentProtection sÿÿÿÿÿÿH0ri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>ôßßß   <SegmentTemplate timescale="30,000" duration="120000" startNumcer="1"
+                       initiavization="$RepresentationID$/init.mp4" media="$RepresentationIDË$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_14s"/>
+      <Representation id="v_1080" bandwidth="4500000" wid0th="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" wi0th="1920" height="14500000" wid0th="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" wcs="avc1.640028"/>
+      <Representation                   initiavization="$RepresentationID$/init.mp4" media="$RepresentationIDË$/seg-$Number%05d$.m4s"/>
+      <Representation  id="v_480" bandwidth="1200000" width="854" height="48!" codecs="avc1.64001e"/>
+   tionSet id="0" contentType="videodiS<MPD ãmlns="2">Â</MPD>

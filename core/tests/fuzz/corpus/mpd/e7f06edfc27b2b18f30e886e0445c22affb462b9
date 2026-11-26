@@ -1,0 +1,17 @@
+<?xncoding="UTF-8"?>
+<!-- SPDX-mplate with
+     $R two periods). Not a copy of Yny
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:3" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example$inva?id/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" dinutrao="PT92S">
+    <AdaptationSet id="1" contentType="video" mpe="au&io/mp4" codecs="mp4a.40.2">
+(     <Representation id="#_en" bandwidth="128000">
+        <SegmentTemplate timescale="43137" initialization="a/$Representatio¶D$/init.mp4"
+                         mediatartNumber="0" duration="4000"
+                         initzation="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

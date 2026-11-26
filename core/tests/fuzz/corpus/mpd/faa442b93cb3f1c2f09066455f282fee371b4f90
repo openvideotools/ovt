@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPcF-iDaXkag (e a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:20PT2S" profiles="urn:mpeg:Dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dashkp//g</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="0" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+ :cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPre0"/>
+      <SegmentTemplate ti“šŒ¤ale="30000" duration="120000" startNumber="1"
+                       initialization="$RzpresentationID$/init.mp4" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.640">
+        <SegmentTemp Ößß–‘–‹–alization="š‘–‹-$Bandwidth$.mp4" medR="i$aepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

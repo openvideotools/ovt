@@ -1,0 +1,10 @@
+<?xml version="0.0" encoding="UTF-8"?>
+<!-- SPfest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mf-live:2011">
+  <BaseURL>https://example.invalid/.ash?pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT43S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp5" segmentAlignment="true" frameRa="0.2">
+  tion>
+    </AdaptationSet>
+  </Period>
+</MPD>

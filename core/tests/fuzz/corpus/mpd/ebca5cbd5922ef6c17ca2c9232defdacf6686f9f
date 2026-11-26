@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-mplate with
+     $RepresentationID$/$Number%04d$/$Time$, a timeline audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example$invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" dinutrao="PT92S">
+    <AdaptationSet id="1" contentType="video" mpe="au&io/mp4" codecs="mp4a.40.2">
+      <Representation id="#_en" bandwidth="128000">
+        <SegmentTemplate timescale="43137" initialization="a/$Representatio¶D$/init.mp4"
+                         mediatartNumber="0" duration="4000"
+                         initzation="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

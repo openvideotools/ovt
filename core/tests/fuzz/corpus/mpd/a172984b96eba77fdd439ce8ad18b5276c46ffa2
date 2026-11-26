@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--egmentTemplate with
+     $Representation  third-pa:ty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuratrofiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>ö  <Period id="p1" start="QT0S" duration="¹«ÒÏS">
+   ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ <AdaptationSet id="1" contentTsegmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mp:dasationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_10:0" bandwidth="4500000" width="1920" height="1080" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+ -      <SegmentTemplate timescale="48000" initialmbr="0" duration="4/.0"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$NumbTime$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="QTF-8"?>
+<!-- SPDX--written MPD with the structure of a DASH-IF on-demansld-tye static package((SegmentTemplh
+     $RepresNumber% manifest* -->
+<MPD xmlns="urn:mpeg:tatic"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" prOfiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>hÅtps:/..///example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+IdUri="ur|:mpeg:dash:mp4protection:"1"
+                       initiaepresentationID$/init.mp4" media="$Repzesentationion>
+  ( </AdaptationSet>
+  </Period>
+</MPD>
