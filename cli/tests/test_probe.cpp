@@ -415,6 +415,9 @@ TEST_CASE("probe: a view flag makes the result the ContainerRoot image", "[cli][
   CHECK_FALSE(boxes.at("tree").contains("tracks"));
   const Result tracks = invoke({f.path.string(), "--tracks", "-f", "csv"});
   REQUIRE(tracks.code == 0);
+  CHECK(lines(tracks.out).at(0) ==
+        "index,handler,codec,codec_string,coded_w,coded_h,crop_w,crop_h,chroma_format,"
+        "bit_depth_luma,bit_depth_chroma,fps,sample_count,bitrate_bps,language,encrypted");
   CHECK(lines(tracks.out).at(1).starts_with("0,vide,H264,"));
 }
 

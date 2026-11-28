@@ -423,23 +423,35 @@ struct Rows {
   std::vector<std::vector<std::string>> rows;
 };
 
+// The §12.2.2 columns. SPEC-ASSUMPTION(#837): chroma_format and the bit depths are not in TrackInfo and stay empty;
+// crop_w/crop_h come from the clap rational, else the coded size; fps is empty when the duration is 0.
 Rows track_rows(const Probe& p) {
-  Rows r{{"index", "handler", "codec", "codec_string", "coded_w", "coded_h", "timescale", "duration", "sample_count",
-          "bitrate_bps", "language", "fragmented", "encrypted"},
+  Rows r{{"index", "handler", "codec", "codec_string", "coded_w", "coded_h", "crop_w", "crop_h", "chroma_format",
+          "bit_depth_luma", "bit_depth_chroma", "fps", "sample_count", "bitrate_bps", "language", "encrypted"},
          {}};
   for (const auto& buf : p.tracks) {
     const fb::TrackInfo& t = info(buf);
+    const auto* clap = t.clean_aperture();
+    const bool has_clap = clap != nullptr && clap->size() >= 4 && clap->Get(1) != 0 && clap->Get(3) != 0;
+    const std::string crop_w = has_clap ? CsvWriter::number(static_cast<double>(clap->Get(0)) / clap->Get(1))
+                                        : std::to_string(t.coded_width());
+    const std::string crop_h = has_clap ? CsvWriter::number(static_cast<double>(clap->Get(2)) / clap->Get(3))
+                                        : std::to_string(t.coded_height());
+    const std::string fps = t.duration() == 0 || t.timescale() == 0
+                                ? ""
+                                : CsvWriter::number(static_cast<double>(t.sample_count()) * t.timescale() /
+                                                    static_cast<double>(t.duration()));
     r.rows.push_back({std::to_string(t.index()), std::string(sv(t.handler_fourcc())), fb::EnumNameCodec(t.codec()),
                       std::string(sv(t.codec_string())), std::to_string(t.coded_width()),
-                      std::to_string(t.coded_height()), std::to_string(t.timescale()), std::to_string(t.duration()),
+                      std::to_string(t.coded_height()), crop_w, crop_h, "", "", "", fps,
                       std::to_string(t.sample_count()), std::to_string(t.bitrate_avg_bps()),
-                      std::string(sv(t.language())), std::string(CsvWriter::boolean(t.is_fragmented())),
-                      std::string(CsvWriter::boolean(t.is_encrypted()))});
+                      std::string(sv(t.language())), std::string(CsvWriter::boolean(t.is_encrypted()))});
   }
   return r;
 }
 
-// One row per moof (AT1). earliest_pts is the first traf's decode start (tfdt, else the computed one).
+// One row per moof (AT1). SPEC-ASSUMPTION(#837): earliest_pts is the first traf's decode start (tfdt, else the
+// computed one), not the composition time.
 Rows fragment_rows(const Probe& p) {
   Rows r{{"sequence_number", "moof_offset", "moof_size", "base_data_offset", "earliest_pts", "duration", "sample_count",
           "data_offset", "data_size"},
