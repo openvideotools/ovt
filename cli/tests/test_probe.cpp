@@ -248,7 +248,7 @@ TEST_CASE("probe AT1: --fragments -f csv has one row per moof", "[cli][probe][fa
   REQUIRE(r.code == 0);
   const std::vector<std::string> rows = lines(r.out);
   CHECK(rows.front() ==
-        "sequence_number,moof_offset,moof_size,base_data_offset,earliest_pts,duration,sample_count,data_offset,data_"
+        "sequence_number,moof_offset,moof_size,base_data_offset,earliest_dts,duration,sample_count,data_offset,data_"
         "size");
   CHECK(rows.size() - 1 == count_moofs(mp4));
   CHECK(rows.size() - 1 == 5);
