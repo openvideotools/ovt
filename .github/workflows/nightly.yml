@@ -121,6 +121,9 @@ jobs:
         with:
           preset: macos-arm64-asan
           triplet: arm64-osx-ovt
+          # Same subset as asan-ubsan-macos in ci.yml: the sanitizers preset runs `golden` and needs_corpus tests,
+          # and under CI=true the units goldens fail rather than skip when no corpus file is present.
+          corpora: fast
 
       - name: Configure, build, test (sanitizers)
         run: cmake --workflow --preset ci-macos-asan # ctest --preset sanitizers-macos
