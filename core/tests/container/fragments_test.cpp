@@ -45,7 +45,8 @@ using Bytes = std::vector<uint8_t>;
 Bytes be(uint64_t v, unsigned nbytes) {
   Bytes b;
   for (unsigned i = nbytes; i > 0; --i) {
-    b.push_back(static_cast<uint8_t>(v >> (8U * (i - 1U))));
+    const unsigned shift = 8U * (i - 1U);
+    b.push_back(shift >= 64U ? uint8_t{0} : static_cast<uint8_t>(v >> shift));  // wider than 8 bytes: zero pad
   }
   return b;
 }
