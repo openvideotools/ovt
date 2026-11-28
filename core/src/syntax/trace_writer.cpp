@@ -109,6 +109,8 @@ std::string_view severity_word(fb::Severity s) {
 }
 
 // The low `n` bits of `v`, most significant first.
+constexpr uint32_t kMaxRebuiltBits = 4096;
+
 std::string binary(uint64_t v, uint32_t n) {
   std::string s;
   s.reserve(n);
@@ -118,12 +120,17 @@ std::string binary(uint64_t v, uint32_t n) {
   return s;
 }
 
-// Exp-Golomb code word of `code_num` (ue(v), uvlc()).
-std::string exp_golomb(uint64_t code_num) {
-  const uint64_t x = code_num + 1;  // a code_num of 2^64 - 1 cannot occur: ue(v) values are 32-bit
+// Exp-Golomb code word of `code_num` (ue(v), uvlc()); empty when it is longer than `max_len` bits.
+std::string exp_golomb(uint64_t code_num, uint32_t max_len) {
+  const uint64_t x = code_num + 1;  // 0 when code_num is 2^64 - 1, which no reader returns
   uint32_t len = 0;
   for (uint64_t t = x; t != 0; t >>= 1U) {
     ++len;
+  }
+  // The code word is 2 * len - 1 bits; one longer than the element's span cannot be the bits as read, and a buffer
+  // from the caller must not make the writer allocate more than the span (SPEC-ASSUMPTION(#822)).
+  if (len == 0 || 2 * len - 1 > max_len) {
+    return {};
   }
   return std::string(len - 1, '0') + binary(x, len);
 }
@@ -159,14 +166,14 @@ std::string vlc_bits(std::string_view d, const fb::SyntaxNode& n, uint64_t u, ui
     return std::string(len - 1, '0') + '1';
   }
   if (d == "ue(v)" || d == "uvlc()") {
-    return exp_golomb(u);
+    return exp_golomb(u, len);
   }
   if (d == "se(v)") {
     const int64_t v = n.ivalue();
-    return exp_golomb(v > 0 ? 2 * static_cast<uint64_t>(v) - 1 : 2 * (0 - static_cast<uint64_t>(v)));
+    return exp_golomb(v > 0 ? 2 * static_cast<uint64_t>(v) - 1 : 2 * (0 - static_cast<uint64_t>(v)), len);
   }
   if (d == "te(v)") {
-    return len == 1 ? std::string(1, u == 0 ? '1' : '0') : exp_golomb(u);
+    return len == 1 ? std::string(1, u == 0 ? '1' : '0') : exp_golomb(u, len);
   }
   return {};
 }
@@ -176,7 +183,9 @@ std::optional<std::string> rebuild_bits(const fb::SyntaxNode& n) {
   const std::string_view d = sv(n.descriptor());
   const uint32_t len = n.span() == nullptr ? 0U : n.span()->bit_length();
   const fb::SyntaxValueKind kind = n.kind();
-  if (kind == fb::SyntaxValueKind::Bytes || kind == fb::SyntaxValueKind::String || len == 0) {
+  // kMaxRebuiltBits bounds what a caller's buffer can make the writer allocate (a capped uvlc() is the only code
+  // longer than 64 bits).
+  if (kind == fb::SyntaxValueKind::Bytes || kind == fb::SyntaxValueKind::String || len == 0 || len > kMaxRebuiltBits) {
     return std::nullopt;
   }
   uint64_t u = n.uvalue();

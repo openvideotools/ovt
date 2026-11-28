@@ -18,7 +18,10 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
+
+#include <flatbuffers/flatbuffers.h>
 
 #include "io/memory_file.hpp"
 #include "io/ovt_file.hpp"
@@ -28,6 +31,7 @@
 #include "ovt/index.h"
 #include "ovt/status.h"
 #include "ovt/syntax.h"
+#include "ovt_model_generated.h"
 #include "syntax/common/syntax_node_buffer.h"
 
 namespace {
@@ -229,6 +233,22 @@ TEST_CASE("syntax trace: argument checks, a corrupt buffer, deep trees", "[synta
   const auto ls = lines(trace(tree));
   REQUIRE(ls.size() == 61);
   CHECK(ls.back() == "[ovt]      0  leaf                                                          0101 = 5");
+
+  // A caller's buffer cannot make the writer build a code word longer than the element's span: ue(v), se(v),
+  // te(v) and uvlc() with an out-of-range value, and a span of 2^32 - 1 bits, print `--` (review of #831).
+  for (const auto& [desc, bits] : {std::pair{"ue(v)", 5U}, std::pair{"te(v)", 5U}, std::pair{"uvlc()", 5U},
+                                   std::pair{"se(v)", 5U}, std::pair{"uvlc()", 0xFFFFFFFFU}}) {
+    CAPTURE(desc, bits);
+    flatbuffers::FlatBufferBuilder fbb;
+    const ovt::fb::BitSpan span(0, bits);
+    fbb.Finish(ovt::fb::CreateSyntaxNodeDirect(fbb, "x", desc, ovt::fb::SyntaxValueKind::UInt,
+                                               bits == 5U ? UINT64_MAX : UINT32_MAX, INT64_MIN, false, nullptr, nullptr,
+                                               nullptr, nullptr, &span));
+    const Bytes buf(fbb.GetBufferPointer(), fbb.GetBufferPointer() + fbb.GetSize());
+    const auto out = lines(trace(buf));
+    REQUIRE(out.size() == 1);
+    CHECK(out[0].find(" -- = ") != std::string::npos);
+  }
 
   // A string read from the stream stays on its line: control characters, '"' and '\\' are escaped.
   const Bytes text = {'a', '\n', '"', '\\', 0x7f, 'b', 0};
