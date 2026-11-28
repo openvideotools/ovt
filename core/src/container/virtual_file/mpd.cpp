@@ -801,6 +801,49 @@ std::optional<std::vector<TemplatePiece>> compile_plain_template(std::string_vie
   return compiled;
 }
 
+// A valid media template that is not a plain relative reference (dot segments, an absolute path, another authority)
+// still resolves the same way for every segment when all of its numeric fields sit in the last path segment: those
+// fields only add digits and a minus sign, so the segment can never become "." or "..", and a ':' after a '/' cannot
+// end a scheme. Then the resolved URL is one fixed prefix (resolved once) followed by the expanded last segment.
+// nullopt when the template has no field (the caller resolves it once) or a field outside the last segment.
+struct SplitTemplate {
+  std::string prefix;               // resolved base + directory part, ending where the last segment starts
+  std::vector<TemplatePiece> tail;  // the last segment, compiled
+};
+
+std::optional<SplitTemplate> compile_split_template(const SplitBase& base, std::string_view tmpl,
+                                                    std::string_view representation_id) {
+  auto pieces = compile_template(tmpl, representation_id);
+  if (!pieces || pieces->size() < 2) {
+    return std::nullopt;  // invalid, or no numeric field at all
+  }
+  // Fields follow the text of every piece but the last, so the first field comes right after pieces[0].text.
+  std::string dir = pieces->front().text;
+  const size_t slash = dir.rfind('/');
+  const size_t tail_start = slash == std::string::npos ? 0 : slash + 1;
+  std::string tail_text = dir.substr(tail_start);
+  dir.resize(tail_start);
+  for (size_t i = 1; i < pieces->size(); ++i) {
+    tail_text += (*pieces)[i].text;
+  }
+  if (tail_text.find_first_of("/?#") != std::string::npos ||
+      (tail_start == 0 && tail_text.find(':') != std::string::npos)) {
+    return std::nullopt;
+  }
+  SplitTemplate out;
+  out.tail = std::move(*pieces);
+  out.tail.front().text.erase(0, tail_start);
+  std::string probe;
+  append_compiled(probe, out.tail, TemplateValues{representation_id, 0, 0, 0});
+  std::string resolved = resolve_against(base.parts, base.empty, dir + probe);
+  if (resolved.size() < probe.size() || std::string_view(resolved).substr(resolved.size() - probe.size()) != probe) {
+    return std::nullopt;  // not expected by the reasoning above; the caller resolves every segment
+  }
+  resolved.resize(resolved.size() - probe.size());
+  out.prefix = std::move(resolved);
+  return out;
+}
+
 // Whether a template expands at all. Validity depends only on the identifiers and format tags, never on the values,
 // so a media template is checked (and an invalid one reported) once per representation, not once per segment.
 bool template_valid(std::string_view tmpl) {
@@ -870,14 +913,25 @@ void append_template_segments(Context& ctx, Representation& rep, const std::vect
   if (!as_written && !entries.empty() && !base.empty) {
     compiled = compile_plain_template(media, rep.id);
   }
+  // Templates that need full resolution (fuzz-nightly 2026-11-18, #773: 480 000 segments of "." or
+  // "..././_$Number$...") resolve once: a template without numeric fields gives the same URL for every segment, and one
+  // whose fields are all in the last path segment resolves to a fixed prefix plus that segment.
+  std::optional<SplitTemplate> split;
+  if (!as_written && !compiled && !entries.empty()) {
+    if (const auto pieces = compile_template(media, rep.id); pieces && pieces->size() == 1) {
+      as_written = segment_url(ctx, base, media, values, at);
+    } else {
+      split = compile_split_template(base, media, rep.id);
+    }
+  }
   std::string scratch;
   for (const TimelineEntry& e : entries) {
     values.number = e.number;
     values.time = e.time;
     Segment seg;
-    if (compiled) {
-      scratch.assign(base.dir_prefix);
-      append_compiled(scratch, *compiled, values);
+    if (compiled || split) {
+      scratch.assign(compiled ? base.dir_prefix : split->prefix);
+      append_compiled(scratch, compiled ? *compiled : split->tail, values);
       seg.url = scratch;  // exact-size copy; the scratch buffer is reused
     } else {
       seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, at);
