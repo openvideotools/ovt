@@ -243,7 +243,8 @@ TEST_CASE("fragments: the serialised timeline is a valid, deterministic FlatBuff
   CHECK(std::vector<uint8_t>(x.data(), x.data() + x.size()) == std::vector<uint8_t>(y.data(), y.data() + y.size()));
 }
 
-TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with that gap", "[container][fragments][fast]") {
+TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with that gap",
+          "[container][fragments][fast]") {
   // Acceptance test 4. Fragments are numbered from 0 (FragmentInfo.index); the message also names sequence_number.
   const Built r = build(stream(5, 3, 9000));
   REQUIRE(r.b.timeline.fragments.size() == 5);
@@ -257,7 +258,8 @@ TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with tha
   CHECK(message(back.b, "CNT-4020").find("overlap of 60 ticks") != std::string::npos);
 }
 
-TEST_CASE("fragments: two trafs without base flags use the implicit base chain (CNT-4006)", "[container][fragments][fast]") {
+TEST_CASE("fragments: two trafs without base flags use the implicit base chain (CNT-4006)",
+          "[container][fragments][fast]") {
   // Acceptance test 3 (synthetic Smooth Streaming layout): the first traf's base is the moof, the second continues
   // after the first traf's data, so its data_offset is relative to that end.
   TrafSpec a = at(0);
@@ -720,7 +722,8 @@ std::unique_ptr<ovt::fb::SampleTableT> table_of(ovt_Container* c, int track) {
 
 }  // namespace
 
-TEST_CASE("fragments: the SampleTable appends the fragment samples", "[container][fragments][sample_table][c_api][fast]") {
+TEST_CASE("fragments: the SampleTable appends the fragment samples",
+          "[container][fragments][sample_table][c_api][fast]") {
   const Bytes seg = fragment(2, {at(120)}, 3 * kSize);
   const Opened o(cat({ftyp(), moov({kTrack}), fragment(1, {at(0)}, 3 * kSize), seg}));
   const auto table = table_of(o.c, 0);
@@ -1071,7 +1074,8 @@ TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on cta_cmaf_video_cmf
   compare_corpus_with_ffprobe("cta_cmaf_video_cmfv");
 }
 
-TEST_CASE("fragments: traf sbgp memberships join the SampleTable groups", "[container][fragments][sample_table][fast]") {
+TEST_CASE("fragments: traf sbgp memberships join the SampleTable groups",
+          "[container][fragments][sample_table][fast]") {
   // Fragment 0: sbgp 'seig' → samples 0-1 use the fragment-local entry 1 (0x10001), sample 2 none; one local sgpd.
   // Fragment 1: no sbgp → 0 for its samples.
   TrafSpec t = at(0);
