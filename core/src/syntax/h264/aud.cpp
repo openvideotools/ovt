@@ -27,10 +27,11 @@ BitSpan parse_empty_rbsp(BitReader& br, SyntaxBuilder& b, std::string_view name,
   if (br.bits_left() > 0) {
     // SPEC-ASSUMPTION(#551): Info SYN-H264-0033 "%s has %d trailing bytes after the NAL unit header" (accepted,
     // §7.9 row lands in rc34).
+    // Count before opaque_rest consumes the bytes, or the message always says 0.
+    const auto trailing_bytes = (br.bits_left() + 7) / 8;
     b.opaque_rest("trailing_data");
     b.diag(Severity::Info, kTrailingBytesCode,
-           fmt::format("{} has {} trailing bytes after the NAL unit header", name, (br.bits_left() + 7) / 8), spec_ref,
-           true);
+           fmt::format("{} has {} trailing bytes after the NAL unit header", name, trailing_bytes), spec_ref, true);
   }
   return br.span_since(start);
 }

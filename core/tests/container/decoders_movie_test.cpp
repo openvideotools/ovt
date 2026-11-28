@@ -671,8 +671,10 @@ TEST_CASE("isom_basic.mp4 matches the MP4Box golden for mvhd, tkhd, mdhd and els
           "[container][decoders][movie][golden][needs-corpus]") {
   // Acceptance test 1, SPEC-ASSUMPTION(#567). isom_basic.mp4 is mpegff_a1_foreman_qcif (§14.3.5); it has no edts, so
   // the elst part uses mpegff_hvc1_only, whose golden has elst.entries[0].media_time == 17000.
-  CHECK(compare_with_golden("mpegff_a1_foreman_qcif") >= 20);
-  CHECK(compare_with_golden("mpegff_hvc1_only") >= 9);
+  const size_t foreman = compare_with_golden("mpegff_a1_foreman_qcif");
+  CHECK(foreman >= 20);
+  const size_t hvc1_only = compare_with_golden("mpegff_hvc1_only");
+  CHECK(hvc1_only >= 9);
 }
 
 TEST_CASE("group A fields match the MP4Box goldens of the container-smoke corpus",
@@ -680,6 +682,8 @@ TEST_CASE("group A fields match the MP4Box goldens of the container-smoke corpus
   for (const std::string_view id :
        {"mpegff_10_fragments", "mpegff_a4_tone_fragmented", "mpegff_fragment_random_access_2",
         "mpegff_hev1_clg1_header", "mpegff_video_cenc_128iv", "mpegff_video_cenc_roll_frag1s", "ytugc_clip01"}) {
-    CHECK(compare_with_golden(id) > 0);
+    // Outside CHECK: a missing corpus file SKIPs the test case, and a SKIP inside a CHECK expression is a failure.
+    const size_t compared = compare_with_golden(id);
+    CHECK(compared > 0);
   }
 }
