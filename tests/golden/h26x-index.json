@@ -2516,5 +2516,17 @@
    "skipped": {}
   }
  },
- "skipped_entries": {}
+ "skipped_entries": {
+  "cta_cmaf_video_cmfv": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "cta_hdr10_hevc": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "gpac_dolby_vision_cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "gpac_enc_cenc": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "hdr_hlg_bt2020": "no recorded hash: tools/fetch_corpora.py cannot fetch it",
+  "heif_C001": "an image item, not a video track",
+  "heif_heic_grid": "an image item, not a video track",
+  "mpegff_hev1_clg1_header": "an initialisation or media segment on its own: no sample description or no samples",
+  "mpegff_hev1_clg1_segment": "an initialisation or media segment on its own: no sample description or no samples",
+  "mpegff_video_cenc_128iv": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones",
+  "mpegff_video_cenc_roll_frag1s": "encrypted samples: the slice data is not decodable and the headers repeat the clear ones"
+ }
 }
