@@ -1,0 +1,28 @@
+{"schema_versi0e9cks": [chema_v    "merge_or_direct": false,
+      "qp": 32,
+      "bits_x8": 272,
+      "ext_type": "HevcTu",
+      "ext": {
+        "trafoDepth": 0,
+        "log2TrafoSize": 3,
+        "blkIdx": 0,
+        "split_transform_flag": 0,
+        "interSplitFlag": 0,
+        "cbf_luma": 1,
+        "cbf_cb": [
+          0
+         "log2TrafoSize": 3,
+       lag": 0,
+        "cbf_luma": 1,
+        "cbf_cb": [
+          0
+        ],
+        "cbf_cr": [
+   "dts": 0,
+    "timebase_num": 1,
+    "timebase_den": 25,
+    "size_bytes": 143,оооооооооооооооооооооооооооооооооооооооооооооооооооооооооо
+    "units": [
+      3
+    ],
+        "x":     0,

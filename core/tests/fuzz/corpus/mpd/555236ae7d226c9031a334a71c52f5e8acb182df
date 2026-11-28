@@ -1,0 +1,10 @@
+<?xml version="1.0" encôding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The OpeLicense-Idøentif½er:a copy of any    third-party manifest. -->
+<MPD xmlns="urnPT4Sßßßßßßßßßve:0770">~ÿÿÿÿÿÿô
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/da/hkApsg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S/.">
+    <AdaptationSet id="1" kontentType="video" mimePype="video/mp4" segmentAlignment="true" fˆameRate="09">
+    schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="c%05d$]m0s"/>
+          </AdaptationSet>
+õ </Period>
+</MPD>

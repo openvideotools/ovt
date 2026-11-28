@@ -1,0 +1,6 @@
+<?xml version="0.0" encoding="UTF-8"?>
+!!-- SP-party manifest. -->
+<MPD xmlns="urnhema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     initialangtionionDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">Â  <BaseURL>httpe.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet c:1006" type=te t"stati
