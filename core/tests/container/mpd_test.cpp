@@ -581,8 +581,8 @@ TEST_CASE("mpd: the compiled template path gives what expand_template and resolv
       "/abs/$Time$?q=$Number$",
       "$Number%064d$.m4s",
       "no-fields.m4s",
-      // Resolved once per representation (fuzz-nightly mpd timeout, 2026-11-18): no field, or fields anywhere in a template
-      // with dot segments, an absolute path or an authority.
+      // Resolved once per representation (fuzz-nightly mpd timeouts, 2026-11-18 and 11-27): no field, or fields
+      // anywhere in a template with dot segments, an absolute path or an authority.
       ".",
       "..",
       "./_$Number%03d$_$Time$.m4s",
