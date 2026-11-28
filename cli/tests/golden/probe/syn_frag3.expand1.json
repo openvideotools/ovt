@@ -1,0 +1,313 @@
+{
+  "format": "isobmff",
+  "root": [
+    {
+      "description": "file type and compatibility",
+      "fields": [
+        {
+          "ivalue": 0,
+          "kind": "String",
+          "name": "major_brand",
+          "span": {
+            "bit_length": 32,
+            "bit_offset": 64
+          },
+          "spec_ref": "ISO/IEC 14496-12:2022 §4.3",
+          "svalue": "iso6",
+          "uvalue": 1769172790
+        },
+        {
+          "ivalue": 0,
+          "kind": "String",
+          "name": "major_brand.derived",
+          "span": {
+            "bit_length": 0,
+            "bit_offset": 96
+          },
+          "spec_ref": "ISO/IEC 14496-12:2022 §4.3",
+          "svalue": "ISO Base Media File Format version 6",
+          "uvalue": 0
+        },
+        {
+          "ivalue": 0,
+          "kind": "UInt",
+          "name": "minor_version",
+          "span": {
+            "bit_length": 32,
+            "bit_offset": 96
+          },
+          "spec_ref": "ISO/IEC 14496-12:2022 §4.3",
+          "uvalue": 0
+        },
+        {
+          "children": [
+            {
+              "ivalue": 0,
+              "kind": "String",
+              "name": "compatible_brands[0]",
+              "span": {
+                "bit_length": 32,
+                "bit_offset": 128
+              },
+              "svalue": "iso6",
+              "uvalue": 1769172790
+            },
+            {
+              "ivalue": 0,
+              "kind": "String",
+              "name": "compatible_brands[1]",
+              "span": {
+                "bit_length": 32,
+                "bit_offset": 160
+              },
+              "svalue": "mp41",
+              "uvalue": 1836069937
+            }
+          ],
+          "ivalue": 0,
+          "kind": "None",
+          "name": "compatible_brands",
+          "span": {
+            "bit_length": 64,
+            "bit_offset": 128
+          },
+          "spec_ref": "ISO/IEC 14496-12:2022 §4.3",
+          "uvalue": 2
+        },
+        {
+          "ivalue": 0,
+          "kind": "String",
+          "name": "compatible_brands.derived",
+          "span": {
+            "bit_length": 0,
+            "bit_offset": 192
+          },
+          "spec_ref": "ISO/IEC 14496-12:2022 §4.3",
+          "svalue": "iso6: ISO Base Media File Format version 6; mp41: MP4 version 1",
+          "uvalue": 0
+        }
+      ],
+      "file_span": {
+        "length": 24,
+        "offset": 0
+      },
+      "flags": -1,
+      "fourcc": "ftyp",
+      "header_length": 8,
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "children": [
+        {
+          "description": "movie header, overall declarations",
+          "file_span": {
+            "length": 108,
+            "offset": 32
+          },
+          "flags": 0,
+          "fourcc": "mvhd",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": 0
+        },
+        {
+          "description": "container for an individual track or stream",
+          "file_span": {
+            "length": 394,
+            "offset": 140
+          },
+          "flags": -1,
+          "fourcc": "trak",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": -1
+        },
+        {
+          "description": "movie extends box",
+          "file_span": {
+            "length": 40,
+            "offset": 534
+          },
+          "flags": -1,
+          "fourcc": "mvex",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": -1
+        }
+      ],
+      "description": "container for all the meta-data",
+      "file_span": {
+        "length": 550,
+        "offset": 24
+      },
+      "flags": -1,
+      "fourcc": "moov",
+      "header_length": 8,
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "children": [
+        {
+          "description": "movie fragment header",
+          "file_span": {
+            "length": 16,
+            "offset": 582
+          },
+          "flags": 0,
+          "fourcc": "mfhd",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": 0
+        },
+        {
+          "description": "Track fragment",
+          "file_span": {
+            "length": 112,
+            "offset": 598
+          },
+          "flags": -1,
+          "fourcc": "traf",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": -1
+        }
+      ],
+      "description": "movie fragment, sequence_number 1",
+      "file_span": {
+        "length": 136,
+        "offset": 574
+      },
+      "flags": -1,
+      "fourcc": "moof",
+      "header_length": 8,
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "description": "media data container",
+      "file_span": {
+        "length": 72,
+        "offset": 710
+      },
+      "flags": -1,
+      "fourcc": "mdat",
+      "header_length": 8,
+      "payload_span": {
+        "length": 64,
+        "offset": 718
+      },
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "children": [
+        {
+          "description": "movie fragment header",
+          "file_span": {
+            "length": 16,
+            "offset": 790
+          },
+          "flags": 0,
+          "fourcc": "mfhd",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": 0
+        },
+        {
+          "description": "Track fragment",
+          "file_span": {
+            "length": 112,
+            "offset": 806
+          },
+          "flags": -1,
+          "fourcc": "traf",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": -1
+        }
+      ],
+      "description": "movie fragment, sequence_number 2",
+      "file_span": {
+        "length": 136,
+        "offset": 782
+      },
+      "flags": -1,
+      "fourcc": "moof",
+      "header_length": 8,
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "description": "media data container",
+      "file_span": {
+        "length": 72,
+        "offset": 918
+      },
+      "flags": -1,
+      "fourcc": "mdat",
+      "header_length": 8,
+      "payload_span": {
+        "length": 64,
+        "offset": 926
+      },
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "children": [
+        {
+          "description": "movie fragment header",
+          "file_span": {
+            "length": 16,
+            "offset": 998
+          },
+          "flags": 0,
+          "fourcc": "mfhd",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": 0
+        },
+        {
+          "description": "Track fragment",
+          "file_span": {
+            "length": 112,
+            "offset": 1014
+          },
+          "flags": -1,
+          "fourcc": "traf",
+          "header_length": 8,
+          "spec_ref": "ISO/IEC 14496-12:2022",
+          "version": -1
+        }
+      ],
+      "description": "movie fragment, sequence_number 3",
+      "file_span": {
+        "length": 136,
+        "offset": 990
+      },
+      "flags": -1,
+      "fourcc": "moof",
+      "header_length": 8,
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    },
+    {
+      "description": "media data container",
+      "file_span": {
+        "length": 72,
+        "offset": 1126
+      },
+      "flags": -1,
+      "fourcc": "mdat",
+      "header_length": 8,
+      "payload_span": {
+        "length": 64,
+        "offset": 1134
+      },
+      "spec_ref": "ISO/IEC 14496-12:2022",
+      "version": -1
+    }
+  ]
+}

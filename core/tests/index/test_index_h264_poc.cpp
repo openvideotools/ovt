@@ -213,6 +213,25 @@ TEST_CASE("h264_frame_boundary: prefix NAL, redundant pictures, partitions and e
   CHECK(after.role == idx::UnitRole::FirstSlice);
   CHECK(after.rules.empty());
   CHECK(after.picture_index == 2);
+  // End of sequence, then a PPS: the PPS starts the next access unit (it must not be held back as a change inside the
+  // closed picture; fuzz-nightly h264_index crash 4e2718fa, 2026-11-19), and the slice does not report it again.
+  CHECK(fb.on_non_vcl(make_nal(10, 0)).role == idx::UnitRole::Following);
+  CHECK(fb.on_non_vcl(make_nal(8, 3)).starts_access_unit);
+  CHECK_FALSE(fb.on_non_vcl(make_nal(7, 3)).starts_access_unit);
+  const auto next = fb.on_slice(p, make_slice(1), 0);
+  CHECK(next.role == idx::UnitRole::FirstSlice);
+  CHECK_FALSE(next.starts_access_unit);
+  CHECK(next.picture_index == 3);
+  // A redundant slice after an SPS that started the next access unit is a new picture (rule 10), not part of the open
+  // one, so a PPS that follows it starts the access unit after it (fuzz-nightly h264_index crash fca46b18).
+  CHECK(fb.on_non_vcl(make_nal(7, 3)).starts_access_unit);
+  auto redundant = make_slice(1);
+  redundant.redundant_pic_cnt = 1;
+  const auto late = fb.on_slice(p, redundant, 0);
+  CHECK(late.role == idx::UnitRole::FirstSlice);
+  CHECK(late.rules == std::vector<uint8_t>{10});
+  CHECK(late.picture_index == 4);
+  CHECK(fb.on_non_vcl(make_nal(8, 3)).starts_access_unit);
 }
 
 TEST_CASE("h264_frame_boundary: complementary field pairs", "[index][h264][fast]") {
