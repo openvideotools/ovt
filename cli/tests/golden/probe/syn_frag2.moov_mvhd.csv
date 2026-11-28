@@ -1,0 +1,38 @@
+depth,path,name,descriptor,value,bit_offset,bit_length,spec_ref
+1,ftyp,ftyp,box,24,0,192,ISO/IEC 14496-12:2022
+1,moov,moov,box,550,192,4400,ISO/IEC 14496-12:2022
+2,moov/mvhd,mvhd,box,108,256,864,ISO/IEC 14496-12:2022
+3,moov/mvhd/version,version,UInt,0,64,8,
+3,moov/mvhd/flags,flags,UInt,0,72,24,
+3,moov/mvhd/creation_time,creation_time,UInt,0,96,32,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/modification_time,modification_time,UInt,0,128,32,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/timescale,timescale,UInt,1000,160,32,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/duration,duration,UInt,0,192,32,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/rate,rate,Fixed,1.0,224,32,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/volume,volume,Fixed,1.0,256,16,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/reserved,reserved,UInt,0,272,16,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/reserved,reserved,UInt,0,288,64,ISO/IEC 14496-12:2022 §8.2.2
+3,moov/mvhd/matrix,matrix,None,,352,288,ISO/IEC 14496-12:2022 §8.2.2
+4,moov/mvhd/matrix/matrix[0],matrix[0],Fixed,1.0,352,32,
+4,moov/mvhd/matrix/matrix[1],matrix[1],Fixed,0.0,384,32,
+4,moov/mvhd/matrix/matrix[2],matrix[2],Fixed,0.0,416,32,
+4,moov/mvhd/matrix/matrix[3],matrix[3],Fixed,0.0,448,32,
+4,moov/mvhd/matrix/matrix[4],matrix[4],Fixed,1.0,480,32,
+4,moov/mvhd/matrix/matrix[5],matrix[5],Fixed,0.0,512,32,
+4,moov/mvhd/matrix/matrix[6],matrix[6],Fixed,0.0,544,32,
+4,moov/mvhd/matrix/matrix[7],matrix[7],Fixed,0.0,576,32,
+4,moov/mvhd/matrix/matrix[8],matrix[8],Fixed,1.0,608,32,
+3,moov/mvhd/pre_defined,pre_defined,None,,640,192,ISO/IEC 14496-12:2022 §8.2.2
+4,moov/mvhd/pre_defined/pre_defined[0],pre_defined[0],UInt,0,640,32,
+4,moov/mvhd/pre_defined/pre_defined[1],pre_defined[1],UInt,0,672,32,
+4,moov/mvhd/pre_defined/pre_defined[2],pre_defined[2],UInt,0,704,32,
+4,moov/mvhd/pre_defined/pre_defined[3],pre_defined[3],UInt,0,736,32,
+4,moov/mvhd/pre_defined/pre_defined[4],pre_defined[4],UInt,0,768,32,
+4,moov/mvhd/pre_defined/pre_defined[5],pre_defined[5],UInt,0,800,32,
+3,moov/mvhd/next_track_ID,next_track_ID,UInt,2,832,32,ISO/IEC 14496-12:2022 §8.2.2
+2,moov/trak,trak,box,394,1120,3152,ISO/IEC 14496-12:2022
+2,moov/mvex,mvex,box,40,4272,320,ISO/IEC 14496-12:2022
+1,moof[0],moof,box,136,4592,1088,ISO/IEC 14496-12:2022
+1,mdat[0],mdat,box,72,5680,576,ISO/IEC 14496-12:2022
+1,moof[1],moof,box,136,6256,1088,ISO/IEC 14496-12:2022
+1,mdat[1],mdat,box,72,7344,576,ISO/IEC 14496-12:2022
