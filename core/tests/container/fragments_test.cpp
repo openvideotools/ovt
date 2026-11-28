@@ -45,7 +45,8 @@ using Bytes = std::vector<uint8_t>;
 Bytes be(uint64_t v, unsigned nbytes) {
   Bytes b;
   for (unsigned i = nbytes; i > 0; --i) {
-    b.push_back(static_cast<uint8_t>(v >> (8U * (i - 1U))));
+    const unsigned shift = 8U * (i - 1U);
+    b.push_back(shift >= 64U ? uint8_t{0} : static_cast<uint8_t>(v >> shift));  // wider than 8 bytes: zero pad
   }
   return b;
 }
@@ -198,7 +199,7 @@ Bytes stream(size_t fragments, uint64_t jump_at = SIZE_MAX, uint64_t jump = 0) {
 
 }  // namespace
 
-TEST_CASE("fragments: offsets, sizes and DTS of a clean fragmented stream", "[container][fragments]") {
+TEST_CASE("fragments: offsets, sizes and DTS of a clean fragmented stream", "[container][fragments][fast]") {
   const Built r = build(stream(4));
   const auto& tl = r.b.timeline;
   CHECK(codes(r.b).empty());
@@ -233,7 +234,7 @@ TEST_CASE("fragments: offsets, sizes and DTS of a clean fragmented stream", "[co
   }
 }
 
-TEST_CASE("fragments: the serialised timeline is a valid, deterministic FlatBuffer", "[container][fragments]") {
+TEST_CASE("fragments: the serialised timeline is a valid, deterministic FlatBuffer", "[container][fragments][fast]") {
   const Built a = build(stream(3));
   const Built b = build(stream(3));
   const auto x = iso::serialise(a.b.timeline);
@@ -243,7 +244,8 @@ TEST_CASE("fragments: the serialised timeline is a valid, deterministic FlatBuff
   CHECK(std::vector<uint8_t>(x.data(), x.data() + x.size()) == std::vector<uint8_t>(y.data(), y.data() + y.size()));
 }
 
-TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with that gap", "[container][fragments]") {
+TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with that gap",
+          "[container][fragments][fast]") {
   // Acceptance test 4. Fragments are numbered from 0 (FragmentInfo.index); the message also names sequence_number.
   const Built r = build(stream(5, 3, 9000));
   REQUIRE(r.b.timeline.fragments.size() == 5);
@@ -257,7 +259,8 @@ TEST_CASE("fragments: a tfdt jump of 9000 before fragment 3 is CNT-4020 with tha
   CHECK(message(back.b, "CNT-4020").find("overlap of 60 ticks") != std::string::npos);
 }
 
-TEST_CASE("fragments: two trafs without base flags use the implicit base chain (CNT-4006)", "[container][fragments]") {
+TEST_CASE("fragments: two trafs without base flags use the implicit base chain (CNT-4006)",
+          "[container][fragments][fast]") {
   // Acceptance test 3 (synthetic Smooth Streaming layout): the first traf's base is the moof, the second continues
   // after the first traf's data, so its data_offset is relative to that end.
   TrafSpec a = at(0);
@@ -284,7 +287,7 @@ TEST_CASE("fragments: two trafs without base flags use the implicit base chain (
   CHECK(r2.b.samples.offset[3] == payload + 2 * kSize + 6 + 3 * kSize);
 }
 
-TEST_CASE("fragments: base_data_offset and data-offset-less truns", "[container][fragments]") {
+TEST_CASE("fragments: base_data_offset and data-offset-less truns", "[container][fragments][fast]") {
   SECTION("explicit base_data_offset") {
     const Bytes probe = cat({ftyp(), moov({kTrack})});
     TrafSpec t = at(0);
@@ -307,7 +310,7 @@ TEST_CASE("fragments: base_data_offset and data-offset-less truns", "[container]
   }
 }
 
-TEST_CASE("fragments: pairing, defaults, bounds and count diagnostics", "[container][fragments]") {
+TEST_CASE("fragments: pairing, defaults, bounds and count diagnostics", "[container][fragments][fast]") {
   const Bytes head = cat({ftyp(), moov({kTrack})});
   SECTION("moof without mdat (CNT-4004) and samples outside it (CNT-4021)") {
     const Bytes f = fragment(1, {at(0)}, 3 * kSize);
@@ -369,7 +372,7 @@ TEST_CASE("fragments: pairing, defaults, bounds and count diagnostics", "[contai
   }
 }
 
-TEST_CASE("fragments: the first fragment continues the moov samples", "[container][fragments]") {
+TEST_CASE("fragments: the first fragment continues the moov samples", "[container][fragments][fast]") {
   // A track with 2 moov samples of 40 ticks (stts + stsz): expected DTS of fragment 0 is 80.
   const Bytes stbl = box("stbl", cat({box("stts", full(0, 0, cat({be(1, 4), be(2, 4), be(40, 4)}))),
                                       box("stsz", full(0, 0, cat({be(kSize, 4), be(2, 4)})))}));
@@ -385,7 +388,7 @@ TEST_CASE("fragments: the first fragment continues the moov samples", "[containe
   CHECK(has(gap.b, "CNT-4020"));
 }
 
-TEST_CASE("fragments: saio resolution against senc (CNT-6005)", "[container][fragments]") {
+TEST_CASE("fragments: saio resolution against senc (CNT-6005)", "[container][fragments][fast]") {
   // senc v0 with 3 samples of 8-byte IVs; saio v0 with one offset relative to the moof (default-base-is-moof).
   const Bytes senc = box("senc", full(0, 0, cat({be(3, 4), Bytes(24, 0x11)})));
   const auto with_saio = [&](uint32_t off) {
@@ -419,7 +422,7 @@ Bytes sidx_for(const std::vector<Bytes>& frags, int32_t size_delta, int32_t dur_
 
 }  // namespace
 
-TEST_CASE("fragments: sidx references match the fragments they cover", "[container][fragments][sidx]") {
+TEST_CASE("fragments: sidx references match the fragments they cover", "[container][fragments][sidx][fast]") {
   std::vector<Bytes> frags;
   frags.reserve(3);
   for (uint32_t k = 0; k < 3; ++k) {
@@ -455,7 +458,7 @@ TEST_CASE("fragments: sidx references match the fragments they cover", "[contain
   }
 }
 
-TEST_CASE("fragments: many sidx references over many moofs stay near-linear", "[container][fragments][sidx]") {
+TEST_CASE("fragments: many sidx references over many moofs stay near-linear", "[container][fragments][sidx][fast]") {
   // 40 sidx boxes × 4000 references over 4000 moofs: the old linear scans did ~10⁹ steps here.
   constexpr size_t kFrags = 4000;
   constexpr size_t kSidx = 40;
@@ -495,7 +498,7 @@ TEST_CASE("fragments: many sidx references over many moofs stay near-linear", "[
   CHECK(elapsed < std::chrono::seconds(10));  // the quadratic version took ~24 s in a debug build, this one < 1 s
 }
 
-TEST_CASE("fragments: a sidx whose offsets overflow is CNT-4030", "[container][fragments][sidx]") {
+TEST_CASE("fragments: a sidx whose offsets overflow is CNT-4030", "[container][fragments][sidx][fast]") {
   const Bytes head = cat({ftyp(), moov({kTrack})});
   const Bytes f0 = fragment(1, {at(0)}, 3 * kSize);
   const Bytes refs = cat({be(f0.size(), 4), be(3 * kDur, 4), be(0, 4), be(16, 4), be(3 * kDur, 4), be(0, 4)});
@@ -512,7 +515,7 @@ TEST_CASE("fragments: a sidx whose offsets overflow is CNT-4030", "[container][f
   CHECK(r.b.timeline.fragments[0]->sidx_reference_index == -1);
 }
 
-TEST_CASE("fragments: mfra / tfra / mfro cross-checks", "[container][fragments][mfra]") {
+TEST_CASE("fragments: mfra / tfra / mfro cross-checks", "[container][fragments][mfra][fast]") {
   const Bytes head = cat({ftyp(), moov({kTrack})});
   const Bytes f0 = fragment(1, {at(0)}, 3 * kSize);
   const Bytes f1 = fragment(2, {at(120)}, 3 * kSize);
@@ -532,7 +535,7 @@ TEST_CASE("fragments: mfra / tfra / mfro cross-checks", "[container][fragments][
   CHECK(has(build(cat({head, f0, f1, mfra(moof1, 120, 4)})).b, "CNT-4011"));
 }
 
-TEST_CASE("fragments: header-only (lazy) moofs give the same timeline", "[container][fragments][lazy]") {
+TEST_CASE("fragments: header-only (lazy) moofs give the same timeline", "[container][fragments][lazy][fast]") {
   // More than kEagerMoofLimit moofs: the lazy walk keeps only their mfhd, the builder reads the rest itself.
   const Bytes bytes = stream(iso::kEagerMoofLimit + 6);
   const Built eager = build(bytes);
@@ -545,7 +548,7 @@ TEST_CASE("fragments: header-only (lazy) moofs give the same timeline", "[contai
   CHECK(std::vector<uint8_t>(x.data(), x.data() + x.size()) == std::vector<uint8_t>(y.data(), y.data() + y.size()));
 }
 
-TEST_CASE("fragments: a requested cancel stops the build", "[container][fragments]") {
+TEST_CASE("fragments: a requested cancel stops the build", "[container][fragments][fast]") {
   const Bytes bytes = stream(3);
   const ovt::io::MemoryFile file(bytes);
   const iso::WalkResult w = iso::walk(file);
@@ -629,7 +632,7 @@ TEST_CASE("fragment samples match the MP4Box -dts goldens of the container-smoke
   }
 }
 
-TEST_CASE("fragments: the sample bound truncates the expansion (CNT-2031)", "[container][fragments]") {
+TEST_CASE("fragments: the sample bound truncates the expansion (CNT-2031)", "[container][fragments][fast]") {
   // A 24-byte trun claims 10^9 default-sized samples; the expansion stops at the bound.
   TrafSpec t = at(0);
   t.samples = 1'000'000'000;
@@ -648,7 +651,7 @@ TEST_CASE("fragments: the sample bound truncates the expansion (CNT-2031)", "[co
   CHECK(message(f, "CNT-2031").find("in a file of") != std::string::npos);
 }
 
-TEST_CASE("fragments: another track's huge default-sized trun is not iterated", "[container][fragments]") {
+TEST_CASE("fragments: another track's huge default-sized trun is not iterated", "[container][fragments][fast]") {
   // Track 2's trun claims 0xFFFFFFFF samples without per-sample fields: its data end is computed, not looped.
   TrafSpec a = at(0);
   a.tfhd_flags = 0;
@@ -722,7 +725,8 @@ std::unique_ptr<ovt::fb::SampleTableT> table_of(ovt_Container* c, int track) {
 
 }  // namespace
 
-TEST_CASE("fragments: the SampleTable appends the fragment samples", "[container][fragments][sample_table][c_api]") {
+TEST_CASE("fragments: the SampleTable appends the fragment samples",
+          "[container][fragments][sample_table][c_api][fast]") {
   const Bytes seg = fragment(2, {at(120)}, 3 * kSize);
   const Opened o(cat({ftyp(), moov({kTrack}), fragment(1, {at(0)}, 3 * kSize), seg}));
   const auto table = table_of(o.c, 0);
@@ -741,7 +745,7 @@ TEST_CASE("fragments: the SampleTable appends the fragment samples", "[container
 }
 
 TEST_CASE("fragments: the fragment part continues the moov samples of the SampleTable",
-          "[container][fragments][sample_table][c_api]") {
+          "[container][fragments][sample_table][c_api][fast]") {
   const Bytes stbl = box("stbl", cat({box("stts", full(0, 0, cat({be(1, 4), be(2, 4), be(40, 4)}))),
                                       box("stsz", full(0, 0, cat({be(kSize, 4), be(2, 4)})))}));
   const Bytes tkhd = box("tkhd", full(0, 3, cat({be(0, 8), be(kTrack, 4), be(0, 68)})));
@@ -765,7 +769,7 @@ TEST_CASE("fragments: the fragment part continues the moov samples of the Sample
 }
 
 TEST_CASE("fragments: append_fragment_samples packs sample_flags and pads moov-only columns",
-          "[container][fragments][sample_table]") {
+          "[container][fragments][sample_table][fast]") {
   ovt::fb::SampleTableT table;
   table.count = 1;
   table.dts = {0};
@@ -804,7 +808,7 @@ TEST_CASE("fragments: append_fragment_samples packs sample_flags and pads moov-o
   CHECK(table.composition_to_dts_shift == 20);
 }
 
-TEST_CASE("fragments: ovt_container_fragments arguments and cancellation", "[container][fragments][c_api]") {
+TEST_CASE("fragments: ovt_container_fragments arguments and cancellation", "[container][fragments][c_api][fast]") {
   const Opened o(stream(3));
   Owned b;
   CHECK(ovt_container_fragments(o.c, 1, nullptr, &b.b) == OVT_E_INVALID_ARG);
@@ -1073,7 +1077,8 @@ TEST_CASE("fragments: offsets, sizes and DTS equal ffprobe on cta_cmaf_video_cmf
   compare_corpus_with_ffprobe("cta_cmaf_video_cmfv");
 }
 
-TEST_CASE("fragments: traf sbgp memberships join the SampleTable groups", "[container][fragments][sample_table]") {
+TEST_CASE("fragments: traf sbgp memberships join the SampleTable groups",
+          "[container][fragments][sample_table][fast]") {
   // Fragment 0: sbgp 'seig' → samples 0-1 use the fragment-local entry 1 (0x10001), sample 2 none; one local sgpd.
   // Fragment 1: no sbgp → 0 for its samples.
   TrafSpec t = at(0);

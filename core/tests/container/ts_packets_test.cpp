@@ -655,3 +655,41 @@ TEST_CASE("corpus: tsduck-test input walks to the reference PID statistics",
   CHECK(f->pids[2].pid == 1068);
   CHECK(f->pids[2].packets == 1832);
 }
+
+TEST_CASE("reader: the adaptation field node shows OPCR, splice countdown and private data length",
+          "[container][mpegts][fast]") {
+  std::vector<Bytes> v = clean_packets(5);
+  Pkt p;
+  p.pid = 0x0200;
+  p.afc = 3;
+  p.af_body = pcr_field(1000, 5, 0x08U | 0x04U | 0x02U);
+  const Bytes opcr = pcr_field(9, 13);
+  p.af_body.insert(p.af_body.end(), opcr.begin() + 1, opcr.end());
+  p.af_body.push_back(0xFE);  // splice_countdown
+  p.af_body.push_back(2);     // transport_private_data_length
+  p.af_body.push_back(0xAA);
+  p.af_body.push_back(0xBB);
+  v[2] = make_packet(p);
+  const Bytes data = concat(v);
+  const ovt::io::MemoryFile file{std::span<const uint8_t>(data)};
+  auto reader = ts::make_reader(file);
+  REQUIRE(reader != nullptr);
+  const auto buf = reader->tree();
+  const auto* tree = flatbuffers::GetRoot<ovt::fb::ContainerTree>(buf.data());
+  const auto* adpt = tree->root()->Get(0)->children()->Get(2)->children()->Get(0);
+  const auto field = [&](const char* name) -> const ovt::fb::Field* {
+    for (const auto* f : *adpt->fields()) {
+      if (std::string(f->name()->c_str()) == name) {
+        return f;
+      }
+    }
+    return nullptr;
+  };
+  REQUIRE(field("original_program_clock_reference_base") != nullptr);
+  CHECK(field("original_program_clock_reference_base")->uvalue() == 9);
+  CHECK(field("original_program_clock_reference_extension")->uvalue() == 13);
+  REQUIRE(field("splice_countdown") != nullptr);
+  CHECK(field("splice_countdown")->uvalue() == 0xFE);
+  REQUIRE(field("transport_private_data_length") != nullptr);
+  CHECK(field("transport_private_data_length")->uvalue() == 2);
+}

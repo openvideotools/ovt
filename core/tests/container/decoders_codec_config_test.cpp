@@ -732,3 +732,72 @@ TEST_CASE("AT3 on syn_av1_pq_hdr_obu: av1C high_bitdepth, level and one sequence
 }
 
 }  // namespace
+
+// ---- name tables of the configuration records ----
+
+TEST_CASE("avcC names every profile it knows and level 9 is 1b", "[container][decoders][codec_config][fast]") {
+  const std::vector<std::pair<uint8_t, std::string_view>> profiles = {{66, "Baseline"},
+                                                                      {77, "Main"},
+                                                                      {88, "Extended"},
+                                                                      {100, "High"},
+                                                                      {110, "High 10"},
+                                                                      {122, "High 4:2:2"},
+                                                                      {244, "High 4:4:4 Predictive"}};
+  for (const auto& [idc, name] : profiles) {
+    CAPTURE(idc);
+    Bytes rec = hex(kAvccBaseline);
+    rec[1] = idc;
+    const Decoded d = run("avcC", rec, "avc1");
+    CHECK(field(d.node, "AVCProfileIndication").svalue == name);
+  }
+  Bytes unknown = hex(kAvccBaseline);
+  unknown[1] = 7;
+  CHECK(field(run("avcC", unknown, "avc1").node, "AVCProfileIndication").uvalue == 7);
+  Bytes level_1b = hex(kAvccBaseline);
+  level_1b[3] = 9;
+  CHECK(field(run("avcC", level_1b, "avc1").node, "AVCLevelIndication").svalue == "1b");
+}
+
+TEST_CASE("hvcC names the profiles and NAL unit types it knows", "[container][decoders][codec_config][fast]") {
+  const std::vector<std::pair<uint8_t, std::string_view>> profiles = {
+      {1, "Main"}, {3, "Main Still Picture"}, {4, "Format Range Extensions"}, {9, "Screen Content Coding Extensions"}};
+  for (const auto& [idc, name] : profiles) {
+    CAPTURE(idc);
+    Bytes rec = hex(kHvccMain10);
+    rec[1] = idc;
+    CHECK(field(run("hvcC", rec, "hvc1").node, "general_profile_idc").svalue == name);
+  }
+  const std::vector<std::pair<uint8_t, std::string_view>> nal_types = {
+      {39, "PREFIX_SEI_NUT"}, {40, "SUFFIX_SEI_NUT"}, {41, ""}};
+  for (const auto& [type, name] : nal_types) {
+    CAPTURE(type);
+    Bytes rec = hex(kHvccMain10);
+    rec[23] = type;  // first array: array_completeness 0, reserved 0, NAL_unit_type
+    CHECK(field(run("hvcC", rec, "hvc1").node, "arrays/array[0]/NAL_unit_type").svalue == name);
+  }
+}
+
+TEST_CASE("esds names the objectTypeIndications it knows", "[container][decoders][codec_config][fast]") {
+  const Bytes marker = hex("0480808017");  // DecoderConfigDescriptor tag and its expanded size
+  const std::vector<std::pair<uint8_t, std::string_view>> otis = {{0x20, "MPEG-4 Visual"},
+                                                                  {0x21, "AVC"},
+                                                                  {0x61, "MPEG-2 Visual"},
+                                                                  {0x67, "MPEG-2 AAC"},
+                                                                  {0x69, "MP3 (ISO/IEC 13818-3)"},
+                                                                  {0x6A, "MPEG-1 Visual"},
+                                                                  {0x6B, "MP3 (ISO/IEC 11172-3)"},
+                                                                  {0x6C, "JPEG"},
+                                                                  {0xA5, "AC-3"},
+                                                                  {0xA6, "E-AC-3"},
+                                                                  {0xAD, "Opus"},
+                                                                  {0xDD, "Vorbis"}};
+  for (const auto& [oti, name] : otis) {
+    CAPTURE(oti);
+    Bytes rec = hex(kEsdsAacLc);
+    const auto at = std::search(rec.begin(), rec.end(), marker.begin(), marker.end());
+    REQUIRE(at != rec.end());
+    *(at + static_cast<std::ptrdiff_t>(marker.size())) = oti;
+    const Decoded d = run("esds", rec, "mp4a");
+    CHECK(field(d.node, "ES_Descriptor/DecoderConfigDescriptor/objectTypeIndication").svalue == name);
+  }
+}

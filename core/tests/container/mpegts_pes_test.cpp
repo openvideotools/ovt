@@ -15,6 +15,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -608,4 +609,34 @@ TEST_CASE("corpus: syn_ts_cc_errors has a 1 s PCR gap", "[container][mpegts][tim
     return d.code == DiagCode::CNT_TS_2003 && d.message.starts_with(head) &&
            std::stoul(d.message.substr(head.size())) >= 1000;
   }));
+}
+
+TEST_CASE("reader: handler and codec of each PES stream follow its stream_type", "[container][mpegts][pes][fast]") {
+  const std::vector<std::pair<uint16_t, uint8_t>> streams = {{0x101, 0x24}, {0x102, 0x33}, {0x103, 0x02}, {0x104, 0x01},
+                                                             {0x105, 0x0F}, {0x106, 0x81}, {0x107, 0x06}};
+  Bytes file = psi_packets(0x1FFF, streams);
+  for (const auto& [pid, type] : streams) {
+    uint8_t cc = 0;
+    packetize(file, pid, cc, pes(Bytes(40, 0x55), 9000));
+  }
+  const ovt::io::MemoryFile mf{std::span<const uint8_t>(file)};
+  const auto reader = ts::make_reader(mf);
+  REQUIRE(reader != nullptr);
+  const auto tree = reader->tree();
+  const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(tree.data());
+  REQUIRE(t->tracks()->size() == streams.size());
+  using ovt::fb::Codec;
+  using ovt::fb::HandlerType;
+  const std::vector<std::tuple<uint16_t, Codec, HandlerType>> expected = {
+      {0x101, Codec::H265, HandlerType::Video},     {0x102, Codec::H266, HandlerType::Video},
+      {0x103, Codec::MPEG2, HandlerType::Video},    {0x104, Codec::MPEG2, HandlerType::Video},
+      {0x105, Codec::Unknown, HandlerType::Audio},  {0x106, Codec::Unknown, HandlerType::Audio},
+      {0x107, Codec::Unknown, HandlerType::Unknown}};
+  for (const auto& [pid, codec, handler] : expected) {
+    CAPTURE(pid);
+    const auto it = std::ranges::find_if(*t->tracks(), [want = pid](const auto* tr) { return tr->track_id() == want; });
+    REQUIRE(it != t->tracks()->end());
+    CHECK((*it)->codec() == codec);
+    CHECK((*it)->handler() == handler);
+  }
 }

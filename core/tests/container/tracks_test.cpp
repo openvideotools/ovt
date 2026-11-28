@@ -575,3 +575,153 @@ TEST_CASE("tracks: every trak of every ISOBMFF corpus file yields a verified Tra
     SKIP("no ISOBMFF corpus file present");
   }
 }
+
+// ---- handler, codec and sample-entry mappings (§8.1.3) ----------------------------------------------------------
+
+namespace {
+
+// esds whose ES_Descriptor carries `es_flags` (and the optional fields they announce) and whose
+// DecoderSpecificInfo is `asc`. `with_dsi` false ends the box after DecoderConfigDescriptor's fixed part.
+Bytes esds_custom(uint8_t oti, uint8_t es_flags, const Bytes& optional_fields, const Bytes& asc, bool with_dsi = true) {
+  Bytes body = {oti, 0x15};
+  put(body, 0, 11);
+  if (with_dsi) {
+    body.push_back(0x05);
+    body.push_back(static_cast<uint8_t>(asc.size()));
+    put_all(body, asc);
+  }
+  Bytes dcd = {0x04, static_cast<uint8_t>(body.size())};
+  put_all(dcd, body);
+  Bytes es = {0x03, static_cast<uint8_t>(3 + optional_fields.size() + dcd.size()), 0, 1, es_flags};
+  put_all(es, optional_fields);
+  put_all(es, dcd);
+  return full_box("esds", 0, es);
+}
+
+ovt::fb::TrackInfoT only_track(const Bytes& trak_box) {
+  const Bytes data = mp4({trak_box});
+  Opened o(data);
+  REQUIRE(ovt_container_track_count(o.container) == 1);
+  return track_of(o.container, 0);
+}
+
+}  // namespace
+
+TEST_CASE("tracks: every handler type maps to its HandlerType", "[container][tracks][fast]") {
+  const Bytes entry = audio_entry("mp4a", 2, 48000, {});
+  const std::vector<std::pair<std::string_view, ovt::fb::HandlerType>> cases = {
+      {"sbtl", ovt::fb::HandlerType::Subtitle},  {"subt", ovt::fb::HandlerType::Subtitle},
+      {"text", ovt::fb::HandlerType::Text},      {"meta", ovt::fb::HandlerType::Metadata},
+      {"hint", ovt::fb::HandlerType::Hint},      {"tmcd", ovt::fb::HandlerType::Timecode},
+      {"auxv", ovt::fb::HandlerType::Auxiliary}, {"zzzz", ovt::fb::HandlerType::Unknown}};
+  for (const auto& [fourcc, expected] : cases) {
+    CAPTURE(fourcc);
+    const auto t = only_track(trak(1, fourcc, entry, 1));
+    CHECK(t.handler == expected);
+    CHECK(t.handler_fourcc == fourcc);
+  }
+}
+
+TEST_CASE("tracks: tkhd matrices of 180 and 270 degrees give those rotations", "[container][tracks][fast]") {
+  const Bytes entry = visual_entry("avc1", 640, 360, {avcc()});
+  const Bytes r180 = tkhd(1, 3, {0xFFFF0000U, 0, 0, 0xFFFF0000U});
+  const Bytes r270 = tkhd(2, 3, {0, 0xFFFF0000U, 0x10000, 0});
+  const Bytes data =
+      mp4({trak(1, "vide", entry, 1, 30000, 90000, r180), trak(2, "vide", entry, 1, 30000, 90000, r270)});
+  Opened o(data);
+  CHECK(track_of(o.container, 0).rotation == 180);
+  CHECK(track_of(o.container, 1).rotation == 270);
+}
+
+TEST_CASE("tracks: VP9, VVC and MPEG-2 sample entries map to their codecs", "[container][tracks][fast]") {
+  Bytes vpcc_payload = {1, 0, 0, 0, 2, 31, 0xA0, 2, 2, 2, 0, 0};
+  const auto vp9 = only_track(trak(1, "vide", visual_entry("vp09", 640, 360, {box("vpcC", vpcc_payload)}), 1));
+  CHECK(vp9.codec == ovt::fb::Codec::VP9);
+  CHECK(vp9.codec_string == "vp09.02.31.10");
+
+  const auto short_vp9 =
+      only_track(trak(1, "vide", visual_entry("vp09", 640, 360, {box("vpcC", Bytes{1, 0, 0, 0})}), 1));
+  CHECK(short_vp9.codec == ovt::fb::Codec::VP9);
+  CHECK(short_vp9.codec_string == "vp09");
+
+  CHECK(only_track(trak(1, "vide", visual_entry("vvc1", 640, 360, {}), 1)).codec == ovt::fb::Codec::H266);
+
+  const Bytes mpeg2 = esds_custom(0x61, 0, {}, Bytes{});
+  CHECK(only_track(trak(1, "vide", visual_entry("mp4v", 640, 360, {mpeg2}), 1)).codec == ovt::fb::Codec::MPEG2);
+  const Bytes mpeg4 = esds_custom(0x20, 0, {}, Bytes{});
+  CHECK(only_track(trak(1, "vide", visual_entry("mp4v", 640, 360, {mpeg4}), 1)).codec == ovt::fb::Codec::Unknown);
+}
+
+TEST_CASE("tracks: clap fills clean_aperture", "[container][tracks][fast]") {
+  Bytes clap;
+  for (const uint32_t v : {1900U, 1U, 1060U, 1U, 10U, 1U, 20U, 1U}) {
+    put(clap, v, 4);
+  }
+  const auto t = only_track(trak(1, "vide", visual_entry("avc1", 1920, 1080, {avcc(), box("clap", clap)}), 1));
+  CHECK(t.clean_aperture == std::vector<uint32_t>{1900, 1, 1060, 1, 10, 1, 20, 1});
+}
+
+TEST_CASE("tracks: esds ASC with an extended audioObjectType and an explicit sample rate",
+          "[container][tracks][fast]") {
+  const Bytes asc = {248, 94, 0, 96, 114, 64};  // aot 34 (escape), explicit 24-bit rate 12345, 2 channels
+  const auto t = only_track(trak(1, "soun", audio_entry("mp4a", 0, 0, {esds_custom(0x40, 0, {}, asc)}), 1));
+  CHECK(t.codec_string == "mp4a.40.34");
+  CHECK(t.sample_rate == 12345.0);
+  CHECK(t.channel_count == 2);
+}
+
+TEST_CASE("tracks: esds ES_Descriptor optional fields are skipped", "[container][tracks][fast]") {
+  const Bytes asc = {0x12, 0x10};                     // AAC-LC, 44.1 kHz, 2 channels
+  Bytes optional_fields = {0, 7};                     // dependsOn_ES_ID
+  put_all(optional_fields, Bytes{3, 'u', 'r', 'l'});  // URL
+  put_all(optional_fields, Bytes{0, 9});              // OCR_ES_ID
+  const auto t =
+      only_track(trak(1, "soun", audio_entry("mp4a", 0, 0, {esds_custom(0x40, 0xE0, optional_fields, asc)}), 1));
+  CHECK(t.codec_string == "mp4a.40.2");
+  CHECK(t.sample_rate == 44100.0);
+  CHECK(t.channel_count == 2);
+}
+
+TEST_CASE("tracks: truncated AudioSpecificConfigs keep what was read", "[container][tracks][fast]") {
+  const std::vector<Bytes> ascs = {
+      Bytes{248},      // escape without the extension bits
+      Bytes{248, 64},  // escape and extension, no sampling index
+      Bytes{16},       // aot only
+      Bytes{23, 128},  // index 15 without the 24-bit rate
+      Bytes{18, 0},    // index 4 (44.1 kHz) without ... channels still present as 0
+  };
+  for (const Bytes& asc : ascs) {
+    CAPTURE(asc);
+    const auto t = only_track(trak(1, "soun", audio_entry("mp4a", 2, 0, {esds_custom(0x40, 0, {}, asc)}), 1));
+    CHECK(t.codec == ovt::fb::Codec::Unknown);
+    CHECK(t.channel_count == 2);
+  }
+  const auto no_dsi =
+      only_track(trak(1, "soun", audio_entry("mp4a", 2, 48000, {esds_custom(0x40, 0, {}, {}, false)}), 1));
+  CHECK(no_dsi.codec_string == "mp4a.40");
+}
+
+TEST_CASE("tracks: Opus sample rate comes from dOps when the entry has none", "[container][tracks][fast]") {
+  Bytes dops = {0, 2, 0, 0};
+  put(dops, 48000, 4);
+  put(dops, 0, 3);
+  const auto t = only_track(trak(1, "soun", audio_entry("Opus", 2, 0, {box("dOps", dops)}), 1));
+  CHECK(t.sample_rate == 48000.0);
+}
+
+TEST_CASE("tracks: elng overrides the mdhd language and stz2 gives the sample count", "[container][tracks][fast]") {
+  Bytes elng_payload;
+  put_str(elng_payload, "en-US");
+  elng_payload.push_back(0);
+  Bytes stz2_payload;
+  put(stz2_payload, 4, 4);  // reserved(24) + field_size 4
+  put(stz2_payload, 3, 4);  // sample_count
+  put_all(stz2_payload, Bytes{0x11, 0x10});
+  const Bytes stbl =
+      box("stbl", cat({stsd(visual_entry("avc1", 640, 360, {avcc()})), full_box("stz2", 0, stz2_payload)}));
+  const Bytes mdia =
+      box("mdia", cat({mdhd(30000, 90000), full_box("elng", 0, elng_payload), hdlr("vide"), box("minf", stbl)}));
+  const auto t = only_track(box("trak", cat({tkhd(1, 3), mdia})));
+  CHECK(t.language == "en-US");
+  CHECK(t.sample_count == 3);
+}

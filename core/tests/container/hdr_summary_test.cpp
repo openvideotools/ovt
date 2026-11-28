@@ -859,3 +859,74 @@ TEST_CASE("FR-CNT-102: syn_h265_main10_pq_hdr is HDR10 with MaxCLL 1000 / MaxFAL
 }
 
 }  // namespace
+
+// ---- H.264 parameter sets and in-band units ----
+
+namespace {
+
+// A 1280x720 Main-profile SPS with a VUI colour description.
+Bytes avc_sps(unsigned cp, unsigned tc, unsigned mc, bool full_range = false) {
+  BitWriter w;
+  w.u(8, 0x67).u(8, 77).u(8, 0).u(8, 40);   // nal_unit_type 7, Main, no constraint flags, level 4.0
+  w.ue(0).ue(0).ue(2).ue(1).u(1, 0);        // sps_id, log2_max_frame_num, poc type 2, refs, gaps
+  w.ue(79).ue(44).u(1, 1).u(1, 1).u(1, 0);  // size, frame_mbs_only, direct_8x8, no cropping
+  w.u(1, 1);                                // vui_parameters_present_flag
+  w.u(1, 0).u(1, 0);                        // aspect ratio, overscan
+  w.u(1, 1).u(3, 5).u(1, full_range ? 1 : 0).u(1, 1).u(8, cp).u(8, tc).u(8, mc);
+  w.u(1, 0).u(1, 0).u(1, 0).u(1, 0).u(1, 0).u(1, 0);  // chroma loc, timing, nal hrd, vcl hrd, pic_struct, restriction
+  w.trailing();
+  return with_epb(w.bytes(), 1);
+}
+
+Bytes avcc_record(const Bytes& sps) {
+  Bytes rec{1, 77, 0, 40, 0xFF, static_cast<uint8_t>(sps.empty() ? 0xE0 : 0xE1)};
+  if (!sps.empty()) {
+    rec = cat({rec, be(sps.size(), 2), sps});
+  }
+  rec.push_back(0);  // numOfPictureParameterSets
+  return box("avcC", rec);
+}
+
+}  // namespace
+
+TEST_CASE("avcC with an SPS: the VUI colour description is the bitstream colour", "[container][hdr][fast]") {
+  const Run r = summarize(visual_entry("avc1", cat({avcc_record(avc_sps(9, 16, 9, true)), colr(9, 16, 9)})));
+  const auto* sps = signal(r, "sps_vui");
+  REQUIRE(sps != nullptr);
+  CHECK(sps->box_offset >= 0);
+  CHECK(sps->sample_index == -1);
+}
+
+TEST_CASE("an in-band H.264 SPS and a Dolby Vision RPU NAL (type 28) are found by the sample probe",
+          "[container][hdr][fast]") {
+  const Bytes rpu{0x7C, 0x01, 0x19, 0x08, 0x09, 0x00};  // nal_ref_idc 3, nal_unit_type 28
+  const Bytes idr{0x65, 0x88, 0x84, 0x00};
+  const Bytes entry = visual_entry("dva1", cat({avcc_record({}), dovi_box("dvcC", 9, 2), colr(9, 16, 9)}));
+  const Run r = summarize(probed(entry, {length_prefixed({avc_sps(9, 16, 9), rpu, idr})}));
+  const auto* sps = signal(r, "sps_vui");
+  REQUIRE(sps != nullptr);
+  CHECK(sps->sample_index == 0);
+  CHECK(sps->unit_index == 0);
+  const auto* rpu_signal = signal(r, "nal_28_rpu");
+  REQUIRE(rpu_signal != nullptr);
+  CHECK(rpu_signal->unit_index == 1);
+  CHECK(r.meta.dv_rpu_present);
+
+  // Without a dvav / dva1 entry type 28 is not a Dolby Vision RPU.
+  const Run plain =
+      summarize(probed(visual_entry("avc1", cat({avcc_record({}), colr(9, 16, 9)})), {length_prefixed({rpu, idr})}));
+  CHECK(signal(plain, "nal_28_rpu") == nullptr);
+}
+
+TEST_CASE("an in-band H.265 SPS and a Dolby Vision enhancement layer NAL (type 63) are found by the sample probe",
+          "[container][hdr][fast]") {
+  const Bytes el{0x7E, 0x01, 0xAA, 0xBB};
+  const Bytes entry = visual_entry("hvc1", cat({hvcc({}), colr(9, 16, 9)}));
+  const Run r = summarize(probed(entry, {length_prefixed({hevc_sps(9, 16, 9), el, kIdr})}));
+  const auto* sps = signal(r, "sps_vui");
+  REQUIRE(sps != nullptr);
+  CHECK(sps->sample_index == 0);
+  const auto* layer = signal(r, "nal_63_el");
+  REQUIRE(layer != nullptr);
+  CHECK(layer->unit_index == 1);
+}

@@ -774,3 +774,47 @@ TEST_CASE("bento4_widevine: the Widevine pssh names the system and its key_id eq
   CHECK(field(*widevine, "Data/content_id").svalue == "syn_mp4_cenc_widevine");
   check_no_errors(w, {"pssh", "schm", "tenc", "senc"});
 }
+
+TEST_CASE("pssh Widevine: algorithm names and every known field with the wrong wire type",
+          "[container][decoders][cenc][fast]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  const auto widevine = [&](const Bytes& data) {
+    return run("pssh", full(0, 0, cat({kWidevineId, be(data.size(), 4), data})), ctx);
+  };
+  CHECK(field(widevine(Bytes{0x08, 0x00}).node, "Data/algorithm").svalue == "UNENCRYPTED");
+  CHECK(field(widevine(Bytes{0x08, 0x09}).node, "Data/algorithm").svalue == "unknown");
+
+  // Varint where a length-delimited field is expected (2, 3, 4, 6, 8) and the reverse (7, 9).
+  const Bytes wrong = cat({Bytes{0x10, 0x05}, Bytes{0x18, 0x05}, Bytes{0x20, 0x05}, Bytes{0x30, 0x05},
+                           Bytes{0x40, 0x05}, Bytes{0x3A, 0x01, 0x07}, Bytes{0x4A, 0x01, 0x07}});
+  const Decoded w = widevine(wrong);
+  for (const char* name : {"Data/key_id[0]", "Data/provider", "Data/content_id", "Data/policy", "Data/grouped_license",
+                           "Data/crypto_period_index", "Data/protection_scheme"}) {
+    CAPTURE(name);
+    CHECK_FALSE(has_field(w.node, name));
+  }
+  for (const char* name : {"Data/field_2", "Data/field_3", "Data/field_4", "Data/field_6", "Data/field_8",
+                           "Data/field_7", "Data/field_9"}) {
+    CAPTURE(name);
+    CHECK(has_field(w.node, name));
+  }
+}
+
+TEST_CASE("pssh PlayReady: device ID records and non-ASCII WRMHEADER text", "[container][decoders][cenc][fast]") {
+  iso::BoxContext ctx = ctx_in("moov");
+  // LA_URL with U+00E9 (two UTF-8 bytes), U+20AC (three), U+1F600 as a surrogate pair (four) and a lone high
+  // surrogate (U+FFFD).
+  const std::vector<uint16_t> text = {'<',    'L',    'A', '_', 'U', 'R', 'L', '>', 0x00E9, 0x20AC, 0xD83D,
+                                      0xDE00, 0xD800, '<', '/', 'L', 'A', '_', 'U', 'R',    'L',    '>'};
+  Bytes xml16;
+  for (const uint16_t u : text) {
+    xml16.push_back(static_cast<uint8_t>(u & 0xFFU));
+    xml16.push_back(static_cast<uint8_t>(u >> 8U));
+  }
+  const Bytes rec1 = cat({le(1, 2), le(xml16.size(), 2), xml16});
+  const Bytes rec2 = cat({le(2, 2), le(2, 2), Bytes{0xAB, 0xCD}});
+  const Bytes object = cat({le(10 + rec1.size() + rec2.size(), 4), le(2, 2), rec1, rec2});
+  const Decoded p = run("pssh", full(0, 0, cat({kPlayReadyId, be(object.size(), 4), object})), ctx);
+  CHECK(field(p.node, "Data/record[0]/LA_URL").svalue == "\xC3\xA9\xE2\x82\xAC\xF0\x9F\x98\x80\xEF\xBF\xBD");
+  CHECK(field(p.node, "Data/record[1]/record_type").svalue == "device ID");
+}
