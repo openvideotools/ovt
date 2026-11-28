@@ -182,13 +182,36 @@ struct DpbStepResult {
   std::vector<IndexDiagnostic> diagnostics;
 };
 
+/// A list entry during construction: a field (or frame) of Dpb's store `store`; store -1 is "no reference picture".
+struct ListRef {
+  int32_t store = -1;
+  Parity parity = Parity::Frame;
+  friend bool operator==(const ListRef&, const ListRef&) = default;
+};
+
+/// Working vectors of one list construction. The Dpb owns one, so that a step in steady state reuses the capacity of
+/// the previous one and allocates nothing (§7.4.6).
+struct ListScratch {
+  std::vector<int32_t> st;  // the short-term frame stores, ordered
+  std::vector<int32_t> lt;  // the long-term frame stores, ordered
+  std::vector<int32_t> lo;  // B slices: stores before the current picture
+  std::vector<int32_t> hi;  // B slices: stores after it
+  std::vector<int32_t> order0;
+  std::vector<int32_t> order1;
+  std::array<std::vector<ListRef>, 2> lists;
+};
+
 class Dpb {
  public:
   /// Runs the §7.4.4 step for the picture `decode_index` whose first slice header is `sh` (unit header `nal`, active
   /// SPS `sps`, order counts `poc` from PocState). `second_field_of` is the decode index of the first field when the
   /// picture is the second field of a complementary field pair (FrameRec.second_field_of), else -1.
-  DpbStepResult step(int32_t decode_index, const syntax::h264::NalHeader& nal, const syntax::h264::SliceHeader& sh,
-                     const syntax::h264::Sps& sps, const PocResult& poc, int32_t second_field_of);
+  ///
+  /// The result is owned by the Dpb and valid until the next step(): its vectors keep their capacity from step to
+  /// step, so that a step allocates nothing once they have grown (§7.4.6).
+  const DpbStepResult& step(int32_t decode_index, const syntax::h264::NalHeader& nal,
+                            const syntax::h264::SliceHeader& sh, const syntax::h264::Sps& sps, const PocResult& poc,
+                            int32_t second_field_of);
 
   /// Frame stores holding at least one field marked "used for reference" (non-existing frames included).
   [[nodiscard]] size_t reference_frames() const noexcept { return stores_.size(); }
@@ -219,6 +242,8 @@ class Dpb {
                     size_t current, DpbStepResult& out);
   void drop_unused();
 
+  DpbStepResult result_;                  // the last step's result, reused
+  ListScratch scratch_;                   // list-construction working vectors, reused
   std::vector<FrameStore> stores_;        // reference frame stores, in insertion order
   int32_t max_long_term_frame_idx_ = -1;  // MaxLongTermFrameIdx; -1 is "no long-term frame indices"
   bool have_prev_ref_ = false;

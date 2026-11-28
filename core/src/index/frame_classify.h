@@ -26,7 +26,7 @@ namespace ovt::index {
 
 /// S6 "AV1" with the §7.4.3 table: `r` is the slot step of the frame (for show_existing_frame it carries the
 /// loaded slot), `current_frame_id` the header's value. declared_refs and dpb_after come from `r` (WI-1.124).
-void classify_av1(FrameRec& f, const Av1FrameRecord& r, const syntax::av1::SequenceHeader& seq,
+void classify_av1(FrameRec& f, RefArena& refs, const Av1FrameRecord& r, const syntax::av1::SequenceHeader& seq,
                   uint32_t current_frame_id);
 
 /// S6 "H.264" for the picture whose first slice is `sh`: `bd` is that slice's §7.3.9 decision, `poc` its

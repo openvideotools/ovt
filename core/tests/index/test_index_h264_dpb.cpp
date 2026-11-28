@@ -509,7 +509,7 @@ void check_reflist_vs_jm(std::string_view id) {
     std::array<std::vector<int64_t>, 2> ours;
     std::vector<int32_t> stores;
     for (size_t x = 0; x < 2; ++x) {
-      for (const idx::RefSlotRec& r : f.ref_lists[x]) {
+      for (const idx::RefSlotRec& r : ix->core.refs.get_slots(f.ref_lists[x])) {
         ours[x].push_back(r.poc);
         if (r.decode_index >= 0 && std::ranges::find(stores, r.decode_index) == stores.end()) {
           stores.push_back(r.decode_index);
@@ -518,7 +518,8 @@ void check_reflist_vs_jm(std::string_view id) {
     }
     const std::string theirs = describe(jm[i].structure, jm[i].poc, jm[i].lists);
     const std::string mine = describe(structure_char(f.structure), f.poc, ours);
-    if ((mine != theirs || stores != f.declared_refs) && ++differ <= 5) {
+    const std::span<const int32_t> declared = ix->core.refs.get(f.declared_refs);
+    if ((mine != theirs || !std::ranges::equal(stores, declared)) && ++differ <= 5) {
       UNSCOPED_INFO("picture " << i << ": JM " << theirs << " | OVT " << mine);
     }
   }
@@ -571,7 +572,7 @@ TEST_CASE("h264_dpb: MR6_BT_B and MR9_BT_B stay within max_num_ref_frames", "[in
       REQUIRE_FALSE(ix->core.frames.empty());
       for (const idx::FrameRec& f : ix->core.frames) {
         INFO("frame " << f.decode_index);
-        CHECK(f.dpb_after.size() <= ix->max_num_ref_frames);
+        CHECK(f.dpb_after.size <= ix->max_num_ref_frames);
       }
       CHECK(count_code(ix->core, "SYN-H264-0105") == 0);
       CHECK(count_code(ix->core, "SYN-H264-0106") == 0);

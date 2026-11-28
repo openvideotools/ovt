@@ -76,10 +76,12 @@ flatbuffers::Offset<fb::Unit> write_unit(flatbuffers::FlatBufferBuilder& fbb, co
 }
 
 flatbuffers::Offset<fb::FrameInfo> write_frame(flatbuffers::FlatBufferBuilder& fbb, const FrameRec& f,
-                                               const SampleTiming& t) {
+                                               const RefArena& refs, const SampleTiming& t) {
   const auto units = fbb.CreateVector(f.units);
-  const auto declared_refs = f.declared_refs.empty() ? 0 : fbb.CreateVector(f.declared_refs);
-  const auto dpb_after = f.dpb_after.empty() ? 0 : fbb.CreateVector(f.dpb_after);
+  const std::span<const int32_t> declared = refs.get(f.declared_refs);
+  const std::span<const int32_t> after = refs.get(f.dpb_after);
+  const auto declared_refs = declared.empty() ? 0 : fbb.CreateVector(declared.data(), declared.size());
+  const auto dpb_after = after.empty() ? 0 : fbb.CreateVector(after.data(), after.size());
   const fb::FrameId id(f.decode_index, f.display_index);
   fb::FrameInfoBuilder b(fbb);
   b.add_id(&id);
@@ -334,7 +336,7 @@ std::vector<uint8_t> StreamIndexBuilder::Impl::serialise(std::span<const uint8_t
   std::vector<flatbuffers::Offset<fb::FrameInfo>> frames;
   frames.reserve(core.frames.size());
   for (size_t i = 0; i < core.frames.size(); ++i) {
-    frames.push_back(write_frame(fbb, core.frames[i], timing[i]));
+    frames.push_back(write_frame(fbb, core.frames[i], core.refs, timing[i]));
   }
   const auto hash_off = fbb.CreateVector(source_hash.data(), source_hash.size());
   const auto units_off = fbb.CreateVector(units);
