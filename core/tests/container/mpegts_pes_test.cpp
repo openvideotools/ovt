@@ -634,7 +634,7 @@ TEST_CASE("reader: handler and codec of each PES stream follow its stream_type",
       {0x107, Codec::Unknown, HandlerType::Unknown}};
   for (const auto& [pid, codec, handler] : expected) {
     CAPTURE(pid);
-    const auto it = std::ranges::find_if(*t->tracks(), [pid = pid](const auto* tr) { return tr->track_id() == pid; });
+    const auto it = std::ranges::find_if(*t->tracks(), [want = pid](const auto* tr) { return tr->track_id() == want; });
     REQUIRE(it != t->tracks()->end());
     CHECK((*it)->codec() == codec);
     CHECK((*it)->handler() == handler);
