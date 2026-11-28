@@ -28,6 +28,10 @@
 #include <string_view>
 #include <vector>
 
+extern "C" {
+#include <libavutil/opt.h>
+}
+
 #include "demux/demuxer.h"
 #include "io/memory_file.hpp"
 #include "ovt/cxx/io/random_access_file.hpp"
@@ -726,6 +730,21 @@ TEST_CASE("demux: a probe that picks a demuxer outside §8.7.2 rule 5 is OVT_E_U
     const auto r = Demuxer::open(memory(msf), hint);
     REQUIRE_FALSE(r.has_value());
     CHECK(r.status() == OVT_E_UNSUPPORTED);
+  }
+}
+
+TEST_CASE("demux: a probed ISOBMFF demuxer gets the §8.7.2 rule 4 options", "[demux][fast]") {
+  // With hint "" the demuxer comes from the probe; the options must match what the explicit hint gets.
+  const Mp4 m = make_mp4();
+  for (const std::string_view hint : {"isobmff", ""}) {
+    INFO("hint '" << hint << "'");
+    auto d = open_ok(memory(m.bytes), hint);
+    int64_t v = -1;
+    REQUIRE(av_opt_get_int(d->raw()->priv_data, "advanced_editlist", 0, &v) >= 0);
+    CHECK(v == 0);
+    REQUIRE(av_opt_get_int(d->raw()->priv_data, "export_all", 0, &v) >= 0);
+    CHECK(v == 1);
+    CHECK(d->raw()->probesize == int64_t{5} << 20U);
   }
 }
 
