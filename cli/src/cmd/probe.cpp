@@ -165,6 +165,7 @@ struct Probe {
   const fb::ContainerTree* tree = nullptr;  // valid until the next expand
   BoxList boxes;                            // the printed top level (all, or the --offset box)
   Expand expand;
+  std::optional<std::uint64_t> offset;            // --offset
   std::set<const fb::BoxNode*> expanded;          // --expand <fourcc list>: the boxes that show fields and children
   bool show_boxes = true;                         // tree.root: always without a view flag, else only with --boxes
   std::vector<std::vector<std::uint8_t>> tracks;  // TrackInfo buffers (every view flag reads them)
@@ -200,20 +201,56 @@ void refresh(Probe& p) {
   p.tree = b.data == nullptr ? nullptr : flatbuffers::GetRoot<fb::ContainerTree>(b.data);
 }
 
+bool contains(const fb::ByteSpan& s, std::uint64_t off) {
+  return s.offset() <= off && off - s.offset() < s.length();
+}
+
+// With --offset (#835): the selected box is depth 1. Returns the depth of a box relative to the selected one (0 for a
+// box outside it); a strict ancestor of the selected offset is depth 0 but always expanded, so the box can be found.
+struct OffsetScope {
+  std::optional<std::uint64_t> offset;
+  int base = 0;                        // file depth of the selected box, 0 while it is not in the tree yet
+  const fb::ByteSpan* span = nullptr;  // its file span
+
+  OffsetScope(const Probe& p, std::optional<std::uint64_t> off) : offset(off) {
+    if (offset) {
+      walk(p.tree->root(), 1, [&](const fb::BoxNode& b, int depth) {
+        if (base == 0 && b.file_span() != nullptr && b.file_span()->offset() == *offset) {
+          base = depth;
+          span = b.file_span();
+        }
+      });
+    }
+  }
+  [[nodiscard]] bool ancestor(const fb::BoxNode& b) const {
+    return offset && contains(*b.file_span(), *offset) && b.file_span()->offset() != *offset;
+  }
+  [[nodiscard]] int depth(const fb::BoxNode& b, int file_depth) const {
+    if (!offset) {
+      return file_depth;
+    }
+    return span != nullptr && contains(*span, b.file_span()->offset()) ? file_depth - base + 1 : 0;
+  }
+};
+
 // The offsets of the boxes still carrying CNT-0007 (mdat never) that the depth or fourcc-list selector reaches and
 // that were not tried yet. A fourcc list that names a box type not in the tree reaches every lazy box, since the type
-// may sit inside one.
+// may sit inside one. With --offset, the ancestors of the selected box and the boxes below it count.
 std::vector<std::uint64_t> expansion_round(const Probe& p, std::set<std::uint64_t>& tried) {
   std::set<std::string_view> present;
   walk(p.tree->root(), 1, [&](const fb::BoxNode& b, int) { present.insert(sv(b.fourcc())); });
   const bool any_missing = std::ranges::any_of(p.expand.fourccs, [&](const auto& cc) { return !present.contains(cc); });
+  const OffsetScope scope(p, p.offset);
   std::vector<std::uint64_t> todo;
-  walk(p.tree->root(), 1, [&](const fb::BoxNode& b, int depth) {
+  walk(p.tree->root(), 1, [&](const fb::BoxNode& b, int file_depth) {
     if (!is_unexpanded(b) || sv(b.fourcc()) == "mdat" || b.file_span() == nullptr) {
       return;
     }
-    const bool wanted = p.expand.kind == Expand::Kind::Depth ? depth <= p.expand.depth
-                                                             : any_missing || p.expand.fourccs.contains(sv(b.fourcc()));
+    const int depth = scope.depth(b, file_depth);
+    const bool wanted =
+        scope.ancestor(b) || (depth > 0 && (p.expand.kind == Expand::Kind::Depth
+                                                ? depth <= p.expand.depth
+                                                : any_missing || p.expand.fourccs.contains(sv(b.fourcc()))));
     if (wanted && tried.insert(b.file_span()->offset()).second) {
       todo.push_back(b.file_span()->offset());
     }
@@ -736,6 +773,7 @@ ProbeOutcome run_probe(const ProbeArgs& a, const Globals& g, std::FILE* out) {
   }
 
   p.expand = a.tree ? Expand{} : parse_expand(a.expand).value_or(Expand{});  // checked by check_probe_args
+  p.offset = a.offset;
   p.show_boxes = a.boxes || a.tree || a.offset || !view_flag(a);
   if (const ovt_status st = drive_expansion(p, job.get()); st != OVT_OK) {
     return fail(st);

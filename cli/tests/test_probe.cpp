@@ -460,3 +460,40 @@ TEST_CASE("probe: json keys follow the schema field order (§6.8.1)", "[cli][pro
   REQUIRE(root.code == 0);
   CHECK(in_order(root.out, {"schema_version", "tree", "format", "tracks", "file_size", "file_name", "is_fragmented"}));
 }
+
+namespace {
+
+// The file offsets of the last moof of `f` and of its traf, as text for --offset.
+std::pair<std::string, std::string> last_moof_and_traf(const fs::path& f) {
+  const json all = run_json(f).at("result").at("root");
+  const json& moof = all.at(all.size() - 2);  // the last moof (then its mdat)
+  const json& traf = moof.at("children").at(1);
+  CHECK(moof.at("fourcc") == "moof");
+  CHECK(traf.at("fourcc") == "traf");
+  const auto at = [](const json& b) { return std::to_string(b.at("file_span").at("offset").get<std::uint64_t>()); };
+  return {at(moof), at(traf)};
+}
+
+}  // namespace
+
+// #835: with --offset the selected box is depth 1. More than 64 fragments leave the moofs unexpanded (CNT-0007)
+// until asked.
+TEST_CASE("probe: with --offset, --expand N counts from the selected box", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(70));
+  const auto [moof, traf] = last_moof_and_traf(f.path);
+  const json sel = run_json(f.path, {"--offset", moof, "--expand", "2"}).at("result").at("root");
+  REQUIRE(sel.size() == 1);
+  CHECK(deepest_with_fields(sel) == 2);  // moof and its children (mfhd, traf), not the traf's children
+  const json inner = run_json(f.path, {"--offset", traf, "--expand", "2"}).at("result").at("root");
+  REQUIRE(inner.size() == 1);
+  CHECK(deepest_with_fields(inner) == 2);  // traf is a container: its children (tfhd, tfdt, trun) carry the fields
+}
+
+TEST_CASE("probe: --offset inside a lazy moof expands the moof on the way", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(70));
+  const std::string traf = last_moof_and_traf(f.path).second;
+  const json bare = run_json(f.path, {"--offset", traf, "--expand", "none"}).at("result").at("root");
+  REQUIRE(bare.size() == 1);
+  CHECK(bare[0].at("fourcc") == "traf");
+  CHECK(deepest_with_fields(bare) == 0);
+}
