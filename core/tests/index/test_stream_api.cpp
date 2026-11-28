@@ -199,7 +199,6 @@ TEST_CASE("stream C API: NULL arguments and functions of later work items", "[in
   CHECK(ovt_stream_rap_before(o.stream, 0) == -1);
   ovt_ColorDescription color{};
   CHECK(ovt_stream_index_summary(o.stream, &buf) == OVT_E_UNSUPPORTED);
-  CHECK(ovt_stream_unit_bytes(o.stream, 0, &buf, nullptr) == OVT_E_UNSUPPORTED);
   CHECK(ovt_stream_unit_syntax(o.stream, 0, &buf) == OVT_E_INVALID_ARG);  // before build_index (WI-1.125)
   CHECK(ovt_stream_frame_info(o.stream, 0, &buf) == OVT_E_UNSUPPORTED);
   CHECK(ovt_stream_color(o.stream, &color) == OVT_E_UNSUPPORTED);

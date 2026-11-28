@@ -1,0 +1,48 @@
+{
+  "brands": [
+    "isom",
+    "iso6",
+    "mp41"
+  ],
+  "duration_s": 1.001,
+  "encrypted": false,
+  "fast_start": true,
+  "format": "isobmff",
+  "fragmented": false,
+  "size_bytes": 490,
+  "tracks": [
+    {
+      "bitrate_bps": 982058,
+      "codec": "H264",
+      "codec_string": "avc1.64001F",
+      "coded_size": {
+        "h": 1080,
+        "w": 1920,
+        "x": 0,
+        "y": 0
+      },
+      "color": {
+        "full_range": 0,
+        "has_dolby_vision": false,
+        "has_hdr10plus": false,
+        "matrix": 2,
+        "max_cll": 0,
+        "max_fall": 0,
+        "mdcv_max_luminance": 0,
+        "primaries": 2,
+        "transfer": 2
+      },
+      "crop": {
+        "h": 1080,
+        "w": 1920,
+        "x": 0,
+        "y": 0
+      },
+      "fps": "30000/1001",
+      "handler": "vide",
+      "index": 0,
+      "language": "eng",
+      "sample_count": 30
+    }
+  ]
+}

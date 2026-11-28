@@ -16,6 +16,7 @@
 #include "container/format.hpp"
 #include "ovt/container.h"
 #include "ovt/cxx/io/random_access_file.hpp"
+#include "ovt/cxx/jobs.hpp"
 
 namespace ovt::container {
 
@@ -50,6 +51,25 @@ class Reader {
     (void)count;
     return {};
   }
+  // FragmentTimeline FlatBuffer of one track (chapter 08 §8.4.3); empty when unsupported. Throws ovt::Cancelled when
+  // `cancel` is requested.
+  [[nodiscard]] virtual std::vector<uint8_t> fragments(int track_index, jobs::Cancel& cancel) const {
+    (void)track_index;
+    (void)cancel;
+    return {};
+  }
+  // TrackInfo FlatBuffer of one track (chapter 08 §8.1.3); empty when the reader has no such track.
+  [[nodiscard]] virtual std::vector<uint8_t> track_info(int track_index) const {
+    (void)track_index;
+    return {};
+  }
+  // HdrMetadata FlatBuffer of one track (chapter 08 §8.4.6); empty when unsupported. Throws ovt::Cancelled when
+  // `cancel` is requested and io::IoError on an I/O failure.
+  [[nodiscard]] virtual std::vector<uint8_t> hdr_metadata(int track_index, jobs::Cancel& cancel) const {
+    (void)track_index;
+    (void)cancel;
+    return {};
+  }
   // TsTiming FlatBuffer (MPEG-TS reader); empty otherwise.
   [[nodiscard]] virtual std::vector<uint8_t> ts_timing() const { return {}; }
   // TsReport FlatBuffer (TR 101 290 priority 1 and 2 checks, MPEG-TS reader); empty otherwise.
@@ -75,6 +95,12 @@ namespace ovt::container {
 // Re-serialises the handle's tree when an expand marked it stale; a no-op otherwise. The caller holds
 // bytes.tree_mutex(). Throws what Reader::tree() throws (std::bad_alloc).
 void refresh_tree(ovt_Container& c);
+// ovt_container_expand without the C boundary: expands the box at `box_offset` under the tree lock and marks the tree
+// stale when the reader changed it. OVT_E_UNSUPPORTED without a reader. May throw (std::bad_alloc).
+ovt_status expand_box(ovt_Container& c, uint64_t box_offset);
+// Body of ovt_container_expand_all (WI-1.235): expands every box except `mdat` payloads, checking `cancel` before each
+// box (throws ovt::Cancelled) and reporting progress to `sink`. OVT_OK once no unexpanded box is left.
+ovt_status expand_all(ovt_Container& c, jobs::Cancel& cancel, const jobs::Pool::ProgressSink& sink);
 }  // namespace ovt::container
 
 struct ovt_Container {
