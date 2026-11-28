@@ -580,6 +580,7 @@ Scheduled WIs per phase: 0 → 90, 1 → 119, 2 → 49, 3 → 30, 4 → 63, A �
 | WI-1.220 | 8 §8.10 | Implement `EditList` and the `elst ↔ tfdt` sanity check | S | 1 | M1.3 | WI-1.219 | — |
 | WI-1.221 | 8 §8.10 | Implement the CENC per-sample encryption map and hex shading ranges | M | 1 | M1.3 | WI-1.213, WI-1.219 | FR-CNT-008 |
 | WI-1.222 | 8 §8.10 | Implement brand and profile checks | M | 1 | M1.3 | WI-1.220, WI-1.221 | — |
+| WI-1.222b | 8 §8.10 | Deep brand checks on sample bytes (split from WI-1.222, §16.2.6) | S | 1 | M1.3 | WI-1.222, WI-1.231 | — |
 | WI-1.223 | 8 §8.10 | Implement `HdrMetadata` (box-level + bitstream probe) | M | 1 | M1.3 | WI-1.208, WI-1.218, WI-1.231, WI-1.110, WI-1.114, WI-1.116 | FR-CNT-102, FR-HDR-001 |
 | WI-1.224 | 8 §8.10 | Implement the validation driver, diagnostics table and broken-corpus coverage test | M | 1 | M1.3 | WI-1.218, WI-1.219, WI-1.220, WI-1.221, WI-1.222, WI-1.223 | FR-CNT-009, FR-CNT-101, FR-GEN-006, NFR-013, NFR-036 |
 | WI-1.225 | 8 §8.10 | Implement the IVF reader | S | 1 | M1.1 | WI-1.200 | FR-CNT-010 |

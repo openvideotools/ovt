@@ -8,16 +8,21 @@ add_executable(
   ovt_tests_container
   annexb_test.cpp
   box_walk_test.cpp
+  brands_test.cpp
   byte_service_test.cpp
   c_api_test.cpp
   decoders_fragment_boxes_test.cpp
   decoders_codec_config_test.cpp
   decoders_colour_test.cpp
+  decoders_encryption_test.cpp
   decoders_movie_test.cpp
   decoders_sample_entries_test.cpp
   decoders_sample_tables_test.cpp
+  diag_coverage_test.cpp
+  edit_list_test.cpp
   field_builder_test.cpp
   fragments_test.cpp
+  hdr_summary_test.cpp
   ivf_test.cpp
   lazy_test.cpp
   m3u8_robustness_test.cpp
@@ -26,10 +31,12 @@ add_executable(
   mxf_placeholder_test.cpp
   obu_robustness_test.cpp
   obu_test.cpp
+  probe_test.cpp
   psi_test.cpp
   rawyuv_test.cpp
   registry_gen_test.cpp
   registry_lookup_test.cpp
+  sample_table_test.cpp
   sniff_test.cpp
   test_container_annexb.cpp
   test_container_ivf.cpp
@@ -38,8 +45,10 @@ add_executable(
   mpegts_descriptors_sweep_test.cpp
   mpegts_pes_test.cpp
   tr101290_test.cpp
+  tracks_test.cpp
   ts_packets_robustness_test.cpp
   ts_packets_test.cpp
+  validate_test.cpp
   y4m_test.cpp)
 target_include_directories(ovt_tests_container PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/..")
 target_link_libraries(

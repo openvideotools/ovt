@@ -23,7 +23,7 @@ manifest's end state; each later work item adds its ports in the PR that first u
   manifest mode, so `cmake --preset <name>` runs `vcpkg install` for the preset's triplet into
   `build/vcpkg_installed/<triplet>/` before the project configures.
 - `vcpkg-configuration.json` adds the overlay directories: `third_party/vcpkg-triplets/` (the `*-ovt`
-  triplets, see `docs/dev/presets.md`) and `third_party/vcpkg-overlays/` (overlay ports; none yet).
+  triplets, see `docs/dev/presets.md`) and `third_party/vcpkg-overlays/` (overlay ports; see its README).
 - CMake finds each package with `ovt_find_package()` (`cmake/OvtThirdParty.cmake`), which also records the
   package's SPDX id and version for the licence manifest (`ovt_license_manifest` target).
 

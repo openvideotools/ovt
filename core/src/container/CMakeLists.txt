@@ -13,18 +13,28 @@ target_sources(
           isobmff/box_registry.cpp
           isobmff/box_registry.gen.cpp
           isobmff/box_walk.cpp
+          isobmff/brands.cpp
+          isobmff/brands_samples.cpp
           isobmff/decoders/fragment_boxes.cpp
           isobmff/decoders/codec_config.cpp
           isobmff/decoders/colour_hdr.cpp
+          isobmff/decoders/encryption.cpp
           isobmff/decoders/movie.cpp
+          isobmff/decoders/pssh_systems.cpp
           isobmff/decoders/sample_entries.cpp
           isobmff/decoders/sample_tables.cpp
+          isobmff/edit_list.cpp
           isobmff/field_builder.cpp
           isobmff/fragments.cpp
+          isobmff/hdr_summary.cpp
           isobmff/lazy.cpp
           isobmff/paged_span.cpp
+          isobmff/sample_table.cpp
+          isobmff/tracks.cpp
+          isobmff/validate.cpp
           diagnostics.cpp
           format_sniff.cpp
+          hex_dump.cpp
           ivf.cpp
           mpegts/descriptors.cpp
           mpegts/pes.cpp
