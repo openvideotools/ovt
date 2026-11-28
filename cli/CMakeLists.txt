@@ -21,6 +21,9 @@ endif()
 ovt_find_package(zstd SPDX "BSD-3-Clause OR GPL-2.0-only" TARGETS ${_ovt_zstd_targets})
 unset(_ovt_zstd_targets)
 
+# `ovt probe` (WI-1.503) compiles two self-contained core sources: the CNT-* registry of --list-diagnostics (until
+# ovt_container_list_diagnostics returns the DiagnosticRegistry table, #772, #829) and the hex layout of --bytes. They
+# read no core state; the shared library keeps its own hidden copies.
 add_library(
   ovt_cli_lib STATIC
   src/app.cpp
@@ -32,8 +35,11 @@ add_library(
   src/output/fb_writer.cpp
   src/output/csv_writer.cpp
   src/output/text_writer.cpp
-  src/output/tree_flatten.cpp)
-target_include_directories(ovt_cli_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${OVT_GENERATED_DIR}")
+  src/output/tree_flatten.cpp
+  "${PROJECT_SOURCE_DIR}/core/src/container/diagnostics.cpp"
+  "${PROJECT_SOURCE_DIR}/core/src/container/hex_format.cpp")
+target_include_directories(ovt_cli_lib PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src" "${OVT_GENERATED_DIR}"
+                           PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
 target_link_libraries(ovt_cli_lib PUBLIC ovt::core ${CLI11_TARGET} ${fmt_TARGET} ${flatbuffers_TARGET}
                       PRIVATE ovt::flags ovt_schemas ${nlohmann_json_TARGET} ${zstd_TARGET})
 target_compile_definitions(ovt_cli_lib PUBLIC "OVT_CLI_NAME_VALUE=\"${OVT_CLI_NAME}\""
@@ -90,6 +96,7 @@ if(OVT_BUILD_TESTS)
                                tests/test_info.cpp tests/test_probe.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
   target_link_libraries(ovt_tests_cli PRIVATE ovt_cli_lib ovt::flags ovt_schemas ovt_test_support
                                               ${nlohmann_json_TARGET} ${Catch2_TARGET})
+  target_include_directories(ovt_tests_cli PRIVATE "${PROJECT_SOURCE_DIR}/core/src")
   target_compile_definitions(ovt_tests_cli
                              PRIVATE "OVT_CLI_TEST_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/golden\"")
   ovt_set_license(ovt_tests_cli "GPL-3.0-or-later")

@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // `ovt probe` (chapter 12 §12.2.2, WI-1.503): the container box tree with every decoded field, plus the derived views
-// of chapter 08 on request. Part a: the tree with --expand and --offset.
+// of chapter 08 on request. Parts a and b: the tree with --expand and --offset, --tracks, --fragments, --bytes and
+// --list-diagnostics.
 
 #ifndef OVT_CLI_CMD_PROBE_H
 #define OVT_CLI_CMD_PROBE_H
@@ -34,13 +35,18 @@ struct ProbeArgs {
   bool boxes = false;
   bool tree = false;  // alias of --boxes --expand all
   std::optional<std::uint64_t> offset;
+  bool tracks = false;
+  bool fragments = false;
+  std::optional<int> track;  // the track of --fragments (default: the first video track)
+  std::string bytes;         // OFFSET:LEN
+  bool list_diagnostics = false;
 };
 
 // Adds `probe` to cli.app().
 void add_probe_command(Cli& cli, ProbeArgs& args);
 
 // Checks the flag combination before any output is opened (exit 2 when set).
-[[nodiscard]] std::optional<UsageIssue> check_probe_args(const ProbeArgs& args);
+[[nodiscard]] std::optional<UsageIssue> check_probe_args(const ProbeArgs& args, const Globals& g);
 
 struct ProbeOutcome {
   ExitCode code = ExitCode::Ok;

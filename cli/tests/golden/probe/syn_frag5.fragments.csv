@@ -1,0 +1,6 @@
+sequence_number,moof_offset,moof_size,base_data_offset,earliest_dts,duration,sample_count,data_offset,data_size
+1,574,136,574,0,400,4,710,72
+2,782,136,782,400,400,4,918,72
+3,990,136,990,800,400,4,1126,72
+4,1198,136,1198,1200,400,4,1334,72
+5,1406,136,1406,1600,400,4,1542,72

@@ -1,9 +1,9 @@
 // SPDX-FileCopyrightText: 2026 The Open Video Tools contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// WI-1.503 part a: `ovt probe` (chapter 12 §12.2.2) run in-process through ovt::cli::run(). The fast cases use a
-// fragmented MP4 built here (no corpus media is committed); the [needs-corpus] case runs acceptance test 4 on a corpus
-// file. Acceptance tests 2 and 4 are here; 1 and 5 (--fragments, --list-diagnostics) are part b, 3 (--hdr) part c.
+// WI-1.503 parts a and b: `ovt probe` (chapter 12 §12.2.2) run in-process through ovt::cli::run(). The fast cases use
+// a fragmented MP4 built here (no corpus media is committed); the [needs-corpus] cases run acceptance tests 1 and 4 on
+// the corpus files they name. Acceptance tests 1, 2, 4 and 5 are here; 3 (--hdr) is part c.
 // Goldens: cli/tests/golden/probe/ (OVT_UPDATE_GOLDEN=1 rewrites them).
 
 #include <unistd.h>
@@ -26,6 +26,7 @@
 
 #include "app.h"
 #include "completions.h"
+#include "container/diagnostics.h"
 #include "test_support/corpus.h"
 
 namespace {
@@ -224,9 +225,51 @@ Bytes read_file(const fs::path& p) {
   return {std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
 }
 
+// The top-level `moof` boxes of `file`, counted straight from the box headers.
+std::size_t count_moofs(const Bytes& file) {
+  std::size_t n = 0;
+  for (std::size_t at = 0; at + 8 <= file.size();) {
+    const std::size_t size = (std::size_t{file[at]} << 24U) | (std::size_t{file[at + 1]} << 16U) |
+                             (std::size_t{file[at + 2]} << 8U) | file[at + 3];
+    n += std::string_view(reinterpret_cast<const char*>(&file[at + 4]), 4) == "moof" ? 1U : 0U;
+    at += std::max<std::size_t>(size, 8);
+  }
+  return n;
+}
+
 }  // namespace
 
 // ---- acceptance tests ----------------------------------------------------------------------------------------
+
+TEST_CASE("probe AT1: --fragments -f csv has one row per moof", "[cli][probe][fast]") {
+  const Bytes mp4 = fragmented_mp4(5);
+  const TempFile f(mp4);
+  const Result r = invoke({f.path.string(), "--fragments", "-f", "csv"});
+  REQUIRE(r.code == 0);
+  const std::vector<std::string> rows = lines(r.out);
+  CHECK(rows.front() ==
+        "sequence_number,moof_offset,moof_size,base_data_offset,earliest_dts,duration,sample_count,data_offset,data_"
+        "size");
+  CHECK(rows.size() - 1 == count_moofs(mp4));
+  CHECK(rows.size() - 1 == 5);
+  check_golden("syn_frag5.fragments.csv", r.out);
+}
+
+TEST_CASE("probe AT1 on syn_mp4_frag: init and media segments joined", "[cli][probe][needs-corpus]") {
+  // #829: syn_mp4_frag is a DASH segment set, so the file probed is the init segment followed by the media segments
+  // in manifest order.
+  const fs::path dir = ovt::test::corpus_or_skip("syn_mp4_frag").parent_path();
+  Bytes joined;
+  for (const char* name : {"seg_init.mp4", "seg_1.m4s", "seg_2.m4s"}) {
+    const Bytes part = read_file(dir / name);
+    REQUIRE_FALSE(part.empty());
+    joined.insert(joined.end(), part.begin(), part.end());
+  }
+  const TempFile f(joined);
+  const Result r = invoke({f.path.string(), "--fragments", "-f", "csv"});
+  REQUIRE(r.code == 0);
+  CHECK(lines(r.out).size() - 1 == count_moofs(joined));
+}
 
 TEST_CASE("probe AT2: --expand 1 leaves every box below level 1 without fields", "[cli][probe][fast]") {
   const TempFile f(fragmented_mp4(3));
@@ -257,6 +300,23 @@ TEST_CASE("probe AT4 on a corpus file", "[cli][probe][needs-corpus]") {
   const Result b = invoke({file.string(), "-f", "json"});
   REQUIRE(a.code == 0);
   CHECK(a.out == b.out);
+}
+
+TEST_CASE("probe AT5: --list-diagnostics lists the registry without an input", "[cli][probe][fast]") {
+  // #829: the rows come from ovt::container::all_diagnostics() until ovt_container_list_diagnostics returns the
+  // DiagnosticRegistry table (#772).
+  const Result r = invoke({"--list-diagnostics", "-f", "csv"});
+  REQUIRE(r.code == 0);
+  CHECK(r.out == ovt::container::diagnostics_csv());
+  const auto registry = ovt::container::all_diagnostics();
+  const std::vector<std::string> rows = lines(r.out);
+  REQUIRE(rows.size() == registry.size() + 1);
+  CHECK(rows[1].starts_with(std::string(registry.front().code) + ","));
+  CHECK(rows.back().starts_with(std::string(registry.back().code) + ","));
+  const json j = json::parse(invoke({"--list-diagnostics", "-f", "json"}).out).at("result");
+  CHECK(j.at("family") == "CNT");
+  REQUIRE(j.at("entries").size() == registry.size());
+  CHECK(j.at("entries").at(0).at("code") == std::string(registry.front().code));
 }
 
 TEST_CASE("probe: text tree line format", "[cli][probe][fast]") {
@@ -334,14 +394,109 @@ TEST_CASE("probe: usage errors", "[cli][probe][fast]") {
   CHECK(bad.err.find("CLI-0001") != std::string::npos);
   CHECK(invoke({f.path.string(), "--expand", "moov,,trak"}).code == 2);
   CHECK(invoke({f.path.string(), "--hdr"}).code == 2);  // part c
+  CHECK(invoke({f.path.string(), "--tracks", "--fragments", "-f", "csv"}).code == 2);
+  CHECK(invoke({f.path.string(), "--bytes", "0:4", "--tracks"}).code == 2);  // standalone result (#829)
+  CHECK(invoke({f.path.string(), "--list-diagnostics", "--bytes", "0:4"}).code == 2);
+  CHECK(invoke({f.path.string(), "-t", "4", "--fragments"}).code == 2);
+  CHECK(invoke({"--list-diagnostics", "-f", "fb", "-o", (f.path.parent_path() / "x.fb").string()}).code == 2);
+}
+
+TEST_CASE("probe: a view flag makes the result the ContainerRoot image", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(3));
+  const json r = run_json(f.path, {"--tracks", "--fragments"}).at("result");
+  CHECK(r.at("schema_version") == 1);
+  CHECK(r.at("tree").at("format") == "isobmff");
+  CHECK_FALSE(r.at("tree").contains("root"));  // only with --boxes
+  CHECK(r.at("tree").at("tracks").at(0).at("handler") == "Video");
+  CHECK(r.at("fragment_timelines").at(0).at("fragments").size() == 3);
+  CHECK(r.at("is_fragmented") == true);
+  const json boxes = run_json(f.path, {"--fragments", "--boxes", "--expand", "1"}).at("result");
+  CHECK(deepest_with_fields(boxes.at("tree").at("root")) == 1);
+  CHECK_FALSE(boxes.at("tree").contains("tracks"));
+  const Result tracks = invoke({f.path.string(), "--tracks", "-f", "csv"});
+  REQUIRE(tracks.code == 0);
+  CHECK(lines(tracks.out).at(0) ==
+        "index,handler,codec,codec_string,coded_w,coded_h,crop_w,crop_h,chroma_format,"
+        "bit_depth_luma,bit_depth_chroma,fps,sample_count,bitrate_bps,language,encrypted");
+  CHECK(lines(tracks.out).at(1).starts_with("0,vide,H264,"));
+}
+
+TEST_CASE("probe: --bytes prints the hex layout, and base64 in json", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(1));
+  const Result r = invoke({f.path.string(), "--bytes", "0:24", "-f", "text"});
+  REQUIRE(r.code == 0);
+  CHECK(r.out ==
+        "00000000  00 00 00 18 66 74 79 70  69 73 6f 36 00 00 00 00  |....ftypiso6....|\n"
+        "00000010  69 73 6f 36 6d 70 34 31                           |iso6mp41|\n");
+  const json b = run_json(f.path, {"--bytes", "4:4"}).at("result");
+  CHECK(b == json{{"offset", 4}, {"length", 4}, {"data", "ZnR5cA=="}});
+  CHECK(invoke({f.path.string(), "--bytes", "0:1048577"}).code == 2);
 }
 
 TEST_CASE("probe: -f fb writes the envelope and a ContainerRoot record", "[cli][probe][fast]") {
   const TempFile f(fragmented_mp4(2));
   const fs::path out = f.path.parent_path() / "out.fb";
-  REQUIRE(invoke({f.path.string(), "-f", "fb", "-o", out.string()}).code == 0);
+  REQUIRE(invoke({f.path.string(), "--tracks", "--fragments", "-f", "fb", "-o", out.string()}).code == 0);
   const Bytes b = read_file(out);
   REQUIRE(b.size() > 32);
   CHECK(std::string_view(reinterpret_cast<const char*>(b.data()), 6) == "OVTFBS");
   CHECK(std::string(b.begin(), b.end()).find("OVTC") != std::string::npos);
+}
+
+TEST_CASE("probe: json keys follow the schema field order (§6.8.1)", "[cli][probe][fast]") {
+  // The goldens are compared after a parse, so the key order is checked on the raw text here.
+  const TempFile f(fragmented_mp4(1));
+  const auto in_order = [](const std::string& s, std::initializer_list<std::string_view> keys) {
+    std::size_t at = 0;
+    for (const std::string_view k : keys) {
+      at = s.find("\"" + std::string(k) + "\":", at);
+      if (at == std::string::npos) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const Result tree = invoke({f.path.string(), "-f", "json", "--expand", "1"});
+  REQUIRE(tree.code == 0);
+  CHECK(in_order(tree.out, {"format", "root", "fourcc", "file_span", "header_length"}));
+  const Result root = invoke({f.path.string(), "-f", "json", "--tracks"});
+  REQUIRE(root.code == 0);
+  CHECK(in_order(root.out, {"schema_version", "tree", "format", "tracks", "file_size", "file_name", "is_fragmented"}));
+}
+
+namespace {
+
+// The file offsets of the last moof of `f` and of its traf, as text for --offset.
+std::pair<std::string, std::string> last_moof_and_traf(const fs::path& f) {
+  const json all = run_json(f).at("result").at("root");
+  const json& moof = all.at(all.size() - 2);  // the last moof (then its mdat)
+  const json& traf = moof.at("children").at(1);
+  CHECK(moof.at("fourcc") == "moof");
+  CHECK(traf.at("fourcc") == "traf");
+  const auto at = [](const json& b) { return std::to_string(b.at("file_span").at("offset").get<std::uint64_t>()); };
+  return {at(moof), at(traf)};
+}
+
+}  // namespace
+
+// #835: with --offset the selected box is depth 1. More than 64 fragments leave the moofs unexpanded (CNT-0007)
+// until asked.
+TEST_CASE("probe: with --offset, --expand N counts from the selected box", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(70));
+  const auto [moof, traf] = last_moof_and_traf(f.path);
+  const json sel = run_json(f.path, {"--offset", moof, "--expand", "2"}).at("result").at("root");
+  REQUIRE(sel.size() == 1);
+  CHECK(deepest_with_fields(sel) == 2);  // moof and its children (mfhd, traf), not the traf's children
+  const json inner = run_json(f.path, {"--offset", traf, "--expand", "2"}).at("result").at("root");
+  REQUIRE(inner.size() == 1);
+  CHECK(deepest_with_fields(inner) == 2);  // traf is a container: its children (tfhd, tfdt, trun) carry the fields
+}
+
+TEST_CASE("probe: --offset inside a lazy moof expands the moof on the way", "[cli][probe][fast]") {
+  const TempFile f(fragmented_mp4(70));
+  const std::string traf = last_moof_and_traf(f.path).second;
+  const json bare = run_json(f.path, {"--offset", traf, "--expand", "none"}).at("result").at("root");
+  REQUIRE(bare.size() == 1);
+  CHECK(bare[0].at("fourcc") == "traf");
+  CHECK(deepest_with_fields(bare) == 0);
 }
