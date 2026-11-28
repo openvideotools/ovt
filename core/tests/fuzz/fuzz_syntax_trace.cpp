@@ -133,8 +133,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
   const std::span<const uint8_t> rest(data + 1, size - 1);
   if ((data[0] & 1U) == 0) {
+    const std::vector<uint8_t> fb(rest.begin(), rest.end());  // operator new: aligned for the Verifier
     ovt_Buffer out{nullptr, 0};
-    static_cast<void>(ovt_syntax_trace(rest.data(), rest.size(), &out));
+    static_cast<void>(ovt_syntax_trace(fb.data(), fb.size(), &out));
     release(out);
     return 0;
   }
