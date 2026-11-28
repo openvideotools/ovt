@@ -26,6 +26,7 @@ ScalingMatrices h264_pps_scaling(const ovt::syntax::h264::Pps& pps, const ovt::s
 
 void add_h264_sps_derived(const ovt::syntax::h264::Sps& sps, ParsedUnit& u);
 void add_h264_pps_derived(const ovt::syntax::h264::Pps& pps, const ovt::syntax::h264::Sps* sps, ParsedUnit& u);
-void add_h264_slice_derived(const ovt::syntax::h264::SliceHeader& sh, ParsedUnit& u);
+/// `sps` is the slice's active SPS (nullptr when unknown); its ChromaArrayType decides whether chroma weights are kept.
+void add_h264_slice_derived(const ovt::syntax::h264::SliceHeader& sh, const ovt::syntax::h264::Sps* sps, ParsedUnit& u);
 
 }  // namespace ovt::test::syntax_golden

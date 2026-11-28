@@ -57,11 +57,12 @@ struct ParsedUnit {
 /// The NAL units of an Annex B byte stream (start codes excluded, trailing zero bytes kept as the scanner keeps them).
 std::vector<std::span<const uint8_t>> annexb_units(std::span<const uint8_t> stream);
 
-/// The H.264 Annex B elementary stream of a container file (ISOBMFF, Matroska): the first H.264 video track, at most
-/// `max_packets` packets, converted the way FFmpeg's `h264_mp4toannexb` bitstream filter converts it (the avcC
-/// parameter sets are inserted before the first IDR slice of a packet that carries none). This is the stream
-/// `tools/goldens/gen_h26x.py` gives the oracles (`ffmpeg -frames:v 16 -bsf:v h264_mp4toannexb`).
-std::vector<uint8_t> h264_container_to_annexb(const std::filesystem::path& path, unsigned max_packets);
+/// The Annex B elementary stream of a container file (ISOBMFF, Matroska): the first video track of the codec, at
+/// most `max_packets` packets, converted the way FFmpeg 7.1's `h264_mp4toannexb` / `hevc_mp4toannexb` bitstream
+/// filters convert it (H.264: the avcC parameter sets go before the first IDR slice of a packet that carries none;
+/// H.265: the hvcC arrays go before the first IRAP unit of every packet). This is the stream
+/// `tools/goldens/gen_h26x.py` gives the oracles (`ffmpeg -frames:v 16 -bsf:v <codec>_mp4toannexb`).
+std::vector<uint8_t> container_to_annexb(const std::filesystem::path& path, Codec codec, unsigned max_packets);
 
 /// True when the bytes start like an Annex B stream (zero bytes, then 00 00 01).
 bool looks_like_annexb(std::span<const uint8_t> head);
@@ -75,6 +76,9 @@ std::vector<std::span<const uint8_t>> cut_to_pictures(std::span<const std::span<
 /// latest one per id replaces the previous one at once). Units the oracle does not decompose are skipped and do not
 /// take an index: H.264 CBS reads nal_unit_type 1, 5, 6, 7, 8, 9, 10, 11, 12, 13 and 19.
 std::vector<ParsedUnit> parse_h264(std::span<const std::span<const uint8_t>> units);
+
+/// The same for H.265. CBS reads nal_unit_type 0..9, 16..21, 32..35 and 38..40.
+std::vector<ParsedUnit> parse_h265(std::span<const std::span<const uint8_t>> units);
 
 /// One `syntax-elements` record (chapter 14 §14.4.0) with the name reduced to its base (array subscripts dropped).
 struct Element {
