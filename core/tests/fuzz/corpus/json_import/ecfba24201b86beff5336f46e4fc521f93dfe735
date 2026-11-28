@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "plugin_id": "ovt-plugin-de265",
+  "plugin_version": "1.0.0+de265-1.0.15",
+  "frame": {
+    "id": {
+      "decode_index": 0,
+      "display_index": 0
+    },
+  "structure": "Frame",
+    "temporal_id": 0,
+    "layer_id": 0,
+    "is_rap": true,
+    "poc": 0,
+    "pts": 0,
+    "dts": 0,
+    "timebase_num": 1,
+   3,cbf_lu
+m

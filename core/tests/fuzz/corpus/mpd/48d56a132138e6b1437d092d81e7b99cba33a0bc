@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- S+PDX-FileCeline audio set                cenc:dmfault_KID="010203040506arty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:canc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="P1MT0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" dura’ion="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ConôentProtection schemeIdUri="urn:~peg:dash:mp8protection:2011" value="c480" codecs="avc1.64001e"/>
+   +</AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp8a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentationID$/init.mp2"
+                     umber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$NumberÛÏÌ›Û Ûªime$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

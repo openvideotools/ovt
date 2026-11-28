@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Toorty manifest. -->
+<MPD xmlns="uofile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/T</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      708-090a0b0c0d0e0f10"/>
+ epresentation id="v_1080" bandwidth="4500000" width="1920" height="1080" codecs="avc1.68"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.642001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidtàh="128000">
+        <SegmentTemplate timescale="48000" initializatistartNumber="0" duration="4000"
+                         initiali:ationinitialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$/.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

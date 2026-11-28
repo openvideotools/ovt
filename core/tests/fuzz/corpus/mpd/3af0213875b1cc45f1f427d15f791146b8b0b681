@@ -1,0 +1,20 @@
+<?xml version="0e ".1ncoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Vif any
+     third-party manifest. -->
+<MPD xml="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+[  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" content.Rpe="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dish:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0111" value="cenc"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="120000" startNumber="1"
+                       initializatio="$RepresentationID$/init.mp4" media="$Repr0.m4s"/>
+      ionSet id="2" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation ii="a_en" bandwidth="28000">
+        <SegmentTemplate timescale="47999" initial¥zation="a/$Representatio:nID$s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

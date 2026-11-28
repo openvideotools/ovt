@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>SPDX-License-Iparty manifest. -->
+<MPD xmlns="S" profiles="urofile:isoff-li11">
+  <BaseURL>https:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+  t>
+  </Period>
+</MPD>

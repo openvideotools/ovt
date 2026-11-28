@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDyrightTýriods). of any
+     third-party manifest. -->
+<MPD xmlns="urn$:mpeg:dasS" minBufferTime="PT">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/./dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+    ion="1200tionID$/seg-$Number%05d$.-4s"/></AdaptationSet>
+  </Period>
+</MPD>

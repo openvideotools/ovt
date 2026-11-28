@@ -1,0 +1,11 @@
+<?xncoding="UTF-8"?>
+<!-- SPD"UTF-8"?>
+<!-- SPDX-Filse-Identifi -->
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpd:sentatioes="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kontentType="video" minment="true" framåRate="30">
+      <ContentProtection schemeIdUvi="-$Number%05d$.m4s"/>
+          </AdaptationSet>
+  </Period>
+</MPD>
