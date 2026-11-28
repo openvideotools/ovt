@@ -275,7 +275,9 @@ size_t count_boxes(const flatbuffers::Vector<flatbuffers::Offset<ovt::fb::BoxNod
     return n;
   }
   for (const auto* b : *nodes) {
-    n += b->fourcc()->string_view() == fourcc ? 1U : 0U;
+    // A "trailing bytes" node (fewer than eight bytes after the last box) has an empty fourcc, which the FlatBuffer
+    // omits: fourcc() is then nullptr, as container.cpp's own tree walks already allow for.
+    n += b->fourcc() != nullptr && b->fourcc()->string_view() == fourcc ? 1U : 0U;
     n += count_boxes(b->children(), fourcc);
   }
   return n;
@@ -440,6 +442,24 @@ TEST_CASE("tracks: a file without moov has no tracks", "[container][tracks][fast
   CHECK(ovt_container_track_count(o.container) == 0);
   ovt_Buffer b{};
   CHECK(ovt_container_track_info(o.container, 0, &b) == OVT_E_INVALID_ARG);
+}
+
+TEST_CASE("tracks: a tree with a trailing-bytes node still counts its traks", "[container][tracks][fast]") {
+  // Five bytes after the last box become a node with no fourcc; the corpus walk below met one in
+  // mpegff_meta_2500000bps_0 and dereferenced the null fourcc() (SIGSEGV on the Linux nightly).
+  const Bytes file = mp4({trak(1, "vide", visual_entry("avc1", 640, 360, {avcc()}), 90)});
+  const Bytes data = cat({file, Bytes{1, 2, 3, 4, 5}});
+  Opened o(data);
+  const ovt_Buffer tree = ovt_container_tree(o.container);
+  const auto* t = flatbuffers::GetRoot<ovt::fb::ContainerTree>(tree.data);
+  REQUIRE(t->root() != nullptr);
+  bool has_unnamed = false;
+  for (const auto* n : *t->root()) {
+    has_unnamed = has_unnamed || n->fourcc() == nullptr;
+  }
+  CHECK(has_unnamed);
+  CHECK(count_boxes(t->root(), "trak") == 1);
+  CHECK(ovt_container_track_count(o.container) == 1);
 }
 
 TEST_CASE("tracks: ovt_container_track_info returns the TrackInfo FlatBuffer", "[container][tracks][c_api][fast]") {
