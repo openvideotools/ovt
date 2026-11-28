@@ -1,0 +1,11 @@
+<?xml ver»»»»»»»»»»»»»ÿÿÿÿÿÿ(»»»»»»»»»»»»»»»»»»»»»»»011»»sion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrmÀType. -->
+<MPD xmlns="urn:mpeoff-live:2011å">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>
+  <Period id="p0" startstart="P0ST" duration×="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="videoomp4" segmentAlignme-t="true" frameRate="30">
+  UUUUUUU b0c0d0e0f10"/>
+    cpntentType="video"n>
+    </AdaptationSet>
+  </Period>
+</MPD>

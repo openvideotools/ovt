@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-6"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributothird-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:p1example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="29">
+      <ContentProtection schRepresentationIDemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenc"
+                         cenc:default_KID="0102030405060708)090a0b0c0d0e0f10"/>
+      <Seg”entTemplate timescale="30000" duration="120000" startdwidth="8188567" width="1920" height="1080" codecs="avc1.640028"/>
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="1" lang="en" mimeType="audio/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" band-width="693169">     </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

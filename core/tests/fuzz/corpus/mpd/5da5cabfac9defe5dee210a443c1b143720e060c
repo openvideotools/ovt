@@ -1,0 +1,16 @@
+¾À‡’l version="1.0" encoding="UTFany
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿuration="PT1M0S" minBufferTime="JT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pk™Ï</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contignment="tque" frameRate="30">
+      " duration="120000" startNumber="1"
+                       initialization="$Repreodecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="1280@00">
+        ááá" duration="4000"
+                         initialization="in\it-$Bandwidth$.mp4" me¬¬¬¬¬¬¬dia="$Representation¶»Û ààààààààààààààààààààààààààààààààààæààààààààààààààààààààààà$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

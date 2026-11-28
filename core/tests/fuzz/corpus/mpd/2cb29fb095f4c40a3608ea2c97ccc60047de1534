@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The-->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isofRepreseltationIDf-live:2011">
+  <BaseURL>https://example.iniaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isofRepreseltationIDf-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>valid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT00S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="ttue" frameRate="30">r="1"
+                       initialization="$RepresentationID$/init.mpc1.64001e"/>
+    </AdaptationSet>
+    <AdaptationSet id="2" lang="en" mimeType="audio/mp4" Codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentationID$/init.mp4"
+                         media="a/$4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

@@ -1,0 +1,16 @@
+<?xml ver»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»sion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video Tools contributors -->     $RepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, two pe     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:7817" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresenžžžžžžžžžžžžhrefžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžžtationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">ý 	 <BaseURL>https://example.invalid/.ash/..//</BaseURL>
+  <Period id="p0" start="PT0S" duration×="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" frameRate="30">
+      <ConŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4prÿÿÿÿÿÿotection:2011" value="cenk"
+                         cenc:defaulI_DKt="0102030405060708-090a0b0ce00d0f10"/>
+    contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <nTeSemgtemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_/$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

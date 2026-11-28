@@ -1,0 +1,14 @@
+<?xml ver»»»»»»»»»»»»»ÿÿÿÿÿÿy»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»sion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrighny
+     third-paÄty manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediAPTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration×="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="videoomp4" segmentAlignme-t="true" frameRate="30">
+      <ConŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenk"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+    contentType="video"n>
+    </AdaptationSet>
+  </Period>
+</MPD>

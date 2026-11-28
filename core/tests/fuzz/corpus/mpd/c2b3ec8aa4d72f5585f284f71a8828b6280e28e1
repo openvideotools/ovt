@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video Tools contributors -->
+<!-- SPDX-License-Identifie§r: CC@-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IFe audio set with r = -1, two periods). Not a copy of any
+     third-parzy manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration×="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignme-t="true" framaRate="30">
+        contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bandwidth="1200000" width="854" heRepresentationIDs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%0;d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

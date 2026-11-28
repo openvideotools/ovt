@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-demand-style static package (SegmentTemplate with
+     $RepresentationID$/$Number%05d$/$Time$, a timeline audio set with r = -1, two periods). Not a co. -->
+<MPD xmlentationDuraufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pk&g/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT75S">
+    <AdaptationSet id="1" contentType="video" mimšType="video/mp4" segmentAlignme-t="true" frameRate="30">
+      <ConŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenk
+    "                     cenc:defaulŒ™KID="0102030405060708-090a0b0c0d0e0f10"/>
+    contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿandwidth="1200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="100ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ0" startNumber="0" duration="0000"
+                         initialization="init-$Bandwidth$.mp4" media="$Represen333333333333333imTe333333tationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

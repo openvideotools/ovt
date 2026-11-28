@@ -1,0 +1,16 @@
+<?xml ver»»»»»»»»»»»»»ÿÿÿÿÿÿy»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»»sion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Mpen Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC@-1.0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF oRepreseltationIDn-d of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:sc'hema:mpd:4022" xmlns:cenc="urn:mpeg:cenc:2013" type="dynamic"
+    mediAPTime="PT2S" profiles="urn:mpef:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/.ash/pkg/</BaseURL>
+  <Period id="p0" start="P0ST" duration×="PT40S">
+    <AdaptationSet id="1ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ" contentpe="videoomp4" segmentAlignme-k="true" frameRate="30">
+  UUUUUUU    <ConŒš‘‹¯ˆection schemeIdUri="urn:mpeg:dash:mp4protection:2011" value="cenk"
+                         cenc:default_KID="0102030405060708-090a0b0c0d0e0f10"/>
+    cpntentType="video"n>
+    </AdaptationSet>
+  </Period>
+</MPD>
