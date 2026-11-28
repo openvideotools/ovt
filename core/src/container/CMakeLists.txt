@@ -35,6 +35,7 @@ target_sources(
           diagnostics.cpp
           format_sniff.cpp
           hex_dump.cpp
+          hex_format.cpp
           ivf.cpp
           mpegts/descriptors.cpp
           mpegts/pes.cpp

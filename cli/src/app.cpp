@@ -555,7 +555,7 @@ int dispatch_probe(const Cli& cli, const Globals& g, Context& ctx) {
     print_usage_error(ctx, *bad);
     return static_cast<int>(ExitCode::Usage);
   }
-  if (const auto issue = cmd::check_probe_args(cli.probe())) {
+  if (const auto issue = cmd::check_probe_args(cli.probe(), g)) {
     print_usage_error(ctx, UsageError{issue->code, issue->message, issue->command});
     return static_cast<int>(ExitCode::Usage);
   }

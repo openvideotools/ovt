@@ -106,7 +106,9 @@ NESTED: dict[str, list[tuple[str, str | None, tuple[str, ...]]]] = {
 # ("free", why): a JSON object or array whose shape no chapter fixes yet.
 COMMANDS: dict[str, tuple[str, Any]] = {
     "info": ("free", "ContainerTree + StreamIndex summary; JSON shape not fixed by chapter 12 (§12.2.1)"),
-    "probe": ("table", "ContainerTree"),
+    # §12.2.2 (WI-1.503, #829): ContainerTree without a view flag, the ContainerRoot image with one, and the standalone
+    # results of --list-diagnostics and --bytes. The Probe* names are defined below, not in core/schema.
+    "probe": ("any", ["ContainerTree", "ProbeContainerRoot", "ProbeDiagnosticRegistry", "ProbeByteDump"]),
     "syntax": ("any", ["StreamIndex", "SyntaxNode"]),
     "index": ("table", "StreamIndex"),
     "frames": ("array", "FrameInfo"),
@@ -127,6 +129,51 @@ COMMANDS: dict[str, tuple[str, Any]] = {
     "doctor": ("table", "DoctorReport"),
     "hrd": ("free", "free JSON object (§12.2.0)"),
 }
+
+# Tables the CLI-local shapes below refer to; they join the envelope's $defs.
+PROBE_ROOTS = ("ContainerRoot", "Diagnostic")
+
+
+def probe_defs(defs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """The `ovt probe` shapes that are not a core/schema table (§12.2.2, #829)."""
+    u64 = ref(U64)
+    bitrate = {
+        "type": "array",
+        "items": {
+            "type": "object",
+            "properties": {"t_ms": u64, "bps": u64},
+            "required": ["t_ms", "bps"],
+            "additionalProperties": False,
+        },
+    }
+    return {
+        # The ContainerRoot image plus the CLI-only `bitrate` of --bitrate; `tree` always carries `format` (FR-CLI-004).
+        "ProbeContainerRoot": {
+            "type": "object",
+            "properties": {**defs["ContainerRoot"]["properties"], "bitrate": bitrate},
+            "required": ["tree"],
+            "additionalProperties": False,
+        },
+        # The DiagnosticRegistry table of ovt_container_list_diagnostics (#772), as --list-diagnostics writes it.
+        "ProbeDiagnosticRegistry": {
+            "type": "object",
+            "properties": {"family": {"type": "string"}, "entries": {"type": "array", "items": ref("Diagnostic")}},
+            "required": ["family", "entries"],
+            "additionalProperties": False,
+        },
+        # --bytes: the byte range, base64-encoded.
+        "ProbeByteDump": {
+            "type": "object",
+            "properties": {
+                "offset": u64,
+                "length": {"type": "integer", "minimum": 0},
+                "data": {"type": "string", "pattern": "^[A-Za-z0-9+/]*={0,2}$"},
+            },
+            "required": ["offset", "length", "data"],
+            "additionalProperties": False,
+        },
+    }
+
 
 # Exit-code names written as the envelope `status` (chapter 12 §12.1.3; cli/src/exit_codes.h).
 STATUS_NAMES = ("OK", "ERROR", "USAGE", "IO", "UNSUPPORTED", "CORRUPT", "PLUGIN", "CANCELLED", "MISMATCH", "PARTIAL")
@@ -357,7 +404,8 @@ def result_schema(shape: tuple[str, Any]) -> dict[str, Any]:
 
 def envelope_document(defs: dict[str, dict[str, Any]]) -> dict[str, Any]:
     roots = [arg for kind, arg in COMMANDS.values() if kind in ("table", "array")]
-    roots += [t for kind, arg in COMMANDS.values() if kind == "any" for t in arg]
+    roots += [t for kind, arg in COMMANDS.values() if kind == "any" for t in arg if t in defs]
+    roots += list(PROBE_ROOTS)
     diagnostic = {
         "type": "object",
         "properties": {
@@ -382,7 +430,7 @@ def envelope_document(defs: dict[str, dict[str, Any]]) -> dict[str, Any]:
         }
         for cmd, shape in COMMANDS.items()
     ]
-    local = {"EnvelopeDiagnostic": diagnostic}
+    local = {"EnvelopeDiagnostic": diagnostic, **probe_defs(defs)}
     return {
         "$schema": DRAFT,
         "$id": ENVELOPE_ID,
