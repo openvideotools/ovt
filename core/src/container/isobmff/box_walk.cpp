@@ -525,6 +525,7 @@ WalkResult walk(const io::RandomAccessFile& file, std::vector<DeferredBox>* defe
   }
 
   r.root_ctx.trex_for_track = std::make_shared<std::map<uint32_t, TrackFragmentInfo>>();  // SPEC-ASSUMPTION(#670)
+  r.root_ctx.enc_for_track = std::make_shared<std::map<uint32_t, TrackEncryption>>();     // SPEC-ASSUMPTION(#794)
   WalkState st;
   st.file = &file;
   st.deferred = deferred;

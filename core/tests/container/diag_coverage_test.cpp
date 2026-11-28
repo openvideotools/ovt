@@ -3,9 +3,9 @@
 //
 // The broken-corpus coverage test (chapter 08 §8.5, §8.9.3; FR-CNT-009, FR-CNT-101; WI-1.224). Every manifest entry
 // tagged `isobmff-broken` whose files are committed under tests/corpora/synthetic/isobmff-broken/ must make the walk
-// plus the validation driver emit the codes of its `expected.diagnostics`, and every code the reader emits must be in
-// the registry. WI-1.224a covers the box-level and sample-table codes the reader raises today; WI-1.224b extends the
-// set to every code of diag_codes.inc.
+// plus the validation driver and the brand checks emit the codes of its `expected.diagnostics`, and every code the
+// reader emits must be in the registry. WI-1.224a covers the box-level and sample-table codes the reader raises today;
+// WI-1.224b extends the set to every code of diag_codes.inc.
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -22,6 +22,7 @@
 
 #include "container/diagnostics.h"
 #include "container/isobmff/box_walk.h"
+#include "container/isobmff/brands.h"
 #include "container/isobmff/validate.h"
 #include "io/memory_file.hpp"
 #include "test_support/corpus.h"
@@ -49,6 +50,7 @@ std::set<std::string> emitted_codes(const std::filesystem::path& path) {
   const ovt::io::MemoryFile file(bytes);
   auto r = iso::walk(file);
   iso::validate(r.top_level, iso::ValidationLevel::Standard);
+  iso::check_brands(file, r.top_level, iso::ValidationLevel::Standard);
   std::set<std::string> codes;
   for (const auto& d : r.diagnostics) {
     codes.insert(d->code);
@@ -94,8 +96,9 @@ TEST_CASE("diag_coverage: every committed isobmff-broken file emits the codes it
       ++checked;
     }
   }
-  CHECK(checked >= 9);  // the entries of recipe 72, committed under isobmff-broken/
-  for (const char* code : {"CNT-0106", "CNT-1011", "CNT-1012", "CNT-1013", "CNT-1014", "CNT-1015", "CNT-2003"}) {
+  CHECK(checked >= 12);  // the entries of recipe 72, committed under isobmff-broken/
+  for (const char* code : {"CNT-0106", "CNT-1011", "CNT-1012", "CNT-1013", "CNT-1014", "CNT-1015", "CNT-2003",
+                           "CNT-7005", "CNT-7010", "CNT-7031"}) {
     CHECK(covered.contains(code));
   }
 }
