@@ -5,6 +5,8 @@
 
 #include <array>
 #include <cstddef>
+#include <string>
+#include <string_view>
 
 namespace ovt::container {
 namespace {
@@ -14,6 +16,23 @@ constexpr std::array kRegistry = {
 #include "container/diag_codes.inc"
 #undef X
 };
+
+constexpr std::array<std::string_view, 4> kSeverityNames = {"Info", "Warning", "Error", "Fatal"};
+
+void append_csv_field(std::string& out, std::string_view field) {
+  if (field.find_first_of(",\"\n\r") == std::string_view::npos) {
+    out += field;
+    return;
+  }
+  out += '"';
+  for (const char c : field) {
+    if (c == '"') {
+      out += '"';
+    }
+    out += c;
+  }
+  out += '"';
+}
 
 }  // namespace
 
@@ -32,6 +51,21 @@ const DiagInfo* diag(std::string_view code) noexcept {
     }
   }
   return nullptr;
+}
+
+std::string diagnostics_csv() {
+  std::string out = "code,severity,message,spec_ref\n";
+  for (const DiagInfo& d : kRegistry) {
+    append_csv_field(out, d.code);
+    out += ',';
+    out += kSeverityNames[static_cast<size_t>(d.severity)];
+    out += ',';
+    append_csv_field(out, d.message);
+    out += ',';
+    append_csv_field(out, d.spec_ref);
+    out += '\n';
+  }
+  return out;
 }
 
 }  // namespace ovt::container

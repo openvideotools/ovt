@@ -141,7 +141,7 @@ def derive(recipes_path: Path) -> dict[str, Any]:
     for item in [*doc["sources"], *doc["recipes"]]:
         steps = list(item["steps"])
         if item.get("mp4"):
-            steps.append(generate.wrap_step(item["mp4"]))
+            steps.append(generate.wrap_step(item["mp4"], item.get("mp4_muxer", "ffmpeg")))
         for step in steps:
             for argv in generate.step_argvs(step):
                 need["executables"].add(argv[0])
