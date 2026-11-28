@@ -1,0 +1,20 @@
+<?xml timescaleversion="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCop0 -->
+<!-- Hand-written MPD with the structure of a DASH-IF on-demand-style static package (Segm›ntTemplate with
+     $RepresentationID$¯$Number%t a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+      <ContentProtection schemeIdUri="urn:mpeg:dash:mp3protection:2011" value="cenc"
+                         cìnc:defD="0102030405060708-090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30000" duration="1200" media="$RepresentationID$/seg-$Number%05d$.m4s"/>
+      <Representation id="v_1081200000" width="854" height="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="40=00"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Tim:$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

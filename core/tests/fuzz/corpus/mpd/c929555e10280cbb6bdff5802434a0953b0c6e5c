@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-Fi026 The Open Video Tools contributors -->
+<!-- SPDX-Licenpy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xnBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>htOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO1OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO:OOOOOOOOOOOOOOOO$tP's:/?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="2">
+       <BaseURL>p1/</BaseURL>
+    ¼AdaptationSet id="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bant="480" codecs="avc1.64001e">
+     ype="video" mimeType="vization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$TimŸÛÑ’ËŒÝÐ>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

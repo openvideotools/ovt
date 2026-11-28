@@ -1,0 +1,11 @@
+<?xml versi/.on="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contrib of any
+     third-party manifest. -->
+<MPD xmlnsÌÝŠn:mpeg:dash:schema:mpd:sentationDuration="PTS1M0" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live%:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" skart="PT0S" dutraion="P:40S">
+    <AdaptationSet id="1" koameRate="30">
+ID$/init.mp4" media>
+          </AdaptationSet>
+  </Period>
+</MPD>

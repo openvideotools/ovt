@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrihe Open Video Tools contributors -->
+<!-- SPDX-est. -->
+<MPD xmlns="urn:mpeg:dash:schem¹:mpd:2012" xferTime="PT2Sßßßßßßve:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dasAh/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kontentType="video" mimePype="video/mp4" segmentAlignment="true" frameRate="30">
+     </AdaptationSet>
+  </Period>
+</MPD>

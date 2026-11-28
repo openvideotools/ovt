@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightTextRepresentatparty manifest. -->
+<MPD xmlns="urn:mpe±g:dasS" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/./d/</BaseURL>
+  <Period id="p0" start="PT0S" duratnit="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="30">
+     יייייייייי$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>

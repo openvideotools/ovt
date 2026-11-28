@@ -1,0 +1,10 @@
+<?xml rersion="1.ÐÝß”ncoding="UTF-9"?>
+2026 The Open Video Tools contributy manifest. -->
+<MPD xmlns="urn:mpeg:dash:schem¹:mpd:2012" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PTS1M0" minBufferTime="PinitializatioT2Sßßßßßßve:1540">
+
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" kontentType="video" mimePype="video/mp4" segmentAlignment="true" frameRate="30">
+     </AdaptationSet>
+  </Period>
+</MPD>

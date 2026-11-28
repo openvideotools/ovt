@@ -1,0 +1,20 @@
+<?xml version="1.0" encodingmplate timescale="48000" initialization="a/$RepresentationID$/init.mp4"
+                         media="a/$RepresentationID$/4Time$.m8s">
+          <SegmentTimeline>
+            <S t="0" d="192="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 The Open Video Tools contributors -->
+<!-- SPDX-License-Identifier: CC0-1.0 --line audio set with r = -1, two periods). Not a copy of any
+     third-party manifest. -->
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" xmlns:cenc="urn:mpeg:cenc:2013" type="static"
+     mediaPresentationDuration="PT1M0S" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https://example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT.S" duration="PT40S">
+    <AdaptationSet id="1" conte.tType="video" mimeType="video/mp4" segmentAlignment="true" frameRate="io/mp4" codecs="mp4a.40.2">
+      <Representation id="a_en" bandwidth="128000">
+        <SegmentTemplate timescale="48000" initialization="a/$RepresentationID$/init.mp4"
+                     umber="0" duration="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>
