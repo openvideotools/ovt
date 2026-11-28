@@ -21,6 +21,14 @@ target_link_libraries(ovt_tests_syntax PRIVATE ovt_core_objects ovt::flags ${Cat
 ovt_set_license(ovt_tests_syntax "LGPL-2.1-or-later")
 ovt_catch_discover_tests(ovt_tests_syntax)
 
+# ovt_syntax_trace (WI-1.504a): the §12.2.3.1 trace text of hand-built trees and of the index_builder seeds.
+add_executable(ovt_tests_syntax_trace test_syntax_trace.cpp)
+target_link_libraries(ovt_tests_syntax_trace PRIVATE ovt_core_objects ovt::flags ${Catch2_TARGET})
+target_compile_definitions(ovt_tests_syntax_trace
+                           PRIVATE OVT_INDEX_BUILDER_SEEDS="${PROJECT_SOURCE_DIR}/core/tests/fuzz/corpus/index_builder")
+ovt_set_license(ovt_tests_syntax_trace "LGPL-2.1-or-later")
+ovt_catch_discover_tests(ovt_tests_syntax_trace)
+
 add_subdirectory(av1)
 # H.265 parameter-set parsers (WI-1.112).
 add_subdirectory(h265)
