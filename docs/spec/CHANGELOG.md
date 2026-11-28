@@ -4,7 +4,7 @@ Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
 ## 1.0.0-rc50 — 2026-11-28
 
-Spec-amendment pass 30 (two accepted `spec-question` answers from the WI-1.503 reviews, PRs #830 and #836).
+PATCH-level: spec-amendment pass 30 (two accepted `spec-question` answers from the WI-1.503 reviews, PRs #830 and #836).
 
 - 12 §12.1.4 `csv` paragraph, §12.2.2 `--expand` and `--offset` rows — a container row (box, unit) carries its `file_span` in bits, absolute; a field row carries its `BitSpan` as the JSON does, relative to the owning box or unit; with `--offset` the selected box is depth 1 and `--expand N` counts from it, the driver expanding the ancestor chain first — WI-1.503 (#835)
 - 12 §12.2.2 `--tracks` and `--fragments` rows — each `--tracks` CSV column is derived from `TrackInfo` (`crop_*` from `clap` else coded size, `fps` from count × timescale / duration, `chroma_format`/bit depths empty until a codec-config decoder fills them); the `--fragments` CSV column `earliest_pts` is renamed `earliest_dts` and holds the first `traf`'s `tfdt` or `computed_dts_start` — WI-1.503 (#837)
