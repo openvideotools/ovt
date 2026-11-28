@@ -814,7 +814,7 @@ std::optional<std::vector<TemplatePiece>> compile_resolved_template(const SplitB
     return std::nullopt;  // invalid, or no numeric field at all
   }
   const auto marker = [](size_t index) {
-    std::string m = std::to_string(index + 1);
+    const std::string m = std::to_string(index + 1);
     return "9" + std::string(8 - std::min<size_t>(m.size(), 8), '0') + m;  // fixed width, digits only
   };
   std::string probe;
