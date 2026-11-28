@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Release candidate for owner review |
-| **Version** | 1.0-rc49 (2026-11-28) |
+| **Version** | 1.0-rc50 (2026-11-28) |
 | **Audience** | The implementation team (coding agents and their human reviewers), the project owner, and future contributors |
 | **Scope** | A free and open-source, cross-platform (macOS, Linux, Android/ChromeOS) video analysis suite for H.264/AVC, H.265/HEVC and AV1 with HDR (PQ/HLG) display, bitstream inspection, container inspection, block-level visualisation, per-plane views and video quality metrics |
 | **Licence of this document** | CC-BY-4.0 (owner decision of 2026-11-04, issue #20; the rest of `docs/` stays CC-BY-SA-4.0, chapter 15 §15.1) |
@@ -104,3 +104,4 @@ Chapter 17 lists the open questions the owner still has to answer; each has a de
 | 1.0-rc47 (2026-11-22) | Spec-amendment pass 27: accepted answers of `spec-question` issues #783 (`ovt info` omits unsupported views with `CLI-0012`), #784 (§8.4.1 `expand_sample_table`/`find_trak` instead of `ParsedMovie`), #785 (WI-1.218 AT4 via a `co64` overflow), #788 (sample-count evidence bound), #790 (`HdrProbeOptions` bounds), #791 and #798 (WI-1.219 AT1 oracle and CTA hand-off), #793 (§8.4.2 entry points, rounding, `negative_cts_compensation`, media end = composition end), #794 (`BoxContext.enc_for_track`, `CNT-6014`), #795 (Widevine PSSH field numbers), #797 (§8.4.5 finding nodes and readings), #802 and #803 (WI-1.222 hand-off, WI-1.222b with AT5 and recipe 78), #804 (`CNT-7009` trigger), #808 (`CNT-6015`, partial trailing block, `senc` entries of unprotected samples); see `CHANGELOG.md`. |
 | 1.0-rc48 (2026-11-28) | Spec-amendment pass 28: accepted answers of `spec-question` issues #806 (§14.3.3 `mp4_muxer: MP4Box` wrap for recipe 3, so the MP4 carries `ctts` for WI-1.220 AT1) and #812 (§8.4.4 `CNT-6007` threshold counts the whole NAL header: 2 bytes for `hvcC`); see `CHANGELOG.md`. |
 | 1.0-rc49 (2026-11-28) | Spec-amendment pass 29: accepted answer of `spec-question` issue #829 (`ovt probe` result shape with view flags is the `ContainerRoot` image, `CLI-0012` for unavailable views, transitional `--list-diagnostics` and `--validate-level`, `--expand N` depth origin, AT1 on the concatenated segment set, AT3 on `hdr[].diagnostics`, WI-1.503 split a/b/c; `ContainerRoot` named as the `OVTC` root); see `CHANGELOG.md`. |
+| 1.0-rc50 (2026-11-28) | Spec-amendment pass 30: accepted answers of `spec-question` issues #835 and #837 (probe/syntax CSV `bit_offset` origin per row kind; `--expand N` counts depth from the `--offset` box; `--tracks` CSV column derivation; `--fragments` CSV `earliest_dts`); see `CHANGELOG.md`. |
