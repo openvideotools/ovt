@@ -802,45 +802,60 @@ std::optional<std::vector<TemplatePiece>> compile_plain_template(std::string_vie
 }
 
 // A valid media template that is not a plain relative reference (dot segments, an absolute path, another authority)
-// still resolves the same way for every segment when all of its numeric fields sit in the last path segment: those
-// fields only add digits and a minus sign, so the segment can never become "." or "..", and a ':' after a '/' cannot
-// end a scheme. Then the resolved URL is one fixed prefix (resolved once) followed by the expanded last segment.
-// nullopt when the template has no field (the caller resolves it once) or a field outside the last segment.
-struct SplitTemplate {
-  std::string prefix;               // resolved base + directory part, ending where the last segment starts
-  std::vector<TemplatePiece> tail;  // the last segment, compiled
-};
-
-std::optional<SplitTemplate> compile_split_template(const SplitBase& base, std::string_view tmpl,
-                                                    std::string_view representation_id) {
-  auto pieces = compile_template(tmpl, representation_id);
+// resolves with the same structure for every segment: the numeric fields only add digits and a minus sign, so a
+// segment holding a field is never "." or "..", and a ':' after it cannot end a scheme. Only the values differ. One
+// probe expansion with a unique digit marker per field is resolved once; each marker that survives (a field in a
+// segment that a later ".." removes does not) splits the result into the literal text between the fields.
+// nullopt when the template is invalid or the result is not of that form; the caller then resolves every segment.
+std::optional<std::vector<TemplatePiece>> compile_resolved_template(const SplitBase& base, std::string_view tmpl,
+                                                                    std::string_view representation_id) {
+  const auto pieces = compile_template(tmpl, representation_id);
   if (!pieces || pieces->size() < 2) {
     return std::nullopt;  // invalid, or no numeric field at all
   }
-  // Fields follow the text of every piece but the last, so the first field comes right after pieces[0].text.
-  std::string dir = pieces->front().text;
-  const size_t slash = dir.rfind('/');
-  const size_t tail_start = slash == std::string::npos ? 0 : slash + 1;
-  std::string tail_text = dir.substr(tail_start);
-  dir.resize(tail_start);
-  for (size_t i = 1; i < pieces->size(); ++i) {
-    tail_text += (*pieces)[i].text;
-  }
-  if (tail_text.find_first_of("/?#") != std::string::npos ||
-      (tail_start == 0 && tail_text.find(':') != std::string::npos)) {
-    return std::nullopt;
-  }
-  SplitTemplate out;
-  out.tail = std::move(*pieces);
-  out.tail.front().text.erase(0, tail_start);
+  const auto marker = [](size_t index) {
+    std::string m = std::to_string(index + 1);
+    return "9" + std::string(8 - std::min<size_t>(m.size(), 8), '0') + m;  // fixed width, digits only
+  };
   std::string probe;
-  append_compiled(probe, out.tail, TemplateValues{representation_id, 0, 0, 0});
-  std::string resolved = resolve_against(base.parts, base.empty, dir + probe);
-  if (resolved.size() < probe.size() || std::string_view(resolved).substr(resolved.size() - probe.size()) != probe) {
-    return std::nullopt;  // not expected by the reasoning above; the caller resolves every segment
+  for (size_t i = 0; i < pieces->size(); ++i) {
+    probe += (*pieces)[i].text;
+    if ((*pieces)[i].field != TemplatePiece::Field::None) {
+      probe += marker(i);
+    }
   }
-  resolved.resize(resolved.size() - probe.size());
-  out.prefix = std::move(resolved);
+  const std::string resolved = resolve_against(base.parts, base.empty, probe);
+  std::vector<TemplatePiece> out(1);
+  size_t at = 0;
+  for (size_t i = 0; i + 1 < pieces->size(); ++i) {
+    const std::string m = marker(i);
+    const size_t pos = resolved.find(m, at);
+    if (pos == std::string::npos) {
+      if (resolved.find(m) != std::string::npos) {
+        return std::nullopt;  // out of order
+      }
+      continue;  // removed by a dot segment
+    }
+    if (resolved.find(m, pos + m.size()) != std::string::npos) {
+      return std::nullopt;  // not unique: the base or the template text contains the marker
+    }
+    out.back().text.assign(resolved, at, pos - at);
+    out.back().field = (*pieces)[i].field;
+    out.back().width = (*pieces)[i].width;
+    out.emplace_back();
+    at = pos + m.size();
+  }
+  out.back().text.assign(resolved, at, std::string::npos);
+  // Check the result against full resolution for two other sets of values before relying on it.
+  for (const TemplateValues& v : {TemplateValues{representation_id, 7, 123456, 9876543210},
+                                  TemplateValues{representation_id, -3, 0, 42}}) {
+    std::string got;
+    append_compiled(got, out, v);
+    const auto expanded = expand_template(tmpl, v);
+    if (!expanded || got != resolve_against(base.parts, base.empty, *expanded)) {
+      return std::nullopt;
+    }
+  }
   return out;
 }
 
@@ -913,15 +928,15 @@ void append_template_segments(Context& ctx, Representation& rep, const std::vect
   if (!as_written && !entries.empty() && !base.empty) {
     compiled = compile_plain_template(media, rep.id);
   }
-  // Templates that need full resolution (fuzz-nightly 2026-11-18, #773: 480 000 segments of "." or
-  // "..././_$Number$...") resolve once: a template without numeric fields gives the same URL for every segment, and one
-  // whose fields are all in the last path segment resolves to a fixed prefix plus that segment.
-  std::optional<SplitTemplate> split;
+  // Templates that need full resolution (fuzz-nightly 2026-11-18 and 11-27, #773: 480 000 segments of "." or
+  // "../$Number$/../x") resolve once: a template without numeric fields gives the same URL for every segment, and
+  // one with fields becomes literal text around the fields, resolved once.
+  std::optional<std::vector<TemplatePiece>> resolved;
   if (!as_written && !compiled && !entries.empty()) {
     if (const auto pieces = compile_template(media, rep.id); pieces && pieces->size() == 1) {
       as_written = segment_url(ctx, base, media, values, at);
     } else {
-      split = compile_split_template(base, media, rep.id);
+      resolved = compile_resolved_template(base, media, rep.id);
     }
   }
   std::string scratch;
@@ -929,9 +944,9 @@ void append_template_segments(Context& ctx, Representation& rep, const std::vect
     values.number = e.number;
     values.time = e.time;
     Segment seg;
-    if (compiled || split) {
-      scratch.assign(compiled ? base.dir_prefix : split->prefix);
-      append_compiled(scratch, compiled ? *compiled : split->tail, values);
+    if (compiled || resolved) {
+      scratch.assign(compiled ? base.dir_prefix : std::string_view());
+      append_compiled(scratch, compiled ? *compiled : *resolved, values);
       seg.url = scratch;  // exact-size copy; the scratch buffer is reused
     } else {
       seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, at);

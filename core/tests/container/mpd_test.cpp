@@ -581,8 +581,8 @@ TEST_CASE("mpd: the compiled template path gives what expand_template and resolv
       "/abs/$Time$?q=$Number$",
       "$Number%064d$.m4s",
       "no-fields.m4s",
-      // Resolved once per representation (fuzz-nightly mpd timeout, 2026-11-18): no field, or fields only in the last
-      // path segment of a template with dot segments, an absolute path or an authority.
+      // Resolved once per representation (fuzz-nightly mpd timeout, 2026-11-18): no field, or fields anywhere in a template
+      // with dot segments, an absolute path or an authority.
       ".",
       "..",
       "./_$Number%03d$_$Time$.m4s",
@@ -592,6 +592,9 @@ TEST_CASE("mpd: the compiled template path gives what expand_template and resolv
       "/abs/$Number$:$Time$",
       ".$Number$",
       "../$Number$/x.m4s",
+      "$Number$/../x.m4s",
+      "a/$Time$/./b/../$Number$/c.m4s",
+      "/$Number$/../../$Time$.m4s",
   };
   for (const std::string& tmpl : templates) {
     CAPTURE(tmpl);
