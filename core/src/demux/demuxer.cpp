@@ -259,9 +259,18 @@ ovt::Result<std::unique_ptr<Demuxer>> Demuxer::open(std::shared_ptr<ovt::io::Ran
     fmt->pb = d->avio_->context();
     fmt->flags |= AVFMT_FLAG_CUSTOM_IO;
 
+    if (ifmt == nullptr) {
+      // Probed before the options below are built, so §8.7.2 rule 4 applies to the probed demuxer too.
+      auto probed = probe_format(*d->avio_, hint_format);
+      if (!probed) {
+        avformat_free_context(fmt);
+        return R::error(probed.status(), probed.message());
+      }
+      ifmt = probed.value();
+    }
     // §8.7.2 rule 4. The options only apply to the demuxer that defines them; unknown ones stay in `opts`.
     AVDictionary* opts = nullptr;
-    const std::string_view name = ifmt != nullptr ? std::string_view(ifmt->name) : std::string_view{};
+    const std::string_view name(ifmt->name);  // set by the hint or by the probe above
     if (name == "mpegts") {
       av_dict_set(&opts, "fflags", "+genpts", 0);
     }
@@ -270,15 +279,6 @@ ovt::Result<std::unique_ptr<Demuxer>> Demuxer::open(std::shared_ptr<ovt::io::Ran
       av_dict_set(&opts, "ignore_editlist", "0", 0);
       av_dict_set(&opts, "export_all", "1", 0);
       av_dict_set(&opts, "probesize", std::to_string(kIsobmffProbeSize).c_str(), 0);
-    }
-    if (ifmt == nullptr) {
-      auto probed = probe_format(*d->avio_, hint_format);
-      if (!probed) {
-        av_dict_free(&opts);
-        avformat_free_context(fmt);
-        return R::error(probed.status(), probed.message());
-      }
-      ifmt = probed.value();
     }
     // On failure avformat_open_input frees `fmt` (and sets it to null) but not the custom pb.
     const int rc = avformat_open_input(&fmt, nullptr, ifmt, &opts);
