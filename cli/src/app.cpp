@@ -550,6 +550,51 @@ int dispatch_info(const Cli& cli, const Globals& g, Context& ctx) {
   return static_cast<int>(code);
 }
 
+int dispatch_probe(const Cli& cli, const Globals& g, Context& ctx) {
+  if (const auto bad = check_format(g, "probe", {Format::Text, Format::Json, Format::Csv, Format::Fb})) {
+    print_usage_error(ctx, *bad);
+    return static_cast<int>(ExitCode::Usage);
+  }
+  if (const auto issue = cmd::check_probe_args(cli.probe())) {
+    print_usage_error(ctx, UsageError{issue->code, issue->message, issue->command});
+    return static_cast<int>(ExitCode::Usage);
+  }
+  OutputTarget target(ctx, g);
+  if (auto d = target.open()) {
+    report(ctx, g, *d);
+    return static_cast<int>(ExitCode::Io);
+  }
+  const cmd::ProbeOutcome outcome = cmd::run_probe(cli.probe(), g, target.stream());
+  if (outcome.usage) {
+    static_cast<void>(target.close(ExitCode::Usage));
+    if (g.output != "-") {
+      static_cast<void>(std::remove(g.output.c_str()));
+    }
+    print_usage_error(ctx, UsageError{outcome.usage->code, outcome.usage->message, outcome.usage->command});
+    return static_cast<int>(ExitCode::Usage);
+  }
+  ExitCode code = outcome.code;
+  if (cancel_requested()) {
+    code = ExitCode::Cancelled;
+  }
+  const auto closed = target.close(code);
+  // json and fb carry the diagnostics in the envelope; text, csv and failures print them on stderr.
+  const bool in_output =
+      (code == ExitCode::Ok || code == ExitCode::Corrupt) && (g.format == Format::Json || g.format == Format::Fb);
+  if (!in_output) {
+    for (const Diagnostic& d : outcome.diagnostics) {
+      report(ctx, g, d);
+    }
+  }
+  if (outcome.write_failed || closed) {
+    report(
+        ctx, g,
+        closed.value_or(Diagnostic{"Error", "CLI-0004", fmt::format("cannot write '{}'", g.output), std::nullopt, ""}));
+    return static_cast<int>(ExitCode::Io);
+  }
+  return static_cast<int>(code);
+}
+
 int dispatch_syntax(const Cli& cli, const Globals& globals, Context& ctx) {
   Globals g = globals;
   // --trace implies --format text (§12.2.3); an explicit other --format is CLI-0006. WI-1.504a: --trace is required.
@@ -589,6 +634,9 @@ int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
   const bool version = cli.raw().version;
   if (!version && cli.info().app->parsed()) {
     return dispatch_info(cli, g, ctx);
+  }
+  if (!version && cli.probe().app->parsed()) {
+    return dispatch_probe(cli, g, ctx);
   }
   if (!version && cli.syntax().app->parsed()) {
     return dispatch_syntax(cli, g, ctx);
@@ -727,6 +775,7 @@ Cli::Cli()
 
   cmd::add_cache_command(*this, cache_);
   cmd::add_info_command(*this, info_);
+  cmd::add_probe_command(*this, probe_);
   cmd::add_syntax_command(*this, syntax_);
   completion_ = app_.add_subcommand("completion", "Shell completion scripts (bash, zsh, fish)");
   add_choice(*completion_, "shell", raw_.shell, "Shell to print the completion script for", {"bash", "zsh", "fish"})

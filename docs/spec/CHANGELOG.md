@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc49 — 2026-11-28
+
+PATCH-level: spec-amendment pass 29 folds in the accepted answer of `spec-question` issue #829 (WI-1.503, `ovt probe`). The generated CLI JSON schema (`docs/spec/schemas/ovt-cli-1.schema.json`, WI-1.501) changes for `probe` and was reviewed under the owner's 2026-11-09 rule (Fable approve); no FlatBuffers schema, plugin ABI, public C header or CLI grammar change; no new diagnostic code.
+
+- 12 §12.2.0 `probe` row, §12.2.2 output rule, `--hdr` row, §12.1.4 `fb` identifiers — with any view flag `result` is the JSON image of the chapter 06 root table `ContainerRoot` (`tree` always present with `format`, `tree.root` only with `--boxes`, `tree.tracks` only with `--tracks`, derived-view vectors filled only for the flags given; `--hdr` conflicts are `hdr[].box_vs_bitstream_mismatch` plus `CNT-50xx` rows in `hdr[].diagnostics`, `HdrMetadata` has no `conflicts` field); `--bitrate` adds the CLI-only `bitrate` key; `--bytes` and `--list-diagnostics` are standalone results and a new `CLI-0006` case with view flags; `ContainerRoot` is the `OVTC` root — WI-1.503 (#829 item 1, Fable-reviewed)
+- 12 §12.1 `CLI-0012` row, §12.2.2 `--expand`, `--list-diagnostics`, `--validate-level` rows, WI-1.503 AT1, AT3 and notes — `CLI-0012` covers any subcommand's unavailable view; `--expand N` counts a top-level box as depth 1, `none` lists the top level; the CLI prints `all_diagnostics()` until the `DiagnosticRegistry` table lands (#772) and filters `--validate-level` itself until the C API takes a level (owner item); AT1 runs on the concatenated `syn_mp4_frag` segment set; AT3 asserts the mismatch flag and a `CNT-50xx` code; the WI is split a/b/c per §16.2.6 — WI-1.503 (#829 items 2–7)
+
 ## 1.0.0-rc48 — 2026-11-28
 
 PATCH-level: spec-amendment pass 28 folds in the accepted answers of `spec-question` issues #806 (WI-1.220, PR #799) and #812 (WI-1.221 part a). No FlatBuffers schema, plugin ABI, public C header or CLI grammar change; no new diagnostic code.

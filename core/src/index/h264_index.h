@@ -107,6 +107,7 @@ class FrameBoundary {
   bool picture_open_ = false;
   bool rule10_since_vcl_ = false;  // a rule-10 unit was seen since the last VCL unit of the open picture
   bool au_started_ = false;        // starts_access_unit was already reported for the access unit being collected
+  bool after_end_of_seq_ = false;  // an end of sequence / stream closed the picture; its access unit is still open
   Key prev_{};
   LastPicture last_{};
   int32_t next_index_ = 0;

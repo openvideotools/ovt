@@ -23,6 +23,7 @@
 
 #include "cmd/cache.h"
 #include "cmd/info.h"
+#include "cmd/probe.h"
 #include "cmd/syntax.h"
 #include "exit_codes.h"
 
@@ -117,6 +118,7 @@ class Cli {
   [[nodiscard]] CLI::App* completion() const noexcept { return completion_; }
   [[nodiscard]] const cmd::CacheArgs& cache() const noexcept { return cache_; }
   [[nodiscard]] const cmd::InfoArgs& info() const noexcept { return info_; }
+  [[nodiscard]] const cmd::ProbeArgs& probe() const noexcept { return probe_; }
   [[nodiscard]] const cmd::SyntaxArgs& syntax() const noexcept { return syntax_; }
 
   // An option restricted to `canonical` (plus the accepted `extra` spellings); completion offers `canonical`.
@@ -129,6 +131,7 @@ class Cli {
   CLI::App* completion_ = nullptr;
   cmd::CacheArgs cache_;
   cmd::InfoArgs info_;
+  cmd::ProbeArgs probe_;
   cmd::SyntaxArgs syntax_;
   std::map<const CLI::Option*, std::vector<std::string>> choices_;
 };

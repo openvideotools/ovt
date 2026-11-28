@@ -158,7 +158,8 @@ def av1_scale_problem(argv: list[str]) -> str | None:
 def determinism_problem(argv: list[str]) -> str | None:
     """Why ``argv`` would give different bytes on another machine or run, or None.
 
-    The x264/x265/libaom output depends on the thread count, which defaults to the CPU count; MP4Box and
+    The x264/x265/libaom output depends on the thread count, which defaults to the CPU count, and x265's info SEI
+    embeds the encoding CPU's cpuid (#780); MP4Box and
     mkvmerge stamp the wall-clock time and random UIDs unless told not to; lavfi ``life``/``cellauto`` start
     from a random grid and ``mp4encrypt --key …:random`` draws a random IV (#119, §14.3.3 rules 1-2).
     """
@@ -173,6 +174,8 @@ def determinism_problem(argv: list[str]) -> str | None:
         return "x264 needs --threads N"
     if tool == "x265" and not {"--frame-threads", "--pools"} <= set(args):
         return "x265 needs --frame-threads N --pools N"
+    if tool == "x265" and "--no-info" not in args:  # the version-info SEI embeds the encoding CPU's cpuid (#780)
+        return "x265 needs --no-info (its info SEI embeds the host CPU id)"
     if tool == "aomenc" and not any(a.startswith("--threads=") for a in args):
         return "aomenc needs --threads=N"
     if tool == "MP4Box" and "-for-test" not in args:
@@ -188,6 +191,8 @@ def determinism_problem(argv: list[str]) -> str | None:
             params = args[args.index("-x265-params") + 1] if "-x265-params" in args else ""
             if "frame-threads=" not in params or "pools=" not in params:
                 return "ffmpeg libx265 needs -x265-params ...:frame-threads=N:pools=N"
+            if not re.search(r"(^|:)info=0(:|$)", params):
+                return "ffmpeg libx265 needs -x265-params ...:info=0 (the info SEI embeds the host CPU id)"
     return None
 
 
