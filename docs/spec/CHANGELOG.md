@@ -2,6 +2,13 @@
 
 Newest first. Format and versioning rules: chapter 16 §16.2.8.
 
+## 1.0.0-rc48 — 2026-11-28
+
+PATCH-level: spec-amendment pass 28 folds in the accepted answers of `spec-question` issues #806 (WI-1.220, PR #799) and #812 (WI-1.221 part a). No FlatBuffers schema, plugin ABI, public C header or CLI grammar change; no new diagnostic code.
+
+- 14 §14.3.3 wrapping rule and recipe 3 — a recipe may set `"mp4_muxer": "MP4Box"`; the wrap is then `MP4Box -for-test -add <es>:fps=30 -new <out>.mp4`, which writes `ctts` and the delay-removing `elst` (an ffmpeg remux of raw Annex B writes no `ctts`); only recipe 3 (`syn_h264_weightedpred_ltr`) uses it, its `.mp4` hash was regenerated on the Mac Mini — WI-1.220 (#806)
+- 8 §8.4.4 step 5 — the `CNT-6007` clear-bytes threshold is `length_size + nal_header_size` (1 for `avcC`, 2 for `hvcC`, so a protected second HEVC header byte is now reported); entries without a NAL length size skip the check — WI-1.221 (#812)
+
 ## 1.0.0-rc47 — 2026-11-22
 
 PATCH-level: spec-amendment pass 27 folds in the accepted answers of `spec-question` issues #783 (WI-1.502), #784, #785 and #788 (WI-1.218, PR #787), #790 (WI-1.223 part b), #791 and #798 (WI-1.219 part c, PR #792), #793 (WI-1.220, PR #799), #794 and #795 (WI-1.213), #797, #802, #803 and #804 (WI-1.222, PRs #800 and #805), #808 (WI-1.221). New diagnostic codes `CLI-0012` (Info), `CNT-6014` (Info) and `CNT-6015` (Warning); new §16.4 row WI-1.222b; no FlatBuffers schema, plugin ABI, public C header or CLI grammar change (`CLI-0012` is a stderr diagnostic, not grammar).
