@@ -847,8 +847,8 @@ std::optional<std::vector<TemplatePiece>> compile_resolved_template(const SplitB
   }
   out.back().text.assign(resolved, at, std::string::npos);
   // Check the result against full resolution for two other sets of values before relying on it.
-  for (const TemplateValues& v : {TemplateValues{representation_id, 7, 123456, 9876543210},
-                                  TemplateValues{representation_id, -3, 0, 42}}) {
+  for (const TemplateValues& v :
+       {TemplateValues{representation_id, 7, 123456, 9876543210}, TemplateValues{representation_id, -3, 0, 42}}) {
     std::string got;
     append_compiled(got, out, v);
     const auto expanded = expand_template(tmpl, v);
