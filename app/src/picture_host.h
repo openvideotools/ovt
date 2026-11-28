@@ -9,8 +9,10 @@
 //
 //   Vulkan (Linux)  Interop::VulkanSharedDevice: libplacebo imports Qt's VkDevice; Qt wraps the VkImage.
 //   Metal (macOS)   Interop::MetalTexture: the surface exports an id<MTLTexture>; Qt wraps it.
+//   GLES (Android)  Interop::GlTexture: the surface draws on a context shared with Qt's and fences the texture name
+//                   Qt wraps (picture_host_android.h, WI-A.403).
 //   anything else   Interop::None: the surface renders on its own device and the renderer uploads a CPU copy (no
-//                   zero-copy row exists for it in phase 1; Android's GlTexture host is WI-A.403).
+//                   zero-copy row exists for it in phase 1).
 //
 // NATIVE mode (WI-1.463, §10.1.2): with a NativeSurfaceHost attached, the renderer follows the host's target: it calls
 // VideoSurface::retarget() with the host's child-window target (macOS: the CAMetalLayer) and from then on renders and
@@ -44,7 +46,8 @@ namespace ovt::app {
 // What the renderer last reported to the item (copied in QQuickRhiItemRenderer::synchronize, when the GUI thread
 // is blocked).
 struct PictureHostStats {
-  QString interop;      // "vulkan-shared-device", "metal-texture", "cpu-copy" or "" before the first frame
+  QString interop;      // "vulkan-shared-device", "metal-texture", "gl-texture", "cpu-copy" or "" before the
+                        // first frame
   QString error;        // VideoSurface::last_error() or the renderer's own reason; "" when none
   bool native = false;  // the surface presents to the NativeSurfaceHost's target (WI-1.463)
   QString encoding;     // VideoSurface::active_encoding(): "Srgb8", "ScRgbLinear16F", "Pq10", "Hlg10"; "" before

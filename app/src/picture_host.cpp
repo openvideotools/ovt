@@ -38,6 +38,7 @@
 #include "overlay/overlay_set_impl.h"  // the complete OverlaySet: the host owns built sets until set_overlays()
 #include "ovt/render/overlay_set.h"
 #include "ovt/render/video_surface.h"
+#include "picture_host_android.h"
 #include "render_stub.h"
 #include "surface/output_download.h"  // ovt::render::detail::download_output (exported, for Interop::None)
 
@@ -168,7 +169,11 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       rhi_->finish();
     }
     release_qt_resources();
-    surface_.reset();
+    {
+      const SurfaceGlScope scope(gl_);  // the surface's GL objects live in the shared context (Android)
+      surface_.reset();
+    }
+    gl_.reset();
   }
 
  protected:
@@ -192,6 +197,7 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       src_texture_ = nullptr;
       wrapped_.reset();
       cpu_texture_.reset();
+      const SurfaceGlScope scope(gl_);
       if (surface_->resize(size.width(), size.height())) {
         surface_size_ = size;
         ++stats_.surface_resizes;
@@ -241,14 +247,24 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
   }
 
   void render(QRhiCommandBuffer* cb) override {
-    apply_target();
+    {
+      const SurfaceGlScope scope(gl_);  // retarget() is a VideoSurface call too (NATIVE has no Android backend yet)
+      apply_target();
+    }
     QRhiResourceUpdateBatch* updates = rhi_->nextResourceUpdateBatch();
     if (!vertices_uploaded_ && vbuf_ != nullptr) {
       updates->uploadStaticBuffer(vbuf_.get(), quad_.data());
       vertices_uploaded_ = true;
     }
     // NATIVE: the surface presents to the host's child window over the item; the item itself shows the background.
-    QRhiTexture* src = native_ ? render_native() : render_surface(updates);
+    // render_surface() scopes its own surface calls: Qt's context must be current again for the fence wait.
+    QRhiTexture* src = nullptr;
+    if (native_) {
+      const SurfaceGlScope scope(gl_);
+      src = render_native();
+    } else {
+      src = render_surface(updates);
+    }
     const std::uint32_t bg = state_.background_rgba;
     const QColor clear(static_cast<int>((bg >> 24U) & 0xFFU), static_cast<int>((bg >> 16U) & 0xFFU),
                        static_cast<int>((bg >> 8U) & 0xFFU), static_cast<int>(bg & 0xFFU));
@@ -276,7 +292,6 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       init_failed_ = true;
       return;
     }
-    surface_ = VideoSurface::create("studio");
     DisplayTarget target;
     target.kind = DisplayTarget::Kind::OffscreenTexture;
     target.width = size.width();
@@ -284,10 +299,20 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     target.offscreen_format = DisplayTarget::OffscreenFormat::Rgba8Srgb;  // the Qt Quick window is SDR (§10.1.2)
     target.device_pixel_ratio = static_cast<float>(device_pixel_ratio_);
     choose_interop(target);
-    bool ok = surface_->init(target);
+    bool ok = false;
+    {
+      // Interop::GlTexture: libplacebo takes the GL context current at init() (§10.2.2 Android row).
+      const SurfaceGlScope scope(gl_);
+      surface_ = VideoSurface::create("studio");
+      ok = surface_->init(target);
+      if (!ok && target.interop != DisplayTarget::Interop::None) {
+        stats_.error = QString::fromUtf8(surface_->last_error());
+        surface_.reset();
+      }
+    }
     if (!ok && target.interop != DisplayTarget::Interop::None) {
       // The zero-copy row failed (for instance a Vulkan device without timelineSemaphore): copy through the CPU.
-      stats_.error = QString::fromUtf8(surface_->last_error());
+      gl_.reset();
       target.interop = DisplayTarget::Interop::None;
       target.interop_device = nullptr;
       surface_ = VideoSurface::create("studio");
@@ -450,6 +475,19 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
       case QRhi::Metal:
         target.interop = DisplayTarget::Interop::MetalTexture;
         return;
+#if defined(__ANDROID__)
+      case QRhi::OpenGLES2: {
+        // Android (EMBEDDED): a context shared with Qt's, made here on the render thread (WI-A.403).
+        QString reason;
+        gl_ = AndroidGlInterop::create(rhi_, reason);
+        if (gl_ == nullptr) {
+          stats_.error = reason;
+          return;
+        }
+        target.interop = DisplayTarget::Interop::GlTexture;
+        return;
+      }
+#endif
       default:
         return;
     }
@@ -529,29 +567,40 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
     if (surface_ == nullptr) {
       return nullptr;
     }
-    if (state_.frame != nullptr && state_.frame->picture.generation != uploaded_generation_) {
-      surface_->set_frame(state_.frame->picture);  // uploads now; the frame outlives the call (§10.2.1)
-      uploaded_generation_ = state_.frame->picture.generation;
-      a_changed_ = true;
+    ExternalTexture ext{};
+    {
+      const SurfaceGlScope scope(gl_);  // Android: the surface's calls on the shared context, Qt's restored after
+      if (state_.frame != nullptr && state_.frame->picture.generation != uploaded_generation_) {
+        surface_->set_frame(state_.frame->picture);  // uploads now; the frame outlives the call (§10.2.1)
+        uploaded_generation_ = state_.frame->picture.generation;
+        a_changed_ = true;
+      }
+      // No picture: background only, which the pass clears to (slot A may still hold an earlier frame).
+      if (state_.frame == nullptr) {
+        return nullptr;
+      }
+      apply_compare();
+      apply_marks();
+      surface_->render(view_for(state_, surface_size_.width(), surface_size_.height()));
+      const std::string_view err = surface_->last_error();
+      stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
+      ext = surface_->output_texture();
     }
-    // No picture: background only, which the pass clears to (slot A may still hold an earlier frame).
-    if (state_.frame == nullptr) {
-      return nullptr;
-    }
-    apply_compare();
-    apply_marks();
-    surface_->render(view_for(state_, surface_size_.width(), surface_size_.height()));
-    const std::string_view err = surface_->last_error();
-    stats_.error = QString::fromUtf8(err.data(), static_cast<qsizetype>(err.size()));
-    const ExternalTexture ext = surface_->output_texture();
     if (ext.width <= 0 || ext.height <= 0) {
       return nullptr;
     }
     const QSize size(ext.width, ext.height);
     switch (interop_) {
+      case DisplayTarget::Interop::GlTexture:
+        // §10.2.2 fence rule: Qt's context waits for the surface's GLsync before it samples the texture.
+        if (gl_ != nullptr) {
+          gl_->wait(rhi_, ext.handle2);
+        }
+        [[fallthrough]];
       case DisplayTarget::Interop::VulkanSharedDevice:
       case DisplayTarget::Interop::MetalTexture: {
-        // The handle is a VkImage or an id<MTLTexture>; QRhiTexture::createFrom takes it as an integer.
+        // The handle is a VkImage, an id<MTLTexture> or a GL texture name; QRhiTexture::createFrom takes it as an
+        // integer.
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
         const auto object = reinterpret_cast<quintptr>(ext.handle);
         const int layout = static_cast<int>(ext.layout);
@@ -570,7 +619,6 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
         return wrapped_.get();
       }
       case DisplayTarget::Interop::None:
-      case DisplayTarget::Interop::GlTexture:
         break;
     }
     // Interop::None: copy through the CPU (rows top first, RGBA8 like the texture).
@@ -686,6 +734,7 @@ class PictureHostRenderer : public QQuickRhiItemRenderer {
 #if QT_CONFIG(vulkan)
   ovt::render::VulkanDeviceInfo vk_info_{};  // the device Qt shares with libplacebo (VulkanSharedDevice)
 #endif
+  std::unique_ptr<AndroidGlInterop> gl_;  // the context shared with Qt's (GlTexture, Android only)
   bool init_failed_ = false;
   bool native_ = false;                   // the surface presents to the host's target (WI-1.463)
   QSize native_size_;                     // its drawable size in device pixels
