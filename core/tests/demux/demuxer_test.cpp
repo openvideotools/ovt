@@ -713,6 +713,22 @@ TEST_CASE("demux: bad arguments and truncated or garbage input fail cleanly", "[
   CHECK_FALSE(t.has_value());
 }
 
+TEST_CASE("demux: a probe that picks a demuxer outside §8.7.2 rule 5 is OVT_E_UNSUPPORTED", "[demux][fast]") {
+  // A PS3 MSF audio header (codec 0, 1 channel, 48 kHz) and 1 KiB of payload: libavformat's msf probe scores it 66.
+  // The fuzz target found msf and vpk hangs and a division by zero behind the "annexb" hint (nightly 2026-11-18..21).
+  Bytes msf = {'M', 'S', 'F', 0x30, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0x10, 0, 0, 0, 0xBB, 0x80};
+  msf.resize(64, 0);
+  for (int i = 0; i < 1024; ++i) {
+    msf.push_back(static_cast<uint8_t>(i));
+  }
+  for (const std::string_view hint : {"", "annexb"}) {
+    INFO("hint '" << hint << "'");
+    const auto r = Demuxer::open(memory(msf), hint);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.status() == OVT_E_UNSUPPORTED);
+  }
+}
+
 TEST_CASE("demux: a failing RandomAccessFile maps to OVT_E_IO", "[demux][fast]") {
   // 4000 frames of 390 bytes: larger than the 256 KiB AVIO buffer, so a late failure happens after open.
   const Y4m y = make_y4m(4000);

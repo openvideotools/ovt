@@ -16978,16 +16978,23 @@
         "h265"
       ],
       "containers": [
-        "matroska"
+        "isobmff"
       ],
       "tags": [
         "fast"
       ],
       "features": [
         "dolby-vision",
-        "dv-profile-8"
+        "dv-profile-8",
+        "hdr10plus"
       ],
-      "note": "SPEC-ASSUMPTION: dovi_tool assets/hevc_tests/regular.mkv is a Dolby Vision 8.1 HEVC clip; HDR10+ presence not verified"
+      "post": {
+        "mp4box_dv_remux": {
+          "dv_profile": "8.1",
+          "hdr10plus_inject": "tests/corpora/synthetic/hdr10plus_metadata.json"
+        }
+      },
+      "note": "Primary file: the MP4Box dv-profile=8.1 remux of the Matroska original (a WI-4.202 input). hdr10plus_tool extract finds no HDR10+ in regular.mkv (checked 2026-11-22, hdr10plus_tool 1.7.2), so the post step injects tests/corpora/synthetic/hdr10plus_metadata.json (60 frames, the last repeated to the 259 pictures) with hdr10plus_tool inject first (#769)"
     },
     {
       "id": "netflix_src01_hrc00_576x324",
@@ -18023,11 +18030,11 @@
         "long_term_refs",
         "multi_ref"
       ],
-      "sha256": "cf45d37f381506a419b1d20eb5c2391f73c7c88685da3e1a0155bd552fac2539",
-      "size_bytes": 720477,
+      "sha256": "edfa1527b0deca39476a7c311a67df33720910660f24213bcbcff39490c2b74c",
+      "size_bytes": 720449,
       "files": {
-        "syn_h264_weightedpred_ltr.264": "cd4ebfb7a155f3c2cdafaee88a50974a4148e8316f3f669892ab45f9dedfa660",
-        "syn_h264_weightedpred_ltr.mp4": "cf45d37f381506a419b1d20eb5c2391f73c7c88685da3e1a0155bd552fac2539"
+        "syn_h264_weightedpred_ltr.mp4": "edfa1527b0deca39476a7c311a67df33720910660f24213bcbcff39490c2b74c",
+        "syn_h264_weightedpred_ltr.264": "cd4ebfb7a155f3c2cdafaee88a50974a4148e8316f3f669892ab45f9dedfa660"
       }
     },
     {
@@ -18101,11 +18108,11 @@
         "wpp",
         "main"
       ],
-      "sha256": "ef69d5a0403c36bdfbc095a6697dfd681cc2651a0fdbcb9bae0c2aaec41e4b72",
-      "size_bytes": 525324,
+      "sha256": "c2ad65ef244d6bb19bde92eda798ced842e5c94cca4add44ec1dddb6adf4d4bf",
+      "size_bytes": 520614,
       "files": {
-        "syn_h265_tiles_2x2.265": "0e5a1cf58f447b3b45f658572b9013a8bed8094ca084cd027fcacd233bc54317",
-        "syn_h265_wpp.265": "ef69d5a0403c36bdfbc095a6697dfd681cc2651a0fdbcb9bae0c2aaec41e4b72"
+        "syn_h265_wpp.265": "c2ad65ef244d6bb19bde92eda798ced842e5c94cca4add44ec1dddb6adf4d4bf",
+        "syn_h265_tiles_2x2.265": "0e5a1cf58f447b3b45f658572b9013a8bed8094ca084cd027fcacd233bc54317"
       }
     },
     {
@@ -18124,10 +18131,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "e919c04349de3a31b5c5fd0755d2ce2653f59fa3676bdea4f9e3433cc7541199",
-      "size_bytes": 555649,
+      "sha256": "f8a8a7fc0732fa6ddd640a14b5fe5fb162a8b22b8626e50bccc61086812ed165",
+      "size_bytes": 553334,
       "files": {
-        "syn_h265_amp_sao_on.265": "e919c04349de3a31b5c5fd0755d2ce2653f59fa3676bdea4f9e3433cc7541199"
+        "syn_h265_amp_sao_on.265": "f8a8a7fc0732fa6ddd640a14b5fe5fb162a8b22b8626e50bccc61086812ed165"
       }
     },
     {
@@ -18168,11 +18175,11 @@
       "tags": [
         "fast"
       ],
-      "sha256": "df44b7f63aac0c0f848145d813133f7f866c4055355b88add8a16f6b952f4a16",
-      "size_bytes": 1045965,
+      "sha256": "bbc5a832dce68263dd94bb81003774c8b678e7f4b976799a9424f41dfaecf076",
+      "size_bytes": 1041175,
       "files": {
-        "syn_h265_main10_pq_hdr.265": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07",
-        "syn_h265_main10_pq_hdr.mp4": "df44b7f63aac0c0f848145d813133f7f866c4055355b88add8a16f6b952f4a16"
+        "syn_h265_main10_pq_hdr.mp4": "bbc5a832dce68263dd94bb81003774c8b678e7f4b976799a9424f41dfaecf076",
+        "syn_h265_main10_pq_hdr.265": "6d82a7e7a5368287a16378bc74770f11cab60844ed271016f57aa2bf6e8063d5"
       }
     },
     {
@@ -18189,11 +18196,11 @@
         "rext",
         "12bit"
       ],
-      "sha256": "f972dd5b52c069dec63eb99c6458fd2cad23d8c7a7e38b70deac563831eb0b40",
-      "size_bytes": 90004,
+      "sha256": "df8ba9cadcb3c76afe3f4fcf8690cb27b0465f05ec9096784e983c3e7bb38570",
+      "size_bytes": 87694,
       "files": {
-        "syn_h265_422_10bit.265": "0d94155c63f14f9fd6063d9a1593fb54536eb58e80e1bc1297fa22435cfc2bdf",
-        "syn_h265_444_12bit.265": "f972dd5b52c069dec63eb99c6458fd2cad23d8c7a7e38b70deac563831eb0b40"
+        "syn_h265_444_12bit.265": "df8ba9cadcb3c76afe3f4fcf8690cb27b0465f05ec9096784e983c3e7bb38570",
+        "syn_h265_422_10bit.265": "33e0f753cc9ab47d3b1dd60b00c4b369b78c8d87115be87cc443b3c9f7fc0f7c"
       }
     },
     {
@@ -18425,10 +18432,10 @@
         "tfdt",
         "trun"
       ],
-      "sha256": "e7382758cf829b62128e61dc732693df3458939cb71d3e9bc31e76ab57e4c8a1",
-      "size_bytes": 537979,
+      "sha256": "f54574dae10376b882f989017eb8219437a791a57757e4ff15edf62b108fe76a",
+      "size_bytes": 535654,
       "files": {
-        "syn_mp4_frag_cmaf.mp4": "e7382758cf829b62128e61dc732693df3458939cb71d3e9bc31e76ab57e4c8a1"
+        "syn_mp4_frag_cmaf.mp4": "f54574dae10376b882f989017eb8219437a791a57757e4ff15edf62b108fe76a"
       }
     },
     {
@@ -18463,10 +18470,10 @@
         "pq",
         "hdr_conflict"
       ],
-      "sha256": "ce5c95a7f4fe0a6ac75ac74db6241ed23950abe1fa09d805f68584af3e9621f2",
-      "size_bytes": 1045865,
+      "sha256": "fb7fb81cb3ba343e6182c99b916e9908eb88eced1b4b54a8487bc2634aeb26b3",
+      "size_bytes": 1041075,
       "files": {
-        "syn_h265_main10_pq_hdr_mismatch.mp4": "ce5c95a7f4fe0a6ac75ac74db6241ed23950abe1fa09d805f68584af3e9621f2"
+        "syn_h265_main10_pq_hdr_mismatch.mp4": "fb7fb81cb3ba343e6182c99b916e9908eb88eced1b4b54a8487bc2634aeb26b3"
       }
     },
     {
@@ -18550,11 +18557,11 @@
       "tags": [
         "fast"
       ],
-      "sha256": "db99c37b75126f6fb4f94c8226076f69be326b93df75a4a5ada4051cd18fd8d3",
-      "size_bytes": 7653371,
+      "sha256": "16175b032d92eaa89a6348da544e6870517dd01eb74e676ae50a44a58a65ea09",
+      "size_bytes": 7651044,
       "files": {
-        "syn_h265_gop60_1080p.265": "a3ed3abf2717f3fe9f3106530a0ed1c85754613287d92983241c178c5f73e05d",
-        "syn_h265_gop60_1080p.mp4": "db99c37b75126f6fb4f94c8226076f69be326b93df75a4a5ada4051cd18fd8d3"
+        "syn_h265_gop60_1080p.mp4": "16175b032d92eaa89a6348da544e6870517dd01eb74e676ae50a44a58a65ea09",
+        "syn_h265_gop60_1080p.265": "ce9791c4cbb976164041e5a75f58e9bfe915d20957f5cca87908681e16f97ff4"
       }
     },
     {
@@ -18573,11 +18580,11 @@
       "tags": [
         "fast"
       ],
-      "sha256": "0747ced1496db97e2c336445e30acb356a38eb943bf5e7230fff841ada6bf2d4",
-      "size_bytes": 7621847,
+      "sha256": "6a6c4c019d84039a4adcc08c31e6ff70ba72656ea8b4f8a8123484757942bf51",
+      "size_bytes": 7619517,
       "files": {
-        "syn_h265_gop60_1080p_nowpp.mp4": "0747ced1496db97e2c336445e30acb356a38eb943bf5e7230fff841ada6bf2d4",
-        "syn_h265_gop60_1080p_nowpp.265": "de864256176422aca7c27a5146bec0de24c83940e129e2782a6f800c4d6053bb"
+        "syn_h265_gop60_1080p_nowpp.mp4": "6a6c4c019d84039a4adcc08c31e6ff70ba72656ea8b4f8a8123484757942bf51",
+        "syn_h265_gop60_1080p_nowpp.265": "293760c906a3d74d126e062676e132017aad2b143e6b260300559edce28c0846"
       }
     },
     {
@@ -18710,6 +18717,7 @@
       "files": {
         "seg_1.m4s": "db573900d867c4f64a4702a4d75f386d0113c7a2f7b1f8c22348548335cd5ca9",
         "seg_2.m4s": "6c76d01ca653aa8841d5f379ff688197278cd6d572a1083607f67ca5edfb9ed9",
+        "seg_init.mp4": "29b4c89babe7e2746dc0151ee65213f5b6876ffb7dfe390bd2e40db8f7929170",
         "syn_mp4_frag.mpd": "4cfd8d0583ed2dfc4294f4192563c82385cf37d546a707eb2d127d3966e367ba"
       }
     },
@@ -18891,11 +18899,11 @@
       "tags": [
         "fast"
       ],
-      "sha256": "2f0a3c8faa6fe34afa8aa3f333d19f82a4487dc2f3793c579e0a60c820f228f4",
-      "size_bytes": 752541,
+      "sha256": "cc36bbe49ebd8519afc2a88414a04402c189a493cf2f0c972d8c2413790fece1",
+      "size_bytes": 747919,
       "files": {
-        "syn_hlg_1080p.265": "2896b7cdecef8c4e6269c1d82b740932539459fc0d356f693381aff9c74ea25c",
-        "syn_hlg_1080p.mp4": "2f0a3c8faa6fe34afa8aa3f333d19f82a4487dc2f3793c579e0a60c820f228f4"
+        "syn_hlg_1080p.mp4": "cc36bbe49ebd8519afc2a88414a04402c189a493cf2f0c972d8c2413790fece1",
+        "syn_hlg_1080p.265": "8b50c65eb88dabf3de58e7b5ddbe50ee88c33ab00bda837c1b2cf8532ec1acb1"
       }
     },
     {
@@ -18915,10 +18923,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07",
-      "size_bytes": 1044386,
+      "sha256": "6d82a7e7a5368287a16378bc74770f11cab60844ed271016f57aa2bf6e8063d5",
+      "size_bytes": 1039598,
       "files": {
-        "syn_h265_pq_sei_only.265": "160dcf1814dd1ddd8512f42992bf68f0ed829091e97b590f8e23fb1413106c07"
+        "syn_h265_pq_sei_only.265": "6d82a7e7a5368287a16378bc74770f11cab60844ed271016f57aa2bf6e8063d5"
       }
     },
     {
@@ -18937,10 +18945,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "e82993c4f5bfed2331c62871e72a7d11b457dbc354088070f6cdb30eeda880d7",
-      "size_bytes": 780650,
+      "sha256": "b289ef0020ad975e6f8a4e227bc3205864e6554c2ba9416444a068381552145c",
+      "size_bytes": 778333,
       "files": {
-        "syn_h265_pq_colr_only.mp4": "e82993c4f5bfed2331c62871e72a7d11b457dbc354088070f6cdb30eeda880d7"
+        "syn_h265_pq_colr_only.mp4": "b289ef0020ad975e6f8a4e227bc3205864e6554c2ba9416444a068381552145c"
       }
     },
     {
@@ -18957,11 +18965,11 @@
         "mdcv_sei",
         "clli_sei"
       ],
-      "sha256": "7e1229fcd688140d7e6c608d6499f5b9daff71fd1f8c1edc029181a2b2611752",
-      "size_bytes": 1079553,
+      "sha256": "e1cc3f5640f6fd1c2395f30316dbb98c88e6b82d96112efde00a0bd2bc015348",
+      "size_bytes": 1074759,
       "files": {
-        "syn_h265_pq_4000nit.265": "0916dbc9220d4a7f89cfcb0d71dc3628abd16ac9cccc2c7285e212ae29bcf5e2",
-        "syn_h265_pq_4000nit.mp4": "7e1229fcd688140d7e6c608d6499f5b9daff71fd1f8c1edc029181a2b2611752"
+        "syn_h265_pq_4000nit.mp4": "e1cc3f5640f6fd1c2395f30316dbb98c88e6b82d96112efde00a0bd2bc015348",
+        "syn_h265_pq_4000nit.265": "4ebff07fae1a92049966ba9b9ecfa93a11ef09c80bf4bcd204703e28f9b7a36c"
       }
     },
     {
@@ -19037,10 +19045,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "1fae4826938ca43b79a46239b607593d4d80bb48b638767d6bcd941f689d909e",
-      "size_bytes": 555777,
+      "sha256": "2c0504abf3d8fdfb16cb49e1e0fafeca532b05db5425eb3b2255c0c95fbcaff4",
+      "size_bytes": 553462,
       "files": {
-        "syn_h265_multi_pps.265": "1fae4826938ca43b79a46239b607593d4d80bb48b638767d6bcd941f689d909e"
+        "syn_h265_multi_pps.265": "2c0504abf3d8fdfb16cb49e1e0fafeca532b05db5425eb3b2255c0c95fbcaff4"
       }
     },
     {
@@ -19078,10 +19086,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "7aa3e48937e16c548526ff0d291e80d6be7c2a54b222a952821a4497d9913f4b",
-      "size_bytes": 555675,
+      "sha256": "3157cd6cec9dfd6d1e7a36f43f5b0f5f86d2d912de3de808eaa6feef4c57340d",
+      "size_bytes": 553360,
       "files": {
-        "syn_h265_sei_unknown_200.265": "7aa3e48937e16c548526ff0d291e80d6be7c2a54b222a952821a4497d9913f4b"
+        "syn_h265_sei_unknown_200.265": "3157cd6cec9dfd6d1e7a36f43f5b0f5f86d2d912de3de808eaa6feef4c57340d"
       }
     },
     {
@@ -19189,10 +19197,10 @@
       "features": [
         "sei"
       ],
-      "sha256": "f10e1ba8ffc58189b686bca3c33c0509f74c6026d1b7825fc2afc2a10f477c02",
-      "size_bytes": 555683,
+      "sha256": "c0c55d033ca643baee7239629ec3b273ce1ed6b3e35a959a6d1a935b8949ebae",
+      "size_bytes": 553368,
       "files": {
-        "syn_sei_h265_mastering_display_colour_volume.265": "f10e1ba8ffc58189b686bca3c33c0509f74c6026d1b7825fc2afc2a10f477c02"
+        "syn_sei_h265_mastering_display_colour_volume.265": "c0c55d033ca643baee7239629ec3b273ce1ed6b3e35a959a6d1a935b8949ebae"
       }
     },
     {
@@ -19206,10 +19214,10 @@
       "features": [
         "sei"
       ],
-      "sha256": "b243914c60f5f201e629f259e73e9eb9e4d91f42fd0831ccaa01bed9569a6e55",
-      "size_bytes": 555662,
+      "sha256": "9f901395fa9ee4d104b77a38f58443111329a6832e64692719128abd204a6a0c",
+      "size_bytes": 553347,
       "files": {
-        "syn_sei_h265_content_light_level_info.265": "b243914c60f5f201e629f259e73e9eb9e4d91f42fd0831ccaa01bed9569a6e55"
+        "syn_sei_h265_content_light_level_info.265": "9f901395fa9ee4d104b77a38f58443111329a6832e64692719128abd204a6a0c"
       }
     },
     {
@@ -19223,10 +19231,10 @@
       "features": [
         "sei"
       ],
-      "sha256": "85041aa38d5514f730c2c474062972159492d861e6bd2b31cd30fe94276bc1b1",
-      "size_bytes": 555659,
+      "sha256": "d725729e4026dabf2d89c550f249423de4d243426bc9f32fd9367a91dda3021c",
+      "size_bytes": 553344,
       "files": {
-        "syn_sei_h265_alternative_transfer.265": "85041aa38d5514f730c2c474062972159492d861e6bd2b31cd30fe94276bc1b1"
+        "syn_sei_h265_alternative_transfer.265": "d725729e4026dabf2d89c550f249423de4d243426bc9f32fd9367a91dda3021c"
       }
     },
     {
@@ -19240,10 +19248,10 @@
       "features": [
         "sei"
       ],
-      "sha256": "8cdfac411a0b7eb78ad1195912dd957ddf65a0fb853b781e980a9e8a85cec8b3",
-      "size_bytes": 555680,
+      "sha256": "7a6a3e2a17f75845dce14c9a19ac2b04a42a4b57cf521c70a7ab9707e1939616",
+      "size_bytes": 553365,
       "files": {
-        "syn_sei_h265_user_data_unregistered.265": "8cdfac411a0b7eb78ad1195912dd957ddf65a0fb853b781e980a9e8a85cec8b3"
+        "syn_sei_h265_user_data_unregistered.265": "7a6a3e2a17f75845dce14c9a19ac2b04a42a4b57cf521c70a7ab9707e1939616"
       }
     },
     {
@@ -19257,10 +19265,10 @@
       "features": [
         "sei"
       ],
-      "sha256": "c72493a3cbc3d7b0b37ec629f0c1ef835bc4f879f824cac28df85ccc61183b23",
-      "size_bytes": 555659,
+      "sha256": "f9114605fae5462af013bfdd32e6f436a557c4a9cf95e9aadae68e2de9b7e15b",
+      "size_bytes": 553344,
       "files": {
-        "syn_sei_h265_recovery_point.265": "c72493a3cbc3d7b0b37ec629f0c1ef835bc4f879f824cac28df85ccc61183b23"
+        "syn_sei_h265_recovery_point.265": "f9114605fae5462af013bfdd32e6f436a557c4a9cf95e9aadae68e2de9b7e15b"
       }
     },
     {
@@ -19280,11 +19288,11 @@
       "tags": [
         "fast"
       ],
-      "sha256": "6688f4fa426422d2dbe9f07964eccc0b6a626c0f579243e1712021061d57bd6f",
-      "size_bytes": 1050361,
+      "sha256": "d954440483462d90c5102a1eb59f5489d25abe13dfd3220ee4fedc3abe6c72b8",
+      "size_bytes": 1045555,
       "files": {
-        "syn_h265_hdr10plus.265": "c9165021e7937dd524a7f95c0b66d3687793d8fe1ed6b0ddb668b99fc87b8c97",
-        "syn_h265_hdr10plus.mp4": "6688f4fa426422d2dbe9f07964eccc0b6a626c0f579243e1712021061d57bd6f"
+        "syn_h265_hdr10plus.mp4": "d954440483462d90c5102a1eb59f5489d25abe13dfd3220ee4fedc3abe6c72b8",
+        "syn_h265_hdr10plus.265": "bb61767441d85a07fe853104924b093112d3378124c2ca6e021069db1760b281"
       }
     },
     {
@@ -19301,10 +19309,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7",
-      "size_bytes": 555615,
+      "sha256": "679e2e8d343b4a9f97b5e158e528b0ca92d9a89dc059a562cc3523c62c846b64",
+      "size_bytes": 553300,
       "files": {
-        "syn_broken_h265_truncated_sps.265": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7"
+        "syn_broken_h265_truncated_sps.265": "679e2e8d343b4a9f97b5e158e528b0ca92d9a89dc059a562cc3523c62c846b64"
       }
     },
     {
@@ -19321,10 +19329,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "5db5b617721fe410cb0e9304c608f8eca0de23e63f1517e4383aee0249d6d1b1",
-      "size_bytes": 555649,
+      "sha256": "527b775011f907679f4100db1e6a78d8896a483f5587252b688990968977e939",
+      "size_bytes": 553334,
       "files": {
-        "syn_broken_h265_slice_error_f12.265": "5db5b617721fe410cb0e9304c608f8eca0de23e63f1517e4383aee0249d6d1b1"
+        "syn_broken_h265_slice_error_f12.265": "527b775011f907679f4100db1e6a78d8896a483f5587252b688990968977e939"
       }
     },
     {
@@ -19358,10 +19366,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "40e8639b0b31876ba8974883036b50abb690fd2ba2e01e5aefdfc20c2abe23be",
-      "size_bytes": 555650,
+      "sha256": "1f857f80d25b4211b65c45a419e54dc55da37e0968dd5ab3a3f8f1758ad73a27",
+      "size_bytes": 553335,
       "files": {
-        "syn_broken_syntax_SYN_GEN_0001.265": "40e8639b0b31876ba8974883036b50abb690fd2ba2e01e5aefdfc20c2abe23be"
+        "syn_broken_syntax_SYN_GEN_0001.265": "1f857f80d25b4211b65c45a419e54dc55da37e0968dd5ab3a3f8f1758ad73a27"
       }
     },
     {
@@ -19545,10 +19553,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "d01637b23153e625daa5b762ae1d0f344113c727b530ad05f376fae6a6376714",
-      "size_bytes": 555649,
+      "sha256": "05d4a2d86e9a130933b1197663bd9a1759407597cfc54a0c025c8c9f5389987e",
+      "size_bytes": 1039598,
       "files": {
-        "syn_broken_syntax_SYN_H265_0001.265": "d01637b23153e625daa5b762ae1d0f344113c727b530ad05f376fae6a6376714"
+        "syn_broken_syntax_SYN_H265_0001.265": "05d4a2d86e9a130933b1197663bd9a1759407597cfc54a0c025c8c9f5389987e"
       }
     },
     {
@@ -19562,10 +19570,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7",
-      "size_bytes": 555615,
+      "sha256": "679e2e8d343b4a9f97b5e158e528b0ca92d9a89dc059a562cc3523c62c846b64",
+      "size_bytes": 553300,
       "files": {
-        "syn_broken_syntax_SYN_H265_0003.265": "920026b0d344159f364be8860932efdb189042fafc215462dcdcb68ef80012d7"
+        "syn_broken_syntax_SYN_H265_0003.265": "679e2e8d343b4a9f97b5e158e528b0ca92d9a89dc059a562cc3523c62c846b64"
       }
     },
     {
@@ -19579,10 +19587,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "5d63db9b7a3ab78c49ef276ba5d46ca0cbbbe72da6ff0fe93d28ebcfb5c4ca5f",
-      "size_bytes": 555649,
+      "sha256": "7fad6b54ec26292a737e439e104b49a327077bde642a553ddc82fc6d3f5c8c0b",
+      "size_bytes": 553334,
       "files": {
-        "syn_broken_syntax_SYN_H265_0007.265": "5d63db9b7a3ab78c49ef276ba5d46ca0cbbbe72da6ff0fe93d28ebcfb5c4ca5f"
+        "syn_broken_syntax_SYN_H265_0007.265": "7fad6b54ec26292a737e439e104b49a327077bde642a553ddc82fc6d3f5c8c0b"
       }
     },
     {
@@ -19596,10 +19604,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "8a6a3adbe414d956dc5150f8c60480979a46609352745a128edaf9ec0b5fe555",
-      "size_bytes": 555650,
+      "sha256": "2dd792ac57babacd69a70079f2e14662e02cab04465c14576d145f03727aacf1",
+      "size_bytes": 553335,
       "files": {
-        "syn_broken_syntax_SYN_H265_0010.265": "8a6a3adbe414d956dc5150f8c60480979a46609352745a128edaf9ec0b5fe555"
+        "syn_broken_syntax_SYN_H265_0010.265": "2dd792ac57babacd69a70079f2e14662e02cab04465c14576d145f03727aacf1"
       }
     },
     {
@@ -19613,10 +19621,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "fd861557a4c652f1f8f28fc86f72f1a813513e97c072173009e45438ecfe373d",
-      "size_bytes": 555649,
+      "sha256": "7267d68a7eb7889b42e40deeb4b7c9138d973da2dbcbbd9ca68a6c1962cb3121",
+      "size_bytes": 1039598,
       "files": {
-        "syn_broken_syntax_SYN_H265_0050.265": "fd861557a4c652f1f8f28fc86f72f1a813513e97c072173009e45438ecfe373d"
+        "syn_broken_syntax_SYN_H265_0050.265": "7267d68a7eb7889b42e40deeb4b7c9138d973da2dbcbbd9ca68a6c1962cb3121"
       }
     },
     {
@@ -19630,10 +19638,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "61cdfd2d826100faa603997cee69a719f3a988b463696958efad9fcf4a7ba710",
-      "size_bytes": 555649,
+      "sha256": "fdcdb03216b95d061d2fe490d69b69559c8005589d2fb673864ebdcaf6b37422",
+      "size_bytes": 553334,
       "files": {
-        "syn_broken_syntax_SYN_H265_0060.265": "61cdfd2d826100faa603997cee69a719f3a988b463696958efad9fcf4a7ba710"
+        "syn_broken_syntax_SYN_H265_0060.265": "fdcdb03216b95d061d2fe490d69b69559c8005589d2fb673864ebdcaf6b37422"
       }
     },
     {
@@ -19647,10 +19655,10 @@
       "features": [
         "broken"
       ],
-      "sha256": "132c555118aeff8be146a051e2144a75b1bdd3bbede3b463a98999c29107debe",
-      "size_bytes": 538450,
+      "sha256": "65787af02e0b3661a2847f0339351c019451740ed91ac52ac0dcb3bd06e7e6db",
+      "size_bytes": 536135,
       "files": {
-        "syn_broken_syntax_SYN_H265_0102.265": "132c555118aeff8be146a051e2144a75b1bdd3bbede3b463a98999c29107debe"
+        "syn_broken_syntax_SYN_H265_0102.265": "65787af02e0b3661a2847f0339351c019451740ed91ac52ac0dcb3bd06e7e6db"
       }
     },
     {
@@ -19827,10 +19835,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "35c5c8ed9807ce4c5a3f48497dcafd7964b0750e9a9033c0ada05162eccc6124",
-      "size_bytes": 7649233,
+      "sha256": "9649697f9b751dd59d40a915b963dd28e9629b5bf8df60271ecf0564b5dfbc66",
+      "size_bytes": 7646906,
       "files": {
-        "syn_level_violation_h265.265": "35c5c8ed9807ce4c5a3f48497dcafd7964b0750e9a9033c0ada05162eccc6124"
+        "syn_level_violation_h265.265": "9649697f9b751dd59d40a915b963dd28e9629b5bf8df60271ecf0564b5dfbc66"
       }
     },
     {
@@ -20067,8 +20075,8 @@
       "sha256": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e",
       "size_bytes": 373248418,
       "files": {
-        "syn_metrics_pq_1080p_dist.y4m": "f939be50c02651436f9457ce796e55d178e0ea36824290e835b6d9384a864bab",
-        "syn_metrics_pq_1080p_ref.y4m": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e"
+        "syn_metrics_pq_1080p_ref.y4m": "541b8fc4c37a3c64e6209115a045bcf4dee1488ef283b9c02d299cf22163e79e",
+        "syn_metrics_pq_1080p_dist.y4m": "f939be50c02651436f9457ce796e55d178e0ea36824290e835b6d9384a864bab"
       }
     },
     {
@@ -20689,10 +20697,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "734748076a2674b46d3680414d9ecaf153b0768d220e325e9cde64b0b110712d",
-      "size_bytes": 3738345,
+      "sha256": "dd6126ea400065f5e3442e521909c1251833c2988f456f85a8b7c9fa5a327944",
+      "size_bytes": 3735933,
       "files": {
-        "syn_h265_hrd_cbr.265": "734748076a2674b46d3680414d9ecaf153b0768d220e325e9cde64b0b110712d"
+        "syn_h265_hrd_cbr.265": "dd6126ea400065f5e3442e521909c1251833c2988f456f85a8b7c9fa5a327944"
       }
     },
     {
@@ -20709,10 +20717,10 @@
       "tags": [
         "fast"
       ],
-      "sha256": "af1991063b1fc046df7f7107eed81f16938046ac1dfd806c4f077898fe122960",
-      "size_bytes": 7733570,
+      "sha256": "c5533ffc812e441cdf9840df34b0f5be684d44418aa8c473fcb30db3a6c80c01",
+      "size_bytes": 7731135,
       "files": {
-        "syn_h265_hrd_vbr.265": "af1991063b1fc046df7f7107eed81f16938046ac1dfd806c4f077898fe122960"
+        "syn_h265_hrd_vbr.265": "c5533ffc812e441cdf9840df34b0f5be684d44418aa8c473fcb30db3a6c80c01"
       }
     },
     {
@@ -20733,10 +20741,10 @@
       "aliases": [
         "hev1_main10.mp4"
       ],
-      "sha256": "3eec29d0257ae56c101b315279d6c925dced1468d9800348f4edc9184375843b",
-      "size_bytes": 1045965,
+      "sha256": "211f09bada3288baec3f3c91300c232361a2deca18a0c9659ccd7b1f44067f4d",
+      "size_bytes": 1041175,
       "files": {
-        "syn_h265_main10_hev1.mp4": "3eec29d0257ae56c101b315279d6c925dced1468d9800348f4edc9184375843b"
+        "syn_h265_main10_hev1.mp4": "211f09bada3288baec3f3c91300c232361a2deca18a0c9659ccd7b1f44067f4d"
       }
     },
     {
@@ -20966,10 +20974,10 @@
       "aliases": [
         "hdr10.mkv"
       ],
-      "sha256": "cedd839bcc704451b124f224ee39492db07b9e52d374b4981f7093dae4e2e01a",
-      "size_bytes": 1050827,
+      "sha256": "017b55cbbf5893fb9935081da16ed5a9065b40c45f99a148131e7a26d2898b9b",
+      "size_bytes": 1046037,
       "files": {
-        "syn_mkv_hdr10.mkv": "cedd839bcc704451b124f224ee39492db07b9e52d374b4981f7093dae4e2e01a"
+        "syn_mkv_hdr10.mkv": "017b55cbbf5893fb9935081da16ed5a9065b40c45f99a148131e7a26d2898b9b"
       }
     },
     {
@@ -21104,6 +21112,186 @@
       "size_bytes": 19873,
       "files": {
         "size7_in_moov.mp4": "16a16e916bd423dcdb63258a8f69f62f429e1d8624300d0955dfc5a322ec1f08"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_missing_stsd",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "missing_stsd.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1011"
+        ]
+      },
+      "sha256": "1c0990abcead96fea7ce2bddeb43d110f416377fdda08d2305d52120afbc04cf",
+      "size_bytes": 19713,
+      "files": {
+        "missing_stsd.mp4": "1c0990abcead96fea7ce2bddeb43d110f416377fdda08d2305d52120afbc04cf"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_dup_stts",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "dup_stts.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1012"
+        ]
+      },
+      "sha256": "fe48c956676fde2ac0365a1288baea4768c58dfae76b9cf774139aefc4897e87",
+      "size_bytes": 19889,
+      "files": {
+        "dup_stts.mp4": "fe48c956676fde2ac0365a1288baea4768c58dfae76b9cf774139aefc4897e87"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_elst_in_moov",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "elst_in_moov.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1013"
+        ]
+      },
+      "sha256": "e5c63c7ed3de00d53d855f1f932b1a8c6f8c66ab044841daaff5d8eb788096e9",
+      "size_bytes": 19893,
+      "files": {
+        "elst_in_moov.mp4": "e5c63c7ed3de00d53d855f1f932b1a8c6f8c66ab044841daaff5d8eb788096e9"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_stts_count_overflow",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "stts_count_overflow.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1014"
+        ]
+      },
+      "sha256": "21031864120cab73561caf189a6052a9e1851d81b8cd869f941badc0885f79fb",
+      "size_bytes": 19865,
+      "files": {
+        "stts_count_overflow.mp4": "21031864120cab73561caf189a6052a9e1851d81b8cd869f941badc0885f79fb"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_tkhd_padded",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "tkhd_padded.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1015"
+        ]
+      },
+      "sha256": "1e40b5cdeb1909ef6515f1ba66f0cddfa1d6c0736fb5273ecd61e2806394ba73",
+      "size_bytes": 19869,
+      "files": {
+        "tkhd_padded.mp4": "1e40b5cdeb1909ef6515f1ba66f0cddfa1d6c0736fb5273ecd61e2806394ba73"
+      }
+    },
+    {
+      "id": "syn_mp4_broken_traf_no_tfhd",
+      "source": "syn",
+      "kind": "stream",
+      "recipe": "72",
+      "licence": "OVT synthetic stream generated from lavfi sources (CC0)",
+      "licence_spdx": "CC0-1.0",
+      "redistributable": true,
+      "features": [
+        "broken"
+      ],
+      "tags": [
+        "fast",
+        "isobmff-broken"
+      ],
+      "aliases": [
+        "traf_no_tfhd.mp4"
+      ],
+      "expected": {
+        "format": "isobmff",
+        "diagnostics": [
+          "CNT-1011"
+        ]
+      },
+      "sha256": "124480b7de7f4df8fe341752d1f68bbe19f4f5cf9f2423cfd761ba4a47988dca",
+      "size_bytes": 20177,
+      "files": {
+        "traf_no_tfhd.mp4": "124480b7de7f4df8fe341752d1f68bbe19f4f5cf9f2423cfd761ba4a47988dca"
       }
     },
     {

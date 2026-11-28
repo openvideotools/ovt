@@ -22,6 +22,8 @@
 #include <vector>
 
 #include "cmd/cache.h"
+#include "cmd/info.h"
+#include "cmd/probe.h"
 #include "exit_codes.h"
 
 namespace ovt::cli {
@@ -114,6 +116,8 @@ class Cli {
   [[nodiscard]] bool given(std::string_view long_name) const;  // the option appeared on the command line
   [[nodiscard]] CLI::App* completion() const noexcept { return completion_; }
   [[nodiscard]] const cmd::CacheArgs& cache() const noexcept { return cache_; }
+  [[nodiscard]] const cmd::InfoArgs& info() const noexcept { return info_; }
+  [[nodiscard]] const cmd::ProbeArgs& probe() const noexcept { return probe_; }
 
   // An option restricted to `canonical` (plus the accepted `extra` spellings); completion offers `canonical`.
   CLI::Option* add_choice(CLI::App& app, const std::string& name, std::string& var, const std::string& help,
@@ -124,6 +128,8 @@ class Cli {
   Raw raw_;
   CLI::App* completion_ = nullptr;
   cmd::CacheArgs cache_;
+  cmd::InfoArgs info_;
+  cmd::ProbeArgs probe_;
   std::map<const CLI::Option*, std::vector<std::string>> choices_;
 };
 

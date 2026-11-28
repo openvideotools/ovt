@@ -801,6 +801,64 @@ std::optional<std::vector<TemplatePiece>> compile_plain_template(std::string_vie
   return compiled;
 }
 
+// A valid media template that is not a plain relative reference (dot segments, an absolute path, another authority)
+// resolves with the same structure for every segment: the numeric fields only add digits and a minus sign, so a
+// segment holding a field is never "." or "..", and a ':' after it cannot end a scheme. Only the values differ. One
+// probe expansion with a unique digit marker per field is resolved once; each marker that survives (a field in a
+// segment that a later ".." removes does not) splits the result into the literal text between the fields.
+// nullopt when the template is invalid or the result is not of that form; the caller then resolves every segment.
+std::optional<std::vector<TemplatePiece>> compile_resolved_template(const SplitBase& base, std::string_view tmpl,
+                                                                    std::string_view representation_id) {
+  const auto pieces = compile_template(tmpl, representation_id);
+  if (!pieces || pieces->size() < 2) {
+    return std::nullopt;  // invalid, or no numeric field at all
+  }
+  const auto marker = [](size_t index) {
+    const std::string m = std::to_string(index + 1);
+    return "9" + std::string(8 - std::min<size_t>(m.size(), 8), '0') + m;  // fixed width, digits only
+  };
+  std::string probe;
+  for (size_t i = 0; i < pieces->size(); ++i) {
+    probe += (*pieces)[i].text;
+    if ((*pieces)[i].field != TemplatePiece::Field::None) {
+      probe += marker(i);
+    }
+  }
+  const std::string resolved = resolve_against(base.parts, base.empty, probe);
+  std::vector<TemplatePiece> out(1);
+  size_t at = 0;
+  for (size_t i = 0; i + 1 < pieces->size(); ++i) {
+    const std::string m = marker(i);
+    const size_t pos = resolved.find(m, at);
+    if (pos == std::string::npos) {
+      if (resolved.find(m) != std::string::npos) {
+        return std::nullopt;  // out of order
+      }
+      continue;  // removed by a dot segment
+    }
+    if (resolved.find(m, pos + m.size()) != std::string::npos) {
+      return std::nullopt;  // not unique: the base or the template text contains the marker
+    }
+    out.back().text.assign(resolved, at, pos - at);
+    out.back().field = (*pieces)[i].field;
+    out.back().width = (*pieces)[i].width;
+    out.emplace_back();
+    at = pos + m.size();
+  }
+  out.back().text.assign(resolved, at, std::string::npos);
+  // Check the result against full resolution for two other sets of values before relying on it.
+  for (const TemplateValues& v :
+       {TemplateValues{representation_id, 7, 123456, 9876543210}, TemplateValues{representation_id, -3, 0, 42}}) {
+    std::string got;
+    append_compiled(got, out, v);
+    const auto expanded = expand_template(tmpl, v);
+    if (!expanded || got != resolve_against(base.parts, base.empty, *expanded)) {
+      return std::nullopt;
+    }
+  }
+  return out;
+}
+
 // Whether a template expands at all. Validity depends only on the identifiers and format tags, never on the values,
 // so a media template is checked (and an invalid one reported) once per representation, not once per segment.
 bool template_valid(std::string_view tmpl) {
@@ -870,14 +928,25 @@ void append_template_segments(Context& ctx, Representation& rep, const std::vect
   if (!as_written && !entries.empty() && !base.empty) {
     compiled = compile_plain_template(media, rep.id);
   }
+  // Templates that need full resolution (fuzz-nightly 2026-11-18 and 11-27, #773: 480 000 segments of "." or
+  // "../$Number$/../x") resolve once: a template without numeric fields gives the same URL for every segment, and
+  // one with fields becomes literal text around the fields, resolved once.
+  std::optional<std::vector<TemplatePiece>> resolved;
+  if (!as_written && !compiled && !entries.empty()) {
+    if (const auto pieces = compile_template(media, rep.id); pieces && pieces->size() == 1) {
+      as_written = segment_url(ctx, base, media, values, at);
+    } else {
+      resolved = compile_resolved_template(base, media, rep.id);
+    }
+  }
   std::string scratch;
   for (const TimelineEntry& e : entries) {
     values.number = e.number;
     values.time = e.time;
     Segment seg;
-    if (compiled) {
-      scratch.assign(base.dir_prefix);
-      append_compiled(scratch, *compiled, values);
+    if (compiled || resolved) {
+      scratch.assign(compiled ? base.dir_prefix : std::string_view());
+      append_compiled(scratch, compiled ? *compiled : *resolved, values);
       seg.url = scratch;  // exact-size copy; the scratch buffer is reused
     } else {
       seg.url = as_written ? *as_written : segment_url(ctx, base, media, values, at);

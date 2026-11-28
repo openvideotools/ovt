@@ -1,0 +1,1 @@
+<MPD mediaPresentationDuration="PT100000H"><Period><AdaptationSet><Representation id="r" bandwidth="1"><SegmentTemplate media="$Number$/../x.m4s" duration="1" timescale="1"/></Representation></AdaptationSet></Period></MPD>

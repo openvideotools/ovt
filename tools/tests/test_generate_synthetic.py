@@ -93,6 +93,15 @@ def test_recipes_load_and_cover_every_numbered_recipe():
     [
         (["x264", "--crf", "20", "-o", "a.264", "s.y4m"], "x264 needs --threads"),
         (["x265", "--frame-threads", "1", "--input", "s.y4m"], "x265 needs"),
+        (["x265", "--frame-threads", "1", "--pools", "1", "--input", "s.y4m"], "x265 needs --no-info"),
+        (
+            ["ffmpeg", "-i", "s.y4m", "-c:v", "libx265", "-x265-params", "frame-threads=1:pools=1", "a.265"],
+            "libx265 needs -x265-params ...:info=0",
+        ),
+        (
+            ["ffmpeg", "-i", "s.y4m", "-c:v", "libx265", "-x265-params", "frame-threads=1:pools=1:info=00", "a.265"],
+            "info=0",
+        ),
         (["aomenc", "--cpu-used=4", "-o", "a.ivf", "s.y4m"], "aomenc needs"),
         (["ffmpeg", "-i", "s.y4m", "-c:v", "libx264", "a.264"], "libx264 needs -threads"),
         (["ffmpeg", "-i", "s.y4m", "-c:v", "libx265", "-x265-params", "pools=1", "a.265"], "libx265 needs"),
@@ -117,6 +126,15 @@ def test_unpinned_threads_and_dates_are_rejected(tmp_path, argv, problem):
     with pytest.raises(generate.GenError, match="not reproducible") as err:
         generate.load_recipes(path)
     assert err.value.code == 4
+
+
+def test_x265_with_info_sei_disabled_passes():
+    """#780: x265's info SEI carries the encoding CPU's cpuid, so ``--no-info`` / ``info=0`` is required."""
+    assert (
+        generate.determinism_problem(["x265", "--no-info", "--frame-threads", "1", "--pools", "1", "-o", "a"]) is None
+    )
+    params = "frame-threads=1:pools=1:info=0"
+    assert generate.determinism_problem(["ffmpeg", "-i", "s", "-c:v", "libx265", "-x265-params", params, "a"]) is None
 
 
 def test_seeded_lavfi_and_fixed_iv_pass():
