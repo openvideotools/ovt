@@ -6,6 +6,7 @@
 
 #include "demux/demuxer.h"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <exception>
@@ -18,6 +19,7 @@ extern "C" {
 #include <libavcodec/codec_id.h>
 #include <libavcodec/codec_par.h>
 #include <libavcodec/packet.h>
+#include <libavformat/avformat.h>
 #include <libavutil/dict.h>
 #include <libavutil/error.h>
 }
@@ -48,6 +50,14 @@ constexpr std::array kFormatAliases{
 };
 
 constexpr std::string_view kMovNames = "mov,mp4,m4a,3gp,3g2,mj2";
+
+// The demuxers a probe may pick. "annexb" is H.264 or HEVC by sniffed codec (§8.7.2 rule 5), so its probe is limited
+// to those two. SPEC-ASSUMPTION(#759): an empty hint probes only the demuxers of §8.7.2 rule 5, not every demuxer
+// libavformat was built with; the rest (game and console audio formats, playlists, image sequences) are not inputs
+// OVT analyses, and two of them (msf, vpk) hang or divide by zero on fuzzed bytes inside libavformat.
+constexpr std::array<std::string_view, 2> kAnnexBProbe{"h264", "hevc"};
+constexpr std::array<std::string_view, 10> kOpenProbe{kMovNames,       "ivf",    "obu", "av1",  "yuv4mpegpipe",
+                                                      "matroska,webm", "mpegts", "mxf", "h264", "hevc"};
 constexpr int64_t kIsobmffProbeSize = int64_t{5} << 20U;  // §8.7.2 rule 4
 
 std::string av_error_text(int rc) {
@@ -70,6 +80,25 @@ ovt_status map_av_error(int rc, bool io_failed) {
     return OVT_E_UNSUPPORTED;
   }
   return OVT_E_CORRUPT;  // AVERROR_INVALIDDATA, AVERROR_EOF inside a header, and everything else
+}
+
+// The probe avformat_open_input would run, done here so its pick can be checked against kAnnexBProbe / kOpenProbe
+// first. The probed bytes stay buffered in the AVIOContext, so a later open reads from the start of the file.
+ovt::Result<const AVInputFormat*> probe_format(detail::AvioAdapter& avio, std::string_view hint_format) {
+  using R = ovt::Result<const AVInputFormat*>;
+  const AVInputFormat* probed = nullptr;
+  const int probe_rc = av_probe_input_buffer2(avio.context(), &probed, "", nullptr, 0, 0);
+  if (probe_rc < 0 || probed == nullptr) {
+    const int err = probe_rc < 0 ? probe_rc : AVERROR_INVALIDDATA;
+    return R::error(map_av_error(err, avio.io_failed()), "demux: open failed: " + av_error_text(err));
+  }
+  const std::string_view name(probed->name);
+  const auto allowed = [&](const auto& names) { return std::ranges::find(names, name) != names.end(); };
+  if (hint_format == "annexb" ? !allowed(kAnnexBProbe) : !allowed(kOpenProbe)) {
+    return R::error(OVT_E_UNSUPPORTED,
+                    "demux: libavformat probed '" + std::string(name) + "', which is not an input format OVT opens");
+  }
+  return R::ok(probed);
 }
 
 std::span<AVStream* const> streams_of(const AVFormatContext* fmt) {
@@ -241,6 +270,15 @@ ovt::Result<std::unique_ptr<Demuxer>> Demuxer::open(std::shared_ptr<ovt::io::Ran
       av_dict_set(&opts, "ignore_editlist", "0", 0);
       av_dict_set(&opts, "export_all", "1", 0);
       av_dict_set(&opts, "probesize", std::to_string(kIsobmffProbeSize).c_str(), 0);
+    }
+    if (ifmt == nullptr) {
+      auto probed = probe_format(*d->avio_, hint_format);
+      if (!probed) {
+        av_dict_free(&opts);
+        avformat_free_context(fmt);
+        return R::error(probed.status(), probed.message());
+      }
+      ifmt = probed.value();
     }
     // On failure avformat_open_input frees `fmt` (and sets it to null) but not the custom pb.
     const int rc = avformat_open_input(&fmt, nullptr, ifmt, &opts);
