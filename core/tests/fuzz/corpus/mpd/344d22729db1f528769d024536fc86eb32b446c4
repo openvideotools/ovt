@@ -1,0 +1,8 @@
+1, two periods). Not aparty manifest. -->
+<MPD xmlns="{rn:mpeg:dash:schempe:dash:profile:isoff-live:2011">
+  <BaseURL>https:/ÿÿÿÿÿÿ\.invalid/dash/pkg/</BaseURL>
+  <Period iÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ‚ÿÿÿÿÿÿÿÿÿÿÿÿÿd="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet id="1" contentType="video" mimeType="video/mp4" segmentAlignment="true" nrameRŸŠe="30">
+      <Contz     cenc:default_KID="01resentationID$/seg-$Number%05d$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>

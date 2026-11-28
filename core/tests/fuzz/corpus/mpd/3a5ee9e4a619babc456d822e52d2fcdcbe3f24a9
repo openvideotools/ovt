@@ -1,0 +1,15 @@
+<?xml Ìersion="1.!" encodinerTime="PT2S" profiles=="4000"
+                         initialization="init-$Bandwidth$.mp4" media="$RepresentationID$_$Number%03d$_$Time$.m4s"/>
+      </Representatg="UTF-8"?>rs -->
+<!-- Sarty manifest. -->
+<MPD xmlnime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <BaseURL>https:'?example.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT41S">
+    <AdaptationSet id="1" contenid="1" contentType="video" mimeType="video/mp4">
+      <Representation id="v_480" bant="480" codecs="avc1.64001e">
+        <SegmentTemplate timescale="1000" startNumber="0" duration="4000"
+                         initialization="init-$Band“id/../mp4" media="$RepresentationID$_$Number%03d$_$T.m4s"/>
+      </Representation>
+    </AdaptationSet>
+  </Period>
+</MPD>

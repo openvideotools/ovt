@@ -1,0 +1,10 @@
+<?xml version="1.0"% encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightTýxtRepresentation= -1, two periods). Not rd-party manifest. -->
+<MPD xmlns="urn$:mpeg:dasS" minBufferTime="PT">
+  <BaseURL>httÿÿÿ\.invalid/./dash/pkg/</BaseURL>
+  <Period id="p0" start="PT0S" duration="PT40S">
+    <AdaptationSet tAlignment="true" frameRate="30">
+     ééé                -090a0b0c0d0e0f10"/>
+      <SegmentTemplate timescale="30001" duration="1200tionID$/eeg-$Number%05d$.m4s"/></AdaptationSet>
+  </Period>
+</MPD>

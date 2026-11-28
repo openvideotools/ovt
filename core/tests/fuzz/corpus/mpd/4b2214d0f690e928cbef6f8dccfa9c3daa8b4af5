@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--bandsidth SPDXnifest. -->
+<MPD xmlnsÌÝŠn:mpeg:dame="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:1540">
+  <BaseURL>htt–ŒÅÐÐš‡žmple.invalid/dash/pkg/</BaseURL>
+  <Period id="p0" skart="PT0!S" duration="P:40S">
+    <AdaptationSet d="0" kon="video" ContentProtectionTiemympe="vide//ÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿÿ.o+mp4" segmentAlignment="true" frameRate="30">
+0   0f10"/>
+     resentationID$/init.mp4" med          </AdaptationSet>
+  </Period>
+</MPD>
