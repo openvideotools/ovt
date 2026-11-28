@@ -2,11 +2,14 @@
 <!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
 # isobmff-broken
 
-Small ISOBMFF files (about 20 KiB each, 260 KiB in all) with one deliberate defect in the box headers, used by
+Small ISOBMFF files (about 20 KiB each, 450 KiB in all) with one deliberate defect in the box headers, used by
 `core/tests/container/box_walk_test.cpp` (chapter 08 §8.2.3, §8.9.3, WI-1.201); the last three files, with a defect
-in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209). Each is the base
-file of `tools/make_broken.py` with one change; regenerate a file with the command in the table (the output is
-byte-for-byte reproducible).
+in the sample tables, are used by `core/tests/container/decoders_sample_tables_test.cpp` (WI-1.209); the six
+before the `syn_mp4_broken_*` files, with a defect in the box rules of chapter 8 §8.5, are used by
+`core/tests/container/diag_coverage_test.cpp` (WI-1.224a); the three `syn_mp4_broken_*` files (recipes 35 to 37, a
+defect the brand checks of §8.4.5 find) are used by the same test (WI-1.222a).
+Each is the base file of `tools/make_broken.py` (the fragmented file for `traf_no_tfhd.mp4`) with one change;
+regenerate a file with the command in the table (the output is byte-for-byte reproducible).
 
 | File | `tools/make_broken.py` arguments | Expected code |
 |---|---|---|
@@ -27,6 +30,22 @@ byte-for-byte reproducible).
 | `stsc_descending.mp4` | `--stsc-descending` | `CNT-2003` |
 | `ctts_v0_negative.mp4` | `--ctts-v0-negative` | `CNT-2002` |
 | `stco_beyond_eof.mp4` | `--stco-beyond-eof` | `CNT-2007` |
+| `missing_stsd.mp4` | `--missing-stsd` | `CNT-1011` |
+| `traf_no_tfhd.mp4` | `--traf-no-tfhd` | `CNT-1011` |
+| `dup_stts.mp4` | `--dup-stts` | `CNT-1012` |
+| `elst_in_moov.mp4` | `--elst-in-moov` | `CNT-1013` |
+| `stts_count_overflow.mp4` | `--stts-count-overflow` | `CNT-1014` |
+| `tkhd_padded.mp4` | `--tkhd-padded` | `CNT-1015` |
+| `syn_mp4_broken_cmfc_two_tracks.mp4` | `--cmfc-two-tracks` | `CNT-7010` |
+| `syn_mp4_broken_msix_without_sidx.mp4` | `--msix-no-sidx` | `CNT-7031` |
+| `syn_mp4_broken_hvc1_no_ps.mp4` | `--hvc1-strip-ps` | `CNT-7005` |
+| `syn_mp4_broken_avc1_inband_ps.mp4` | `--avc1-inband-ps` | `CNT-7004` (Deep) |
+| `syn_mp4_broken_av01_td_in_sample.mp4` | `--av01-td-in-sample` | `CNT-7008` (Deep) |
+| `syn_mp4_broken_av01_unsized_obu.mp4` | `--av01-unsized-obu` | `CNT-7009` (Deep) |
 
 The other truncation offsets and the 0/1/7/0xFFFFFFFF size words are exercised in memory by the test, which
 mutates a base file of its own, so the committed set stays small.
+
+The last three files (WI-1.222b) have real NAL and OBU structure in their samples and raise their code at the `Deep`
+level only; `core/tests/container/brands_test.cpp` checks them, and `diag_coverage_test.cpp` does not (it runs
+`Standard`). They have no manifest entry until the spec folds the acceptance test of #803.

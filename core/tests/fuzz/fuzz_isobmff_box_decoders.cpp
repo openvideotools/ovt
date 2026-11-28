@@ -6,7 +6,8 @@
 // decoders are reached without a valid box tree around them (the whole-file walk is fuzz_isobmff_tree, WI-1.204).
 // Input layout: byte 0 selects the box type and ancestor chain from kCases, byte 1 is the FullBox version, bytes
 // 2-4 the flags, byte 5 the context bits (bit 0 quicktime, bit 1 movie/track timescales known, bits 2-3 the track
-// handler: 0 none, 1 vide, 2 soun, 3 text; bit 4 stsd version 1), the rest is the payload. Invariants, each an abort
+// handler: 0 none, 1 vide, 2 soun, 3 text; bit 4 stsd version 1; bit 5 track_ID 1 with an encryption table, bit 6 the
+// table already holds an IV size of 8 for it), the rest is the payload. Invariants, each an abort
 // when violated: no exception escapes run_decoder(); every top-level field span lies inside the box; decoding the same
 // input twice gives byte-identical FlatBuffers. Later decoder WIs add their boxes to kCases (append: the corpus seeds
 // are indexed by position).
@@ -18,6 +19,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <map>
+#include <memory>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -118,6 +121,12 @@ constexpr auto kCases = std::to_array<Case>({
     {"vpcC", "vp09", true, "stsd"},
     {"esds", "mp4a", true, "stsd"},
     {"dOps", "Opus", false, "stsd"},
+    // WI-1.213 group H: encryption boxes.
+    {"frma", "sinf", false},
+    {"schm", "sinf", true},
+    {"tenc", "schi", true},
+    {"senc", "traf", true},
+    {"pssh", "moov", true},
 });
 
 void require(bool ok) {
@@ -151,6 +160,13 @@ std::vector<uint8_t> decode_once(const Case& c, uint8_t version, uint32_t flags,
     ctx.handler_type = cc_of(h);
   }
   ctx.stsd_version = (ctx_bits & 16U) != 0 ? 1 : 0;
+  if ((ctx_bits & 32U) != 0) {
+    ctx.track_id = 1;
+    ctx.enc_for_track = std::make_shared<std::map<uint32_t, iso::TrackEncryption>>();
+    if ((ctx_bits & 64U) != 0) {
+      (*ctx.enc_for_track)[1] = iso::TrackEncryption{8, true};
+    }
+  }
   const iso::RegistryEntry* e = iso::lookup(c.fourcc, ctx);
   require(e != nullptr && e->decoder != nullptr);
 

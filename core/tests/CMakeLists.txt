@@ -69,6 +69,7 @@ set_tests_properties(catch_discovery_registers_every_test_case PROPERTIES LABELS
 # ---- Module tests ---------------------------------------------------------------------------------
 add_subdirectory(io)
 add_subdirectory(analysis)
+add_subdirectory(api) # WI-1.130: ovt_stream_unit_bytes
 add_subdirectory(bitreader)
 add_subdirectory(cache)
 add_subdirectory(container)

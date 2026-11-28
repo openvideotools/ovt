@@ -92,6 +92,21 @@ X(CNT_1007, "CNT-1007", Info, "reserved field has unexpected value", "")
 
 // WI-1.206 (stsd and sample entries, §8.3.2).
 X(CNT_1010, "CNT-1010", Error, "`stsd.entry_count` ≠ number of sample entries found", "14496-12 §8.5.2")
+X(CNT_1003, "CNT-1003", Warning, "unknown FullBox version", "per box")
+X(CNT_1005, "CNT-1005", Info, "unparsed trailing bytes after the last field", "per box")
+X(CNT_1011, "CNT-1011", Error,
+  "required box missing: `mvhd` in `moov`; `tkhd`, `mdia` in `trak`; `mdhd`, `hdlr`, `minf` in `mdia`; `stbl`, `dinf` in `minf`; `stsd`, `stts`, `stsc`, `stsz|stz2`, `stco|co64` in `stbl` (unless `cmfc`/fragment-only with empty stbl, where `stts/stsc/stsz/stco` must still exist with 0 entries); `mfhd` in `moof`; `tfhd` in `traf`; message names the box and parent", "14496-12 §8.x \"Mandatory: Yes\"")
+X(CNT_1012, "CNT-1012", Error,
+  "duplicate box where exactly one is allowed (`mvhd`, `tkhd`, `mdhd`, `hdlr`, `stsd`, `stts`, `stsz`, `stco`/`co64`, `tfhd`, `tfdt`, `mehd`, `ftyp`) or duplicate `track_ID`", "14496-12 §8.x \"Quantity: Exactly one\"")
+X(CNT_1013, "CNT-1013", Warning,
+  "box in a parent where the registry does not allow it (`allowed_parents` non-empty and mismatch); e.g. `colr` in `stbl`, `elst` outside `edts`, `stss` in `traf`", "conformance JSON")
+X(CNT_1014, "CNT-1014", Error,
+  "box size does not match its fields: payload ends before the fields' declared count (`entry_count` × entry size > payload)", "per box")
+X(CNT_1015, "CNT-1015", Warning,
+  "box size larger than fields + known children by more than 0 bytes **and** box is one of the fixed-size boxes (`tkhd`, `mdhd`, `mvhd`, `vmhd`, `smhd`, `btrt`, `pasp`, `clli`, `mdcv`, `tfdt`, `mfhd`, `mehd`, `trex`)", "per box")
+X(CNT_1024, "CNT-1024", Info,
+  "`tkhd.matrix` is neither identity nor a 90°/180°/270° rotation; `TrackInfo.rotation = 0`", "14496-12 §8.3.2")
+X(CNT_1032, "CNT-1032", Warning, "`mdhd.timescale == 0` or `mvhd.timescale == 0`", "14496-12 §8.4.2")
 
 // WI-1.203 (generated registry wired into the walk, §8.2.3 step 2.10).
 X(CNT_1001, "CNT-1001", Info, "unknown fourcc (not in MP4RA/conformance/extra registry)", "")
@@ -120,8 +135,17 @@ X(CNT_2008, "CNT-2008", Error, "both `stco` and `co64` present", "14496-12 §8.7
 X(CNT_2009, "CNT-2009", Error, "`stss` sample number out of range or not increasing", "14496-12 §8.6.2")
 X(CNT_2010, "CNT-2010", Error, "`sdtp` length ≠ sample count", "14496-12 §8.6.4")
 X(CNT_2011, "CNT-2011", Warning, "`ctts` run total ≠ sample count", "14496-12 §8.6.1.3")
+X(CNT_2012, "CNT-2012", Warning,
+  "`cslg` hints inconsistent with `ctts`: compositionToDTSShift `S` < derived shift `D`, or least/greatest delta ≠ min/max `cts_offset` (informative box; CTS unchanged)",
+  "14496-12 §8.6.1.4")
 X(CNT_2013, "CNT-2013", Info, "zero-size sample", "")
+X(CNT_2014, "CNT-2014", Warning, "`stsc`/`stco` describe more samples than `stsz`", "14496-12 §8.7.4")
+X(CNT_2015, "CNT-2015", Error, "samples without a chunk", "14496-12 §8.7.4")
+X(CNT_2018, "CNT-2018", Info, "`sdtp` says I-picture but not in `stss` (open GOP)", "14496-12 §8.6.4")
 X(CNT_2019, "CNT-2019", Warning, "`stss` present but lists every sample (should be omitted)", "14496-12 §8.6.2")
+X(CNT_2021, "CNT-2021", Error, "`sbgp` index without matching `sgpd` entry", "14496-12 §8.9.2")
+X(CNT_2030, "CNT-2030", Error, "64-bit overflow while summing durations/offsets", "")
+X(CNT_2031, "CNT-2031", Error, "sample count > 50 000 000, table truncated", "")
 
 // WI-1.228 (Y4M reader, §8.6.5).
 X(CNT_Y4M_0001, "CNT-Y4M-0001", Info, "Y4M header without `F` tag; 25:1 assumed", "yuv4mpeg(5)")
@@ -133,6 +157,51 @@ X(CNT_Y4M_0003, "CNT-Y4M-0003", Error, "`FRAME` magic missing at offset `o` (fra
 X(CNT_RAW_0001, "CNT-RAW-0001", Warning, "`N` trailing bytes do not form a whole frame (ignored)", "")
 X(CNT_RAW_0002, "CNT-RAW-0002", Error,
   "raw format undetermined; `N` candidates (`list`); supply `--raw-format` or a sidecar", "")
+
+// WI-1.220 (EditList and the elst <-> tfdt sanity check, §8.4.2).
+X(CNT_3001, "CNT-3001", Error, "edit starts beyond media duration", "14496-12 §8.6.6")
+X(CNT_3002, "CNT-3002", Warning, "edit exceeds media duration", "14496-12 §8.6.6")
+X(CNT_3003, "CNT-3003", Info, "`media_rate` not 0 or 1 (unsupported by most players)", "14496-12 §8.6.6")
+X(CNT_3004, "CNT-3004", Warning, "Σ `segment_duration` ≠ `tkhd.duration`", "14496-12 §8.6.6")
+X(CNT_3010, "CNT-3010", Warning, "`elst.media_time` inconsistent with first fragment `tfdt + cts_offset`",
+  "23000-19 §7.5.13")
+X(CNT_3011, "CNT-3011", Info, "presentation offset implied without `elst`", "")
+X(CNT_3012, "CNT-3012", Warning, "multi-segment `elst` in fragmented/CMAF file", "23000-19 §7.5.13")
+
+// WI-1.219a/b (fragment timeline, §8.4.3; CNT-4002 / CNT-4003 are raised by the tfhd / trun decoders, §8.3.5).
+X(CNT_4001, "CNT-4001", Warning, "`mfhd.sequence_number` not strictly increasing", "14496-12 §8.8.5")
+X(CNT_4002, "CNT-4002", Warning,
+  "`tfhd` has both `base-data-offset-present` and `default-base-is-moof`", "14496-12 §8.8.7")
+X(CNT_4003, "CNT-4003", Warning,
+  "`trun` has both `first-sample-flags-present` and `sample-flags-present`", "14496-12 §8.8.8")
+X(CNT_4004, "CNT-4004", Warning, "`moof` not immediately followed by `mdat`", "23000-19 §7.3.2.3")
+X(CNT_4005, "CNT-4005", Error,
+  "no default sample duration/size/flags (neither `tfhd` nor `trex`) while `trun` omits them", "14496-12 §8.8.7")
+X(CNT_4006, "CNT-4006", Info, "implicit base data offsets with several `traf`s", "14496-12 §8.8.7")
+X(CNT_4007, "CNT-4007", Warning,
+  "first `trun` of a `traf` without `data_offset` and no `base_data_offset`", "14496-12 §8.8.8")
+X(CNT_4008, "CNT-4008", Info, "`tfdt` absent; DTS inferred by continuity", "14496-12 §8.8.12")
+X(CNT_4010, "CNT-4010", Error, "`tfra` entry does not point at a `moof` / wrong time", "14496-12 §8.8.10")
+X(CNT_4011, "CNT-4011", Error, "`mfro.size` ≠ `mfra` size", "14496-12 §8.8.11")
+X(CNT_4020, "CNT-4020", Warning, "`tfdt` discontinuity (gap or overlap vs previous fragment)", "14496-12 §8.8.12")
+X(CNT_4021, "CNT-4021", Error, "fragment sample outside its `mdat`", "14496-12 §8.8.8")
+X(CNT_4022, "CNT-4022", Info, "bytes in `mdat` not referenced by any `trun`", "")
+X(CNT_4030, "CNT-4030", Warning, "`sidx.referenced_size` ≠ actual bytes", "14496-12 §8.16.3")
+X(CNT_4031, "CNT-4031", Info, "`sidx.timescale` ≠ track timescale", "14496-12 §8.16.3")
+X(CNT_4032, "CNT-4032", Warning, "`sidx.subsegment_duration` ≠ Σ `trun` durations", "14496-12 §8.16.3")
+X(CNT_4033, "CNT-4033", Info, "`sidx.earliest_presentation_time` ≠ first CTS", "14496-12 §8.16.3")
+X(CNT_4034, "CNT-4034", Warning, "`starts_with_SAP` but first sample is non-sync", "14496-12 §8.16.3")
+X(CNT_4035, "CNT-4035", Warning, "fragment `trun` sample count 0 and not `duration-is-empty`", "14496-12 §8.8.8")
+X(CNT_4036, "CNT-4036", Info, "`styp` brands differ between segments of one file", "14496-12 §8.16.2")
+X(CNT_6005, "CNT-6005", Warning, "`saio` does not point at `senc` sample data", "23001-7 §7.1")
+
+// WI-1.213 (group H: encryption boxes, §8.3.8). SPEC-ASSUMPTION(#794): CNT-6014 is the Info the spec asks for when the
+// `senc` IV size had to be inferred.
+X(CNT_6001, "CNT-6001", Error, "`senc` IV size unknown and not inferable", "23001-7 §7.2")
+X(CNT_6003, "CNT-6003", Error, "`tenc` IV size ∉ {0,8,16}", "23001-7 §8.2")
+X(CNT_6004, "CNT-6004", Error, "`pssh.DataSize` inconsistent with box size", "23001-7 §8.1")
+X(CNT_6009, "CNT-6009", Warning, "`pssh` with unknown SystemID", "")
+X(CNT_6014, "CNT-6014", Info, "`senc` IV size inferred from the box size (no `tenc` known)", "23001-7 §7.2")
 
 // WI-4.208 (DASH MPD parser, §8.10). SPEC-ASSUMPTION(#349): §8.5 has no DASH family; CNT-DASH-0001..0009 are the
 // proposed rows.
@@ -183,3 +252,86 @@ X(CNT_9001, "CNT-9001", Error,
 X(CNT_9002, "CNT-9002", Warning, "Annex B start codes found inside an `avc1`/`hvc1` sample (muxer bug)",
   "14496-15 §4.3")
 X(CNT_9003, "CNT-9003", Warning, "AV1 `OBU_TEMPORAL_DELIMITER` inside a sample", "AV1-ISOBMFF §2.4")
+
+// WI-1.223 (HdrMetadata summary, §8.4.6).
+X(CNT_5001, "CNT-5001", Warning, "`colr` nclx differs from SPS VUI / AV1 `color_config`", "14496-12 §12.1.5")
+X(CNT_5003, "CNT-5003", Info, "`mdcv` differs from SEI 137", "ST 2086")
+X(CNT_5004, "CNT-5004", Info, "`clli` differs from SEI 144", "CTA-861.3")
+X(CNT_5005, "CNT-5005", Error, "`av1C` bit depth/chroma ≠ sequence header", "AV1-ISOBMFF §2.3")
+X(CNT_5006, "CNT-5006", Error, "`hvcC`/`avcC` profile/bit depth ≠ SPS", "14496-15")
+X(CNT_5007, "CNT-5007", Warning, "`colr` absent on a video track (SDR assumed)", "23000-19 §7.5.3")
+X(CNT_5008, "CNT-5008", Warning, "`transfer_characteristics == 2` (unspecified) with 10-bit BT.2020 content", "")
+X(CNT_5010, "CNT-5010", Warning, "DV RPU in bitstream, no `dvcC`/`dvvC`", "DV-ISOBMFF")
+X(CNT_5011, "CNT-5011", Warning, "`dvcC`/`dvvC` present, no RPU found in probed samples", "DV-ISOBMFF")
+X(CNT_5012, "CNT-5012", Info, "PQ without static metadata", "")
+X(CNT_5021, "CNT-5021", Warning, "`dv_bl_signal_compatibility_id` contradicts `colr`", "DV-ISOBMFF §2.2")
+X(CNT_5022, "CNT-5022", Info, "sample entry `dvh1`/`dvhe` (non-cross-compatible) vs `hvc1`+`dvvC`", "DV-ISOBMFF §3")
+
+// WI-1.222 (brand and profile checks, §8.4.5). CNT-8011..8014 (MIAF item properties) come with WI-4.213.
+X(CNT_7001, "CNT-7001", Warning,
+  "`default-base-is-moof`/`tfdt` used but no `iso5`+/`cmfc`/`dash`/`msdh` brand declares them", "14496-12 Annex E")
+X(CNT_7002, "CNT-7002", Warning,
+  "`mp42` file: `mp4a`/`mp4v` sample entry without `esds`", "14496-14 §5")
+X(CNT_7003, "CNT-7003", Error,
+  "`avc1`/`avc2` sample entry with `numOfSequenceParameterSets == 0`", "14496-15 §5.3.4")
+X(CNT_7005, "CNT-7005", Error,
+  "`hvc1` sample entry whose `hvcC` arrays lack VPS, SPS or PPS", "14496-15 §8.4.1")
+X(CNT_7006, "CNT-7006", Info,
+  "`hvc1` sample entry with `array_completeness == 0`", "14496-15 §8.3.3")
+X(CNT_7007, "CNT-7007", Error,
+  "`av1C.configOBUs` does not contain exactly one `OBU_SEQUENCE_HEADER`", "AV1-ISOBMFF §2.3.4")
+X(CNT_7010, "CNT-7010", Error,
+  "`cmfc` file with `N` `trak` boxes (exactly one required)", "23000-19 §7.3.2")
+X(CNT_7011, "CNT-7011", Error,
+  "`cmfc` file without `mvex`/`trex`", "23000-19 §7.3.2")
+X(CNT_7012, "CNT-7012", Info,
+  "`cmfc` file with `mvhd.duration ≠ 0` and no `mehd`", "23000-19 §7.3.2")
+X(CNT_7013, "CNT-7013", Error,
+  "`cmfc` file whose `stbl` tables are not empty (`box.entry_count == N`)", "23000-19 §7.3.2")
+X(CNT_7014, "CNT-7014", Error,
+  "`cmfc` `moof` `k` with `N` `traf` boxes (exactly one required)", "23000-19 §7.3.2")
+X(CNT_7015, "CNT-7015", Warning,
+  "`cmfc` `tfhd` of fragment `k` without `default-base-is-moof`", "23000-19 §7.3.2")
+X(CNT_7016, "CNT-7016", Error,
+  "`cmfc` `traf` of fragment `k` without `tfdt`", "23000-19 §7.3.2")
+X(CNT_7017, "CNT-7017", Info,
+  "`cmfc` file with `sdtp`/`stss` (not used by CMAF)", "23000-19 §7.3.2")
+X(CNT_7018, "CNT-7018", Warning,
+  "`cmfc` video sample entry without `colr`", "23000-19 §7.5.3")
+X(CNT_7019, "CNT-7019", Info,
+  "`cmfc` video sample entry without `btrt`", "23000-19 §7.5")
+X(CNT_7020, "CNT-7020", Warning,
+  "`cmf2` file with `elst.media_time > 0` (negative composition offsets expected instead)", "23000-19 §7.7")
+X(CNT_7021, "CNT-7021", Info,
+  "`cmf2` file with `cslg`", "23000-19 §7.7")
+X(CNT_7022, "CNT-7022", Info,
+  "`cmf2` file with in-band parameter-set entries (`avc3`/`hev1`)", "23000-19 §7.7")
+X(CNT_7023, "CNT-7023", Error,
+  "`cmfs` segment without a leading `styp`", "23000-19 §7.3.3")
+X(CNT_7024, "CNT-7024", Warning,
+  "`sidx` not at the segment start, or `cmfl` chunk with more than one `moof`", "23000-19 §7.3.3")
+X(CNT_7025, "CNT-7025", Warning,
+  "`emsg`/`prft` after the `moof` of a CMAF chunk", "23000-19 §7.3.3")
+X(CNT_7030, "CNT-7030", Error,
+  "`dash` brand but no `mvex`, or `stsz.sample_count > 0` (self-initialising segment expected)", "23009-1 §6")
+X(CNT_7031, "CNT-7031", Error,
+  "`msix` brand without `sidx`", "23009-1 §6.3.4")
+X(CNT_7032, "CNT-7032", Warning,
+  "`msix` file: `moof` at offset `o` not referenced by any `sidx`", "23009-1 §6.3.4")
+X(CNT_7033, "CNT-7033", Info,
+  "`lmsg` brand on a segment that is not the last", "23009-1 §6.3.4")
+X(CNT_7040, "CNT-7040", Error,
+  "HLS fMP4 segment without `tfdt`", "HLS Authoring Specification for Apple Devices")
+X(CNT_7041, "CNT-7041", Warning,
+  "HLS context with `hev1`/`avc3` sample entry (Apple requires `hvc1`/`avc1`)", "HLS Authoring Specification for Apple Devices")
+X(CNT_7050, "CNT-7050", Info,
+  "iTunes brand (`M4A `/`M4V `/`M4P `/`M4B `) without `ilst`", "")
+X(CNT_8010, "CNT-8010", Error,
+  "`mif1` file: `meta` lacks required child `box` (`hdlr == pict`, `pitm`, `iinf`, `iloc`, `iprp`)", "23008-12 §10")
+// WI-1.222b: the Deep rows that read sample bytes.
+X(CNT_7004, "CNT-7004", Warning,
+  "SPS/PPS NAL unit inside an `avc1` sample (parameter sets must be out of band)", "14496-15 §5.3.4")
+X(CNT_7008, "CNT-7008", Warning,
+  "sample `i` contains an `OBU_TEMPORAL_DELIMITER` (SHOULD be omitted)", "AV1-ISOBMFF §2.4")
+X(CNT_7009, "CNT-7009", Error,
+  "OBU `k` of sample `i` has `obu_has_size_field == 0` and is not the last OBU", "AV1-ISOBMFF §2.4")
