@@ -13,6 +13,8 @@ target_sources(ovt_core_objects PRIVATE common/unit_scan.cpp)
 # WI-1.106: SyntaxBuilder, the arena tree SyntaxNodeBuffer with its ovt.fb.SyntaxNode conversion, and the JSON and
 # trace writers.
 target_sources(ovt_core_objects PRIVATE common/syntax_builder.cpp common/syntax_node_buffer.cpp common/syntax_dump.cpp)
+# WI-1.504: ovt_syntax_trace (ovt/syntax.h), the `ovt syntax --trace` text of chapter 12 §12.2.3.1.
+target_sources(ovt_core_objects PRIVATE trace_writer.cpp)
 # common/syntax_node_buffer.h includes the generated ovt_model_generated.h, and the module tests include that
 # header, so the generated include directory and flatbuffers are PUBLIC on the objects, inside BUILD_INTERFACE
 # (core-objects rule 1, #62).

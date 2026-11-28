@@ -595,6 +595,41 @@ int dispatch_probe(const Cli& cli, const Globals& g, Context& ctx) {
   return static_cast<int>(code);
 }
 
+int dispatch_syntax(const Cli& cli, const Globals& globals, Context& ctx) {
+  Globals g = globals;
+  // --trace implies --format text (§12.2.3); an explicit other --format is CLI-0006. WI-1.504a: --trace is required.
+  if (!g.format_from_flag) {
+    g.format = Format::Text;
+  } else if (g.format != Format::Text) {
+    print_usage_error(
+        ctx, UsageError{"CLI-0006",
+                        fmt::format("options --trace and --format {} are mutually exclusive", format_name(g.format)),
+                        "ovt syntax"});
+    return static_cast<int>(ExitCode::Usage);
+  }
+  OutputTarget target(ctx, g);
+  if (auto d = target.open()) {
+    report(ctx, g, *d);
+    return static_cast<int>(ExitCode::Io);
+  }
+  const cmd::SyntaxOutcome outcome = cmd::run_syntax(cli.syntax(), target.stream());
+  ExitCode code = outcome.code;
+  if (cancel_requested()) {
+    code = ExitCode::Cancelled;
+  }
+  const auto closed = target.close(code);
+  for (const Diagnostic& d : outcome.diagnostics) {
+    report(ctx, g, d);
+  }
+  if (outcome.write_failed || closed) {
+    report(
+        ctx, g,
+        closed.value_or(Diagnostic{"Error", "CLI-0004", fmt::format("cannot write '{}'", g.output), std::nullopt, ""}));
+    return static_cast<int>(ExitCode::Io);
+  }
+  return static_cast<int>(code);
+}
+
 int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
   const bool version = cli.raw().version;
   if (!version && cli.info().app->parsed()) {
@@ -602,6 +637,9 @@ int dispatch(const Cli& cli, const Globals& g, Context& ctx) {
   }
   if (!version && cli.probe().app->parsed()) {
     return dispatch_probe(cli, g, ctx);
+  }
+  if (!version && cli.syntax().app->parsed()) {
+    return dispatch_syntax(cli, g, ctx);
   }
   if (!version && cli.cache().app->parsed()) {
     return dispatch_cache(cli, g, ctx);
@@ -738,6 +776,7 @@ Cli::Cli()
   cmd::add_cache_command(*this, cache_);
   cmd::add_info_command(*this, info_);
   cmd::add_probe_command(*this, probe_);
+  cmd::add_syntax_command(*this, syntax_);
   completion_ = app_.add_subcommand("completion", "Shell completion scripts (bash, zsh, fish)");
   add_choice(*completion_, "shell", raw_.shell, "Shell to print the completion script for", {"bash", "zsh", "fish"})
       ->required();

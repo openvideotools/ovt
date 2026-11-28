@@ -27,6 +27,7 @@ add_library(
   src/cmd/cache.cpp
   src/cmd/info.cpp
   src/cmd/probe.cpp
+  src/cmd/syntax.cpp
   src/output/json_writer.cpp
   src/output/fb_json.cpp
   src/output/fb_writer.cpp
@@ -86,12 +87,14 @@ ovt_set_license(ovt_cli "GPL-3.0-or-later")
 
 if(OVT_BUILD_TESTS)
   ovt_find_package(Catch2 SPDX "BSL-1.0" TARGETS Catch2::Catch2WithMain)
-  add_executable(ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp
-                               tests/test_info.cpp tests/test_probe.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
+  add_executable(
+    ovt_tests_cli tests/test_globals.cpp tests/test_writers.cpp tests/test_cache_cmd.cpp tests/test_info.cpp
+                  tests/test_probe.cpp tests/test_syntax.cpp $<TARGET_OBJECTS:ovt_cli_completions>)
   target_link_libraries(ovt_tests_cli PRIVATE ovt_cli_lib ovt::flags ovt_schemas ovt_test_support
                                               ${nlohmann_json_TARGET} ${Catch2_TARGET})
-  target_compile_definitions(ovt_tests_cli
-                             PRIVATE "OVT_CLI_TEST_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/golden\"")
+  target_compile_definitions(
+    ovt_tests_cli PRIVATE "OVT_CLI_TEST_GOLDEN_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/tests/golden\""
+                          "OVT_CLI_TEST_SEEDS_DIR=\"${PROJECT_SOURCE_DIR}/core/tests/fuzz/corpus/index_builder\"")
   ovt_set_license(ovt_tests_cli "GPL-3.0-or-later")
   ovt_catch_discover_tests(ovt_tests_cli)
 
